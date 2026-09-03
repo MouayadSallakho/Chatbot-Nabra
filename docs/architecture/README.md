@@ -4,9 +4,13 @@ Decisions recorded here are binding until explicitly revisited. Each entry state
 the decision, why it was taken, and what it forbids.
 
 Phase 1 established the foundation. Phase 2 added the tenant core domain model.
-No persistence, AI or channel architecture has been designed yet.
+Phase 3 added the conversation and message core domain. No persistence, AI or
+channel-provider architecture has been designed yet.
 
-Tenant isolation has its own document: [multi-tenancy-isolation.md](multi-tenancy-isolation.md).
+Two areas have their own documents:
+
+- [multi-tenancy-isolation.md](multi-tenancy-isolation.md) - tenant isolation
+- [conversation-domain.md](conversation-domain.md) - conversation and message modelling
 
 ---
 
@@ -162,6 +166,21 @@ normal flow.
 — exceptions report the first failure only. That is a real limitation, and the
 point at which an explicit result type earns its cost.
 
+**Extended in Phase 3.** A second type, `DomainStateException`, covers an
+operation that is well-formed but not permitted by the current state of its
+aggregate - adding a message to a closed conversation. The two describe genuinely
+different failures: invalid input could never succeed as written, while an
+invalid transition is a well-formed request that would succeed once the aggregate
+is in another state. Collapsing them would lose that distinction and force every
+caller to re-derive it. The rule stays **one type per meaningful category of
+failure, never one per rule**; two categories are known, so there are two types.
+
+The Domain draws the distinction and stops there. It contains no status codes,
+no ASP.NET types and no transport vocabulary. **How each category is surfaced to
+a client - status codes, error contracts, retry advice - is a future
+Application/API concern**, and the two types exist so that layer has something
+unambiguous to map.
+
 ---
 
 ## 10. Identity and constrained strings are value objects, not primitives
@@ -182,3 +201,31 @@ an identity from outside the Domain can reject it explicitly.
 
 **Forbids.** Passing raw `Guid` tenant identity through domain or application
 signatures. Validating a name or slug at a call site instead of at construction.
+
+---
+
+## 11. Aggregates supply their own time; the Domain never reads the clock
+
+**Decision.** Every state-changing domain operation takes the effective instant
+as a `DateTimeOffset` parameter, normalised to UTC on the way in. No domain code
+calls `DateTime.UtcNow` or `DateTimeOffset.UtcNow`.
+
+**Why.** It makes domain behaviour deterministic and every test reproducible
+without a clock abstraction, a fake clock or an injected time provider - a
+framework avoided by pushing one parameter down instead. It also keeps the
+decision of *what time it is* at the edge, which is where it actually belongs:
+an ingested channel message carries its own timestamp, and the Domain should
+record that instant rather than the moment the process happened to handle it.
+
+**Forbids.** Reading the system clock anywhere in Domain. Storing local time.
+Introducing a time abstraction while a parameter suffices. **Requiring supplied
+instants to increase**, which would push a distributed-systems problem into the
+wrong layer.
+
+**Consequence.** Callers must supply the instant, and out-of-order arrival is
+accepted: a value earlier than an aggregate's last activity is recorded as given,
+never rewritten. Where an aggregate tracks a "last activity" instant, that is a
+high-water mark updated as `max(current, supplied)`, so it never regresses.
+Collection order is ingestion order and is not a claim about chronological order;
+callers needing chronological order sort by the timestamp themselves. See
+[conversation-domain.md](conversation-domain.md) C10-C11.
