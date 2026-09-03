@@ -3,8 +3,10 @@
 Decisions recorded here are binding until explicitly revisited. Each entry states
 the decision, why it was taken, and what it forbids.
 
-Phase 1 established the foundation only. No product architecture (tenancy,
-persistence, AI, channels) has been designed yet.
+Phase 1 established the foundation. Phase 2 added the tenant core domain model.
+No persistence, AI or channel architecture has been designed yet.
+
+Tenant isolation has its own document: [multi-tenancy-isolation.md](multi-tenancy-isolation.md).
 
 ---
 
@@ -74,6 +76,11 @@ single most expensive mistake this kind of platform can make.
 or persistence code is written, so that isolation is structural rather than a
 filter every query has to remember to apply.
 
+**Status.** Phase 2 implemented the tenant *domain model* — `Tenant`, `TenantId`,
+`TenantName`, `TenantSlug`, `TenantStatus`. Every isolation *mechanism* remains
+deferred. The full strategy, its fixed invariants and its open questions are in
+[multi-tenancy-isolation.md](multi-tenancy-isolation.md).
+
 ---
 
 ## 5. Warnings are build errors
@@ -130,3 +137,48 @@ project files reference packages without versions, and transitive pinning is on.
 **Why.** With eight projects and growing, version drift between projects is a
 real and silent source of runtime mismatch. Transitive pinning is also what makes
 it possible to remediate a vulnerable transitive dependency directly.
+
+---
+
+## 9. Domain rule violations raise one exception type
+
+**Decision.** `DomainValidationException` is raised for every domain invariant
+violation. BCL argument exceptions (`ArgumentNullException`) are kept for
+programming defects such as passing null where a value object is required.
+
+**Why.** An outer layer needs to tell "the caller supplied a value the business
+rejects" (a client error) from "the code has a bug" (a server error). One
+dedicated type makes that translation a single `catch` at the edge. A hierarchy
+of exception classes carrying no extra behaviour would add ceremony without
+adding information, and a hand-rolled `Result<T>` framework would be a
+substantial piece of infrastructure built for a domain that currently has one
+aggregate.
+
+**Forbids.** A third-party result library. A generic enterprise result framework.
+A new exception type per rule. Catching `DomainValidationException` to control
+normal flow.
+
+**Revisit when** a use case needs to report *several* validation failures at once
+— exceptions report the first failure only. That is a real limitation, and the
+point at which an explicit result type earns its cost.
+
+---
+
+## 10. Identity and constrained strings are value objects, not primitives
+
+**Decision.** `TenantId` wraps `Guid`; `TenantName` and `TenantSlug` wrap
+`string`. Validation happens once, at construction.
+
+**Why.** For `TenantId` this is a security property, not tidiness: tenant
+identity is the isolation boundary, and a bare `Guid` can be transposed with any
+other `Guid` without the compiler noticing. For the strings it removes the
+possibility of an unvalidated value existing at all — there is no path that
+produces a blank name or a malformed slug.
+
+**Consequence.** `TenantId` is a `readonly record struct`, so C# permits
+`default(TenantId)`, which holds `Guid.Empty`. No factory can produce it, but the
+hole cannot be closed in the language; `IsEmpty` exists so any boundary accepting
+an identity from outside the Domain can reject it explicitly.
+
+**Forbids.** Passing raw `Guid` tenant identity through domain or application
+signatures. Validating a name or slug at a call site instead of at construction.
