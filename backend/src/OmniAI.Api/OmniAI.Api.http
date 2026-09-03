@@ -1,0 +1,9 @@
+@OmniAI.Api_HostAddress = http://localhost:5027
+
+### Liveness probe
+GET {{OmniAI.Api_HostAddress}}/health
+Accept: application/json
+
+### OpenAPI document (Development environment only)
+GET {{OmniAI.Api_HostAddress}}/openapi/v1.json
+Accept: application/json

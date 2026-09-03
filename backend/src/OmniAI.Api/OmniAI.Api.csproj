@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <!--
+    Api is the composition root: hosting, HTTP surface and dependency wiring.
+    Business rules must not live here.
+  -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\OmniAI.Application\OmniAI.Application.csproj" />
+    <ProjectReference Include="..\OmniAI.Infrastructure\OmniAI.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>

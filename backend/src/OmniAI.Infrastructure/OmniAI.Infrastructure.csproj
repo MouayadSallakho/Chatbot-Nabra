@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Infrastructure implements Application-owned abstractions. It references
+    Domain only where a persisted/mapped domain type is legitimately required.
+  -->
+  <ItemGroup>
+    <ProjectReference Include="..\OmniAI.Application\OmniAI.Application.csproj" />
+    <ProjectReference Include="..\OmniAI.Domain\OmniAI.Domain.csproj" />
+  </ItemGroup>
+
+</Project>

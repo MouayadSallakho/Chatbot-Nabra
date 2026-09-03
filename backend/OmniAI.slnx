@@ -1,0 +1,14 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/OmniAI.Api/OmniAI.Api.csproj" />
+    <Project Path="src/OmniAI.Application/OmniAI.Application.csproj" />
+    <Project Path="src/OmniAI.Domain/OmniAI.Domain.csproj" />
+    <Project Path="src/OmniAI.Infrastructure/OmniAI.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/OmniAI.Api.IntegrationTests/OmniAI.Api.IntegrationTests.csproj" />
+    <Project Path="tests/OmniAI.Application.Tests/OmniAI.Application.Tests.csproj" />
+    <Project Path="tests/OmniAI.Domain.Tests/OmniAI.Domain.Tests.csproj" />
+    <Project Path="tests/OmniAI.Infrastructure.IntegrationTests/OmniAI.Infrastructure.IntegrationTests.csproj" />
+  </Folder>
+</Solution>

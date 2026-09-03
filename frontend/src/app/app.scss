@@ -1,0 +1,21 @@
+// Shell-only styling. Product styling arrives with the features that need it.
+
+.skip-link {
+  position: absolute;
+  left: -9999px;
+
+  &:focus-visible {
+    position: static;
+    display: inline-block;
+    padding: 0.5rem 1rem;
+  }
+}
+
+.app-header,
+.app-main {
+  padding: 1rem;
+}
+
+.app-main:focus-visible {
+  outline: none;
+}

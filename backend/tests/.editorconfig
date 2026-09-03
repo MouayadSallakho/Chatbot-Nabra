@@ -1,0 +1,8 @@
+# Test-project overrides. Scoped to backend/tests only; production rules under
+# backend/src remain fully enforced.
+
+[*.cs]
+# CA1707 (no underscores in member names) conflicts with the
+# Subject_scenario_expectation test-naming convention used across this solution.
+# Readable test intent is worth more here than identifier casing uniformity.
+dotnet_diagnostic.CA1707.severity = none
