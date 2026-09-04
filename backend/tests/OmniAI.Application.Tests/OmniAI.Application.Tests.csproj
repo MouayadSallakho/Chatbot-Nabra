@@ -13,6 +13,8 @@
 
   <ItemGroup>
     <Compile Include="..\Shared\AssemblyReferenceReader.cs" Link="AssemblyReferenceReader.cs" />
+    <!-- Deterministic clock for the use cases that supply an effective instant. -->
+    <Compile Include="..\Shared\FixedTimeProvider.cs" Link="FixedTimeProvider.cs" />
   </ItemGroup>
 
   <ItemGroup>

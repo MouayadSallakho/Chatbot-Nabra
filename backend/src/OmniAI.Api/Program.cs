@@ -1,3 +1,4 @@
+using OmniAI.Api.AiAgents;
 using OmniAI.Api.Composition;
 using OmniAI.Api.Tenants;
 
@@ -37,6 +38,16 @@ app.MapGet("/health", () => Results.Ok(new { status = "healthy" }))
 // missing controls, deliberately: a fake one would hide the gap rather than close
 // it.
 app.MapTenantEndpoints();
+
+// AI agent configuration, scoped to the tenant that owns each agent.
+//
+// NOT AUTHORISED FOR PRODUCTION EXPOSURE, for the same reason and with one
+// addition. The tenant id in the route is supplied by the caller and believed,
+// because there is no authenticated principal to check it against. Tenant
+// scoping is enforced all the way into the SQL, so no request can read or
+// change an agent through another tenant's route -- but until authentication
+// exists, nothing stops a caller from naming whichever tenant it likes.
+app.MapAiAgentEndpoints();
 
 // TLS is terminated by the reverse proxy in front of this process, so the
 // application deliberately does not perform its own HTTPS redirection.

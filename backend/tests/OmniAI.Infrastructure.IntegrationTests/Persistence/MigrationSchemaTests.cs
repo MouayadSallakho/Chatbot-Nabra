@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Migrations;
 using OmniAI.Infrastructure.Persistence;
 using OmniAI.Testing;
@@ -33,10 +34,65 @@ public sealed class MigrationSchemaTests(PostgresTestDatabase database)
         Assert.DoesNotContain("xmin xid", script, StringComparison.OrdinalIgnoreCase);
 
         // The token itself must still be in the model, or the concurrency tests
-        // would be passing for the wrong reason.
-        Assert.NotNull(
-            context.Model.FindEntityType(typeof(Domain.Conversations.Conversation))!
-                .FindProperty(PersistenceSchemaNames.Xmin));
+        // would be passing for the wrong reason. Checked for every aggregate that
+        // is mutable, so an entity added later without a token is noticed here
+        // rather than by a lost update in production.
+        Type[] concurrencyTracked =
+        [
+            typeof(Domain.Tenants.Tenant),
+            typeof(Domain.Conversations.Conversation),
+            typeof(Domain.AiAgents.AiAgent),
+        ];
+
+        foreach (Type aggregate in concurrencyTracked)
+        {
+            Assert.NotNull(
+                context.Model.FindEntityType(aggregate)!.FindProperty(PersistenceSchemaNames.Xmin));
+        }
+    }
+
+    [Fact]
+    public void The_ai_agent_concurrency_token_is_read_only_and_never_written()
+    {
+        // xmin is PostgreSQL's own column. EF must read it and put it in the
+        // UPDATE predicate, and must never try to set it -- attempting that would
+        // make every write fail.
+        using OmniAiDbContext context = database.CreateContext();
+
+        Microsoft.EntityFrameworkCore.Metadata.IProperty token =
+            context.Model.FindEntityType(typeof(Domain.AiAgents.AiAgent))!
+                .FindProperty(PersistenceSchemaNames.Xmin)!;
+
+        Assert.True(token.IsConcurrencyToken);
+        Assert.Equal(ValueGenerated.OnAddOrUpdate, token.ValueGenerated);
+    }
+
+    [Fact]
+    public async Task Both_migrations_are_applied_to_the_test_database()
+    {
+        // The Phase 4 migration is an accepted committed baseline and was not
+        // rewritten; Phase 7 added a second one beside it. Both must be present,
+        // in order, or these suites are testing a schema nobody will deploy.
+        using OmniAiDbContext context = database.CreateContext();
+
+        string[] applied = [.. await context.Database.GetAppliedMigrationsAsync()];
+
+        Assert.Equal(2, applied.Length);
+        Assert.EndsWith("InitialPersistence", applied[0], StringComparison.Ordinal);
+        Assert.EndsWith("AddAiAgents", applied[1], StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task The_ai_agents_table_has_no_user_column_named_xmin()
+    {
+        // The hand-edit guard, aimed at the table Phase 7 added. The scaffolder
+        // emitted the column again for ai_agents and it was removed again by hand,
+        // so this is what notices if a future regeneration puts it back.
+        object? columns = await database.ExecuteScalarAsync(
+            "SELECT count(*) FROM information_schema.columns " +
+            "WHERE table_schema = 'public' AND table_name = 'ai_agents' AND column_name = 'xmin'");
+
+        Assert.Equal(0L, columns as long?);
     }
 
     [Fact]

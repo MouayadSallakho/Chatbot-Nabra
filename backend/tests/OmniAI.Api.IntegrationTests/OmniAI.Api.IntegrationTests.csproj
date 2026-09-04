@@ -20,6 +20,12 @@
   -->
   <ItemGroup>
     <Compile Include="..\Shared\PostgresTestDatabase.cs" Link="PostgresTestDatabase.cs" />
+    <!--
+      Deterministic clock. Used by one dedicated fixture that substitutes it for
+      TimeProvider.System, so exact timestamps and the high-water-mark rule can be
+      proven over real HTTP. Every other API fixture runs the real clock.
+    -->
+    <Compile Include="..\Shared\FixedTimeProvider.cs" Link="FixedTimeProvider.cs" />
   </ItemGroup>
 
   <ItemGroup>

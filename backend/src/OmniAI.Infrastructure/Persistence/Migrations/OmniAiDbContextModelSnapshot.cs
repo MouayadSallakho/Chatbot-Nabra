@@ -24,6 +24,56 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
 
             modelBuilder.HasSequence("message_ingestion_sequence");
 
+            modelBuilder.Entity("OmniAI.Domain.AiAgents.AiAgent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Instructions")
+                        .IsRequired()
+                        .HasMaxLength(20000)
+                        .HasColumnType("character varying(20000)")
+                        .HasColumnName("instructions");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_ai_agents_tenant");
+
+                    b.ToTable("ai_agents", (string)null);
+                });
+
             modelBuilder.Entity("OmniAI.Domain.Conversations.Conversation", b =>
                 {
                     b.Property<Guid>("Id")
@@ -150,6 +200,16 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_tenants_slug");
 
                     b.ToTable("tenants", (string)null);
+                });
+
+            modelBuilder.Entity("OmniAI.Domain.AiAgents.AiAgent", b =>
+                {
+                    b.HasOne("OmniAI.Domain.Tenants.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_ai_agents_tenant");
                 });
 
             modelBuilder.Entity("OmniAI.Domain.Conversations.Conversation", b =>

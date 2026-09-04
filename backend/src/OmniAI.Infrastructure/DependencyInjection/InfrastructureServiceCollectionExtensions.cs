@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using OmniAI.Application.AiAgents.Persistence;
 using OmniAI.Application.Tenants.Persistence;
 using OmniAI.Infrastructure.Persistence;
 using OmniAI.Infrastructure.Persistence.Repositories;
@@ -12,11 +13,12 @@ namespace OmniAI.Infrastructure.DependencyInjection;
 /// <remarks>
 /// Registration lives beside the implementations, so the composition root does
 /// not need to know that persistence is EF Core, that the provider is Npgsql, or
-/// which concrete type satisfies <see cref="ITenantRepository"/>.
+/// which concrete types satisfy <see cref="ITenantRepository"/> and
+/// <see cref="IAiAgentRepository"/>.
 /// <para>
-/// Written by hand rather than by assembly scanning. Two registrations do not
-/// justify a convention-based scanner, and an explicit list is the one form of
-/// this code that cannot silently register -- or silently miss -- a type.
+/// Written by hand rather than by assembly scanning. A short explicit list
+/// does not justify a convention-based scanner, and it is the one form of this
+/// code that cannot silently register -- or silently miss -- a type.
 /// </para>
 /// </remarks>
 public static class InfrastructureServiceCollectionExtensions
@@ -59,6 +61,7 @@ public static class InfrastructureServiceCollectionExtensions
         });
 
         services.AddScoped<ITenantRepository, TenantRepository>();
+        services.AddScoped<IAiAgentRepository, AiAgentRepository>();
 
         return services;
     }

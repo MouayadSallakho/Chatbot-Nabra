@@ -14,6 +14,8 @@
   <ItemGroup>
     <Compile Include="..\Shared\AssemblyReferenceReader.cs" Link="AssemblyReferenceReader.cs" />
     <Compile Include="..\Shared\PostgresTestDatabase.cs" Link="PostgresTestDatabase.cs" />
+    <!-- Deterministic clock, for the storage-precision clock wrapper tests. -->
+    <Compile Include="..\Shared\FixedTimeProvider.cs" Link="FixedTimeProvider.cs" />
   </ItemGroup>
 
   <ItemGroup>

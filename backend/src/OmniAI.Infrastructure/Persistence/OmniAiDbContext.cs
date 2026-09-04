@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
+using OmniAI.Domain.AiAgents;
 using OmniAI.Domain.Conversations;
 using OmniAI.Domain.Tenants;
 
@@ -25,6 +26,8 @@ public sealed class OmniAiDbContext(DbContextOptions<OmniAiDbContext> options)
     public DbSet<Tenant> Tenants => Set<Tenant>();
 
     public DbSet<Conversation> Conversations => Set<Conversation>();
+
+    public DbSet<AiAgent> AiAgents => Set<AiAgent>();
 
     public override int SaveChanges()
     {

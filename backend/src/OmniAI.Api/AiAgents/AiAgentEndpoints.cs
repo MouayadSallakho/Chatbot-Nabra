@@ -1,0 +1,333 @@
+using OmniAI.Application.AiAgents;
+using OmniAI.Application.AiAgents.ActivateAiAgent;
+using OmniAI.Application.AiAgents.CreateAiAgent;
+using OmniAI.Application.AiAgents.DisableAiAgent;
+using OmniAI.Application.AiAgents.GetAiAgentById;
+using OmniAI.Application.AiAgents.RenameAiAgent;
+using OmniAI.Application.AiAgents.UpdateAiAgentInstructions;
+using OmniAI.Application.Concurrency;
+
+namespace OmniAI.Api.AiAgents;
+
+/// <summary>
+/// The AI agent HTTP surface, nested under the tenant that owns it.
+/// </summary>
+/// <remarks>
+/// Minimal API endpoint mapping, matching the style the tenant endpoints use. No
+/// controller is introduced: mixing two API styles in one application means two
+/// places to look for routing, filters and model binding.
+/// <para>
+/// Each endpoint does much the same four things -- read the precondition,
+/// translate the request, call one handler, translate the outcome. There is no
+/// business logic here, no database call, and no error mapping: expected failures
+/// are translated centrally by
+/// <see cref="ErrorHandling.DomainProblemDetailsHandler"/>, so the mapping exists
+/// once rather than once per endpoint. That is what keeps six endpoints from
+/// becoming a fat class.
+/// </para>
+/// <para>
+/// <strong>Every route carries the owning tenant, and it is not decoration.</strong>
+/// The tenant reaches the repository and lands in the SQL WHERE clause, so an
+/// agent belonging to another tenant is never read. A caller who knows a valid
+/// agent id -- or a valid entity tag for it -- still cannot reach it through a
+/// route naming a different tenant: the answer is the same not-found they would
+/// get for an id that does not exist anywhere, and no response distinguishes the
+/// two.
+/// </para>
+/// <para>
+/// <strong>Every mutation is conditional.</strong> The four mutating endpoints
+/// require <c>If-Match</c>, and refuse to act without it. See
+/// <see cref="EntityTags"/> for the exact contract and
+/// <c>docs/architecture/ai-agent-vertical-slice.md</c> for why client-think-time
+/// concurrency needs it even though the database already has a concurrency
+/// token.
+/// </para>
+/// <para>
+/// <strong>These endpoints are unauthenticated.</strong> Authentication and
+/// authorisation are not implemented yet, so the tenant in the route is supplied
+/// by the caller and believed. Route scoping is a correctness boundary, not yet a
+/// security boundary -- it stops one tenant's data being reached through another
+/// tenant's route, but nothing yet stops a caller from claiming to be either
+/// tenant. These are development-stage endpoints and are not authorised for
+/// public production exposure until the authentication phase binds an
+/// authenticated principal to the tenant ids it may use. No placeholder API key,
+/// bearer token or admin secret is present, because a fake control would only
+/// hide that fact.
+/// </para>
+/// </remarks>
+internal static class AiAgentEndpoints
+{
+    /// <summary>Route name for the single-agent read endpoint.</summary>
+    /// <remarks>
+    /// Used to generate the <c>Location</c> header of a successful creation, so
+    /// the header and the route cannot drift apart the way a hand-built path
+    /// string would.
+    /// </remarks>
+    private const string GetAiAgentByIdRouteName = "GetAiAgentById";
+
+    public static IEndpointRouteBuilder MapAiAgentEndpoints(this IEndpointRouteBuilder endpoints)
+    {
+        ArgumentNullException.ThrowIfNull(endpoints);
+
+        RouteGroupBuilder agents = endpoints
+            .MapGroup("/api/tenants/{tenantId:guid}/ai-agents")
+            .WithTags("AI agents");
+
+        agents.MapPost("/", CreateAsync)
+            .WithName("CreateAiAgent");
+
+        agents.MapGet("/{aiAgentId:guid}", GetByIdAsync)
+            .WithName(GetAiAgentByIdRouteName);
+
+        // PUT on a named sub-resource, not PATCH on the agent. Each of these
+        // replaces one addressable thing whose whole value is in the body, which
+        // is what PUT means; a PATCH would need the partial-update semantics this
+        // contract deliberately does not define.
+        agents.MapPut("/{aiAgentId:guid}/name", RenameAsync)
+            .WithName("RenameAiAgent");
+
+        agents.MapPut("/{aiAgentId:guid}/instructions", UpdateInstructionsAsync)
+            .WithName("UpdateAiAgentInstructions");
+
+        // POST, not PUT: activation and disabling are operations rather than
+        // representations. There is nothing to send and nothing at these paths to
+        // read back, so modelling them as a state resource would invent a
+        // document that does not exist.
+        agents.MapPost("/{aiAgentId:guid}/activate", ActivateAsync)
+            .WithName("ActivateAiAgent");
+
+        agents.MapPost("/{aiAgentId:guid}/disable", DisableAsync)
+            .WithName("DisableAiAgent");
+
+        return endpoints;
+    }
+
+    /// <summary>
+    /// <c>POST /api/tenants/{tenantId}/ai-agents</c>. Returns <c>201 Created</c>
+    /// with a <c>Location</c> header pointing at the read endpoint and an
+    /// <c>ETag</c> for the version just stored.
+    /// </summary>
+    /// <remarks>
+    /// No <c>If-Match</c>: there is no previous version of a resource that does
+    /// not exist yet, so there is nothing to be out of date about. The <c>ETag</c>
+    /// it returns is what lets a client immediately make a conditional write
+    /// without reading the agent back.
+    /// <para>
+    /// A rejected name or instruction text surfaces as <c>400</c>, and an unknown
+    /// tenant as <c>404</c>. Neither is caught here.
+    /// </para>
+    /// </remarks>
+    private static async Task<IResult> CreateAsync(
+        HttpContext http,
+        Guid tenantId,
+        CreateAiAgentRequest request,
+        CreateAiAgentHandler handler,
+        CancellationToken cancellationToken)
+    {
+        VersionedAiAgentView created = await handler
+            .HandleAsync(
+                new CreateAiAgentCommand(tenantId, request.Name, request.Instructions),
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        SetETag(http, created.Version);
+
+        return Results.CreatedAtRoute(
+            GetAiAgentByIdRouteName,
+            new { tenantId = created.View.TenantId, aiAgentId = created.View.Id },
+            AiAgentResponse.From(created.View));
+    }
+
+    /// <summary>
+    /// <c>GET /api/tenants/{tenantId}/ai-agents/{aiAgentId}</c>. Returns
+    /// <c>200</c> with an <c>ETag</c>, or <c>404</c> as Problem Details.
+    /// </summary>
+    /// <remarks>
+    /// No <c>If-Match</c>, and no <c>If-None-Match</c> either: reads change
+    /// nothing, and conditional caching is not in scope. The <c>ETag</c> is here
+    /// because it is what a client must send back to change the agent safely.
+    /// </remarks>
+    private static async Task<IResult> GetByIdAsync(
+        HttpContext http,
+        Guid tenantId,
+        Guid aiAgentId,
+        GetAiAgentByIdHandler handler,
+        CancellationToken cancellationToken)
+    {
+        VersionedAiAgentView? agent = await handler
+            .HandleAsync(new GetAiAgentByIdQuery(tenantId, aiAgentId), cancellationToken)
+            .ConfigureAwait(false);
+
+        return Respond(http, agent, aiAgentId);
+    }
+
+    /// <summary>
+    /// <c>PUT /api/tenants/{tenantId}/ai-agents/{aiAgentId}/name</c>. Requires
+    /// <c>If-Match</c>. Returns <c>200</c> with the updated agent and its new
+    /// <c>ETag</c>.
+    /// </summary>
+    private static async Task<IResult> RenameAsync(
+        HttpContext http,
+        Guid tenantId,
+        Guid aiAgentId,
+        RenameAiAgentRequest request,
+        RenameAiAgentHandler handler,
+        CancellationToken cancellationToken)
+    {
+        if (EntityTags.ReadIfMatch(http.Request, out ConcurrencyToken expected) is IResult failure)
+        {
+            return failure;
+        }
+
+        VersionedAiAgentView? renamed = await handler
+            .HandleAsync(
+                new RenameAiAgentCommand(tenantId, aiAgentId, request.Name, expected),
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        return Respond(http, renamed, aiAgentId);
+    }
+
+    /// <summary>
+    /// <c>PUT /api/tenants/{tenantId}/ai-agents/{aiAgentId}/instructions</c>.
+    /// Requires <c>If-Match</c>. Returns <c>200</c> with the updated agent.
+    /// </summary>
+    private static async Task<IResult> UpdateInstructionsAsync(
+        HttpContext http,
+        Guid tenantId,
+        Guid aiAgentId,
+        UpdateAiAgentInstructionsRequest request,
+        UpdateAiAgentInstructionsHandler handler,
+        CancellationToken cancellationToken)
+    {
+        if (EntityTags.ReadIfMatch(http.Request, out ConcurrencyToken expected) is IResult failure)
+        {
+            return failure;
+        }
+
+        VersionedAiAgentView? updated = await handler
+            .HandleAsync(
+                new UpdateAiAgentInstructionsCommand(tenantId, aiAgentId, request.Instructions, expected),
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        return Respond(http, updated, aiAgentId);
+    }
+
+    /// <summary>
+    /// <c>POST /api/tenants/{tenantId}/ai-agents/{aiAgentId}/activate</c>.
+    /// Requires <c>If-Match</c>. Returns <c>200</c> with the updated agent.
+    /// </summary>
+    private static async Task<IResult> ActivateAsync(
+        HttpContext http,
+        Guid tenantId,
+        Guid aiAgentId,
+        ActivateAiAgentHandler handler,
+        CancellationToken cancellationToken)
+    {
+        if (EntityTags.ReadIfMatch(http.Request, out ConcurrencyToken expected) is IResult failure)
+        {
+            return failure;
+        }
+
+        VersionedAiAgentView? activated = await handler
+            .HandleAsync(new ActivateAiAgentCommand(tenantId, aiAgentId, expected), cancellationToken)
+            .ConfigureAwait(false);
+
+        return Respond(http, activated, aiAgentId);
+    }
+
+    /// <summary>
+    /// <c>POST /api/tenants/{tenantId}/ai-agents/{aiAgentId}/disable</c>.
+    /// Requires <c>If-Match</c>. Returns <c>200</c> with the updated agent, or
+    /// <c>409</c> when the agent is still a draft.
+    /// </summary>
+    private static async Task<IResult> DisableAsync(
+        HttpContext http,
+        Guid tenantId,
+        Guid aiAgentId,
+        DisableAiAgentHandler handler,
+        CancellationToken cancellationToken)
+    {
+        if (EntityTags.ReadIfMatch(http.Request, out ConcurrencyToken expected) is IResult failure)
+        {
+            return failure;
+        }
+
+        VersionedAiAgentView? disabled = await handler
+            .HandleAsync(new DisableAiAgentCommand(tenantId, aiAgentId, expected), cancellationToken)
+            .ConfigureAwait(false);
+
+        return Respond(http, disabled, aiAgentId);
+    }
+
+    /// <summary>
+    /// The response shared by the read and all four mutations: the agent with its
+    /// <c>ETag</c>, or not-found.
+    /// </summary>
+    /// <remarks>
+    /// One contract for every mutation, chosen over <c>204 No Content</c>. Each of
+    /// these operations changes <c>updatedAt</c> and the version, and two change
+    /// <c>status</c>, so a client that needs the result of its own request would
+    /// otherwise have to issue a second <c>GET</c> to learn what happened -- and
+    /// would meanwhile be showing state it inferred rather than state the server
+    /// confirmed. It also matters for the next write: the response carries the new
+    /// <c>ETag</c>, so a client can make consecutive edits without re-reading.
+    /// <para>
+    /// It is what makes an idempotent call informative too: activating an already
+    /// active agent answers <c>200</c> with an unchanged <c>updatedAt</c> and an
+    /// unchanged <c>ETag</c>, which is the truthful account of a request that
+    /// changed nothing.
+    /// </para>
+    /// </remarks>
+    private static IResult Respond(HttpContext http, VersionedAiAgentView? agent, Guid aiAgentId)
+    {
+        if (agent is null)
+        {
+            return AgentNotFound(aiAgentId);
+        }
+
+        SetETag(http, agent.Version);
+
+        return Results.Ok(AiAgentResponse.From(agent.View));
+    }
+
+    /// <summary>
+    /// Publishes the resource version as a strong entity tag.
+    /// </summary>
+    /// <remarks>
+    /// A header, never the body. The JSON representation stays the accepted seven
+    /// fields with no version, row version, transaction id or other persistence
+    /// metadata in it -- which is also why the version is carried beside the view
+    /// through the Application rather than inside it.
+    /// </remarks>
+    private static void SetETag(HttpContext http, ConcurrencyToken version) =>
+        http.Response.Headers.ETag = EntityTags.Format(version);
+
+    /// <summary>
+    /// The single not-found response for every agent operation.
+    /// </summary>
+    /// <remarks>
+    /// Identical whether the agent does not exist at all or exists under another
+    /// tenant, and it says nothing about which. The wording is chosen with that in
+    /// mind: it reports what this tenant has and makes no claim about the wider
+    /// system, so it stays accurate without ever confirming that an id is real
+    /// somewhere else.
+    /// <para>
+    /// It is also what a cross-tenant request carrying the target's genuine
+    /// entity tag receives. The lookup is tenant-scoped and runs before any
+    /// version is compared, so a valid tag never becomes an alternative route to
+    /// somebody else's agent -- and never produces a <c>412</c> that would confirm
+    /// the agent exists.
+    /// </para>
+    /// <para>
+    /// <c>Results.Problem</c>, not <c>Results.NotFound</c>: the API answers every
+    /// error in one contract, and an empty 404 body would be the exception.
+    /// </para>
+    /// </remarks>
+    private static IResult AgentNotFound(Guid aiAgentId) =>
+        Results.Problem(
+            title: "AI agent not found",
+            detail: $"This tenant has no AI agent with id '{aiAgentId}'.",
+            statusCode: StatusCodes.Status404NotFound);
+}
