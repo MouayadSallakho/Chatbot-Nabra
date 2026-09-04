@@ -3,6 +3,7 @@ using OmniAI.Application.AiAgents.ActivateAiAgent;
 using OmniAI.Application.AiAgents.CreateAiAgent;
 using OmniAI.Application.AiAgents.DisableAiAgent;
 using OmniAI.Application.AiAgents.GetAiAgentById;
+using OmniAI.Application.AiAgents.PreviewAiAgent;
 using OmniAI.Application.AiAgents.RenameAiAgent;
 using OmniAI.Application.AiAgents.UpdateAiAgentInstructions;
 using OmniAI.Application.Tenants.CreateTenant;
@@ -22,7 +23,7 @@ namespace OmniAI.Api.Composition;
 /// Every registration is explicit. No assembly scanning, no reflection-based
 /// handler discovery and no mediator: a scanner would replace a readable list
 /// with a convention that has to be learned, and would happily register or miss
-/// a type without anyone noticing. Eight handlers is still a list worth reading.
+/// a type without anyone noticing. Nine handlers is still a list worth reading.
 /// </para>
 /// </remarks>
 internal static class CompositionRoot
@@ -63,6 +64,14 @@ internal static class CompositionRoot
         // the very next read returns. See MicrosecondTimeProvider.
         services.AddSingleton<TimeProvider>(new MicrosecondTimeProvider(TimeProvider.System));
 
+        // The AI runtime. No provider is configured on this platform yet, so what
+        // this registers is an implementation that refuses every generation
+        // request explicitly -- which is why the application still starts, and why
+        // the one endpoint that needs a provider says so plainly instead of
+        // returning something invented. Infrastructure owns that choice; nothing
+        // here names a vendor, and no API key is read.
+        services.AddOmniAiRuntime();
+
         // Application use cases. Registered as their concrete types, because
         // nothing substitutes them at runtime -- an interface per handler would be
         // ceremony with one implementation each. Scoped, so a handler shares the
@@ -75,6 +84,7 @@ internal static class CompositionRoot
         services.AddScoped<UpdateAiAgentInstructionsHandler>();
         services.AddScoped<ActivateAiAgentHandler>();
         services.AddScoped<DisableAiAgentHandler>();
+        services.AddScoped<PreviewAiAgentHandler>();
 
         // Turns expected Domain and Application failures into Problem Details.
         // Registered before any future handler so its specific cases are

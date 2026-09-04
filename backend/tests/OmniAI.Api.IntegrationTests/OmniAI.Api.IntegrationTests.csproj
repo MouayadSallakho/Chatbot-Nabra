@@ -26,6 +26,12 @@
       proven over real HTTP. Every other API fixture runs the real clock.
     -->
     <Compile Include="..\Shared\FixedTimeProvider.cs" Link="FixedTimeProvider.cs" />
+    <!--
+      Deterministic AI text generator. Installed by one dedicated fixture in place
+      of the unconfigured production implementation, so the preview slice can be
+      proven end to end without a provider, an API key or a network call.
+    -->
+    <Compile Include="..\Shared\RecordingAiTextGenerator.cs" Link="RecordingAiTextGenerator.cs" />
   </ItemGroup>
 
   <ItemGroup>

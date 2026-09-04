@@ -9,10 +9,13 @@ persistence for those aggregates. Phase 5 added the first vertical slice --
 tenant onboarding -- through API, Application, Domain and Infrastructure. Phase 6
 added the AI agent core domain, provider-independent and Domain-only. Phase 7
 made that domain persistable and usable through tenant-scoped Application use
-cases and HTTP endpoints. No AI provider integration or channel-provider
-architecture has been designed yet, and there is still no authentication.
+cases and HTTP endpoints. Phase 8 added the first AI-oriented flow: a
+provider-independent text-generation contract and a stateless agent preview. No
+AI provider is implemented yet -- a deployment with none configured refuses
+generation explicitly -- no channel-provider architecture has been designed, and
+there is still no authentication.
 
-Six areas have their own documents:
+Seven areas have their own documents:
 
 - [multi-tenancy-isolation.md](multi-tenancy-isolation.md) - tenant isolation
 - [conversation-domain.md](conversation-domain.md) - conversation and message modelling
@@ -20,6 +23,7 @@ Six areas have their own documents:
 - [tenant-onboarding-vertical-slice.md](tenant-onboarding-vertical-slice.md) - the first API-to-database slice
 - [ai-agent-domain.md](ai-agent-domain.md) - the AI agent core domain
 - [ai-agent-vertical-slice.md](ai-agent-vertical-slice.md) - AI agent persistence, use cases and endpoints
+- [ai-runtime.md](ai-runtime.md) - the provider-independent AI text-generation contract and agent preview
 
 ---
 

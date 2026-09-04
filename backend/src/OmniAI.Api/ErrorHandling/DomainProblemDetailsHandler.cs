@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
+using OmniAI.Application.Ai;
 using OmniAI.Application.AiAgents;
 using OmniAI.Application.Tenants;
 using OmniAI.Domain;
@@ -54,7 +55,7 @@ internal sealed partial class DomainProblemDetailsHandler(
 
         (int status, string title, string detail) = mapped.Value;
 
-        LogRejected(logger, status, detail);
+        LogOutcome(logger, status, detail);
 
         httpContext.Response.StatusCode = status;
 
@@ -72,15 +73,36 @@ internal sealed partial class DomainProblemDetailsHandler(
     }
 
     /// <summary>
+    /// Records an expected outcome at the level its status deserves.
+    /// </summary>
+    /// <remarks>
+    /// A caller's mistake and a provider outage are both handled here, and they
+    /// are emphatically not the same event to an operator, so the status decides
+    /// the level rather than one level covering both.
+    /// </remarks>
+    private static void LogOutcome(ILogger logger, int statusCode, string reason)
+    {
+        if (statusCode >= StatusCodes.Status500InternalServerError)
+        {
+            LogUpstreamFailure(logger, statusCode, reason);
+        }
+        else
+        {
+            LogRejected(logger, statusCode, reason);
+        }
+    }
+
+    /// <summary>
     /// Records an expected rejection.
     /// </summary>
     /// <remarks>
-    /// Information, not Error: a rejected name, a taken slug, a draft that cannot
-    /// be disabled and a write that lost a race are all the API working
-    /// correctly. Logging them at error level would fill an alert channel with
-    /// other people's typing mistakes and lost races and bury real faults. The
-    /// message text is the exception's own explanation of a business rule and
-    /// carries no connection string, credential or database detail.
+    /// Information, not Error: a rejected name, a taken slug, a message that
+    /// breaks a platform limit, a draft that cannot be disabled and a write that
+    /// lost a race are all the API working correctly. Logging them at error level
+    /// would fill an alert channel with other people's typing mistakes and lost
+    /// races and bury real faults. The message text is the exception's own
+    /// explanation of a business rule and carries no connection string,
+    /// credential or database detail.
     /// <para>
     /// Source-generated rather than a <c>LogInformation</c> call, so the message
     /// template is compiled, nothing is boxed into a <c>params</c> array, and the
@@ -92,6 +114,30 @@ internal sealed partial class DomainProblemDetailsHandler(
         Level = LogLevel.Information,
         Message = "Request rejected with {StatusCode}: {Reason}")]
     private static partial void LogRejected(ILogger logger, int statusCode, string reason);
+
+    /// <summary>
+    /// Records a capability this deployment could not deliver.
+    /// </summary>
+    /// <remarks>
+    /// Warning, because an unconfigured AI runtime and an upstream that answers
+    /// with nothing usable are both things an operator has to act on, and neither
+    /// is a caller's fault -- logging them at the same level as somebody's typing
+    /// mistake would mean a provider outage left no more trace than a rejected
+    /// name. Not Error, because both are states this code recognises and reports
+    /// deliberately rather than faults it failed to anticipate; the unhandled path
+    /// still logs at error level.
+    /// <para>
+    /// The reason recorded is the exception's own fixed sentence. It carries no
+    /// preview message, no agent instructions, no provider name and no upstream
+    /// response, so turning this level up cannot start writing customers' text or
+    /// a tenant's configuration into the log.
+    /// </para>
+    /// </remarks>
+    [LoggerMessage(
+        EventId = 1001,
+        Level = LogLevel.Warning,
+        Message = "Request could not be served with {StatusCode}: {Reason}")]
+    private static partial void LogUpstreamFailure(ILogger logger, int statusCode, string reason);
 
     /// <summary>
     /// The status code for an exception, or <see langword="null"/> if it is not
@@ -161,6 +207,55 @@ internal sealed partial class DomainProblemDetailsHandler(
             StatusCodes.Status412PreconditionFailed,
             "Precondition failed",
             stale.Message),
+
+        // Text a caller offered as a message that this platform will not process:
+        // blank, past the length bound, or carrying control characters. 400 for
+        // the same reason a rejected name is -- the caller can see what it sent,
+        // change it and try again.
+        //
+        // Not a Domain failure, and it is worth being precise about why: no
+        // aggregate was consulted. This is a limit the platform places on a
+        // request it will accept, so the Application raises its own type and the
+        // Domain is never asked a question about a message it does not model.
+        AiTurnValidationException message => (
+            StatusCodes.Status400BadRequest,
+            "Invalid request details",
+            message.Message),
+
+        // No AI provider is configured on this deployment. 503, because the
+        // request is perfectly good and the capability is simply not there --
+        // the same request will succeed once a provider is configured, without
+        // the caller changing anything.
+        //
+        // Not 500: nothing failed unexpectedly, and calling a known,
+        // deliberate configuration state a server fault would send an operator
+        // hunting for a bug in code that is behaving exactly as intended. Not
+        // 501 either, which would claim the platform does not implement preview
+        // at all rather than that this deployment cannot currently serve it.
+        //
+        // Deliberately no Retry-After. The platform has no idea when a provider
+        // will be configured -- that is a deployment decision, not a queue that
+        // drains -- and inventing a number would invite clients to poll on a
+        // schedule with nothing behind it.
+        AiRuntimeUnavailableException unavailable => (
+            StatusCodes.Status503ServiceUnavailable,
+            "AI generation unavailable",
+            unavailable.Message),
+
+        // Something answered, and what came back was not a usable reply. 502,
+        // which is exactly what it describes: this server acted as a gateway to
+        // an upstream service and received an invalid response from it. The
+        // caller did nothing wrong and cannot fix it, so a 4xx would misdirect
+        // them entirely.
+        //
+        // The detail is the exception's fixed sentence, and the exception carries
+        // no provider name, status line, response body or request id -- so an
+        // upstream failure cannot become a way to learn which vendor this
+        // platform uses or how it is failing.
+        AiResponseInvalidException invalid => (
+            StatusCodes.Status502BadGateway,
+            "AI generation failed",
+            invalid.Message),
 
         // A request the transport layer could not even read -- a body that is not
         // valid JSON of the expected shape, for instance. This is not a Domain

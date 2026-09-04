@@ -65,6 +65,18 @@ public class AiAgentApiFixture : IAsyncLifetime
         await _database.DisposeAsync();
     }
 
+    /// <summary>
+    /// The hosted application's service provider.
+    /// </summary>
+    /// <remarks>
+    /// For the few assertions that are about the composition root itself rather
+    /// than about a request -- notably that the AI text generator a real
+    /// deployment resolves is the one that refuses, not a test double.
+    /// </remarks>
+    public IServiceProvider Services =>
+        (_application ?? throw new InvalidOperationException("The fixture was not initialised."))
+            .Services;
+
     /// <summary>A client for the hosted API.</summary>
     public HttpClient CreateClient() =>
         (_application ?? throw new InvalidOperationException("The fixture was not initialised."))

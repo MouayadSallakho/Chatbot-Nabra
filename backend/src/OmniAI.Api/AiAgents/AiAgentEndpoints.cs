@@ -3,6 +3,7 @@ using OmniAI.Application.AiAgents.ActivateAiAgent;
 using OmniAI.Application.AiAgents.CreateAiAgent;
 using OmniAI.Application.AiAgents.DisableAiAgent;
 using OmniAI.Application.AiAgents.GetAiAgentById;
+using OmniAI.Application.AiAgents.PreviewAiAgent;
 using OmniAI.Application.AiAgents.RenameAiAgent;
 using OmniAI.Application.AiAgents.UpdateAiAgentInstructions;
 using OmniAI.Application.Concurrency;
@@ -98,6 +99,14 @@ internal static class AiAgentEndpoints
 
         agents.MapPost("/{aiAgentId:guid}/disable", DisableAsync)
             .WithName("DisableAiAgent");
+
+        // POST rather than GET, even though preview changes nothing on this
+        // server. The request carries a body, and the body is the message -- a GET
+        // would have to put somebody's text in the URL, where it lands in access
+        // logs, proxy logs and browser history. Nor is it cacheable: the same
+        // message may legitimately produce a different answer each time.
+        agents.MapPost("/{aiAgentId:guid}/preview", PreviewAsync)
+            .WithName("PreviewAiAgent");
 
         return endpoints;
     }
@@ -259,6 +268,55 @@ internal static class AiAgentEndpoints
             .ConfigureAwait(false);
 
         return Respond(http, disabled, aiAgentId);
+    }
+
+    /// <summary>
+    /// <c>POST /api/tenants/{tenantId}/ai-agents/{aiAgentId}/preview</c>. Returns
+    /// <c>200</c> with the generated reply, or <c>404</c> as Problem Details.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <strong>No <c>If-Match</c>, and no <c>ETag</c> in the response.</strong>
+    /// Preview reads the agent and changes nothing: no property is written,
+    /// <c>updatedAt</c> does not move and the agent's version does not change.
+    /// A precondition protects a caller from overwriting somebody else's edit, and
+    /// there is no write here to protect. Requiring one would be ceremony that
+    /// taught clients the wrong thing about what this endpoint does.
+    /// </para>
+    /// <para>
+    /// <strong>Works for every lifecycle state.</strong> Draft, active and
+    /// disabled agents all preview, because previewing is how somebody decides
+    /// whether an agent is ready to activate, and how they check one they have
+    /// taken out of service for repair. Status governs whether an agent serves
+    /// customers, not whether its owner may test it.
+    /// </para>
+    /// <para>
+    /// Failures are translated centrally: an unusable message becomes
+    /// <c>400</c>, an unconfigured AI runtime <c>503</c>, and an unusable provider
+    /// answer <c>502</c>. None of them is caught here -- see
+    /// <see cref="ErrorHandling.DomainProblemDetailsHandler"/>.
+    /// </para>
+    /// </remarks>
+    private static async Task<IResult> PreviewAsync(
+        Guid tenantId,
+        Guid aiAgentId,
+        AiAgentPreviewRequest request,
+        PreviewAiAgentHandler handler,
+        CancellationToken cancellationToken)
+    {
+        AiAgentPreview? preview = await handler
+            .HandleAsync(
+                new PreviewAiAgentCommand(tenantId, aiAgentId, request.Message),
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        // The same not-found body every other agent operation returns, including
+        // for an agent that exists under a different tenant. The generator was
+        // never reached in that case, so nothing was sent anywhere before the
+        // request was refused.
+        return preview is null
+            ? AgentNotFound(aiAgentId)
+            : Results.Ok(AiAgentPreviewResponse.From(preview));
     }
 
     /// <summary>
