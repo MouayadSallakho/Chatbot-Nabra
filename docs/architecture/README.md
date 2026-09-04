@@ -4,13 +4,15 @@ Decisions recorded here are binding until explicitly revisited. Each entry state
 the decision, why it was taken, and what it forbids.
 
 Phase 1 established the foundation. Phase 2 added the tenant core domain model.
-Phase 3 added the conversation and message core domain. No persistence, AI or
-channel-provider architecture has been designed yet.
+Phase 3 added the conversation and message core domain. Phase 4 added PostgreSQL
+persistence for those aggregates. No AI or channel-provider architecture has been
+designed yet.
 
-Two areas have their own documents:
+Three areas have their own documents:
 
 - [multi-tenancy-isolation.md](multi-tenancy-isolation.md) - tenant isolation
 - [conversation-domain.md](conversation-domain.md) - conversation and message modelling
+- [persistence-postgresql.md](persistence-postgresql.md) - PostgreSQL and EF Core persistence
 
 ---
 
@@ -81,8 +83,12 @@ or persistence code is written, so that isolation is structural rather than a
 filter every query has to remember to apply.
 
 **Status.** Phase 2 implemented the tenant *domain model* — `Tenant`, `TenantId`,
-`TenantName`, `TenantSlug`, `TenantStatus`. Every isolation *mechanism* remains
-deferred. The full strategy, its fixed invariants and its open questions are in
+`TenantName`, `TenantSlug`, `TenantStatus`. Phase 4 added the first relational
+safeguards: a non-null `tenant_id` foreign key on conversations, and a unique
+index on the slug. Request tenant context, query scoping and row level security
+are **still not implemented**, so an unscoped tenant-owned query is currently
+incorrect rather than impossible. The full strategy, its fixed invariants and its
+open questions are in
 [multi-tenancy-isolation.md](multi-tenancy-isolation.md).
 
 ---

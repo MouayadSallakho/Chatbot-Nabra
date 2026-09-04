@@ -1,7 +1,11 @@
 # Multi-tenancy and tenant isolation
 
-**Status:** design; partially decided. Phase 2 introduced the tenant domain model
-only. No isolation *mechanism* is implemented yet.
+**Status:** design; partially decided. Phase 2 introduced the tenant domain
+model. Phase 4 added the first relational safeguards -- a tenant foreign key on
+conversations and a unique slug index. The mechanisms that would satisfy the
+non-negotiable invariant below -- request tenant context, query scoping and
+row level security -- are **still absent**. See
+[What Phase 4 settled, and what it did not](#what-phase-4-settled-and-what-it-did-not).
 
 One deployment serves many independent businesses. A tenant is a business account
 on the platform, and tenant-owned data will eventually include AI agents, channel
@@ -126,6 +130,48 @@ Open, and deliberately not settled before the persistence phase:
 | M4 | Where tenant resolution happens for HTTP (subdomain from the slug, path segment, or token claim) | Belongs with authentication; the slug grammar was chosen to keep the subdomain option open (see `TenantSlug`). |
 | M5 | Save-time cross-tenant write interception | The mechanism depends on M1 and M3; the *requirement* (invariant 2) is already fixed. |
 | M6 | Whether a suspended tenant is blocked at authentication, at authorisation, or per-operation | Needs the real rules for what a suspended tenant may still do — read-only access, billing pages, data export. |
+
+## What Phase 4 settled, and what it did not
+
+Phase 4 introduced PostgreSQL persistence for `Tenant`, `Conversation` and
+`Message`. Its effect on the questions above:
+
+**Now decided:**
+
+- **M1 is partly answered.** The isolation model is **shared schema with an
+  explicit discriminator**: `conversations.tenant_id` is a non-null column with a
+  foreign key to `tenants.id`, satisfying D4 for the aggregates that exist.
+  Schema-per-tenant and database-per-tenant are no longer under consideration for
+  these tables. What remains open is whether any future high-volume table needs
+  physical separation or partitioning.
+- **D3 is now enforced.** Slug uniqueness is a unique index,
+  `ix_tenants_slug`, proven by an integration test that expects the database to
+  reject the duplicate.
+- **Delete behaviour is decided.** `conversations.tenant_id` is `RESTRICT`, so a
+  tenant that still owns conversations cannot be deleted casually. Messages
+  cascade from their conversation, because they are inside that aggregate.
+- **D7 is applied where it applies.** The slug is globally unique; the
+  ingestion-order index is scoped to its conversation.
+
+**Still open, and important:**
+
+- **M2 (Row Level Security) remains under evaluation and is deliberately not
+  enabled.** The blocking reason is concrete: RLS policies read a per-session
+  tenant setting, and D6's request-scoped tenant context does not exist yet, so
+  any policy written today would be permanently open or permanently closed. The
+  full cost assessment -- connection pooling, migrations, admin bypass,
+  background workers, test complexity -- is in
+  [persistence-postgresql.md](persistence-postgresql.md).
+- **M3, M4, M5 and M6 are untouched.** No query filter, no HTTP tenant
+  resolution, no save-time cross-tenant interception, no suspended-tenant gate.
+- **Invariant 1 is not yet satisfied.** An unscoped tenant-owned query is
+  currently only *incorrect*, not *impossible*. Nothing in Phase 4 changed that,
+  and nothing in Phase 4 pretends otherwise: the only tenant-scoping in place is
+  the foreign key.
+- **`messages` carries no `tenant_id`.** Evaluated and rejected as redundant,
+  since a message's tenant is already single-valued through its conversation's
+  non-null foreign key. Recorded as a decision to revisit if tenant-scoped
+  indexes or RLS later require the column on every tenant-owned table.
 
 ## Testing obligation
 

@@ -3,7 +3,17 @@
   <!--
     Infrastructure implements Application-owned abstractions. It references
     Domain only where a persisted/mapped domain type is legitimately required.
+    Every database dependency stops here: neither Domain nor Application may
+    reference EF Core or Npgsql.
   -->
+  <ItemGroup>
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\OmniAI.Application\OmniAI.Application.csproj" />
     <ProjectReference Include="..\OmniAI.Domain\OmniAI.Domain.csproj" />
