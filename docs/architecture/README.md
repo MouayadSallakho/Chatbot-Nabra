@@ -6,16 +6,18 @@ the decision, why it was taken, and what it forbids.
 Phase 1 established the foundation. Phase 2 added the tenant core domain model.
 Phase 3 added the conversation and message core domain. Phase 4 added PostgreSQL
 persistence for those aggregates. Phase 5 added the first vertical slice --
-tenant onboarding -- through API, Application, Domain and Infrastructure. No AI
-or channel-provider architecture has been designed yet, and there is still no
-authentication.
+tenant onboarding -- through API, Application, Domain and Infrastructure. Phase 6
+added the AI agent core domain, provider-independent and Domain-only. No AI
+provider integration or channel-provider architecture has been designed yet, and
+there is still no authentication.
 
-Four areas have their own documents:
+Five areas have their own documents:
 
 - [multi-tenancy-isolation.md](multi-tenancy-isolation.md) - tenant isolation
 - [conversation-domain.md](conversation-domain.md) - conversation and message modelling
 - [persistence-postgresql.md](persistence-postgresql.md) - PostgreSQL and EF Core persistence
 - [tenant-onboarding-vertical-slice.md](tenant-onboarding-vertical-slice.md) - the first API-to-database slice
+- [ai-agent-domain.md](ai-agent-domain.md) - the AI agent core domain
 
 ---
 
@@ -70,6 +72,13 @@ payload shapes leaking inward.
 **Deliberately deferred.** The abstractions themselves are *not* written yet.
 Designing them before a real use case exists would produce a speculative
 framework rather than a fitted one.
+
+**Exercised in Phase 6.** The AI agent core domain is the first place this rule
+had teeth: `AiAgent` models a tenant's assistant configuration with no model
+name, provider id, sampling parameter, prompt object or vector reference, and two
+reflection tests fail if any of those appear. **An `AiAgent` is not an OpenAI
+Assistant** -- see [ai-agent-domain.md](ai-agent-domain.md) A1. No provider
+abstraction was written, because no provider integration exists to fit one to.
 
 ---
 
