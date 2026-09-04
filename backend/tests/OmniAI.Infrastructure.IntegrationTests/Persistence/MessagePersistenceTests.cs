@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore.Storage;
 using OmniAI.Domain.Conversations;
 using OmniAI.Domain.Tenants;
 using OmniAI.Infrastructure.Persistence;
+using OmniAI.Testing;
 
 namespace OmniAI.Infrastructure.IntegrationTests.Persistence;
 

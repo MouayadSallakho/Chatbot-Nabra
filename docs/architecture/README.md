@@ -5,14 +5,17 @@ the decision, why it was taken, and what it forbids.
 
 Phase 1 established the foundation. Phase 2 added the tenant core domain model.
 Phase 3 added the conversation and message core domain. Phase 4 added PostgreSQL
-persistence for those aggregates. No AI or channel-provider architecture has been
-designed yet.
+persistence for those aggregates. Phase 5 added the first vertical slice --
+tenant onboarding -- through API, Application, Domain and Infrastructure. No AI
+or channel-provider architecture has been designed yet, and there is still no
+authentication.
 
-Three areas have their own documents:
+Four areas have their own documents:
 
 - [multi-tenancy-isolation.md](multi-tenancy-isolation.md) - tenant isolation
 - [conversation-domain.md](conversation-domain.md) - conversation and message modelling
 - [persistence-postgresql.md](persistence-postgresql.md) - PostgreSQL and EF Core persistence
+- [tenant-onboarding-vertical-slice.md](tenant-onboarding-vertical-slice.md) - the first API-to-database slice
 
 ---
 
@@ -85,10 +88,11 @@ filter every query has to remember to apply.
 **Status.** Phase 2 implemented the tenant *domain model* — `Tenant`, `TenantId`,
 `TenantName`, `TenantSlug`, `TenantStatus`. Phase 4 added the first relational
 safeguards: a non-null `tenant_id` foreign key on conversations, and a unique
-index on the slug. Request tenant context, query scoping and row level security
-are **still not implemented**, so an unscoped tenant-owned query is currently
-incorrect rather than impossible. The full strategy, its fixed invariants and its
-open questions are in
+index on the slug. Phase 5 added an endpoint that *creates* tenants but **changed
+nothing about isolation**: there is no caller identity and no request tenant
+context, so query scoping and row level security are **still not implemented**
+and an unscoped tenant-owned query remains incorrect rather than impossible. The
+full strategy, its fixed invariants and its open questions are in
 [multi-tenancy-isolation.md](multi-tenancy-isolation.md).
 
 ---
@@ -171,6 +175,14 @@ normal flow.
 **Revisit when** a use case needs to report *several* validation failures at once
 — exceptions report the first failure only. That is a real limitation, and the
 point at which an explicit result type earns its cost.
+
+**Held in Phase 5.** The first real use cases did not need a result type. The
+tenant slice added exactly one Application exception,
+`TenantSlugAlreadyExistsException`, and expressed "not found" as a nullable
+return rather than a third type -- so the count of error mechanisms went from two
+to three, not to a framework. The revisit trigger is unchanged: a use case that
+must report several validation failures at once. See
+[tenant-onboarding-vertical-slice.md](tenant-onboarding-vertical-slice.md) V5.
 
 **Extended in Phase 3.** A second type, `DomainStateException`, covers an
 operation that is well-formed but not permitted by the current state of its

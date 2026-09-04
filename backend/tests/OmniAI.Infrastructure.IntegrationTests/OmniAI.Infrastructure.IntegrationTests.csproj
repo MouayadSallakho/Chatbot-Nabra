@@ -13,6 +13,7 @@
 
   <ItemGroup>
     <Compile Include="..\Shared\AssemblyReferenceReader.cs" Link="AssemblyReferenceReader.cs" />
+    <Compile Include="..\Shared\PostgresTestDatabase.cs" Link="PostgresTestDatabase.cs" />
   </ItemGroup>
 
   <ItemGroup>

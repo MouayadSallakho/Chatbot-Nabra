@@ -1,10 +1,9 @@
-using System.Data.Common;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Npgsql;
 using OmniAI.Infrastructure.Persistence;
 
-namespace OmniAI.Infrastructure.IntegrationTests.Persistence;
+namespace OmniAI.Testing;
 
 /// <summary>
 /// A disposable PostgreSQL database, created fresh for one test class and dropped
@@ -25,6 +24,14 @@ namespace OmniAI.Infrastructure.IntegrationTests.Persistence;
 /// </para>
 /// Each test class gets its own randomly named database, so classes can run in
 /// parallel without seeing each other's rows.
+/// <para>
+/// Compiled into both the Infrastructure and the API integration test projects
+/// from <c>backend/tests/Shared</c>, following the convention already used for
+/// <c>AssemblyReferenceReader</c>. One provisioning implementation rather than
+/// two: a second copy of "create a database, migrate it, drop it" is exactly the
+/// kind of duplicate that drifts until the two suites are testing different
+/// schemas.
+/// </para>
 /// </remarks>
 public sealed class PostgresTestDatabase : IAsyncLifetime
 {
@@ -80,15 +87,15 @@ public sealed class PostgresTestDatabase : IAsyncLifetime
     /// work with its own change tracker, which is what makes it possible to
     /// simulate two competing writers.
     /// </summary>
-    public OmniAiDbContext CreateContext(RecordedSql? recorder = null)
+    public OmniAiDbContext CreateContext(params IInterceptor[] interceptors)
     {
         DbContextOptionsBuilder<OmniAiDbContext> builder =
             new DbContextOptionsBuilder<OmniAiDbContext>()
                 .UseNpgsql(ConnectionString);
 
-        if (recorder is not null)
+        if (interceptors.Length > 0)
         {
-            builder.AddInterceptors(recorder);
+            builder.AddInterceptors(interceptors);
         }
 
         return new OmniAiDbContext(builder.Options);
@@ -111,80 +118,5 @@ public sealed class PostgresTestDatabase : IAsyncLifetime
 
         await using NpgsqlCommand command = new(sql, connection);
         await command.ExecuteNonQueryAsync();
-    }
-}
-
-/// <summary>
-/// Records the SQL a context actually sends, so a test can assert on what was
-/// <em>not</em> queried.
-/// </summary>
-/// <remarks>
-/// Counting tracked entities would only show what EF materialised. This shows
-/// the statements themselves, which is what makes "appending a message does not
-/// read the message history" a structural claim rather than an inference.
-/// </remarks>
-public sealed class RecordedSql : DbCommandInterceptor
-{
-    private readonly List<string> _statements = [];
-
-    public IReadOnlyList<string> Statements => _statements;
-
-    public void Clear() => _statements.Clear();
-
-    public override InterceptionResult<DbDataReader> ReaderExecuting(
-        DbCommand command,
-        CommandEventData eventData,
-        InterceptionResult<DbDataReader> result)
-    {
-        Record(command);
-        return base.ReaderExecuting(command, eventData, result);
-    }
-
-    public override ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(
-        DbCommand command,
-        CommandEventData eventData,
-        InterceptionResult<DbDataReader> result,
-        CancellationToken cancellationToken = default)
-    {
-        Record(command);
-        return base.ReaderExecutingAsync(command, eventData, result, cancellationToken);
-    }
-
-    public override InterceptionResult<object> ScalarExecuting(
-        DbCommand command,
-        CommandEventData eventData,
-        InterceptionResult<object> result)
-    {
-        Record(command);
-        return base.ScalarExecuting(command, eventData, result);
-    }
-
-    public override InterceptionResult<int> NonQueryExecuting(
-        DbCommand command,
-        CommandEventData eventData,
-        InterceptionResult<int> result)
-    {
-        Record(command);
-        return base.NonQueryExecuting(command, eventData, result);
-    }
-
-    public override ValueTask<InterceptionResult<int>> NonQueryExecutingAsync(
-        DbCommand command,
-        CommandEventData eventData,
-        InterceptionResult<int> result,
-        CancellationToken cancellationToken = default)
-    {
-        Record(command);
-        return base.NonQueryExecutingAsync(command, eventData, result, cancellationToken);
-    }
-
-    private void Record(DbCommand command)
-    {
-        ArgumentNullException.ThrowIfNull(command);
-
-        lock (_statements)
-        {
-            _statements.Add(command.CommandText);
-        }
     }
 }

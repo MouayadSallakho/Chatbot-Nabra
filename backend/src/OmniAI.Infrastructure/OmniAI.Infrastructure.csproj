@@ -14,6 +14,16 @@
     </PackageReference>
   </ItemGroup>
 
+  <!--
+    The repository implementation stays internal: nothing outside this project
+    should name it, only the Application contract it satisfies. Its own tests are
+    the exception, so they are granted access explicitly rather than by making
+    the type public to the whole solution.
+  -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="OmniAI.Infrastructure.IntegrationTests" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\OmniAI.Application\OmniAI.Application.csproj" />
     <ProjectReference Include="..\OmniAI.Domain\OmniAI.Domain.csproj" />

@@ -355,12 +355,15 @@ development machine, so adding it would mean shipping a package no one here can
 exercise. The environment-variable contract is what keeps it a drop-in change
 when CI exists.
 
-Two things this machine cannot do, and CI must:
+Two things this machine cannot be relied on for, and CI must cover:
 
-- Execute `OmniAI.Domain.Tests`. The host's Windows Application Control policy
-  refuses to load locally built unsigned test assemblies (`0x800711C7`). The
-  assembly builds; it cannot be loaded to enumerate its tests.
-- Provide Docker, and therefore container-based database isolation.
+- Executing `OmniAI.Domain.Tests`. Through Phases 1-4 the host's Windows
+  Application Control policy refused to load locally built unsigned test
+  assemblies (`0x800711C7`). As of Phase 5 that assembly loads and passes, with
+  the policy still enforcing and unmodified -- its verdicts are per file hash, so
+  a hash that was refused can later be permitted and a rebuild can be refused
+  again. The suite currently runs; that is not something to gate a release on.
+- Providing Docker, and therefore container-based database isolation.
 
 ---
 

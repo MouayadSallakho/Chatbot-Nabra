@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 using OmniAI.Infrastructure.Persistence;
+using OmniAI.Testing;
 
 namespace OmniAI.Infrastructure.IntegrationTests.Persistence;
 

@@ -13,6 +13,15 @@
     <ProjectReference Include="..\..\src\OmniAI.Api\OmniAI.Api.csproj" />
   </ItemGroup>
 
+  <!--
+    Same disposable-PostgreSQL provisioning as the Infrastructure suite. Compiled
+    in from Shared rather than reimplemented, so both suites migrate and drop
+    databases the same way.
+  -->
+  <ItemGroup>
+    <Compile Include="..\Shared\PostgresTestDatabase.cs" Link="PostgresTestDatabase.cs" />
+  </ItemGroup>
+
   <ItemGroup>
     <Using Include="Xunit" />
   </ItemGroup>

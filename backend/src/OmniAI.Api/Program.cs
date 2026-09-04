@@ -1,3 +1,6 @@
+using OmniAI.Api.Composition;
+using OmniAI.Api.Tenants;
+
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
 // OpenAPI describes the HTTP surface that the Angular admin application consumes.
@@ -5,6 +8,9 @@ builder.Services.AddOpenApi();
 
 // Problem Details is the single, uniform error contract for the whole API.
 builder.Services.AddProblemDetails();
+
+// Persistence, use cases and error translation. See CompositionRoot.
+builder.Services.AddOmniAi(builder.Configuration);
 
 WebApplication app = builder.Build();
 
@@ -21,6 +27,16 @@ if (app.Environment.IsDevelopment())
 // components they check.
 app.MapGet("/health", () => Results.Ok(new { status = "healthy" }))
    .WithName("GetHealth");
+
+// Tenant onboarding.
+//
+// NOT AUTHORISED FOR PRODUCTION EXPOSURE. These endpoints are unauthenticated
+// because authentication and authorisation are not implemented yet, so anyone
+// able to reach this process can create a tenant. Deployment is not authorised
+// until that phase is complete. No placeholder credential stands in for the
+// missing controls, deliberately: a fake one would hide the gap rather than close
+// it.
+app.MapTenantEndpoints();
 
 // TLS is terminated by the reverse proxy in front of this process, so the
 // application deliberately does not perform its own HTTPS redirection.
