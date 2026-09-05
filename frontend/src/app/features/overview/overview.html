@@ -1,0 +1,93 @@
+<div class="page">
+  <app-page-header
+    heading="Platform overview"
+    description="Once this workspace is connected to the platform backend, this page will summarise agent activity, conversation volume and channel health. Nothing below reports live data yet."
+  />
+
+  <!--
+    The Bootstrap grid, doing the job it is here for: proportional columns that
+    reflow at defined breakpoints. One panel per row on a phone, two side by side
+    from the medium breakpoint, three from extra-large -- so the panels stay wide
+    enough to read rather than being squeezed into thirds of a laptop screen.
+  -->
+  <section class="page-section" aria-labelledby="operations-heading">
+    <h2 id="operations-heading" class="text-section-title">Operations</h2>
+
+    <div class="row area-panels">
+      @for (panel of panels; track panel.path) {
+        <div class="col-12 col-md-6 col-xl-4">
+          <article class="card panel">
+            <div class="card-header">
+              <span class="card-heading">
+                <app-icon [name]="panel.icon" [strokeWidth]="1.6" />
+                <span class="text-card-title">{{ panel.label }}</span>
+              </span>
+              <span class="badge badge-neutral">Not implemented</span>
+            </div>
+
+            <app-empty-state
+              heading="No data source connected"
+              description="This panel has nothing to show until the platform API is wired up."
+            >
+              <a stateActions class="btn btn-secondary btn-sm" [routerLink]="'/' + panel.path">
+                Open {{ panel.label }}
+                <app-icon name="arrow-end" [strokeWidth]="1.75" />
+              </a>
+            </app-empty-state>
+          </article>
+        </div>
+      }
+    </div>
+  </section>
+
+  <!--
+    The one table in the product so far, and the only genuinely factual content
+    on this page: it is rendered from the navigation model, so it cannot claim an
+    area is built when it is not.
+  -->
+  <section class="page-section" aria-labelledby="areas-heading">
+    <h2 id="areas-heading" class="text-section-title">Product areas</h2>
+    <p class="section-note text-small text-secondary">
+      What this build of the admin application contains today.
+    </p>
+
+    <div class="table-wrap areas-table">
+      <table class="table">
+        <caption class="visually-hidden">
+          Product areas and whether each is implemented in this build
+        </caption>
+        <thead>
+          <tr>
+            <th scope="col">Area</th>
+            <th scope="col">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (area of areas; track area.path) {
+            <tr>
+              <!--
+                `scope="row"` makes this cell the row's header, so a screen
+                reader announces "AI Agents, Status, Not implemented" instead of
+                reading a status with nothing attached to it.
+              -->
+              <th scope="row" class="area-cell">
+                <a [routerLink]="'/' + area.path">{{ area.label }}</a>
+              </th>
+              <td>
+                <!--
+                  The badge carries a dot and a word, not just a colour, so the
+                  status survives greyscale and colour vision deficiency.
+                -->
+                @if (area.implemented) {
+                  <span class="badge badge-success">Available</span>
+                } @else {
+                  <span class="badge badge-neutral">Not implemented</span>
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>

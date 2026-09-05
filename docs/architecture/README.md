@@ -13,10 +13,13 @@ cases and HTTP endpoints. Phase 8 added the first AI-oriented flow: a
 provider-independent text-generation contract and a stateless agent preview.
 Phase 9 implemented the first real provider behind that contract: OpenAI, through
 the Responses API, in Infrastructure only. A deployment with no key configured
-still refuses generation explicitly. No channel-provider architecture has been
-designed, and there is still no authentication.
+still refuses generation explicitly. Phase 10 turned to the frontend and built
+the admin design system and application shell: semantic tokens, light/dark/system
+theming, a responsive sidebar and top bar, and the reusable primitives that
+product screens will be built from. No channel-provider architecture has been
+designed, there is still no authentication, and the frontend calls no API.
 
-Eight areas have their own documents:
+Nine areas have their own documents:
 
 - [multi-tenancy-isolation.md](multi-tenancy-isolation.md) - tenant isolation
 - [conversation-domain.md](conversation-domain.md) - conversation and message modelling
@@ -26,6 +29,7 @@ Eight areas have their own documents:
 - [ai-agent-vertical-slice.md](ai-agent-vertical-slice.md) - AI agent persistence, use cases and endpoints
 - [ai-runtime.md](ai-runtime.md) - the provider-independent AI text-generation contract and agent preview
 - [openai-provider.md](openai-provider.md) - the OpenAI Responses adapter behind that contract
+- [admin-design-system.md](admin-design-system.md) - the admin design system and application shell
 
 ---
 

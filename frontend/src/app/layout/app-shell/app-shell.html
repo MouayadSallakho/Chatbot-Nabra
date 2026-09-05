@@ -1,0 +1,59 @@
+<!--
+  First in the tab order, on every page. Without it a keyboard reader tabs
+  through the whole sidebar before reaching the content, on every navigation.
+-->
+<a class="skip-link" href="#main-content" (click)="skipToContent($event)">Skip to main content</a>
+
+<div class="shell" [class.is-drawer]="drawer()" [class.is-collapsed]="collapsed()">
+  <app-sidebar
+    id="primary-navigation"
+    class="shell-sidebar"
+    [class.is-open]="navOpen()"
+    [collapsed]="collapsed()"
+    [drawer]="drawer()"
+    [open]="navOpen()"
+    [attr.inert]="navHidden() ? '' : null"
+    (collapseToggled)="toggleCollapsed()"
+    (dismissed)="closeNav()"
+    (navigated)="onNavigated()"
+  />
+
+  @if (drawer()) {
+    <!--
+      The scrim. Purely presentational: it is hidden from assistive technology
+      and is not the accessible way to dismiss the drawer -- Escape and the close
+      button are. It exists so a pointer user can tap away, and so the content
+      behind reads as unavailable.
+    -->
+    <div
+      class="shell-scrim"
+      [class.is-visible]="navOpen()"
+      aria-hidden="true"
+      (click)="closeNav()"
+    ></div>
+  }
+
+  <!--
+    Made inert while the drawer is open, which is what turns the drawer into a
+    real modal surface: focus cannot tab out behind it, and a screen reader
+    cannot wander into content the reader cannot see.
+  -->
+  <div class="shell-content" [attr.inert]="navOpen() ? '' : null">
+    <app-topbar
+      [pageTitle]="pageTitle()"
+      [drawer]="drawer()"
+      [navOpen]="navOpen()"
+      (menuToggled)="toggleNav()"
+    />
+
+    <!--
+      `tabindex="-1"` makes the skip link's target focusable, so following it
+      actually moves focus rather than only scrolling. The outline is suppressed
+      because this is a programmatic focus target, not something the reader
+      navigated to.
+    -->
+    <main #mainRegion id="main-content" class="shell-main" tabindex="-1">
+      <router-outlet />
+    </main>
+  </div>
+</div>

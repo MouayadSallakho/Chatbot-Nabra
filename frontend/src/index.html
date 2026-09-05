@@ -6,6 +6,42 @@
     <base href="/" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="icon" type="image/x-icon" href="favicon.ico" />
+    <!--
+      Theme resolution, before first paint.
+
+      This runs synchronously in <head>, ahead of any stylesheet being applied to
+      a rendered frame, so the correct palette is in place the moment the page is
+      painted. Without it the browser paints the light default, Angular boots,
+      and a dark-mode user sees a white flash on every single load -- the kind of
+      detail that separates a product from a project.
+
+      It is inline for the same reason: an external file is one more round trip
+      during which that flash happens anyway.
+
+      COUPLED TO ThemeService. The storage key, the attribute name and the two
+      attribute values are duplicated here from src/app/core/theme/theme.ts. That
+      duplication is deliberate and unavoidable -- this has to run before the
+      bundle exists -- and it is asserted by a unit test that reads this file, so
+      the two cannot drift apart silently.
+
+      Wrapped in try/catch because localStorage throws outright, rather than
+      returning null, in some privacy modes. A failure here must degrade to the
+      light default, never to a blank page.
+    -->
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem('omniai.theme');
+          var dark =
+            stored === 'dark' ||
+            ((stored === 'system' || stored === null) &&
+              window.matchMedia('(prefers-color-scheme: dark)').matches);
+          document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+        } catch (_) {
+          document.documentElement.setAttribute('data-theme', 'light');
+        }
+      })();
+    </script>
   </head>
   <body>
     <app-root></app-root>

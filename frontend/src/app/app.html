@@ -1,10 +1,6 @@
-<a class="skip-link" href="#main-content">Skip to main content</a>
-
-<header class="app-header">
-  <h1>{{ title() }}</h1>
-</header>
-
-<!-- Routed views render here. Routes are added as features are built. -->
-<main id="main-content" class="app-main" tabindex="-1">
-  <router-outlet />
-</main>
+<!--
+  Everything visible lives in the shell, which is a routed layout component.
+  Keeping the root empty is what stops AppComponent slowly becoming the
+  application: there is nowhere here to put "just one" global control.
+-->
+<router-outlet />

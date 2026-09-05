@@ -1,0 +1,108 @@
+:host {
+  display: block;
+}
+
+// -----------------------------------------------------------------------------
+// Shell frame
+// -----------------------------------------------------------------------------
+// CSS Grid, not the Bootstrap grid. The shell is a two-region application frame
+// with a fixed-width column and a filling one -- a job for the layout engine.
+// Bootstrap's twelve columns are for content inside a page, where a proportional
+// grid is what is actually wanted.
+.shell {
+  --shell-sidebar-width: var(--sidebar-width);
+
+  display: grid;
+  grid-template-columns: var(--shell-sidebar-width) 1fr;
+  // Dynamic viewport height: on mobile browsers `100vh` is the height with the
+  // address bar hidden, which leaves the layout taller than the window and the
+  // page permanently scrolled by a few pixels.
+  block-size: 100vh;
+  block-size: 100dvh;
+  transition: grid-template-columns var(--motion-normal) var(--ease-standard);
+}
+
+.shell.is-collapsed {
+  --shell-sidebar-width: var(--sidebar-width-collapsed);
+}
+
+.shell-sidebar {
+  grid-column: 1;
+  min-inline-size: 0;
+  overflow: hidden; // labels shrink out of view rather than spilling mid-transition
+}
+
+.shell-content {
+  grid-column: 2;
+  display: flex;
+  flex-direction: column;
+  // Without this a wide child -- a table, a long unbroken string -- would stretch
+  // the grid column instead of scrolling inside it, and take the whole layout
+  // wider than the window.
+  min-inline-size: 0;
+}
+
+// The only scrolling region. Keeping the scroll here rather than on the body is
+// what holds the sidebar and top bar still while the page moves.
+.shell-main {
+  flex: 1;
+  overflow-y: auto;
+  min-block-size: 0;
+
+  &:focus-visible {
+    // Focused programmatically by the skip link, so it needs no ring of its own;
+    // the reader knows where they went because they chose to go there.
+    outline: none;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Drawer layout
+// -----------------------------------------------------------------------------
+// Below Bootstrap's `lg` the sidebar leaves the grid entirely and becomes an
+// overlay. This is a different layout, not a narrower version of the same one:
+// a shrunken permanent sidebar would eat a third of a phone screen forever.
+.shell.is-drawer {
+  grid-template-columns: 1fr;
+
+  .shell-content {
+    grid-column: 1;
+  }
+
+  .shell-sidebar {
+    position: fixed;
+    inset-block: 0;
+    inset-inline-start: 0;
+    z-index: 40;
+    // Wide enough to read, never so wide it covers the page completely -- seeing
+    // the edge of what is behind is what makes a drawer feel dismissible.
+    inline-size: min(17rem, 84vw);
+    // Transforms do not mirror under RTL on their own, so the direction comes
+    // from a token that flips with `dir`.
+    transform: translateX(calc(var(--direction-flip) * -100%));
+    transition: transform var(--motion-normal) var(--ease-standard);
+  }
+
+  .shell-sidebar.is-open {
+    transform: translateX(0);
+  }
+}
+
+.shell-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  background-color: var(--scrim);
+  opacity: 0;
+  // Not merely transparent: an invisible full-screen layer would still swallow
+  // every tap on the page behind it.
+  visibility: hidden;
+  transition:
+    opacity var(--motion-normal) var(--ease-standard),
+    visibility var(--motion-normal) var(--ease-standard);
+}
+
+.shell-scrim.is-visible {
+  opacity: 1;
+  visibility: visible;
+}

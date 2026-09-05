@@ -1,0 +1,252 @@
+// =============================================================================
+// Design tokens
+// =============================================================================
+//
+// The single source of visual truth. Every colour, space, radius, shadow, type
+// step and duration in this product resolves to something declared here.
+//
+// Two rules keep it that way:
+//
+//   1. Components consume semantic tokens, never raw values. A component that
+//      hard-codes #4a56e2 is invisible to theming, and will be wrong in dark
+//      mode the moment somebody stops thinking about it.
+//   2. Tokens are named for their ROLE, not their appearance. `--surface-raised`
+//      survives a palette change; `--grey-100` becomes a lie the first time the
+//      product is restyled.
+//
+// Theming works by redefining the same custom properties under a different
+// selector. Components are written once and are never duplicated per theme.
+// -----------------------------------------------------------------------------
+
+// -----------------------------------------------------------------------------
+// Dark palette
+// -----------------------------------------------------------------------------
+// A mixin rather than a plain selector, because the dark values are needed in
+// two places: when dark is explicitly chosen, and when the OS asks for dark and
+// no choice has been made (the no-JavaScript path). Writing them once means the
+// two can never drift apart.
+@mixin dark-palette {
+  // Surfaces. Deliberately not pure black: #000 makes shadows invisible, causes
+  // halation against light text, and reads as "terminal" rather than "product".
+  // These are desaturated blue-greys, which also stops the accent looking alien
+  // against them.
+  --surface-page: #0c0f16;
+  --surface-default: #141924;
+  --surface-muted: #1a2130;
+  --surface-raised: #1f2735;
+  --surface-inset: #10141d;
+  --surface-hover: #1e2634;
+  --surface-selected: #1a1f3d;
+
+  // Text. Not pure white either, for the same reason.
+  --text-primary: #e7ecf3;
+  --text-secondary: #a5b0c0;
+  --text-muted: #7b8698;
+
+  --border-subtle: #232b3a;
+  --border-default: #2c3546;
+  --border-strong: #3d4859;
+  // Boundary of an interactive control (inputs, checkboxes). Held to the 3:1
+  // non-text contrast requirement, which decorative borders above do not carry.
+  --border-control: #5a6880;
+
+  // Accent, lightened for dark surfaces. The light-mode indigo would fail
+  // contrast here, so this is a designed value rather than the same one reused.
+  --accent: #7b87ff;
+  --accent-hover: #949dff;
+  --accent-active: #6570f0;
+  --accent-subtle: #1a1f3d;
+  --accent-subtle-border: #2e3663;
+  --accent-contrast: #0c0f16;
+
+  --success-fg: #4ed09a;
+  --success-bg: #0e2a1f;
+  --success-border: #1d4634;
+
+  --warning-fg: #e8b15c;
+  --warning-bg: #2c210e;
+  --warning-border: #4a3a18;
+
+  --danger-fg: #ff8b80;
+  --danger-bg: #2e1512;
+  --danger-border: #4e2723;
+  --danger-solid: #e2564a;
+  --danger-solid-hover: #ea6459;
+  --danger-contrast: #1a0a08;
+
+  --info-fg: #6bb6f0;
+  --info-bg: #0e2233;
+  --info-border: #1c3a52;
+
+  // Shadows read poorly on dark surfaces, so dark mode leans on borders for
+  // separation and keeps shadows for the few places depth is the actual point.
+  --shadow-subtle: 0 1px 2px rgb(0 0 0 / 40%);
+  --shadow-raised: 0 4px 12px rgb(0 0 0 / 45%);
+  --shadow-overlay: 0 16px 40px rgb(0 0 0 / 60%);
+
+  --skeleton-base: #1e2634;
+  --skeleton-sheen: #2a3444;
+
+  --scrim: rgb(3 5 10 / 65%);
+
+  color-scheme: dark;
+}
+
+// -----------------------------------------------------------------------------
+// Light palette, and everything that does not change between themes
+// -----------------------------------------------------------------------------
+:root {
+  // ---------------------------------------------------------------------------
+  // Colour - light
+  // ---------------------------------------------------------------------------
+  // Light mode is designed, not "white with black text". Hierarchy comes from a
+  // tinted page sitting behind white cards, so a surface reads as raised without
+  // needing a shadow on every panel.
+  --surface-page: #f5f7fa;
+  --surface-default: #ffffff;
+  --surface-muted: #eff2f6;
+  --surface-raised: #ffffff;
+  --surface-inset: #f7f9fb;
+  --surface-hover: #eef1f6;
+  --surface-selected: #eef0fe;
+
+  --text-primary: #131822;
+  --text-secondary: #4c5666;
+  --text-muted: #646e7f;
+
+  --border-subtle: #e9edf3;
+  --border-default: #e1e6ed;
+  --border-strong: #c7ced9;
+  --border-control: #828b9a;
+
+  --accent: #4a56e2;
+  --accent-hover: #3d48c8;
+  --accent-active: #333da8;
+  --accent-subtle: #eef0fe;
+  --accent-subtle-border: #d5d9fb;
+  --accent-contrast: #ffffff;
+
+  --success-fg: #0e7a4d;
+  --success-bg: #e7f5ee;
+  --success-border: #b4e0cb;
+
+  --warning-fg: #8a5300;
+  --warning-bg: #fdf3e0;
+  --warning-border: #f2d9a8;
+
+  --danger-fg: #b62a20;
+  --danger-bg: #fdecea;
+  --danger-border: #f4c4be;
+  --danger-solid: #c0392c;
+  --danger-solid-hover: #a72f24;
+  --danger-contrast: #ffffff;
+
+  --info-fg: #0b5fa5;
+  --info-bg: #e8f2fc;
+  --info-border: #bedbf3;
+
+  --shadow-subtle: 0 1px 2px rgb(19 24 34 / 6%);
+  --shadow-raised: 0 4px 12px rgb(19 24 34 / 8%);
+  --shadow-overlay: 0 16px 40px rgb(19 24 34 / 16%);
+
+  --skeleton-base: #e6eaf0;
+  --skeleton-sheen: #f2f5f8;
+
+  --scrim: rgb(19 24 34 / 45%);
+
+  color-scheme: light;
+
+  // ---------------------------------------------------------------------------
+  // Spacing - a 4px foundation
+  // ---------------------------------------------------------------------------
+  // One scale, ten steps, nothing in between. If a gap seems to want 13px the
+  // answer is 12 or 16, not a new token: consistent rhythm is most of what
+  // separates a designed interface from an assembled one.
+  --space-1: 0.25rem; // 4px
+  --space-2: 0.5rem; // 8px
+  --space-3: 0.75rem; // 12px
+  --space-4: 1rem; // 16px
+  --space-5: 1.25rem; // 20px
+  --space-6: 1.5rem; // 24px
+  --space-7: 2rem; // 32px
+  --space-8: 2.5rem; // 40px
+  --space-9: 3rem; // 48px
+  --space-10: 4rem; // 64px
+
+  // ---------------------------------------------------------------------------
+  // Radius
+  // ---------------------------------------------------------------------------
+  --radius-sm: 6px; // inputs, badges, small controls
+  --radius-md: 8px; // buttons, nav items
+  --radius-lg: 12px; // cards and panels
+  --radius-xl: 16px; // the few large surfaces that carry the layout
+  --radius-pill: 999px; // status pills only, where the shape itself carries meaning
+
+  // ---------------------------------------------------------------------------
+  // Typography
+  // ---------------------------------------------------------------------------
+  // A system stack. No webfont is fetched: a CDN request is a third-party
+  // dependency on every page load, a privacy consideration, and a guaranteed
+  // flash of unstyled text. System UI fonts are also what the reader's OS
+  // already renders best.
+  --font-sans:
+    system-ui, -apple-system, 'Segoe UI', roboto, 'Helvetica Neue', arial, 'Noto Sans', sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', 'Cascadia Mono', 'Roboto Mono', menlo, consolas, monospace;
+
+  // Steps are named for the job they do, so a stylesheet says what it means.
+  --text-page-title: 600 clamp(1.375rem, 1.15rem + 0.7vw, 1.75rem) / 1.25 var(--font-sans);
+  --text-section-title: 600 1.125rem / 1.35 var(--font-sans);
+  --text-card-title: 600 0.9375rem / 1.4 var(--font-sans);
+  --text-body: 400 0.875rem / 1.55 var(--font-sans);
+  --text-body-strong: 500 0.875rem / 1.55 var(--font-sans);
+  --text-small: 400 0.8125rem / 1.5 var(--font-sans);
+  --text-label: 500 0.8125rem / 1.4 var(--font-sans);
+  --text-nav: 500 0.875rem / 1.2 var(--font-sans);
+
+  --letter-spacing-tight: -0.011em; // titles only, to close optical gaps at size
+  --letter-spacing-caps: 0.04em; // the one place uppercase is used
+
+  // ---------------------------------------------------------------------------
+  // Motion
+  // ---------------------------------------------------------------------------
+  // Short enough to read as response rather than as animation.
+  --motion-fast: 120ms;
+  --motion-normal: 200ms;
+  --motion-slow: 320ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0.2, 1);
+  --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+
+  // ---------------------------------------------------------------------------
+  // Layout
+  // ---------------------------------------------------------------------------
+  --sidebar-width: 16.5rem; // 264px
+  --sidebar-width-collapsed: 4.5rem; // 72px
+  --topbar-height: 3.5rem; // 56px
+  --page-max-width: 100rem; // 1600px: wide desktops get room, text stays readable
+  --page-gutter: var(--space-6);
+  --focus-ring-width: 2px;
+  --focus-ring-offset: 2px;
+
+  // Direction multiplier for the one transform that has to mirror under RTL.
+  // Transforms do not respond to `dir`, so the drawer takes its direction from
+  // here rather than from a hard-coded sign.
+  --direction-flip: 1;
+}
+
+[dir='rtl'] {
+  --direction-flip: -1;
+}
+
+// An explicit choice wins, in both directions.
+:root[data-theme='dark'] {
+  @include dark-palette;
+}
+
+// The no-JavaScript path. The pre-bootstrap script normally resolves the theme
+// and stamps data-theme before first paint, so this only takes effect when that
+// script did not run at all. Scoped so it can never override an explicit choice.
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']):not([data-theme='dark']) {
+    @include dark-palette;
+  }
+}

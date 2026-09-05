@@ -1,1 +1,37 @@
-/* You can add global styles to this file, and also import other style files */
+// =============================================================================
+// Global stylesheet
+// =============================================================================
+//
+// Three layers, in cascade order:
+//
+//   tokens      the values everything else resolves to
+//   base        element defaults, typography, focus, reduced motion
+//   primitives  the reusable visual vocabulary
+//
+// Bootstrap's grid is loaded before this file, from angular.json, so anything
+// here can override it without needing specificity tricks or !important.
+//
+// Feature styling does not belong in this file. Components own their own
+// stylesheets and consume tokens; a global sheet that grows feature rules
+// becomes the place nobody dares delete from.
+// -----------------------------------------------------------------------------
+
+@use 'styles/tokens';
+@use 'styles/base';
+@use 'styles/primitives';
+
+// -----------------------------------------------------------------------------
+// Bootstrap grid, bound to our spacing scale
+// -----------------------------------------------------------------------------
+// Bootstrap 5 drives its gutters through custom properties, which means the grid
+// can be tuned to this product's spacing scale without recompiling its Sass --
+// and therefore without inheriting the 21 `@import` deprecation warnings its
+// SCSS entry point currently emits.
+//
+// The vertical gutter is set as well as the horizontal one: `.row` only applies
+// row-gap when it is told to, and columns that wrap on a narrow screen would
+// otherwise touch.
+.row {
+  --bs-gutter-x: var(--space-6);
+  --bs-gutter-y: var(--space-6);
+}

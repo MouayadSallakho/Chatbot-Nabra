@@ -1,0 +1,37 @@
+:host {
+  display: block;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-block-size: var(--topbar-height);
+  padding-inline: var(--space-4);
+  background-color: var(--surface-default);
+  border-block-end: 1px solid var(--border-default);
+}
+
+.topbar-menu {
+  flex: none;
+}
+
+.topbar-context {
+  font: var(--text-body-strong);
+  color: var(--text-secondary);
+  // Long page names truncate rather than pushing the theme control off a phone
+  // screen. `min-inline-size: 0` is what allows a flex child to shrink below its
+  // content width at all.
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  // Pushed to the end edge logically, so it lands on the left under RTL.
+  margin-inline-start: auto;
+}

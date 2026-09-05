@@ -1,0 +1,207 @@
+// =============================================================================
+// Base layer
+// =============================================================================
+//
+// Element defaults only. Nothing here knows about a feature, and nothing here
+// is a component. Bootstrap's Reboot is deliberately absent -- only its grid is
+// loaded -- so the small number of resets the product actually needs live here
+// where they can be read in one sitting.
+// -----------------------------------------------------------------------------
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  // The rem base. Everything else is expressed in rem so a reader who enlarges
+  // their default font size scales the whole interface rather than breaking it.
+  font-size: 100%;
+
+  // Belt and braces with the token layer: `color-scheme` also drives the
+  // browser's own chrome -- scrollbars, form controls, the canvas behind the
+  // page -- which is what stops a dark page flashing a white scrollbar.
+  block-size: 100%;
+}
+
+body {
+  margin: 0;
+  min-block-size: 100%;
+  background-color: var(--surface-page);
+  color: var(--text-primary);
+  font: var(--text-body);
+
+  // Kerning and ligatures on, because UI text is short and reads better for it.
+  text-rendering: optimizelegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+// Headings are reset to inherit, then given weight by the type utilities below.
+// A bare <h2> should never be 1.5em Times just because nobody styled it.
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  margin: 0;
+  font: inherit;
+}
+
+p {
+  margin: 0;
+}
+
+ul,
+ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+img,
+svg {
+  display: block;
+  max-inline-size: 100%;
+}
+
+// Form elements do not inherit typography by default. Making them do so is the
+// difference between a product and a page with widgets on it.
+input,
+button,
+textarea,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+// -----------------------------------------------------------------------------
+// Focus
+// -----------------------------------------------------------------------------
+// One focus treatment for the entire product, defined once.
+//
+// `:focus-visible` rather than `:focus`, so a mouse user clicking a button does
+// not get a ring while a keyboard user always does. The ring is drawn with
+// `outline` on purpose: it follows border-radius, it cannot be clipped by
+// `overflow: hidden`, and it does not affect layout the way a border would.
+:focus-visible {
+  outline: var(--focus-ring-width) solid var(--accent);
+  outline-offset: var(--focus-ring-offset);
+  border-radius: var(--radius-sm);
+}
+
+// The default ring is removed only where a component draws its own, never
+// globally.
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+// -----------------------------------------------------------------------------
+// Typography utilities
+// -----------------------------------------------------------------------------
+// Classes rather than components: text does not need a wrapper element to be
+// styled, and `<h1 class="text-page-title">` keeps the heading level -- which
+// screen readers use to build a document outline -- independent of its size,
+// which is a visual decision.
+.text-page-title {
+  font: var(--text-page-title);
+  letter-spacing: var(--letter-spacing-tight);
+  color: var(--text-primary);
+}
+
+.text-section-title {
+  font: var(--text-section-title);
+  letter-spacing: var(--letter-spacing-tight);
+  color: var(--text-primary);
+}
+
+.text-card-title {
+  font: var(--text-card-title);
+  color: var(--text-primary);
+}
+
+.text-body {
+  font: var(--text-body);
+}
+
+.text-small {
+  font: var(--text-small);
+}
+
+.text-secondary {
+  color: var(--text-secondary);
+}
+
+.text-muted {
+  color: var(--text-muted);
+}
+
+// -----------------------------------------------------------------------------
+// Accessibility helpers
+// -----------------------------------------------------------------------------
+
+// Available to assistive technology, invisible on screen. Used for the labels
+// that a sighted reader gets from layout and an unsighted one would otherwise
+// lose entirely.
+.visually-hidden {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+// The first thing in the tab order. Hidden until focused, then a real, visible
+// control -- a keyboard reader should not have to tab through the whole sidebar
+// on every page to reach the content.
+.skip-link {
+  position: absolute;
+  inset-block-start: var(--space-2);
+  inset-inline-start: var(--space-2);
+  z-index: 100;
+  padding: var(--space-2) var(--space-4);
+  background-color: var(--surface-raised);
+  color: var(--text-primary);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-overlay);
+  font: var(--text-body-strong);
+  transform: translateY(calc(-100% - var(--space-4)));
+  transition: transform var(--motion-fast) var(--ease-standard);
+
+  &:focus-visible {
+    transform: translateY(0);
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Reduced motion
+// -----------------------------------------------------------------------------
+// A global switch rather than a per-component opt-in, so a component added later
+// cannot forget to honour it. Durations collapse to ~0 instead of being removed
+// outright: transitionend still fires, so anything that waits on it keeps
+// working.
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms;
+    animation-iteration-count: 1;
+    transition-duration: 0.01ms;
+    scroll-behavior: auto;
+  }
+}

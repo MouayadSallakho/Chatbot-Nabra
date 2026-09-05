@@ -1,0 +1,14 @@
+// The host is inline so an icon sits on the text baseline flow of whatever
+// contains it, rather than forcing its own line.
+:host {
+  display: inline-flex;
+  flex: none;
+}
+
+// Sized in `em` so an icon scales with the text beside it. A caller that needs a
+// specific size sets it on `.icon` from its own stylesheet -- the primitives do
+// exactly that for buttons and state panels.
+.icon {
+  inline-size: 1.25em;
+  block-size: 1.25em;
+}

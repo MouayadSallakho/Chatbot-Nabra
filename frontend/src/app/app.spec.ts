@@ -1,36 +1,39 @@
 import { TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 import { App } from './app';
 
+/**
+ * The root is deliberately almost nothing: the landmarks, navigation and layout
+ * all moved into the routed shell, so that a future phase can render a sign-in
+ * screen outside the shell without unpicking anything here.
+ *
+ * These tests assert exactly that, and no more. Everything the application shows
+ * is covered where it lives -- see app-shell.spec.ts.
+ */
 describe('App', () => {
-  beforeEach(async () => {
-    await TestBed.configureTestingModule({
+  beforeEach(() => {
+    TestBed.configureTestingModule({
       imports: [App],
-    }).compileComponents();
+      providers: [provideRouter([])],
+    });
   });
 
-  it('should create the app', () => {
+  it('creates', () => {
     const fixture = TestBed.createComponent(App);
 
     expect(fixture.componentInstance).toBeTruthy();
   });
 
-  it('should render the application title in the page heading', async () => {
+  it('renders only a routed outlet', async () => {
     const fixture = TestBed.createComponent(App);
     await fixture.whenStable();
 
     const compiled = fixture.nativeElement as HTMLElement;
 
-    expect(compiled.querySelector('h1')?.textContent).toContain('OmniAI Admin');
-  });
-
-  it('should expose a skip link that targets the main landmark', async () => {
-    const fixture = TestBed.createComponent(App);
-    await fixture.whenStable();
-
-    const compiled = fixture.nativeElement as HTMLElement;
-    const skipLink = compiled.querySelector<HTMLAnchorElement>('a.skip-link');
-
-    expect(skipLink?.getAttribute('href')).toBe('#main-content');
-    expect(compiled.querySelector('main')?.id).toBe('main-content');
+    // No heading, no chrome, no "just one" global control. If this starts
+    // failing, something has begun accumulating in the root again.
+    expect(compiled.querySelector('h1')).toBeNull();
+    expect(compiled.querySelector('header')).toBeNull();
+    expect(compiled.querySelector('nav')).toBeNull();
   });
 });

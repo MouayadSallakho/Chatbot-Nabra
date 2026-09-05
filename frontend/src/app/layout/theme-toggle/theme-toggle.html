@@ -1,0 +1,35 @@
+<!--
+  A fieldset with a hidden legend is the semantic form of "these three controls
+  are one choice". The legend is the group's accessible name, so a screen reader
+  announces "Theme, System, radio button, 1 of 3" rather than three unrelated
+  radios in a toolbar.
+-->
+<fieldset class="theme-toggle">
+  <legend class="visually-hidden">Theme</legend>
+
+  @for (option of options; track option.value) {
+    <label class="theme-option" [title]="option.label">
+      <!--
+        The real control. Visually hidden rather than removed, so keyboard
+        interaction, the checked state and arrow-key movement between options
+        all remain the browser's job.
+      -->
+      <input
+        class="visually-hidden"
+        type="radio"
+        name="theme-preference"
+        [value]="option.value"
+        [checked]="preference() === option.value"
+        (change)="select(option.value)"
+      />
+      <app-icon [name]="option.icon" [strokeWidth]="1.75" />
+      <!--
+        Kept in the DOM at every width. Below the medium breakpoint it is hidden
+        visually but not from assistive technology, so the accessible name still
+        comes from the visible-when-there text rather than from an aria-label
+        that could drift away from it.
+      -->
+      <span class="theme-option-label">{{ option.label }}</span>
+    </label>
+  }
+</fieldset>
