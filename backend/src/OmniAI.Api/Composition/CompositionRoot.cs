@@ -64,13 +64,13 @@ internal static class CompositionRoot
         // the very next read returns. See MicrosecondTimeProvider.
         services.AddSingleton<TimeProvider>(new MicrosecondTimeProvider(TimeProvider.System));
 
-        // The AI runtime. No provider is configured on this platform yet, so what
-        // this registers is an implementation that refuses every generation
-        // request explicitly -- which is why the application still starts, and why
-        // the one endpoint that needs a provider says so plainly instead of
-        // returning something invented. Infrastructure owns that choice; nothing
-        // here names a vendor, and no API key is read.
-        services.AddOmniAiRuntime();
+        // The AI runtime. Infrastructure decides which implementation that is:
+        // the OpenAI adapter when a key is configured in the environment, and an
+        // implementation that refuses every request explicitly when it is not.
+        // The composition root only says where non-secret configuration comes
+        // from -- it names no vendor, reads no key, and does not know which of the
+        // two it just registered.
+        services.AddOmniAiRuntime(configuration);
 
         // Application use cases. Registered as their concrete types, because
         // nothing substitutes them at runtime -- an interface per handler would be

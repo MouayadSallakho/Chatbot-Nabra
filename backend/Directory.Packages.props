@@ -29,8 +29,25 @@
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.11" />
   </ItemGroup>
 
+  <ItemGroup Label="AI providers">
+    <!--
+      Official OpenAI .NET SDK. Infrastructure only: neither Domain, Application
+      nor Api references it, so the vendor stops at the adapter that implements
+      IAiTextGenerator. 2.13.0 was the latest stable release on nuget.org when
+      this phase ran.
+    -->
+    <PackageVersion Include="OpenAI" Version="2.13.0" />
+  </ItemGroup>
+
   <ItemGroup Label="Testing">
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <!--
+      In-memory IConfiguration for tests that must prove both branches of the AI
+      runtime registration without mutating the process environment. Already in
+      the dependency graph transitively; declared here so the test project can
+      reference it explicitly rather than rely on another package's graph.
+    -->
+    <PackageVersion Include="Microsoft.Extensions.Configuration" Version="10.0.11" />
     <PackageVersion Include="xunit" Version="2.9.3" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.4" />
     <PackageVersion Include="coverlet.collector" Version="6.0.4" />

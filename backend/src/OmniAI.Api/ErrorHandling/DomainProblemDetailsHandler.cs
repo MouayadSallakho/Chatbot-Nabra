@@ -242,6 +242,23 @@ internal sealed partial class DomainProblemDetailsHandler(
             "AI generation unavailable",
             unavailable.Message),
 
+        // The provider did not answer inside this deployment's own patience. 504,
+        // which is precisely what it means: this server, acting as a gateway, did
+        // not get a timely response from upstream.
+        //
+        // Separated from 503 because the two tell a caller different things. 503
+        // says the platform could not get the work started -- nothing was spent,
+        // and the same request will work once the deployment is fixed. This says
+        // the work probably did start and the answer did not arrive, so a shorter
+        // question might succeed where a repeat of the same one would not.
+        //
+        // Never produced by caller cancellation: a closed tab is an
+        // OperationCanceledException, which this handler does not map at all.
+        AiRuntimeTimeoutException timeout => (
+            StatusCodes.Status504GatewayTimeout,
+            "AI generation timed out",
+            timeout.Message),
+
         // Something answered, and what came back was not a usable reply. 502,
         // which is exactly what it describes: this server acted as a gateway to
         // an upstream service and received an invalid response from it. The

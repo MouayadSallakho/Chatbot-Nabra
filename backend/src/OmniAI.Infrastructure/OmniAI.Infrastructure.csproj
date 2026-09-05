@@ -8,6 +8,12 @@
   -->
   <ItemGroup>
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+    <!--
+      The official OpenAI SDK. It appears in this project and nowhere else: the
+      Application owns IAiTextGenerator, and the vendor stops at the adapter that
+      implements it.
+    -->
+    <PackageReference Include="OpenAI" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
@@ -22,6 +28,13 @@
   -->
   <ItemGroup>
     <InternalsVisibleTo Include="OmniAI.Infrastructure.IntegrationTests" />
+    <!--
+      The API integration suite installs the real OpenAI adapter over a canned
+      socket, so it needs the internal client factory. Granted explicitly rather
+      than by making the adapter public: nothing outside these two test projects
+      should be able to name it.
+    -->
+    <InternalsVisibleTo Include="OmniAI.Api.IntegrationTests" />
   </ItemGroup>
 
   <ItemGroup>

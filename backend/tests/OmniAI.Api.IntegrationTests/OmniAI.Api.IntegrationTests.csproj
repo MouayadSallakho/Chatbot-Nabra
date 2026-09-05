@@ -2,6 +2,13 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <!--
+      Test-only. Needed to build the canned transport that the OpenAI preview
+      suite installs in place of a socket, so that the real adapter and the real
+      SDK serialisation run end to end without a network. The production
+      OmniAI.Api assembly references no provider SDK, and a guard test asserts it.
+    -->
+    <PackageReference Include="OpenAI" />
     <PackageReference Include="xunit" />
     <PackageReference Include="xunit.runner.visualstudio" />
     <PackageReference Include="coverlet.collector" />
@@ -20,6 +27,8 @@
   -->
   <ItemGroup>
     <Compile Include="..\Shared\PostgresTestDatabase.cs" Link="PostgresTestDatabase.cs" />
+    <!-- Reads assembly metadata without loading code, for the layer guards. -->
+    <Compile Include="..\Shared\AssemblyReferenceReader.cs" Link="AssemblyReferenceReader.cs" />
     <!--
       Deterministic clock. Used by one dedicated fixture that substitutes it for
       TimeProvider.System, so exact timestamps and the high-water-mark rule can be

@@ -36,6 +36,13 @@ public class AiAgentApiFixture : IAsyncLifetime
     /// <summary>Configuration key the API reads its connection string from.</summary>
     private const string ConnectionStringSetting = "ConnectionStrings:OmniAiDatabase";
 
+    /// <summary>Configuration key the API reads its AI provider credential from.</summary>
+    /// <remarks>
+    /// Named here so it can be blanked. No test ever reads or supplies a real
+    /// value for it.
+    /// </remarks>
+    private const string ApiKeySetting = "OPENAI_API_KEY";
+
     private readonly PostgresTestDatabase _database = new();
 
     private WebApplicationFactory<Program>? _application;
@@ -51,6 +58,27 @@ public class AiAgentApiFixture : IAsyncLifetime
             .WithWebHostBuilder(builder =>
             {
                 builder.UseSetting(ConnectionStringSetting, _database.ConnectionString);
+
+                // No AI provider, whatever the developer's machine happens to have
+                // configured.
+                //
+                // The hosted application reads OPENAI_API_KEY through
+                // configuration, and configuration includes the process
+                // environment -- so without this line a machine with a real key
+                // would silently register the real OpenAI adapter and these tests
+                // would make live, billed calls to the internet. That is not a
+                // hypothetical: it happened once during development, which is why
+                // the override is here rather than in a comment asking people to
+                // remember.
+                //
+                // Overriding it to blank makes every suite built on this fixture
+                // deterministic and offline. The suite that needs the real adapter
+                // installs it explicitly over a canned socket.
+                if (DisableAiProvider)
+                {
+                    builder.UseSetting(ApiKeySetting, string.Empty);
+                }
+
                 builder.ConfigureServices(ConfigureTestServices);
             });
     }
@@ -125,6 +153,17 @@ public class AiAgentApiFixture : IAsyncLifetime
         return scope.ServiceProvider.GetRequiredService<OmniAiDbContext>()
             .Database.GetConnectionString() ?? string.Empty;
     }
+
+    /// <summary>
+    /// Whether to force this host to have no AI provider.
+    /// </summary>
+    /// <remarks>
+    /// True everywhere except the explicitly gated live smoke fixture, which is
+    /// the only place a real credential is allowed to reach a hosted application.
+    /// Keeping the default on this side means a new fixture is offline unless
+    /// somebody deliberately says otherwise.
+    /// </remarks>
+    protected virtual bool DisableAiProvider => true;
 
     /// <summary>
     /// Hook for the fixtures that need one service replaced.
