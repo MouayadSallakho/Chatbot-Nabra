@@ -1,0 +1,40 @@
+// A single-column form. Capped narrower than a full page: a text field that runs
+// the width of a 1600px layout is measurably harder to read back, and a form
+// this short has nothing to put beside it.
+.page-narrow {
+  max-inline-size: 46rem;
+}
+
+.create-form .card-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.instructions-input {
+  min-block-size: 14rem;
+  font: var(--text-body);
+  line-height: 1.6;
+}
+
+.counter {
+  display: block;
+  margin-block-start: var(--space-1);
+}
+
+// Approaching the limit is worth noticing before the field stops accepting
+// input. The number itself carries the message, so this only reinforces it.
+.counter-low {
+  color: var(--warning-fg);
+  font-weight: 500;
+}
+
+.create-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-5);
+  border-block-start: 1px solid var(--border-subtle);
+  background-color: var(--surface-inset);
+}

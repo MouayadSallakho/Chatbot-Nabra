@@ -1,0 +1,146 @@
+<div class="page">
+  <app-page-header
+    heading="AI Agents"
+    description="An AI agent answers on your behalf. Its instructions describe how it should reply, and its status controls whether it is in service."
+  >
+    @if (hasAgents()) {
+      <a pageActions class="btn btn-primary" routerLink="/ai-agents/new">Create agent</a>
+    }
+  </app-page-header>
+
+  <div class="page-section">
+    @if (loading()) {
+      <!--
+        A skeleton shaped like the rows that are coming, so the layout does not
+        jump when they arrive. `aria-busy` plus a hidden label is what makes the
+        wait perceivable to a screen reader, which sees nothing at all otherwise.
+      -->
+      <div class="agent-list" aria-busy="true">
+        <p class="visually-hidden" role="status">Loading agents…</p>
+        @for (row of skeletonRows; track row) {
+          <div class="agent-row agent-row-skeleton" aria-hidden="true">
+            <span class="skeleton skeleton-title"></span>
+            <span class="skeleton skeleton-text"></span>
+            <span class="skeleton skeleton-text"></span>
+          </div>
+        }
+      </div>
+    } @else if (failure(); as error) {
+      <div class="card">
+        <app-empty-state
+          icon="alert"
+          tone="error"
+          heading="Could not load agents"
+          [description]="error.message"
+        >
+          <button stateActions type="button" class="btn btn-secondary btn-sm" (click)="load()">
+            Try again
+          </button>
+        </app-empty-state>
+      </div>
+    } @else if (!hasAgents()) {
+      <!--
+        Not "No data". Somebody reaching an empty list for the first time needs
+        to know what the thing is before they can want one.
+      -->
+      <div class="card">
+        <app-empty-state
+          icon="agents"
+          heading="No agents yet"
+          description="An AI agent replies to customers using instructions you write. Create one to describe how it should behave, then preview its answers before putting it in service."
+        >
+          <a stateActions class="btn btn-primary btn-sm" routerLink="/ai-agents/new">
+            Create your first agent
+          </a>
+        </app-empty-state>
+      </div>
+    } @else {
+      <div class="agent-list">
+        <!--
+          Column labels for the desktop grid. Hidden from assistive technology
+          because each row already names its own values -- announcing the headings
+          as loose text would just add noise before the list.
+        -->
+        <div class="agent-list-head" aria-hidden="true">
+          <span>Name</span>
+          <span>Status</span>
+          <span>Last updated</span>
+        </div>
+
+        <ul>
+          @for (agent of page()!.items; track agent.id) {
+            <li>
+              <!--
+                The whole row is one link. A row with a separate "open" button
+                would give a keyboard reader two stops for one destination, and a
+                pointer user a small target inside a large one.
+              -->
+              <a class="agent-row" [routerLink]="['/ai-agents', agent.id]">
+                <span class="agent-name">{{ agent.name }}</span>
+
+                <span class="agent-status">
+                  <span
+                    class="badge"
+                    [class.badge-success]="agent.status === 'Active'"
+                    [class.badge-neutral]="agent.status === 'Draft'"
+                    [class.badge-warning]="agent.status === 'Disabled'"
+                  >
+                    {{ agent.status }}
+                  </span>
+                </span>
+
+                <span class="agent-updated text-small text-muted">
+                  <!--
+                    A real space, not a CSS margin: Angular strips whitespace between
+                    elements, and a purely visual gap would still be announced as
+                    "UpdatedSep 5" by a screen reader.
+                  -->
+                  <span class="agent-updated-label">Updated&nbsp;</span>
+                  <time [attr.datetime]="agent.updatedAt">{{
+                    agent.updatedAt | date: 'medium'
+                  }}</time>
+                </span>
+
+                <app-icon class="agent-chevron" name="chevron-end" [strokeWidth]="1.75" />
+              </a>
+            </li>
+          }
+        </ul>
+      </div>
+
+      @if (range(); as shown) {
+        <nav class="pager" aria-label="Agent list pages">
+          <p class="text-small text-muted" aria-live="polite">
+            Showing {{ shown.first }}–{{ shown.last }} of {{ shown.total }}
+          </p>
+
+          @if (totalPages() > 1) {
+            <div class="pager-controls">
+              <button
+                type="button"
+                class="btn btn-secondary btn-sm"
+                (click)="goTo(currentPage() - 1)"
+                [disabled]="currentPage() <= 1"
+              >
+                <app-icon name="chevron-start" [strokeWidth]="1.75" />
+                <span>Previous</span>
+              </button>
+              <span class="text-small text-secondary">
+                Page {{ currentPage() }} of {{ totalPages() }}
+              </span>
+              <button
+                type="button"
+                class="btn btn-secondary btn-sm"
+                (click)="goTo(currentPage() + 1)"
+                [disabled]="currentPage() >= totalPages()"
+              >
+                <span>Next</span>
+                <app-icon name="arrow-end" [strokeWidth]="1.75" />
+              </button>
+            </div>
+          }
+        </nav>
+      }
+    }
+  </div>
+</div>

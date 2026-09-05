@@ -1,0 +1,93 @@
+// Two columns on wide screens, one on narrow. CSS Grid rather than the Bootstrap
+// grid: this is a page-level split between "the thing" and "tools for the
+// thing", not a proportional twelve-column layout, and the breakpoint it wants
+// is where a 14-row textarea and a preview panel can both stay usable.
+.editor {
+  display: grid;
+  gap: var(--space-6);
+  margin-block-start: var(--space-6);
+}
+
+.editor-main,
+.editor-side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  min-inline-size: 0;
+}
+
+@media (min-width: 1200px) {
+  .editor {
+    // The editor gets the larger share: instructions are the work, and the
+    // preview is how you check it.
+    grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+    align-items: start;
+  }
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.card-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.instructions-input {
+  min-block-size: 18rem;
+  font: var(--text-body);
+  line-height: 1.6;
+}
+
+.counter {
+  display: block;
+  margin-block-start: var(--space-1);
+}
+
+.counter-low {
+  color: var(--warning-fg);
+  font-weight: 500;
+}
+
+.section-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+// Announced as well as shown, so a save button that is suddenly enabled is not
+// the only clue that something is unsaved.
+.unsaved {
+  margin-inline-end: auto;
+  color: var(--warning-fg);
+  font-weight: 500;
+}
+
+.lifecycle .section-actions {
+  justify-content: flex-start;
+}
+
+// ----------------------------------------------------------------------------
+// Conflict
+// ----------------------------------------------------------------------------
+.conflict {
+  margin-block-start: var(--space-6);
+  align-items: flex-start;
+}
+
+.conflict-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.conflict-title {
+  font: var(--text-body-strong);
+}

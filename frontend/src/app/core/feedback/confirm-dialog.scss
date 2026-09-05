@@ -1,0 +1,27 @@
+// The native dialog carries its own centring and top-layer placement, so only
+// the surface itself needs styling.
+.confirm {
+  inline-size: min(26rem, calc(100vw - var(--space-8)));
+  padding: var(--space-6);
+  background-color: var(--surface-raised);
+  color: var(--text-primary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-overlay);
+
+  &::backdrop {
+    background-color: var(--scrim);
+  }
+}
+
+.confirm-body {
+  margin-block-start: var(--space-3);
+}
+
+.confirm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  margin-block-start: var(--space-6);
+}

@@ -16,10 +16,14 @@ the Responses API, in Infrastructure only. A deployment with no key configured
 still refuses generation explicitly. Phase 10 turned to the frontend and built
 the admin design system and application shell: semantic tokens, light/dark/system
 theming, a responsive sidebar and top bar, and the reusable primitives that
-product screens will be built from. No channel-provider architecture has been
-designed, there is still no authentication, and the frontend calls no API.
+product screens will be built from. Phase 11 turned that shell into the first
+real product workflow: a development workspace, and AI agent listing, creation,
+editing, lifecycle and preview against the real API, with a tenant-scoped
+paginated list endpoint added to support it. No channel-provider architecture has
+been designed, and there is still no authentication -- which is why the admin
+application and the API behind it remain development-only.
 
-Nine areas have their own documents:
+Ten areas have their own documents:
 
 - [multi-tenancy-isolation.md](multi-tenancy-isolation.md) - tenant isolation
 - [conversation-domain.md](conversation-domain.md) - conversation and message modelling
@@ -30,6 +34,7 @@ Nine areas have their own documents:
 - [ai-runtime.md](ai-runtime.md) - the provider-independent AI text-generation contract and agent preview
 - [openai-provider.md](openai-provider.md) - the OpenAI Responses adapter behind that contract
 - [admin-design-system.md](admin-design-system.md) - the admin design system and application shell
+- [admin-ai-agent-experience.md](admin-ai-agent-experience.md) - the development workspace and the AI agent admin workflow
 
 ---
 

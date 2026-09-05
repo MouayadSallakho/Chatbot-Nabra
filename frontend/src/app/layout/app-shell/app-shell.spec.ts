@@ -1,11 +1,24 @@
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter, withComponentInputBinding } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
+import { of } from 'rxjs';
 import { MEDIA_QUERY_FACTORY, MediaQueries } from '@app/core/media/media';
 import { LOCAL_STORAGE } from '@app/core/storage/local-storage';
+import { TenantApi } from '@app/core/api/tenant-api';
+import { WORKSPACE_STORAGE_KEY } from '@app/core/workspace/workspace-context-service';
 import { NAV_ITEMS } from '@app/layout/navigation';
 import { FakeMediaMatcher, memoryStorage } from '@app/testing/test-doubles';
 import { routes } from '@app/app.routes';
+
+/** A workspace that already exists, so the guard lets the shell render. */
+const TENANT = {
+  id: '11111111-1111-1111-1111-111111111111',
+  name: 'Acme Trading',
+  slug: 'acme-trading',
+  status: 'Active' as const,
+};
 
 /**
  * The shell is tested through the real router, against the real route table.
@@ -35,8 +48,17 @@ describe('AppShell', () => {
     TestBed.configureTestingModule({
       providers: [
         provideRouter(routes, withComponentInputBinding()),
+        provideHttpClient(),
+        provideHttpClientTesting(),
         { provide: MEDIA_QUERY_FACTORY, useValue: media.factory },
-        { provide: LOCAL_STORAGE, useValue: memoryStorage() },
+        // A stored workspace, and a backend that confirms it exists. Together
+        // these satisfy the guard, so these tests stay about the shell rather
+        // than about workspace bootstrap -- which has its own suite.
+        {
+          provide: LOCAL_STORAGE,
+          useValue: memoryStorage({ [WORKSPACE_STORAGE_KEY]: TENANT.id }),
+        },
+        { provide: TenantApi, useValue: { get: () => of(TENANT), create: () => of(TENANT) } },
       ],
     });
 
@@ -115,11 +137,20 @@ describe('AppShell', () => {
     });
 
     it('renders a placeholder for an area that is not built, naming the area', async () => {
+      await render('/knowledge');
+
+      expect(query('h1')?.textContent).toContain('Knowledge');
+      // The point of the page: it says plainly that nothing is there.
+      expect(host().textContent).toContain('Not implemented yet');
+    });
+
+    it('renders the real feature for an area that is built', async () => {
+      // AI Agents stopped being a placeholder in Phase 11. The navigation model
+      // says so, and this is what proves the route followed it.
       await render('/ai-agents');
 
       expect(query('h1')?.textContent).toContain('AI Agents');
-      // The point of the page: it says plainly that nothing is there.
-      expect(host().textContent).toContain('Not implemented yet');
+      expect(host().textContent).not.toContain('Not implemented yet');
     });
 
     it('answers an unknown address deliberately, without redirecting', async () => {

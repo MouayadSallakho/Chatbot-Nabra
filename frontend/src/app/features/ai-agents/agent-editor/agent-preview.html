@@ -1,0 +1,95 @@
+<section class="card preview" aria-labelledby="preview-heading">
+  <div class="card-header">
+    <h2 id="preview-heading" class="text-card-title">Preview</h2>
+    @if (exchanges().length > 0) {
+      <button type="button" class="btn btn-ghost btn-sm" (click)="clear()">Clear</button>
+    }
+  </div>
+
+  <div class="card-body preview-body">
+    <p class="text-small text-secondary">
+      Send one message to test how this agent replies. Each message is answered on its own — the
+      agent is not given the earlier ones, and nothing here is saved.
+    </p>
+
+    @if (unsavedInstructions()) {
+      <!--
+        Worth saying plainly. The preview uses the agent's saved instructions, so
+        somebody testing an unsaved edit would otherwise conclude their change
+        had no effect.
+      -->
+      <div class="alert alert-info">
+        <app-icon name="alert" [strokeWidth]="1.75" />
+        <span>Preview uses the saved instructions. Save your changes to test them.</span>
+      </div>
+    }
+
+    @if (exchanges().length > 0) {
+      <ol class="transcript">
+        @for (exchange of exchanges(); track $index) {
+          <li class="exchange">
+            <div class="bubble bubble-you">
+              <span class="bubble-role">You</span>
+              <p>{{ exchange.message }}</p>
+            </div>
+            <div class="bubble bubble-agent">
+              <span class="bubble-role">Agent</span>
+              <p>{{ exchange.reply }}</p>
+            </div>
+          </li>
+        }
+      </ol>
+    }
+
+    @if (generating()) {
+      <p class="preview-status text-small text-secondary" role="status">
+        <span class="spinner" aria-hidden="true"></span>
+        <span>Generating a reply…</span>
+      </p>
+    }
+
+    @if (failure(); as error) {
+      <!--
+        One panel for every failure, with the copy chosen per kind. Nothing from
+        the provider reaches the screen: no status code, no upstream body, no
+        vendor name.
+      -->
+      <div
+        class="alert"
+        [class.alert-danger]="error.kind !== 'providerUnavailable'"
+        [class.alert-info]="error.kind === 'providerUnavailable'"
+        role="alert"
+      >
+        <app-icon name="alert" [strokeWidth]="1.75" />
+        <span>{{ error.message }}</span>
+      </div>
+    }
+
+    <form class="preview-form" [formGroup]="form" (ngSubmit)="send()">
+      <div class="field">
+        <label class="field-label" for="preview-message">Test message</label>
+        <textarea
+          id="preview-message"
+          class="textarea preview-input"
+          formControlName="message"
+          rows="3"
+          [attr.maxlength]="limits.previewMessageMax"
+          placeholder="Ask the agent something a customer might ask."
+        ></textarea>
+      </div>
+
+      <div class="preview-actions">
+        <button
+          type="submit"
+          class="btn btn-primary btn-sm"
+          [disabled]="generating() || message.invalid"
+        >
+          @if (generating()) {
+            <span class="spinner" aria-hidden="true"></span>
+          }
+          <span class="btn-label">{{ generating() ? 'Generating…' : 'Send' }}</span>
+        </button>
+      </div>
+    </form>
+  </div>
+</section>

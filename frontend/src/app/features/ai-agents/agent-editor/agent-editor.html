@@ -1,0 +1,257 @@
+<div class="page">
+  @if (loading()) {
+    <p class="text-body text-secondary" role="status">Loading agent…</p>
+  } @else if (loadFailure(); as error) {
+    <div class="card">
+      <app-empty-state
+        icon="alert"
+        tone="error"
+        heading="Could not load this agent"
+        [description]="error.message"
+      >
+        <button stateActions type="button" class="btn btn-secondary btn-sm" (click)="load()">
+          Try again
+        </button>
+        <a stateActions class="btn btn-ghost btn-sm" routerLink="/ai-agents">Back to agents</a>
+      </app-empty-state>
+    </div>
+  } @else if (agent(); as current) {
+    <app-page-header
+      [heading]="current.name"
+      description="Configure how this agent replies, then test it before putting it in service."
+    >
+      <div pageActions class="header-actions">
+        <span
+          class="badge"
+          [class.badge-success]="current.status === 'Active'"
+          [class.badge-neutral]="current.status === 'Draft'"
+          [class.badge-warning]="current.status === 'Disabled'"
+        >
+          {{ current.status }}
+        </span>
+        <a class="btn btn-secondary btn-sm" routerLink="/ai-agents">All agents</a>
+      </div>
+    </app-page-header>
+
+    @if (conflict(); as source) {
+      <!--
+        The stale-version state. It says what happened in plain words, confirms
+        the reader's work is still there, and offers exactly one action. There is
+        no automatic retry and no automatic merge -- both would decide something
+        only the reader can decide.
+      -->
+      <div class="alert alert-danger conflict" role="alert">
+        <app-icon name="alert" [strokeWidth]="1.75" />
+        <div class="conflict-body">
+          <p class="conflict-title">This agent was updated somewhere else.</p>
+          <p>
+            Your unsaved changes have not been overwritten and are still shown below. Reload the
+            latest saved version before saving again.
+            @if (source === 'lifecycle') {
+              The status change was not applied.
+            }
+          </p>
+          <button type="button" class="btn btn-secondary btn-sm" (click)="reloadLatest()">
+            Reload latest version
+          </button>
+        </div>
+      </div>
+    }
+
+    <div class="editor">
+      <div class="editor-main">
+        <!-- ------------------------------------------------------ identity -->
+        <section class="card" aria-labelledby="general-heading">
+          <div class="card-header">
+            <h2 id="general-heading" class="text-card-title">General</h2>
+          </div>
+          <div class="card-body">
+            <div class="field">
+              <label class="field-label field-required" for="agent-name">Agent name</label>
+              <input
+                id="agent-name"
+                class="input"
+                type="text"
+                [formControl]="name"
+                autocomplete="off"
+                [attr.maxlength]="limits.nameMax"
+                [attr.aria-invalid]="name.invalid ? 'true' : null"
+                aria-describedby="agent-name-hint"
+              />
+              <p class="field-hint" id="agent-name-hint">
+                How you will recognise this agent. Customers never see it.
+              </p>
+              @if (nameFailure(); as error) {
+                <p class="field-error" role="alert">
+                  <app-icon name="alert" [strokeWidth]="1.75" />
+                  <span>{{ error.message }}</span>
+                </p>
+              }
+            </div>
+
+            <div class="section-actions">
+              @if (nameChanged()) {
+                <span class="unsaved text-small" aria-live="polite">Unsaved changes</span>
+                <button type="button" class="btn btn-ghost btn-sm" (click)="resetName()">
+                  Discard
+                </button>
+              }
+              <button
+                type="button"
+                class="btn btn-primary btn-sm"
+                (click)="saveName()"
+                [disabled]="!nameChanged() || name.invalid || savingName() || cannotSave()"
+              >
+                @if (savingName()) {
+                  <span class="spinner" aria-hidden="true"></span>
+                }
+                <span class="btn-label">{{ savingName() ? 'Saving…' : 'Save name' }}</span>
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- -------------------------------------------------- instructions -->
+        <section class="card" aria-labelledby="instructions-heading">
+          <div class="card-header">
+            <h2 id="instructions-heading" class="text-card-title">Instructions</h2>
+          </div>
+          <div class="card-body">
+            <div class="field">
+              <label class="field-label field-required" for="agent-instructions">
+                How this agent should reply
+              </label>
+              <textarea
+                id="agent-instructions"
+                class="textarea instructions-input"
+                [formControl]="instructions"
+                rows="14"
+                [attr.maxlength]="limits.instructionsMax"
+                [attr.aria-invalid]="instructions.invalid ? 'true' : null"
+                aria-describedby="agent-instructions-hint"
+              ></textarea>
+              <p class="field-hint" id="agent-instructions-hint">
+                Instructions control this agent's business behaviour — its tone, what it may
+                promise, and when it should hand over to a person. Line breaks are preserved.
+                <span class="counter" [class.counter-low]="instructionsRemaining() < 500">
+                  {{ instructionsRemaining() }} of {{ limits.instructionsMax }} characters
+                  remaining.
+                </span>
+              </p>
+              @if (instructionsFailure(); as error) {
+                <p class="field-error" role="alert">
+                  <app-icon name="alert" [strokeWidth]="1.75" />
+                  <span>{{ error.message }}</span>
+                </p>
+              }
+            </div>
+
+            <div class="section-actions">
+              @if (instructionsChanged()) {
+                <span class="unsaved text-small" aria-live="polite">Unsaved changes</span>
+                <button type="button" class="btn btn-ghost btn-sm" (click)="resetInstructions()">
+                  Discard
+                </button>
+              }
+              <button
+                type="button"
+                class="btn btn-primary btn-sm"
+                (click)="saveInstructions()"
+                [disabled]="
+                  !instructionsChanged() ||
+                  instructions.invalid ||
+                  savingInstructions() ||
+                  cannotSave()
+                "
+              >
+                @if (savingInstructions()) {
+                  <span class="spinner" aria-hidden="true"></span>
+                }
+                <span class="btn-label">
+                  {{ savingInstructions() ? 'Saving…' : 'Save instructions' }}
+                </span>
+              </button>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <div class="editor-side">
+        <!-- ----------------------------------------------------- lifecycle -->
+        <section class="card" aria-labelledby="status-heading">
+          <div class="card-header">
+            <h2 id="status-heading" class="text-card-title">Status</h2>
+          </div>
+          <div class="card-body lifecycle">
+            <p class="text-small text-secondary">
+              @if (current.status === 'Draft') {
+                This agent is a draft. It is not in service, and activating it makes it available to
+                answer.
+              } @else if (current.status === 'Active') {
+                This agent is in service. Disabling it takes it out of service; its configuration is
+                kept.
+              } @else {
+                This agent is out of service. Activating it puts it back into service.
+              }
+            </p>
+
+            @if (lifecycleFailure(); as error) {
+              <div class="alert alert-danger" role="alert">
+                <app-icon name="alert" [strokeWidth]="1.75" />
+                <span>{{ error.message }}</span>
+              </div>
+            }
+
+            <!--
+              Only the transitions the agent's current state actually allows. A
+              draft cannot be disabled, so no disable control is offered for one:
+              showing an action that is guaranteed to be refused invites a click
+              and teaches the reader that this product's buttons do not work.
+            -->
+            <div class="section-actions">
+              @if (current.status === 'Active') {
+                <button
+                  type="button"
+                  class="btn btn-danger btn-sm"
+                  (click)="requestDisable()"
+                  [disabled]="changingLifecycle() || cannotSave()"
+                >
+                  <span class="btn-label">Disable agent</span>
+                </button>
+              } @else {
+                <button
+                  type="button"
+                  class="btn btn-primary btn-sm"
+                  (click)="activate()"
+                  [disabled]="changingLifecycle() || cannotSave()"
+                >
+                  @if (changingLifecycle()) {
+                    <span class="spinner" aria-hidden="true"></span>
+                  }
+                  <span class="btn-label">
+                    {{ changingLifecycle() ? 'Working…' : 'Activate agent' }}
+                  </span>
+                </button>
+              }
+            </div>
+          </div>
+        </section>
+
+        <app-agent-preview
+          [tenantId]="tenantId()"
+          [aiAgentId]="aiAgentId()"
+          [unsavedInstructions]="instructionsChanged()"
+        />
+      </div>
+    </div>
+
+    <app-confirm-dialog
+      #confirmDisable
+      heading="Disable this agent?"
+      body="It will stop answering until you activate it again. Its name and instructions are kept."
+      confirmLabel="Disable agent"
+      tone="danger"
+      (confirmed)="disable()"
+    />
+  }
+</div>

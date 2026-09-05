@@ -1,0 +1,66 @@
+// A centred single-purpose page. Deliberately outside the admin shell: there is
+// no workspace yet, so navigation to workspace-scoped areas would lead nowhere.
+.setup {
+  display: grid;
+  place-items: center;
+  min-block-size: 100vh;
+  min-block-size: 100dvh;
+  padding: var(--space-6);
+  background-color: var(--surface-page);
+}
+
+.setup-card {
+  inline-size: 100%;
+  max-inline-size: 32rem;
+  padding: var(--space-7);
+
+  &:focus-visible {
+    outline: none;
+  }
+}
+
+.setup-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-block-end: var(--space-6);
+}
+
+.brand-mark {
+  inline-size: 1.75rem;
+  block-size: 1.75rem;
+  color: var(--accent);
+  flex: none;
+}
+
+.brand-name {
+  font: var(--text-section-title);
+  letter-spacing: var(--letter-spacing-tight);
+}
+
+.setup-lead {
+  margin-block-start: var(--space-3);
+  max-inline-size: 52ch;
+}
+
+.setup-alert {
+  margin-block-start: var(--space-5);
+}
+
+.setup-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  margin-block-start: var(--space-6);
+}
+
+.setup-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-block-start: var(--space-6);
+}
+
+.setup-form .setup-actions {
+  margin-block-start: 0;
+}

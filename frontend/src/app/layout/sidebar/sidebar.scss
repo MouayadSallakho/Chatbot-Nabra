@@ -169,3 +169,49 @@
   border-inline-end: none;
   box-shadow: var(--shadow-overlay);
 }
+
+// -----------------------------------------------------------------------------
+// Workspace
+// -----------------------------------------------------------------------------
+// The one place the workspace is named, and it names only what the backend owns.
+// Deliberately quiet: it is context, not a control panel, and it is explicitly
+// labelled as a development concept so nobody mistakes it for an account.
+.sidebar-workspace {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  flex: none;
+  padding: var(--space-3) var(--space-4);
+  border-block-start: 1px solid var(--border-subtle);
+  overflow: hidden;
+}
+
+.workspace-label {
+  font: var(--text-label);
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-caps);
+  white-space: nowrap;
+}
+
+.workspace-name {
+  font: var(--text-body-strong);
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-reset {
+  align-self: flex-start;
+  padding-inline: 0;
+  color: var(--text-muted);
+  text-decoration: underline;
+}
+
+// Collapsed to icons, the workspace block has nothing legible to show, so it
+// steps aside entirely rather than becoming an unexplained stripe.
+.sidebar.is-collapsed .sidebar-workspace {
+  display: none;
+}

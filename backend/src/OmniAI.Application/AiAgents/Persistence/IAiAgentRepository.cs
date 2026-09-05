@@ -8,9 +8,9 @@ namespace OmniAI.Application.AiAgents.Persistence;
 /// The only way the AI agent use cases reach storage.
 /// </summary>
 /// <remarks>
-/// Three methods, because the six authorised use cases need three things and
-/// nothing more: find one agent, store a new one, save changes to an existing
-/// one. It is deliberately <em>not</em> an <c>IRepository&lt;T&gt;</c>, and a
+/// Four methods, because the authorised use cases need four things and nothing
+/// more: find one agent, list a tenant's agents, store a new one, save changes
+/// to an existing one. It is deliberately <em>not</em> an <c>IRepository&lt;T&gt;</c>, and a
 /// second repository existing is not a reason to introduce one -- a generic
 /// repository would have to expose either <c>IQueryable</c> or a specification
 /// language to stay useful, and both hand the caller the storage model back
@@ -74,6 +74,50 @@ public interface IAiAgentRepository
     Task<VersionedAiAgent?> FindAsync(
         TenantId tenantId,
         AiAgentId agentId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Reads one page of a tenant's agents, newest change first.
+    /// </summary>
+    /// <param name="tenantId">The tenant whose agents to list.</param>
+    /// <param name="page">The 1-based page number. Already validated by the caller.</param>
+    /// <param name="pageSize">How many agents the page may hold. Already validated.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>
+    /// The page, together with the tenant's total agent count. A tenant with no
+    /// agents -- and a tenant that does not exist -- both produce an empty page.
+    /// </returns>
+    /// <remarks>
+    /// <para>
+    /// <strong>The tenant is a required argument, exactly as it is for
+    /// <see cref="FindAsync"/>.</strong> There is no "list all agents" overload,
+    /// so no call site can accidentally read across tenants, and the filter must
+    /// be in the query rather than applied to results afterwards.
+    /// </para>
+    /// <para>
+    /// <strong>Returns summaries, not aggregates.</strong> Instructions may be
+    /// twenty thousand characters and a list shows none of them, so the
+    /// implementation must not select the column. Returning <c>AiAgent</c>
+    /// instances would also put a page of aggregates into the change tracker for a
+    /// read that will never write.
+    /// </para>
+    /// <para>
+    /// <strong>The order is part of the contract, not an implementation
+    /// detail.</strong> Most recently changed first, tie-broken by identity, so
+    /// paging is stable: without a total order two pages can overlap or skip rows
+    /// when several agents share a timestamp. No caller may choose the order --
+    /// a sort parameter is a query surface with no requirement behind it yet.
+    /// </para>
+    /// <para>
+    /// No version markers. A summary is not something a caller may write against;
+    /// conditional writes need the version of the representation actually read,
+    /// which only <see cref="FindAsync"/> produces.
+    /// </para>
+    /// </remarks>
+    Task<ListAiAgents.AiAgentPage> ListAsync(
+        TenantId tenantId,
+        int page,
+        int pageSize,
         CancellationToken cancellationToken = default);
 
     /// <summary>

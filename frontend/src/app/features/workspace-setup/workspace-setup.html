@@ -1,0 +1,131 @@
+<div class="setup">
+  <main class="setup-card card" id="main-content" tabindex="-1">
+    <div class="setup-brand">
+      <svg class="brand-mark" viewBox="0 0 28 28" aria-hidden="true" focusable="false">
+        <rect width="28" height="28" rx="8" fill="currentColor" />
+        <circle cx="11" cy="11.5" r="3.25" fill="var(--accent-contrast)" />
+        <circle cx="18" cy="17" r="2.25" fill="var(--accent-contrast)" fill-opacity="0.7" />
+      </svg>
+      <span class="brand-name">OmniAI</span>
+    </div>
+
+    @if (unreachable()) {
+      <!--
+        The stored workspace exists as far as this browser knows; we simply could
+        not reach the backend. Deliberately no create form here -- offering one
+        would invite a duplicate workspace to repair a problem that is probably a
+        backend that is not running.
+      -->
+      <h1 class="text-page-title">Cannot reach the backend</h1>
+      <p class="setup-lead text-body text-secondary">
+        This browser has a development workspace selected, but the OmniAI API did not respond. Your
+        workspace has not been changed or cleared.
+      </p>
+
+      <div class="alert alert-danger setup-alert" role="alert">
+        <app-icon name="alert" [strokeWidth]="1.75" />
+        <span>Check that the backend is running, then try again.</span>
+      </div>
+
+      <div class="setup-actions">
+        <button type="button" class="btn btn-primary" (click)="retry()" [disabled]="retrying()">
+          @if (retrying()) {
+            <span class="spinner" aria-hidden="true"></span>
+          }
+          <span class="btn-label">{{ retrying() ? 'Retrying…' : 'Try again' }}</span>
+        </button>
+        <button type="button" class="btn btn-ghost" (click)="forget()">
+          Forget this workspace
+        </button>
+      </div>
+    } @else {
+      <h1 class="text-page-title">Create a development workspace</h1>
+      <p class="setup-lead text-body text-secondary">
+        OmniAI needs a workspace to hold your AI agents. This creates a real tenant through the
+        platform API.
+      </p>
+
+      <!--
+        Said plainly, on screen. A reviewer looking at a polished first-run flow
+        will otherwise reasonably assume it is a sign-in.
+      -->
+      <div class="alert alert-info setup-alert">
+        <app-icon name="alert" [strokeWidth]="1.75" />
+        <span>
+          This is a development-only workspace selector, not a sign-in. OmniAI has no accounts,
+          passwords or permissions yet, and this application is not ready to be exposed publicly.
+        </span>
+      </div>
+
+      <form class="setup-form" [formGroup]="form" (ngSubmit)="create()" novalidate>
+        <div class="field">
+          <label class="field-label field-required" for="workspace-name">Workspace name</label>
+          <input
+            id="workspace-name"
+            class="input"
+            type="text"
+            formControlName="name"
+            autocomplete="organization"
+            [attr.aria-invalid]="showError('name') ? 'true' : null"
+            [attr.aria-describedby]="showError('name') ? 'workspace-name-error' : null"
+            (input)="suggestSlug()"
+          />
+          @if (showError('name')) {
+            <p class="field-error" id="workspace-name-error" role="alert">
+              <app-icon name="alert" [strokeWidth]="1.75" />
+              <span>A workspace name is required.</span>
+            </p>
+          }
+        </div>
+
+        <div class="field">
+          <label class="field-label field-required" for="workspace-slug">Workspace slug</label>
+          <input
+            id="workspace-slug"
+            class="input"
+            type="text"
+            formControlName="slug"
+            autocomplete="off"
+            spellcheck="false"
+            [attr.aria-invalid]="showError('slug') ? 'true' : null"
+            aria-describedby="workspace-slug-hint"
+            [attr.aria-errormessage]="showError('slug') ? 'workspace-slug-error' : null"
+          />
+          <p class="field-hint" id="workspace-slug-hint">
+            Lowercase letters, digits and hyphens, {{ slugLimits.min }}–{{ slugLimits.max }}
+            characters. Used to identify the workspace.
+          </p>
+          @if (showError('slug')) {
+            <p class="field-error" id="workspace-slug-error" role="alert">
+              <app-icon name="alert" [strokeWidth]="1.75" />
+              <span>
+                Use {{ slugLimits.min }}–{{ slugLimits.max }} lowercase letters, digits or hyphens.
+              </span>
+            </p>
+          }
+        </div>
+
+        @if (failure(); as error) {
+          <!--
+            The backend's own words for a rejected value or a slug somebody
+            already holds. It stays the authority; nothing here re-derives its
+            rules.
+          -->
+          <div class="alert alert-danger" role="alert">
+            <app-icon name="alert" [strokeWidth]="1.75" />
+            <span>{{ error.message }}</span>
+          </div>
+        }
+
+        <div class="setup-actions">
+          <button type="submit" class="btn btn-primary" [disabled]="submitting()">
+            @if (submitting()) {
+              <span class="spinner" aria-hidden="true"></span>
+            }
+            <span class="btn-label">{{ submitting() ? 'Creating…' : 'Create workspace' }}</span>
+          </button>
+        </div>
+      </form>
+    }
+  </main>
+</div>

@@ -1,0 +1,69 @@
+.preview-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.transcript {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-block-size: 24rem;
+  overflow-y: auto;
+  padding-inline-end: var(--space-1);
+}
+
+.exchange {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.bubble {
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  // Preserves the line breaks somebody typed and the ones the agent produced,
+  // without letting a long unbroken string widen the panel.
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: var(--text-body);
+}
+
+.bubble-role {
+  display: block;
+  margin-block-end: var(--space-1);
+  font: var(--text-label);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-caps);
+}
+
+// The two sides differ by surface and by inline offset, not by colour alone,
+// and each is labelled in text.
+.bubble-you {
+  background-color: var(--surface-muted);
+  border: 1px solid var(--border-subtle);
+  margin-inline-start: var(--space-6);
+}
+
+.bubble-agent {
+  background-color: var(--accent-subtle);
+  border: 1px solid var(--accent-subtle-border);
+  margin-inline-end: var(--space-6);
+}
+
+.preview-status {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.preview-input {
+  min-block-size: 5rem;
+}
+
+.preview-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-block-start: var(--space-3);
+}

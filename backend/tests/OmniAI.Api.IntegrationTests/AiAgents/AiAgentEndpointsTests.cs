@@ -686,22 +686,54 @@ public sealed class AiAgentEndpointsTests(AiAgentApiFixture api) : IClassFixture
 
     // ------------------------------------------------------------------ routing
 
+    /// <summary>
+    /// Deletion is still not a thing this API does.
+    /// </summary>
+    /// <remarks>
+    /// This guard originally covered listing as well. Phase 11 added
+    /// <c>GET /api/tenants/{tenantId}/ai-agents</c> by explicit authorisation, so
+    /// that half moved to the assertion below rather than being dropped -- an
+    /// endpoint appearing should always be a deliberate, reviewed change, and a
+    /// guard that is silently deleted stops being one.
+    /// <para>
+    /// Removing an agent is deferred: what should happen to its conversations,
+    /// and whether removal is archival or destructive, are product decisions
+    /// nobody has taken. Answering 405 says that honestly; a soft-delete invented
+    /// here would be a decision made by accident.
+    /// </para>
+    /// </remarks>
     [Fact]
-    public async Task Delete_and_list_are_not_exposed()
+    public async Task Delete_is_not_exposed()
     {
         using HttpClient client = api.CreateClient();
         (Guid tenantId, Guid agentId, _) = await ArrangeAsync(client);
 
         using HttpResponseMessage deleted = await client.DeleteAsync(AgentRoute(tenantId, agentId));
-        using HttpResponseMessage listed = await client.GetAsync(AgentsRoute(tenantId));
 
         Assert.Equal(HttpStatusCode.MethodNotAllowed, deleted.StatusCode);
-        Assert.Equal(HttpStatusCode.MethodNotAllowed, listed.StatusCode);
 
+        // And nothing was removed on the way to being refused.
         object? stored = await api.Database.ExecuteScalarAsync(
             $"SELECT count(*) FROM ai_agents WHERE id = '{agentId}'");
 
         Assert.Equal(1L, stored as long?);
+    }
+
+    /// <summary>Listing is exposed, as of Phase 11.</summary>
+    /// <remarks>
+    /// The counterpart to the guard above: the contract changed deliberately, so
+    /// a test says so. Its behaviour is covered in full by
+    /// <see cref="AiAgentListApiTests"/>.
+    /// </remarks>
+    [Fact]
+    public async Task List_is_exposed()
+    {
+        using HttpClient client = api.CreateClient();
+        (Guid tenantId, _, _) = await ArrangeAsync(client);
+
+        using HttpResponseMessage listed = await client.GetAsync(AgentsRoute(tenantId));
+
+        Assert.Equal(HttpStatusCode.OK, listed.StatusCode);
     }
 
     [Fact]

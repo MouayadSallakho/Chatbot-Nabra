@@ -12,10 +12,12 @@
     [collapsed]="collapsed()"
     [drawer]="drawer()"
     [open]="navOpen()"
+    [workspaceName]="workspaceName()"
     [attr.inert]="navHidden() ? '' : null"
     (collapseToggled)="toggleCollapsed()"
     (dismissed)="closeNav()"
     (navigated)="onNavigated()"
+    (workspaceReset)="resetWorkspace()"
   />
 
   @if (drawer()) {
@@ -56,4 +58,10 @@
       <router-outlet />
     </main>
   </div>
+
+  <!--
+    Rendered once, by the shell, because its live region has to exist in the DOM
+    before anything is announced into it.
+  -->
+  <app-toast-host />
 </div>

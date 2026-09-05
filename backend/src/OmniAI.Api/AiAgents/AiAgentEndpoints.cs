@@ -3,6 +3,7 @@ using OmniAI.Application.AiAgents.ActivateAiAgent;
 using OmniAI.Application.AiAgents.CreateAiAgent;
 using OmniAI.Application.AiAgents.DisableAiAgent;
 using OmniAI.Application.AiAgents.GetAiAgentById;
+using OmniAI.Application.AiAgents.ListAiAgents;
 using OmniAI.Application.AiAgents.PreviewAiAgent;
 using OmniAI.Application.AiAgents.RenameAiAgent;
 using OmniAI.Application.AiAgents.UpdateAiAgentInstructions;
@@ -77,6 +78,9 @@ internal static class AiAgentEndpoints
         agents.MapPost("/", CreateAsync)
             .WithName("CreateAiAgent");
 
+        agents.MapGet("/", ListAsync)
+            .WithName("ListAiAgents");
+
         agents.MapGet("/{aiAgentId:guid}", GetByIdAsync)
             .WithName(GetAiAgentByIdRouteName);
 
@@ -145,6 +149,48 @@ internal static class AiAgentEndpoints
             GetAiAgentByIdRouteName,
             new { tenantId = created.View.TenantId, aiAgentId = created.View.Id },
             AiAgentResponse.From(created.View));
+    }
+
+    /// <summary>
+    /// <c>GET /api/tenants/{tenantId}/ai-agents</c>. Returns <c>200</c> with one
+    /// page of the tenant's agents.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <strong>No <c>ETag</c>, and no <c>404</c>.</strong> A page is not a
+    /// resource a caller may write against, so there is no version to publish. A
+    /// tenant with no agents and a tenant that does not exist both answer
+    /// <c>200</c> with an empty page: making those distinguishable would turn this
+    /// endpoint into a way to discover which tenant ids are real, and an empty
+    /// list is the truthful answer to "what agents does this tenant have" in both
+    /// cases.
+    /// </para>
+    /// <para>
+    /// <c>page</c> and <c>pageSize</c> are optional and bound from the query
+    /// string as nullable integers, so "not supplied" stays distinguishable from
+    /// "supplied as zero". Out-of-range values are refused as <c>400</c> by the
+    /// handler rather than clamped -- a caller that asked for five hundred and
+    /// silently received a hundred cannot tell a truncated page from the end of
+    /// the list.
+    /// </para>
+    /// <para>
+    /// A value that is not an integer at all never reaches the handler: model
+    /// binding rejects it, and the malformed-request arm of the Problem Details
+    /// handler answers <c>400</c>.
+    /// </para>
+    /// </remarks>
+    private static async Task<IResult> ListAsync(
+        Guid tenantId,
+        int? page,
+        int? pageSize,
+        ListAiAgentsHandler handler,
+        CancellationToken cancellationToken)
+    {
+        AiAgentPage agents = await handler
+            .HandleAsync(new ListAiAgentsQuery(tenantId, page, pageSize), cancellationToken)
+            .ConfigureAwait(false);
+
+        return Results.Ok(AiAgentPageResponse.From(agents));
     }
 
     /// <summary>

@@ -36,7 +36,7 @@ export interface NavItem {
  */
 export const NAV_ITEMS: readonly NavItem[] = [
   { label: 'Overview', path: 'overview', icon: 'overview', implemented: true },
-  { label: 'AI Agents', path: 'ai-agents', icon: 'agents', implemented: false },
+  { label: 'AI Agents', path: 'ai-agents', icon: 'agents', implemented: true },
   { label: 'Conversations', path: 'conversations', icon: 'conversations', implemented: false },
   { label: 'Knowledge', path: 'knowledge', icon: 'knowledge', implemented: false },
   { label: 'Channels', path: 'channels', icon: 'channels', implemented: false },

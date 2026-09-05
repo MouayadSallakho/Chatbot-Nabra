@@ -1,5 +1,6 @@
 using System.Globalization;
 using OmniAI.Application.AiAgents;
+using OmniAI.Application.AiAgents.ListAiAgents;
 using OmniAI.Application.AiAgents.Persistence;
 using OmniAI.Application.Concurrency;
 using OmniAI.Application.Tenants;
@@ -13,7 +14,7 @@ namespace OmniAI.Application.Tests.AiAgents;
 /// </summary>
 /// <remarks>
 /// Written out rather than produced by a mocking framework, for the same reasons
-/// as <c>InMemoryTenantRepository</c>: the contract has three methods, this fake
+/// as <c>InMemoryTenantRepository</c>: the contract has four methods, this fake
 /// is shorter than the setup code a framework would need, and it can express the
 /// things that actually matter -- that tenant scoping happens in the store rather
 /// than being decided by the handler, and that a version mismatch is raised by
@@ -92,6 +93,52 @@ internal sealed class InMemoryAiAgentRepository : IAiAgentRepository
             candidate.Agent.Id == agentId && candidate.Agent.TenantId == tenantId);
 
         return Task.FromResult(row is null ? null : new VersionedAiAgent(row.Agent, row.Version));
+    }
+
+    /// <summary>
+    /// Reads a page of one tenant's agents, in the order the contract promises.
+    /// </summary>
+    /// <remarks>
+    /// <strong>Filters by tenant, exactly as the real query does in SQL.</strong>
+    /// A fake that returned every stored agent would let a cross-tenant test pass
+    /// against a handler with no scoping at all, which would make it worse than
+    /// no test -- so the property under test is preserved here rather than
+    /// assumed.
+    /// <para>
+    /// The ordering is reproduced too, including the identity tie-break, so the
+    /// Application suite can prove the handler asks for a deterministic page
+    /// without needing a database to do it.
+    /// </para>
+    /// </remarks>
+    public Task<AiAgentPage> ListAsync(
+        TenantId tenantId,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default)
+    {
+        List<AiAgent> owned = [.. _rows
+            .Select(row => row.Agent)
+            .Where(agent => agent.TenantId == tenantId)];
+
+        if (owned.Count == 0)
+        {
+            return Task.FromResult(AiAgentPage.Empty(page, pageSize));
+        }
+
+        List<AiAgentSummary> items = [.. owned
+            .OrderByDescending(agent => agent.UpdatedAt)
+            .ThenBy(agent => agent.Id.Value)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(agent => new AiAgentSummary(
+                agent.Id.Value,
+                agent.TenantId.Value,
+                agent.Name.Value,
+                agent.Status,
+                agent.CreatedAt,
+                agent.UpdatedAt))];
+
+        return Task.FromResult(new AiAgentPage(items, page, pageSize, owned.Count));
     }
 
     public Task<ConcurrencyToken> AddAsync(

@@ -3,6 +3,7 @@ using OmniAI.Application.AiAgents.ActivateAiAgent;
 using OmniAI.Application.AiAgents.CreateAiAgent;
 using OmniAI.Application.AiAgents.DisableAiAgent;
 using OmniAI.Application.AiAgents.GetAiAgentById;
+using OmniAI.Application.AiAgents.ListAiAgents;
 using OmniAI.Application.AiAgents.PreviewAiAgent;
 using OmniAI.Application.AiAgents.RenameAiAgent;
 using OmniAI.Application.AiAgents.UpdateAiAgentInstructions;
@@ -80,6 +81,7 @@ internal static class CompositionRoot
         services.AddScoped<GetTenantByIdHandler>();
         services.AddScoped<CreateAiAgentHandler>();
         services.AddScoped<GetAiAgentByIdHandler>();
+        services.AddScoped<ListAiAgentsHandler>();
         services.AddScoped<RenameAiAgentHandler>();
         services.AddScoped<UpdateAiAgentInstructionsHandler>();
         services.AddScoped<ActivateAiAgentHandler>();

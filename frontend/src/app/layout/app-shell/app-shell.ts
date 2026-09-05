@@ -15,6 +15,9 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { filter } from 'rxjs';
 import { MediaQueries, mediaQuerySignal } from '@app/core/media/media';
 import { LOCAL_STORAGE, readStored, writeStored } from '@app/core/storage/local-storage';
+import { ToastHost } from '@app/core/feedback/toast-host';
+import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
+import { WORKSPACE_SETUP_PATH } from '@app/core/workspace/workspace-guard';
 import { Sidebar } from '@app/layout/sidebar/sidebar';
 import { Topbar } from '@app/layout/topbar/topbar';
 
@@ -36,7 +39,7 @@ const COLLAPSED_STORAGE_KEY = 'omniai.sidebar-collapsed';
 @Component({
   selector: 'app-shell',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterOutlet, Sidebar, Topbar],
+  imports: [RouterOutlet, Sidebar, Topbar, ToastHost],
   templateUrl: './app-shell.html',
   styleUrl: './app-shell.scss',
   host: {
@@ -50,6 +53,7 @@ const COLLAPSED_STORAGE_KEY = 'omniai.sidebar-collapsed';
 export class AppShell {
   private readonly router = inject(Router);
   private readonly storage = inject(LOCAL_STORAGE);
+  private readonly workspace = inject(WorkspaceContextService);
   private readonly injector = inject(Injector);
 
   private readonly sidebar = viewChild.required(Sidebar);
@@ -84,6 +88,14 @@ export class AppShell {
    * most common ways a drawer fails for keyboard users.
    */
   protected readonly navHidden = computed(() => this.drawer() && !this.drawerOpen());
+
+  /**
+   * The real name of the workspace being administered, or empty before it loads.
+   *
+   * Read straight from the tenant the backend returned. Nothing here is invented,
+   * and there is no user, plan or role to show alongside it.
+   */
+  protected readonly workspaceName = computed(() => this.workspace.tenant()?.name ?? '');
 
   /** Emits once per completed navigation. */
   private readonly navigation = toSignal(
@@ -172,6 +184,17 @@ export class AppShell {
 
   protected onEscape(): void {
     this.closeNav();
+  }
+
+  /**
+   * Forgets the local development workspace and returns to setup.
+   *
+   * Development-only, and not a sign-out -- nothing is signed in. The tenant and
+   * its agents are untouched; this browser stops pointing at them.
+   */
+  protected async resetWorkspace(): Promise<void> {
+    this.workspace.clear();
+    await this.router.navigate(['/', WORKSPACE_SETUP_PATH]);
   }
 
   /**

@@ -1,0 +1,86 @@
+// One markup, two layouts.
+//
+// Rows are a list of links, styled as an aligned grid on wide screens and as
+// stacked cards on narrow ones. A real <table> would have meant either a second
+// copy of the markup for mobile or a horizontally scrolling table on a phone --
+// and these rows are navigational, not tabular data somebody compares
+// column-by-column.
+.agent-list {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background-color: var(--surface-default);
+  overflow: hidden;
+}
+
+.agent-list-head {
+  display: none;
+}
+
+.agent-row {
+  display: grid;
+  gap: var(--space-1) var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  color: var(--text-primary);
+  text-decoration: none;
+  transition: background-color var(--motion-fast) var(--ease-standard);
+
+  &:hover {
+    background-color: var(--surface-hover);
+    text-decoration: none;
+  }
+}
+
+li + li .agent-row {
+  border-block-start: 1px solid var(--border-subtle);
+}
+
+.agent-name {
+  font: var(--text-body-strong);
+  overflow-wrap: anywhere;
+}
+
+.agent-chevron {
+  display: none;
+  color: var(--text-muted);
+}
+
+.agent-row-skeleton {
+  display: grid;
+  gap: var(--space-2);
+}
+
+// ----------------------------------------------------------------------------
+// Wide layout
+// ----------------------------------------------------------------------------
+// From Bootstrap's `md`, the same breakpoint the grid classes use.
+@media (min-width: 768px) {
+  .agent-list-head,
+  .agent-row {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) 9rem minmax(0, 1fr) 1.5rem;
+    align-items: center;
+    gap: var(--space-4);
+  }
+
+  .agent-list-head {
+    padding: var(--space-3) var(--space-5);
+    background-color: var(--surface-muted);
+    border-block-end: 1px solid var(--border-default);
+    color: var(--text-secondary);
+    font: var(--text-label);
+    text-transform: uppercase;
+    letter-spacing: var(--letter-spacing-caps);
+  }
+
+  // On a wide row the column header supplies the word, so repeating it inside
+  // the cell would be duplication. It stays for the stacked layout, where there
+  // is no header.
+  .agent-updated-label {
+    display: none;
+  }
+
+  .agent-chevron {
+    display: inline-flex;
+    justify-self: end;
+  }
+}

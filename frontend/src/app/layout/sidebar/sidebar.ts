@@ -37,6 +37,15 @@ export class Sidebar {
   /** Whether the drawer is showing. Meaningless outside drawer mode. */
   readonly open = input(false);
 
+  /**
+   * The real name of the workspace being administered.
+   *
+   * Only ever a value the backend owns. There is deliberately no plan, role,
+   * avatar or account here -- none of those exist, and a placeholder for one
+   * would be a claim this product cannot back up.
+   */
+  readonly workspaceName = input('');
+
   /** The reader asked to collapse or expand the desktop sidebar. */
   readonly collapseToggled = output<void>();
 
@@ -51,6 +60,14 @@ export class Sidebar {
    * the reader's own action.
    */
   readonly navigated = output<void>();
+
+  /**
+   * The operator asked to forget the local development workspace.
+   *
+   * Not a sign-out: nothing is signed in, no session ends, and the workspace and
+   * its agents continue to exist. This browser simply stops pointing at them.
+   */
+  readonly workspaceReset = output<void>();
 
   protected readonly items = NAV_ITEMS;
 

@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 using OmniAI.Application.Ai;
 using OmniAI.Application.AiAgents;
+using OmniAI.Application.AiAgents.ListAiAgents;
 using OmniAI.Application.Tenants;
 using OmniAI.Domain;
 
@@ -217,6 +218,16 @@ internal sealed partial class DomainProblemDetailsHandler(
         // aggregate was consulted. This is a limit the platform places on a
         // request it will accept, so the Application raises its own type and the
         // Domain is never asked a question about a message it does not model.
+        // A listing request asking for a page this platform will not serve.
+        // 400, because the caller can fix it: the message names the bound, so a
+        // corrected request is one edit away. Refused rather than clamped --
+        // silently returning fewer rows than asked for is how a client concludes
+        // it has reached the end of a list when it has not.
+        AiAgentPageValidationException paging => (
+            StatusCodes.Status400BadRequest,
+            "Invalid page request",
+            paging.Message),
+
         AiTurnValidationException message => (
             StatusCodes.Status400BadRequest,
             "Invalid request details",

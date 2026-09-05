@@ -22,12 +22,25 @@
                 <app-icon [name]="panel.icon" [strokeWidth]="1.6" />
                 <span class="text-card-title">{{ panel.label }}</span>
               </span>
-              <span class="badge badge-neutral">Not implemented</span>
+              @if (panel.implemented) {
+                <span class="badge badge-success">Available</span>
+              } @else {
+                <span class="badge badge-neutral">Not implemented</span>
+              }
             </div>
 
+            <!--
+              Still no metrics. The AI Agents area is now real, but no aggregation
+              endpoint exists and none is authorised, so this panel offers a way
+              in rather than a number nobody can substantiate.
+            -->
             <app-empty-state
-              heading="No data source connected"
-              description="This panel has nothing to show until the platform API is wired up."
+              [heading]="panel.implemented ? 'Ready to configure' : 'No data source connected'"
+              [description]="
+                panel.implemented
+                  ? 'Create and configure the agents that answer on your behalf.'
+                  : 'This panel has nothing to show until the platform API is wired up.'
+              "
             >
               <a stateActions class="btn btn-secondary btn-sm" [routerLink]="'/' + panel.path">
                 Open {{ panel.label }}

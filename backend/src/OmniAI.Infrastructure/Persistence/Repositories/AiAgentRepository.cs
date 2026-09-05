@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Npgsql;
 using OmniAI.Application.AiAgents;
+using OmniAI.Application.AiAgents.ListAiAgents;
 using OmniAI.Application.AiAgents.Persistence;
 using OmniAI.Application.Concurrency;
 using OmniAI.Application.Tenants;
@@ -60,6 +61,73 @@ internal sealed class AiAgentRepository(OmniAiDbContext context) : IAiAgentRepos
             .ConfigureAwait(false);
 
         return agent is null ? null : new VersionedAiAgent(agent, CurrentVersion(agent));
+    }
+
+    /// <summary>
+    /// Reads one page of a tenant's agents, most recently changed first.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <strong>The tenant predicate is in the SQL, and it is the first thing in
+    /// the query.</strong> Rows belonging to another tenant are never read,
+    /// never counted and never materialised -- the count is filtered too, so a
+    /// caller cannot even learn how many agents somebody else has from a total
+    /// that looks too large.
+    /// </para>
+    /// <para>
+    /// <strong>The projection is the point of this method.</strong> Selecting
+    /// specific columns means <c>instructions</c> -- up to twenty thousand
+    /// characters per row -- never leaves PostgreSQL. It also keeps the change
+    /// tracker empty: <c>AsNoTracking</c> is implied by projecting to a
+    /// non-entity type, so a page of twenty agents costs no tracked state for a
+    /// read that will never write.
+    /// </para>
+    /// <para>
+    /// <strong>A total order, not just a useful one.</strong> Ordering by
+    /// <c>updated_at</c> alone would leave rows sharing a timestamp in whatever
+    /// order the database happened to return them, and two agents created in the
+    /// same transaction share one exactly. Under paging that is not cosmetic: an
+    /// unstable order makes consecutive pages overlap or skip rows. The id
+    /// tie-break makes the order deterministic.
+    /// </para>
+    /// <para>
+    /// Two round trips -- one count, one page. At the expected sizes that is
+    /// cheaper to reason about than a windowed count, and it keeps the page query
+    /// to the columns a list actually shows.
+    /// </para>
+    /// </remarks>
+    public async Task<AiAgentPage> ListAsync(
+        TenantId tenantId,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default)
+    {
+        IQueryable<AiAgent> owned = _context.AiAgents
+            .Where(candidate => candidate.TenantId == tenantId);
+
+        int totalCount = await owned.CountAsync(cancellationToken).ConfigureAwait(false);
+
+        if (totalCount == 0)
+        {
+            return AiAgentPage.Empty(page, pageSize);
+        }
+
+        List<AiAgentSummary> items = await owned
+            .OrderByDescending(candidate => candidate.UpdatedAt)
+            .ThenBy(candidate => candidate.Id)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(candidate => new AiAgentSummary(
+                candidate.Id.Value,
+                candidate.TenantId.Value,
+                candidate.Name.Value,
+                candidate.Status,
+                candidate.CreatedAt,
+                candidate.UpdatedAt))
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        return new AiAgentPage(items, page, pageSize, totalCount);
     }
 
     public async Task<ConcurrencyToken> AddAsync(
