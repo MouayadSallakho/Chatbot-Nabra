@@ -1,3 +1,4 @@
+using OmniAI.Api.Security;
 using OmniAI.Application.Tenants;
 using OmniAI.Application.Tenants.CreateTenant;
 using OmniAI.Application.Tenants.GetTenantById;
@@ -17,12 +18,14 @@ namespace OmniAI.Api.Tenants;
 /// database call.
 /// </para>
 /// <para>
-/// <strong>These endpoints are unauthenticated.</strong> Authentication and
-/// authorisation are not implemented yet, so anyone who can reach the process can
-/// create a tenant. They are development-stage functionality and are not
-/// authorised for public production exposure until the authentication phase is
-/// complete. No placeholder API key, bearer token or admin secret is present,
-/// because a fake control would only hide that fact.
+/// <strong>Both endpoints require a signed-in caller, and reading one requires
+/// membership of it.</strong> A tenant id in the route addresses a resource; it
+/// authorises nothing. Somebody who is signed in but does not belong to the
+/// tenant they name is answered exactly as they would be for a tenant that was
+/// never created -- so this route cannot be used to find out which workspaces
+/// exist. The check is made inside the use case rather than here, because an
+/// authorization attribute on an endpoint proves only that somebody is signed
+/// in.
 /// </para>
 /// </remarks>
 internal static class TenantEndpoints
@@ -40,7 +43,11 @@ internal static class TenantEndpoints
         ArgumentNullException.ThrowIfNull(endpoints);
 
         RouteGroupBuilder tenants = endpoints.MapGroup("/api/tenants")
-            .WithTags("Tenants");
+            .WithTags("Tenants")
+            // Nothing here is reachable anonymously. Creating a workspace needs
+            // somebody to own it, and reading one needs a membership to check.
+            .RequireAuthorization()
+            .AddEndpointFilter<AntiforgeryEndpointFilter>();
 
         tenants.MapPost("/", CreateTenantAsync)
             .WithName("CreateTenant");

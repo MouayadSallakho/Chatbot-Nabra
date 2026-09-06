@@ -54,8 +54,12 @@ public sealed class AiAgentPreconditionApiTests(AiAgentApiFixture api) : IClassF
         // Client A's request is handled by a server that reads the CURRENT row, so
         // nothing about the request itself is out of date. Only the version Client
         // A presents reveals that it never saw Client B's change.
-        using HttpClient clientA = api.CreateClient();
-        using HttpClient clientB = api.CreateClient();
+        // One person, two tabs: the same account signed in twice, differing only
+        // in their cookie jars. Two separate accounts would be a different test --
+        // neither would be a member of the other's workspace, so the second save
+        // would be refused as not-found long before any precondition was compared.
+        using HttpClient clientA = await api.CreateSignedInClientAsync();
+        using HttpClient clientB = await api.CreateSecondClientForAsync(clientA);
 
         (Guid tenantId, Guid agentId) = await ArrangeAsync(clientA);
 
@@ -108,7 +112,7 @@ public sealed class AiAgentPreconditionApiTests(AiAgentApiFixture api) : IClassF
         // The same scenario across every mutating route, including the two that
         // send no body. A precondition that held only for the endpoints with a
         // payload would leave the lifecycle operations able to act on a stale view.
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
 
         foreach ((string method, string suffix, bool hasBody) in
             (( string Method, string Suffix, bool HasBody)[])
@@ -155,7 +159,7 @@ public sealed class AiAgentPreconditionApiTests(AiAgentApiFixture api) : IClassF
         // can fail. Without an explicit precondition check the request would
         // succeed on a version the caller has not seen since -- a precondition
         // silently skipped because the operation happened to be a no-op.
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, Guid agentId) = await ArrangeAsync(client);
 
         string stale = await ReadVersionAsync(client, tenantId, agentId);
@@ -178,7 +182,7 @@ public sealed class AiAgentPreconditionApiTests(AiAgentApiFixture api) : IClassF
         // caller whose version is stale it is a 412, because the caller has not
         // seen the agent as it is -- and telling it about a rule describing a
         // state it has never seen would answer a question it did not ask.
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, Guid agentId) = await ArrangeAsync(client);
 
         string stale = await ReadVersionAsync(client, tenantId, agentId);
@@ -209,7 +213,7 @@ public sealed class AiAgentPreconditionApiTests(AiAgentApiFixture api) : IClassF
     {
         // A 412 is recoverable, not terminal. Re-reading and retrying is the
         // caller's own decision -- nothing retries on its behalf -- and it works.
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, Guid agentId) = await ArrangeAsync(client);
 
         string stale = await ReadVersionAsync(client, tenantId, agentId);
@@ -244,7 +248,7 @@ public sealed class AiAgentPreconditionApiTests(AiAgentApiFixture api) : IClassF
     [MemberData(nameof(Mutations))]
     public async Task A_mutation_without_if_match_returns_428(string method, string suffix, bool hasBody)
     {
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, Guid agentId) = await ArrangeAsync(client);
 
         using HttpResponseMessage response = await SendAsync(
@@ -266,7 +270,7 @@ public sealed class AiAgentPreconditionApiTests(AiAgentApiFixture api) : IClassF
     [MemberData(nameof(Mutations))]
     public async Task A_mutation_without_if_match_changes_nothing(string method, string suffix, bool hasBody)
     {
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, Guid agentId) = await ArrangeAsync(client);
 
         string before = await SnapshotAsync(agentId);
@@ -285,7 +289,7 @@ public sealed class AiAgentPreconditionApiTests(AiAgentApiFixture api) : IClassF
     [Fact]
     public async Task An_empty_if_match_is_treated_as_missing()
     {
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, Guid agentId) = await ArrangeAsync(client);
 
         using HttpResponseMessage response = await SendAsync(
@@ -312,7 +316,7 @@ public sealed class AiAgentPreconditionApiTests(AiAgentApiFixture api) : IClassF
         // because it would permit an update computed from any earlier version. A
         // weak tag is refused because it asserts semantic equivalence rather than
         // byte equality, and a list because it cannot express one exact version.
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, Guid agentId) = await ArrangeAsync(client);
 
         string before = await SnapshotAsync(agentId);
@@ -336,7 +340,7 @@ public sealed class AiAgentPreconditionApiTests(AiAgentApiFixture api) : IClassF
         // 412 tells it that it is out of date -- and only the second describes an
         // action that recovers. A value that cannot decode is certainly not this
         // row's version, so refusing the write is both correct and safe.
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, Guid agentId) = await ArrangeAsync(client);
 
         string before = await SnapshotAsync(agentId);
@@ -352,7 +356,7 @@ public sealed class AiAgentPreconditionApiTests(AiAgentApiFixture api) : IClassF
     [Fact]
     public async Task A_precondition_failure_discloses_nothing_about_the_database()
     {
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, Guid agentId) = await ArrangeAsync(client);
 
         using HttpResponseMessage response = await SendAsync(
@@ -371,7 +375,7 @@ public sealed class AiAgentPreconditionApiTests(AiAgentApiFixture api) : IClassF
 
     private async Task<(Guid TenantId, Guid AgentId)> ArrangeAsync(HttpClient client)
     {
-        Guid tenantId = await api.CreateTenantAsync();
+        Guid tenantId = await api.CreateTenantAsync(client);
 
         using HttpResponseMessage created =
             await CreateAsync(client, tenantId, "Sales Assistant", Instructions);

@@ -1,18 +1,25 @@
+using OmniAI.Application.Security;
 using OmniAI.Application.Tenants;
 using OmniAI.Application.Tenants.CreateTenant;
 using OmniAI.Application.Tenants.Persistence;
 using OmniAI.Domain;
+using OmniAI.Application.Tests.Security;
 using OmniAI.Domain.Tenants;
+using OmniAI.Domain.Users;
+using OmniAI.Testing;
 
 namespace OmniAI.Application.Tests.Tenants;
 
 public sealed class CreateTenantHandlerTests
 {
+    /// <summary>The person creating the workspaces in these tests.</summary>
+    private static readonly UserId Creator = UserId.New();
+
     [Fact]
     public async Task A_valid_command_creates_the_tenant()
     {
         InMemoryTenantRepository tenants = new();
-        CreateTenantHandler handler = new(tenants);
+        CreateTenantHandler handler = NewHandler(tenants);
 
         TenantView created = await handler.HandleAsync(
             new CreateTenantCommand("Acme Corporation", "acme"));
@@ -29,7 +36,7 @@ public sealed class CreateTenantHandlerTests
         // The handler must not do its own trimming: the Domain owns the rule, and
         // the value that reaches storage is the Domain's canonical form.
         InMemoryTenantRepository tenants = new();
-        CreateTenantHandler handler = new(tenants);
+        CreateTenantHandler handler = NewHandler(tenants);
 
         TenantView created = await handler.HandleAsync(
             new CreateTenantCommand("   Acme Corporation   ", "acme"));
@@ -42,7 +49,7 @@ public sealed class CreateTenantHandlerTests
     public async Task The_slug_is_stored_as_the_domain_canonicalises_it()
     {
         InMemoryTenantRepository tenants = new();
-        CreateTenantHandler handler = new(tenants);
+        CreateTenantHandler handler = NewHandler(tenants);
 
         TenantView created = await handler.HandleAsync(
             new CreateTenantCommand("Acme Corporation", "  ACME-Syria  "));
@@ -55,7 +62,7 @@ public sealed class CreateTenantHandlerTests
     public async Task A_new_tenant_starts_active()
     {
         InMemoryTenantRepository tenants = new();
-        CreateTenantHandler handler = new(tenants);
+        CreateTenantHandler handler = NewHandler(tenants);
 
         TenantView created = await handler.HandleAsync(
             new CreateTenantCommand("Acme Corporation", "acme"));
@@ -70,7 +77,7 @@ public sealed class CreateTenantHandlerTests
         // The command carries no id, so the aggregate is the only thing that can
         // have supplied this one.
         InMemoryTenantRepository tenants = new();
-        CreateTenantHandler handler = new(tenants);
+        CreateTenantHandler handler = NewHandler(tenants);
 
         TenantView first = await handler.HandleAsync(new CreateTenantCommand("Acme", "acme"));
         TenantView second = await handler.HandleAsync(new CreateTenantCommand("Globex", "globex"));
@@ -88,7 +95,7 @@ public sealed class CreateTenantHandlerTests
     public async Task A_blank_name_is_rejected_by_the_domain(string? name)
     {
         InMemoryTenantRepository tenants = new();
-        CreateTenantHandler handler = new(tenants);
+        CreateTenantHandler handler = NewHandler(tenants);
 
         await Assert.ThrowsAsync<DomainValidationException>(
             () => handler.HandleAsync(new CreateTenantCommand(name, "acme")));
@@ -106,7 +113,7 @@ public sealed class CreateTenantHandlerTests
     public async Task An_invalid_slug_is_rejected_by_the_domain(string slug)
     {
         InMemoryTenantRepository tenants = new();
-        CreateTenantHandler handler = new(tenants);
+        CreateTenantHandler handler = NewHandler(tenants);
 
         await Assert.ThrowsAsync<DomainValidationException>(
             () => handler.HandleAsync(new CreateTenantCommand("Acme Corporation", slug)));
@@ -119,7 +126,7 @@ public sealed class CreateTenantHandlerTests
     {
         // Nothing should reach persistence when the input could never be valid.
         InMemoryTenantRepository tenants = new();
-        CreateTenantHandler handler = new(tenants);
+        CreateTenantHandler handler = NewHandler(tenants);
 
         await Assert.ThrowsAsync<DomainValidationException>(
             () => handler.HandleAsync(new CreateTenantCommand("Acme", "no")));
@@ -133,7 +140,7 @@ public sealed class CreateTenantHandlerTests
         InMemoryTenantRepository tenants = new InMemoryTenantRepository()
             .Seed(Tenant.Create(TenantName.Create("Acme Corporation"), TenantSlug.Create("acme")));
 
-        CreateTenantHandler handler = new(tenants);
+        CreateTenantHandler handler = NewHandler(tenants);
 
         TenantSlugAlreadyExistsException conflict =
             await Assert.ThrowsAsync<TenantSlugAlreadyExistsException>(
@@ -151,7 +158,7 @@ public sealed class CreateTenantHandlerTests
         InMemoryTenantRepository tenants = new InMemoryTenantRepository()
             .Seed(Tenant.Create(TenantName.Create("Acme Corporation"), TenantSlug.Create("acme")));
 
-        CreateTenantHandler handler = new(tenants);
+        CreateTenantHandler handler = NewHandler(tenants);
 
         await Assert.ThrowsAsync<TenantSlugAlreadyExistsException>(
             () => handler.HandleAsync(new CreateTenantCommand("Acme Two", "ACME")));
@@ -166,7 +173,7 @@ public sealed class CreateTenantHandlerTests
         InMemoryTenantRepository tenants = new InMemoryTenantRepository { PretendSlugIsFree = true };
         tenants.Seed(Tenant.Create(TenantName.Create("Acme Corporation"), TenantSlug.Create("acme")));
 
-        CreateTenantHandler handler = new(tenants);
+        CreateTenantHandler handler = NewHandler(tenants);
 
         await Assert.ThrowsAsync<TenantSlugAlreadyExistsException>(
             () => handler.HandleAsync(new CreateTenantCommand("Acme Two", "acme")));
@@ -179,15 +186,107 @@ public sealed class CreateTenantHandlerTests
     [Fact]
     public async Task A_null_command_is_a_programming_error()
     {
-        CreateTenantHandler handler = new(new InMemoryTenantRepository());
+        CreateTenantHandler handler = NewHandler(new InMemoryTenantRepository());
 
         await Assert.ThrowsAsync<ArgumentNullException>(() => handler.HandleAsync(null!));
     }
 
     [Fact]
-    public void The_handler_requires_a_repository()
+    public void The_handler_requires_its_dependencies()
     {
-        Assert.Throws<ArgumentNullException>(() => new CreateTenantHandler(null!));
+        Assert.Throws<ArgumentNullException>(
+            () => new CreateTenantHandler(null!, Access(), TimeProvider.System));
+
+        Assert.Throws<ArgumentNullException>(
+            () => new CreateTenantHandler(new InMemoryTenantRepository(), null!, TimeProvider.System));
+
+        Assert.Throws<ArgumentNullException>(
+            () => new CreateTenantHandler(new InMemoryTenantRepository(), Access(), null!));
+    }
+
+    [Fact]
+    public async Task The_creator_becomes_a_member_of_the_workspace()
+    {
+        // Without this, a workspace would be created that its own creator could
+        // not open: every tenant-scoped request checks membership, and no
+        // endpoint grants one. The tenant would exist and be reachable by
+        // nobody, permanently.
+        InMemoryTenantRepository tenants = new();
+        CreateTenantHandler handler = NewHandler(tenants);
+
+        TenantView created = await handler.HandleAsync(
+            new CreateTenantCommand("Acme Corporation", "acme"));
+
+        TenantMembership membership = Assert.Single(tenants.Memberships);
+
+        Assert.Equal(Creator, membership.UserId);
+        Assert.Equal(created.Id, membership.TenantId.Value);
+    }
+
+    [Fact]
+    public async Task The_membership_is_stamped_with_the_injected_clock()
+    {
+        // One instant for the whole act, taken from the clock the composition
+        // root supplies. A handler that read DateTimeOffset.UtcNow itself could
+        // not be tested for this at all.
+        DateTimeOffset moment = new(2026, 9, 6, 8, 30, 0, TimeSpan.Zero);
+        InMemoryTenantRepository tenants = new();
+
+        CreateTenantHandler handler =
+            new(tenants, Access(), new FixedTimeProvider(moment));
+
+        await handler.HandleAsync(new CreateTenantCommand("Acme", "acme"));
+
+        Assert.Equal(moment, tenants.Memberships[0].CreatedAt);
+    }
+
+    [Fact]
+    public async Task An_anonymous_caller_cannot_create_a_workspace()
+    {
+        // Refused by the use case itself, not merely by the endpoint in front of
+        // it. A workspace has to belong to somebody, and there is nobody here.
+        InMemoryTenantRepository tenants = new();
+
+        CreateTenantHandler handler =
+            new(tenants, TestAccess.Anonymous(), TimeProvider.System);
+
+        await Assert.ThrowsAsync<NotAuthenticatedException>(
+            () => handler.HandleAsync(new CreateTenantCommand("Acme", "acme")));
+
+        Assert.Empty(tenants.Stored);
+        Assert.Empty(tenants.Memberships);
+    }
+
+    [Fact]
+    public async Task Identity_is_checked_before_the_command_is_validated()
+    {
+        // An anonymous caller with a malformed name is told to sign in, not told
+        // their name is wrong. Reversing the order would let somebody who is not
+        // signed in probe this platform's validation rules.
+        CreateTenantHandler handler = new(
+            new InMemoryTenantRepository(),
+            TestAccess.Anonymous(),
+            TimeProvider.System);
+
+        await Assert.ThrowsAsync<NotAuthenticatedException>(
+            () => handler.HandleAsync(new CreateTenantCommand("", "")));
+    }
+
+    [Fact]
+    public async Task A_rejected_creation_leaves_no_membership_behind()
+    {
+        // The orphan this use case must never produce: a membership granting
+        // access to a workspace that was never created. The fake refuses before
+        // it writes either row, exactly as the real transaction does.
+        InMemoryTenantRepository tenants = new InMemoryTenantRepository { PretendSlugIsFree = true };
+        tenants.Seed(Tenant.Create(TenantName.Create("Acme"), TenantSlug.Create("acme")));
+
+        CreateTenantHandler handler = NewHandler(tenants);
+
+        await Assert.ThrowsAsync<TenantSlugAlreadyExistsException>(
+            () => handler.HandleAsync(new CreateTenantCommand("Acme Two", "acme")));
+
+        Assert.Empty(tenants.Memberships);
     }
 
     [Fact]
@@ -198,13 +297,25 @@ public sealed class CreateTenantHandlerTests
         await cancellation.CancelAsync();
 
         CancellationObservingTenantRepository tenants = new();
-        CreateTenantHandler handler = new(tenants);
+        CreateTenantHandler handler = NewHandler(tenants);
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
             () => handler.HandleAsync(new CreateTenantCommand("Acme", "acme"), cancellation.Token));
 
         Assert.True(tenants.SawToken);
     }
+
+    /// <summary>A guard for a signed-in creator who belongs to nothing yet.</summary>
+    /// <remarks>
+    /// Creating a workspace needs an identity, not a membership -- nobody can be a
+    /// member of a tenant that does not exist. So the guard here grants nothing,
+    /// which is exactly the state somebody is in immediately after registering.
+    /// </remarks>
+    private static TenantAccessGuard Access() => TestAccess.Outsider(Creator);
+
+    /// <summary>A handler for the signed-in creator, on the real system clock.</summary>
+    private static CreateTenantHandler NewHandler(ITenantRepository tenants) =>
+        new(tenants, Access(), TimeProvider.System);
 
     /// <summary>A repository that respects the token it is handed.</summary>
     private sealed class CancellationObservingTenantRepository : ITenantRepository
@@ -227,7 +338,10 @@ public sealed class CreateTenantHandlerTests
             return Task.FromResult(false);
         }
 
-        public Task AddAsync(Tenant tenant, CancellationToken cancellationToken = default)
+        public Task AddAsync(
+            Tenant tenant,
+            TenantMembership membership,
+            CancellationToken cancellationToken = default)
         {
             SawToken = true;
             cancellationToken.ThrowIfCancellationRequested();

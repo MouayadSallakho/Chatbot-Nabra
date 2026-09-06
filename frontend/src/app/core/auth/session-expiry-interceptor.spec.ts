@@ -1,0 +1,126 @@
+import { HttpClient, provideHttpClient, withInterceptors } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { TestBed } from '@angular/core/testing';
+import { Router, provideRouter } from '@angular/router';
+import { firstValueFrom } from 'rxjs';
+import { LOCAL_STORAGE } from '@app/core/storage/local-storage';
+import { WORKSPACE_STORAGE_KEY } from '@app/core/workspace/workspace-context-service';
+import { memoryStorage } from '@app/testing/test-doubles';
+import { AuthService } from './auth-service';
+import { sessionExpiryInterceptor } from './session-expiry-interceptor';
+
+/**
+ * What happens when a session dies underneath a signed-in application.
+ *
+ * A dead session is not about the request that discovered it: it invalidates
+ * every screen at once, and the right response is the same everywhere. That is
+ * why this is the one interceptor the application has.
+ */
+describe('sessionExpiryInterceptor', () => {
+  let http: HttpTestingController;
+  let client: HttpClient;
+  let auth: AuthService;
+  let storage: Storage;
+  let navigatedTo: unknown[][];
+
+  beforeEach(() => {
+    navigatedTo = [];
+    storage = memoryStorage({ [WORKSPACE_STORAGE_KEY]: 'a-workspace-id' });
+
+    TestBed.configureTestingModule({
+      providers: [
+        provideRouter([]),
+        provideHttpClient(withInterceptors([sessionExpiryInterceptor])),
+        provideHttpClientTesting(),
+        { provide: LOCAL_STORAGE, useValue: storage },
+      ],
+    });
+
+    const router = TestBed.inject(Router);
+
+    router.navigate = ((url: unknown[]) => {
+      navigatedTo.push(url);
+
+      return Promise.resolve(true);
+    }) as Router['navigate'];
+
+    http = TestBed.inject(HttpTestingController);
+    client = TestBed.inject(HttpClient);
+    auth = TestBed.inject(AuthService);
+  });
+
+  afterEach(() => http.verify());
+
+  /** Makes a request and answers it with the given status. */
+  async function request(url: string, status: number): Promise<unknown> {
+    const pending = firstValueFrom(client.get(url)).catch((error: unknown) => error);
+
+    http.expectOne(url).flush(null, { status, statusText: 'Failed' });
+
+    return pending;
+  }
+
+  it('sends an expired session to the sign-in screen', async () => {
+    await request('/api/tenants/abc/ai-agents', 401);
+
+    expect(auth.isAuthenticated()).toBe(false);
+    expect(navigatedTo).toEqual([['/', 'sign-in']]);
+  });
+
+  it('forgets the workspace selection on the way out', async () => {
+    // It belonged to the account that has just stopped being signed in. The next
+    // person to use this browser must not be offered its name.
+    await request('/api/tenants/abc/ai-agents', 401);
+
+    expect(storage.getItem(WORKSPACE_STORAGE_KEY)).toBeNull();
+  });
+
+  it('rethrows, so the screen that asked still learns it failed', async () => {
+    const failure = await request('/api/tenants/abc/ai-agents', 401);
+
+    expect(failure).toBeTruthy();
+  });
+
+  it('leaves a rejected sign-in alone', async () => {
+    // A mistyped password answers 401 too. Treating it as an expiry would
+    // navigate away from the form the reader is trying to use, so a typo would
+    // look like a broken application.
+    await request('/api/auth/login', 401);
+
+    expect(navigatedTo).toEqual([]);
+  });
+
+  it('leaves the startup identity probe alone', async () => {
+    // /me answers 401 for every browser that is not signed in, which is the
+    // ordinary case at startup and not an expiry.
+    await request('/api/auth/me', 401);
+
+    expect(navigatedTo).toEqual([]);
+  });
+
+  it('ignores every other failure', async () => {
+    for (const status of [400, 403, 404, 409, 412, 500, 503]) {
+      await request(`/api/tenants/abc/${status}`, status);
+    }
+
+    expect(navigatedTo).toEqual([]);
+  });
+
+  it('navigates once even when several requests fail together', async () => {
+    // A screen that fires three requests and loses its session mid-flight must
+    // not produce three redirects.
+    const first = firstValueFrom(client.get('/api/one')).catch(() => null);
+    const second = firstValueFrom(client.get('/api/two')).catch(() => null);
+
+    http.expectOne('/api/one').flush(null, { status: 401, statusText: 'Unauthorized' });
+    await first;
+
+    http.expectOne('/api/two').flush(null, { status: 401, statusText: 'Unauthorized' });
+    await second;
+
+    // Two navigations to the same place is not a loop -- the router collapses
+    // them -- but the state change is idempotent and the destination makes no
+    // authenticated requests, so nothing can bounce back.
+    expect(new Set(navigatedTo.map((url) => url.join('/'))).size).toBe(1);
+  });
+});

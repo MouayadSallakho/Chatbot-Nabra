@@ -19,9 +19,9 @@ export interface CreateTenantRequest {
 /**
  * The tenant endpoints.
  *
- * Two calls, because two exist. There is no update, no delete and no list: the
- * backend publishes none of those, and a client method that throws 404 is worse
- * than no method at all.
+ * Three calls, because three exist. There is still no update and no delete: the
+ * backend publishes neither, and a client method that throws 404 is worse than
+ * no method at all.
  *
  * <strong>Same-origin, relative paths.</strong> Nothing here names a host or a
  * port. In development the Angular dev server proxies `/api` to the local
@@ -38,8 +38,25 @@ export class TenantApi {
     return this.http.post<Tenant>('/api/tenants', request);
   }
 
-  /** Reads one tenant. 404 when it does not exist. */
+  /**
+   * Reads one tenant.
+   *
+   * 404 both when it does not exist and when the signed-in account does not
+   * belong to it -- deliberately indistinguishable, so this cannot be used to
+   * find out which workspaces are real.
+   */
   get(tenantId: string): Observable<Tenant> {
     return this.http.get<Tenant>(`/api/tenants/${tenantId}`);
+  }
+
+  /**
+   * Every workspace the signed-in account belongs to.
+   *
+   * <strong>The only source of tenant ids this application may use.</strong> It
+   * takes no argument, because who is asking is the session rather than a
+   * parameter -- there is no shape of call here that asks about somebody else.
+   */
+  listMine(): Observable<readonly Tenant[]> {
+    return this.http.get<readonly Tenant[]>('/api/me/tenants');
   }
 }

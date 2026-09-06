@@ -359,10 +359,10 @@ public sealed class AiAgentTenantIsolationTests(AiAgentApiFixture api) : IClassF
 
     private async Task<Boundary> ArrangeAsync(bool activateB = false)
     {
-        HttpClient client = api.CreateClient();
+        HttpClient client = await api.CreateSignedInClientAsync();
 
-        Guid tenantA = await api.CreateTenantAsync("Tenant A");
-        Guid tenantB = await api.CreateTenantAsync("Tenant B");
+        Guid tenantA = await api.CreateTenantAsync(client, "Tenant A");
+        Guid tenantB = await api.CreateTenantAsync(client, "Tenant B");
 
         using HttpResponseMessage createdA =
             await CreateAsync(client, tenantA, "Tenant A Assistant", "Tenant A rules.");

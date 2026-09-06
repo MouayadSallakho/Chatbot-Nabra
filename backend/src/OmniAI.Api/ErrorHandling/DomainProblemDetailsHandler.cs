@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using OmniAI.Application.Ai;
 using OmniAI.Application.AiAgents;
 using OmniAI.Application.AiAgents.ListAiAgents;
+using OmniAI.Application.Security;
 using OmniAI.Application.Tenants;
 using OmniAI.Domain;
 
@@ -209,15 +210,19 @@ internal sealed partial class DomainProblemDetailsHandler(
             "Precondition failed",
             stale.Message),
 
-        // Text a caller offered as a message that this platform will not process:
-        // blank, past the length bound, or carrying control characters. 400 for
-        // the same reason a rejected name is -- the caller can see what it sent,
-        // change it and try again.
+        // A use case that needs a signed-in person was reached without one. 401,
+        // never 404: the caller has not yet said who they are, and signing in may
+        // change the answer entirely -- which is the opposite of what a not-found
+        // would tell them.
         //
-        // Not a Domain failure, and it is worth being precise about why: no
-        // aggregate was consulted. This is a limit the platform places on a
-        // request it will accept, so the Application raises its own type and the
-        // Domain is never asked a question about a message it does not model.
+        // This should be unreachable, because every protected endpoint is behind
+        // authorization already. It is the second layer, for the case where a
+        // route is mapped without its requirement.
+        NotAuthenticatedException unauthenticated => (
+            StatusCodes.Status401Unauthorized,
+            "Not authenticated",
+            unauthenticated.Message),
+
         // A listing request asking for a page this platform will not serve.
         // 400, because the caller can fix it: the message names the bound, so a
         // corrected request is one edit away. Refused rather than clamped --
@@ -228,6 +233,15 @@ internal sealed partial class DomainProblemDetailsHandler(
             "Invalid page request",
             paging.Message),
 
+        // Text a caller offered as a message that this platform will not process:
+        // blank, past the length bound, or carrying control characters. 400 for
+        // the same reason a rejected name is -- the caller can see what it sent,
+        // change it and try again.
+        //
+        // Not a Domain failure, and it is worth being precise about why: no
+        // aggregate was consulted. This is a limit the platform places on a
+        // request it will accept, so the Application raises its own type and the
+        // Domain is never asked a question about a message it does not model.
         AiTurnValidationException message => (
             StatusCodes.Status400BadRequest,
             "Invalid request details",

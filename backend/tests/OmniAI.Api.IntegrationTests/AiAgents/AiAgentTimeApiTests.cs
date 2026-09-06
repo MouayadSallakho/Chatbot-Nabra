@@ -32,8 +32,8 @@ public sealed class AiAgentTimeApiTests(AiAgentTimeApiFixture api) : IClassFixtu
     [Fact]
     public async Task A_created_agent_carries_the_exact_instant_from_the_clock()
     {
-        using HttpClient client = api.CreateClient();
-        Guid tenantId = await api.CreateTenantAsync();
+        using HttpClient client = await api.CreateSignedInClientAsync();
+        Guid tenantId = await api.CreateTenantAsync(client);
         api.Clock.Now = Start;
 
         AgentPayload created = await ReadAgentAsync(
@@ -49,8 +49,8 @@ public sealed class AiAgentTimeApiTests(AiAgentTimeApiFixture api) : IClassFixtu
         // The create response is built from the aggregate in memory. If the two
         // ever disagreed, a client would see createdAt change on the next read
         // without anything having been edited.
-        using HttpClient client = api.CreateClient();
-        Guid tenantId = await api.CreateTenantAsync();
+        using HttpClient client = await api.CreateSignedInClientAsync();
+        Guid tenantId = await api.CreateTenantAsync(client);
         api.Clock.Now = Start;
 
         AgentPayload created = await ReadAgentAsync(
@@ -66,8 +66,8 @@ public sealed class AiAgentTimeApiTests(AiAgentTimeApiFixture api) : IClassFixtu
     [Fact]
     public async Task A_rename_stamps_the_clock_instant_and_leaves_the_creation_instant_alone()
     {
-        using HttpClient client = api.CreateClient();
-        Guid tenantId = await api.CreateTenantAsync();
+        using HttpClient client = await api.CreateSignedInClientAsync();
+        Guid tenantId = await api.CreateTenantAsync(client);
         api.Clock.Now = Start;
 
         using HttpResponseMessage createdResponse =
@@ -89,8 +89,8 @@ public sealed class AiAgentTimeApiTests(AiAgentTimeApiFixture api) : IClassFixtu
     [Fact]
     public async Task Activation_stamps_the_clock_instant()
     {
-        using HttpClient client = api.CreateClient();
-        Guid tenantId = await api.CreateTenantAsync();
+        using HttpClient client = await api.CreateSignedInClientAsync();
+        Guid tenantId = await api.CreateTenantAsync(client);
         api.Clock.Now = Start;
 
         using HttpResponseMessage createdResponse =
@@ -111,8 +111,8 @@ public sealed class AiAgentTimeApiTests(AiAgentTimeApiFixture api) : IClassFixtu
         // The clock moves, the request succeeds, and updatedAt stays where it was
         // -- because nothing about the agent changed. Anything that stamped the
         // time unconditionally would report an edit that never happened.
-        using HttpClient client = api.CreateClient();
-        Guid tenantId = await api.CreateTenantAsync();
+        using HttpClient client = await api.CreateSignedInClientAsync();
+        Guid tenantId = await api.CreateTenantAsync(client);
         api.Clock.Now = Start;
 
         using HttpResponseMessage createdResponse =
@@ -132,8 +132,8 @@ public sealed class AiAgentTimeApiTests(AiAgentTimeApiFixture api) : IClassFixtu
     [Fact]
     public async Task Renaming_to_the_current_name_does_not_advance_the_update_mark()
     {
-        using HttpClient client = api.CreateClient();
-        Guid tenantId = await api.CreateTenantAsync();
+        using HttpClient client = await api.CreateSignedInClientAsync();
+        Guid tenantId = await api.CreateTenantAsync(client);
         api.Clock.Now = Start;
 
         using HttpResponseMessage createdResponse =
@@ -157,8 +157,8 @@ public sealed class AiAgentTimeApiTests(AiAgentTimeApiFixture api) : IClassFixtu
         // aggregate, EF Core and PostgreSQL. The Domain records what it is told --
         // so the new instructions are stored -- while a consumer sorting by "last
         // changed" is never told the agent changed before it did.
-        using HttpClient client = api.CreateClient();
-        Guid tenantId = await api.CreateTenantAsync();
+        using HttpClient client = await api.CreateSignedInClientAsync();
+        Guid tenantId = await api.CreateTenantAsync(client);
         api.Clock.Now = Start;
 
         using HttpResponseMessage createdResponse =
@@ -200,8 +200,8 @@ public sealed class AiAgentTimeApiTests(AiAgentTimeApiFixture api) : IClassFixtu
         // microseconds. The clock is wrapped so the platform never reports an
         // instant finer than it can record -- otherwise the create response and
         // the very next read would disagree about createdAt.
-        using HttpClient client = api.CreateClient();
-        Guid tenantId = await api.CreateTenantAsync();
+        using HttpClient client = await api.CreateSignedInClientAsync();
+        Guid tenantId = await api.CreateTenantAsync(client);
         api.Clock.Now = Start.AddTicks(1237);
 
         AgentPayload created = await ReadAgentAsync(

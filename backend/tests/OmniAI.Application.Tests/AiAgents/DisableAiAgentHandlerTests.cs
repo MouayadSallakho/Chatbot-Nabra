@@ -2,6 +2,7 @@ using OmniAI.Application.AiAgents;
 using OmniAI.Application.AiAgents.DisableAiAgent;
 using OmniAI.Application.Concurrency;
 using OmniAI.Domain;
+using OmniAI.Application.Tests.Security;
 using OmniAI.Domain.AiAgents;
 using OmniAI.Domain.Tenants;
 using OmniAI.Testing;
@@ -236,5 +237,5 @@ public sealed class DisableAiAgentHandlerTests
     private static DisableAiAgentHandler Handler(
         InMemoryAiAgentRepository agents,
         DateTimeOffset now) =>
-        new(agents, new FixedTimeProvider(now));
+        new(agents, TestAccess.Anywhere(), new FixedTimeProvider(now));
 }

@@ -1,0 +1,110 @@
+// The centred single-purpose page shared by sign-in and registration.
+//
+// Deliberately outside the admin shell: there is no session yet, so navigation
+// to workspace-scoped areas would lead nowhere, and a sidebar full of links a
+// reader cannot follow is worse than no sidebar.
+//
+// Every value is a design token. Nothing here introduces a colour, a spacing
+// step or a type scale of its own, so these screens inherit light and dark
+// theming, the reduced-motion preference and the responsive rhythm without
+// restating any of it.
+.auth {
+  display: grid;
+  place-items: center;
+  min-block-size: 100vh;
+  min-block-size: 100dvh;
+  padding: var(--space-6);
+  background-color: var(--surface-page);
+}
+
+.auth-card {
+  inline-size: 100%;
+  // Narrower than the workspace card: two short fields read badly stretched
+  // across a wide measure, and a sign-in form that fills a desktop screen looks
+  // like a data-entry page rather than a door.
+  max-inline-size: 26rem;
+  padding: var(--space-7);
+
+  &:focus-visible {
+    outline: none;
+  }
+}
+
+.auth-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-block-end: var(--space-6);
+}
+
+.brand-mark {
+  inline-size: 1.75rem;
+  block-size: 1.75rem;
+  color: var(--accent);
+  flex: none;
+}
+
+.brand-name {
+  font: var(--text-section-title);
+  letter-spacing: var(--letter-spacing-tight);
+}
+
+.auth-lead {
+  margin-block-start: var(--space-3);
+  max-inline-size: 46ch;
+}
+
+.auth-alert {
+  margin-block-start: var(--space-5);
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  margin-block-start: var(--space-6);
+}
+
+.auth-actions {
+  display: flex;
+  margin-block-start: var(--space-2);
+}
+
+// Full width, because it is the only thing to do on this page. A small button
+// floating beside a wide field makes the reader hunt for the obvious next step.
+.auth-actions .btn {
+  inline-size: 100%;
+  justify-content: center;
+}
+
+.auth-alternate {
+  margin-block-start: var(--space-6);
+  padding-block-start: var(--space-5);
+  border-block-start: 1px solid var(--border-subtle);
+  text-align: center;
+}
+
+// The password field and the control that reveals it share a row, so the
+// control sits inside the field's visual bounds rather than after it.
+.password-field {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.password-field .input {
+  // Room for the reveal button, so a long password never runs underneath it.
+  padding-inline-end: var(--space-9);
+}
+
+.password-toggle {
+  position: absolute;
+  inset-inline-end: var(--space-1);
+  // Not part of the field's own focus ring: it is a separate control and gets
+  // its own, which the primitive already provides.
+  color: var(--text-muted);
+}
+
+.auth-note {
+  margin-block-start: var(--space-4);
+}

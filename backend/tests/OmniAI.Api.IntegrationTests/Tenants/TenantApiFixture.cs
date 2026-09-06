@@ -63,10 +63,29 @@ public sealed class TenantApiFixture : IAsyncLifetime
         await _database.DisposeAsync();
     }
 
-    /// <summary>A client for the hosted API.</summary>
+    /// <summary>A client for the hosted API. Anonymous.</summary>
     public HttpClient CreateClient() =>
         (_application ?? throw new InvalidOperationException("The fixture was not initialised."))
             .CreateClient();
+
+    /// <summary>
+    /// A client with a registered, signed-in account and a valid antiforgery
+    /// token.
+    /// </summary>
+    /// <remarks>
+    /// Both tenant endpoints require authentication as of Phase 12, so almost
+    /// every test here needs one. The account is created through the real
+    /// registration endpoint rather than by forging a cookie, so what these tests
+    /// exercise is the pipeline a browser meets.
+    /// </remarks>
+    public async Task<HttpClient> CreateSignedInClientAsync()
+    {
+        HttpClient client = CreateClient();
+
+        await ApiAuthentication.RegisterAsync(client);
+
+        return client;
+    }
 
     /// <summary>
     /// A context over the same database the API is using, for assertions that

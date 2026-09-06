@@ -20,6 +20,7 @@ namespace OmniAI.Application.AiAgents.CreateAiAgent;
 public sealed class CreateAiAgentHandler(
     ITenantRepository tenants,
     IAiAgentRepository agents,
+    TenantAccessGuard access,
     TimeProvider clock)
 {
     private readonly ITenantRepository _tenants =
@@ -27,6 +28,9 @@ public sealed class CreateAiAgentHandler(
 
     private readonly IAiAgentRepository _agents =
         agents ?? throw new ArgumentNullException(nameof(agents));
+
+    private readonly TenantAccessGuard _access =
+        access ?? throw new ArgumentNullException(nameof(access));
 
     private readonly TimeProvider _clock =
         clock ?? throw new ArgumentNullException(nameof(clock));
@@ -52,12 +56,28 @@ public sealed class CreateAiAgentHandler(
         AiAgentName name = AiAgentName.Create(command.Name);
         AgentInstructions instructions = AgentInstructions.Create(command.Instructions);
 
+        // Membership before existence, and both answered the same way. A caller
+        // who does not belong to this tenant is told the tenant is not there --
+        // which, for them, is the only true thing that can be said about it. If
+        // this check ran after the existence check, a non-member would learn that
+        // somebody else's workspace exists by the order in which they were
+        // refused.
+        if (!await _access.IsCurrentUserMemberAsync(tenantId, cancellationToken).ConfigureAwait(false))
+        {
+            throw TenantNotFoundException.ForId(tenantId.Value);
+        }
+
         // The ordinary answer to "create an agent under a tenant that is not
         // there". Without it the insert would fail on the foreign key, and a
         // routine mistake would surface as an unexplained server error instead of
         // a plain "no such tenant". The foreign key still exists and still
         // refuses the row -- it is the defence that survives this check being
         // raced -- but it is no longer what a normal caller meets.
+        //
+        // Still reachable despite the membership check above: a membership row
+        // can outlive its tenant only if something deleted the tenant behind the
+        // foreign key, and this is what would report that honestly rather than
+        // crashing.
         if (await _tenants.FindByIdAsync(tenantId, cancellationToken).ConfigureAwait(false) is null)
         {
             throw TenantNotFoundException.ForId(tenantId.Value);

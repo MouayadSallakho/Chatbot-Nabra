@@ -1,3 +1,4 @@
+using OmniAI.Api.Security;
 using OmniAI.Application.AiAgents;
 using OmniAI.Application.AiAgents.ActivateAiAgent;
 using OmniAI.Application.AiAgents.CreateAiAgent;
@@ -73,7 +74,13 @@ internal static class AiAgentEndpoints
 
         RouteGroupBuilder agents = endpoints
             .MapGroup("/api/tenants/{tenantId:guid}/ai-agents")
-            .WithTags("AI agents");
+            .WithTags("AI agents")
+            // Applied to the group, so a route added later inherits both and
+            // cannot be published unprotected by omission. Authorization answers
+            // 401 for an anonymous caller; membership is checked below it, in
+            // each use case, and answers 404 for a signed-in stranger.
+            .RequireAuthorization()
+            .AddEndpointFilter<AntiforgeryEndpointFilter>();
 
         agents.MapPost("/", CreateAsync)
             .WithName("CreateAiAgent");

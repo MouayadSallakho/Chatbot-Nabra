@@ -1,5 +1,6 @@
 using OmniAI.Application.AiAgents.Persistence;
 using OmniAI.Application.Concurrency;
+using OmniAI.Application.Tenants;
 using OmniAI.Domain.AiAgents;
 using OmniAI.Domain.Tenants;
 
@@ -8,10 +9,16 @@ namespace OmniAI.Application.AiAgents.DisableAiAgent;
 /// <summary>
 /// Switches an AI agent off.
 /// </summary>
-public sealed class DisableAiAgentHandler(IAiAgentRepository agents, TimeProvider clock)
+public sealed class DisableAiAgentHandler(
+    IAiAgentRepository agents,
+    TenantAccessGuard access,
+    TimeProvider clock)
 {
     private readonly IAiAgentRepository _agents =
         agents ?? throw new ArgumentNullException(nameof(agents));
+
+    private readonly TenantAccessGuard _access =
+        access ?? throw new ArgumentNullException(nameof(access));
 
     private readonly TimeProvider _clock =
         clock ?? throw new ArgumentNullException(nameof(clock));
@@ -46,6 +53,16 @@ public sealed class DisableAiAgentHandler(IAiAgentRepository agents, TimeProvide
 
         TenantId tenantId = TenantId.From(command.TenantId);
         AiAgentId agentId = AiAgentId.From(command.AiAgentId);
+
+        // Membership is checked before the agent is read, and before any
+        // precondition is evaluated. A caller who does not belong to this tenant
+        // is answered exactly as they would be for an agent that does not exist,
+        // so a valid entity tag for somebody else's agent buys nothing: it never
+        // reaches the version comparison.
+        if (!await _access.IsCurrentUserMemberAsync(tenantId, cancellationToken).ConfigureAwait(false))
+        {
+            return null;
+        }
 
         VersionedAiAgent? stored = await _agents
             .FindAsync(tenantId, agentId, cancellationToken)

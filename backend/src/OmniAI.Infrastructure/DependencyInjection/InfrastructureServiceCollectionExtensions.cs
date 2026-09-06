@@ -69,6 +69,7 @@ public static class InfrastructureServiceCollectionExtensions
         });
 
         services.AddScoped<ITenantRepository, TenantRepository>();
+        services.AddScoped<ITenantMembershipRepository, TenantMembershipRepository>();
         services.AddScoped<IAiAgentRepository, AiAgentRepository>();
 
         return services;

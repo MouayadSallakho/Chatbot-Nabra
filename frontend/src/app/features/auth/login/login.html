@@ -1,0 +1,116 @@
+<div class="auth">
+  <main class="auth-card card" id="main-content" tabindex="-1">
+    <div class="auth-brand">
+      <!--
+        The product mark, matching the shell's. Decorative: the wordmark beside
+        it already carries the name.
+      -->
+      <svg class="brand-mark" viewBox="0 0 28 28" aria-hidden="true" focusable="false">
+        <rect width="28" height="28" rx="8" fill="currentColor" />
+        <circle cx="11" cy="11.5" r="3.25" fill="var(--accent-contrast)" />
+        <circle cx="18" cy="17" r="2.25" fill="var(--accent-contrast)" fill-opacity="0.7" />
+      </svg>
+      <span class="brand-name">OmniAI</span>
+    </div>
+
+    <h1 class="text-page-title">Sign in</h1>
+    <p class="auth-lead text-body text-secondary">
+      Sign in to manage your workspace and the AI agents that answer on your behalf.
+    </p>
+
+    @if (failure(); as error) {
+      <!--
+        `role="alert"` so a screen reader hears the refusal without having to go
+        looking for it. The text is the server's own sentence, which deliberately
+        does not say whether the address exists.
+      -->
+      <div class="alert alert-danger auth-alert" role="alert">
+        <app-icon name="alert" [strokeWidth]="1.75" />
+        <span>{{ error.message }}</span>
+      </div>
+    }
+
+    <form class="auth-form" [formGroup]="form" (ngSubmit)="submit()" novalidate>
+      <div class="field">
+        <label class="field-label field-required" for="email">Email address</label>
+        <input
+          id="email"
+          class="input"
+          type="email"
+          formControlName="email"
+          autocomplete="username"
+          inputmode="email"
+          autocapitalize="off"
+          spellcheck="false"
+          [attr.aria-invalid]="showError('email') ? 'true' : null"
+          [attr.aria-describedby]="showError('email') ? 'email-error' : null"
+        />
+        @if (showError('email')) {
+          <p class="field-error" id="email-error" role="alert">
+            <app-icon name="alert" [strokeWidth]="1.75" />
+            <span>Enter the email address you signed up with.</span>
+          </p>
+        }
+      </div>
+
+      <div class="field">
+        <label class="field-label field-required" for="password">Password</label>
+        <!--
+          `autocomplete="current-password"` is what tells a password manager this
+          is a sign-in rather than a new password. Nothing here disables managers
+          or blocks pasting: both are things people rely on to use strong,
+          unique passwords at all.
+        -->
+        <div class="password-field">
+          <input
+            id="password"
+            class="input"
+            [type]="passwordVisible() ? 'text' : 'password'"
+            formControlName="password"
+            autocomplete="current-password"
+            [attr.aria-invalid]="showError('password') ? 'true' : null"
+            [attr.aria-describedby]="showError('password') ? 'password-error' : null"
+          />
+          <button
+            type="button"
+            class="btn btn-ghost btn-sm password-toggle"
+            (click)="togglePassword()"
+            [attr.aria-pressed]="passwordVisible()"
+          >
+            {{ passwordVisible() ? 'Hide' : 'Show' }}
+            <span class="visually-hidden">password</span>
+          </button>
+        </div>
+        @if (showError('password')) {
+          <p class="field-error" id="password-error" role="alert">
+            <app-icon name="alert" [strokeWidth]="1.75" />
+            <span>Enter your password.</span>
+          </p>
+        }
+      </div>
+
+      <div class="auth-actions">
+        <button type="submit" class="btn btn-primary" [disabled]="submitting()">
+          @if (submitting()) {
+            <span class="spinner" aria-hidden="true"></span>
+          }
+          <span class="btn-label">{{ submitting() ? 'Signing in…' : 'Sign in' }}</span>
+        </button>
+      </div>
+    </form>
+
+    <p class="auth-alternate text-small text-secondary">
+      No account yet?
+      <a [routerLink]="['/', registerPath]">Create one</a>
+    </p>
+
+    <!--
+      Said plainly rather than left for somebody to discover. Password recovery
+      is a later phase, and a form with a dead "forgot password" link would be
+      worse than one that admits the feature is not there.
+    -->
+    <p class="auth-note text-small text-muted">
+      Password reset is not available yet. Contact an administrator if you cannot sign in.
+    </p>
+  </main>
+</div>

@@ -1,6 +1,7 @@
 using OmniAI.Application.Tenants;
 using OmniAI.Application.Tenants.Persistence;
 using OmniAI.Domain.Tenants;
+using OmniAI.Domain.Users;
 
 namespace OmniAI.Application.Tests.Tenants;
 
@@ -22,9 +23,18 @@ namespace OmniAI.Application.Tests.Tenants;
 internal sealed class InMemoryTenantRepository : ITenantRepository
 {
     private readonly List<Tenant> _stored = [];
+    private readonly List<TenantMembership> _memberships = [];
 
     /// <summary>Tenants currently stored, in insertion order.</summary>
     public IReadOnlyList<Tenant> Stored => _stored;
+
+    /// <summary>Memberships currently stored, in insertion order.</summary>
+    /// <remarks>
+    /// Exposed so a test can assert the thing that actually matters about
+    /// workspace creation: that the creator ended up a member, and that a
+    /// rejected creation left neither row behind.
+    /// </remarks>
+    public IReadOnlyList<TenantMembership> Memberships => _memberships;
 
     /// <summary>How many times <see cref="AddAsync"/> was called.</summary>
     public int AddAttempts { get; private set; }
@@ -50,11 +60,34 @@ internal sealed class InMemoryTenantRepository : ITenantRepository
         return Task.FromResult(!PretendSlugIsFree && ContainsSlug(slug));
     }
 
-    public Task AddAsync(Tenant tenant, CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Stores the tenant and its membership, or neither.
+    /// </summary>
+    /// <remarks>
+    /// The all-or-nothing behaviour is reproduced rather than assumed: the
+    /// conflict is raised before either list is touched, so a test can assert
+    /// that a losing creation leaves no orphan membership without needing a
+    /// database to prove it. The real transaction is proven separately, against
+    /// PostgreSQL.
+    /// </remarks>
+    public Task AddAsync(
+        Tenant tenant,
+        TenantMembership membership,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(tenant);
+        ArgumentNullException.ThrowIfNull(membership);
 
         AddAttempts++;
+
+        // The real repository refuses a mismatched pair before writing, and so
+        // does this: a fake that accepted one would let a handler defect through.
+        if (membership.TenantId != tenant.Id)
+        {
+            throw new ArgumentException(
+                "The membership must name the tenant being created.",
+                nameof(membership));
+        }
 
         // Stands in for the unique index: the store, not the caller, is the
         // authority on whether a slug is taken.
@@ -64,6 +97,7 @@ internal sealed class InMemoryTenantRepository : ITenantRepository
         }
 
         _stored.Add(tenant);
+        _memberships.Add(membership);
 
         return Task.CompletedTask;
     }

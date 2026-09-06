@@ -40,9 +40,11 @@ export class Sidebar {
   /**
    * The real name of the workspace being administered.
    *
-   * Only ever a value the backend owns. There is deliberately no plan, role,
-   * avatar or account here -- none of those exist, and a placeholder for one
-   * would be a claim this product cannot back up.
+   * Only ever a value the backend owns. There is deliberately no plan, role or
+   * avatar beside it -- none of those exist, and a placeholder for one would be
+   * a claim this product cannot back up. The account's email address is real and
+   * does appear, because somebody needs to be able to see which account they are
+   * signed in as.
    */
   readonly workspaceName = input('');
 
@@ -61,13 +63,28 @@ export class Sidebar {
    */
   readonly navigated = output<void>();
 
+  /** The address of the signed-in account. Empty before it loads. */
+  readonly userEmail = input('');
+
+  /** Whether this account belongs to more than one workspace. */
+  readonly canSwitchWorkspace = input(false);
+
   /**
-   * The operator asked to forget the local development workspace.
+   * The reader asked to work in a different workspace.
    *
-   * Not a sign-out: nothing is signed in, no session ends, and the workspace and
-   * its agents continue to exist. This browser simply stops pointing at them.
+   * Only offered when there is more than one to switch between: a control that
+   * leads to a list of one is a step that exists only to be completed.
    */
-  readonly workspaceReset = output<void>();
+  readonly workspaceSwitched = output<void>();
+
+  /**
+   * The reader asked to sign out.
+   *
+   * A real sign-out now: the session ends on the server, the cookie is cleared,
+   * and the workspace selection is forgotten because it belonged to the account
+   * that has just stopped being signed in.
+   */
+  readonly signedOut = output<void>();
 
   protected readonly items = NAV_ITEMS;
 

@@ -19,7 +19,7 @@ public sealed class TenantEndpointsTests(TenantApiFixture api) : IClassFixture<T
     [Fact]
     public async Task Creating_a_tenant_returns_201_with_the_created_representation()
     {
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         string slug = NewSlug();
 
         using HttpResponseMessage response = await PostAsync(client, "Acme Corporation", slug);
@@ -38,7 +38,7 @@ public sealed class TenantEndpointsTests(TenantApiFixture api) : IClassFixture<T
     [Fact]
     public async Task Creating_a_tenant_sets_a_location_header_pointing_at_the_read_endpoint()
     {
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
 
         using HttpResponseMessage response = await PostAsync(client, "Acme Corporation", NewSlug());
         TenantPayload created = await ReadTenantAsync(response) ?? throw new InvalidOperationException();
@@ -61,7 +61,7 @@ public sealed class TenantEndpointsTests(TenantApiFixture api) : IClassFixture<T
     [Fact]
     public async Task A_created_tenant_is_in_the_database()
     {
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         string slug = NewSlug();
 
         using HttpResponseMessage response = await PostAsync(client, "Acme Corporation", slug);
@@ -81,7 +81,7 @@ public sealed class TenantEndpointsTests(TenantApiFixture api) : IClassFixture<T
         // A padded name and a mixed-case, padded slug. The Domain canonicalises
         // both, and the response and the row must agree with it -- no silent
         // truncation, and no slug invented from the name.
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         string slug = NewSlug();
 
         using HttpResponseMessage response = await PostAsync(
@@ -108,7 +108,7 @@ public sealed class TenantEndpointsTests(TenantApiFixture api) : IClassFixture<T
         // Extra properties are not part of the contract, so they are ignored
         // rather than honoured. The identity must be generated and the tenant
         // must start Active regardless of what was sent.
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         Guid attempted = Guid.CreateVersion7();
 
         string body = JsonSerializer.Serialize(new
@@ -138,7 +138,7 @@ public sealed class TenantEndpointsTests(TenantApiFixture api) : IClassFixture<T
     [InlineData("   ")]
     public async Task An_invalid_name_is_rejected_as_400_problem_details(string? name)
     {
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
 
         using HttpResponseMessage response = await PostAsync(client, name, NewSlug());
 
@@ -154,7 +154,7 @@ public sealed class TenantEndpointsTests(TenantApiFixture api) : IClassFixture<T
     [Fact]
     public async Task An_over_long_name_is_rejected_rather_than_truncated()
     {
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         string slug = NewSlug();
 
         using HttpResponseMessage response = await PostAsync(client, new string('a', 201), slug);
@@ -179,7 +179,7 @@ public sealed class TenantEndpointsTests(TenantApiFixture api) : IClassFixture<T
     [InlineData("ACME!")]
     public async Task An_invalid_slug_is_rejected_as_400_problem_details(string? slug)
     {
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
 
         using HttpResponseMessage response = await PostAsync(client, "Acme Corporation", slug);
 
@@ -193,7 +193,7 @@ public sealed class TenantEndpointsTests(TenantApiFixture api) : IClassFixture<T
     {
         // Not a Domain concern: this never reaches a value object, because it is
         // not valid JSON of the expected shape.
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         using StringContent content = new("{ not json", Encoding.UTF8, "application/json");
 
         using HttpResponseMessage response = await client.PostAsync(Route(), content);
@@ -204,7 +204,7 @@ public sealed class TenantEndpointsTests(TenantApiFixture api) : IClassFixture<T
     [Fact]
     public async Task A_validation_failure_discloses_no_internals()
     {
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
 
         using HttpResponseMessage response = await PostAsync(client, "Acme Corporation", "ac--me");
 
@@ -218,7 +218,7 @@ public sealed class TenantEndpointsTests(TenantApiFixture api) : IClassFixture<T
     [Fact]
     public async Task A_sequential_duplicate_slug_is_409_problem_details()
     {
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         string slug = NewSlug();
 
         using HttpResponseMessage first = await PostAsync(client, "Acme One", slug);
@@ -245,7 +245,7 @@ public sealed class TenantEndpointsTests(TenantApiFixture api) : IClassFixture<T
     [Fact]
     public async Task A_duplicate_slug_differing_only_in_case_is_still_a_conflict()
     {
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         string slug = NewSlug();
 
         using HttpResponseMessage first = await PostAsync(client, "Acme One", slug);
@@ -263,7 +263,7 @@ public sealed class TenantEndpointsTests(TenantApiFixture api) : IClassFixture<T
         // The race the brief calls out. Nothing in application code serialises
         // these: no lock, no mutex, no serialisable transaction. Exactly one
         // request wins because PostgreSQL's unique index says so.
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         string slug = NewSlug();
 
         HttpResponseMessage[] responses = await Task.WhenAll(
@@ -302,7 +302,7 @@ public sealed class TenantEndpointsTests(TenantApiFixture api) : IClassFixture<T
         // reliably pass the pre-check before any of them commits.
         const int callers = 8;
 
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         string slug = NewSlug();
 
         HttpResponseMessage[] responses = await Task.WhenAll(
@@ -335,7 +335,7 @@ public sealed class TenantEndpointsTests(TenantApiFixture api) : IClassFixture<T
     [Fact]
     public async Task Getting_an_existing_tenant_returns_200_with_the_correct_payload()
     {
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         string slug = NewSlug();
 
         using HttpResponseMessage creation = await PostAsync(client, "Acme Corporation", slug);
@@ -357,7 +357,7 @@ public sealed class TenantEndpointsTests(TenantApiFixture api) : IClassFixture<T
     [Fact]
     public async Task The_status_is_a_name_on_the_wire_never_an_enum_ordinal()
     {
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
 
         using HttpResponseMessage creation = await PostAsync(client, "Acme Corporation", NewSlug());
         string body = await creation.Content.ReadAsStringAsync();
@@ -371,7 +371,7 @@ public sealed class TenantEndpointsTests(TenantApiFixture api) : IClassFixture<T
     [Fact]
     public async Task Getting_an_unknown_tenant_returns_404_problem_details()
     {
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
 
         using HttpResponseMessage response = await client.GetAsync(Route(Guid.CreateVersion7()));
 
@@ -390,7 +390,7 @@ public sealed class TenantEndpointsTests(TenantApiFixture api) : IClassFixture<T
     {
         // An all-zero GUID matches the route constraint but is not a valid
         // identity, so it is invalid input rather than a tenant that is absent.
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
 
         using HttpResponseMessage response = await client.GetAsync(Route(Guid.Empty));
 
@@ -401,7 +401,7 @@ public sealed class TenantEndpointsTests(TenantApiFixture api) : IClassFixture<T
     [Fact]
     public async Task A_non_guid_tenant_id_does_not_match_the_route()
     {
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
 
         using HttpResponseMessage response =
             await client.GetAsync(new Uri($"{TenantsRoute}/not-a-guid", UriKind.Relative));
@@ -414,7 +414,7 @@ public sealed class TenantEndpointsTests(TenantApiFixture api) : IClassFixture<T
     [Fact]
     public async Task A_created_tenant_round_trips_through_its_location_header()
     {
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         string slug = NewSlug();
 
         using HttpResponseMessage creation = await PostAsync(client, "Acme Corporation", slug);
@@ -437,7 +437,7 @@ public sealed class TenantEndpointsTests(TenantApiFixture api) : IClassFixture<T
     [Fact]
     public async Task Two_tenants_with_different_slugs_are_both_created_and_readable()
     {
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
 
         using HttpResponseMessage firstCreation = await PostAsync(client, "Acme", NewSlug());
         using HttpResponseMessage secondCreation = await PostAsync(client, "Globex", NewSlug());

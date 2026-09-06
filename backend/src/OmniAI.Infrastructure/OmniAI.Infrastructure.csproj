@@ -9,6 +9,13 @@
   <ItemGroup>
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
     <!--
+      ASP.NET Core Identity's EF Core stores. This project is where credentials
+      are persisted, so this is where the package belongs: neither Domain nor
+      Application references it, and guard tests assert that. The API consumes
+      Identity's services through the shared framework rather than through here.
+    -->
+    <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" />
+    <!--
       The official OpenAI SDK. It appears in this project and nowhere else: the
       Application owns IAiTextGenerator, and the vendor stops at the adapter that
       implements it.

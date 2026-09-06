@@ -1,5 +1,6 @@
 using OmniAI.Application.Ai;
 using OmniAI.Application.AiAgents.Persistence;
+using OmniAI.Application.Tenants;
 using OmniAI.Domain.AiAgents;
 using OmniAI.Domain.Tenants;
 
@@ -30,29 +31,37 @@ namespace OmniAI.Application.AiAgents.PreviewAiAgent;
 /// silently accumulating other people's text.
 /// </para>
 /// </remarks>
-public sealed class PreviewAiAgentHandler(IAiAgentRepository agents, IAiTextGenerator generator)
+public sealed class PreviewAiAgentHandler(
+    IAiAgentRepository agents,
+    TenantAccessGuard access,
+    IAiTextGenerator generator)
 {
     private readonly IAiAgentRepository _agents =
         agents ?? throw new ArgumentNullException(nameof(agents));
+
+    private readonly TenantAccessGuard _access =
+        access ?? throw new ArgumentNullException(nameof(access));
 
     private readonly IAiTextGenerator _generator =
         generator ?? throw new ArgumentNullException(nameof(generator));
 
     /// <summary>Generates a reply from the agent's stored instructions.</summary>
     /// <returns>
-    /// The generated reply, or <see langword="null"/> when this tenant has no agent
-    /// with that id -- including when the agent exists under a different tenant,
-    /// which is indistinguishable here because the lookup itself is tenant-scoped.
+    /// The generated reply, or <see langword="null"/> when the caller does not
+    /// belong to this tenant, or when this tenant has no agent with that id --
+    /// including when the agent exists under a different tenant. All three are
+    /// indistinguishable to the caller, deliberately.
     /// </returns>
     /// <remarks>
     /// <para>
-    /// <strong>The order of these steps is the security property.</strong>
-    /// Ownership is resolved at step 3, before any instruction text is read, before
-    /// a request is assembled, and before the generator is reached. A caller naming
-    /// another tenant's agent gets not-found without a single character of that
-    /// agent's configuration being loaded into a request -- so a cross-tenant
-    /// preview cannot become a way to extract somebody's instructions through a
-    /// model's answer, and cannot spend this platform's AI budget on their data.
+    /// <strong>The order of these steps is the security property.</strong> Access
+    /// is resolved before any instruction text is read, before a request is
+    /// assembled, and before the generator is reached -- first by membership, then
+    /// by the tenant-scoped lookup. A caller naming another tenant's agent gets
+    /// not-found without a single character of that agent's configuration being
+    /// loaded into a request, so a cross-tenant preview cannot become a way to
+    /// extract somebody's instructions through a model's answer, and cannot spend
+    /// this platform's AI budget on their data.
     /// </para>
     /// <para>
     /// Input validation runs first, before the lookup, matching every other handler
@@ -82,6 +91,19 @@ public sealed class PreviewAiAgentHandler(IAiAgentRepository agents, IAiTextGene
         // Validated here, where a person can be told what is wrong with what they
         // typed, rather than by a provider rejecting it later in its own words.
         AiTurn question = AiTurn.FromUser(command.Message);
+
+        // Membership before anything that costs money. This endpoint is the one
+        // place in the platform where a request reaches a paid third party, so a
+        // caller outside the tenant must be stopped here -- not merely denied the
+        // answer afterwards. Nothing below this line runs for a non-member: the
+        // agent is never read, its instructions are never loaded, and the
+        // generator is never called, so somebody else's workspace cannot be used
+        // to spend this deployment's provider budget or to have its instructions
+        // inferred from a reply.
+        if (!await _access.IsCurrentUserMemberAsync(tenantId, cancellationToken).ConfigureAwait(false))
+        {
+            return null;
+        }
 
         VersionedAiAgent? stored = await _agents
             .FindAsync(tenantId, agentId, cancellationToken)

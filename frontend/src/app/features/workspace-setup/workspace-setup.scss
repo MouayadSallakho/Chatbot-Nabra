@@ -64,3 +64,73 @@
 .setup-form .setup-actions {
   margin-block-start: 0;
 }
+
+// -----------------------------------------------------------------------------
+// Choosing between workspaces
+// -----------------------------------------------------------------------------
+// Only rendered when there is more than one. A list of one is not a choice, and
+// the workspace is selected without asking.
+.workspace-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-block-start: var(--space-6);
+  list-style: none;
+  padding: 0;
+}
+
+// The whole row is one control, so a keyboard reader gets one stop per
+// workspace rather than a name and a separate button that go to the same place.
+.workspace-option {
+  inline-size: 100%;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 0 var(--space-3);
+  padding: var(--space-4);
+  text-align: start;
+  background-color: var(--surface-raised);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  color: inherit;
+  cursor: pointer;
+  transition:
+    background-color var(--motion-fast),
+    border-color var(--motion-fast);
+
+  &:hover {
+    background-color: var(--surface-hover);
+    border-color: var(--border-strong);
+  }
+
+  &:focus-visible {
+    outline: var(--focus-ring-width) solid var(--focus-ring);
+    outline-offset: var(--focus-ring-offset);
+  }
+}
+
+.workspace-name {
+  grid-column: 1;
+}
+
+.workspace-slug {
+  grid-column: 1;
+}
+
+.workspace-chevron {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  color: var(--text-muted);
+}
+
+// The account this screen is acting for, and the way out of it. Quiet: it is
+// context, not the task.
+.setup-account {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-block-start: var(--space-6);
+  padding-block-start: var(--space-5);
+  border-block-start: 1px solid var(--border-subtle);
+}

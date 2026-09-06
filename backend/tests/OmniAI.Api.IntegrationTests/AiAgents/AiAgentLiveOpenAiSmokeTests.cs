@@ -50,9 +50,9 @@ public sealed class AiAgentLiveOpenAiSmokeTests(AiAgentLiveOpenAiFixture api)
             return;
         }
 
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
 
-        Guid tenantId = await api.CreateTenantAsync("Live Smoke Tenant");
+        Guid tenantId = await api.CreateTenantAsync(client, "Live Smoke Tenant");
 
         using HttpResponseMessage created = await CreateAsync(
             client,

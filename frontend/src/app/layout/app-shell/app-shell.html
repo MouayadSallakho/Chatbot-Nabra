@@ -13,11 +13,14 @@
     [drawer]="drawer()"
     [open]="navOpen()"
     [workspaceName]="workspaceName()"
+    [userEmail]="userEmail()"
+    [canSwitchWorkspace]="canSwitchWorkspace()"
     [attr.inert]="navHidden() ? '' : null"
     (collapseToggled)="toggleCollapsed()"
     (dismissed)="closeNav()"
     (navigated)="onNavigated()"
-    (workspaceReset)="resetWorkspace()"
+    (workspaceSwitched)="switchWorkspace()"
+    (signedOut)="signOut()"
   />
 
   @if (drawer()) {

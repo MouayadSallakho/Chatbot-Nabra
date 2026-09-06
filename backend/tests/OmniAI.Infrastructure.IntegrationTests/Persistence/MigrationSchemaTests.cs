@@ -68,18 +68,20 @@ public sealed class MigrationSchemaTests(PostgresTestDatabase database)
     }
 
     [Fact]
-    public async Task Both_migrations_are_applied_to_the_test_database()
+    public async Task Every_migration_is_applied_to_the_test_database()
     {
-        // The Phase 4 migration is an accepted committed baseline and was not
-        // rewritten; Phase 7 added a second one beside it. Both must be present,
-        // in order, or these suites are testing a schema nobody will deploy.
+        // Each accepted migration is a committed baseline that was not rewritten;
+        // every phase that changes the schema adds one beside them. All must be
+        // present, in order, or these suites are testing a schema nobody will
+        // deploy.
         using OmniAiDbContext context = database.CreateContext();
 
         string[] applied = [.. await context.Database.GetAppliedMigrationsAsync()];
 
-        Assert.Equal(2, applied.Length);
+        Assert.Equal(3, applied.Length);
         Assert.EndsWith("InitialPersistence", applied[0], StringComparison.Ordinal);
         Assert.EndsWith("AddAiAgents", applied[1], StringComparison.Ordinal);
+        Assert.EndsWith("AddIdentityAndTenantMemberships", applied[2], StringComparison.Ordinal);
     }
 
     [Fact]

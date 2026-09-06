@@ -61,7 +61,7 @@ public sealed class AiAgentOpenAiPreviewApiTests(AiAgentOpenAiApiFixture api)
         CannedOpenAiHandler handler = api.ResetProvider();
         handler.ResponseBody = Completed("A student laptop should be light.");
 
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, Guid agentId) = await ArrangeAsync(client);
 
         using HttpResponseMessage response =
@@ -79,7 +79,7 @@ public sealed class AiAgentOpenAiPreviewApiTests(AiAgentOpenAiApiFixture api)
     {
         CannedOpenAiHandler handler = api.ResetProvider();
 
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, Guid agentId) = await ArrangeAsync(client);
 
         using HttpResponseMessage response =
@@ -104,7 +104,7 @@ public sealed class AiAgentOpenAiPreviewApiTests(AiAgentOpenAiApiFixture api)
         // really leaves the process.
         CannedOpenAiHandler handler = api.ResetProvider();
 
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, Guid agentId) = await ArrangeAsync(client);
 
         using HttpResponseMessage response = await client.PostAsJsonAsync(
@@ -131,9 +131,9 @@ public sealed class AiAgentOpenAiPreviewApiTests(AiAgentOpenAiApiFixture api)
         // must be settled first — and it must stay settled first.
         CannedOpenAiHandler handler = api.ResetProvider();
 
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid _, Guid agentB) = await ArrangeAsync(client);
-        Guid tenantA = await api.CreateTenantAsync("Other Tenant");
+        Guid tenantA = await api.CreateTenantAsync(client, "Other Tenant");
 
         using HttpResponseMessage response = await PreviewAsync(client, tenantA, agentB, "Hello?");
 
@@ -148,8 +148,8 @@ public sealed class AiAgentOpenAiPreviewApiTests(AiAgentOpenAiApiFixture api)
     {
         CannedOpenAiHandler handler = api.ResetProvider();
 
-        using HttpClient client = api.CreateClient();
-        Guid tenantId = await api.CreateTenantAsync();
+        using HttpClient client = await api.CreateSignedInClientAsync();
+        Guid tenantId = await api.CreateTenantAsync(client);
 
         using HttpResponseMessage response =
             await PreviewAsync(client, tenantId, Guid.CreateVersion7(), "Hello?");
@@ -165,7 +165,7 @@ public sealed class AiAgentOpenAiPreviewApiTests(AiAgentOpenAiApiFixture api)
         // nothing.
         CannedOpenAiHandler handler = api.ResetProvider();
 
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, Guid agentId) = await ArrangeAsync(client);
 
         using HttpResponseMessage response = await PreviewAsync(client, tenantId, agentId, "   ");
@@ -179,7 +179,7 @@ public sealed class AiAgentOpenAiPreviewApiTests(AiAgentOpenAiApiFixture api)
     {
         CannedOpenAiHandler handler = api.ResetProvider();
 
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, Guid agentId) = await ArrangeAsync(client);
 
         using HttpResponseMessage before = await client.GetAsync(AgentRoute(tenantId, agentId));
@@ -217,7 +217,7 @@ public sealed class AiAgentOpenAiPreviewApiTests(AiAgentOpenAiApiFixture api)
     {
         CannedOpenAiHandler handler = api.ResetProvider();
 
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, Guid agentId) = await ArrangeAsync(client);
 
         using HttpResponseMessage response = await PreviewAsync(client, tenantId, agentId, "Hello?");
@@ -243,7 +243,7 @@ public sealed class AiAgentOpenAiPreviewApiTests(AiAgentOpenAiApiFixture api)
         handler.Status = provider;
         handler.ResponseBody = """{"error":{"message":"leaked at api.openai.com","code":"x"},"request_id":"req_leak"}""";
 
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, Guid agentId) = await ArrangeAsync(client);
 
         using HttpResponseMessage response = await PreviewAsync(client, tenantId, agentId, "Hello?");
@@ -260,7 +260,7 @@ public sealed class AiAgentOpenAiPreviewApiTests(AiAgentOpenAiApiFixture api)
         CannedOpenAiHandler handler = api.ResetProvider();
         handler.ResponseBody = Completed("   ");
 
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, Guid agentId) = await ArrangeAsync(client);
 
         using HttpResponseMessage response = await PreviewAsync(client, tenantId, agentId, "Hello?");
@@ -276,7 +276,7 @@ public sealed class AiAgentOpenAiPreviewApiTests(AiAgentOpenAiApiFixture api)
         handler.ResponseBody =
             """{"error":{"message":"Incorrect API key sk-leaked-probe at api.openai.com","code":"invalid_api_key"},"request_id":"req_leak"}""";
 
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, Guid agentId) = await ArrangeAsync(client);
 
         using HttpResponseMessage response = await PreviewAsync(client, tenantId, agentId, "Hello?");
@@ -297,7 +297,7 @@ public sealed class AiAgentOpenAiPreviewApiTests(AiAgentOpenAiApiFixture api)
         CannedOpenAiHandler handler = api.ResetProvider();
         handler.ResponseBody = Completed("Certainly.");
 
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, Guid agentId) = await ArrangeAsync(client);
 
         using HttpResponseMessage response = await PreviewAsync(client, tenantId, agentId, "Hello?");
@@ -338,7 +338,7 @@ public sealed class AiAgentOpenAiPreviewApiTests(AiAgentOpenAiApiFixture api)
 
     private async Task<(Guid TenantId, Guid AgentId)> ArrangeAsync(HttpClient client)
     {
-        Guid tenantId = await api.CreateTenantAsync();
+        Guid tenantId = await api.CreateTenantAsync(client);
 
         using HttpResponseMessage created =
             await CreateAsync(client, tenantId, "Sales Assistant", Instructions);

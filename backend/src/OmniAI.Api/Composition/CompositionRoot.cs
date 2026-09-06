@@ -1,4 +1,5 @@
 using OmniAI.Api.ErrorHandling;
+using OmniAI.Api.Security;
 using OmniAI.Application.AiAgents.ActivateAiAgent;
 using OmniAI.Application.AiAgents.CreateAiAgent;
 using OmniAI.Application.AiAgents.DisableAiAgent;
@@ -8,7 +9,9 @@ using OmniAI.Application.AiAgents.PreviewAiAgent;
 using OmniAI.Application.AiAgents.RenameAiAgent;
 using OmniAI.Application.AiAgents.UpdateAiAgentInstructions;
 using OmniAI.Application.Tenants.CreateTenant;
+using OmniAI.Application.Tenants;
 using OmniAI.Application.Tenants.GetTenantById;
+using OmniAI.Application.Tenants.ListMyTenants;
 using OmniAI.Infrastructure.DependencyInjection;
 using OmniAI.Infrastructure.Time;
 
@@ -24,7 +27,7 @@ namespace OmniAI.Api.Composition;
 /// Every registration is explicit. No assembly scanning, no reflection-based
 /// handler discovery and no mediator: a scanner would replace a readable list
 /// with a convention that has to be learned, and would happily register or miss
-/// a type without anyone noticing. Nine handlers is still a list worth reading.
+/// a type without anyone noticing. Eleven handlers is still a list worth reading.
 /// </para>
 /// </remarks>
 internal static class CompositionRoot
@@ -43,10 +46,24 @@ internal static class CompositionRoot
 
     public static IServiceCollection AddOmniAi(
         this IServiceCollection services,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        IHostEnvironment environment)
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configuration);
+        ArgumentNullException.ThrowIfNull(environment);
+
+        // How this process learns the scheme the browser actually used, across a
+        // TLS-terminating proxy, and which proxies it will believe. Registered
+        // before authentication because every cookie decision depends on it.
+        services.AddOmniAiForwardedHeaders(configuration);
+
+        // Authentication, authorization, antiforgery and the current-user
+        // adapter. Registered before the use cases that depend on knowing who
+        // is calling. The environment is passed in because cookie security is
+        // the one setting that must differ between Development and everywhere
+        // else -- see AuthenticationSetup for exactly how far that goes.
+        services.AddOmniAiAuthentication(environment);
 
         // Infrastructure decides how persistence is built; the composition root
         // only decides where its configuration comes from.
@@ -79,6 +96,12 @@ internal static class CompositionRoot
         // request's DbContext and therefore its unit of work.
         services.AddScoped<CreateTenantHandler>();
         services.AddScoped<GetTenantByIdHandler>();
+        services.AddScoped<ListMyTenantsHandler>();
+
+        // The membership check every tenant-scoped use case runs. Scoped, like
+        // the handlers that hold it, so it shares the request's DbContext and
+        // its view of the current principal.
+        services.AddScoped<TenantAccessGuard>();
         services.AddScoped<CreateAiAgentHandler>();
         services.AddScoped<GetAiAgentByIdHandler>();
         services.AddScoped<ListAiAgentsHandler>();
@@ -87,6 +110,11 @@ internal static class CompositionRoot
         services.AddScoped<ActivateAiAgentHandler>();
         services.AddScoped<DisableAiAgentHandler>();
         services.AddScoped<PreviewAiAgentHandler>();
+
+        // The antiforgery filter. Registered so route groups can resolve it by
+        // type; it is applied at the mapping sites rather than globally, so a
+        // group without it is visible in the routing code.
+        services.AddScoped<AntiforgeryEndpointFilter>();
 
         // Turns expected Domain and Application failures into Problem Details.
         // Registered before any future handler so its specific cases are

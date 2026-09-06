@@ -30,7 +30,7 @@ public sealed class AiAgentPreviewApiTests(AiAgentPreviewApiFixture api)
         RecordingAiTextGenerator generator = api.ResetGenerator();
         generator.Reply = "Tell me what you need it for.";
 
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, Guid agentId) = await ArrangeAsync(client);
 
         using HttpResponseMessage response =
@@ -48,7 +48,7 @@ public sealed class AiAgentPreviewApiTests(AiAgentPreviewApiFixture api)
         // configuration and must not be echoed back by a generation endpoint.
         api.ResetGenerator();
 
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, Guid agentId) = await ArrangeAsync(client);
 
         using HttpResponseMessage response = await PreviewAsync(client, tenantId, agentId, "Hello?");
@@ -66,7 +66,7 @@ public sealed class AiAgentPreviewApiTests(AiAgentPreviewApiFixture api)
     {
         api.ResetGenerator();
 
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, Guid agentId) = await ArrangeAsync(client);
 
         using HttpResponseMessage response = await PreviewAsync(client, tenantId, agentId, "Hello?");
@@ -82,7 +82,7 @@ public sealed class AiAgentPreviewApiTests(AiAgentPreviewApiFixture api)
     {
         api.ResetGenerator();
 
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, Guid agentId) = await ArrangeAsync(client);
 
         using HttpResponseMessage response = await PreviewAsync(client, tenantId, agentId, "Hello?");
@@ -102,7 +102,7 @@ public sealed class AiAgentPreviewApiTests(AiAgentPreviewApiFixture api)
     {
         RecordingAiTextGenerator generator = api.ResetGenerator();
 
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, Guid agentId) = await ArrangeAsync(client);
 
         using HttpResponseMessage response = await PreviewAsync(client, tenantId, agentId, "Hello?");
@@ -121,7 +121,7 @@ public sealed class AiAgentPreviewApiTests(AiAgentPreviewApiFixture api)
         // with. The generator must still receive the stored text and nothing else.
         RecordingAiTextGenerator generator = api.ResetGenerator();
 
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, Guid agentId) = await ArrangeAsync(client);
 
         using HttpResponseMessage response = await client.PostAsJsonAsync(
@@ -149,7 +149,7 @@ public sealed class AiAgentPreviewApiTests(AiAgentPreviewApiFixture api)
     {
         RecordingAiTextGenerator generator = api.ResetGenerator();
 
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, Guid agentId) = await ArrangeAsync(client);
 
         using HttpResponseMessage response = await PreviewAsync(client, tenantId, agentId, "Hello?");
@@ -164,7 +164,7 @@ public sealed class AiAgentPreviewApiTests(AiAgentPreviewApiFixture api)
     {
         RecordingAiTextGenerator generator = api.ResetGenerator();
 
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, Guid agentId) = await ArrangeAsync(client);
 
         const string Multiline = "I need:\n\n  1. a laptop\n  2. a case\n\nWhich first?";
@@ -184,7 +184,7 @@ public sealed class AiAgentPreviewApiTests(AiAgentPreviewApiFixture api)
         // for a client to be out of date about.
         api.ResetGenerator();
 
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, Guid agentId) = await ArrangeAsync(client);
 
         using HttpResponseMessage response = await PreviewAsync(client, tenantId, agentId, "Hello?");
@@ -198,7 +198,7 @@ public sealed class AiAgentPreviewApiTests(AiAgentPreviewApiFixture api)
     {
         api.ResetGenerator();
 
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, Guid agentId) = await ArrangeAsync(client);
 
         using HttpResponseMessage before = await client.GetAsync(AgentRoute(tenantId, agentId));
@@ -224,7 +224,7 @@ public sealed class AiAgentPreviewApiTests(AiAgentPreviewApiFixture api)
         // cannot pass because of a projection that happens to hide a change.
         api.ResetGenerator();
 
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, Guid agentId) = await ArrangeAsync(client);
 
         object? before = await api.Database.ExecuteScalarAsync(
@@ -246,7 +246,7 @@ public sealed class AiAgentPreviewApiTests(AiAgentPreviewApiFixture api)
     {
         api.ResetGenerator();
 
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, Guid agentId) = await ArrangeAsync(client);
 
         using HttpResponseMessage before = await client.GetAsync(AgentRoute(tenantId, agentId));
@@ -274,7 +274,7 @@ public sealed class AiAgentPreviewApiTests(AiAgentPreviewApiFixture api)
         // before deciding whether to activate it.
         api.ResetGenerator();
 
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, Guid agentId) = await ArrangeAsync(client);
 
         using HttpResponseMessage agent = await client.GetAsync(AgentRoute(tenantId, agentId));
@@ -290,7 +290,7 @@ public sealed class AiAgentPreviewApiTests(AiAgentPreviewApiFixture api)
     {
         api.ResetGenerator();
 
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, Guid agentId, string version) = await ArrangeWithVersionAsync(client);
 
         await ActAsync(client, tenantId, agentId, "activate", version);
@@ -308,7 +308,7 @@ public sealed class AiAgentPreviewApiTests(AiAgentPreviewApiFixture api)
         // testing.
         api.ResetGenerator();
 
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, Guid agentId, string version) = await ArrangeWithVersionAsync(client);
 
         (AgentPayload _, string activated) = await ActAsync(client, tenantId, agentId, "activate", version);
@@ -328,9 +328,9 @@ public sealed class AiAgentPreviewApiTests(AiAgentPreviewApiFixture api)
     {
         api.ResetGenerator();
 
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid _, Guid agentB) = await ArrangeAsync(client);
-        Guid tenantA = await api.CreateTenantAsync("Other Tenant");
+        Guid tenantA = await api.CreateTenantAsync(client, "Other Tenant");
 
         using HttpResponseMessage response = await PreviewAsync(client, tenantA, agentB, "Hello?");
 
@@ -346,9 +346,9 @@ public sealed class AiAgentPreviewApiTests(AiAgentPreviewApiFixture api)
         // and this platform's AI budget is never spent on their data.
         RecordingAiTextGenerator generator = api.ResetGenerator();
 
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid _, Guid agentB) = await ArrangeAsync(client);
-        Guid tenantA = await api.CreateTenantAsync("Other Tenant");
+        Guid tenantA = await api.CreateTenantAsync(client, "Other Tenant");
 
         using HttpResponseMessage response = await PreviewAsync(client, tenantA, agentB, "Hello?");
 
@@ -362,9 +362,9 @@ public sealed class AiAgentPreviewApiTests(AiAgentPreviewApiFixture api)
     {
         api.ResetGenerator();
 
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantB, Guid agentB) = await ArrangeAsync(client);
-        Guid tenantA = await api.CreateTenantAsync("Other Tenant");
+        Guid tenantA = await api.CreateTenantAsync(client, "Other Tenant");
 
         using HttpResponseMessage before = await client.GetAsync(AgentRoute(tenantB, agentB));
         AgentPayload stored = await ReadAgentAsync(before);
@@ -384,8 +384,8 @@ public sealed class AiAgentPreviewApiTests(AiAgentPreviewApiFixture api)
     {
         RecordingAiTextGenerator generator = api.ResetGenerator();
 
-        using HttpClient client = api.CreateClient();
-        Guid tenantId = await api.CreateTenantAsync();
+        using HttpClient client = await api.CreateSignedInClientAsync();
+        Guid tenantId = await api.CreateTenantAsync(client);
 
         using HttpResponseMessage response =
             await PreviewAsync(client, tenantId, Guid.CreateVersion7(), "Hello?");
@@ -402,9 +402,9 @@ public sealed class AiAgentPreviewApiTests(AiAgentPreviewApiFixture api)
         // which ids are real.
         api.ResetGenerator();
 
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid _, Guid agentB) = await ArrangeAsync(client);
-        Guid tenantA = await api.CreateTenantAsync("Other Tenant");
+        Guid tenantA = await api.CreateTenantAsync(client, "Other Tenant");
 
         Guid neverExisted = Guid.CreateVersion7();
 
@@ -436,7 +436,7 @@ public sealed class AiAgentPreviewApiTests(AiAgentPreviewApiFixture api)
     {
         RecordingAiTextGenerator generator = api.ResetGenerator();
 
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, Guid agentId) = await ArrangeAsync(client);
 
         using HttpResponseMessage response = await PreviewAsync(client, tenantId, agentId, message);
@@ -450,7 +450,7 @@ public sealed class AiAgentPreviewApiTests(AiAgentPreviewApiFixture api)
     {
         api.ResetGenerator();
 
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, Guid agentId) = await ArrangeAsync(client);
 
         using HttpResponseMessage response =
@@ -464,7 +464,7 @@ public sealed class AiAgentPreviewApiTests(AiAgentPreviewApiFixture api)
     {
         RecordingAiTextGenerator generator = api.ResetGenerator();
 
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, Guid agentId) = await ArrangeAsync(client);
 
         using HttpResponseMessage response = await PreviewAsync(
@@ -481,7 +481,7 @@ public sealed class AiAgentPreviewApiTests(AiAgentPreviewApiFixture api)
     {
         api.ResetGenerator();
 
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, Guid agentId) = await ArrangeAsync(client);
 
         using HttpResponseMessage response = await PreviewAsync(
@@ -495,7 +495,7 @@ public sealed class AiAgentPreviewApiTests(AiAgentPreviewApiFixture api)
     {
         api.ResetGenerator();
 
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, Guid agentId) = await ArrangeAsync(client);
 
         using StringContent body = new("{ not json", System.Text.Encoding.UTF8, "application/json");
@@ -510,7 +510,7 @@ public sealed class AiAgentPreviewApiTests(AiAgentPreviewApiFixture api)
     {
         api.ResetGenerator();
 
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
 
         using HttpResponseMessage response = await client.PostAsJsonAsync(
             "/api/tenants/not-a-guid/ai-agents/also-not-a-guid/preview", new { message = "Hello?" });
@@ -527,7 +527,7 @@ public sealed class AiAgentPreviewApiTests(AiAgentPreviewApiFixture api)
         RecordingAiTextGenerator generator = api.ResetGenerator();
         generator.PretendUnavailable = true;
 
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, Guid agentId) = await ArrangeAsync(client);
 
         using HttpResponseMessage response = await PreviewAsync(client, tenantId, agentId, "Hello?");
@@ -546,7 +546,7 @@ public sealed class AiAgentPreviewApiTests(AiAgentPreviewApiFixture api)
         RecordingAiTextGenerator generator = api.ResetGenerator();
         generator.Reply = reply;
 
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, Guid agentId) = await ArrangeAsync(client);
 
         using HttpResponseMessage response = await PreviewAsync(client, tenantId, agentId, "Hello?");
@@ -560,7 +560,7 @@ public sealed class AiAgentPreviewApiTests(AiAgentPreviewApiFixture api)
         RecordingAiTextGenerator generator = api.ResetGenerator();
         generator.PretendNullResult = true;
 
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, Guid agentId) = await ArrangeAsync(client);
 
         using HttpResponseMessage response = await PreviewAsync(client, tenantId, agentId, "Hello?");
@@ -574,7 +574,7 @@ public sealed class AiAgentPreviewApiTests(AiAgentPreviewApiFixture api)
         RecordingAiTextGenerator generator = api.ResetGenerator();
         generator.PretendNullResult = true;
 
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, Guid agentId) = await ArrangeAsync(client);
 
         using HttpResponseMessage response = await PreviewAsync(client, tenantId, agentId, "Hello?");
@@ -607,7 +607,7 @@ public sealed class AiAgentPreviewApiTests(AiAgentPreviewApiFixture api)
         RecordingAiTextGenerator generator = api.ResetGenerator();
         generator.PretendNullResult = true;
 
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, Guid agentId) = await ArrangeAsync(client);
 
         using HttpResponseMessage response = await PreviewAsync(client, tenantId, agentId, "Hello?");
@@ -622,7 +622,7 @@ public sealed class AiAgentPreviewApiTests(AiAgentPreviewApiFixture api)
         RecordingAiTextGenerator generator = api.ResetGenerator();
         generator.PretendUnavailable = true;
 
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, Guid agentId) = await ArrangeAsync(client);
 
         using HttpResponseMessage before = await client.GetAsync(AgentRoute(tenantId, agentId));
@@ -645,7 +645,7 @@ public sealed class AiAgentPreviewApiTests(AiAgentPreviewApiFixture api)
     {
         api.ResetGenerator();
 
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, Guid agentId) = await ArrangeAsync(client);
 
         using HttpResponseMessage response = await client.GetAsync(PreviewRoute(tenantId, agentId));
@@ -703,7 +703,7 @@ public sealed class AiAgentPreviewApiTests(AiAgentPreviewApiFixture api)
     private async Task<(Guid TenantId, Guid AgentId, string ETag)> ArrangeWithVersionAsync(
         HttpClient client)
     {
-        Guid tenantId = await api.CreateTenantAsync();
+        Guid tenantId = await api.CreateTenantAsync(client);
 
         using HttpResponseMessage created =
             await CreateAsync(client, tenantId, "Sales Assistant", Instructions);

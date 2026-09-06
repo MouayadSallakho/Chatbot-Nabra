@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using OmniAI.Application.Tenants;
 using OmniAI.Domain.Tenants;
+using OmniAI.Domain.Users;
 using OmniAI.Infrastructure.Persistence;
 using OmniAI.Infrastructure.Persistence.Repositories;
 using OmniAI.Testing;
@@ -27,7 +28,7 @@ public sealed class TenantRepositoryTests(PostgresTestDatabase database)
 
         await using (OmniAiDbContext writing = database.CreateContext())
         {
-            await new TenantRepository(writing).AddAsync(tenant);
+            await new TenantRepository(writing).AddAsync(tenant, await OwnerOfAsync(tenant));
         }
 
         await using OmniAiDbContext reading = database.CreateContext();
@@ -47,7 +48,7 @@ public sealed class TenantRepositoryTests(PostgresTestDatabase database)
         Tenant tenant = NewTenant("Acme Corporation", NewSlug());
 
         await using OmniAiDbContext context = database.CreateContext();
-        await new TenantRepository(context).AddAsync(tenant);
+        await new TenantRepository(context).AddAsync(tenant, await OwnerOfAsync(tenant));
 
         object? stored = await database.ExecuteScalarAsync(
             $"SELECT count(*) FROM tenants WHERE id = '{tenant.Id.Value}'");
@@ -72,7 +73,8 @@ public sealed class TenantRepositoryTests(PostgresTestDatabase database)
         await using OmniAiDbContext context = database.CreateContext();
         TenantRepository repository = new(context);
 
-        await repository.AddAsync(Tenant.Create(TenantName.Create("Acme"), taken));
+        Tenant stored = Tenant.Create(TenantName.Create("Acme"), taken);
+        await repository.AddAsync(stored, await OwnerOfAsync(stored));
 
         Assert.True(await repository.SlugExistsAsync(taken));
         Assert.False(await repository.SlugExistsAsync(free));
@@ -86,16 +88,15 @@ public sealed class TenantRepositoryTests(PostgresTestDatabase database)
         // thing that can reject the second insert is the unique index.
         string slug = NewSlug();
 
-        await using (OmniAiDbContext first = database.CreateContext())
-        {
-            await new TenantRepository(first).AddAsync(NewTenant("Acme One", slug));
-        }
+        await StoreAsync(NewTenant("Acme One", slug));
 
         await using OmniAiDbContext second = database.CreateContext();
+        Tenant loser = NewTenant("Acme Two", slug);
+        TenantMembership losing = await OwnerOfAsync(loser);
 
         TenantSlugAlreadyExistsException conflict =
             await Assert.ThrowsAsync<TenantSlugAlreadyExistsException>(
-                () => new TenantRepository(second).AddAsync(NewTenant("Acme Two", slug)));
+                () => new TenantRepository(second).AddAsync(loser, losing));
 
         Assert.Equal(slug, conflict.Slug);
 
@@ -110,16 +111,15 @@ public sealed class TenantRepositoryTests(PostgresTestDatabase database)
         // name a constraint, a SQLSTATE, a table or any SQL.
         string slug = NewSlug();
 
-        await using (OmniAiDbContext first = database.CreateContext())
-        {
-            await new TenantRepository(first).AddAsync(NewTenant("Acme One", slug));
-        }
+        await StoreAsync(NewTenant("Acme One", slug));
 
         await using OmniAiDbContext second = database.CreateContext();
+        Tenant loser = NewTenant("Acme Two", slug);
+        TenantMembership losing = await OwnerOfAsync(loser);
 
         TenantSlugAlreadyExistsException conflict =
             await Assert.ThrowsAsync<TenantSlugAlreadyExistsException>(
-                () => new TenantRepository(second).AddAsync(NewTenant("Acme Two", slug)));
+                () => new TenantRepository(second).AddAsync(loser, losing));
 
         foreach (string leak in
             (string[])["ix_tenants_slug", "23505", "duplicate key", "INSERT", "tenants", "Npgsql"])
@@ -133,26 +133,35 @@ public sealed class TenantRepositoryTests(PostgresTestDatabase database)
     {
         string slug = NewSlug();
 
-        await using (OmniAiDbContext first = database.CreateContext())
-        {
-            await new TenantRepository(first).AddAsync(NewTenant("Acme One", slug));
-        }
+        await StoreAsync(NewTenant("Acme One", slug));
 
         await using OmniAiDbContext second = database.CreateContext();
         TenantRepository repository = new(second);
         Tenant loser = NewTenant("Acme Two", slug);
+        TenantMembership losing = await OwnerOfAsync(loser);
 
         await Assert.ThrowsAsync<TenantSlugAlreadyExistsException>(
-            () => repository.AddAsync(loser));
+            () => repository.AddAsync(loser, losing));
 
-        // The rejected aggregate must not still be pending, or the next save on
-        // this unit of work would retry an insert nobody asked for.
+        // Neither the rejected aggregate nor its membership may still be pending,
+        // or the next save on this unit of work would retry an insert nobody asked
+        // for -- and the membership's retry would fail on a foreign key pointing at
+        // a tenant that was never written.
         Assert.Equal(EntityState.Detached, second.Entry(loser).State);
+        Assert.Equal(EntityState.Detached, second.Entry(losing).State);
 
         object? rows = await database.ExecuteScalarAsync(
             $"SELECT count(*) FROM tenants WHERE slug = '{slug}'");
 
         Assert.Equal(1L, rows as long?);
+
+        // And no membership survived for the tenant that was rolled back. This
+        // is the orphan the transaction exists to prevent: a membership row
+        // granting access to a workspace that was never created.
+        object? orphans = await database.ExecuteScalarAsync(
+            $"SELECT count(*) FROM tenant_memberships WHERE tenant_id = '{loser.Id.Value}'");
+
+        Assert.Equal(0L, orphans as long?);
     }
 
     [Fact]
@@ -188,10 +197,12 @@ public sealed class TenantRepositoryTests(PostgresTestDatabase database)
     private async Task<bool> AttemptAsync(string name, string slug)
     {
         await using OmniAiDbContext context = database.CreateContext();
+        Tenant candidate = NewTenant(name, slug);
+        TenantMembership membership = await OwnerOfAsync(candidate);
 
         try
         {
-            await new TenantRepository(context).AddAsync(NewTenant(name, slug));
+            await new TenantRepository(context).AddAsync(candidate, membership);
 
             return true;
         }
@@ -199,6 +210,29 @@ public sealed class TenantRepositoryTests(PostgresTestDatabase database)
         {
             return false;
         }
+    }
+
+    /// <summary>
+    /// A membership for a freshly seeded account, so the user foreign key is
+    /// satisfied.
+    /// </summary>
+    /// <remarks>
+    /// A new account per call rather than one shared across the class. Sharing
+    /// would make the concurrent-insert test write eight memberships for one
+    /// person, which is not the shape the platform actually produces.
+    /// </remarks>
+    private async Task<TenantMembership> OwnerOfAsync(Tenant tenant) =>
+        TenantMembership.Create(
+            await TestIdentity.SeedUserAsync(database),
+            tenant.Id,
+            DateTimeOffset.UtcNow);
+
+    /// <summary>Stores a tenant with a fresh owner, on its own context.</summary>
+    private async Task StoreAsync(Tenant tenant)
+    {
+        await using OmniAiDbContext context = database.CreateContext();
+
+        await new TenantRepository(context).AddAsync(tenant, await OwnerOfAsync(tenant));
     }
 
     private static Tenant NewTenant(string name, string slug) =>

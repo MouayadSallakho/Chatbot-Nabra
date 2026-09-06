@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using OmniAI.Domain.AiAgents;
 using OmniAI.Domain.Conversations;
 using OmniAI.Domain.Tenants;
+using OmniAI.Domain.Users;
 
 namespace OmniAI.Infrastructure.Persistence;
 
@@ -19,6 +20,9 @@ internal static class PersistenceConverters
     /// <summary>Identifiers are stored as native PostgreSQL <c>uuid</c>, never as text.</summary>
     public static readonly ValueConverter<TenantId, Guid> TenantId =
         new(id => id.Value, value => Domain.Tenants.TenantId.From(value));
+
+    public static readonly ValueConverter<UserId, Guid> UserId =
+        new(id => id.Value, value => Domain.Users.UserId.From(value));
 
     public static readonly ValueConverter<ConversationId, Guid> ConversationId =
         new(id => id.Value, value => Domain.Conversations.ConversationId.From(value));

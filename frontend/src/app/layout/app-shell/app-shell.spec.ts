@@ -7,7 +7,12 @@ import { of } from 'rxjs';
 import { MEDIA_QUERY_FACTORY, MediaQueries } from '@app/core/media/media';
 import { LOCAL_STORAGE } from '@app/core/storage/local-storage';
 import { TenantApi } from '@app/core/api/tenant-api';
-import { WORKSPACE_STORAGE_KEY } from '@app/core/workspace/workspace-context-service';
+import { AuthApi } from '@app/core/auth/auth-api';
+import {
+  WORKSPACE_STORAGE_KEY,
+  WorkspaceContextService,
+} from '@app/core/workspace/workspace-context-service';
+import { AuthService } from '@app/core/auth/auth-service';
 import { NAV_ITEMS } from '@app/layout/navigation';
 import { FakeMediaMatcher, memoryStorage } from '@app/testing/test-doubles';
 import { routes } from '@app/app.routes';
@@ -19,6 +24,9 @@ const TENANT = {
   slug: 'acme-trading',
   status: 'Active' as const,
 };
+
+/** The signed-in account, so the authentication guard lets the shell render. */
+const ACCOUNT = { id: '99999999-9999-9999-9999-999999999999', email: 'ada@example.test' };
 
 /**
  * The shell is tested through the real router, against the real route table.
@@ -58,9 +66,35 @@ describe('AppShell', () => {
           provide: LOCAL_STORAGE,
           useValue: memoryStorage({ [WORKSPACE_STORAGE_KEY]: TENANT.id }),
         },
-        { provide: TenantApi, useValue: { get: () => of(TENANT), create: () => of(TENANT) } },
+        {
+          provide: TenantApi,
+          useValue: {
+            get: () => of(TENANT),
+            create: () => of(TENANT),
+            listMine: () => of([TENANT]),
+          },
+        },
+        // A signed-in account and a workspace, so these tests stay about the
+        // shell rather than about authentication -- which has its own suites.
+        {
+          provide: AuthApi,
+          useValue: {
+            csrf: () => of(undefined),
+            me: () => of(ACCOUNT),
+            login: () => of(ACCOUNT),
+            register: () => of(ACCOUNT),
+            logout: () => of(undefined),
+          },
+        },
       ],
     });
+
+    // The application resolves authentication and the workspace list before the
+    // first route renders; this harness has no app initializer, so it does the
+    // same thing by hand. Without it the guards would run against an unresolved
+    // state and send every test to the sign-in screen.
+    await TestBed.inject(AuthService).restore();
+    await TestBed.inject(WorkspaceContextService).load();
 
     harness = await RouterTestingHarness.create(url);
 

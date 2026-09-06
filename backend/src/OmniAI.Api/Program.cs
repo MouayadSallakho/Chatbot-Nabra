@@ -1,5 +1,7 @@
 using OmniAI.Api.AiAgents;
+using OmniAI.Api.Auth;
 using OmniAI.Api.Composition;
+using OmniAI.Api.Security;
 using OmniAI.Api.Tenants;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
@@ -10,12 +12,38 @@ builder.Services.AddOpenApi();
 // Problem Details is the single, uniform error contract for the whole API.
 builder.Services.AddProblemDetails();
 
-// Persistence, use cases and error translation. See CompositionRoot.
-builder.Services.AddOmniAi(builder.Configuration);
+// Persistence, authentication, use cases and error translation. See CompositionRoot.
+builder.Services.AddOmniAi(builder.Configuration, builder.Environment);
 
 WebApplication app = builder.Build();
 
+// FIRST, and the order is not negotiable.
+//
+// TLS is terminated by the reverse proxy, so the connection this process accepts
+// is plain HTTP even when the browser spoke HTTPS. This restores the browser's
+// scheme from X-Forwarded-Proto -- but only when the connection came from a
+// trusted proxy, because that header is attacker-controlled input. See
+// ForwardedHeadersSetup.
+//
+// Everything after this point may read Request.Scheme: the antiforgery service
+// refuses to issue a token under a Secure cookie policy over a non-HTTPS request,
+// and the cookie handler decides whether to mark cookies Secure. Both would be
+// deciding from a false premise if this ran later.
+app.UseForwardedHeaders();
+
+// The fail-safe. Outside Development, a request that did not arrive over HTTPS is
+// refused rather than served with downgraded cookies -- see
+// SecureTransportMiddleware for why the alternative was rejected. Placed
+// immediately after the scheme is established and before anything that could
+// issue a cookie.
+app.UseOmniAiSecureTransport();
+
 app.UseExceptionHandler();
+
+// Fills in a Problem Details body for error responses produced by the pipeline
+// rather than by a handler -- notably the 401 the cookie scheme writes when an
+// unauthenticated request reaches a protected endpoint, which would otherwise
+// have no body at all.
 app.UseStatusCodePages();
 
 if (app.Environment.IsDevelopment())
@@ -23,34 +51,55 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
+// Establishes who the caller is, then enforces what each endpoint requires.
+// Order matters and is not interchangeable: authorization can only act on an
+// identity that authentication has already resolved.
+app.UseAuthentication();
+app.UseAuthorization();
+
 // Liveness probe. Intentionally dependency-free: it answers "is the process up",
 // not "are downstream services healthy". Readiness checks arrive with the
 // components they check.
-app.MapGet("/health", () => Results.Ok(new { status = "healthy" }))
-   .WithName("GetHealth");
-
-// Tenant onboarding.
 //
-// NOT AUTHORISED FOR PRODUCTION EXPOSURE. These endpoints are unauthenticated
-// because authentication and authorisation are not implemented yet, so anyone
-// able to reach this process can create a tenant. Deployment is not authorised
-// until that phase is complete. No placeholder credential stands in for the
-// missing controls, deliberately: a fake one would hide the gap rather than close
-// it.
+// Anonymous, deliberately. A liveness probe that requires a session cannot be
+// called by the thing that needs it, and it discloses nothing but that the
+// process is running.
+app.MapGet("/health", () => Results.Ok(new { status = "healthy" }))
+   .WithName("GetHealth")
+   .AllowAnonymous();
+
+// Registration, sign-in, sign-out, the current account and the antiforgery
+// bootstrap. Three of these are necessarily anonymous; each says so at its own
+// mapping rather than inheriting anonymity from the group.
+app.MapAuthEndpoints();
+
+// The workspaces the signed-in person belongs to. This is the only source of
+// tenant ids the admin application may use.
+app.MapMeEndpoints();
+
+// Tenant onboarding. Authenticated: creating a workspace makes the creator its
+// first member, and reading one requires membership.
 app.MapTenantEndpoints();
 
 // AI agent configuration, scoped to the tenant that owns each agent.
 //
-// NOT AUTHORISED FOR PRODUCTION EXPOSURE, for the same reason and with one
-// addition. The tenant id in the route is supplied by the caller and believed,
-// because there is no authenticated principal to check it against. Tenant
-// scoping is enforced all the way into the SQL, so no request can read or
-// change an agent through another tenant's route -- but until authentication
-// exists, nothing stops a caller from naming whichever tenant it likes.
+// Authenticated, and membership-checked inside every use case. The tenant id in
+// the route is still supplied by the caller, but it is no longer believed: it
+// addresses a resource, and reaching that resource requires a membership row
+// pairing the signed-in person with that tenant. The database predicates that
+// scope every query to the tenant remain in place beneath that check, so two
+// independent layers would both have to fail for one tenant's data to reach
+// another's request.
 app.MapAiAgentEndpoints();
 
 // TLS is terminated by the reverse proxy in front of this process, so the
-// application deliberately does not perform its own HTTPS redirection.
+// application deliberately does not perform its own HTTPS redirection -- there is
+// nothing to redirect to from here, and the proxy is where that belongs.
+//
+// What the application does insist on is knowing the truth about the scheme: the
+// forwarded-headers middleware above restores it from a trusted proxy, every
+// cookie requires Secure outside Development, and a request that arrives without
+// a trusted HTTPS context is refused rather than served insecurely.
 
 await app.RunAsync();
 

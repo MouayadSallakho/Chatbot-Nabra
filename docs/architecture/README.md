@@ -19,11 +19,15 @@ theming, a responsive sidebar and top bar, and the reusable primitives that
 product screens will be built from. Phase 11 turned that shell into the first
 real product workflow: a development workspace, and AI agent listing, creation,
 editing, lifecycle and preview against the real API, with a tenant-scoped
-paginated list endpoint added to support it. No channel-provider architecture has
-been designed, and there is still no authentication -- which is why the admin
-application and the API behind it remain development-only.
+paginated list endpoint added to support it. Phase 12 closed the gap those phases
+left open: real accounts, a cookie session, antiforgery protection, and a tenant
+membership that every tenant-scoped request is checked against, so a tenant id in
+a route addresses a resource rather than granting access to it. No
+channel-provider architecture has been designed, and the platform is still not
+authorised for production deployment -- email verification, password recovery,
+roles and permissions all remain ahead of it.
 
-Ten areas have their own documents:
+Eleven areas have their own documents:
 
 - [multi-tenancy-isolation.md](multi-tenancy-isolation.md) - tenant isolation
 - [conversation-domain.md](conversation-domain.md) - conversation and message modelling
@@ -35,6 +39,7 @@ Ten areas have their own documents:
 - [openai-provider.md](openai-provider.md) - the OpenAI Responses adapter behind that contract
 - [admin-design-system.md](admin-design-system.md) - the admin design system and application shell
 - [admin-ai-agent-experience.md](admin-ai-agent-experience.md) - the development workspace and the AI agent admin workflow
+- [authentication-tenant-membership.md](authentication-tenant-membership.md) - accounts, the cookie session, antiforgery, and the membership authorization boundary
 
 ---
 

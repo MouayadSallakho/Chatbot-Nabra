@@ -3,6 +3,7 @@ using OmniAI.Application.AiAgents.CreateAiAgent;
 using OmniAI.Application.Tenants;
 using OmniAI.Application.Tests.Tenants;
 using OmniAI.Domain;
+using OmniAI.Application.Tests.Security;
 using OmniAI.Domain.AiAgents;
 using OmniAI.Domain.Tenants;
 using OmniAI.Testing;
@@ -250,7 +251,7 @@ public sealed class CreateAiAgentHandlerTests
     private static CreateAiAgentHandler Handler(
         InMemoryTenantRepository tenants,
         InMemoryAiAgentRepository agents) =>
-        new(tenants, agents, new FixedTimeProvider(Now));
+        new(tenants, agents, TestAccess.Anywhere(), new FixedTimeProvider(Now));
 
     private static Tenant SeedTenant(out InMemoryTenantRepository tenants)
     {

@@ -1,7 +1,9 @@
+using System.Text.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using OmniAI.Domain.Tenants;
+using OmniAI.Domain.Users;
 using OmniAI.Infrastructure.Persistence;
 using OmniAI.Testing;
 
@@ -117,15 +119,76 @@ public class AiAgentApiFixture : IAsyncLifetime
     public OmniAiDbContext CreateDbContext() => _database.CreateContext();
 
     /// <summary>
-    /// Creates a tenant directly in the database and returns its id.
+    /// A client with a registered, signed-in account and a valid antiforgery
+    /// token.
+    /// </summary>
+    /// <remarks>
+    /// Every suite built on this fixture needs one, because every endpoint under
+    /// test now requires authentication. The account is created through the real
+    /// registration endpoint; nothing here forges a cookie or installs a fake
+    /// principal, so what these tests exercise is the pipeline a browser meets.
+    /// </remarks>
+    public async Task<HttpClient> CreateSignedInClientAsync()
+    {
+        HttpClient client = CreateClient();
+
+        await ApiAuthentication.RegisterAsync(client);
+
+        return client;
+    }
+
+    /// <summary>
+    /// Creates a tenant owned by this client's account and returns its id.
     /// </summary>
     /// <remarks>
     /// Seeded through the Domain factory rather than through the tenant endpoint.
     /// These tests are about AI agents, and routing every fixture through a second
     /// slice would make an unrelated change to tenant onboarding able to fail
-    /// them. The row it produces is identical either way.
+    /// them. The rows it produces are identical either way.
+    /// <para>
+    /// <strong>The membership is seeded with it, and that is not incidental.</strong>
+    /// A tenant without one is unreachable: every request for it answers 404, so
+    /// a fixture that wrote only the tenant row would make every test in this
+    /// project fail for a reason that has nothing to do with what it asserts.
+    /// </para>
     /// </remarks>
-    public async Task<Guid> CreateTenantAsync(string name = "Acme Trading")
+    public async Task<Guid> CreateTenantAsync(HttpClient owner, string name = "Acme Trading")
+    {
+        ArgumentNullException.ThrowIfNull(owner);
+
+        return await CreateTenantAsync(await CurrentUserIdAsync(owner), name);
+    }
+
+    /// <summary>Creates a tenant owned by a known account.</summary>
+    public async Task<Guid> CreateTenantAsync(Guid ownerUserId, string name = "Acme Trading")
+    {
+        Tenant tenant = Tenant.Create(
+            TenantName.Create(name),
+            TenantSlug.Create($"t{Guid.NewGuid():N}"[..20]));
+
+        await using OmniAiDbContext context = CreateDbContext();
+
+        context.Tenants.Add(tenant);
+        context.TenantMemberships.Add(TenantMembership.Create(
+            UserId.From(ownerUserId),
+            tenant.Id,
+            DateTimeOffset.UtcNow));
+
+        await context.SaveChangesAsync();
+
+        return tenant.Id.Value;
+    }
+
+    /// <summary>
+    /// Creates a tenant nobody is a member of.
+    /// </summary>
+    /// <remarks>
+    /// For the tests that need a tenant which genuinely exists and which the
+    /// caller genuinely cannot reach. Without this the only unreachable tenant a
+    /// test could name is an invented id, which proves less: it would leave open
+    /// the possibility that the API answers differently for real ids.
+    /// </remarks>
+    public async Task<Guid> CreateUnownedTenantAsync(string name = "Rival Trading")
     {
         Tenant tenant = Tenant.Create(
             TenantName.Create(name),
@@ -137,6 +200,66 @@ public class AiAgentApiFixture : IAsyncLifetime
         await context.SaveChangesAsync();
 
         return tenant.Id.Value;
+    }
+
+    /// <summary>
+    /// A second client signed in as the same account.
+    /// </summary>
+    /// <remarks>
+    /// For the concurrency scenarios, which are one person with the application
+    /// open in two tabs rather than two different people. Two separate accounts
+    /// would test something else entirely -- and, since neither would be a member
+    /// of the other's workspace, would produce 404s instead of the precondition
+    /// failures those tests exist to prove.
+    /// <para>
+    /// It signs in rather than registering, so the two clients share an account
+    /// and differ only in their cookie jar, which is exactly how two tabs differ.
+    /// </para>
+    /// </remarks>
+    public async Task<HttpClient> CreateSecondClientForAsync(HttpClient existing)
+    {
+        ArgumentNullException.ThrowIfNull(existing);
+
+        string email = await CurrentEmailAsync(existing);
+
+        HttpClient client = CreateClient();
+
+        using HttpResponseMessage signedIn =
+            await ApiAuthentication.SignInAsync(client, email, ApiAuthentication.Password);
+
+        signedIn.EnsureSuccessStatusCode();
+
+        return client;
+    }
+
+    /// <summary>The address this client is signed in as.</summary>
+    public static async Task<string> CurrentEmailAsync(HttpClient client)
+    {
+        ArgumentNullException.ThrowIfNull(client);
+
+        using HttpResponseMessage response = await client.GetAsync("/api/auth/me");
+
+        response.EnsureSuccessStatusCode();
+
+        using JsonDocument body =
+            JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+
+        return body.RootElement.GetProperty("email").GetString() ?? string.Empty;
+    }
+
+    /// <summary>The account this client is signed in as.</summary>
+    public static async Task<Guid> CurrentUserIdAsync(HttpClient client)
+    {
+        ArgumentNullException.ThrowIfNull(client);
+
+        using HttpResponseMessage response = await client.GetAsync("/api/auth/me");
+
+        response.EnsureSuccessStatusCode();
+
+        using JsonDocument body =
+            JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+
+        return body.RootElement.GetProperty("id").GetGuid();
     }
 
     /// <summary>

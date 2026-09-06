@@ -1,8 +1,11 @@
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using OmniAI.Domain.AiAgents;
 using OmniAI.Domain.Conversations;
 using OmniAI.Domain.Tenants;
+using OmniAI.Domain.Users;
+using OmniAI.Infrastructure.Identity;
 
 namespace OmniAI.Infrastructure.Persistence;
 
@@ -19,11 +22,36 @@ namespace OmniAI.Infrastructure.Persistence;
 /// and reaching it independently would route around the aggregate that enforces
 /// its rules.
 /// </para>
+/// <para>
+/// <strong>It derives from <c>IdentityUserContext</c>, not from
+/// <c>IdentityDbContext</c>.</strong> That is the difference between four
+/// Identity tables and seven: the user-only base omits roles, user-roles and
+/// role-claims entirely. Phase 12 has no roles -- membership is the whole
+/// authorization model -- so creating those three tables would have been
+/// schema invented from a template, sitting empty and implying a permission
+/// system that does not exist. The role tables arrive with the phase that
+/// introduces roles, and their shape will be decided then.
+/// </para>
+/// <para>
+/// <strong>One context over one database, rather than a separate identity
+/// context.</strong> A membership row carries foreign keys to both a user and
+/// a tenant, and creating a workspace has to write the tenant and the
+/// membership in a single transaction. Two contexts could not hold either
+/// guarantee without a distributed transaction or a hand-shared connection,
+/// which would be considerably more machinery to protect a boundary that is
+/// already enforced by which layer may name which type.
+/// </para>
 /// </remarks>
 public sealed class OmniAiDbContext(DbContextOptions<OmniAiDbContext> options)
-    : DbContext(options)
+    : IdentityUserContext<OmniAiUser, Guid>(options)
 {
     public DbSet<Tenant> Tenants => Set<Tenant>();
+
+    /// <summary>
+    /// Which people belong to which tenants: the platform's authorization
+    /// boundary, as rows.
+    /// </summary>
+    public DbSet<TenantMembership> TenantMemberships => Set<TenantMembership>();
 
     public DbSet<Conversation> Conversations => Set<Conversation>();
 
@@ -61,19 +89,33 @@ public sealed class OmniAiDbContext(DbContextOptions<OmniAiDbContext> options)
         return await base.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
     }
 
-    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    /// <summary>
+    /// Builds the model: Identity's entities first, then this platform's.
+    /// </summary>
+    /// <param name="builder">
+    /// The model builder. Named to match the base declaration rather than kept as
+    /// <c>modelBuilder</c>: a parameter that disagrees with the member it
+    /// overrides is a hazard for callers using named arguments, and the analyzer
+    /// is right to say so.
+    /// </param>
+    /// <remarks>
+    /// Order matters. <c>base.OnModelCreating</c> configures the Identity tables
+    /// with their default names, and the configurations applied afterwards rename
+    /// them. Reversing the two would silently restore <c>AspNetUsers</c>.
+    /// </remarks>
+    protected override void OnModelCreating(ModelBuilder builder)
     {
-        ArgumentNullException.ThrowIfNull(modelBuilder);
+        ArgumentNullException.ThrowIfNull(builder);
 
-        base.OnModelCreating(modelBuilder);
+        base.OnModelCreating(builder);
 
         // The allocator for message ingestion order. See PersistenceSchema for
         // why a sequence rather than a per-conversation counter.
-        modelBuilder.HasSequence<long>(PersistenceSchema.MessageIngestionSequenceName)
+        builder.HasSequence<long>(PersistenceSchema.MessageIngestionSequenceName)
             .StartsAt(1)
             .IncrementsBy(1);
 
-        modelBuilder.ApplyConfigurationsFromAssembly(typeof(OmniAiDbContext).Assembly);
+        builder.ApplyConfigurationsFromAssembly(typeof(OmniAiDbContext).Assembly);
     }
 
     /// <summary>

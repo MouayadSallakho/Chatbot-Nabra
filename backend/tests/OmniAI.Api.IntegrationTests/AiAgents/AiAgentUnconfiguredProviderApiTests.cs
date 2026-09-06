@@ -34,7 +34,7 @@ public sealed class AiAgentUnconfiguredProviderApiTests(AiAgentApiFixture api)
     {
         // The whole agent management slice keeps working. AI being unconfigured
         // must not take the rest of the platform down with it.
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
 
         using HttpResponseMessage health = await client.GetAsync("/health");
         Assert.Equal(HttpStatusCode.OK, health.StatusCode);
@@ -63,7 +63,7 @@ public sealed class AiAgentUnconfiguredProviderApiTests(AiAgentApiFixture api)
         // Not 500: nothing failed unexpectedly. Not 404: the endpoint exists. The
         // capability is simply not available on this deployment, and the same
         // request will succeed once a provider is configured.
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, Guid agentId) = await ArrangeAsync(client);
 
         using HttpResponseMessage response = await PreviewAsync(client, tenantId, agentId, "Hello?");
@@ -78,7 +78,7 @@ public sealed class AiAgentUnconfiguredProviderApiTests(AiAgentApiFixture api)
         // template, or an echo of the caller's own message returned as though an
         // agent had produced it. Somebody evaluating whether their agent works
         // would conclude that it does.
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, Guid agentId) = await ArrangeAsync(client);
 
         const string Question = "Which laptop suits a student?";
@@ -96,7 +96,7 @@ public sealed class AiAgentUnconfiguredProviderApiTests(AiAgentApiFixture api)
     [Fact]
     public async Task The_failure_names_no_provider_and_no_configuration_key()
     {
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, Guid agentId) = await ArrangeAsync(client);
 
         using HttpResponseMessage response = await PreviewAsync(client, tenantId, agentId, "Hello?");
@@ -119,7 +119,7 @@ public sealed class AiAgentUnconfiguredProviderApiTests(AiAgentApiFixture api)
         // The platform has no idea when a provider will be configured -- that is a
         // deployment decision, not a queue that drains -- so inviting clients to
         // poll on a schedule would be inventing a promise.
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, Guid agentId) = await ArrangeAsync(client);
 
         using HttpResponseMessage response = await PreviewAsync(client, tenantId, agentId, "Hello?");
@@ -133,7 +133,7 @@ public sealed class AiAgentUnconfiguredProviderApiTests(AiAgentApiFixture api)
         // Input validation runs first, so a caller with an unusable message is
         // told what is wrong with it rather than being told AI is unavailable --
         // which would send them to fix the wrong thing.
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, Guid agentId) = await ArrangeAsync(client);
 
         using HttpResponseMessage response = await PreviewAsync(client, tenantId, agentId, "   ");
@@ -147,9 +147,9 @@ public sealed class AiAgentUnconfiguredProviderApiTests(AiAgentApiFixture api)
         // Ownership is resolved before the runtime is reached, so a caller cannot
         // learn that an agent exists in another tenant by observing which failure
         // comes back.
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid _, Guid agentB) = await ArrangeAsync(client);
-        Guid tenantA = await api.CreateTenantAsync("Other Tenant");
+        Guid tenantA = await api.CreateTenantAsync(client, "Other Tenant");
 
         using HttpResponseMessage response = await PreviewAsync(client, tenantA, agentB, "Hello?");
 
@@ -159,7 +159,7 @@ public sealed class AiAgentUnconfiguredProviderApiTests(AiAgentApiFixture api)
     [Fact]
     public async Task A_failed_preview_changes_nothing()
     {
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, Guid agentId) = await ArrangeAsync(client);
 
         using HttpResponseMessage before = await client.GetAsync(AgentRoute(tenantId, agentId));
@@ -188,7 +188,7 @@ public sealed class AiAgentUnconfiguredProviderApiTests(AiAgentApiFixture api)
 
     private async Task<(Guid TenantId, Guid AgentId)> ArrangeAsync(HttpClient client)
     {
-        Guid tenantId = await api.CreateTenantAsync();
+        Guid tenantId = await api.CreateTenantAsync(client);
 
         using HttpResponseMessage created =
             await CreateAsync(client, tenantId, "Sales Assistant", Instructions);

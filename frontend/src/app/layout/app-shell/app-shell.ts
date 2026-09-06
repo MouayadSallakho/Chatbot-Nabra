@@ -16,6 +16,8 @@ import { filter } from 'rxjs';
 import { MediaQueries, mediaQuerySignal } from '@app/core/media/media';
 import { LOCAL_STORAGE, readStored, writeStored } from '@app/core/storage/local-storage';
 import { ToastHost } from '@app/core/feedback/toast-host';
+import { AuthService } from '@app/core/auth/auth-service';
+import { LOGIN_PATH } from '@app/core/auth/auth-guard';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
 import { WORKSPACE_SETUP_PATH } from '@app/core/workspace/workspace-guard';
 import { Sidebar } from '@app/layout/sidebar/sidebar';
@@ -54,6 +56,7 @@ export class AppShell {
   private readonly router = inject(Router);
   private readonly storage = inject(LOCAL_STORAGE);
   private readonly workspace = inject(WorkspaceContextService);
+  private readonly auth = inject(AuthService);
   private readonly injector = inject(Injector);
 
   private readonly sidebar = viewChild.required(Sidebar);
@@ -92,10 +95,17 @@ export class AppShell {
   /**
    * The real name of the workspace being administered, or empty before it loads.
    *
-   * Read straight from the tenant the backend returned. Nothing here is invented,
-   * and there is no user, plan or role to show alongside it.
+   * Read straight from the tenant the backend returned. Nothing here is
+   * invented, and there is no plan or role to show alongside it -- neither
+   * exists.
    */
   protected readonly workspaceName = computed(() => this.workspace.tenant()?.name ?? '');
+
+  /** The address of the signed-in account. Real, and the only account field shown. */
+  protected readonly userEmail = computed(() => this.auth.user()?.email ?? '');
+
+  /** Whether there is another workspace to switch to. */
+  protected readonly canSwitchWorkspace = this.workspace.hasChoice;
 
   /** Emits once per completed navigation. */
   private readonly navigation = toSignal(
@@ -187,14 +197,31 @@ export class AppShell {
   }
 
   /**
-   * Forgets the local development workspace and returns to setup.
+   * Goes back to the workspace chooser.
    *
-   * Development-only, and not a sign-out -- nothing is signed in. The tenant and
-   * its agents are untouched; this browser stops pointing at them.
+   * Not a sign-out: the session continues, and the workspace and its agents are
+   * untouched. It is only a change of which of the account's workspaces this
+   * browser is pointed at.
    */
-  protected async resetWorkspace(): Promise<void> {
-    this.workspace.clear();
+  protected async switchWorkspace(): Promise<void> {
     await this.router.navigate(['/', WORKSPACE_SETUP_PATH]);
+  }
+
+  /**
+   * Ends the session.
+   *
+   * A real sign-out, and it is called one -- the Phase 11 name "reset workspace"
+   * described a browser preference and would now be a lie. The session ends on
+   * the server, and the workspace selection is cleared because it belonged to
+   * the account that has just stopped being signed in: leaving it would offer
+   * the next person to use this browser the name of a workspace that is not
+   * theirs.
+   */
+  protected async signOut(): Promise<void> {
+    await this.auth.logout();
+    this.workspace.clear();
+
+    await this.router.navigate(['/', LOGIN_PATH]);
   }
 
   /**

@@ -203,15 +203,38 @@
   white-space: nowrap;
 }
 
-.workspace-reset {
+.workspace-action {
   align-self: flex-start;
   padding-inline: 0;
   color: var(--text-muted);
   text-decoration: underline;
 }
 
-// Collapsed to icons, the workspace block has nothing legible to show, so it
-// steps aside entirely rather than becoming an unexplained stripe.
-.sidebar.is-collapsed .sidebar-workspace {
+// The account block, matching the workspace block above it. Both are context
+// rather than navigation, so both are quiet.
+.sidebar-account {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  flex: none;
+  padding: var(--space-3) var(--space-4);
+  border-block-start: 1px solid var(--border-subtle);
+  overflow: hidden;
+}
+
+// The address can be long and must not push the sidebar wider or wrap into
+// three lines; it is truncated with the full value in a title attribute.
+.account-email {
+  font: var(--text-small);
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+// Collapsed to icons, neither block has anything legible to show, so both step
+// aside entirely rather than becoming unexplained stripes.
+.sidebar.is-collapsed .sidebar-workspace,
+.sidebar.is-collapsed .sidebar-account {
   display: none;
 }

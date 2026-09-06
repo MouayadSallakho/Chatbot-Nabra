@@ -1,5 +1,6 @@
 using OmniAI.Application.AiAgents.ListAiAgents;
 using OmniAI.Domain;
+using OmniAI.Application.Tests.Security;
 using OmniAI.Domain.AiAgents;
 using OmniAI.Domain.Tenants;
 
@@ -30,7 +31,7 @@ public sealed class ListAiAgentsHandlerTests
             .Seed(NewAgent(theirs, "Their Assistant", Created.AddMinutes(1)))
             .Seed(NewAgent(mine, "Support Assistant", Created.AddMinutes(2)));
 
-        AiAgentPage page = await new ListAiAgentsHandler(agents)
+        AiAgentPage page = await new ListAiAgentsHandler(agents, TestAccess.Anywhere())
             .HandleAsync(new ListAiAgentsQuery(mine.Value));
 
         Assert.Equal(2, page.TotalCount);
@@ -51,7 +52,7 @@ public sealed class ListAiAgentsHandlerTests
             .Seed(NewAgent(theirs, "Theirs One", Created))
             .Seed(NewAgent(theirs, "Theirs Two", Created));
 
-        AiAgentPage page = await new ListAiAgentsHandler(agents)
+        AiAgentPage page = await new ListAiAgentsHandler(agents, TestAccess.Anywhere())
             .HandleAsync(new ListAiAgentsQuery(mine.Value));
 
         Assert.Equal(1, page.TotalCount);
@@ -60,7 +61,7 @@ public sealed class ListAiAgentsHandlerTests
     [Fact]
     public async Task A_tenant_with_no_agents_gets_an_empty_page_rather_than_a_failure()
     {
-        AiAgentPage page = await new ListAiAgentsHandler(new InMemoryAiAgentRepository())
+        AiAgentPage page = await new ListAiAgentsHandler(new InMemoryAiAgentRepository(), TestAccess.Anywhere())
             .HandleAsync(new ListAiAgentsQuery(Guid.CreateVersion7()));
 
         Assert.Empty(page.Items);
@@ -75,7 +76,7 @@ public sealed class ListAiAgentsHandlerTests
         InMemoryAiAgentRepository agents = new InMemoryAiAgentRepository()
             .Seed(NewAgent(TenantId.New(), "Somebody else's", Created));
 
-        AiAgentPage unknown = await new ListAiAgentsHandler(agents)
+        AiAgentPage unknown = await new ListAiAgentsHandler(agents, TestAccess.Anywhere())
             .HandleAsync(new ListAiAgentsQuery(Guid.CreateVersion7()));
 
         Assert.Empty(unknown.Items);
@@ -92,7 +93,7 @@ public sealed class ListAiAgentsHandlerTests
             .Seed(NewAgent(tenant, "Newest", Created.AddHours(2)))
             .Seed(NewAgent(tenant, "Middle", Created.AddHours(1)));
 
-        AiAgentPage page = await new ListAiAgentsHandler(agents)
+        AiAgentPage page = await new ListAiAgentsHandler(agents, TestAccess.Anywhere())
             .HandleAsync(new ListAiAgentsQuery(tenant.Value));
 
         Assert.Equal(["Newest", "Middle", "Oldest"], page.Items.Select(agent => agent.Name));
@@ -111,9 +112,9 @@ public sealed class ListAiAgentsHandlerTests
             .Seed(NewAgent(tenant, "B", Created))
             .Seed(NewAgent(tenant, "C", Created));
 
-        AiAgentPage first = await new ListAiAgentsHandler(agents)
+        AiAgentPage first = await new ListAiAgentsHandler(agents, TestAccess.Anywhere())
             .HandleAsync(new ListAiAgentsQuery(tenant.Value));
-        AiAgentPage again = await new ListAiAgentsHandler(agents)
+        AiAgentPage again = await new ListAiAgentsHandler(agents, TestAccess.Anywhere())
             .HandleAsync(new ListAiAgentsQuery(tenant.Value));
 
         Assert.Equal(first.Items.Select(agent => agent.Id), again.Items.Select(agent => agent.Id));
@@ -133,11 +134,11 @@ public sealed class ListAiAgentsHandlerTests
             agents.Seed(NewAgent(tenant, $"Agent {index}", Created.AddMinutes(index)));
         }
 
-        AiAgentPage first = await new ListAiAgentsHandler(agents)
+        AiAgentPage first = await new ListAiAgentsHandler(agents, TestAccess.Anywhere())
             .HandleAsync(new ListAiAgentsQuery(tenant.Value, Page: 1, PageSize: 2));
-        AiAgentPage second = await new ListAiAgentsHandler(agents)
+        AiAgentPage second = await new ListAiAgentsHandler(agents, TestAccess.Anywhere())
             .HandleAsync(new ListAiAgentsQuery(tenant.Value, Page: 2, PageSize: 2));
-        AiAgentPage third = await new ListAiAgentsHandler(agents)
+        AiAgentPage third = await new ListAiAgentsHandler(agents, TestAccess.Anywhere())
             .HandleAsync(new ListAiAgentsQuery(tenant.Value, Page: 3, PageSize: 2));
 
         Assert.Equal(2, first.Items.Count);
@@ -160,7 +161,7 @@ public sealed class ListAiAgentsHandlerTests
         InMemoryAiAgentRepository agents = new InMemoryAiAgentRepository()
             .Seed(NewAgent(tenant, "Only one", Created));
 
-        AiAgentPage page = await new ListAiAgentsHandler(agents)
+        AiAgentPage page = await new ListAiAgentsHandler(agents, TestAccess.Anywhere())
             .HandleAsync(new ListAiAgentsQuery(tenant.Value, Page: 9));
 
         Assert.Empty(page.Items);
@@ -171,7 +172,7 @@ public sealed class ListAiAgentsHandlerTests
     [Fact]
     public async Task Omitting_the_paging_arguments_takes_the_documented_defaults()
     {
-        AiAgentPage page = await new ListAiAgentsHandler(new InMemoryAiAgentRepository())
+        AiAgentPage page = await new ListAiAgentsHandler(new InMemoryAiAgentRepository(), TestAccess.Anywhere())
             .HandleAsync(new ListAiAgentsQuery(Guid.CreateVersion7()));
 
         Assert.Equal(AiAgentPage.DefaultPage, page.Page);
@@ -186,7 +187,7 @@ public sealed class ListAiAgentsHandlerTests
         // Not reinterpreted as page 1. A caller sending ?page=0 made a mistake,
         // and silently correcting it hides the mistake rather than the symptom.
         await Assert.ThrowsAsync<AiAgentPageValidationException>(() =>
-            new ListAiAgentsHandler(new InMemoryAiAgentRepository())
+            new ListAiAgentsHandler(new InMemoryAiAgentRepository(), TestAccess.Anywhere())
                 .HandleAsync(new ListAiAgentsQuery(Guid.CreateVersion7(), Page: page)));
     }
 
@@ -196,7 +197,7 @@ public sealed class ListAiAgentsHandlerTests
     public async Task A_page_size_below_one_is_refused(int pageSize)
     {
         await Assert.ThrowsAsync<AiAgentPageValidationException>(() =>
-            new ListAiAgentsHandler(new InMemoryAiAgentRepository())
+            new ListAiAgentsHandler(new InMemoryAiAgentRepository(), TestAccess.Anywhere())
                 .HandleAsync(new ListAiAgentsQuery(Guid.CreateVersion7(), PageSize: pageSize)));
     }
 
@@ -208,7 +209,7 @@ public sealed class ListAiAgentsHandlerTests
         // the maximum cannot tell a truncated page from the end of the list.
         AiAgentPageValidationException refused =
             await Assert.ThrowsAsync<AiAgentPageValidationException>(() =>
-                new ListAiAgentsHandler(new InMemoryAiAgentRepository())
+                new ListAiAgentsHandler(new InMemoryAiAgentRepository(), TestAccess.Anywhere())
                     .HandleAsync(new ListAiAgentsQuery(
                         Guid.CreateVersion7(),
                         PageSize: AiAgentPage.MaxPageSize + 1)));
@@ -222,7 +223,7 @@ public sealed class ListAiAgentsHandlerTests
     [Fact]
     public async Task The_maximum_page_size_itself_is_allowed()
     {
-        AiAgentPage page = await new ListAiAgentsHandler(new InMemoryAiAgentRepository())
+        AiAgentPage page = await new ListAiAgentsHandler(new InMemoryAiAgentRepository(), TestAccess.Anywhere())
             .HandleAsync(new ListAiAgentsQuery(
                 Guid.CreateVersion7(),
                 PageSize: AiAgentPage.MaxPageSize));
@@ -236,7 +237,7 @@ public sealed class ListAiAgentsHandlerTests
         // Not a lookup that happens to find nothing: an empty GUID is a
         // programming mistake, and answering it with an empty list would hide it.
         await Assert.ThrowsAsync<DomainValidationException>(() =>
-            new ListAiAgentsHandler(new InMemoryAiAgentRepository())
+            new ListAiAgentsHandler(new InMemoryAiAgentRepository(), TestAccess.Anywhere())
                 .HandleAsync(new ListAiAgentsQuery(Guid.Empty)));
     }
 
@@ -251,7 +252,7 @@ public sealed class ListAiAgentsHandlerTests
         InMemoryAiAgentRepository agents = new InMemoryAiAgentRepository()
             .Seed(NewAgent(tenant, "Sales Assistant", Created));
 
-        AiAgentPage page = await new ListAiAgentsHandler(agents)
+        AiAgentPage page = await new ListAiAgentsHandler(agents, TestAccess.Anywhere())
             .HandleAsync(new ListAiAgentsQuery(tenant.Value));
 
         Assert.DoesNotContain(

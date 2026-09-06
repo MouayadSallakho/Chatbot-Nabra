@@ -62,14 +62,36 @@
   -->
   @if (workspaceName()) {
     <div class="sidebar-workspace">
-      <span class="workspace-label">Development workspace</span>
+      <span class="workspace-label">Workspace</span>
       <span class="workspace-name" [title]="workspaceName()">{{ workspaceName() }}</span>
+
+      <!--
+        Only when there is somewhere to switch to. With one workspace this
+        control would lead to a list of one, which is a step that exists only to
+        be completed.
+      -->
+      @if (canSwitchWorkspace()) {
+        <button
+          type="button"
+          class="btn btn-ghost btn-sm workspace-action"
+          (click)="workspaceSwitched.emit()"
+        >
+          <span class="nav-label">Switch workspace</span>
+        </button>
+      }
+    </div>
+  }
+
+  @if (userEmail()) {
+    <div class="sidebar-account">
+      <span class="workspace-label">Signed in as</span>
+      <span class="account-email" [title]="userEmail()">{{ userEmail() }}</span>
       <button
         type="button"
-        class="btn btn-ghost btn-sm workspace-reset"
-        (click)="workspaceReset.emit()"
+        class="btn btn-ghost btn-sm workspace-action"
+        (click)="signedOut.emit()"
       >
-        <span class="nav-label">Change workspace</span>
+        <span class="nav-label">Sign out</span>
       </button>
     </div>
   }

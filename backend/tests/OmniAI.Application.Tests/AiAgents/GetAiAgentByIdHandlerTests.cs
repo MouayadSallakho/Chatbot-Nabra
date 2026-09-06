@@ -1,6 +1,7 @@
 using OmniAI.Application.AiAgents;
 using OmniAI.Application.AiAgents.GetAiAgentById;
 using OmniAI.Domain;
+using OmniAI.Application.Tests.Security;
 using OmniAI.Domain.AiAgents;
 using OmniAI.Domain.Tenants;
 
@@ -17,7 +18,7 @@ public sealed class GetAiAgentByIdHandlerTests
         AiAgent agent = NewAgent(tenant, "Sales Assistant");
         InMemoryAiAgentRepository agents = new InMemoryAiAgentRepository().Seed(agent);
 
-        VersionedAiAgentView? found = await new GetAiAgentByIdHandler(agents)
+        VersionedAiAgentView? found = await new GetAiAgentByIdHandler(agents, TestAccess.Anywhere())
             .HandleAsync(new GetAiAgentByIdQuery(tenant.Value, agent.Id.Value));
 
         Assert.NotNull(found);
@@ -34,7 +35,7 @@ public sealed class GetAiAgentByIdHandlerTests
         agent.Activate(Created.AddHours(1));
         InMemoryAiAgentRepository agents = new InMemoryAiAgentRepository().Seed(agent);
 
-        VersionedAiAgentView found = await new GetAiAgentByIdHandler(agents)
+        VersionedAiAgentView found = await new GetAiAgentByIdHandler(agents, TestAccess.Anywhere())
             .HandleAsync(new GetAiAgentByIdQuery(tenant.Value, agent.Id.Value))
             ?? throw new InvalidOperationException();
 
@@ -49,7 +50,7 @@ public sealed class GetAiAgentByIdHandlerTests
     {
         InMemoryAiAgentRepository agents = new();
 
-        VersionedAiAgentView? found = await new GetAiAgentByIdHandler(agents)
+        VersionedAiAgentView? found = await new GetAiAgentByIdHandler(agents, TestAccess.Anywhere())
             .HandleAsync(new GetAiAgentByIdQuery(Guid.CreateVersion7(), Guid.CreateVersion7()));
 
         Assert.Null(found);
@@ -65,7 +66,7 @@ public sealed class GetAiAgentByIdHandlerTests
         AiAgent agentB = NewAgent(tenantB, "Tenant B Assistant");
         InMemoryAiAgentRepository agents = new InMemoryAiAgentRepository().Seed(agentB);
 
-        VersionedAiAgentView? found = await new GetAiAgentByIdHandler(agents)
+        VersionedAiAgentView? found = await new GetAiAgentByIdHandler(agents, TestAccess.Anywhere())
             .HandleAsync(new GetAiAgentByIdQuery(tenantA.Value, agentB.Id.Value));
 
         Assert.Null(found);
@@ -81,7 +82,7 @@ public sealed class GetAiAgentByIdHandlerTests
         AiAgent agentB = NewAgent(TenantId.New(), "Tenant B Assistant");
         InMemoryAiAgentRepository agents = new InMemoryAiAgentRepository().Seed(agentB);
 
-        GetAiAgentByIdHandler handler = new(agents);
+        GetAiAgentByIdHandler handler = new(agents, TestAccess.Anywhere());
 
         VersionedAiAgentView? crossTenant = await handler
             .HandleAsync(new GetAiAgentByIdQuery(tenantA.Value, agentB.Id.Value));
@@ -99,7 +100,7 @@ public sealed class GetAiAgentByIdHandlerTests
         InMemoryAiAgentRepository agents = new();
 
         await Assert.ThrowsAsync<DomainValidationException>(() =>
-            new GetAiAgentByIdHandler(agents)
+            new GetAiAgentByIdHandler(agents, TestAccess.Anywhere())
                 .HandleAsync(new GetAiAgentByIdQuery(Guid.Empty, Guid.CreateVersion7())));
     }
 
@@ -109,7 +110,7 @@ public sealed class GetAiAgentByIdHandlerTests
         InMemoryAiAgentRepository agents = new();
 
         await Assert.ThrowsAsync<DomainValidationException>(() =>
-            new GetAiAgentByIdHandler(agents)
+            new GetAiAgentByIdHandler(agents, TestAccess.Anywhere())
                 .HandleAsync(new GetAiAgentByIdQuery(Guid.CreateVersion7(), Guid.Empty)));
     }
 
@@ -119,13 +120,13 @@ public sealed class GetAiAgentByIdHandlerTests
         InMemoryAiAgentRepository agents = new();
 
         await Assert.ThrowsAsync<ArgumentNullException>(() =>
-            new GetAiAgentByIdHandler(agents).HandleAsync(null!));
+            new GetAiAgentByIdHandler(agents, TestAccess.Anywhere()).HandleAsync(null!));
     }
 
     [Fact]
     public void A_null_repository_is_rejected()
     {
-        Assert.Throws<ArgumentNullException>(() => new GetAiAgentByIdHandler(null!));
+        Assert.Throws<ArgumentNullException>(() => new GetAiAgentByIdHandler(null!, TestAccess.Anywhere()));
     }
 
     internal static AiAgent NewAgent(TenantId tenant, string name) =>

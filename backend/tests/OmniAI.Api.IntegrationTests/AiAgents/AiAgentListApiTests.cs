@@ -22,8 +22,8 @@ public sealed class AiAgentListApiTests(AiAgentApiFixture api) : IClassFixture<A
     [Fact]
     public async Task A_tenant_with_no_agents_gets_an_empty_page_not_a_404()
     {
-        using HttpClient client = api.CreateClient();
-        Guid tenantId = await api.CreateTenantAsync();
+        using HttpClient client = await api.CreateSignedInClientAsync();
+        Guid tenantId = await api.CreateTenantAsync(client);
 
         using HttpResponseMessage response = await client.GetAsync(AgentsRoute(tenantId));
 
@@ -37,24 +37,91 @@ public sealed class AiAgentListApiTests(AiAgentApiFixture api) : IClassFixture<A
         Assert.Equal(20, page.PageSize);
     }
 
+    /// <summary>
+    /// A tenant that exists but is somebody else's, and a tenant that was never
+    /// created, are answered identically.
+    /// </summary>
+    /// <remarks>
+    /// <strong>This replaces the Phase 11 rule, deliberately, and the replacement
+    /// is stronger.</strong> Phase 11 answered <c>200</c> with an empty page for
+    /// an unknown tenant, so that a caller could not tell a real id from an
+    /// invented one. With no authentication that was the best available answer.
+    /// It is now the weaker one: it would hand a signed-in stranger a successful
+    /// response for a workspace they have no relationship with. Membership is the
+    /// boundary now, so both cases are <c>404</c> -- existence stays hidden, and
+    /// it stays hidden behind a rule that does not depend on guessing.
+    /// <para>
+    /// The old assertion was narrowed rather than deleted. The property it
+    /// protected -- that these two situations are indistinguishable -- is still
+    /// asserted here; only the status they share has changed.
+    /// </para>
+    /// </remarks>
     [Fact]
-    public async Task A_tenant_that_does_not_exist_is_answered_exactly_like_an_empty_one()
+    public async Task A_tenant_the_caller_does_not_belong_to_is_answered_like_one_that_never_existed()
     {
-        // Deliberately indistinguishable: a difference would make this endpoint a
-        // way to discover which tenant ids are real.
+        using HttpClient client = await api.CreateSignedInClientAsync();
+
+        // A real tenant, really in the database, that this account has no
+        // membership for.
+        Guid somebodyElses = await api.CreateUnownedTenantAsync();
+
+        Guid neverIssued = Guid.CreateVersion7();
+
+        using HttpResponseMessage foreign = await client.GetAsync(AgentsRoute(somebodyElses));
+        using HttpResponseMessage invented = await client.GetAsync(AgentsRoute(neverIssued));
+
+        Assert.Equal(HttpStatusCode.NotFound, foreign.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, invented.StatusCode);
+
+        // Not merely the same status: the same words. The two bodies differ in
+        // exactly two places, and neither is a disclosure -- each echoes back the
+        // tenant id its own caller supplied, and each carries its own trace id.
+        // Everything a caller could compare to tell the two situations apart is
+        // asserted identical here.
+        (string foreignTitle, string foreignDetail) = await ProblemAsync(foreign, somebodyElses);
+        (string inventedTitle, string inventedDetail) = await ProblemAsync(invented, neverIssued);
+
+        Assert.Equal(inventedTitle, foreignTitle);
+        Assert.Equal(inventedDetail, foreignDetail);
+    }
+
+    /// <summary>
+    /// A problem response's title and its detail with the tenant id blanked out.
+    /// </summary>
+    private static async Task<(string Title, string Detail)> ProblemAsync(
+        HttpResponseMessage response,
+        Guid tenantId)
+    {
+        using JsonDocument body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+
+        string detail = body.RootElement.GetProperty("detail").GetString() ?? string.Empty;
+
+        return (
+            body.RootElement.GetProperty("title").GetString() ?? string.Empty,
+            detail.Replace(tenantId.ToString(), "<tenant>", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task An_anonymous_caller_is_told_to_authenticate_rather_than_that_it_is_missing()
+    {
+        // 401, not 404. The distinction matters to a client: one says "sign in
+        // and ask again", the other says "there is nothing here". A signed-out
+        // browser tab must be able to tell them apart.
         using HttpClient client = api.CreateClient();
+        using HttpClient owner = await api.CreateSignedInClientAsync();
 
-        using HttpResponseMessage unknown = await client.GetAsync(AgentsRoute(Guid.CreateVersion7()));
+        Guid tenantId = await api.CreateTenantAsync(owner);
 
-        Assert.Equal(HttpStatusCode.OK, unknown.StatusCode);
-        Assert.Empty((await ReadPageAsync(unknown)).Items);
+        using HttpResponseMessage response = await client.GetAsync(AgentsRoute(tenantId));
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
     [Fact]
     public async Task The_page_carries_the_agents_a_list_needs_and_nothing_more()
     {
-        using HttpClient client = api.CreateClient();
-        Guid tenantId = await api.CreateTenantAsync();
+        using HttpClient client = await api.CreateSignedInClientAsync();
+        Guid tenantId = await api.CreateTenantAsync(client);
 
         using HttpResponseMessage created =
             await CreateAsync(client, tenantId, "Sales Assistant", Instructions);
@@ -79,8 +146,8 @@ public sealed class AiAgentListApiTests(AiAgentApiFixture api) : IClassFixture<A
     {
         // The confidentiality and cost claim, asserted on the bytes a client
         // actually receives rather than on a type's shape.
-        using HttpClient client = api.CreateClient();
-        Guid tenantId = await api.CreateTenantAsync();
+        using HttpClient client = await api.CreateSignedInClientAsync();
+        Guid tenantId = await api.CreateTenantAsync(client);
 
         const string secret = "Never quote a discount above fifteen percent.";
 
@@ -102,8 +169,8 @@ public sealed class AiAgentListApiTests(AiAgentApiFixture api) : IClassFixture<A
         // A page is not something a caller may write against, so there is no
         // version to publish. Offering one would invite a conditional write
         // against a representation the client only half read.
-        using HttpClient client = api.CreateClient();
-        Guid tenantId = await api.CreateTenantAsync();
+        using HttpClient client = await api.CreateSignedInClientAsync();
+        Guid tenantId = await api.CreateTenantAsync(client);
 
         using HttpResponseMessage response = await client.GetAsync(AgentsRoute(tenantId));
 
@@ -113,8 +180,8 @@ public sealed class AiAgentListApiTests(AiAgentApiFixture api) : IClassFixture<A
     [Fact]
     public async Task Status_appears_as_a_name_never_as_an_integer()
     {
-        using HttpClient client = api.CreateClient();
-        Guid tenantId = await api.CreateTenantAsync();
+        using HttpClient client = await api.CreateSignedInClientAsync();
+        Guid tenantId = await api.CreateTenantAsync(client);
 
         using HttpResponseMessage created =
             await CreateAsync(client, tenantId, "Sales Assistant", Instructions);
@@ -134,8 +201,8 @@ public sealed class AiAgentListApiTests(AiAgentApiFixture api) : IClassFixture<A
     [Fact]
     public async Task Every_lifecycle_state_has_a_published_name()
     {
-        using HttpClient client = api.CreateClient();
-        Guid tenantId = await api.CreateTenantAsync();
+        using HttpClient client = await api.CreateSignedInClientAsync();
+        Guid tenantId = await api.CreateTenantAsync(client);
 
         using HttpResponseMessage draft = await CreateAsync(client, tenantId, "Draft one", Instructions);
         Guid draftId = (await ReadAgentAsync(draft)).Id;
@@ -155,9 +222,9 @@ public sealed class AiAgentListApiTests(AiAgentApiFixture api) : IClassFixture<A
     [Fact]
     public async Task One_tenants_list_never_contains_another_tenants_agent()
     {
-        using HttpClient client = api.CreateClient();
-        Guid mine = await api.CreateTenantAsync("Mine");
-        Guid theirs = await api.CreateTenantAsync("Theirs");
+        using HttpClient client = await api.CreateSignedInClientAsync();
+        Guid mine = await api.CreateTenantAsync(client, "Mine");
+        Guid theirs = await api.CreateTenantAsync(client, "Theirs");
 
         using HttpResponseMessage hidden =
             await CreateAsync(client, theirs, "Their Secret Assistant", Instructions);
@@ -180,8 +247,8 @@ public sealed class AiAgentListApiTests(AiAgentApiFixture api) : IClassFixture<A
     [Fact]
     public async Task The_newest_change_comes_first()
     {
-        using HttpClient client = api.CreateClient();
-        Guid tenantId = await api.CreateTenantAsync();
+        using HttpClient client = await api.CreateSignedInClientAsync();
+        Guid tenantId = await api.CreateTenantAsync(client);
 
         using HttpResponseMessage first = await CreateAsync(client, tenantId, "First", Instructions);
         using HttpResponseMessage secondCreated = await CreateAsync(client, tenantId, "Second", Instructions);
@@ -204,8 +271,8 @@ public sealed class AiAgentListApiTests(AiAgentApiFixture api) : IClassFixture<A
     [Fact]
     public async Task Paging_splits_the_list_and_reports_the_whole_total()
     {
-        using HttpClient client = api.CreateClient();
-        Guid tenantId = await api.CreateTenantAsync();
+        using HttpClient client = await api.CreateSignedInClientAsync();
+        Guid tenantId = await api.CreateTenantAsync(client);
 
         for (int index = 0; index < 3; index++)
         {
@@ -237,8 +304,8 @@ public sealed class AiAgentListApiTests(AiAgentApiFixture api) : IClassFixture<A
     [InlineData("?page=0&pageSize=0")]
     public async Task An_out_of_range_page_request_is_refused_as_problem_details(string query)
     {
-        using HttpClient client = api.CreateClient();
-        Guid tenantId = await api.CreateTenantAsync();
+        using HttpClient client = await api.CreateSignedInClientAsync();
+        Guid tenantId = await api.CreateTenantAsync(client);
 
         using HttpResponseMessage response = await client.GetAsync($"{AgentsRoute(tenantId)}{query}");
 
@@ -251,8 +318,8 @@ public sealed class AiAgentListApiTests(AiAgentApiFixture api) : IClassFixture<A
     {
         // The important half: a caller that asked for more must not receive the
         // maximum and be unable to tell truncation from the end of the list.
-        using HttpClient client = api.CreateClient();
-        Guid tenantId = await api.CreateTenantAsync();
+        using HttpClient client = await api.CreateSignedInClientAsync();
+        Guid tenantId = await api.CreateTenantAsync(client);
 
         using HttpResponseMessage response =
             await client.GetAsync($"{AgentsRoute(tenantId)}?pageSize=500");
@@ -267,8 +334,8 @@ public sealed class AiAgentListApiTests(AiAgentApiFixture api) : IClassFixture<A
     [Fact]
     public async Task The_maximum_page_size_is_accepted()
     {
-        using HttpClient client = api.CreateClient();
-        Guid tenantId = await api.CreateTenantAsync();
+        using HttpClient client = await api.CreateSignedInClientAsync();
+        Guid tenantId = await api.CreateTenantAsync(client);
 
         using HttpResponseMessage response =
             await client.GetAsync($"{AgentsRoute(tenantId)}?pageSize=100");
@@ -280,8 +347,8 @@ public sealed class AiAgentListApiTests(AiAgentApiFixture api) : IClassFixture<A
     [Fact]
     public async Task A_page_value_that_is_not_a_number_is_rejected_without_reaching_the_handler()
     {
-        using HttpClient client = api.CreateClient();
-        Guid tenantId = await api.CreateTenantAsync();
+        using HttpClient client = await api.CreateSignedInClientAsync();
+        Guid tenantId = await api.CreateTenantAsync(client);
 
         using HttpResponseMessage response =
             await client.GetAsync($"{AgentsRoute(tenantId)}?page=first");
@@ -292,8 +359,8 @@ public sealed class AiAgentListApiTests(AiAgentApiFixture api) : IClassFixture<A
     [Fact]
     public async Task An_error_body_names_no_database_or_provider_internals()
     {
-        using HttpClient client = api.CreateClient();
-        Guid tenantId = await api.CreateTenantAsync();
+        using HttpClient client = await api.CreateSignedInClientAsync();
+        Guid tenantId = await api.CreateTenantAsync(client);
 
         using HttpResponseMessage response = await client.GetAsync($"{AgentsRoute(tenantId)}?page=0");
         string body = await response.Content.ReadAsStringAsync();

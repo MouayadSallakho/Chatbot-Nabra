@@ -1,6 +1,7 @@
 using OmniAI.Application.Ai;
 using OmniAI.Application.AiAgents.PreviewAiAgent;
 using OmniAI.Domain;
+using OmniAI.Application.Tests.Security;
 using OmniAI.Domain.AiAgents;
 using OmniAI.Domain.Tenants;
 using OmniAI.Testing;
@@ -173,7 +174,7 @@ public sealed class PreviewAiAgentHandlerTests
         InMemoryAiAgentRepository agents = new InMemoryAiAgentRepository().Seed(agentB);
         RecordingAiTextGenerator generator = new();
 
-        AiAgentPreview? preview = await new PreviewAiAgentHandler(agents, generator)
+        AiAgentPreview? preview = await new PreviewAiAgentHandler(agents, TestAccess.Anywhere(), generator)
             .HandleAsync(new PreviewAiAgentCommand(tenantA.Value, agentB.Id.Value, "Hello?"));
 
         Assert.Null(preview);
@@ -191,7 +192,7 @@ public sealed class PreviewAiAgentHandlerTests
         InMemoryAiAgentRepository agents = new InMemoryAiAgentRepository().Seed(agentB);
         RecordingAiTextGenerator generator = new();
 
-        await new PreviewAiAgentHandler(agents, generator)
+        await new PreviewAiAgentHandler(agents, TestAccess.Anywhere(), generator)
             .HandleAsync(new PreviewAiAgentCommand(tenantA.Value, agentB.Id.Value, "Hello?"));
 
         Assert.Equal(0, generator.Calls);
@@ -204,7 +205,7 @@ public sealed class PreviewAiAgentHandlerTests
         InMemoryAiAgentRepository agents = new();
         RecordingAiTextGenerator generator = new();
 
-        AiAgentPreview? preview = await new PreviewAiAgentHandler(agents, generator)
+        AiAgentPreview? preview = await new PreviewAiAgentHandler(agents, TestAccess.Anywhere(), generator)
             .HandleAsync(new PreviewAiAgentCommand(
                 Guid.CreateVersion7(), Guid.CreateVersion7(), "Hello?"));
 
@@ -218,7 +219,7 @@ public sealed class PreviewAiAgentHandlerTests
         TenantId tenantA = TenantId.New();
         AiAgent agentB = NewAgent(TenantId.New());
         InMemoryAiAgentRepository agents = new InMemoryAiAgentRepository().Seed(agentB);
-        PreviewAiAgentHandler handler = new(agents, new RecordingAiTextGenerator());
+        PreviewAiAgentHandler handler = new(agents, TestAccess.Anywhere(), new RecordingAiTextGenerator());
 
         AiAgentPreview? foreign = await handler
             .HandleAsync(new PreviewAiAgentCommand(tenantA.Value, agentB.Id.Value, "Hello?"));
@@ -315,7 +316,7 @@ public sealed class PreviewAiAgentHandlerTests
         Guid agentId = emptyAgent ? Guid.Empty : Guid.CreateVersion7();
 
         await Assert.ThrowsAsync<DomainValidationException>(
-            () => new PreviewAiAgentHandler(agents, generator)
+            () => new PreviewAiAgentHandler(agents, TestAccess.Anywhere(), generator)
                 .HandleAsync(new PreviewAiAgentCommand(tenantId, agentId, "Hello?")));
 
         Assert.Equal(0, generator.Calls);
@@ -325,7 +326,7 @@ public sealed class PreviewAiAgentHandlerTests
     public async Task A_null_command_is_rejected()
     {
         await Assert.ThrowsAsync<ArgumentNullException>(
-            () => new PreviewAiAgentHandler(new InMemoryAiAgentRepository(), new RecordingAiTextGenerator())
+            () => new PreviewAiAgentHandler(new InMemoryAiAgentRepository(), TestAccess.Anywhere(), new RecordingAiTextGenerator())
                 .HandleAsync(null!));
     }
 
@@ -398,7 +399,7 @@ public sealed class PreviewAiAgentHandlerTests
 
         using CancellationTokenSource source = new();
 
-        await new PreviewAiAgentHandler(agents, generator)
+        await new PreviewAiAgentHandler(agents, TestAccess.Anywhere(), generator)
             .HandleAsync(new PreviewAiAgentCommand(tenant.Value, agent.Id.Value, "Hello?"), source.Token);
 
         Assert.Equal(source.Token, generator.LastCancellationToken);
@@ -414,7 +415,7 @@ public sealed class PreviewAiAgentHandlerTests
         await source.CancelAsync();
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
-            () => new PreviewAiAgentHandler(agents, generator).HandleAsync(
+            () => new PreviewAiAgentHandler(agents, TestAccess.Anywhere(), generator).HandleAsync(
                 new PreviewAiAgentCommand(tenant.Value, agent.Id.Value, "Hello?"), source.Token));
     }
 
@@ -424,10 +425,10 @@ public sealed class PreviewAiAgentHandlerTests
     public void Both_dependencies_are_required()
     {
         Assert.Throws<ArgumentNullException>(
-            () => new PreviewAiAgentHandler(null!, new RecordingAiTextGenerator()));
+            () => new PreviewAiAgentHandler(null!, TestAccess.Anywhere(), new RecordingAiTextGenerator()));
 
         Assert.Throws<ArgumentNullException>(
-            () => new PreviewAiAgentHandler(new InMemoryAiAgentRepository(), null!));
+            () => new PreviewAiAgentHandler(new InMemoryAiAgentRepository(), TestAccess.Anywhere(), null!));
     }
 
     // ------------------------------------------------------------------ helpers
@@ -446,7 +447,7 @@ public sealed class PreviewAiAgentHandlerTests
         TenantId tenant,
         AiAgent agent,
         string? message) =>
-        new PreviewAiAgentHandler(agents, generator)
+        new PreviewAiAgentHandler(agents, TestAccess.Anywhere(), generator)
             .HandleAsync(new PreviewAiAgentCommand(tenant.Value, agent.Id.Value, message));
 
     private static AiAgent NewAgent(TenantId tenant) =>

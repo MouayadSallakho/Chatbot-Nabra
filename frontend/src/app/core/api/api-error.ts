@@ -11,6 +11,10 @@ import { HttpErrorResponse } from '@angular/common/http';
 export type ApiErrorKind =
   /** The request was rejected as invalid. The caller can correct it. */
   | 'validation'
+  /** Nobody is signed in, or the session has expired. */
+  | 'unauthenticated'
+  /** Signed in, but not permitted. Unused today; see the note below. */
+  | 'forbidden'
   /** No such resource for this workspace. */
   | 'notFound'
   /** Well-formed, but contradicts the resource's current lifecycle state. */
@@ -51,6 +55,8 @@ export interface ApiError {
 /** Copy for the failures the server cannot usefully describe to a reader. */
 const MESSAGES: Readonly<Record<ApiErrorKind, string>> = {
   validation: 'Some of the details were rejected. Check the highlighted fields and try again.',
+  unauthenticated: 'Your session has ended. Sign in again to continue.',
+  forbidden: 'You do not have permission to do that.',
   notFound: 'That item no longer exists in this workspace.',
   conflict: 'That action is not available for this item right now.',
   stale: 'This item was updated somewhere else since you opened it.',
@@ -70,8 +76,19 @@ const MESSAGES: Readonly<Record<ApiErrorKind, string>> = {
  * useful than anything a generic client could invent. Every other status gets
  * our own copy, so a server-side fault can never put its internals on screen
  * even if a future handler became careless with them.
+ *
+ * 401 is on the list for one specific case: a rejected sign-in, where the server
+ * sends a single deliberately uninformative sentence that must reach the reader
+ * verbatim. Re-wording it here would risk saying more than the server chose to.
+ * Our own copy still covers a 401 with no body, which is what an expired session
+ * produces.
+ *
+ * 403 is deliberately absent, and so is any behaviour that depends on it. The
+ * platform hides resources the caller may not reach behind 404 rather than
+ * admitting they exist; the kind is defined so a future permission check has
+ * somewhere to land, not because anything produces one today.
  */
-const DETAIL_IS_USEFUL: ReadonlySet<number> = new Set([400, 404, 409]);
+const DETAIL_IS_USEFUL: ReadonlySet<number> = new Set([400, 401, 404, 409]);
 
 /**
  * Interprets a failed request.
@@ -103,6 +120,10 @@ function kindOf(status: number): ApiErrorKind {
   switch (status) {
     case 400:
       return 'validation';
+    case 401:
+      return 'unauthenticated';
+    case 403:
+      return 'forbidden';
     case 404:
       return 'notFound';
     case 409:

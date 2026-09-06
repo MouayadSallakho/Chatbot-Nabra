@@ -21,8 +21,8 @@ public sealed class AiAgentEndpointsTests(AiAgentApiFixture api) : IClassFixture
     [Fact]
     public async Task Creating_an_agent_returns_201_with_the_created_representation()
     {
-        using HttpClient client = api.CreateClient();
-        Guid tenantId = await api.CreateTenantAsync();
+        using HttpClient client = await api.CreateSignedInClientAsync();
+        Guid tenantId = await api.CreateTenantAsync(client);
 
         using HttpResponseMessage response =
             await CreateAsync(client, tenantId, "Sales Assistant", Instructions);
@@ -43,8 +43,8 @@ public sealed class AiAgentEndpointsTests(AiAgentApiFixture api) : IClassFixture
     {
         // Returned on creation so a client can make its first conditional write
         // without reading the agent back.
-        using HttpClient client = api.CreateClient();
-        Guid tenantId = await api.CreateTenantAsync();
+        using HttpClient client = await api.CreateSignedInClientAsync();
+        Guid tenantId = await api.CreateTenantAsync(client);
 
         using HttpResponseMessage response =
             await CreateAsync(client, tenantId, "Sales Assistant", Instructions);
@@ -58,8 +58,8 @@ public sealed class AiAgentEndpointsTests(AiAgentApiFixture api) : IClassFixture
         // The version in the create response must describe the row that was
         // actually stored, or the client's first conditional write would fail
         // against state nobody changed.
-        using HttpClient client = api.CreateClient();
-        Guid tenantId = await api.CreateTenantAsync();
+        using HttpClient client = await api.CreateSignedInClientAsync();
+        Guid tenantId = await api.CreateTenantAsync(client);
 
         using HttpResponseMessage created =
             await CreateAsync(client, tenantId, "Sales Assistant", Instructions);
@@ -73,8 +73,8 @@ public sealed class AiAgentEndpointsTests(AiAgentApiFixture api) : IClassFixture
     [Fact]
     public async Task Creating_an_agent_sets_a_location_header_pointing_at_the_tenant_scoped_read_endpoint()
     {
-        using HttpClient client = api.CreateClient();
-        Guid tenantId = await api.CreateTenantAsync();
+        using HttpClient client = await api.CreateSignedInClientAsync();
+        Guid tenantId = await api.CreateTenantAsync(client);
 
         using HttpResponseMessage response =
             await CreateAsync(client, tenantId, "Sales Assistant", Instructions);
@@ -98,8 +98,8 @@ public sealed class AiAgentEndpointsTests(AiAgentApiFixture api) : IClassFixture
     [Fact]
     public async Task A_created_agent_is_in_the_database()
     {
-        using HttpClient client = api.CreateClient();
-        Guid tenantId = await api.CreateTenantAsync();
+        using HttpClient client = await api.CreateSignedInClientAsync();
+        Guid tenantId = await api.CreateTenantAsync(client);
 
         using HttpResponseMessage response =
             await CreateAsync(client, tenantId, "Sales Assistant", Instructions);
@@ -116,8 +116,8 @@ public sealed class AiAgentEndpointsTests(AiAgentApiFixture api) : IClassFixture
     [Fact]
     public async Task Creation_stores_and_returns_the_domain_canonical_values()
     {
-        using HttpClient client = api.CreateClient();
-        Guid tenantId = await api.CreateTenantAsync();
+        using HttpClient client = await api.CreateSignedInClientAsync();
+        Guid tenantId = await api.CreateTenantAsync(client);
 
         using HttpResponseMessage response = await CreateAsync(
             client, tenantId, "   Sales Assistant   ", "\n  Be brief.\n\n  Escalate refunds.  \n");
@@ -136,8 +136,8 @@ public sealed class AiAgentEndpointsTests(AiAgentApiFixture api) : IClassFixture
         const string multiline =
             "Rules:\n1. Be brief.\n2. Never quote a discount.\n\n\tEscalate refunds to a human.";
 
-        using HttpClient client = api.CreateClient();
-        Guid tenantId = await api.CreateTenantAsync();
+        using HttpClient client = await api.CreateSignedInClientAsync();
+        Guid tenantId = await api.CreateTenantAsync(client);
 
         using HttpResponseMessage response =
             await CreateAsync(client, tenantId, "Sales Assistant", multiline);
@@ -156,8 +156,8 @@ public sealed class AiAgentEndpointsTests(AiAgentApiFixture api) : IClassFixture
     [Fact]
     public async Task A_created_agent_has_matching_created_and_updated_instants_in_utc()
     {
-        using HttpClient client = api.CreateClient();
-        Guid tenantId = await api.CreateTenantAsync();
+        using HttpClient client = await api.CreateSignedInClientAsync();
+        Guid tenantId = await api.CreateTenantAsync(client);
 
         AgentPayload created = await ReadAgentAsync(
             await CreateAsync(client, tenantId, "Sales Assistant", Instructions));
@@ -169,8 +169,8 @@ public sealed class AiAgentEndpointsTests(AiAgentApiFixture api) : IClassFixture
     [Fact]
     public async Task The_caller_cannot_choose_the_identity_status_or_timestamps()
     {
-        using HttpClient client = api.CreateClient();
-        Guid tenantId = await api.CreateTenantAsync();
+        using HttpClient client = await api.CreateSignedInClientAsync();
+        Guid tenantId = await api.CreateTenantAsync(client);
         Guid attempted = Guid.CreateVersion7();
 
         string body = $$"""
@@ -205,8 +205,8 @@ public sealed class AiAgentEndpointsTests(AiAgentApiFixture api) : IClassFixture
     {
         // There is no previous version of a resource that does not exist yet, so
         // there is nothing to be out of date about.
-        using HttpClient client = api.CreateClient();
-        Guid tenantId = await api.CreateTenantAsync();
+        using HttpClient client = await api.CreateSignedInClientAsync();
+        Guid tenantId = await api.CreateTenantAsync(client);
 
         using HttpResponseMessage response =
             await CreateAsync(client, tenantId, "Sales Assistant", Instructions);
@@ -219,7 +219,7 @@ public sealed class AiAgentEndpointsTests(AiAgentApiFixture api) : IClassFixture
     [Fact]
     public async Task Reading_an_agent_returns_200_with_a_strong_etag()
     {
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, Guid agentId, _) = await ArrangeAsync(client);
 
         using HttpResponseMessage response = await client.GetAsync(AgentRoute(tenantId, agentId));
@@ -231,7 +231,7 @@ public sealed class AiAgentEndpointsTests(AiAgentApiFixture api) : IClassFixture
     [Fact]
     public async Task Repeated_reads_of_an_unchanged_agent_return_the_same_etag()
     {
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, Guid agentId, _) = await ArrangeAsync(client);
 
         using HttpResponseMessage first = await client.GetAsync(AgentRoute(tenantId, agentId));
@@ -243,7 +243,7 @@ public sealed class AiAgentEndpointsTests(AiAgentApiFixture api) : IClassFixture
     [Fact]
     public async Task Reading_needs_no_if_match()
     {
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, Guid agentId, _) = await ArrangeAsync(client);
 
         using HttpResponseMessage response = await client.GetAsync(AgentRoute(tenantId, agentId));
@@ -254,8 +254,8 @@ public sealed class AiAgentEndpointsTests(AiAgentApiFixture api) : IClassFixture
     [Fact]
     public async Task An_unknown_agent_returns_404_as_problem_details()
     {
-        using HttpClient client = api.CreateClient();
-        Guid tenantId = await api.CreateTenantAsync();
+        using HttpClient client = await api.CreateSignedInClientAsync();
+        Guid tenantId = await api.CreateTenantAsync(client);
 
         using HttpResponseMessage response =
             await client.GetAsync(AgentRoute(tenantId, Guid.CreateVersion7()));
@@ -268,7 +268,7 @@ public sealed class AiAgentEndpointsTests(AiAgentApiFixture api) : IClassFixture
     {
         // The version travels in a header. Seven fields, and no xmin, version,
         // rowVersion, transaction id, provider, model or external identifier.
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, Guid agentId, _) = await ArrangeAsync(client);
 
         using HttpResponseMessage response = await client.GetAsync(AgentRoute(tenantId, agentId));
@@ -294,7 +294,7 @@ public sealed class AiAgentEndpointsTests(AiAgentApiFixture api) : IClassFixture
     [Fact]
     public async Task The_status_is_a_stable_name_not_an_integer_ordinal()
     {
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, Guid agentId, _) = await ArrangeAsync(client);
 
         using HttpResponseMessage response = await client.GetAsync(AgentRoute(tenantId, agentId));
@@ -315,8 +315,8 @@ public sealed class AiAgentEndpointsTests(AiAgentApiFixture api) : IClassFixture
     [InlineData("Sales\nAssistant")]
     public async Task An_unacceptable_name_returns_400_as_problem_details(string? name)
     {
-        using HttpClient client = api.CreateClient();
-        Guid tenantId = await api.CreateTenantAsync();
+        using HttpClient client = await api.CreateSignedInClientAsync();
+        Guid tenantId = await api.CreateTenantAsync(client);
 
         using HttpResponseMessage response = await CreateAsync(client, tenantId, name, Instructions);
 
@@ -329,8 +329,8 @@ public sealed class AiAgentEndpointsTests(AiAgentApiFixture api) : IClassFixture
     [InlineData("   ")]
     public async Task Unacceptable_instructions_return_400_as_problem_details(string? instructions)
     {
-        using HttpClient client = api.CreateClient();
-        Guid tenantId = await api.CreateTenantAsync();
+        using HttpClient client = await api.CreateSignedInClientAsync();
+        Guid tenantId = await api.CreateTenantAsync(client);
 
         using HttpResponseMessage response =
             await CreateAsync(client, tenantId, "Sales Assistant", instructions);
@@ -341,8 +341,8 @@ public sealed class AiAgentEndpointsTests(AiAgentApiFixture api) : IClassFixture
     [Fact]
     public async Task An_over_long_name_returns_400_and_is_not_truncated()
     {
-        using HttpClient client = api.CreateClient();
-        Guid tenantId = await api.CreateTenantAsync();
+        using HttpClient client = await api.CreateSignedInClientAsync();
+        Guid tenantId = await api.CreateTenantAsync(client);
 
         using HttpResponseMessage response =
             await CreateAsync(client, tenantId, new string('a', 121), Instructions);
@@ -355,8 +355,8 @@ public sealed class AiAgentEndpointsTests(AiAgentApiFixture api) : IClassFixture
     [Fact]
     public async Task A_malformed_body_is_rejected_at_the_transport_layer()
     {
-        using HttpClient client = api.CreateClient();
-        Guid tenantId = await api.CreateTenantAsync();
+        using HttpClient client = await api.CreateSignedInClientAsync();
+        Guid tenantId = await api.CreateTenantAsync(client);
 
         using HttpResponseMessage response = await client.PostAsync(
             AgentsRoute(tenantId),
@@ -370,7 +370,7 @@ public sealed class AiAgentEndpointsTests(AiAgentApiFixture api) : IClassFixture
     [Fact]
     public async Task An_empty_tenant_guid_in_the_route_returns_400()
     {
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
 
         using HttpResponseMessage response =
             await CreateAsync(client, Guid.Empty, "Sales Assistant", Instructions);
@@ -381,8 +381,8 @@ public sealed class AiAgentEndpointsTests(AiAgentApiFixture api) : IClassFixture
     [Fact]
     public async Task An_empty_agent_guid_in_the_route_returns_400()
     {
-        using HttpClient client = api.CreateClient();
-        Guid tenantId = await api.CreateTenantAsync();
+        using HttpClient client = await api.CreateSignedInClientAsync();
+        Guid tenantId = await api.CreateTenantAsync(client);
 
         using HttpResponseMessage response = await client.GetAsync(AgentRoute(tenantId, Guid.Empty));
 
@@ -392,7 +392,7 @@ public sealed class AiAgentEndpointsTests(AiAgentApiFixture api) : IClassFixture
     [Fact]
     public async Task A_non_guid_route_segment_does_not_match_the_route()
     {
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
 
         using HttpResponseMessage response = await client.GetAsync("/api/tenants/not-a-guid/ai-agents/also-not");
 
@@ -402,7 +402,7 @@ public sealed class AiAgentEndpointsTests(AiAgentApiFixture api) : IClassFixture
     [Fact]
     public async Task Creating_an_agent_for_an_unknown_tenant_returns_404()
     {
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
 
         using HttpResponseMessage response =
             await CreateAsync(client, Guid.CreateVersion7(), "Sales Assistant", Instructions);
@@ -415,7 +415,7 @@ public sealed class AiAgentEndpointsTests(AiAgentApiFixture api) : IClassFixture
     [Fact]
     public async Task An_agent_moves_through_draft_active_disabled_and_back_to_active()
     {
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, Guid agentId, string version) = await ArrangeAsync(client);
 
         (AgentPayload active, string v2) = await ActAsync(client, tenantId, agentId, "activate", version);
@@ -436,7 +436,7 @@ public sealed class AiAgentEndpointsTests(AiAgentApiFixture api) : IClassFixture
     [Fact]
     public async Task Every_successful_lifecycle_step_returns_a_new_etag()
     {
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, Guid agentId, string version) = await ArrangeAsync(client);
 
         (_, string afterActivate) = await ActAsync(client, tenantId, agentId, "activate", version);
@@ -452,7 +452,7 @@ public sealed class AiAgentEndpointsTests(AiAgentApiFixture api) : IClassFixture
         // The Domain state rule surfacing as a conflict. Distinct from 412: the
         // caller's version is current, so it has seen the agent as it is -- the
         // operation simply contradicts that state.
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, Guid agentId, string version) = await ArrangeAsync(client);
 
         using HttpResponseMessage response =
@@ -474,7 +474,7 @@ public sealed class AiAgentEndpointsTests(AiAgentApiFixture api) : IClassFixture
         // Nothing was written, so the version did not move -- and the response
         // says so, which is the truthful account of a request that changed
         // nothing.
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, Guid agentId, string version) = await ArrangeAsync(client);
 
         (AgentPayload first, string afterActivate) =
@@ -490,7 +490,7 @@ public sealed class AiAgentEndpointsTests(AiAgentApiFixture api) : IClassFixture
     [Fact]
     public async Task Disabling_an_already_disabled_agent_is_an_idempotent_200()
     {
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, Guid agentId, string version) = await ArrangeAsync(client);
 
         (_, string v2) = await ActAsync(client, tenantId, agentId, "activate", version);
@@ -505,7 +505,7 @@ public sealed class AiAgentEndpointsTests(AiAgentApiFixture api) : IClassFixture
     [Fact]
     public async Task Lifecycle_operations_on_an_unknown_agent_return_404()
     {
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, _, string version) = await ArrangeAsync(client);
         Guid unknown = Guid.CreateVersion7();
 
@@ -523,7 +523,7 @@ public sealed class AiAgentEndpointsTests(AiAgentApiFixture api) : IClassFixture
     [Fact]
     public async Task Renaming_with_the_current_etag_returns_200_and_persists_it()
     {
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, Guid agentId, string version) = await ArrangeAsync(client);
 
         using HttpResponseMessage response = await SendAsync(
@@ -550,7 +550,7 @@ public sealed class AiAgentEndpointsTests(AiAgentApiFixture api) : IClassFixture
     {
         // Consecutive edits must be possible without re-reading, so the version a
         // mutation hands back has to be the one the resource is actually at.
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, Guid agentId, string version) = await ArrangeAsync(client);
 
         using HttpResponseMessage renamed = await SendAsync(
@@ -565,7 +565,7 @@ public sealed class AiAgentEndpointsTests(AiAgentApiFixture api) : IClassFixture
     [Fact]
     public async Task Consecutive_edits_can_chain_etags_without_re_reading()
     {
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, Guid agentId, string version) = await ArrangeAsync(client);
 
         using HttpResponseMessage first = await SendAsync(
@@ -583,7 +583,7 @@ public sealed class AiAgentEndpointsTests(AiAgentApiFixture api) : IClassFixture
     [Fact]
     public async Task Renaming_to_an_unacceptable_name_returns_400_and_changes_nothing()
     {
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, Guid agentId, string version) = await ArrangeAsync(client);
 
         using HttpResponseMessage response = await SendAsync(
@@ -601,7 +601,7 @@ public sealed class AiAgentEndpointsTests(AiAgentApiFixture api) : IClassFixture
     [Fact]
     public async Task Renaming_an_unknown_agent_returns_404()
     {
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, _, string version) = await ArrangeAsync(client);
 
         using HttpResponseMessage response = await SendAsync(
@@ -618,7 +618,7 @@ public sealed class AiAgentEndpointsTests(AiAgentApiFixture api) : IClassFixture
     {
         const string replacement = "Answer support questions.\n\n\tEscalate billing to a human.";
 
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, Guid agentId, string version) = await ArrangeAsync(client);
 
         using HttpResponseMessage response = await SendAsync(
@@ -638,7 +638,7 @@ public sealed class AiAgentEndpointsTests(AiAgentApiFixture api) : IClassFixture
     [Fact]
     public async Task Instructions_can_be_updated_while_the_agent_is_active()
     {
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, Guid agentId, string version) = await ArrangeAsync(client);
 
         (_, string activated) = await ActAsync(client, tenantId, agentId, "activate", version);
@@ -656,7 +656,7 @@ public sealed class AiAgentEndpointsTests(AiAgentApiFixture api) : IClassFixture
     [Fact]
     public async Task Updating_instructions_to_a_blank_value_returns_400_and_changes_nothing()
     {
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, Guid agentId, string version) = await ArrangeAsync(client);
 
         using HttpResponseMessage response = await SendAsync(
@@ -674,7 +674,7 @@ public sealed class AiAgentEndpointsTests(AiAgentApiFixture api) : IClassFixture
     [Fact]
     public async Task Updating_instructions_on_an_unknown_agent_returns_404()
     {
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, _, string version) = await ArrangeAsync(client);
 
         using HttpResponseMessage response = await SendAsync(
@@ -705,7 +705,7 @@ public sealed class AiAgentEndpointsTests(AiAgentApiFixture api) : IClassFixture
     [Fact]
     public async Task Delete_is_not_exposed()
     {
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, Guid agentId, _) = await ArrangeAsync(client);
 
         using HttpResponseMessage deleted = await client.DeleteAsync(AgentRoute(tenantId, agentId));
@@ -728,7 +728,7 @@ public sealed class AiAgentEndpointsTests(AiAgentApiFixture api) : IClassFixture
     [Fact]
     public async Task List_is_exposed()
     {
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, _, _) = await ArrangeAsync(client);
 
         using HttpResponseMessage listed = await client.GetAsync(AgentsRoute(tenantId));
@@ -739,7 +739,7 @@ public sealed class AiAgentEndpointsTests(AiAgentApiFixture api) : IClassFixture
     [Fact]
     public async Task Patch_is_not_exposed()
     {
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, Guid agentId, _) = await ArrangeAsync(client);
 
         using HttpRequestMessage request = new(HttpMethod.Patch, AgentRoute(tenantId, agentId))
@@ -828,7 +828,7 @@ public sealed class AiAgentEndpointsTests(AiAgentApiFixture api) : IClassFixture
     /// <summary>Creates a tenant and one draft agent, and returns its current version.</summary>
     internal async Task<(Guid TenantId, Guid AgentId, string ETag)> ArrangeAsync(HttpClient client)
     {
-        Guid tenantId = await api.CreateTenantAsync();
+        Guid tenantId = await api.CreateTenantAsync(client);
 
         using HttpResponseMessage created =
             await CreateAsync(client, tenantId, "Sales Assistant", Instructions);

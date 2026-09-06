@@ -1,4 +1,5 @@
 using OmniAI.Application.AiAgents.Persistence;
+using OmniAI.Application.Tenants;
 using OmniAI.Domain.AiAgents;
 using OmniAI.Domain.Tenants;
 
@@ -7,10 +8,13 @@ namespace OmniAI.Application.AiAgents.GetAiAgentById;
 /// <summary>
 /// Reads one AI agent within a tenant.
 /// </summary>
-public sealed class GetAiAgentByIdHandler(IAiAgentRepository agents)
+public sealed class GetAiAgentByIdHandler(IAiAgentRepository agents, TenantAccessGuard access)
 {
     private readonly IAiAgentRepository _agents =
         agents ?? throw new ArgumentNullException(nameof(agents));
+
+    private readonly TenantAccessGuard _access =
+        access ?? throw new ArgumentNullException(nameof(access));
 
     /// <summary>Finds the agent.</summary>
     /// <returns>
@@ -40,6 +44,16 @@ public sealed class GetAiAgentByIdHandler(IAiAgentRepository agents)
 
         TenantId tenantId = TenantId.From(query.TenantId);
         AiAgentId agentId = AiAgentId.From(query.AiAgentId);
+
+        // Membership is checked before the agent is read, and before any
+        // precondition is evaluated. A caller who does not belong to this tenant
+        // is answered exactly as they would be for an agent that does not exist,
+        // so a valid entity tag for somebody else's agent buys nothing: it never
+        // reaches the version comparison.
+        if (!await _access.IsCurrentUserMemberAsync(tenantId, cancellationToken).ConfigureAwait(false))
+        {
+            return null;
+        }
 
         VersionedAiAgent? stored = await _agents
             .FindAsync(tenantId, agentId, cancellationToken)

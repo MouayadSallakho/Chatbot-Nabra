@@ -37,7 +37,7 @@ public sealed class AiAgentConcurrencyApiTests(AiAgentConcurrencyApiFixture api)
     [Fact]
     public async Task A_race_during_a_rename_is_reported_as_a_precondition_failure()
     {
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, Guid agentId, string version) = await ArrangeAsync(client);
 
         // Somebody else changes the row in the window between this request reading
@@ -65,7 +65,7 @@ public sealed class AiAgentConcurrencyApiTests(AiAgentConcurrencyApiFixture api)
     [Fact]
     public async Task A_race_during_an_instructions_update_leaves_the_other_text_in_place()
     {
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, Guid agentId, string version) = await ArrangeAsync(client);
 
         api.ArmCompetingWrite(
@@ -87,7 +87,7 @@ public sealed class AiAgentConcurrencyApiTests(AiAgentConcurrencyApiFixture api)
     [Fact]
     public async Task A_race_during_a_lifecycle_change_is_reported_as_a_precondition_failure()
     {
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, Guid agentId, string version) = await ArrangeAsync(client);
 
         api.ArmCompetingWrite(
@@ -113,7 +113,7 @@ public sealed class AiAgentConcurrencyApiTests(AiAgentConcurrencyApiFixture api)
         // state they have not seen would overwrite the other writer's change,
         // which is the exact loss this mechanism exists to prevent -- so a
         // precondition failure is reported, once, and the caller decides.
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, Guid agentId, string version) = await ArrangeAsync(client);
 
         api.ArmCompetingWrite($"UPDATE ai_agents SET name = 'Someone else' WHERE id = '{agentId}'");
@@ -136,7 +136,7 @@ public sealed class AiAgentConcurrencyApiTests(AiAgentConcurrencyApiFixture api)
     [Fact]
     public async Task After_a_race_the_caller_can_read_and_reapply_successfully()
     {
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, Guid agentId, string version) = await ArrangeAsync(client);
 
         api.ArmCompetingWrite($"UPDATE ai_agents SET name = 'Someone else' WHERE id = '{agentId}'");
@@ -168,7 +168,7 @@ public sealed class AiAgentConcurrencyApiTests(AiAgentConcurrencyApiFixture api)
         // is that every outcome is one the contract defines, that no request
         // produced a 500, that exactly one succeeded, and that the row is left
         // holding that winner's value rather than a mixture.
-        using HttpClient client = api.CreateClient();
+        using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, Guid agentId, string version) = await ArrangeAsync(client);
 
         string[] names = [.. Enumerable.Range(1, 8).Select(index => $"Writer {index}")];
@@ -213,7 +213,7 @@ public sealed class AiAgentConcurrencyApiTests(AiAgentConcurrencyApiFixture api)
 
     private async Task<(Guid TenantId, Guid AgentId, string ETag)> ArrangeAsync(HttpClient client)
     {
-        Guid tenantId = await api.CreateTenantAsync();
+        Guid tenantId = await api.CreateTenantAsync(client);
 
         using HttpResponseMessage created =
             await CreateAsync(client, tenantId, "Sales Assistant", "Original rules.");

@@ -44,6 +44,40 @@
     </script>
   </head>
   <body>
-    <app-root></app-root>
+    <!--
+      The deliberate initial state, painted before the bundle has parsed.
+
+      Authentication is resolved before the first route renders, which is what
+      stops a reload from flashing a sign-in form at somebody who is already
+      signed in. The cost is two requests before first paint, and this covers
+      that moment with something honest instead of a blank white page.
+
+      It lives inside <app-root> so Angular replaces it on bootstrap; there is no
+      code anywhere that has to remember to remove it. Everything it needs is
+      inline -- no stylesheet has loaded yet -- and every colour is read from the
+      same design tokens the application uses, so it is already correct in dark
+      mode thanks to the script above.
+
+      aria-live and role="status" so a screen reader is told something is
+      happening rather than meeting silence.
+    -->
+    <app-root>
+      <div
+        style="
+          display: grid;
+          place-items: center;
+          min-height: 100vh;
+          font-family:
+            system-ui,
+            -apple-system,
+            'Segoe UI',
+            sans-serif;
+        "
+      >
+        <p role="status" aria-live="polite" style="color: #646e7f; font-size: 0.875rem">
+          Loading OmniAI…
+        </p>
+      </div>
+    </app-root>
   </body>
 </html>

@@ -29,6 +29,25 @@
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.11" />
   </ItemGroup>
 
+  <ItemGroup Label="Identity">
+    <!--
+      ASP.NET Core Identity's Entity Framework stores. Infrastructure only: it is
+      persistence for credentials, and it is the only package in this file that
+      knows what a password hash is.
+
+      Pinned to 10.0.11, the same patch as every EF Core package above, because
+      it depends on EF Core itself. A different patch here would reintroduce
+      exactly the split-version problem the transitive pinning note describes.
+
+      The rest of what authentication needs (cookie handling, antiforgery, the
+      authorization pipeline, the UserManager and SignInManager types) is part
+      of the ASP.NET Core shared framework and needs no package reference.
+      Nothing here brings a JWT library, an identity server or an external
+      provider SDK; none is used.
+    -->
+    <PackageVersion Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.11" />
+  </ItemGroup>
+
   <ItemGroup Label="AI providers">
     <!--
       Official OpenAI .NET SDK. Infrastructure only: neither Domain, Application
