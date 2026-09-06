@@ -15,13 +15,18 @@ namespace OmniAI.Application.Tenants.CreateTenant;
 /// nothing -- and it would hide the call graph that is currently readable in one
 /// hop.
 /// <para>
-/// <strong>The creator becomes a member, in the same transaction.</strong> Phase
-/// 12's rule is that a tenant id grants nothing on its own; access requires a
-/// membership row. That makes creating a tenant without one not merely untidy but
-/// broken -- the creator would immediately be locked out of the workspace they
-/// had just made, and nothing in the platform could let them back in, because no
-/// endpoint grants memberships. So the two rows are written together or not at
-/// all.
+/// <strong>The creator becomes the Owner, in the same transaction.</strong>
+/// Phase 12's rule is that a tenant id grants nothing on its own; access requires
+/// a membership row. Phase 13 added a second rule beside it: a membership grants
+/// nothing on its own either, and what may be done inside a workspace comes from
+/// the roles the member holds. Together those make creating a tenant without the
+/// other three rows not merely untidy but broken. Without the membership the
+/// creator cannot reach the workspace at all; without the Owner role there is no
+/// full authority in it and no way to make one, because no caller can mint a
+/// system role; without the assignment the creator is a member who may do
+/// nothing, in a workspace where nobody can grant them anything. None of those
+/// states is recoverable through any endpoint this platform publishes, so all
+/// four rows are written together or not at all.
 /// </para>
 /// <para>
 /// <strong>The command carries no user id.</strong> Who is creating the workspace
@@ -82,17 +87,19 @@ public sealed class CreateTenantHandler(
             throw TenantSlugAlreadyExistsException.ForSlug(slug.Value);
         }
 
-        // Identity and initial status come from the aggregate. The use case does
-        // not get to choose either.
-        Tenant tenant = Tenant.Create(name, slug);
+        // The workspace and the three rows that make it usable, built together
+        // from one reading of the clock. Two calls to the clock would put
+        // different timestamps on what is a single act.
+        //
+        // Identity and initial status come from the aggregate, and the Owner
+        // role's identity, its fixed name and its system kind are equally not the
+        // use case's to choose. NewWorkspace is the only way to obtain a
+        // consistent set of the four, so this call site cannot pair a membership
+        // for one person with an assignment for another.
+        NewWorkspace workspace = NewWorkspace.Create(name, slug, userId, _clock.GetUtcNow());
 
-        // One instant for both rows, read once. Two calls to the clock would put
-        // two different timestamps on what is a single act.
-        TenantMembership membership =
-            TenantMembership.Create(userId, tenant.Id, _clock.GetUtcNow());
+        await _tenants.AddAsync(workspace, cancellationToken).ConfigureAwait(false);
 
-        await _tenants.AddAsync(tenant, membership, cancellationToken).ConfigureAwait(false);
-
-        return TenantView.From(tenant);
+        return TenantView.From(workspace.Tenant);
     }
 }

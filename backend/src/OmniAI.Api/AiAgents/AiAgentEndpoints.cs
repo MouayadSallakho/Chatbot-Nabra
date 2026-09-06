@@ -1,5 +1,5 @@
+using OmniAI.Api.Http;
 using OmniAI.Api.Security;
-using OmniAI.Application.AiAgents;
 using OmniAI.Application.AiAgents.ActivateAiAgent;
 using OmniAI.Application.AiAgents.CreateAiAgent;
 using OmniAI.Application.AiAgents.DisableAiAgent;
@@ -8,6 +8,7 @@ using OmniAI.Application.AiAgents.ListAiAgents;
 using OmniAI.Application.AiAgents.PreviewAiAgent;
 using OmniAI.Application.AiAgents.RenameAiAgent;
 using OmniAI.Application.AiAgents.UpdateAiAgentInstructions;
+using OmniAI.Application.AiAgents;
 using OmniAI.Application.Concurrency;
 
 namespace OmniAI.Api.AiAgents;
@@ -46,16 +47,19 @@ namespace OmniAI.Api.AiAgents;
 /// token.
 /// </para>
 /// <para>
-/// <strong>These endpoints are unauthenticated.</strong> Authentication and
-/// authorisation are not implemented yet, so the tenant in the route is supplied
-/// by the caller and believed. Route scoping is a correctness boundary, not yet a
-/// security boundary -- it stops one tenant's data being reached through another
-/// tenant's route, but nothing yet stops a caller from claiming to be either
-/// tenant. These are development-stage endpoints and are not authorised for
-/// public production exposure until the authentication phase binds an
-/// authenticated principal to the tenant ids it may use. No placeholder API key,
-/// bearer token or admin secret is present, because a fake control would only
-/// hide that fact.
+/// <strong>Three questions are answered before any of these endpoints does its
+/// work, and they produce three different statuses.</strong> Is anybody signed in
+/// -- <c>401</c> from the pipeline. Does that person belong to the tenant in the
+/// route -- <c>404</c>, the same answer as for a tenant that never existed, so
+/// this route cannot be used to discover which workspaces are real. Do their
+/// roles carry the permission this operation needs -- <c>403</c>, which names the
+/// permission, because somebody who has already proved they belong here can act
+/// on that. The last two are decided inside each use case rather than here: an
+/// authorization attribute on an endpoint proves only that somebody is signed in.
+/// </para>
+/// <para>
+/// This note replaces a Phase 10 one saying these endpoints were unauthenticated.
+/// It was already stale after Phase 12 and would have been read as current.
 /// </para>
 /// </remarks>
 internal static class AiAgentEndpoints
@@ -144,7 +148,7 @@ internal static class AiAgentEndpoints
         CreateAiAgentHandler handler,
         CancellationToken cancellationToken)
     {
-        VersionedAiAgentView created = await handler
+        Versioned<AiAgentView> created = await handler
             .HandleAsync(
                 new CreateAiAgentCommand(tenantId, request.Name, request.Instructions),
                 cancellationToken)
@@ -154,8 +158,8 @@ internal static class AiAgentEndpoints
 
         return Results.CreatedAtRoute(
             GetAiAgentByIdRouteName,
-            new { tenantId = created.View.TenantId, aiAgentId = created.View.Id },
-            AiAgentResponse.From(created.View));
+            new { tenantId = created.Value.TenantId, aiAgentId = created.Value.Id },
+            AiAgentResponse.From(created.Value));
     }
 
     /// <summary>
@@ -216,7 +220,7 @@ internal static class AiAgentEndpoints
         GetAiAgentByIdHandler handler,
         CancellationToken cancellationToken)
     {
-        VersionedAiAgentView? agent = await handler
+        Versioned<AiAgentView>? agent = await handler
             .HandleAsync(new GetAiAgentByIdQuery(tenantId, aiAgentId), cancellationToken)
             .ConfigureAwait(false);
 
@@ -241,7 +245,7 @@ internal static class AiAgentEndpoints
             return failure;
         }
 
-        VersionedAiAgentView? renamed = await handler
+        Versioned<AiAgentView>? renamed = await handler
             .HandleAsync(
                 new RenameAiAgentCommand(tenantId, aiAgentId, request.Name, expected),
                 cancellationToken)
@@ -267,7 +271,7 @@ internal static class AiAgentEndpoints
             return failure;
         }
 
-        VersionedAiAgentView? updated = await handler
+        Versioned<AiAgentView>? updated = await handler
             .HandleAsync(
                 new UpdateAiAgentInstructionsCommand(tenantId, aiAgentId, request.Instructions, expected),
                 cancellationToken)
@@ -292,7 +296,7 @@ internal static class AiAgentEndpoints
             return failure;
         }
 
-        VersionedAiAgentView? activated = await handler
+        Versioned<AiAgentView>? activated = await handler
             .HandleAsync(new ActivateAiAgentCommand(tenantId, aiAgentId, expected), cancellationToken)
             .ConfigureAwait(false);
 
@@ -316,7 +320,7 @@ internal static class AiAgentEndpoints
             return failure;
         }
 
-        VersionedAiAgentView? disabled = await handler
+        Versioned<AiAgentView>? disabled = await handler
             .HandleAsync(new DisableAiAgentCommand(tenantId, aiAgentId, expected), cancellationToken)
             .ConfigureAwait(false);
 
@@ -391,7 +395,7 @@ internal static class AiAgentEndpoints
     /// changed nothing.
     /// </para>
     /// </remarks>
-    private static IResult Respond(HttpContext http, VersionedAiAgentView? agent, Guid aiAgentId)
+    private static IResult Respond(HttpContext http, Versioned<AiAgentView>? agent, Guid aiAgentId)
     {
         if (agent is null)
         {
@@ -400,7 +404,7 @@ internal static class AiAgentEndpoints
 
         SetETag(http, agent.Version);
 
-        return Results.Ok(AiAgentResponse.From(agent.View));
+        return Results.Ok(AiAgentResponse.From(agent.Value));
     }
 
     /// <summary>

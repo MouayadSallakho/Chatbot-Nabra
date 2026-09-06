@@ -50,7 +50,7 @@ public sealed class GetTenantByIdHandlerTests
         // unwind, and nothing that would be logged as a server fault.
         GetTenantByIdHandler handler = new(
             new InMemoryTenantRepository(),
-            TestAccess.Outsider(Member));
+            TestAuthority.Outsider(Member));
 
         TenantView? found = await handler.HandleAsync(new GetTenantByIdQuery(Guid.CreateVersion7()));
 
@@ -71,7 +71,7 @@ public sealed class GetTenantByIdHandlerTests
 
         GetTenantByIdHandler handler = new(
             new InMemoryTenantRepository().Seed(somebodyElses),
-            TestAccess.Outsider(Member));
+            TestAuthority.Outsider(Member));
 
         TenantView? found =
             await handler.HandleAsync(new GetTenantByIdQuery(somebodyElses.Id.Value));
@@ -90,7 +90,7 @@ public sealed class GetTenantByIdHandlerTests
 
         GetTenantByIdHandler handler = new(
             new InMemoryTenantRepository().Seed(stored),
-            TestAccess.Anonymous());
+            TestAuthority.Anonymous());
 
         await Assert.ThrowsAsync<NotAuthenticatedException>(
             () => handler.HandleAsync(new GetTenantByIdQuery(stored.Id.Value)));
@@ -113,7 +113,7 @@ public sealed class GetTenantByIdHandlerTests
         // exist, so it must not be answered with "not found".
         GetTenantByIdHandler handler = new(
             new InMemoryTenantRepository(),
-            TestAccess.Outsider(Member));
+            TestAuthority.Outsider(Member));
 
         await Assert.ThrowsAsync<DomainValidationException>(
             () => handler.HandleAsync(new GetTenantByIdQuery(Guid.Empty)));
@@ -124,7 +124,7 @@ public sealed class GetTenantByIdHandlerTests
     {
         GetTenantByIdHandler handler = new(
             new InMemoryTenantRepository(),
-            TestAccess.Outsider(Member));
+            TestAuthority.Outsider(Member));
 
         await Assert.ThrowsAsync<ArgumentNullException>(() => handler.HandleAsync(null!));
     }
@@ -133,7 +133,7 @@ public sealed class GetTenantByIdHandlerTests
     public void The_handler_requires_its_dependencies()
     {
         Assert.Throws<ArgumentNullException>(
-            () => new GetTenantByIdHandler(null!, TestAccess.Outsider(Member)));
+            () => new GetTenantByIdHandler(null!, TestAuthority.Outsider(Member)));
 
         Assert.Throws<ArgumentNullException>(
             () => new GetTenantByIdHandler(new InMemoryTenantRepository(), null!));
@@ -143,5 +143,5 @@ public sealed class GetTenantByIdHandlerTests
     private static GetTenantByIdHandler HandlerFor(Tenant stored, Tenant memberOf) =>
         new(
             new InMemoryTenantRepository().Seed(stored),
-            TestAccess.ForTenants(Member, memberOf.Id.Value));
+            TestAuthority.Owner(Member, memberOf.Id.Value));
 }

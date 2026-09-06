@@ -83,7 +83,7 @@ describe('AiAgentApi', () => {
 
       http.expectOne(agentUrl).flush(agent, { headers: { ETag: '"v1"' } });
 
-      expect(await pending).toEqual({ agent, etag: '"v1"' });
+      expect(await pending).toEqual({ value: agent, etag: '"v1"' });
     });
 
     it('fails loudly when the response carries no entity tag', async () => {
@@ -124,7 +124,7 @@ describe('AiAgentApi', () => {
 
       request.flush(agent, { headers: { ETag: '"v1"' } });
 
-      expect(await pending).toEqual({ agent, etag: '"v1"' });
+      expect(await pending).toEqual({ value: agent, etag: '"v1"' });
     });
   });
 
@@ -180,7 +180,7 @@ describe('AiAgentApi', () => {
 
         // The new tag, not the one that was sent. A caller that kept using the
         // old one would be refused on its very next save.
-        expect(await pending).toEqual({ agent, etag: '"v2"' });
+        expect(await pending).toEqual({ value: agent, etag: '"v2"' });
       });
     }
 

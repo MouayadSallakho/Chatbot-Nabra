@@ -1,5 +1,4 @@
 using OmniAI.Application.Ai;
-using OmniAI.Application.AiAgents;
 using OmniAI.Application.AiAgents.ActivateAiAgent;
 using OmniAI.Application.AiAgents.CreateAiAgent;
 using OmniAI.Application.AiAgents.DisableAiAgent;
@@ -8,6 +7,8 @@ using OmniAI.Application.AiAgents.ListAiAgents;
 using OmniAI.Application.AiAgents.PreviewAiAgent;
 using OmniAI.Application.AiAgents.RenameAiAgent;
 using OmniAI.Application.AiAgents.UpdateAiAgentInstructions;
+using OmniAI.Application.AiAgents;
+using OmniAI.Application.Authorization;
 using OmniAI.Application.Concurrency;
 using OmniAI.Application.Security;
 using OmniAI.Application.Tenants;
@@ -32,7 +33,7 @@ namespace OmniAI.Application.Tests.AiAgents;
 /// without its authorization requirement -- a one-line mistake no compiler
 /// catches -- still cannot reach another tenant's data.
 /// <para>
-/// Each handler is given a real <see cref="TenantAccessGuard"/> over a membership
+/// Each handler is given a real <see cref="TenantAuthorizer"/> over a membership
 /// store that grants nothing. The agent genuinely exists, under the tenant being
 /// named, and the caller is genuinely signed in: the only reason to refuse is the
 /// missing membership.
@@ -63,7 +64,7 @@ public sealed class AiAgentMembershipTests
         return (new InMemoryAiAgentRepository().Seed(agent), tenantId, agent);
     }
 
-    private static TenantAccessGuard Outsider() => TestAccess.Outsider(Stranger);
+    private static TenantAuthorizer Outsider() => TestAuthority.Outsider(Stranger);
 
     private static FixedTimeProvider Clock() => new(Now);
 
@@ -234,7 +235,7 @@ public sealed class AiAgentMembershipTests
         // for all of them and the point is the completeness of the list.
         (InMemoryAiAgentRepository agents, TenantId tenantId, AiAgent agent) = Arrange();
 
-        TenantAccessGuard anonymous = TestAccess.Anonymous();
+        TenantAuthorizer anonymous = TestAuthority.Anonymous();
         ConcurrencyToken version = agents.VersionOf(agent);
 
         List<Func<Task>> attempts =

@@ -3,7 +3,8 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { TestBed } from '@angular/core/testing';
 import { LOCAL_STORAGE } from '@app/core/storage/local-storage';
 import { Tenant } from '@app/core/api/tenant-api';
-import { memoryStorage } from '@app/testing/test-doubles';
+import { memoryStorage, permissionApiGranting } from '@app/testing/test-doubles';
+import { PermissionApi } from '@app/core/authorization/permission-api';
 import { WORKSPACE_STORAGE_KEY, WorkspaceContextService } from './workspace-context-service';
 
 /**
@@ -32,11 +33,15 @@ describe('WorkspaceContextService', () => {
   let http: HttpTestingController;
   let storage: Storage;
 
-  function create(seed: Record<string, string> = {}): WorkspaceContextService {
+  async function create(seed: Record<string, string> = {}): Promise<WorkspaceContextService> {
     storage = memoryStorage(seed);
 
     TestBed.configureTestingModule({
       providers: [
+        // Selecting a workspace asks what the reader may do there. Without a
+        // double the request would be left open and every case in this file
+        // would fail on verify() for a reason unrelated to what it asserts.
+        { provide: PermissionApi, useValue: permissionApiGranting('*') },
         provideHttpClient(),
         provideHttpClientTesting(),
         { provide: LOCAL_STORAGE, useValue: storage },
@@ -56,8 +61,8 @@ describe('WorkspaceContextService', () => {
   afterEach(() => http.verify());
 
   describe('before anything is loaded', () => {
-    it('reports no workspace and offers no tenant id', () => {
-      const workspace = create();
+    it('reports no workspace and offers no tenant id', async () => {
+      const workspace = await create();
 
       expect(workspace.status()).toBe('unresolved');
       expect(workspace.tenant()).toBeNull();
@@ -70,7 +75,7 @@ describe('WorkspaceContextService', () => {
     it('selects it without asking', async () => {
       // One workspace is not a choice. Making somebody pick from a list of one
       // is a step that exists only to be completed.
-      const workspace = create();
+      const workspace = await create();
       const loading = workspace.load();
 
       respondWith([acme]);
@@ -82,7 +87,7 @@ describe('WorkspaceContextService', () => {
     });
 
     it('remembers the selection for the next load', async () => {
-      const workspace = create();
+      const workspace = await create();
       const loading = workspace.load();
 
       respondWith([acme]);
@@ -94,7 +99,7 @@ describe('WorkspaceContextService', () => {
 
   describe('when the account has several workspaces', () => {
     it('selects none of them, so the reader chooses', async () => {
-      const workspace = create();
+      const workspace = await create();
       const loading = workspace.load();
 
       respondWith([acme, rival]);
@@ -106,7 +111,7 @@ describe('WorkspaceContextService', () => {
     });
 
     it('restores a remembered choice rather than asking again', async () => {
-      const workspace = create({ [WORKSPACE_STORAGE_KEY]: rival.id });
+      const workspace = await create({ [WORKSPACE_STORAGE_KEY]: rival.id });
       const loading = workspace.load();
 
       respondWith([acme, rival]);
@@ -116,13 +121,13 @@ describe('WorkspaceContextService', () => {
     });
 
     it('accepts a choice from the authorised list', async () => {
-      const workspace = create();
+      const workspace = await create();
       const loading = workspace.load();
 
       respondWith([acme, rival]);
       await loading;
 
-      expect(workspace.select(rival.id)).toBe(true);
+      expect(await workspace.select(rival.id)).toBe(true);
       expect(workspace.tenant()).toEqual(rival);
       expect(storage.getItem(WORKSPACE_STORAGE_KEY)).toBe(rival.id);
     });
@@ -130,7 +135,7 @@ describe('WorkspaceContextService', () => {
 
   describe('when the account has no workspaces', () => {
     it('reports none, which is the state of a new account', async () => {
-      const workspace = create();
+      const workspace = await create();
       const loading = workspace.load();
 
       respondWith([]);
@@ -140,7 +145,7 @@ describe('WorkspaceContextService', () => {
     });
 
     it('clears a stored id that no longer belongs to anything', async () => {
-      const workspace = create({ [WORKSPACE_STORAGE_KEY]: acme.id });
+      const workspace = await create({ [WORKSPACE_STORAGE_KEY]: acme.id });
       const loading = workspace.load();
 
       respondWith([]);
@@ -156,7 +161,7 @@ describe('WorkspaceContextService', () => {
       // keeping an id from an account that was removed from a workspace, must
       // not produce a selection. The server would refuse it anyway -- but this
       // application must not even offer it.
-      const workspace = create({ [WORKSPACE_STORAGE_KEY]: rival.id });
+      const workspace = await create({ [WORKSPACE_STORAGE_KEY]: rival.id });
       const loading = workspace.load();
 
       respondWith([acme]);
@@ -168,7 +173,7 @@ describe('WorkspaceContextService', () => {
     });
 
     it('leaves the reader with a choice rather than a forced selection', async () => {
-      const workspace = create({
+      const workspace = await create({
         [WORKSPACE_STORAGE_KEY]: '99999999-9999-9999-9999-999999999999',
       });
 
@@ -182,13 +187,13 @@ describe('WorkspaceContextService', () => {
     });
 
     it('cannot be selected by hand either', async () => {
-      const workspace = create();
+      const workspace = await create();
       const loading = workspace.load();
 
       respondWith([acme]);
       await loading;
 
-      expect(workspace.select(rival.id)).toBe(false);
+      expect(await workspace.select(rival.id)).toBe(false);
       expect(workspace.tenant()).toEqual(acme);
     });
   });
@@ -197,7 +202,7 @@ describe('WorkspaceContextService', () => {
     async function unreachable(
       seed: Record<string, string> = {},
     ): Promise<WorkspaceContextService> {
-      const workspace = create(seed);
+      const workspace = await create(seed);
       const loading = workspace.load();
 
       http.expectOne('/api/me/tenants').error(new ProgressEvent('error'), { status: 0 });
@@ -231,13 +236,13 @@ describe('WorkspaceContextService', () => {
 
   describe('adopting a freshly created workspace', () => {
     it('adds it to the list and selects it', async () => {
-      const workspace = create();
+      const workspace = await create();
       const loading = workspace.load();
 
       respondWith([]);
       await loading;
 
-      workspace.adopt(acme);
+      await workspace.adopt(acme);
 
       expect(workspace.workspaces()).toEqual([acme]);
       expect(workspace.tenant()).toEqual(acme);
@@ -245,13 +250,13 @@ describe('WorkspaceContextService', () => {
     });
 
     it('does not duplicate one that is already there', async () => {
-      const workspace = create();
+      const workspace = await create();
       const loading = workspace.load();
 
       respondWith([acme]);
       await loading;
 
-      workspace.adopt(acme);
+      await workspace.adopt(acme);
 
       expect(workspace.workspaces()).toEqual([acme]);
     });
@@ -262,7 +267,7 @@ describe('WorkspaceContextService', () => {
       // Both belong to the account that has just stopped being signed in. The
       // next person to use this browser must not be shown the name of a
       // workspace that is not theirs.
-      const workspace = create();
+      const workspace = await create();
       const loading = workspace.load();
 
       respondWith([acme]);
@@ -283,6 +288,10 @@ describe('WorkspaceContextService', () => {
       // application must work; only the memory of the choice is lost.
       TestBed.configureTestingModule({
         providers: [
+          // Selecting a workspace asks what the reader may do there. Without a
+          // double the request would be left open and every case in this file
+          // would fail on verify() for a reason unrelated to what it asserts.
+          { provide: PermissionApi, useValue: permissionApiGranting('*') },
           provideHttpClient(),
           provideHttpClientTesting(),
           { provide: LOCAL_STORAGE, useValue: null },

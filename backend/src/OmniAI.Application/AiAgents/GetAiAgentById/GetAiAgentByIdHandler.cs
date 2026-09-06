@@ -1,6 +1,9 @@
 using OmniAI.Application.AiAgents.Persistence;
+using OmniAI.Application.Authorization;
+using OmniAI.Application.Concurrency;
 using OmniAI.Application.Tenants;
 using OmniAI.Domain.AiAgents;
+using OmniAI.Domain.Authorization;
 using OmniAI.Domain.Tenants;
 
 namespace OmniAI.Application.AiAgents.GetAiAgentById;
@@ -8,13 +11,13 @@ namespace OmniAI.Application.AiAgents.GetAiAgentById;
 /// <summary>
 /// Reads one AI agent within a tenant.
 /// </summary>
-public sealed class GetAiAgentByIdHandler(IAiAgentRepository agents, TenantAccessGuard access)
+public sealed class GetAiAgentByIdHandler(IAiAgentRepository agents, TenantAuthorizer authorizer)
 {
     private readonly IAiAgentRepository _agents =
         agents ?? throw new ArgumentNullException(nameof(agents));
 
-    private readonly TenantAccessGuard _access =
-        access ?? throw new ArgumentNullException(nameof(access));
+    private readonly TenantAuthorizer _authorizer =
+        authorizer ?? throw new ArgumentNullException(nameof(authorizer));
 
     /// <summary>Finds the agent.</summary>
     /// <returns>
@@ -36,7 +39,7 @@ public sealed class GetAiAgentByIdHandler(IAiAgentRepository agents, TenantAcces
     /// happens to find nothing, because an empty GUID is malformed input rather
     /// than a resource that does not exist.
     /// </exception>
-    public async Task<VersionedAiAgentView?> HandleAsync(
+    public async Task<Versioned<AiAgentView>?> HandleAsync(
         GetAiAgentByIdQuery query,
         CancellationToken cancellationToken = default)
     {
@@ -45,17 +48,22 @@ public sealed class GetAiAgentByIdHandler(IAiAgentRepository agents, TenantAcces
         TenantId tenantId = TenantId.From(query.TenantId);
         AiAgentId agentId = AiAgentId.From(query.AiAgentId);
 
-        // Membership is checked before the agent is read, and before any
-        // precondition is evaluated. A caller who does not belong to this tenant
-        // is answered exactly as they would be for an agent that does not exist,
-        // so a valid entity tag for somebody else's agent buys nothing: it never
-        // reaches the version comparison.
-        if (!await _access.IsCurrentUserMemberAsync(tenantId, cancellationToken).ConfigureAwait(false))
+        // Authorisation is resolved before the agent is read, and that ordering
+        // is the disclosure rule rather than an optimisation. A member without
+        // ai-agents.view is refused identically whether the id they named is
+        // real, belongs to another tenant, or was invented -- nothing is looked
+        // up before the refusal, so there is no difference for them to observe.
+        // Checking the permission after the lookup would answer 403 for an agent
+        // that exists and 404 for one that does not, turning a permission they
+        // lack into a way to enumerate the ids they cannot see.
+        if (!await _authorizer
+            .RequireAsync(tenantId, PlatformPermissions.AiAgentsView, cancellationToken)
+            .ConfigureAwait(false))
         {
             return null;
         }
 
-        VersionedAiAgent? stored = await _agents
+        Versioned<AiAgent>? stored = await _agents
             .FindAsync(tenantId, agentId, cancellationToken)
             .ConfigureAwait(false);
 
@@ -63,6 +71,6 @@ public sealed class GetAiAgentByIdHandler(IAiAgentRepository agents, TenantAcces
         // agent always has what it needs to change it safely afterwards.
         return stored is null
             ? null
-            : new VersionedAiAgentView(AiAgentView.From(stored.Agent), stored.Version);
+            : new Versioned<AiAgentView>(AiAgentView.From(stored.Value), stored.Version);
     }
 }

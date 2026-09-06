@@ -1,4 +1,6 @@
+using OmniAI.Application.Authorization;
 using OmniAI.Application.Tenants.Persistence;
+using OmniAI.Domain.Authorization;
 using OmniAI.Domain.Tenants;
 
 namespace OmniAI.Application.Tenants.GetTenantById;
@@ -6,13 +8,13 @@ namespace OmniAI.Application.Tenants.GetTenantById;
 /// <summary>
 /// Reads one tenant the caller belongs to.
 /// </summary>
-public sealed class GetTenantByIdHandler(ITenantRepository tenants, TenantAccessGuard access)
+public sealed class GetTenantByIdHandler(ITenantRepository tenants, TenantAuthorizer authorizer)
 {
     private readonly ITenantRepository _tenants =
         tenants ?? throw new ArgumentNullException(nameof(tenants));
 
-    private readonly TenantAccessGuard _access =
-        access ?? throw new ArgumentNullException(nameof(access));
+    private readonly TenantAuthorizer _authorizer =
+        authorizer ?? throw new ArgumentNullException(nameof(authorizer));
 
     /// <summary>Finds the tenant.</summary>
     /// <returns>
@@ -45,7 +47,12 @@ public sealed class GetTenantByIdHandler(ITenantRepository tenants, TenantAccess
 
         TenantId id = TenantId.From(query.TenantId);
 
-        if (!await _access.IsCurrentUserMemberAsync(id, cancellationToken).ConfigureAwait(false))
+        // Authorisation before the tenant is read, so a non-member never puts
+        // somebody else's row into memory and a member without workspace.view is
+        // refused without one either.
+        if (!await _authorizer
+            .RequireAsync(id, PlatformPermissions.WorkspaceView, cancellationToken)
+            .ConfigureAwait(false))
         {
             return null;
         }

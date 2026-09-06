@@ -14,7 +14,8 @@ import {
 } from '@app/core/workspace/workspace-context-service';
 import { AuthService } from '@app/core/auth/auth-service';
 import { NAV_ITEMS } from '@app/layout/navigation';
-import { FakeMediaMatcher, memoryStorage } from '@app/testing/test-doubles';
+import { FakeMediaMatcher, memoryStorage, permissionApiGranting } from '@app/testing/test-doubles';
+import { PermissionApi } from '@app/core/authorization/permission-api';
 import { routes } from '@app/app.routes';
 
 /** A workspace that already exists, so the guard lets the shell render. */
@@ -55,6 +56,10 @@ describe('AppShell', () => {
 
     TestBed.configureTestingModule({
       providers: [
+        // Selecting a workspace asks what the reader may do there. Without a
+        // double the request would be left open and every case in this file
+        // would fail on verify() for a reason unrelated to what it asserts.
+        { provide: PermissionApi, useValue: permissionApiGranting('*') },
         provideRouter(routes, withComponentInputBinding()),
         provideHttpClient(),
         provideHttpClientTesting(),

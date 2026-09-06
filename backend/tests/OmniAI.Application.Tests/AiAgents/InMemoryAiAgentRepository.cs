@@ -84,7 +84,7 @@ internal sealed class InMemoryAiAgentRepository : IAiAgentRepository
     /// </remarks>
     public bool PretendRaceDuringSave { get; init; }
 
-    public Task<VersionedAiAgent?> FindAsync(
+    public Task<Versioned<AiAgent>?> FindAsync(
         TenantId tenantId,
         AiAgentId agentId,
         CancellationToken cancellationToken = default)
@@ -92,7 +92,7 @@ internal sealed class InMemoryAiAgentRepository : IAiAgentRepository
         Row? row = _rows.Find(candidate =>
             candidate.Agent.Id == agentId && candidate.Agent.TenantId == tenantId);
 
-        return Task.FromResult(row is null ? null : new VersionedAiAgent(row.Agent, row.Version));
+        return Task.FromResult(row is null ? null : new Versioned<AiAgent>(row.Agent, row.Version));
     }
 
     /// <summary>

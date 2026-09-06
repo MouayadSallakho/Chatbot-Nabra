@@ -1,0 +1,118 @@
+// The conflict banner. Warning-toned rather than danger-toned: nothing has gone
+// wrong and nothing was lost -- somebody else simply got there first, and the
+// reader has a decision to make.
+.conflict {
+  display: grid;
+  gap: var(--space-2);
+  border-color: var(--border-warning, var(--border-default));
+  background-color: var(--surface-warning, var(--surface-muted));
+}
+
+.conflict-title {
+  font: var(--text-body-strong);
+  margin: 0;
+}
+
+.conflict-actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  margin-block-start: var(--space-1);
+}
+
+.section-note {
+  margin-block-end: var(--space-3);
+}
+
+.role-form {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.field {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.form-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  margin-block-start: var(--space-3);
+}
+
+// ----------------------------------------------------------------------------
+// Permission groups
+// ----------------------------------------------------------------------------
+// Grouped checkboxes rather than a matrix. There are eight capabilities; a
+// spreadsheet of roles against permissions would be a lot of interface for a
+// list somebody can read in one glance, and the thing a matrix is actually for
+// -- assigning roles to members -- does not exist yet.
+.permission-group {
+  display: grid;
+  gap: var(--space-3);
+  margin-block-end: var(--space-3);
+
+  // A <fieldset> carries a browser default border and padding that would fight
+  // the card it is already inside.
+  border-width: 1px;
+  min-inline-size: 0;
+}
+
+.permission-group-name {
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-caps);
+
+  // A <legend> is positioned into the border by default; the card supplies the
+  // frame, so it sits as an ordinary heading instead.
+  float: none;
+  inline-size: auto;
+  padding: 0;
+  margin: 0;
+}
+
+.permission-option {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-3);
+  align-items: start;
+  cursor: pointer;
+
+  // A generous target on a phone, where the label is the only thing large
+  // enough to hit reliably.
+  padding-block: var(--space-1);
+}
+
+.permission-option:has(input:disabled) {
+  cursor: default;
+}
+
+.permission-option-text {
+  display: grid;
+  gap: var(--space-1);
+  min-inline-size: 0;
+}
+
+.permission-label {
+  font: var(--text-body-strong);
+  overflow-wrap: anywhere;
+}
+
+// The read-only rendering, for the protected role. Same information, no
+// controls -- rather than a form of disabled checkboxes, which shows somebody a
+// control and then refuses it.
+.permission-readout {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+
+  li {
+    display: grid;
+    gap: var(--space-1);
+    min-inline-size: 0;
+  }
+}

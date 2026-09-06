@@ -1,6 +1,7 @@
-import { HttpClient, HttpParams, HttpResponse } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable, map } from 'rxjs';
+import { Versioned, withEntityTag } from '@app/core/api/versioned';
 
 /** The lifecycle states the backend publishes, spelled exactly as it spells them. */
 export type AiAgentStatus = 'Draft' | 'Active' | 'Disabled';
@@ -32,18 +33,6 @@ export interface AiAgentPage {
   readonly page: number;
   readonly pageSize: number;
   readonly totalCount: number;
-}
-
-/**
- * An agent together with the entity tag it was read at.
- *
- * The two travel together because they are only useful together: the agent is
- * what to show, and the tag is what the next write must present. A caller that
- * has one without the other cannot safely save.
- */
-export interface VersionedAiAgent {
-  readonly agent: AiAgent;
-  readonly etag: string;
 }
 
 /** What the preview endpoint answers with. One field. */
@@ -91,10 +80,10 @@ export class AiAgentApi {
   }
 
   /** Reads one agent, with the tag needed to change it. */
-  get(tenantId: string, aiAgentId: string): Observable<VersionedAiAgent> {
+  get(tenantId: string, aiAgentId: string): Observable<Versioned<AiAgent>> {
     return this.http
       .get<AiAgent>(this.agentUrl(tenantId, aiAgentId), { observe: 'response' })
-      .pipe(map(versioned));
+      .pipe(map(withEntityTag));
   }
 
   /**
@@ -107,10 +96,10 @@ export class AiAgentApi {
   create(
     tenantId: string,
     request: { name: string; instructions: string },
-  ): Observable<VersionedAiAgent> {
+  ): Observable<Versioned<AiAgent>> {
     return this.http
       .post<AiAgent>(this.agentsUrl(tenantId), request, { observe: 'response' })
-      .pipe(map(versioned));
+      .pipe(map(withEntityTag));
   }
 
   /** Renames an agent, only if it is still at the given version. */
@@ -119,7 +108,7 @@ export class AiAgentApi {
     aiAgentId: string,
     name: string,
     etag: string,
-  ): Observable<VersionedAiAgent> {
+  ): Observable<Versioned<AiAgent>> {
     return this.conditional('PUT', `${this.agentUrl(tenantId, aiAgentId)}/name`, etag, { name });
   }
 
@@ -129,19 +118,19 @@ export class AiAgentApi {
     aiAgentId: string,
     instructions: string,
     etag: string,
-  ): Observable<VersionedAiAgent> {
+  ): Observable<Versioned<AiAgent>> {
     return this.conditional('PUT', `${this.agentUrl(tenantId, aiAgentId)}/instructions`, etag, {
       instructions,
     });
   }
 
   /** Activates an agent, only if it is still at the given version. */
-  activate(tenantId: string, aiAgentId: string, etag: string): Observable<VersionedAiAgent> {
+  activate(tenantId: string, aiAgentId: string, etag: string): Observable<Versioned<AiAgent>> {
     return this.conditional('POST', `${this.agentUrl(tenantId, aiAgentId)}/activate`, etag, null);
   }
 
   /** Disables an agent, only if it is still at the given version. */
-  disable(tenantId: string, aiAgentId: string, etag: string): Observable<VersionedAiAgent> {
+  disable(tenantId: string, aiAgentId: string, etag: string): Observable<Versioned<AiAgent>> {
     return this.conditional('POST', `${this.agentUrl(tenantId, aiAgentId)}/disable`, etag, null);
   }
 
@@ -164,14 +153,14 @@ export class AiAgentApi {
     url: string,
     etag: string,
     body: unknown,
-  ): Observable<VersionedAiAgent> {
+  ): Observable<Versioned<AiAgent>> {
     return this.http
       .request<AiAgent>(method, url, {
         body,
         headers: { 'If-Match': etag },
         observe: 'response',
       })
-      .pipe(map(versioned));
+      .pipe(map(withEntityTag));
   }
 
   private agentsUrl(tenantId: string): string {
@@ -181,22 +170,4 @@ export class AiAgentApi {
   private agentUrl(tenantId: string, aiAgentId: string): string {
     return `${this.agentsUrl(tenantId)}/${aiAgentId}`;
   }
-}
-
-/**
- * Pairs a response body with its entity tag.
- *
- * A missing tag is a broken contract rather than something to paper over: every
- * endpoint that returns an agent sets one. Failing loudly here is far better
- * than returning an empty string that would later be sent as `If-Match` and
- * rejected with a confusing 412.
- */
-function versioned(response: HttpResponse<AiAgent>): VersionedAiAgent {
-  const etag = response.headers.get('ETag');
-
-  if (!etag) {
-    throw new Error('The agent response carried no ETag.');
-  }
-
-  return { agent: response.body as AiAgent, etag };
 }

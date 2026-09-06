@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using OmniAI.Domain.AiAgents;
+using OmniAI.Domain.Authorization;
 using OmniAI.Domain.Conversations;
 using OmniAI.Domain.Tenants;
 using OmniAI.Domain.Users;
@@ -23,6 +24,25 @@ internal static class PersistenceConverters
 
     public static readonly ValueConverter<UserId, Guid> UserId =
         new(id => id.Value, value => Domain.Users.UserId.From(value));
+
+    public static readonly ValueConverter<TenantRoleId, Guid> TenantRoleId =
+        new(id => id.Value, value => Domain.Authorization.TenantRoleId.From(value));
+
+    /// <summary>
+    /// A role name, stored as the display form the workspace typed.
+    /// </summary>
+    /// <remarks>
+    /// The normalised form the unique index is built on is <em>not</em> produced
+    /// by this converter, because one converter cannot fill two columns. It is a
+    /// separate column that the role repository sets from
+    /// <c>TenantRoleName.Normalised</c> -- see TenantRoleConfiguration for why
+    /// that is preferred to a database-computed column.
+    /// </remarks>
+    public static readonly ValueConverter<TenantRoleName, string> TenantRoleName =
+        new(name => name.Value, value => Domain.Authorization.TenantRoleName.Create(value));
+
+    public static readonly ValueConverter<PermissionCode, string> PermissionCode =
+        new(code => code.Value, value => Domain.Authorization.PermissionCode.Create(value));
 
     public static readonly ValueConverter<ConversationId, Guid> ConversationId =
         new(id => id.Value, value => Domain.Conversations.ConversationId.From(value));

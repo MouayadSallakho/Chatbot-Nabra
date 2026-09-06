@@ -22,12 +22,15 @@ editing, lifecycle and preview against the real API, with a tenant-scoped
 paginated list endpoint added to support it. Phase 12 closed the gap those phases
 left open: real accounts, a cookie session, antiforgery protection, and a tenant
 membership that every tenant-scoped request is checked against, so a tenant id in
-a route addresses a resource rather than granting access to it. No
-channel-provider architecture has been designed, and the platform is still not
-authorised for production deployment -- email verification, password recovery,
-roles and permissions all remain ahead of it.
+a route addresses a resource rather than granting access to it. Phase 13 replaced
+that membership's all-or-nothing meaning with tenant-scoped roles: a protected
+Owner whose authority is the platform's whole capability catalogue, custom roles a
+workspace composes from it, and a permission check inside every tenant-scoped use
+case. No channel-provider architecture has been designed, and the platform is
+still not authorised for production deployment -- email verification, password
+recovery and member administration all remain ahead of it.
 
-Eleven areas have their own documents:
+Twelve areas have their own documents:
 
 - [multi-tenancy-isolation.md](multi-tenancy-isolation.md) - tenant isolation
 - [conversation-domain.md](conversation-domain.md) - conversation and message modelling
@@ -40,6 +43,7 @@ Eleven areas have their own documents:
 - [admin-design-system.md](admin-design-system.md) - the admin design system and application shell
 - [admin-ai-agent-experience.md](admin-ai-agent-experience.md) - the development workspace and the AI agent admin workflow
 - [authentication-tenant-membership.md](authentication-tenant-membership.md) - accounts, the cookie session, antiforgery, and the membership authorization boundary
+- [tenant-rbac.md](tenant-rbac.md) - tenant-scoped roles, the permission catalogue, and what a member may do inside a workspace
 
 ---
 

@@ -1,7 +1,9 @@
 using OmniAI.Application.AiAgents.Persistence;
+using OmniAI.Application.Authorization;
 using OmniAI.Application.Concurrency;
 using OmniAI.Application.Tenants;
 using OmniAI.Domain.AiAgents;
+using OmniAI.Domain.Authorization;
 using OmniAI.Domain.Tenants;
 
 namespace OmniAI.Application.AiAgents.DisableAiAgent;
@@ -11,14 +13,14 @@ namespace OmniAI.Application.AiAgents.DisableAiAgent;
 /// </summary>
 public sealed class DisableAiAgentHandler(
     IAiAgentRepository agents,
-    TenantAccessGuard access,
+    TenantAuthorizer authorizer,
     TimeProvider clock)
 {
     private readonly IAiAgentRepository _agents =
         agents ?? throw new ArgumentNullException(nameof(agents));
 
-    private readonly TenantAccessGuard _access =
-        access ?? throw new ArgumentNullException(nameof(access));
+    private readonly TenantAuthorizer _authorizer =
+        authorizer ?? throw new ArgumentNullException(nameof(authorizer));
 
     private readonly TimeProvider _clock =
         clock ?? throw new ArgumentNullException(nameof(clock));
@@ -45,7 +47,7 @@ public sealed class DisableAiAgentHandler(
     /// <exception cref="AiAgentVersionMismatchException">
     /// The agent is no longer at the expected version.
     /// </exception>
-    public async Task<VersionedAiAgentView?> HandleAsync(
+    public async Task<Versioned<AiAgentView>?> HandleAsync(
         DisableAiAgentCommand command,
         CancellationToken cancellationToken = default)
     {
@@ -54,17 +56,23 @@ public sealed class DisableAiAgentHandler(
         TenantId tenantId = TenantId.From(command.TenantId);
         AiAgentId agentId = AiAgentId.From(command.AiAgentId);
 
-        // Membership is checked before the agent is read, and before any
-        // precondition is evaluated. A caller who does not belong to this tenant
-        // is answered exactly as they would be for an agent that does not exist,
-        // so a valid entity tag for somebody else's agent buys nothing: it never
-        // reaches the version comparison.
-        if (!await _access.IsCurrentUserMemberAsync(tenantId, cancellationToken).ConfigureAwait(false))
+        // Authorisation is resolved before the agent is read, and before any
+        // precondition is evaluated. Two different refusals come out of this one
+        // line, and they must stay different: a caller who does not belong to
+        // this tenant is answered exactly as they would be for an agent that
+        // does not exist, while a member whose roles do not carry this
+        // permission is told so. Neither reaches the version comparison, so a
+        // valid entity tag for somebody else's agent buys nothing -- and a
+        // member without the permission cannot use a 412 to discover which
+        // agent ids are real.
+        if (!await _authorizer
+            .RequireAsync(tenantId, PlatformPermissions.AiAgentsLifecycle, cancellationToken)
+            .ConfigureAwait(false))
         {
             return null;
         }
 
-        VersionedAiAgent? stored = await _agents
+        Versioned<AiAgent>? stored = await _agents
             .FindAsync(tenantId, agentId, cancellationToken)
             .ConfigureAwait(false);
 
@@ -80,12 +88,12 @@ public sealed class DisableAiAgentHandler(
 
         // Throws for a draft, before anything is written. Nothing is persisted
         // and no partial change is left behind.
-        stored.Agent.Disable(_clock.GetUtcNow());
+        stored.Value.Disable(_clock.GetUtcNow());
 
         ConcurrencyToken version = await _agents
-            .UpdateAsync(stored.Agent, command.Expected, cancellationToken)
+            .UpdateAsync(stored.Value, command.Expected, cancellationToken)
             .ConfigureAwait(false);
 
-        return new VersionedAiAgentView(AiAgentView.From(stored.Agent), version);
+        return new Versioned<AiAgentView>(AiAgentView.From(stored.Value), version);
     }
 }

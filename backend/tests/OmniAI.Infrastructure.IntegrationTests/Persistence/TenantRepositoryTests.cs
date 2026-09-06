@@ -24,18 +24,18 @@ public sealed class TenantRepositoryTests(PostgresTestDatabase database)
     [Fact]
     public async Task A_tenant_is_stored_and_can_be_found_again()
     {
-        Tenant tenant = NewTenant("Acme Corporation", NewSlug());
+        NewWorkspace workspace = await NewWorkspaceAsync("Acme Corporation", NewSlug());
 
         await using (OmniAiDbContext writing = database.CreateContext())
         {
-            await new TenantRepository(writing).AddAsync(tenant, await OwnerOfAsync(tenant));
+            await new TenantRepository(writing).AddAsync(workspace);
         }
 
         await using OmniAiDbContext reading = database.CreateContext();
-        Tenant? found = await new TenantRepository(reading).FindByIdAsync(tenant.Id);
+        Tenant? found = await new TenantRepository(reading).FindByIdAsync(workspace.Tenant.Id);
 
         Assert.NotNull(found);
-        Assert.Equal(tenant.Id, found.Id);
+        Assert.Equal(workspace.Tenant.Id, found.Id);
         Assert.Equal("Acme Corporation", found.Name.Value);
         Assert.Equal(TenantStatus.Active, found.Status);
     }
@@ -45,13 +45,13 @@ public sealed class TenantRepositoryTests(PostgresTestDatabase database)
     {
         // The contract says AddAsync commits, which is why there is no unit of
         // work. This checks the claim outside EF entirely.
-        Tenant tenant = NewTenant("Acme Corporation", NewSlug());
+        NewWorkspace workspace = await NewWorkspaceAsync("Acme Corporation", NewSlug());
 
         await using OmniAiDbContext context = database.CreateContext();
-        await new TenantRepository(context).AddAsync(tenant, await OwnerOfAsync(tenant));
+        await new TenantRepository(context).AddAsync(workspace);
 
         object? stored = await database.ExecuteScalarAsync(
-            $"SELECT count(*) FROM tenants WHERE id = '{tenant.Id.Value}'");
+            $"SELECT count(*) FROM tenants WHERE id = '{workspace.Tenant.Id.Value}'");
 
         Assert.Equal(1L, stored as long?);
     }
@@ -73,8 +73,7 @@ public sealed class TenantRepositoryTests(PostgresTestDatabase database)
         await using OmniAiDbContext context = database.CreateContext();
         TenantRepository repository = new(context);
 
-        Tenant stored = Tenant.Create(TenantName.Create("Acme"), taken);
-        await repository.AddAsync(stored, await OwnerOfAsync(stored));
+        await repository.AddAsync(await NewWorkspaceAsync("Acme", taken.Value));
 
         Assert.True(await repository.SlugExistsAsync(taken));
         Assert.False(await repository.SlugExistsAsync(free));
@@ -88,15 +87,14 @@ public sealed class TenantRepositoryTests(PostgresTestDatabase database)
         // thing that can reject the second insert is the unique index.
         string slug = NewSlug();
 
-        await StoreAsync(NewTenant("Acme One", slug));
+        await StoreAsync("Acme One", slug);
 
         await using OmniAiDbContext second = database.CreateContext();
-        Tenant loser = NewTenant("Acme Two", slug);
-        TenantMembership losing = await OwnerOfAsync(loser);
+        NewWorkspace loser = await NewWorkspaceAsync("Acme Two", slug);
 
         TenantSlugAlreadyExistsException conflict =
             await Assert.ThrowsAsync<TenantSlugAlreadyExistsException>(
-                () => new TenantRepository(second).AddAsync(loser, losing));
+                () => new TenantRepository(second).AddAsync(loser));
 
         Assert.Equal(slug, conflict.Slug);
 
@@ -111,15 +109,14 @@ public sealed class TenantRepositoryTests(PostgresTestDatabase database)
         // name a constraint, a SQLSTATE, a table or any SQL.
         string slug = NewSlug();
 
-        await StoreAsync(NewTenant("Acme One", slug));
+        await StoreAsync("Acme One", slug);
 
         await using OmniAiDbContext second = database.CreateContext();
-        Tenant loser = NewTenant("Acme Two", slug);
-        TenantMembership losing = await OwnerOfAsync(loser);
+        NewWorkspace loser = await NewWorkspaceAsync("Acme Two", slug);
 
         TenantSlugAlreadyExistsException conflict =
             await Assert.ThrowsAsync<TenantSlugAlreadyExistsException>(
-                () => new TenantRepository(second).AddAsync(loser, losing));
+                () => new TenantRepository(second).AddAsync(loser));
 
         foreach (string leak in
             (string[])["ix_tenants_slug", "23505", "duplicate key", "INSERT", "tenants", "Npgsql"])
@@ -133,35 +130,43 @@ public sealed class TenantRepositoryTests(PostgresTestDatabase database)
     {
         string slug = NewSlug();
 
-        await StoreAsync(NewTenant("Acme One", slug));
+        await StoreAsync("Acme One", slug);
 
         await using OmniAiDbContext second = database.CreateContext();
         TenantRepository repository = new(second);
-        Tenant loser = NewTenant("Acme Two", slug);
-        TenantMembership losing = await OwnerOfAsync(loser);
+        NewWorkspace loser = await NewWorkspaceAsync("Acme Two", slug);
 
         await Assert.ThrowsAsync<TenantSlugAlreadyExistsException>(
-            () => repository.AddAsync(loser, losing));
+            () => repository.AddAsync(loser));
 
-        // Neither the rejected aggregate nor its membership may still be pending,
-        // or the next save on this unit of work would retry an insert nobody asked
-        // for -- and the membership's retry would fail on a foreign key pointing at
-        // a tenant that was never written.
-        Assert.Equal(EntityState.Detached, second.Entry(loser).State);
-        Assert.Equal(EntityState.Detached, second.Entry(losing).State);
+        // None of the four rejected rows may still be pending, or the next save
+        // on this unit of work would retry inserts nobody asked for -- and each
+        // retry would fail on a foreign key pointing at a tenant that was never
+        // written.
+        Assert.Equal(EntityState.Detached, second.Entry(loser.Tenant).State);
+        Assert.Equal(EntityState.Detached, second.Entry(loser.Membership).State);
+        Assert.Equal(EntityState.Detached, second.Entry(loser.OwnerRole).State);
+        Assert.Equal(EntityState.Detached, second.Entry(loser.OwnerAssignment).State);
 
         object? rows = await database.ExecuteScalarAsync(
             $"SELECT count(*) FROM tenants WHERE slug = '{slug}'");
 
         Assert.Equal(1L, rows as long?);
 
-        // And no membership survived for the tenant that was rolled back. This
-        // is the orphan the transaction exists to prevent: a membership row
-        // granting access to a workspace that was never created.
-        object? orphans = await database.ExecuteScalarAsync(
-            $"SELECT count(*) FROM tenant_memberships WHERE tenant_id = '{loser.Id.Value}'");
+        // And nothing survived for the tenant that was rolled back. These are the
+        // orphans the transaction exists to prevent: a membership granting access
+        // to a workspace that was never created, an Owner role for nothing, and an
+        // assignment naming both.
+        string rolledBack = loser.Tenant.Id.Value.ToString();
 
-        Assert.Equal(0L, orphans as long?);
+        foreach (string table in
+            (string[])["tenant_memberships", "tenant_roles", "tenant_role_assignments"])
+        {
+            object? orphans = await database.ExecuteScalarAsync(
+                $"SELECT count(*) FROM {table} WHERE tenant_id = '{rolledBack}'");
+
+            Assert.Equal(0L, orphans as long?);
+        }
     }
 
     [Fact]
@@ -197,12 +202,11 @@ public sealed class TenantRepositoryTests(PostgresTestDatabase database)
     private async Task<bool> AttemptAsync(string name, string slug)
     {
         await using OmniAiDbContext context = database.CreateContext();
-        Tenant candidate = NewTenant(name, slug);
-        TenantMembership membership = await OwnerOfAsync(candidate);
+        NewWorkspace candidate = await NewWorkspaceAsync(name, slug);
 
         try
         {
-            await new TenantRepository(context).AddAsync(candidate, membership);
+            await new TenantRepository(context).AddAsync(candidate);
 
             return true;
         }
@@ -213,30 +217,34 @@ public sealed class TenantRepositoryTests(PostgresTestDatabase database)
     }
 
     /// <summary>
-    /// A membership for a freshly seeded account, so the user foreign key is
+    /// A whole workspace for a freshly seeded account, so the user foreign key is
     /// satisfied.
     /// </summary>
     /// <remarks>
     /// A new account per call rather than one shared across the class. Sharing
     /// would make the concurrent-insert test write eight memberships for one
     /// person, which is not the shape the platform actually produces.
+    /// <para>
+    /// It goes through <see cref="NewWorkspace.Create"/> rather than assembling
+    /// the four rows here, so these tests exercise the same construction the
+    /// production use case does -- including that the Owner role and the
+    /// assignment are derived rather than supplied.
+    /// </para>
     /// </remarks>
-    private async Task<TenantMembership> OwnerOfAsync(Tenant tenant) =>
-        TenantMembership.Create(
+    private async Task<NewWorkspace> NewWorkspaceAsync(string name, string slug) =>
+        NewWorkspace.Create(
+            TenantName.Create(name),
+            TenantSlug.Create(slug),
             await TestIdentity.SeedUserAsync(database),
-            tenant.Id,
             DateTimeOffset.UtcNow);
 
-    /// <summary>Stores a tenant with a fresh owner, on its own context.</summary>
-    private async Task StoreAsync(Tenant tenant)
+    /// <summary>Stores a workspace with a fresh owner, on its own context.</summary>
+    private async Task StoreAsync(string name, string slug)
     {
         await using OmniAiDbContext context = database.CreateContext();
 
-        await new TenantRepository(context).AddAsync(tenant, await OwnerOfAsync(tenant));
+        await new TenantRepository(context).AddAsync(await NewWorkspaceAsync(name, slug));
     }
-
-    private static Tenant NewTenant(string name, string slug) =>
-        Tenant.Create(TenantName.Create(name), TenantSlug.Create(slug));
 
     /// <summary>
     /// A slug unique to one test, so tests in this class cannot collide with each

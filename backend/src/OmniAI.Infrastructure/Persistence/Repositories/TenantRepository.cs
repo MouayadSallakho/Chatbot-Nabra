@@ -45,57 +45,67 @@ internal sealed class TenantRepository(OmniAiDbContext context) : ITenantReposit
     }
 
     /// <summary>
-    /// Inserts a tenant and its first membership in one transaction.
+    /// Inserts a workspace and everything that makes it usable, in one
+    /// transaction.
     /// </summary>
     /// <remarks>
     /// <para>
     /// <strong>An explicit transaction, and it is genuinely needed.</strong> One
-    /// <c>SaveChangesAsync</c> is already atomic, so at first sight adding two
+    /// <c>SaveChangesAsync</c> is already atomic, so at first sight adding four
     /// entities and saving once would be enough. It is not, because of what
-    /// happens on the failure path: the slug race is caught here, the losing
-    /// tenant is detached, and the caller is given a clean conflict. Without an
-    /// enclosing transaction the membership would still be sitting in the change
-    /// tracker as an <c>Added</c> row for a tenant that will never exist, and the
-    /// next save on this context -- in the same request or a later one, if the
-    /// context were reused -- would try to insert it and fail on the foreign key
+    /// happens on the failure path: the slug race is caught here, the losing rows
+    /// are detached, and the caller is given a clean conflict. Without an
+    /// enclosing transaction the other three rows would still be sitting in the
+    /// change tracker as <c>Added</c> rows for a tenant that will never exist, and
+    /// the next save on this context -- in the same request or a later one, if the
+    /// context were reused -- would try to insert them and fail on a foreign key
     /// with an error nobody could explain. The transaction and the paired detach
     /// leave the unit of work exactly as it was before the attempt.
     /// </para>
     /// <para>
-    /// <strong>Not an <c>IUnitOfWork</c>.</strong> This is one use case that needs
-    /// two rows written together, so the transaction lives in the one operation
-    /// that needs it. Introducing a general commit-orchestration abstraction would
-    /// have meant changing every accepted repository so that none of them
-    /// committed, in order to serve a single call site.
+    /// <strong>Not an <c>IUnitOfWork</c>.</strong> This is still the one use case
+    /// that needs several rows written together, so the transaction lives in the
+    /// one operation that needs it. Introducing a general commit-orchestration
+    /// abstraction would mean changing every accepted repository so that none of
+    /// them committed, in order to serve a single call site.
     /// </para>
     /// <para>
-    /// The pairing is checked before anything is written. A membership naming a
-    /// different tenant would be a programming error that the database would
-    /// happily accept -- both foreign keys would resolve -- and it would silently
-    /// grant somebody access to a workspace they did not create.
+    /// <strong>Nothing is checked for consistency here, because nothing can be
+    /// inconsistent.</strong> Phase 12's version of this method verified that the
+    /// membership named the tenant being created, since four loose arguments could
+    /// disagree. <see cref="NewWorkspace"/> replaced them, and it derives the
+    /// membership, the Owner role and the assignment from the tenant and the
+    /// creator -- so a mismatched set cannot be constructed and there is no run-time
+    /// check left to write. The database's composite foreign keys remain the
+    /// guarantee regardless of what any caller believes.
+    /// </para>
+    /// <para>
+    /// The insertion order matters to the change tracker's fixup, not to
+    /// correctness: EF orders the statements itself from the foreign keys it
+    /// knows about, and the assignment's two composite keys mean it can only be
+    /// written after both the membership and the role.
     /// </para>
     /// </remarks>
     public async Task AddAsync(
-        Tenant tenant,
-        TenantMembership membership,
+        NewWorkspace workspace,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(tenant);
-        ArgumentNullException.ThrowIfNull(membership);
-
-        if (membership.TenantId != tenant.Id)
-        {
-            throw new ArgumentException(
-                "The membership must name the tenant being created.",
-                nameof(membership));
-        }
+        ArgumentNullException.ThrowIfNull(workspace);
 
         await using IDbContextTransaction transaction = await _context.Database
             .BeginTransactionAsync(cancellationToken)
             .ConfigureAwait(false);
 
-        _context.Tenants.Add(tenant);
-        _context.TenantMemberships.Add(membership);
+        _context.Tenants.Add(workspace.Tenant);
+        _context.TenantMemberships.Add(workspace.Membership);
+        _context.TenantRoles.Add(workspace.OwnerRole);
+        _context.TenantRoleAssignments.Add(workspace.OwnerAssignment);
+
+        // The Owner role stores no permission grants, so there is no normalised
+        // name to set from a grants collection -- but its name column pair still
+        // needs both halves. See TenantRoleConfiguration for why the normalised
+        // form is a shadow property rather than a computed column.
+        TenantRoles.SetNormalisedName(_context, workspace.OwnerRole);
 
         try
         {
@@ -104,31 +114,23 @@ internal sealed class TenantRepository(OmniAiDbContext context) : ITenantReposit
         }
         catch (DbUpdateException failure) when (IsSlugUniqueViolation(failure))
         {
-            // The insert lost the race for this slug. Roll back so neither row
-            // survives, then detach both so this unit of work is not left holding
-            // rows it would try to insert again if the same context is reused, and
-            // report the outcome in the Application's own vocabulary. The original
-            // exception is kept as the inner exception for logs -- never for the
-            // response body.
+            // The insert lost the race for this slug. Roll back so none of the
+            // four rows survives, then detach all of them so this unit of work is
+            // not left holding inserts it would retry if the same context were
+            // reused, and report the outcome in the Application's own vocabulary.
+            // The original exception is kept as the inner exception for logs --
+            // never for the response body.
             await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
 
-            _context.Entry(tenant).State = EntityState.Detached;
-            _context.Entry(membership).State = EntityState.Detached;
+            _context.Entry(workspace.Tenant).State = EntityState.Detached;
+            _context.Entry(workspace.Membership).State = EntityState.Detached;
+            _context.Entry(workspace.OwnerRole).State = EntityState.Detached;
+            _context.Entry(workspace.OwnerAssignment).State = EntityState.Detached;
 
-            throw TenantSlugAlreadyExistsException.ForSlug(tenant.Slug.Value, failure);
+            throw TenantSlugAlreadyExistsException.ForSlug(workspace.Tenant.Slug.Value, failure);
         }
     }
 
-    /// <summary>
-    /// Whether this failure is the tenant slug unique index rejecting a duplicate.
-    /// </summary>
-    /// <remarks>
-    /// Matched on the constraint name as well as the SQLSTATE, so a future unique
-    /// index on this table cannot be silently reported as a slug conflict. If a
-    /// different constraint fails, this returns false and the original exception
-    /// propagates as the unexpected error it is -- which is the correct outcome,
-    /// because guessing would turn a real defect into a tidy 409.
-    /// </remarks>
     private static bool IsSlugUniqueViolation(DbUpdateException failure) =>
         failure.InnerException is PostgresException postgres
         && postgres.SqlState == UniqueViolation

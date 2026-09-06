@@ -152,6 +152,107 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                     b.ToTable("ai_agents", (string)null);
                 });
 
+            modelBuilder.Entity("OmniAI.Domain.Authorization.RolePermissionGrant", b =>
+                {
+                    b.Property<Guid>("TenantRoleId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_role_id");
+
+                    b.Property<string>("Permission")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("permission");
+
+                    b.HasKey("TenantRoleId", "Permission");
+
+                    b.ToTable("role_permissions", (string)null);
+                });
+
+            modelBuilder.Entity("OmniAI.Domain.Authorization.TenantRole", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("kind");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("NormalisedName")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("normalized_name");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("Id", "TenantId")
+                        .HasName("ak_tenant_roles_id_tenant");
+
+                    b.HasIndex("TenantId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_tenant_roles_owner")
+                        .HasFilter("kind = 'Owner'");
+
+                    b.HasIndex("TenantId", "NormalisedName")
+                        .IsUnique()
+                        .HasDatabaseName("ux_tenant_roles_tenant_name");
+
+                    b.ToTable("tenant_roles", (string)null);
+                });
+
+            modelBuilder.Entity("OmniAI.Domain.Authorization.TenantRoleAssignment", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("TenantRoleId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_role_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.HasKey("UserId", "TenantId", "TenantRoleId");
+
+                    b.HasIndex("TenantRoleId", "TenantId")
+                        .HasDatabaseName("ix_tenant_role_assignments_role");
+
+                    b.ToTable("tenant_role_assignments", (string)null);
+                });
+
             modelBuilder.Entity("OmniAI.Domain.Conversations.Conversation", b =>
                 {
                     b.Property<Guid>("Id")
@@ -423,6 +524,44 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_ai_agents_tenant");
                 });
 
+            modelBuilder.Entity("OmniAI.Domain.Authorization.RolePermissionGrant", b =>
+                {
+                    b.HasOne("OmniAI.Domain.Authorization.TenantRole", null)
+                        .WithMany("Grants")
+                        .HasForeignKey("TenantRoleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_role_permissions_role");
+                });
+
+            modelBuilder.Entity("OmniAI.Domain.Authorization.TenantRole", b =>
+                {
+                    b.HasOne("OmniAI.Domain.Tenants.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_tenant_roles_tenant");
+                });
+
+            modelBuilder.Entity("OmniAI.Domain.Authorization.TenantRoleAssignment", b =>
+                {
+                    b.HasOne("OmniAI.Domain.Authorization.TenantRole", null)
+                        .WithMany()
+                        .HasForeignKey("TenantRoleId", "TenantId")
+                        .HasPrincipalKey("Id", "TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_tenant_role_assignments_role");
+
+                    b.HasOne("OmniAI.Domain.Tenants.TenantMembership", null)
+                        .WithMany()
+                        .HasForeignKey("UserId", "TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_tenant_role_assignments_membership");
+                });
+
             modelBuilder.Entity("OmniAI.Domain.Conversations.Conversation", b =>
                 {
                     b.HasOne("OmniAI.Domain.Tenants.Tenant", null)
@@ -451,6 +590,11 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_tenant_memberships_tenant");
+                });
+
+            modelBuilder.Entity("OmniAI.Domain.Authorization.TenantRole", b =>
+                {
+                    b.Navigation("Grants");
                 });
 
             modelBuilder.Entity("OmniAI.Domain.Conversations.Conversation", b =>

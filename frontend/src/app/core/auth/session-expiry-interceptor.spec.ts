@@ -5,7 +5,8 @@ import { Router, provideRouter } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { LOCAL_STORAGE } from '@app/core/storage/local-storage';
 import { WORKSPACE_STORAGE_KEY } from '@app/core/workspace/workspace-context-service';
-import { memoryStorage } from '@app/testing/test-doubles';
+import { memoryStorage, permissionApiGranting } from '@app/testing/test-doubles';
+import { PermissionApi } from '@app/core/authorization/permission-api';
 import { AuthService } from './auth-service';
 import { sessionExpiryInterceptor } from './session-expiry-interceptor';
 
@@ -29,6 +30,10 @@ describe('sessionExpiryInterceptor', () => {
 
     TestBed.configureTestingModule({
       providers: [
+        // Selecting a workspace asks what the reader may do there. Without a
+        // double the request would be left open and every case in this file
+        // would fail on verify() for a reason unrelated to what it asserts.
+        { provide: PermissionApi, useValue: permissionApiGranting('*') },
         provideRouter([]),
         provideHttpClient(withInterceptors([sessionExpiryInterceptor])),
         provideHttpClientTesting(),

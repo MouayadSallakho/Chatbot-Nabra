@@ -21,13 +21,13 @@ public sealed class UpdateAiAgentInstructionsHandlerTests
         (TenantId tenant, AiAgent agent, InMemoryAiAgentRepository agents) = Arrange();
         ConcurrencyToken before = agents.VersionOf(agent);
 
-        VersionedAiAgentView? updated = await Handler(agents, Later).HandleAsync(
+        Versioned<AiAgentView>? updated = await Handler(agents, Later).HandleAsync(
             new UpdateAiAgentInstructionsCommand(
                 tenant.Value, agent.Id.Value, "Answer support questions.", before));
 
         Assert.NotNull(updated);
-        Assert.Equal("Answer support questions.", updated.View.Instructions);
-        Assert.Equal(Later, updated.View.UpdatedAt);
+        Assert.Equal("Answer support questions.", updated.Value.Instructions);
+        Assert.Equal(Later, updated.Value.UpdatedAt);
         Assert.NotEqual(before, updated.Version);
     }
 
@@ -42,12 +42,12 @@ public sealed class UpdateAiAgentInstructionsHandlerTests
 
         (TenantId tenant, AiAgent agent, InMemoryAiAgentRepository agents) = Arrange();
 
-        VersionedAiAgentView updated = await Handler(agents, Later).HandleAsync(
+        Versioned<AiAgentView> updated = await Handler(agents, Later).HandleAsync(
             new UpdateAiAgentInstructionsCommand(
                 tenant.Value, agent.Id.Value, multiline, agents.VersionOf(agent)))
             ?? throw new InvalidOperationException();
 
-        Assert.Equal(multiline, updated.View.Instructions);
+        Assert.Equal(multiline, updated.Value.Instructions);
         Assert.Equal(multiline, agent.Instructions.Value);
     }
 
@@ -56,12 +56,12 @@ public sealed class UpdateAiAgentInstructionsHandlerTests
     {
         (TenantId tenant, AiAgent agent, InMemoryAiAgentRepository agents) = Arrange();
 
-        VersionedAiAgentView updated = await Handler(agents, Later).HandleAsync(
+        Versioned<AiAgentView> updated = await Handler(agents, Later).HandleAsync(
             new UpdateAiAgentInstructionsCommand(
                 tenant.Value, agent.Id.Value, "\n\n  One.\n\n  Two.  \n\n", agents.VersionOf(agent)))
             ?? throw new InvalidOperationException();
 
-        Assert.Equal("One.\n\n  Two.", updated.View.Instructions);
+        Assert.Equal("One.\n\n  Two.", updated.Value.Instructions);
     }
 
     [Fact]
@@ -71,13 +71,13 @@ public sealed class UpdateAiAgentInstructionsHandlerTests
         (TenantId tenant, AiAgent agent, InMemoryAiAgentRepository agents) =
             Arrange(setUp: stored => stored.Activate(Created.AddMinutes(5)));
 
-        VersionedAiAgentView updated = await Handler(agents, Later).HandleAsync(
+        Versioned<AiAgentView> updated = await Handler(agents, Later).HandleAsync(
             new UpdateAiAgentInstructionsCommand(
                 tenant.Value, agent.Id.Value, "Corrected.", agents.VersionOf(agent)))
             ?? throw new InvalidOperationException();
 
-        Assert.Equal("Corrected.", updated.View.Instructions);
-        Assert.Equal(AiAgentStatus.Active, updated.View.Status);
+        Assert.Equal("Corrected.", updated.Value.Instructions);
+        Assert.Equal(AiAgentStatus.Active, updated.Value.Status);
     }
 
     [Fact]
@@ -87,13 +87,13 @@ public sealed class UpdateAiAgentInstructionsHandlerTests
         string current = agent.Instructions.Value;
         ConcurrencyToken before = agents.VersionOf(agent);
 
-        VersionedAiAgentView updated = await Handler(agents, Later).HandleAsync(
+        Versioned<AiAgentView> updated = await Handler(agents, Later).HandleAsync(
             new UpdateAiAgentInstructionsCommand(
                 tenant.Value, agent.Id.Value, $"  {current}  ", before))
             ?? throw new InvalidOperationException();
 
-        Assert.Equal(current, updated.View.Instructions);
-        Assert.Equal(Created, updated.View.UpdatedAt);
+        Assert.Equal(current, updated.Value.Instructions);
+        Assert.Equal(Created, updated.Value.UpdatedAt);
         Assert.Equal(before, updated.Version);
     }
 
@@ -155,13 +155,13 @@ public sealed class UpdateAiAgentInstructionsHandlerTests
         await Handler(agents, Later).HandleAsync(new UpdateAiAgentInstructionsCommand(
             tenant.Value, agent.Id.Value, "First edit.", agents.VersionOf(agent)));
 
-        VersionedAiAgentView late = await Handler(agents, Created.AddMinutes(-30)).HandleAsync(
+        Versioned<AiAgentView> late = await Handler(agents, Created.AddMinutes(-30)).HandleAsync(
             new UpdateAiAgentInstructionsCommand(
                 tenant.Value, agent.Id.Value, "Arrived out of order.", agents.VersionOf(agent)))
             ?? throw new InvalidOperationException();
 
-        Assert.Equal("Arrived out of order.", late.View.Instructions);
-        Assert.Equal(Later, late.View.UpdatedAt);
+        Assert.Equal("Arrived out of order.", late.Value.Instructions);
+        Assert.Equal(Later, late.Value.UpdatedAt);
     }
 
     [Theory]
@@ -187,7 +187,7 @@ public sealed class UpdateAiAgentInstructionsHandlerTests
     {
         InMemoryAiAgentRepository agents = new();
 
-        VersionedAiAgentView? updated = await Handler(agents, Later).HandleAsync(
+        Versioned<AiAgentView>? updated = await Handler(agents, Later).HandleAsync(
             new UpdateAiAgentInstructionsCommand(
                 Guid.CreateVersion7(), Guid.CreateVersion7(), "Anything.", SomeVersion));
 
@@ -203,7 +203,7 @@ public sealed class UpdateAiAgentInstructionsHandlerTests
         string original = agentB.Instructions.Value;
         InMemoryAiAgentRepository agents = new InMemoryAiAgentRepository().Seed(agentB);
 
-        VersionedAiAgentView? updated = await Handler(agents, Later).HandleAsync(
+        Versioned<AiAgentView>? updated = await Handler(agents, Later).HandleAsync(
             new UpdateAiAgentInstructionsCommand(
                 tenantA.Value,
                 agentB.Id.Value,
@@ -243,5 +243,5 @@ public sealed class UpdateAiAgentInstructionsHandlerTests
     private static UpdateAiAgentInstructionsHandler Handler(
         InMemoryAiAgentRepository agents,
         DateTimeOffset now) =>
-        new(agents, TestAccess.Anywhere(), new FixedTimeProvider(now));
+        new(agents, TestAuthority.Anywhere(), new FixedTimeProvider(now));
 }

@@ -1,8 +1,10 @@
 using OmniAI.Application.AiAgents.Persistence;
+using OmniAI.Application.Authorization;
 using OmniAI.Application.Concurrency;
-using OmniAI.Application.Tenants;
 using OmniAI.Application.Tenants.Persistence;
+using OmniAI.Application.Tenants;
 using OmniAI.Domain.AiAgents;
+using OmniAI.Domain.Authorization;
 using OmniAI.Domain.Tenants;
 
 namespace OmniAI.Application.AiAgents.CreateAiAgent;
@@ -20,7 +22,7 @@ namespace OmniAI.Application.AiAgents.CreateAiAgent;
 public sealed class CreateAiAgentHandler(
     ITenantRepository tenants,
     IAiAgentRepository agents,
-    TenantAccessGuard access,
+    TenantAuthorizer authorizer,
     TimeProvider clock)
 {
     private readonly ITenantRepository _tenants =
@@ -29,8 +31,8 @@ public sealed class CreateAiAgentHandler(
     private readonly IAiAgentRepository _agents =
         agents ?? throw new ArgumentNullException(nameof(agents));
 
-    private readonly TenantAccessGuard _access =
-        access ?? throw new ArgumentNullException(nameof(access));
+    private readonly TenantAuthorizer _authorizer =
+        authorizer ?? throw new ArgumentNullException(nameof(authorizer));
 
     private readonly TimeProvider _clock =
         clock ?? throw new ArgumentNullException(nameof(clock));
@@ -41,7 +43,7 @@ public sealed class CreateAiAgentHandler(
     /// Raised by the value objects, not re-implemented here.
     /// </exception>
     /// <exception cref="TenantNotFoundException">No such tenant.</exception>
-    public async Task<VersionedAiAgentView> HandleAsync(
+    public async Task<Versioned<AiAgentView>> HandleAsync(
         CreateAiAgentCommand command,
         CancellationToken cancellationToken = default)
     {
@@ -56,13 +58,19 @@ public sealed class CreateAiAgentHandler(
         AiAgentName name = AiAgentName.Create(command.Name);
         AgentInstructions instructions = AgentInstructions.Create(command.Instructions);
 
-        // Membership before existence, and both answered the same way. A caller
-        // who does not belong to this tenant is told the tenant is not there --
-        // which, for them, is the only true thing that can be said about it. If
-        // this check ran after the existence check, a non-member would learn that
-        // somebody else's workspace exists by the order in which they were
-        // refused.
-        if (!await _access.IsCurrentUserMemberAsync(tenantId, cancellationToken).ConfigureAwait(false))
+        // Authorisation before existence, and a non-member is answered the same
+        // way a missing tenant is. A caller who does not belong to this tenant is
+        // told the tenant is not there -- which, for them, is the only true thing
+        // that can be said about it. If this check ran after the existence check,
+        // a non-member would learn that somebody else's workspace exists by the
+        // order in which they were refused.
+        //
+        // A member without ai-agents.create is told which permission they need,
+        // because they have already proved they belong here and the workspace's
+        // existence is not news to them.
+        if (!await _authorizer
+            .RequireAsync(tenantId, PlatformPermissions.AiAgentsCreate, cancellationToken)
+            .ConfigureAwait(false))
         {
             throw TenantNotFoundException.ForId(tenantId.Value);
         }
@@ -94,6 +102,6 @@ public sealed class CreateAiAgentHandler(
         ConcurrencyToken version =
             await _agents.AddAsync(agent, cancellationToken).ConfigureAwait(false);
 
-        return new VersionedAiAgentView(AiAgentView.From(agent), version);
+        return new Versioned<AiAgentView>(AiAgentView.From(agent), version);
     }
 }

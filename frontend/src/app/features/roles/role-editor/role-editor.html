@@ -1,0 +1,250 @@
+<div class="page">
+  @if (!canView()) {
+    <app-page-header heading="Role" />
+
+    <div class="page-section">
+      <div class="card">
+        <app-empty-state
+          icon="settings"
+          heading="You do not have access to roles"
+          description="Viewing this workspace's roles needs a permission your roles do not include. Ask somebody who administers this workspace if you need it."
+        />
+      </div>
+    </div>
+  } @else if (loading()) {
+    <app-page-header heading="Role" />
+
+    <div class="page-section" aria-busy="true">
+      <p class="visually-hidden" role="status">Loading role…</p>
+      <div class="card">
+        <span class="skeleton skeleton-title"></span>
+        <span class="skeleton skeleton-text"></span>
+      </div>
+    </div>
+  } @else if (failure(); as error) {
+    <app-page-header heading="Role" />
+
+    <div class="page-section">
+      <div class="card">
+        <app-empty-state
+          icon="alert"
+          tone="error"
+          [heading]="error.kind === 'notFound' ? 'Role not found' : 'Could not load role'"
+          [description]="error.message"
+        >
+          <a stateActions class="btn btn-secondary btn-sm" routerLink="/roles">Back to roles</a>
+        </app-empty-state>
+      </div>
+    </div>
+  } @else if (role(); as current) {
+    <app-page-header
+      [heading]="current.name"
+      [description]="
+        current.isSystem
+          ? 'The workspace owner. This role is maintained by the platform.'
+          : 'A role this workspace defines.'
+      "
+    >
+      <a pageActions class="btn btn-secondary" routerLink="/roles">Back to roles</a>
+    </app-page-header>
+
+    <!--
+      The stale-save banner. It is deliberately not an error beside one field:
+      the role moved underneath the whole screen, and the only thing that
+      recovers is reading it again. Nothing local has been touched, so the reader
+      can copy anything they want to keep before reloading.
+    -->
+    @if (stale()) {
+      <div class="page-section">
+        <div class="card conflict" role="alert">
+          <p class="conflict-title">This role was updated elsewhere.</p>
+          <p class="text-small text-secondary">
+            Your changes have not been saved and are still on screen. Reload to see the current
+            version — anything you have typed here will be replaced.
+          </p>
+          <div class="conflict-actions">
+            <button type="button" class="btn btn-primary btn-sm" (click)="reload()">
+              Reload latest version
+            </button>
+          </div>
+        </div>
+      </div>
+    }
+
+    @if (current.isSystem) {
+      <!--
+        Owner detail, read-only and explained. Deliberately not a form of
+        disabled checkboxes: showing somebody a control and then refusing it
+        reads as a fault rather than a rule.
+      -->
+      <div class="page-section">
+        <div class="card">
+          <h2 class="text-section-title">Protected system role</h2>
+          <p class="text-small text-secondary">
+            Owner always has every permission this platform defines, including any added in future
+            releases. It cannot be renamed and its permissions cannot be changed. To give somebody a
+            narrower set of capabilities, create a custom role.
+          </p>
+        </div>
+      </div>
+
+      <div class="page-section">
+        <h2 class="text-section-title">Permissions</h2>
+
+        @for (group of allGroups(); track group.name) {
+          <div class="card permission-group">
+            <h3 class="text-label permission-group-name">{{ group.name }}</h3>
+            <ul class="permission-readout">
+              @for (permission of group.permissions; track permission.code) {
+                <li>
+                  <span class="permission-label">{{ permission.label }}</span>
+                  <span class="text-small text-muted">{{ permission.description }}</span>
+                </li>
+              }
+            </ul>
+          </div>
+        }
+      </div>
+    } @else if (!editable()) {
+      <!--
+        A custom role this reader may look at but not administer: either they
+        cannot manage roles at all, or this one carries authority they do not
+        hold. Rendered as a record of what it grants rather than as a form of
+        disabled controls -- a checkbox nobody may ever tick reads as a fault,
+        and a catalogue filtered down to the reader's own authority would hide
+        the very capabilities that put this role out of their reach.
+      -->
+      <div class="page-section">
+        <div class="card">
+          <h2 class="text-section-title">
+            {{ readOnlyReason() === 'outranked' ? 'You cannot change this role' : 'Read-only' }}
+          </h2>
+          <p class="text-small text-secondary">
+            @if (readOnlyReason() === 'outranked') {
+              This role grants capabilities your own roles do not include, so it is not yours to
+              change. Ask somebody who administers this workspace if you need it changed.
+            } @else {
+              You can see what this role grants but not change it. Changing roles needs a permission
+              your roles do not include.
+            }
+          </p>
+        </div>
+      </div>
+
+      <div class="page-section">
+        <h2 class="text-section-title">Permissions</h2>
+
+        @if (roleGroups().length === 0) {
+          <div class="card">
+            <p class="text-small text-muted">This role grants nothing.</p>
+          </div>
+        }
+
+        @for (group of roleGroups(); track group.name) {
+          <div class="card permission-group">
+            <h3 class="text-label permission-group-name">{{ group.name }}</h3>
+            <ul class="permission-readout">
+              @for (permission of group.permissions; track permission.code) {
+                <li>
+                  <span class="permission-label">{{ permission.label }}</span>
+                  <span class="text-small text-muted">{{ permission.description }}</span>
+                </li>
+              }
+            </ul>
+          </div>
+        }
+      </div>
+    } @else {
+      <div class="page-section">
+        <h2 class="text-section-title">Name</h2>
+
+        <form class="card role-form" [formGroup]="nameForm" (ngSubmit)="saveName()" novalidate>
+          <div class="field">
+            <label class="form-label" for="role-name">Role name</label>
+            <input
+              id="role-name"
+              class="form-control"
+              type="text"
+              formControlName="name"
+              [attr.maxlength]="nameLimit"
+              autocomplete="off"
+            />
+
+            @if (nameForm.controls.name.touched && nameForm.controls.name.hasError('required')) {
+              <p class="form-error" role="alert">A role name is required.</p>
+            }
+          </div>
+
+          @if (nameFailure(); as error) {
+            <p class="alert alert-danger" role="alert">{{ error.message }}</p>
+          }
+
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary" [disabled]="!nameDirty() || nameSaving()">
+              {{ nameSaving() ? 'Saving…' : 'Save name' }}
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <div class="page-section">
+        <h2 class="text-section-title">Permissions</h2>
+        <p class="text-small text-secondary section-note">
+          Somebody holding this role may do everything ticked below, in this workspace only.
+        </p>
+
+        @for (group of groups(); track group.name) {
+          <fieldset class="card permission-group">
+            <legend class="text-label permission-group-name">{{ group.name }}</legend>
+
+            @for (permission of group.permissions; track permission.code) {
+              <label class="permission-option">
+                <input
+                  type="checkbox"
+                  class="form-check-input"
+                  [checked]="isTicked(permission.code)"
+                  (change)="toggle(permission.code, $any($event.target).checked)"
+                />
+                <span class="permission-option-text">
+                  <span class="permission-label">{{ permission.label }}</span>
+                  <span class="text-small text-muted">{{ permission.description }}</span>
+                </span>
+              </label>
+            }
+          </fieldset>
+        }
+
+        @if (permissionsFailure(); as error) {
+          <p class="alert alert-danger" role="alert">{{ error.message }}</p>
+        }
+
+        <div class="form-actions">
+          <button
+            type="button"
+            class="btn btn-primary"
+            [disabled]="!permissionsDirty() || permissionsSaving()"
+            (click)="savePermissions()"
+          >
+            {{ permissionsSaving() ? 'Saving…' : 'Save permissions' }}
+          </button>
+
+          @if (permissionsDirty()) {
+            <p class="text-small text-muted" aria-live="polite">You have unsaved changes.</p>
+          }
+        </div>
+
+        @if (narrowed()) {
+          <!--
+            Said plainly rather than left as an unexplained short list: somebody
+            who knows the platform has more capabilities should be told why they
+            are not here, not left wondering whether the page failed to load.
+          -->
+          <p class="text-small text-muted section-note">
+            Only capabilities your own roles include are listed. You cannot grant something you
+            cannot do yourself.
+          </p>
+        }
+      </div>
+    }
+  }
+</div>

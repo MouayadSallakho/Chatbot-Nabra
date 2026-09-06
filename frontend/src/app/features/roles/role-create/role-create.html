@@ -1,0 +1,133 @@
+<div class="page">
+  <app-page-header
+    heading="Create role"
+    description="A role is a named set of things its holders may do in this workspace."
+  >
+    <a pageActions class="btn btn-secondary" routerLink="/roles">Cancel</a>
+  </app-page-header>
+
+  @if (!allowed()) {
+    <div class="page-section">
+      <div class="card">
+        <app-empty-state
+          icon="settings"
+          heading="You cannot create roles"
+          description="Creating a role needs permissions your roles do not include. Ask somebody who administers this workspace if you need them."
+        >
+          <a stateActions class="btn btn-secondary btn-sm" routerLink="/roles">Back to roles</a>
+        </app-empty-state>
+      </div>
+    </div>
+  } @else if (loading()) {
+    <div class="page-section" aria-busy="true">
+      <p class="visually-hidden" role="status">Loading permissions…</p>
+      <div class="card">
+        <span class="skeleton skeleton-title"></span>
+        <span class="skeleton skeleton-text"></span>
+      </div>
+    </div>
+  } @else if (loadFailure(); as error) {
+    <div class="page-section">
+      <div class="card">
+        <app-empty-state
+          icon="alert"
+          tone="error"
+          heading="Could not load permissions"
+          [description]="error.message"
+        >
+          <button stateActions type="button" class="btn btn-secondary btn-sm" (click)="load()">
+            Try again
+          </button>
+        </app-empty-state>
+      </div>
+    </div>
+  } @else {
+    <form [formGroup]="form" (ngSubmit)="create()" novalidate>
+      <div class="page-section">
+        <div class="card role-form">
+          <div class="field">
+            <label class="form-label" for="role-name">Role name</label>
+            <input
+              id="role-name"
+              class="form-control"
+              type="text"
+              formControlName="name"
+              [attr.maxlength]="nameLimit"
+              autocomplete="off"
+            />
+            <p class="form-hint text-small text-muted">
+              Something a colleague would recognise, such as “Support agent”.
+            </p>
+
+            @if (showNameError()) {
+              <p class="form-error" role="alert">A role name is required.</p>
+            }
+          </div>
+        </div>
+      </div>
+
+      <div class="page-section">
+        <h2 class="text-section-title">Permissions</h2>
+        <p class="text-small text-secondary section-note">
+          Tick what somebody holding this role may do. You can change these later, and a role that
+          grants nothing is a valid starting point.
+        </p>
+
+        @for (group of groups(); track group.name) {
+          <fieldset class="card permission-group">
+            <legend class="text-label permission-group-name">{{ group.name }}</legend>
+
+            @for (permission of group.permissions; track permission.code) {
+              <label class="permission-option">
+                <input
+                  type="checkbox"
+                  class="form-check-input"
+                  [checked]="isTicked(permission.code)"
+                  (change)="toggle(permission.code, $any($event.target).checked)"
+                />
+                <span class="permission-option-text">
+                  <span class="permission-label">{{ permission.label }}</span>
+                  <span class="text-small text-muted">{{ permission.description }}</span>
+                </span>
+              </label>
+            }
+          </fieldset>
+        }
+      </div>
+
+      @if (failure(); as error) {
+        <div class="page-section">
+          <p class="alert alert-danger" role="alert">{{ error.message }}</p>
+        </div>
+      }
+
+      <div class="page-section form-actions">
+        <button type="submit" class="btn btn-primary" [disabled]="submitting()">
+          {{ submitting() ? 'Creating…' : 'Create role' }}
+        </button>
+
+        <p class="text-small text-muted" aria-live="polite">
+          @if (selectedCount() === 0) {
+            No permissions selected
+          } @else if (selectedCount() === 1) {
+            1 permission selected
+          } @else {
+            {{ selectedCount() }} permissions selected
+          }
+        </p>
+
+        @if (narrowed()) {
+          <!--
+            Said plainly rather than left as an unexplained short list: somebody
+            who knows the platform has more capabilities should be told why they
+            are not here, not left wondering whether the page failed to load.
+          -->
+          <p class="text-small text-muted">
+            Only capabilities your own roles include are listed. You cannot grant something you
+            cannot do yourself.
+          </p>
+        }
+      </div>
+    </form>
+  }
+</div>

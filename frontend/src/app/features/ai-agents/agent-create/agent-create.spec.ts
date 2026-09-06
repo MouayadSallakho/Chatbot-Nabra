@@ -5,7 +5,8 @@ import { Router, provideRouter } from '@angular/router';
 import { LOCAL_STORAGE } from '@app/core/storage/local-storage';
 import { TenantApi } from '@app/core/api/tenant-api';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
-import { memoryStorage } from '@app/testing/test-doubles';
+import { memoryStorage, permissionApiGranting } from '@app/testing/test-doubles';
+import { PermissionApi } from '@app/core/authorization/permission-api';
 import { AiAgent, AiAgentApi } from '../ai-agent-api';
 import { AgentCreate } from './agent-create';
 
@@ -28,12 +29,16 @@ describe('AgentCreate', () => {
   let http: HttpTestingController;
   let navigated: { url: unknown[]; state: unknown } | null;
 
-  function mount(): void {
+  async function mount(): Promise<void> {
     navigated = null;
 
     TestBed.configureTestingModule({
       imports: [AgentCreate],
       providers: [
+        // Selecting a workspace asks what the reader may do there. Without a
+        // double the request would be left open and every case in this file
+        // would fail on verify() for a reason unrelated to what it asserts.
+        { provide: PermissionApi, useValue: permissionApiGranting('*') },
         provideRouter([]),
         provideHttpClient(),
         provideHttpClientTesting(),
@@ -43,7 +48,7 @@ describe('AgentCreate', () => {
       ],
     });
 
-    TestBed.inject(WorkspaceContextService).adopt({
+    await TestBed.inject(WorkspaceContextService).adopt({
       id: tenantId,
       name: 'Acme Trading',
       slug: 'acme',
@@ -85,7 +90,7 @@ describe('AgentCreate', () => {
   afterEach(() => http.verify());
 
   it('sends nothing until both fields are supplied', async () => {
-    mount();
+    await mount();
 
     submit().click();
     await settle();
@@ -96,7 +101,7 @@ describe('AgentCreate', () => {
   });
 
   it('posts the two fields the reader supplied, and only those', async () => {
-    mount();
+    await mount();
     await fill('Sales Assistant', 'Help customers choose suitable products.');
 
     submit().click();
@@ -117,7 +122,7 @@ describe('AgentCreate', () => {
   });
 
   it('hands the created agent and its entity tag to the editor', async () => {
-    mount();
+    await mount();
     await fill('Sales Assistant', 'Be helpful.');
 
     submit().click();
@@ -130,13 +135,13 @@ describe('AgentCreate', () => {
     // The tag is preserved rather than discarded, so the editor opens ready to
     // save without re-reading what it was just handed.
     expect(navigated?.state).toEqual({
-      'omniai.createdAgent': { agent: created, etag: '"v1"' },
+      'omniai.createdAgent': { value: created, etag: '"v1"' },
     });
   });
 
   it('prevents a second submission while the first is in flight', async () => {
     // Without this, a fast second click creates a second agent.
-    mount();
+    await mount();
     await fill('Sales Assistant', 'Be helpful.');
 
     submit().click();
@@ -156,7 +161,7 @@ describe('AgentCreate', () => {
     // A value the client happily accepts and the Domain does not. This is why
     // the frontend does not try to mirror every rule: the backend stays the
     // authority, and its wording is what the reader sees.
-    mount();
+    await mount();
     await fill('   ', 'Be helpful.');
 
     // Whitespace passes `required` on the raw value, so the request is sent.
@@ -182,7 +187,7 @@ describe('AgentCreate', () => {
   });
 
   it('re-enables the button after a failure so the reader can retry', async () => {
-    mount();
+    await mount();
     await fill('Sales Assistant', 'Be helpful.');
 
     submit().click();
@@ -195,7 +200,7 @@ describe('AgentCreate', () => {
   });
 
   it('counts down the instruction capacity as a platform limit', async () => {
-    mount();
+    await mount();
     await fill('Sales Assistant', 'abc');
 
     expect(host().textContent).toContain('19997 of 20000 characters remaining');
@@ -205,7 +210,7 @@ describe('AgentCreate', () => {
   });
 
   it('never offers a field the backend owns', async () => {
-    mount();
+    await mount();
 
     const editable = [...host().querySelectorAll('input, textarea, select')].map(
       (control) => control.id,

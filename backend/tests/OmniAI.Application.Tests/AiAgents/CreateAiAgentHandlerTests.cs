@@ -1,11 +1,12 @@
-using OmniAI.Application.AiAgents;
 using OmniAI.Application.AiAgents.CreateAiAgent;
+using OmniAI.Application.AiAgents;
+using OmniAI.Application.Concurrency;
 using OmniAI.Application.Tenants;
-using OmniAI.Application.Tests.Tenants;
-using OmniAI.Domain;
 using OmniAI.Application.Tests.Security;
+using OmniAI.Application.Tests.Tenants;
 using OmniAI.Domain.AiAgents;
 using OmniAI.Domain.Tenants;
+using OmniAI.Domain;
 using OmniAI.Testing;
 
 namespace OmniAI.Application.Tests.AiAgents;
@@ -22,12 +23,12 @@ public sealed class CreateAiAgentHandlerTests
         Tenant tenant = SeedTenant(out InMemoryTenantRepository tenants);
         InMemoryAiAgentRepository agents = new();
 
-        VersionedAiAgentView created = await Handler(tenants, agents)
+        Versioned<AiAgentView> created = await Handler(tenants, agents)
             .HandleAsync(new CreateAiAgentCommand(tenant.Id.Value, "Sales Assistant", Instructions));
 
-        Assert.NotEqual(Guid.Empty, created.View.Id);
-        Assert.Equal("Sales Assistant", created.View.Name);
-        Assert.Equal(Instructions, created.View.Instructions);
+        Assert.NotEqual(Guid.Empty, created.Value.Id);
+        Assert.Equal("Sales Assistant", created.Value.Name);
+        Assert.Equal(Instructions, created.Value.Instructions);
     }
 
     [Fact]
@@ -36,12 +37,12 @@ public sealed class CreateAiAgentHandlerTests
         Tenant tenant = SeedTenant(out InMemoryTenantRepository tenants);
         InMemoryAiAgentRepository agents = new();
 
-        VersionedAiAgentView created = await Handler(tenants, agents)
+        Versioned<AiAgentView> created = await Handler(tenants, agents)
             .HandleAsync(new CreateAiAgentCommand(tenant.Id.Value, "Sales Assistant", Instructions));
 
         AiAgent stored = Assert.Single(agents.Stored);
 
-        Assert.Equal(created.View.Id, stored.Id.Value);
+        Assert.Equal(created.Value.Id, stored.Id.Value);
     }
 
     [Fact]
@@ -52,10 +53,10 @@ public sealed class CreateAiAgentHandlerTests
         Tenant tenant = SeedTenant(out InMemoryTenantRepository tenants);
         InMemoryAiAgentRepository agents = new();
 
-        VersionedAiAgentView created = await Handler(tenants, agents)
+        Versioned<AiAgentView> created = await Handler(tenants, agents)
             .HandleAsync(new CreateAiAgentCommand(tenant.Id.Value, "Sales Assistant", Instructions));
 
-        Assert.Equal(AiAgentStatus.Draft, created.View.Status);
+        Assert.Equal(AiAgentStatus.Draft, created.Value.Status);
         Assert.Equal(AiAgentStatus.Draft, agents.Stored[0].Status);
     }
 
@@ -67,10 +68,10 @@ public sealed class CreateAiAgentHandlerTests
         Tenant tenant = SeedTenant(out InMemoryTenantRepository tenants);
         InMemoryAiAgentRepository agents = new();
 
-        VersionedAiAgentView created = await Handler(tenants, agents)
+        Versioned<AiAgentView> created = await Handler(tenants, agents)
             .HandleAsync(new CreateAiAgentCommand(tenant.Id.Value, "Sales Assistant", Instructions));
 
-        Assert.Equal(tenant.Id.Value, created.View.TenantId);
+        Assert.Equal(tenant.Id.Value, created.Value.TenantId);
         Assert.Equal(tenant.Id, agents.Stored[0].TenantId);
     }
 
@@ -205,10 +206,10 @@ public sealed class CreateAiAgentHandlerTests
         Tenant tenant = SeedTenant(out InMemoryTenantRepository tenants);
         InMemoryAiAgentRepository agents = new();
 
-        VersionedAiAgentView created = await Handler(tenants, agents)
+        Versioned<AiAgentView> created = await Handler(tenants, agents)
             .HandleAsync(new CreateAiAgentCommand(tenant.Id.Value, "Sales Assistant", Instructions));
 
-        Assert.Equal(Now, created.View.CreatedAt);
+        Assert.Equal(Now, created.Value.CreatedAt);
     }
 
     [Fact]
@@ -217,10 +218,10 @@ public sealed class CreateAiAgentHandlerTests
         Tenant tenant = SeedTenant(out InMemoryTenantRepository tenants);
         InMemoryAiAgentRepository agents = new();
 
-        VersionedAiAgentView created = await Handler(tenants, agents)
+        Versioned<AiAgentView> created = await Handler(tenants, agents)
             .HandleAsync(new CreateAiAgentCommand(tenant.Id.Value, "Sales Assistant", Instructions));
 
-        Assert.Equal(created.View.CreatedAt, created.View.UpdatedAt);
+        Assert.Equal(created.Value.CreatedAt, created.Value.UpdatedAt);
     }
 
     [Fact]
@@ -231,11 +232,11 @@ public sealed class CreateAiAgentHandlerTests
         Tenant tenant = SeedTenant(out InMemoryTenantRepository tenants);
         InMemoryAiAgentRepository agents = new();
 
-        VersionedAiAgentView created = await Handler(tenants, agents).HandleAsync(
+        Versioned<AiAgentView> created = await Handler(tenants, agents).HandleAsync(
             new CreateAiAgentCommand(tenant.Id.Value, "  Sales Assistant  ", "\n  Be brief.\n  Escalate refunds.  \n"));
 
-        Assert.Equal("Sales Assistant", created.View.Name);
-        Assert.Equal("Be brief.\n  Escalate refunds.", created.View.Instructions);
+        Assert.Equal("Sales Assistant", created.Value.Name);
+        Assert.Equal("Be brief.\n  Escalate refunds.", created.Value.Instructions);
     }
 
     [Fact]
@@ -251,7 +252,7 @@ public sealed class CreateAiAgentHandlerTests
     private static CreateAiAgentHandler Handler(
         InMemoryTenantRepository tenants,
         InMemoryAiAgentRepository agents) =>
-        new(tenants, agents, TestAccess.Anywhere(), new FixedTimeProvider(Now));
+        new(tenants, agents, TestAuthority.Anywhere(), new FixedTimeProvider(Now));
 
     private static Tenant SeedTenant(out InMemoryTenantRepository tenants)
     {

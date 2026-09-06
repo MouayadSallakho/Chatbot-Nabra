@@ -1,14 +1,15 @@
-using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using OmniAI.Application.Ai;
 using OmniAI.Application.AiAgents.Persistence;
+using OmniAI.Application.Authorization.Persistence;
 using OmniAI.Application.Tenants.Persistence;
-using OmniAI.Infrastructure.Ai;
 using OmniAI.Infrastructure.Ai.OpenAi;
-using OmniAI.Infrastructure.Persistence;
+using OmniAI.Infrastructure.Ai;
 using OmniAI.Infrastructure.Persistence.Repositories;
+using OmniAI.Infrastructure.Persistence;
+using System.Globalization;
 
 namespace OmniAI.Infrastructure.DependencyInjection;
 
@@ -70,6 +71,7 @@ public static class InfrastructureServiceCollectionExtensions
 
         services.AddScoped<ITenantRepository, TenantRepository>();
         services.AddScoped<ITenantMembershipRepository, TenantMembershipRepository>();
+        services.AddScoped<ITenantRoleRepository, TenantRoleRepository>();
         services.AddScoped<IAiAgentRepository, AiAgentRepository>();
 
         return services;

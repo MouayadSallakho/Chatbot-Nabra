@@ -49,7 +49,7 @@ internal sealed class AiAgentRepository(OmniAiDbContext context) : IAiAgentRepos
     /// caller can learn anything about another tenant's row from one.
     /// </para>
     /// </remarks>
-    public async Task<VersionedAiAgent?> FindAsync(
+    public async Task<Versioned<AiAgent>?> FindAsync(
         TenantId tenantId,
         AiAgentId agentId,
         CancellationToken cancellationToken = default)
@@ -60,7 +60,7 @@ internal sealed class AiAgentRepository(OmniAiDbContext context) : IAiAgentRepos
                 cancellationToken)
             .ConfigureAwait(false);
 
-        return agent is null ? null : new VersionedAiAgent(agent, CurrentVersion(agent));
+        return agent is null ? null : new Versioned<AiAgent>(agent, CurrentVersion(agent));
     }
 
     /// <summary>

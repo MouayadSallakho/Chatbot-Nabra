@@ -41,6 +41,21 @@ internal static class PersistenceSchema
     public const string MessageIngestionSequenceName = "message_ingestion_sequence";
 
     /// <summary>
+    /// Shadow property holding the case-insensitive form of a role's name, which
+    /// the tenant-scoped unique index is built on.
+    /// </summary>
+    /// <remarks>
+    /// A shadow property rather than a member of <c>TenantRoleName</c>'s mapping,
+    /// because a value converter fills one column and this name needs two: the
+    /// display form a person reads, and the form uniqueness is decided on. The
+    /// role repository sets it from <c>TenantRoleName.Normalised</c> on every
+    /// write, so normalisation has exactly one implementation -- the Domain's --
+    /// rather than one in .NET and a second in PostgreSQL's <c>upper()</c>, which
+    /// are not guaranteed to agree for non-ASCII names under every collation.
+    /// </remarks>
+    public const string NormalisedRoleName = "NormalisedName";
+
+    /// <summary>
     /// PostgreSQL's per-row transaction id system column, used as an optimistic
     /// concurrency token. It already exists on every table; it is never created
     /// by a migration.

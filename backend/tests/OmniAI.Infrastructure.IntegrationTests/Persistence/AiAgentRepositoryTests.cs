@@ -40,11 +40,11 @@ public sealed class AiAgentRepositoryTests(PostgresTestDatabase database)
         }
 
         await using OmniAiDbContext reading = database.CreateContext();
-        VersionedAiAgent? found = await new AiAgentRepository(reading).FindAsync(tenant.Id, agent.Id);
+        Versioned<AiAgent>? found = await new AiAgentRepository(reading).FindAsync(tenant.Id, agent.Id);
 
         Assert.NotNull(found);
-        Assert.Equal(agent.Id, found.Agent.Id);
-        Assert.Equal("Sales Assistant", found.Agent.Name.Value);
+        Assert.Equal(agent.Id, found.Value.Id);
+        Assert.Equal("Sales Assistant", found.Value.Name.Value);
     }
 
     [Fact]
@@ -86,7 +86,7 @@ public sealed class AiAgentRepositoryTests(PostgresTestDatabase database)
         Assert.False(fromAdd.IsEmpty);
 
         await using OmniAiDbContext reading = database.CreateContext();
-        VersionedAiAgent found = await new AiAgentRepository(reading).FindAsync(tenant.Id, agent.Id)
+        Versioned<AiAgent> found = await new AiAgentRepository(reading).FindAsync(tenant.Id, agent.Id)
             ?? throw new InvalidOperationException();
 
         Assert.Equal(fromAdd, found.Version);
@@ -100,10 +100,10 @@ public sealed class AiAgentRepositoryTests(PostgresTestDatabase database)
         (Tenant tenant, AiAgent agent) = await SeedAsync();
 
         await using OmniAiDbContext context = database.CreateContext();
-        VersionedAiAgent found = await new AiAgentRepository(context).FindAsync(tenant.Id, agent.Id)
+        Versioned<AiAgent> found = await new AiAgentRepository(context).FindAsync(tenant.Id, agent.Id)
             ?? throw new InvalidOperationException();
 
-        uint rowVersion = context.Entry(found.Agent).Property<uint>("xmin").CurrentValue;
+        uint rowVersion = context.Entry(found.Value).Property<uint>("xmin").CurrentValue;
 
         foreach (string forbidden in (string[])["xmin", "xid", "postgres", "transaction"])
         {
@@ -125,12 +125,12 @@ public sealed class AiAgentRepositoryTests(PostgresTestDatabase database)
         await using OmniAiDbContext context = database.CreateContext();
         AiAgentRepository repository = new(context);
 
-        VersionedAiAgent loaded = await repository.FindAsync(tenant.Id, agent.Id)
+        Versioned<AiAgent> loaded = await repository.FindAsync(tenant.Id, agent.Id)
             ?? throw new InvalidOperationException();
 
-        loaded.Agent.Rename(AiAgentName.Create("Renamed"), Created.AddHours(1));
+        loaded.Value.Rename(AiAgentName.Create("Renamed"), Created.AddHours(1));
 
-        ConcurrencyToken after = await repository.UpdateAsync(loaded.Agent, loaded.Version);
+        ConcurrencyToken after = await repository.UpdateAsync(loaded.Value, loaded.Version);
 
         Assert.NotEqual(loaded.Version, after);
     }
@@ -145,12 +145,12 @@ public sealed class AiAgentRepositoryTests(PostgresTestDatabase database)
         await using OmniAiDbContext context = database.CreateContext();
         AiAgentRepository repository = new(context);
 
-        VersionedAiAgent loaded = await repository.FindAsync(tenant.Id, agent.Id)
+        Versioned<AiAgent> loaded = await repository.FindAsync(tenant.Id, agent.Id)
             ?? throw new InvalidOperationException();
 
-        loaded.Agent.Activate(Created.AddHours(9));
+        loaded.Value.Activate(Created.AddHours(9));
 
-        Assert.Equal(loaded.Version, await repository.UpdateAsync(loaded.Agent, loaded.Version));
+        Assert.Equal(loaded.Version, await repository.UpdateAsync(loaded.Value, loaded.Version));
     }
 
     [Fact]
@@ -167,30 +167,30 @@ public sealed class AiAgentRepositoryTests(PostgresTestDatabase database)
         await using (OmniAiDbContext first = database.CreateContext())
         {
             AiAgentRepository firstRepository = new(first);
-            VersionedAiAgent loaded = await firstRepository.FindAsync(tenant.Id, agent.Id)
+            Versioned<AiAgent> loaded = await firstRepository.FindAsync(tenant.Id, agent.Id)
                 ?? throw new InvalidOperationException();
 
             stale = loaded.Version;
 
-            loaded.Agent.Rename(AiAgentName.Create("Changed by somebody else"), Created.AddHours(1));
-            await firstRepository.UpdateAsync(loaded.Agent, stale);
+            loaded.Value.Rename(AiAgentName.Create("Changed by somebody else"), Created.AddHours(1));
+            await firstRepository.UpdateAsync(loaded.Value, stale);
         }
 
         await using OmniAiDbContext second = database.CreateContext();
         AiAgentRepository secondRepository = new(second);
 
         // Loads the current row, which is now at a newer version.
-        VersionedAiAgent fresh = await secondRepository.FindAsync(tenant.Id, agent.Id)
+        Versioned<AiAgent> fresh = await secondRepository.FindAsync(tenant.Id, agent.Id)
             ?? throw new InvalidOperationException();
 
         Assert.NotEqual(stale, fresh.Version);
 
-        fresh.Agent.Rename(AiAgentName.Create("Changed from a stale screen"), Created.AddHours(2));
+        fresh.Value.Rename(AiAgentName.Create("Changed from a stale screen"), Created.AddHours(2));
 
         // Presenting the stale version must lose, even though the row in memory is
         // current.
         await Assert.ThrowsAsync<AiAgentVersionMismatchException>(() =>
-            secondRepository.UpdateAsync(fresh.Agent, stale));
+            secondRepository.UpdateAsync(fresh.Value, stale));
 
         object? stored = await database.ExecuteScalarAsync(
             $"SELECT name FROM ai_agents WHERE id = '{agent.Id.Value}'");
@@ -210,13 +210,13 @@ public sealed class AiAgentRepositoryTests(PostgresTestDatabase database)
         await using OmniAiDbContext context = database.CreateContext();
         AiAgentRepository repository = new(context);
 
-        VersionedAiAgent loaded = await repository.FindAsync(tenant.Id, agent.Id)
+        Versioned<AiAgent> loaded = await repository.FindAsync(tenant.Id, agent.Id)
             ?? throw new InvalidOperationException();
 
-        loaded.Agent.Rename(AiAgentName.Create("Renamed"), Created.AddHours(1));
+        loaded.Value.Rename(AiAgentName.Create("Renamed"), Created.AddHours(1));
 
         await Assert.ThrowsAsync<AiAgentVersionMismatchException>(() =>
-            repository.UpdateAsync(loaded.Agent, ConcurrencyToken.From("not-a-real-token")));
+            repository.UpdateAsync(loaded.Value, ConcurrencyToken.From("not-a-real-token")));
 
         object? stored = await database.ExecuteScalarAsync(
             $"SELECT name FROM ai_agents WHERE id = '{agent.Id.Value}'");
@@ -241,17 +241,17 @@ public sealed class AiAgentRepositoryTests(PostgresTestDatabase database)
         await using OmniAiDbContext context = database.CreateContext();
         AiAgentRepository repository = new(context);
 
-        VersionedAiAgent loadedFirst = await repository.FindAsync(tenant.Id, first.Id)
+        Versioned<AiAgent> loadedFirst = await repository.FindAsync(tenant.Id, first.Id)
             ?? throw new InvalidOperationException();
-        VersionedAiAgent loadedSecond = await repository.FindAsync(tenant.Id, second.Id)
+        Versioned<AiAgent> loadedSecond = await repository.FindAsync(tenant.Id, second.Id)
             ?? throw new InvalidOperationException();
 
         Assert.NotEqual(loadedFirst.Version, loadedSecond.Version);
 
-        loadedSecond.Agent.Rename(AiAgentName.Create("Renamed"), Created.AddHours(1));
+        loadedSecond.Value.Rename(AiAgentName.Create("Renamed"), Created.AddHours(1));
 
         await Assert.ThrowsAsync<AiAgentVersionMismatchException>(() =>
-            repository.UpdateAsync(loadedSecond.Agent, loadedFirst.Version));
+            repository.UpdateAsync(loadedSecond.Value, loadedFirst.Version));
     }
 
     // ---------------------------------------------------------- tenant isolation
@@ -362,11 +362,11 @@ public sealed class AiAgentRepositoryTests(PostgresTestDatabase database)
         await using (OmniAiDbContext writing = database.CreateContext())
         {
             AiAgentRepository repository = new(writing);
-            VersionedAiAgent loaded = await repository.FindAsync(tenant.Id, agent.Id)
+            Versioned<AiAgent> loaded = await repository.FindAsync(tenant.Id, agent.Id)
                 ?? throw new InvalidOperationException();
 
-            loaded.Agent.Rename(AiAgentName.Create("Pre-sales Assistant"), Created.AddHours(1));
-            await repository.UpdateAsync(loaded.Agent, loaded.Version);
+            loaded.Value.Rename(AiAgentName.Create("Pre-sales Assistant"), Created.AddHours(1));
+            await repository.UpdateAsync(loaded.Value, loaded.Version);
         }
 
         object? stored = await database.ExecuteScalarAsync(
@@ -387,13 +387,13 @@ public sealed class AiAgentRepositoryTests(PostgresTestDatabase database)
 
         await using OmniAiDbContext context = database.CreateContext(recorded);
         AiAgentRepository repository = new(context);
-        VersionedAiAgent loaded = await repository.FindAsync(tenant.Id, agent.Id)
+        Versioned<AiAgent> loaded = await repository.FindAsync(tenant.Id, agent.Id)
             ?? throw new InvalidOperationException();
 
         recorded.Clear();
 
-        loaded.Agent.Activate(Created.AddHours(9));
-        await repository.UpdateAsync(loaded.Agent, loaded.Version);
+        loaded.Value.Activate(Created.AddHours(9));
+        await repository.UpdateAsync(loaded.Value, loaded.Version);
 
         Assert.DoesNotContain(
             recorded.Statements,
@@ -411,19 +411,19 @@ public sealed class AiAgentRepositoryTests(PostgresTestDatabase database)
         AiAgentRepository firstRepository = new(first);
         AiAgentRepository secondRepository = new(second);
 
-        VersionedAiAgent loadedByFirst = await firstRepository.FindAsync(tenant.Id, agent.Id)
+        Versioned<AiAgent> loadedByFirst = await firstRepository.FindAsync(tenant.Id, agent.Id)
             ?? throw new InvalidOperationException();
-        VersionedAiAgent loadedBySecond = await secondRepository.FindAsync(tenant.Id, agent.Id)
+        Versioned<AiAgent> loadedBySecond = await secondRepository.FindAsync(tenant.Id, agent.Id)
             ?? throw new InvalidOperationException();
 
-        loadedByFirst.Agent.Rename(AiAgentName.Create("Renamed by first"), Created.AddHours(1));
-        await firstRepository.UpdateAsync(loadedByFirst.Agent, loadedByFirst.Version);
+        loadedByFirst.Value.Rename(AiAgentName.Create("Renamed by first"), Created.AddHours(1));
+        await firstRepository.UpdateAsync(loadedByFirst.Value, loadedByFirst.Version);
 
-        loadedBySecond.Agent.Rename(AiAgentName.Create("Renamed by second"), Created.AddHours(2));
+        loadedBySecond.Value.Rename(AiAgentName.Create("Renamed by second"), Created.AddHours(2));
 
         AiAgentVersionMismatchException failure =
             await Assert.ThrowsAsync<AiAgentVersionMismatchException>(() =>
-                secondRepository.UpdateAsync(loadedBySecond.Agent, loadedBySecond.Version));
+                secondRepository.UpdateAsync(loadedBySecond.Value, loadedBySecond.Version));
 
         Assert.Equal(agent.Id.Value, failure.AiAgentId);
         Assert.NotNull(failure.InnerException);

@@ -1,6 +1,8 @@
 using OmniAI.Api.Security;
-using OmniAI.Application.Tenants;
+using OmniAI.Application.Authorization.GetMyTenantPermissions;
 using OmniAI.Application.Tenants.ListMyTenants;
+using OmniAI.Application.Tenants;
+using OmniAI.Domain.Authorization;
 using OmniAI.Domain.Tenants;
 
 namespace OmniAI.Api.Auth;
@@ -30,6 +32,9 @@ internal static class MeEndpoints
 
         me.MapGet("/tenants", ListWorkspacesAsync)
             .WithName("ListMyTenants");
+
+        me.MapGet("/tenants/{tenantId:guid}/permissions", ListMyPermissionsAsync)
+            .WithName("ListMyTenantPermissions");
 
         return endpoints;
     }
@@ -67,6 +72,56 @@ internal static class MeEndpoints
             await handler.HandleAsync(cancellationToken).ConfigureAwait(false);
 
         return Results.Ok(workspaces.Select(ToResponse).ToArray());
+    }
+
+    /// <summary>
+    /// <c>GET /api/me/tenants/{tenantId}/permissions</c>. What this person may do
+    /// in one of their workspaces.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <strong>This is a user-experience input, not a security boundary.</strong>
+    /// The admin application asks it so it can stop offering actions that would be
+    /// refused. A browser can be told anything and the answer can be edited in a
+    /// debugger; every request is authorised again on the server regardless, so a
+    /// client that lied to itself here would see buttons it could press and
+    /// <c>403</c>s when it did.
+    /// </para>
+    /// <para>
+    /// <strong>Membership is enough; no permission is required.</strong>
+    /// Requiring one would be circular -- a member with nothing granted could not
+    /// be told they have nothing granted -- and everything in the answer is a fact
+    /// about the caller, so there is nothing here to withhold from them.
+    /// </para>
+    /// <para>
+    /// <strong>It reports on nobody else.</strong> There is no user parameter and
+    /// no shape of request that names one, so this cannot become a way to
+    /// enumerate a colleague's authority. Which members hold which roles belongs to
+    /// the member-administration phase, and this endpoint deliberately does not
+    /// preview it.
+    /// </para>
+    /// <para>
+    /// An empty array and a <c>404</c> mean genuinely different things: a member
+    /// who has been given no roles yet, and somebody this workspace does not know.
+    /// The second is the same answer every other tenant-scoped route gives a
+    /// non-member.
+    /// </para>
+    /// </remarks>
+    private static async Task<IResult> ListMyPermissionsAsync(
+        Guid tenantId,
+        GetMyTenantPermissionsHandler handler,
+        CancellationToken cancellationToken)
+    {
+        IReadOnlyList<PermissionCode>? permissions = await handler
+            .HandleAsync(new GetMyTenantPermissionsQuery(tenantId), cancellationToken)
+            .ConfigureAwait(false);
+
+        return permissions is null
+            ? Results.Problem(
+                title: "Tenant not found",
+                detail: $"No tenant exists with id '{tenantId}'.",
+                statusCode: StatusCodes.Status404NotFound)
+            : Results.Ok(permissions.Select(code => code.Value).ToArray());
     }
 
     private static WorkspaceResponse ToResponse(TenantView tenant) =>

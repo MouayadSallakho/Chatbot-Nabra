@@ -9,7 +9,8 @@ import {
   WORKSPACE_STORAGE_KEY,
   WorkspaceContextService,
 } from '@app/core/workspace/workspace-context-service';
-import { memoryStorage } from '@app/testing/test-doubles';
+import { memoryStorage, permissionApiGranting } from '@app/testing/test-doubles';
+import { PermissionApi } from '@app/core/authorization/permission-api';
 import { WorkspaceSetup } from './workspace-setup';
 
 /**
@@ -46,6 +47,10 @@ describe('WorkspaceSetup', () => {
     TestBed.configureTestingModule({
       imports: [WorkspaceSetup],
       providers: [
+        // Selecting a workspace asks what the reader may do there. Without a
+        // double the request would be left open and every case in this file
+        // would fail on verify() for a reason unrelated to what it asserts.
+        { provide: PermissionApi, useValue: permissionApiGranting('*') },
         provideRouter([]),
         provideHttpClient(),
         provideHttpClientTesting(),

@@ -3,6 +3,7 @@ import { firstValueFrom } from 'rxjs';
 import { LOCAL_STORAGE, readStored, writeStored } from '@app/core/storage/local-storage';
 import { Tenant, TenantApi } from '@app/core/api/tenant-api';
 import { toApiError } from '@app/core/api/api-error';
+import { PermissionService } from '@app/core/authorization/permission-service';
 
 /** Where the selected workspace id is remembered. */
 export const WORKSPACE_STORAGE_KEY = 'omniai.workspace-tenant-id';
@@ -37,6 +38,7 @@ export type WorkspaceStatus = 'unresolved' | 'loading' | 'ready' | 'none' | 'una
 export class WorkspaceContextService {
   private readonly storage = inject(LOCAL_STORAGE);
   private readonly tenants = inject(TenantApi);
+  private readonly permissions = inject(PermissionService);
 
   private readonly state = signal<WorkspaceStatus>('unresolved');
   private readonly available = signal<readonly Tenant[]>([]);
@@ -129,6 +131,8 @@ export class WorkspaceContextService {
 
     this.state.set(this.selectedId() === null ? 'none' : 'ready');
 
+    await this.resolvePermissions();
+
     return this.state();
   }
 
@@ -140,7 +144,7 @@ export class WorkspaceContextService {
    * there is no path through which a hand-edited id becomes the selection, so no
    * screen can be built on the assumption that one might.
    */
-  select(tenantId: string): boolean {
+  async select(tenantId: string): Promise<boolean> {
     if (!this.available().some((workspace) => workspace.id === tenantId)) {
       return false;
     }
@@ -148,11 +152,13 @@ export class WorkspaceContextService {
     this.rememberSelection(tenantId);
     this.state.set('ready');
 
+    await this.resolvePermissions();
+
     return true;
   }
 
   /** Adopts a freshly created workspace, which the account now belongs to. */
-  adopt(tenant: Tenant): void {
+  async adopt(tenant: Tenant): Promise<void> {
     this.available.update((workspaces) =>
       workspaces.some((workspace) => workspace.id === tenant.id)
         ? workspaces
@@ -161,6 +167,8 @@ export class WorkspaceContextService {
 
     this.rememberSelection(tenant.id);
     this.state.set('ready');
+
+    await this.resolvePermissions();
   }
 
   /**
@@ -175,6 +183,32 @@ export class WorkspaceContextService {
     this.available.set([]);
     this.forgetSelection();
     this.state.set('unresolved');
+    this.permissions.clear();
+  }
+
+  /**
+   * Asks what the signed-in person may do in the selected workspace.
+   *
+   * <strong>Authority is per workspace, so it is resolved with the selection and
+   * discarded when the selection changes.</strong> Keeping a map of every
+   * workspace's permissions would be a cache with no invalidation story, and one
+   * that could show somebody the buttons from the workspace they just left.
+   *
+   * A failure inside `PermissionService` grants nothing rather than
+   * everything, so this is safe to await and ignore: the worst outcome is an
+   * admin that offers no actions, which is recoverable by reloading, rather than
+   * one that offers all of them and collects refusals.
+   */
+  private async resolvePermissions(): Promise<void> {
+    const selected = this.selectedId();
+
+    if (selected === null) {
+      this.permissions.clear();
+
+      return;
+    }
+
+    await this.permissions.load(selected);
   }
 
   private rememberSelection(tenantId: string): void {

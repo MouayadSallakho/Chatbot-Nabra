@@ -4,6 +4,7 @@ import { Router, RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { ApiError, toApiError } from '@app/core/api/api-error';
 import { ToastService } from '@app/core/feedback/toast-service';
+import { PermissionService } from '@app/core/authorization/permission-service';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
 import { Icon } from '@app/shared/icon/icon';
 import { PageHeader } from '@app/shared/page-header/page-header';
@@ -36,6 +37,15 @@ import { AiAgentApi } from '../ai-agent-api';
 export class AgentCreate {
   private readonly api = inject(AiAgentApi);
   private readonly workspace = inject(WorkspaceContextService);
+  private readonly permissions = inject(PermissionService);
+
+  /**
+   * Whether the reader may create an agent.
+   *
+   * The list only offers this page to somebody who can; this is what answers
+   * sensibly when they arrive by typing the URL instead.
+   */
+  protected readonly allowed = computed(() => this.permissions.has('ai-agents.create'));
   private readonly router = inject(Router);
   private readonly toasts = inject(ToastService);
 
@@ -105,14 +115,14 @@ export class AgentCreate {
         }),
       );
 
-      this.toasts.success(`${created.agent.name} created.`);
+      this.toasts.success(`${created.value.name} created.`);
 
       // The created representation and its entity tag are handed to the editor
       // through navigation state, so it can open on canonical server state
       // without a second request. If anything about that handoff is missing the
       // editor simply reads the agent itself, so this is an optimisation rather
       // than something correctness depends on.
-      await this.router.navigate(['/ai-agents', created.agent.id], {
+      await this.router.navigate(['/ai-agents', created.value.id], {
         state: { [CREATED_AGENT_STATE]: created },
       });
     } catch (error) {

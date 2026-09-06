@@ -1,8 +1,9 @@
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 using OmniAI.Application.Ai;
-using OmniAI.Application.AiAgents;
 using OmniAI.Application.AiAgents.ListAiAgents;
+using OmniAI.Application.AiAgents;
+using OmniAI.Application.Authorization;
 using OmniAI.Application.Security;
 using OmniAI.Application.Tenants;
 using OmniAI.Domain;
@@ -209,6 +210,51 @@ internal sealed partial class DomainProblemDetailsHandler(
             StatusCodes.Status412PreconditionFailed,
             "Precondition failed",
             stale.Message),
+
+        // A member of a workspace attempted something their roles do not permit.
+        // 403, and it is the one refusal in this platform that admits the
+        // resource exists -- which is safe precisely because the caller has
+        // already proved they belong to the workspace, so it tells them nothing
+        // they did not know. It buys a person who can act: they can see they need
+        // a permission and ask for it, instead of staring at a resource that
+        // appears to have vanished.
+        //
+        // Never 404 for this case, and never 403 for a non-member. Getting that
+        // pair the wrong way round would either confirm somebody else's workspace
+        // is real or tell a member their own had disappeared.
+        //
+        // The detail names the permission, which is already public -- it is in
+        // the catalogue every role editor reads -- and nothing else: no role name,
+        // no member list, no tenant name and no hint about which record was
+        // addressed.
+        PermissionDeniedException denied => (
+            StatusCodes.Status403Forbidden,
+            "Permission denied",
+            denied.Message),
+
+        // The role is not at the version the caller said it was changing. 412,
+        // for exactly the reasons recorded for the AI agent case: the operation
+        // may be perfectly fine and the caller simply has not seen the role as it
+        // stands, which is the one failure re-reading fixes.
+        //
+        // Deliberately distinct from the two conflicts a role can also produce. A
+        // name collision means choose another name; a protected-role refusal means
+        // that operation will never be allowed on that role. Reporting either as
+        // stale would tell somebody to refresh a screen that refreshing cannot
+        // help.
+        TenantRoleVersionMismatchException staleRole => (
+            StatusCodes.Status412PreconditionFailed,
+            "Precondition failed",
+            staleRole.Message),
+
+        // A role name another role in this workspace already holds. 409, not 412:
+        // two roles cannot share a name however recently the caller read the
+        // workspace, so re-reading and retrying unchanged would fail again. The
+        // caller must choose a different name.
+        TenantRoleNameAlreadyExistsException roleName => (
+            StatusCodes.Status409Conflict,
+            "Role name already exists",
+            roleName.Message),
 
         // A use case that needs a signed-in person was reached without one. 401,
         // never 404: the caller has not yet said who they are, and signing in may

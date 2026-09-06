@@ -1,3 +1,5 @@
+import { Observable, of } from 'rxjs';
+import { PermissionDefinition } from '@app/core/authorization/permission-codes';
 import { MediaQueryFactory } from '@app/core/media/media';
 
 /**
@@ -129,3 +131,87 @@ export function hostileStorage(): Storage {
     setItem: refuse,
   };
 }
+
+/**
+ * A permission client that answers from memory.
+ *
+ * <strong>Every spec that resolves a workspace needs one.</strong> Selecting a
+ * workspace asks the server what the reader may do there, so a spec using
+ * `HttpTestingController` would otherwise end with an unexpected open request
+ * and fail on `verify()` for a reason that has nothing to do with what it
+ * asserts.
+ *
+ * Passing no codes models a member who has been given nothing, which is a real
+ * state rather than an edge case. Passing `'*'` grants everything, for the
+ * specs that are about something other than permissions.
+ */
+export function permissionApiGranting(...codes: readonly string[]): {
+  mine(): Observable<readonly string[]>;
+  catalogue(): Observable<readonly PermissionDefinition[]>;
+} {
+  const granted = codes.includes('*') ? EVERY_PERMISSION.map((entry) => entry.code) : codes;
+
+  return {
+    mine: () => of(granted),
+    catalogue: () => of(EVERY_PERMISSION),
+  };
+}
+
+/**
+ * The catalogue these doubles publish.
+ *
+ * A copy of the platform's own, rather than a fetch of it: a frontend spec must
+ * not depend on the backend being reachable, and the codes are a published
+ * contract that would be a breaking change to alter silently. The API tests are
+ * what prove the two agree.
+ */
+export const EVERY_PERMISSION: readonly PermissionDefinition[] = [
+  {
+    code: 'workspace.view',
+    group: 'Workspace',
+    label: 'View workspace',
+    description: "See the workspace's name and status.",
+  },
+  {
+    code: 'ai-agents.view',
+    group: 'AI agents',
+    label: 'View AI agents',
+    description: "See the workspace's AI agents and read their instructions.",
+  },
+  {
+    code: 'ai-agents.create',
+    group: 'AI agents',
+    label: 'Create AI agents',
+    description: 'Add a new AI agent to the workspace.',
+  },
+  {
+    code: 'ai-agents.edit',
+    group: 'AI agents',
+    label: 'Edit AI agents',
+    description: "Change an AI agent's name and instructions.",
+  },
+  {
+    code: 'ai-agents.lifecycle',
+    group: 'AI agents',
+    label: 'Activate and disable AI agents',
+    description: 'Decide whether an AI agent is live or taken out of service.',
+  },
+  {
+    code: 'ai-agents.preview',
+    group: 'AI agents',
+    label: 'Preview AI agents',
+    description: 'Try an AI agent out with a test message.',
+  },
+  {
+    code: 'roles.view',
+    group: 'Roles and permissions',
+    label: 'View roles',
+    description: "See the workspace's roles and which permissions each one grants.",
+  },
+  {
+    code: 'roles.manage',
+    group: 'Roles and permissions',
+    label: 'Manage roles',
+    description: 'Create custom roles and change their names and permissions.',
+  },
+];

@@ -3,6 +3,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { ApiError, toApiError } from '@app/core/api/api-error';
+import { PermissionService } from '@app/core/authorization/permission-service';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
 import { EmptyState } from '@app/shared/empty-state/empty-state';
 import { Icon } from '@app/shared/icon/icon';
@@ -32,6 +33,19 @@ import { AiAgentApi, AiAgentPage, DEFAULT_PAGE_SIZE } from '../ai-agent-api';
 export class AgentList {
   private readonly api = inject(AiAgentApi);
   private readonly workspace = inject(WorkspaceContextService);
+  private readonly permissions = inject(PermissionService);
+
+  /** Whether this list is the reader's to see at all. */
+  protected readonly canView = computed(() => this.permissions.has('ai-agents.view'));
+
+  /**
+   * Whether to offer creating an agent.
+   *
+   * Hidden rather than disabled: a disabled primary action with no explanation
+   * is a worse answer than no action, and the empty state's copy would be
+   * inviting somebody to do something they cannot.
+   */
+  protected readonly canCreate = computed(() => this.permissions.has('ai-agents.create'));
 
   protected readonly loading = signal(true);
   protected readonly failure = signal<ApiError | null>(null);
@@ -79,6 +93,14 @@ export class AgentList {
       // visibly rather than silently is still better than a request to
       // '/api/tenants/null/ai-agents'.
       this.failure.set({ kind: 'unknown', status: 0, message: 'No workspace is selected.' });
+      this.loading.set(false);
+
+      return;
+    }
+
+    if (!this.canView()) {
+      // Nothing worth asking for. The template explains the refusal rather than
+      // reporting an error from a request that was certain to be refused.
       this.loading.set(false);
 
       return;

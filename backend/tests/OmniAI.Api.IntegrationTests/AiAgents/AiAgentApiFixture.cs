@@ -159,24 +159,44 @@ public class AiAgentApiFixture : IAsyncLifetime
         return await CreateTenantAsync(await CurrentUserIdAsync(owner), name);
     }
 
-    /// <summary>Creates a tenant owned by a known account.</summary>
+    /// <summary>Creates a workspace owned by a known account.</summary>
+    /// <remarks>
+    /// <strong>The Owner role and its assignment are seeded too, and that is not
+    /// incidental.</strong> From Phase 13 a membership grants nothing on its own:
+    /// what may be done inside a workspace comes from the roles the member holds.
+    /// A fixture that wrote only the tenant and the membership would make every
+    /// test in this project fail with 403 for a reason that has nothing to do with
+    /// what it asserts.
+    /// <para>
+    /// It goes through <see cref="NewWorkspace.Create"/> rather than assembling
+    /// the four rows here, so the fixture cannot drift from what production
+    /// provisioning actually writes.
+    /// </para>
+    /// </remarks>
     public async Task<Guid> CreateTenantAsync(Guid ownerUserId, string name = "Acme Trading")
     {
-        Tenant tenant = Tenant.Create(
+        NewWorkspace workspace = NewWorkspace.Create(
             TenantName.Create(name),
-            TenantSlug.Create($"t{Guid.NewGuid():N}"[..20]));
+            TenantSlug.Create($"t{Guid.NewGuid():N}"[..20]),
+            UserId.From(ownerUserId),
+            DateTimeOffset.UtcNow);
 
         await using OmniAiDbContext context = CreateDbContext();
 
-        context.Tenants.Add(tenant);
-        context.TenantMemberships.Add(TenantMembership.Create(
-            UserId.From(ownerUserId),
-            tenant.Id,
-            DateTimeOffset.UtcNow));
+        context.Tenants.Add(workspace.Tenant);
+        context.TenantMemberships.Add(workspace.Membership);
+        context.TenantRoles.Add(workspace.OwnerRole);
+        context.TenantRoleAssignments.Add(workspace.OwnerAssignment);
+
+        // The normalised name is a shadow property the role repository maintains;
+        // this fixture writes rows directly, so it sets it the same way.
+        context.Entry(workspace.OwnerRole)
+            .Property<string>("NormalisedName")
+            .CurrentValue = workspace.OwnerRole.Name.Normalised;
 
         await context.SaveChangesAsync();
 
-        return tenant.Id.Value;
+        return workspace.Tenant.Id.Value;
     }
 
     /// <summary>
@@ -196,6 +216,11 @@ public class AiAgentApiFixture : IAsyncLifetime
 
         await using OmniAiDbContext context = CreateDbContext();
 
+        // Deliberately just the tenant: no membership, no role, no assignment.
+        // The property under test is that a workspace which genuinely exists is
+        // unreachable, and the cleanest way to arrange that is a workspace nobody
+        // belongs to. Seeding a second account and giving it the workspace would
+        // test the same refusal through more machinery.
         context.Tenants.Add(tenant);
         await context.SaveChangesAsync();
 

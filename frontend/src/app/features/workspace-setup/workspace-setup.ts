@@ -135,7 +135,7 @@ export class WorkspaceSetup {
 
   /** Enters one of the account's workspaces. */
   protected async choose(tenant: Tenant): Promise<void> {
-    if (!this.workspace.select(tenant.id)) {
+    if (!(await this.workspace.select(tenant.id))) {
       // Only reachable if the list changed underneath the reader. Reloading is
       // the honest repair: it will either offer the workspace again or explain
       // that it is gone.
@@ -172,7 +172,7 @@ export class WorkspaceSetup {
       // The server made the creator a member in the same transaction, so this
       // workspace is immediately usable. Adopting it locally avoids a second
       // round trip to learn what we already know.
-      this.workspace.adopt(tenant);
+      await this.workspace.adopt(tenant);
 
       await this.router.navigate(['/', HOME_PATH]);
     } catch (error) {

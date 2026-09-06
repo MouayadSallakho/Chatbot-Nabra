@@ -3,7 +3,8 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { LOCAL_STORAGE } from '@app/core/storage/local-storage';
-import { memoryStorage } from '@app/testing/test-doubles';
+import { memoryStorage, permissionApiGranting } from '@app/testing/test-doubles';
+import { PermissionApi } from '@app/core/authorization/permission-api';
 import { Register } from './register';
 
 /** Creating an account, and nothing else. */
@@ -23,6 +24,10 @@ describe('Register', () => {
     TestBed.configureTestingModule({
       imports: [Register],
       providers: [
+        // Signing in resolves the workspace, which asks what the reader may
+        // do there. Without a double that request is left open and every case
+        // in this file fails on verify() for an unrelated reason.
+        { provide: PermissionApi, useValue: permissionApiGranting('*') },
         provideRouter([]),
         provideHttpClient(),
         provideHttpClientTesting(),

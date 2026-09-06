@@ -1,5 +1,6 @@
 using OmniAI.Application.AiAgents.Persistence;
 using OmniAI.Application.Concurrency;
+using OmniAI.Domain.AiAgents;
 
 namespace OmniAI.Application.AiAgents;
 
@@ -43,7 +44,7 @@ internal static class AiAgentConcurrency
     /// Throws unless the stored agent is still at the version the caller expected.
     /// </summary>
     /// <exception cref="AiAgentVersionMismatchException">The versions differ.</exception>
-    public static void RequireExpectedVersion(VersionedAiAgent stored, ConcurrencyToken expected)
+    public static void RequireExpectedVersion(Versioned<AiAgent> stored, ConcurrencyToken expected)
     {
         ArgumentNullException.ThrowIfNull(stored);
 
@@ -51,7 +52,7 @@ internal static class AiAgentConcurrency
         // compares it for ordering, or knows what it is made of.
         if (stored.Version != expected)
         {
-            throw AiAgentVersionMismatchException.ForAgent(stored.Agent.Id.Value);
+            throw AiAgentVersionMismatchException.ForAgent(stored.Value.Id.Value);
         }
     }
 }

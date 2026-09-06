@@ -3,13 +3,26 @@
     heading="AI Agents"
     description="An AI agent answers on your behalf. Its instructions describe how it should reply, and its status controls whether it is in service."
   >
-    @if (hasAgents()) {
+    @if (hasAgents() && canCreate()) {
       <a pageActions class="btn btn-primary" routerLink="/ai-agents/new">Create agent</a>
     }
   </app-page-header>
 
   <div class="page-section">
-    @if (loading()) {
+    @if (!canView()) {
+      <!--
+        The permission-denied state. It says what is true and what to do about
+        it, and deliberately does not say "403", does not name a permission code,
+        and does not imply the account is broken.
+      -->
+      <div class="card">
+        <app-empty-state
+          icon="agents"
+          heading="You do not have access to AI agents"
+          description="Seeing this workspace's AI agents needs a permission your roles do not include. Ask somebody who administers this workspace if you need it."
+        />
+      </div>
+    } @else if (loading()) {
       <!--
         A skeleton shaped like the rows that are coming, so the layout does not
         jump when they arrive. `aria-busy` plus a hidden label is what makes the
@@ -49,9 +62,11 @@
           heading="No agents yet"
           description="An AI agent replies to customers using instructions you write. Create one to describe how it should behave, then preview its answers before putting it in service."
         >
-          <a stateActions class="btn btn-primary btn-sm" routerLink="/ai-agents/new">
-            Create your first agent
-          </a>
+          @if (canCreate()) {
+            <a stateActions class="btn btn-primary btn-sm" routerLink="/ai-agents/new">
+              Create your first agent
+            </a>
+          }
         </app-empty-state>
       </div>
     } @else {

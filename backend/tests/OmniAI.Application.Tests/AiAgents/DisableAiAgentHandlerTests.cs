@@ -24,12 +24,12 @@ public sealed class DisableAiAgentHandlerTests
 
         ConcurrencyToken before = agents.VersionOf(agent);
 
-        VersionedAiAgentView? disabled = await Handler(agents, LaterStill).HandleAsync(
+        Versioned<AiAgentView>? disabled = await Handler(agents, LaterStill).HandleAsync(
             new DisableAiAgentCommand(tenant.Value, agent.Id.Value, before));
 
         Assert.NotNull(disabled);
-        Assert.Equal(AiAgentStatus.Disabled, disabled.View.Status);
-        Assert.Equal(LaterStill, disabled.View.UpdatedAt);
+        Assert.Equal(AiAgentStatus.Disabled, disabled.Value.Status);
+        Assert.Equal(LaterStill, disabled.Value.UpdatedAt);
         Assert.NotEqual(before, disabled.Version);
     }
 
@@ -45,12 +45,12 @@ public sealed class DisableAiAgentHandlerTests
 
         ConcurrencyToken before = agents.VersionOf(agent);
 
-        VersionedAiAgentView again = await Handler(agents, LaterStill.AddHours(1)).HandleAsync(
+        Versioned<AiAgentView> again = await Handler(agents, LaterStill.AddHours(1)).HandleAsync(
             new DisableAiAgentCommand(tenant.Value, agent.Id.Value, before))
             ?? throw new InvalidOperationException();
 
-        Assert.Equal(AiAgentStatus.Disabled, again.View.Status);
-        Assert.Equal(LaterStill, again.View.UpdatedAt);
+        Assert.Equal(AiAgentStatus.Disabled, again.Value.Status);
+        Assert.Equal(LaterStill, again.Value.UpdatedAt);
         Assert.Equal(before, again.Version);
     }
 
@@ -154,12 +154,12 @@ public sealed class DisableAiAgentHandlerTests
             new DisableAiAgentCommand(tenant.Value, agent.Id.Value, agents.VersionOf(agent)));
         agent.Activate(LaterStill.AddHours(1));
 
-        VersionedAiAgentView disabledAgain = await Handler(agents, LaterStill.AddHours(2))
+        Versioned<AiAgentView> disabledAgain = await Handler(agents, LaterStill.AddHours(2))
             .HandleAsync(new DisableAiAgentCommand(
                 tenant.Value, agent.Id.Value, agents.VersionOf(agent)))
             ?? throw new InvalidOperationException();
 
-        Assert.Equal(AiAgentStatus.Disabled, disabledAgain.View.Status);
+        Assert.Equal(AiAgentStatus.Disabled, disabledAgain.Value.Status);
     }
 
     [Fact]
@@ -167,7 +167,7 @@ public sealed class DisableAiAgentHandlerTests
     {
         InMemoryAiAgentRepository agents = new();
 
-        VersionedAiAgentView? disabled = await Handler(agents, Later).HandleAsync(
+        Versioned<AiAgentView>? disabled = await Handler(agents, Later).HandleAsync(
             new DisableAiAgentCommand(Guid.CreateVersion7(), Guid.CreateVersion7(), SomeVersion));
 
         Assert.Null(disabled);
@@ -186,7 +186,7 @@ public sealed class DisableAiAgentHandlerTests
 
         InMemoryAiAgentRepository agents = new InMemoryAiAgentRepository().Seed(agentB);
 
-        VersionedAiAgentView? disabled = await Handler(agents, LaterStill).HandleAsync(
+        Versioned<AiAgentView>? disabled = await Handler(agents, LaterStill).HandleAsync(
             new DisableAiAgentCommand(tenantA.Value, agentB.Id.Value, agents.VersionOf(agentB)));
 
         Assert.Null(disabled);
@@ -205,7 +205,7 @@ public sealed class DisableAiAgentHandlerTests
         AiAgent draftB = GetAiAgentByIdHandlerTests.NewAgent(TenantId.New(), "Tenant B Assistant");
         InMemoryAiAgentRepository agents = new InMemoryAiAgentRepository().Seed(draftB);
 
-        VersionedAiAgentView? disabled = await Handler(agents, Later).HandleAsync(
+        Versioned<AiAgentView>? disabled = await Handler(agents, Later).HandleAsync(
             new DisableAiAgentCommand(tenantA.Value, draftB.Id.Value, agents.VersionOf(draftB)));
 
         Assert.Null(disabled);
@@ -237,5 +237,5 @@ public sealed class DisableAiAgentHandlerTests
     private static DisableAiAgentHandler Handler(
         InMemoryAiAgentRepository agents,
         DateTimeOffset now) =>
-        new(agents, TestAccess.Anywhere(), new FixedTimeProvider(now));
+        new(agents, TestAuthority.Anywhere(), new FixedTimeProvider(now));
 }

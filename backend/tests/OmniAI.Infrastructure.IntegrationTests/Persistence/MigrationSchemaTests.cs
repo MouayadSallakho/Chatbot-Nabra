@@ -78,10 +78,11 @@ public sealed class MigrationSchemaTests(PostgresTestDatabase database)
 
         string[] applied = [.. await context.Database.GetAppliedMigrationsAsync()];
 
-        Assert.Equal(3, applied.Length);
+        Assert.Equal(4, applied.Length);
         Assert.EndsWith("InitialPersistence", applied[0], StringComparison.Ordinal);
         Assert.EndsWith("AddAiAgents", applied[1], StringComparison.Ordinal);
         Assert.EndsWith("AddIdentityAndTenantMemberships", applied[2], StringComparison.Ordinal);
+        Assert.EndsWith("AddTenantRolesAndPermissions", applied[3], StringComparison.Ordinal);
     }
 
     [Fact]

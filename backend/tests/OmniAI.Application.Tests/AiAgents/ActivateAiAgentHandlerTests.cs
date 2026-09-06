@@ -22,12 +22,12 @@ public sealed class ActivateAiAgentHandlerTests
         (TenantId tenant, AiAgent agent, InMemoryAiAgentRepository agents) = Arrange();
         ConcurrencyToken before = agents.VersionOf(agent);
 
-        VersionedAiAgentView? activated = await Handler(agents, Later).HandleAsync(
+        Versioned<AiAgentView>? activated = await Handler(agents, Later).HandleAsync(
             new ActivateAiAgentCommand(tenant.Value, agent.Id.Value, before));
 
         Assert.NotNull(activated);
-        Assert.Equal(AiAgentStatus.Active, activated.View.Status);
-        Assert.Equal(Later, activated.View.UpdatedAt);
+        Assert.Equal(AiAgentStatus.Active, activated.Value.Status);
+        Assert.Equal(Later, activated.Value.UpdatedAt);
         Assert.NotEqual(before, activated.Version);
     }
 
@@ -41,11 +41,11 @@ public sealed class ActivateAiAgentHandlerTests
         // those concepts exists, and no stub stands in for them.
         (TenantId tenant, AiAgent agent, InMemoryAiAgentRepository agents) = Arrange();
 
-        VersionedAiAgentView activated = await Handler(agents, Later).HandleAsync(
+        Versioned<AiAgentView> activated = await Handler(agents, Later).HandleAsync(
             new ActivateAiAgentCommand(tenant.Value, agent.Id.Value, agents.VersionOf(agent)))
             ?? throw new InvalidOperationException();
 
-        Assert.Equal(AiAgentStatus.Active, activated.View.Status);
+        Assert.Equal(AiAgentStatus.Active, activated.Value.Status);
     }
 
     [Fact]
@@ -58,12 +58,12 @@ public sealed class ActivateAiAgentHandlerTests
                 stored.Disable(Created.AddMinutes(2));
             });
 
-        VersionedAiAgentView reactivated = await Handler(agents, LaterStill).HandleAsync(
+        Versioned<AiAgentView> reactivated = await Handler(agents, LaterStill).HandleAsync(
             new ActivateAiAgentCommand(tenant.Value, agent.Id.Value, agents.VersionOf(agent)))
             ?? throw new InvalidOperationException();
 
-        Assert.Equal(AiAgentStatus.Active, reactivated.View.Status);
-        Assert.Equal(LaterStill, reactivated.View.UpdatedAt);
+        Assert.Equal(AiAgentStatus.Active, reactivated.Value.Status);
+        Assert.Equal(LaterStill, reactivated.Value.UpdatedAt);
     }
 
     [Fact]
@@ -77,12 +77,12 @@ public sealed class ActivateAiAgentHandlerTests
 
         ConcurrencyToken before = agents.VersionOf(agent);
 
-        VersionedAiAgentView again = await Handler(agents, LaterStill).HandleAsync(
+        Versioned<AiAgentView> again = await Handler(agents, LaterStill).HandleAsync(
             new ActivateAiAgentCommand(tenant.Value, agent.Id.Value, before))
             ?? throw new InvalidOperationException();
 
-        Assert.Equal(AiAgentStatus.Active, again.View.Status);
-        Assert.Equal(Later, again.View.UpdatedAt);
+        Assert.Equal(AiAgentStatus.Active, again.Value.Status);
+        Assert.Equal(Later, again.Value.UpdatedAt);
         Assert.Equal(before, again.Version);
     }
 
@@ -144,7 +144,7 @@ public sealed class ActivateAiAgentHandlerTests
     {
         InMemoryAiAgentRepository agents = new();
 
-        VersionedAiAgentView? activated = await Handler(agents, Later).HandleAsync(
+        Versioned<AiAgentView>? activated = await Handler(agents, Later).HandleAsync(
             new ActivateAiAgentCommand(Guid.CreateVersion7(), Guid.CreateVersion7(), SomeVersion));
 
         Assert.Null(activated);
@@ -161,7 +161,7 @@ public sealed class ActivateAiAgentHandlerTests
         AiAgent agentB = GetAiAgentByIdHandlerTests.NewAgent(TenantId.New(), "Tenant B Assistant");
         InMemoryAiAgentRepository agents = new InMemoryAiAgentRepository().Seed(agentB);
 
-        VersionedAiAgentView? activated = await Handler(agents, Later).HandleAsync(
+        Versioned<AiAgentView>? activated = await Handler(agents, Later).HandleAsync(
             new ActivateAiAgentCommand(tenantA.Value, agentB.Id.Value, agents.VersionOf(agentB)));
 
         Assert.Null(activated);
@@ -195,5 +195,5 @@ public sealed class ActivateAiAgentHandlerTests
     private static ActivateAiAgentHandler Handler(
         InMemoryAiAgentRepository agents,
         DateTimeOffset now) =>
-        new(agents, TestAccess.Anywhere(), new FixedTimeProvider(now));
+        new(agents, TestAuthority.Anywhere(), new FixedTimeProvider(now));
 }

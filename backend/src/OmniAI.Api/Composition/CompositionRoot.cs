@@ -8,10 +8,18 @@ using OmniAI.Application.AiAgents.ListAiAgents;
 using OmniAI.Application.AiAgents.PreviewAiAgent;
 using OmniAI.Application.AiAgents.RenameAiAgent;
 using OmniAI.Application.AiAgents.UpdateAiAgentInstructions;
+using OmniAI.Application.Authorization.CreateTenantRole;
+using OmniAI.Application.Authorization.GetMyTenantPermissions;
+using OmniAI.Application.Authorization.GetPermissionCatalog;
+using OmniAI.Application.Authorization.GetTenantRoleById;
+using OmniAI.Application.Authorization.ListTenantRoles;
+using OmniAI.Application.Authorization.RenameTenantRole;
+using OmniAI.Application.Authorization.ReplaceTenantRolePermissions;
+using OmniAI.Application.Authorization;
 using OmniAI.Application.Tenants.CreateTenant;
-using OmniAI.Application.Tenants;
 using OmniAI.Application.Tenants.GetTenantById;
 using OmniAI.Application.Tenants.ListMyTenants;
+using OmniAI.Application.Tenants;
 using OmniAI.Infrastructure.DependencyInjection;
 using OmniAI.Infrastructure.Time;
 
@@ -27,7 +35,9 @@ namespace OmniAI.Api.Composition;
 /// Every registration is explicit. No assembly scanning, no reflection-based
 /// handler discovery and no mediator: a scanner would replace a readable list
 /// with a convention that has to be learned, and would happily register or miss
-/// a type without anyone noticing. Eleven handlers is still a list worth reading.
+/// a type without anyone noticing. Eighteen handlers is still a list worth
+/// reading -- and the day it is not, an explicit list that has grown too long is
+/// a better problem than a convention nobody can audit.
 /// </para>
 /// </remarks>
 internal static class CompositionRoot
@@ -98,10 +108,28 @@ internal static class CompositionRoot
         services.AddScoped<GetTenantByIdHandler>();
         services.AddScoped<ListMyTenantsHandler>();
 
-        // The membership check every tenant-scoped use case runs. Scoped, like
-        // the handlers that hold it, so it shares the request's DbContext and
-        // its view of the current principal.
+        // The two halves of the authorization boundary. The guard answers "does
+        // this person belong to this workspace"; the authorizer adds "and may
+        // they do this", composing the guard with the roles they hold. Both are
+        // scoped, like the handlers that hold them, so they share the request's
+        // DbContext and its view of the current principal.
+        //
+        // Registered as concrete types with no interface between them, which is
+        // deliberate: nothing substitutes either at runtime, and an interface
+        // would make it possible to register a permissive implementation by
+        // accident -- for the authorizer, that is a platform-wide authorization
+        // bypass in one line.
         services.AddScoped<TenantAccessGuard>();
+        services.AddScoped<TenantAuthorizer>();
+
+        // Role administration.
+        services.AddScoped<ListTenantRolesHandler>();
+        services.AddScoped<GetTenantRoleByIdHandler>();
+        services.AddScoped<CreateTenantRoleHandler>();
+        services.AddScoped<RenameTenantRoleHandler>();
+        services.AddScoped<ReplaceTenantRolePermissionsHandler>();
+        services.AddScoped<GetPermissionCatalogHandler>();
+        services.AddScoped<GetMyTenantPermissionsHandler>();
         services.AddScoped<CreateAiAgentHandler>();
         services.AddScoped<GetAiAgentByIdHandler>();
         services.AddScoped<ListAiAgentsHandler>();

@@ -1,5 +1,6 @@
 using OmniAI.Application.Tenants;
 using OmniAI.Application.Tenants.Persistence;
+using OmniAI.Domain.Authorization;
 using OmniAI.Domain.Tenants;
 using OmniAI.Domain.Users;
 
@@ -24,6 +25,8 @@ internal sealed class InMemoryTenantRepository : ITenantRepository
 {
     private readonly List<Tenant> _stored = [];
     private readonly List<TenantMembership> _memberships = [];
+    private readonly List<TenantRole> _ownerRoles = [];
+    private readonly List<TenantRoleAssignment> _ownerAssignments = [];
 
     /// <summary>Tenants currently stored, in insertion order.</summary>
     public IReadOnlyList<Tenant> Stored => _stored;
@@ -35,6 +38,18 @@ internal sealed class InMemoryTenantRepository : ITenantRepository
     /// rejected creation left neither row behind.
     /// </remarks>
     public IReadOnlyList<TenantMembership> Memberships => _memberships;
+
+    /// <summary>Owner roles created, in insertion order.</summary>
+    /// <remarks>
+    /// Exposed so a test can assert that provisioning made one -- and that a
+    /// rejected creation left none. A workspace with no Owner has no full
+    /// authority in it and no way to acquire one, since no caller can mint a
+    /// system role.
+    /// </remarks>
+    public IReadOnlyList<TenantRole> OwnerRoles => _ownerRoles;
+
+    /// <summary>Owner assignments created, in insertion order.</summary>
+    public IReadOnlyList<TenantRoleAssignment> OwnerAssignments => _ownerAssignments;
 
     /// <summary>How many times <see cref="AddAsync"/> was called.</summary>
     public int AddAttempts { get; private set; }
@@ -61,43 +76,41 @@ internal sealed class InMemoryTenantRepository : ITenantRepository
     }
 
     /// <summary>
-    /// Stores the tenant and its membership, or neither.
+    /// Stores the whole workspace, or none of it.
     /// </summary>
     /// <remarks>
     /// The all-or-nothing behaviour is reproduced rather than assumed: the
-    /// conflict is raised before either list is touched, so a test can assert
-    /// that a losing creation leaves no orphan membership without needing a
-    /// database to prove it. The real transaction is proven separately, against
-    /// PostgreSQL.
+    /// conflict is raised before any list is touched, so a test can assert that a
+    /// losing creation leaves no orphan membership, role or assignment without
+    /// needing a database to prove it. The real transaction is proven separately,
+    /// against PostgreSQL.
+    /// <para>
+    /// There is no consistency check here any more, and its absence is the point.
+    /// Phase 12's version verified that the membership named the tenant being
+    /// created, because two loose arguments could disagree. <c>NewWorkspace</c>
+    /// derives all four rows from the tenant and the creator, so a mismatched set
+    /// cannot be built and there is nothing left for a fake to catch.
+    /// </para>
     /// </remarks>
     public Task AddAsync(
-        Tenant tenant,
-        TenantMembership membership,
+        NewWorkspace workspace,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(tenant);
-        ArgumentNullException.ThrowIfNull(membership);
+        ArgumentNullException.ThrowIfNull(workspace);
 
         AddAttempts++;
 
-        // The real repository refuses a mismatched pair before writing, and so
-        // does this: a fake that accepted one would let a handler defect through.
-        if (membership.TenantId != tenant.Id)
-        {
-            throw new ArgumentException(
-                "The membership must name the tenant being created.",
-                nameof(membership));
-        }
-
         // Stands in for the unique index: the store, not the caller, is the
         // authority on whether a slug is taken.
-        if (ContainsSlug(tenant.Slug))
+        if (ContainsSlug(workspace.Tenant.Slug))
         {
-            throw TenantSlugAlreadyExistsException.ForSlug(tenant.Slug.Value);
+            throw TenantSlugAlreadyExistsException.ForSlug(workspace.Tenant.Slug.Value);
         }
 
-        _stored.Add(tenant);
-        _memberships.Add(membership);
+        _stored.Add(workspace.Tenant);
+        _memberships.Add(workspace.Membership);
+        _ownerRoles.Add(workspace.OwnerRole);
+        _ownerAssignments.Add(workspace.OwnerAssignment);
 
         return Task.CompletedTask;
     }

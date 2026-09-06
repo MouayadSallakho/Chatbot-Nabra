@@ -58,6 +58,20 @@
       </div>
     }
 
+    @if (!canEdit()) {
+      <!--
+        One explanation for the whole editor, rather than a note beside every
+        control. The fields stay readable because somebody with view access came
+        here to read them; what changes is that nothing can be saved.
+      -->
+      <div class="page-section">
+        <p class="alert alert-info" role="status">
+          You can read this agent's configuration but not change it. Editing needs a permission your
+          roles do not include.
+        </p>
+      </div>
+    }
+
     <div class="editor">
       <div class="editor-main">
         <!-- ------------------------------------------------------ identity -->
@@ -73,6 +87,7 @@
                 class="input"
                 type="text"
                 [formControl]="name"
+                [attr.readonly]="canEdit() ? null : ''"
                 autocomplete="off"
                 [attr.maxlength]="limits.nameMax"
                 [attr.aria-invalid]="name.invalid ? 'true' : null"
@@ -125,6 +140,7 @@
                 id="agent-instructions"
                 class="textarea instructions-input"
                 [formControl]="instructions"
+                [attr.readonly]="canEdit() ? null : ''"
                 rows="14"
                 [attr.maxlength]="limits.instructionsMax"
                 [attr.aria-invalid]="instructions.invalid ? 'true' : null"
@@ -208,8 +224,18 @@
               showing an action that is guaranteed to be refused invites a click
               and teaches the reader that this product's buttons do not work.
             -->
+            @if (!canChangeLifecycle()) {
+              <p class="text-small text-muted">
+                Putting this agent in or out of service needs a permission your roles do not
+                include.
+              </p>
+            }
+
             <div class="section-actions">
-              @if (current.status === 'Active') {
+              @if (!canChangeLifecycle()) {
+                <!-- No control at all. A disabled primary button with no reason
+                     beside it reads as a fault rather than a rule. -->
+              } @else if (current.status === 'Active') {
                 <button
                   type="button"
                   class="btn btn-danger btn-sm"
@@ -237,11 +263,31 @@
           </div>
         </section>
 
-        <app-agent-preview
-          [tenantId]="tenantId()"
-          [aiAgentId]="aiAgentId()"
-          [unsavedInstructions]="instructionsChanged()"
-        />
+        <!--
+          The preview panel is the one place a request reaches a paid third
+          party, so it has a permission of its own. Without it the panel is
+          replaced by an explanation rather than shown disabled: a text box that
+          refuses to send is more confusing than no text box.
+        -->
+        @if (canPreview()) {
+          <app-agent-preview
+            [tenantId]="tenantId()"
+            [aiAgentId]="aiAgentId()"
+            [unsavedInstructions]="instructionsChanged()"
+          />
+        } @else {
+          <section class="card" aria-labelledby="preview-unavailable-heading">
+            <div class="card-header">
+              <h2 id="preview-unavailable-heading" class="text-card-title">Preview</h2>
+            </div>
+            <div class="card-body">
+              <p class="text-small text-secondary">
+                Trying this agent out needs a permission your roles do not include. Ask somebody who
+                administers this workspace if you need it.
+              </p>
+            </div>
+          </section>
+        }
       </div>
     </div>
 

@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using OmniAI.Domain.AiAgents;
+using OmniAI.Domain.Authorization;
 using OmniAI.Domain.Conversations;
 using OmniAI.Domain.Tenants;
 using OmniAI.Domain.Users;
@@ -48,10 +49,22 @@ public sealed class OmniAiDbContext(DbContextOptions<OmniAiDbContext> options)
     public DbSet<Tenant> Tenants => Set<Tenant>();
 
     /// <summary>
-    /// Which people belong to which tenants: the platform's authorization
-    /// boundary, as rows.
+    /// Which people belong to which tenants: the first half of the platform's
+    /// authorization boundary, as rows.
     /// </summary>
     public DbSet<TenantMembership> TenantMemberships => Set<TenantMembership>();
+
+    /// <summary>
+    /// The roles each tenant can hand out, including its protected Owner.
+    /// </summary>
+    public DbSet<TenantRole> TenantRoles => Set<TenantRole>();
+
+    /// <summary>
+    /// Which members hold which roles: the second half of the authorization
+    /// boundary. Membership says whether somebody may reach a workspace; this
+    /// says what they may do inside it.
+    /// </summary>
+    public DbSet<TenantRoleAssignment> TenantRoleAssignments => Set<TenantRoleAssignment>();
 
     public DbSet<Conversation> Conversations => Set<Conversation>();
 

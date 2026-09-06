@@ -1,5 +1,7 @@
 using OmniAI.Application.AiAgents.Persistence;
+using OmniAI.Application.Authorization;
 using OmniAI.Application.Tenants;
+using OmniAI.Domain.Authorization;
 using OmniAI.Domain.Tenants;
 
 namespace OmniAI.Application.AiAgents.ListAiAgents;
@@ -14,13 +16,13 @@ namespace OmniAI.Application.AiAgents.ListAiAgents;
 /// surface invented before its first real requirement is a surface that has to
 /// be supported before anybody knows whether it was right.
 /// </remarks>
-public sealed class ListAiAgentsHandler(IAiAgentRepository agents, TenantAccessGuard access)
+public sealed class ListAiAgentsHandler(IAiAgentRepository agents, TenantAuthorizer authorizer)
 {
     private readonly IAiAgentRepository _agents =
         agents ?? throw new ArgumentNullException(nameof(agents));
 
-    private readonly TenantAccessGuard _access =
-        access ?? throw new ArgumentNullException(nameof(access));
+    private readonly TenantAuthorizer _authorizer =
+        authorizer ?? throw new ArgumentNullException(nameof(authorizer));
 
     /// <summary>Reads the page.</summary>
     /// <returns>
@@ -77,12 +79,20 @@ public sealed class ListAiAgentsHandler(IAiAgentRepository agents, TenantAccessG
 
         TenantId tenantId = TenantId.From(query.TenantId);
 
-        // A page is not a nullable thing, so this use case reports the refusal the
-        // only other way a not-found can travel out of the Application: the same
+        // A page is not a nullable thing, so a non-member is refused the only
+        // other way a not-found can travel out of the Application: the same
         // exception a create would raise for a tenant that is not there. The API
         // turns both into the same 404, so the two are indistinguishable on the
         // wire as well as here.
-        if (!await _access.IsCurrentUserMemberAsync(tenantId, cancellationToken).ConfigureAwait(false))
+        //
+        // A member without ai-agents.view leaves by the other door -- RequireAsync
+        // throws, and the API answers 403. That difference is intended: they have
+        // already proved they belong here, so telling them their own workspace had
+        // vanished would be a lie, and telling them which permission is missing is
+        // something they can act on.
+        if (!await _authorizer
+            .RequireAsync(tenantId, PlatformPermissions.AiAgentsView, cancellationToken)
+            .ConfigureAwait(false))
         {
             throw TenantNotFoundException.ForId(tenantId.Value);
         }

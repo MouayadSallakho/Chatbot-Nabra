@@ -339,8 +339,7 @@ public sealed class CreateTenantHandlerTests
         }
 
         public Task AddAsync(
-            Tenant tenant,
-            TenantMembership membership,
+            NewWorkspace workspace,
             CancellationToken cancellationToken = default)
         {
             SawToken = true;

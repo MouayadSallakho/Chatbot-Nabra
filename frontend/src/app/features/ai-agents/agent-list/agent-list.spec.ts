@@ -5,7 +5,8 @@ import { provideRouter } from '@angular/router';
 import { LOCAL_STORAGE } from '@app/core/storage/local-storage';
 import { TenantApi } from '@app/core/api/tenant-api';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
-import { memoryStorage } from '@app/testing/test-doubles';
+import { memoryStorage, permissionApiGranting } from '@app/testing/test-doubles';
+import { PermissionApi } from '@app/core/authorization/permission-api';
 import { AiAgentApi, AiAgentSummary } from '../ai-agent-api';
 import { AgentList } from './agent-list';
 
@@ -28,10 +29,14 @@ describe('AgentList', () => {
   let fixture: ComponentFixture<AgentList>;
   let http: HttpTestingController;
 
-  function mount(): void {
+  async function mount(): Promise<void> {
     TestBed.configureTestingModule({
       imports: [AgentList],
       providers: [
+        // Selecting a workspace asks what the reader may do there. Without a
+        // double the request would be left open and every case in this file
+        // would fail on verify() for a reason unrelated to what it asserts.
+        { provide: PermissionApi, useValue: permissionApiGranting('*') },
         provideRouter([]),
         provideHttpClient(),
         provideHttpClientTesting(),
@@ -41,7 +46,7 @@ describe('AgentList', () => {
       ],
     });
 
-    TestBed.inject(WorkspaceContextService).adopt({
+    await TestBed.inject(WorkspaceContextService).adopt({
       id: tenantId,
       name: 'Acme Trading',
       slug: 'acme',
@@ -75,8 +80,8 @@ describe('AgentList', () => {
 
   afterEach(() => http.verify());
 
-  it('asks for the first page of the current workspace', () => {
-    mount();
+  it('asks for the first page of the current workspace', async () => {
+    await mount();
 
     const request = http.expectOne((candidate) => candidate.url === agentsUrl);
 
@@ -86,7 +91,7 @@ describe('AgentList', () => {
   });
 
   it('shows a busy state while loading, announced rather than silent', async () => {
-    mount();
+    await mount();
 
     expect(host().querySelector('[aria-busy="true"]')).not.toBeNull();
     expect(host().textContent).toContain('Loading agents');
@@ -100,7 +105,7 @@ describe('AgentList', () => {
   it('explains what an agent is when there are none, and offers the first step', async () => {
     // Not "No data". Somebody who has never seen this product needs to know what
     // the thing is before they can want one.
-    mount();
+    await mount();
 
     expectList().flush({ items: [], page: 1, pageSize: 20, totalCount: 0 });
     await settle();
@@ -114,7 +119,7 @@ describe('AgentList', () => {
   });
 
   it('lists the agents with their status and last change', async () => {
-    mount();
+    await mount();
 
     expectList().flush({
       items: [
@@ -134,7 +139,7 @@ describe('AgentList', () => {
   });
 
   it('shows each status as a badge carrying its own word, not colour alone', async () => {
-    mount();
+    await mount();
 
     expectList().flush({
       items: [summary({ status: 'Active' })],
@@ -151,7 +156,7 @@ describe('AgentList', () => {
   });
 
   it('links each row to that agent', async () => {
-    mount();
+    await mount();
 
     const agent = summary();
 
@@ -165,7 +170,7 @@ describe('AgentList', () => {
     // The list endpoint does not return instructions. This is the guard against
     // the other half of that contract: a template that would happily display
     // them if a future change started sending them.
-    mount();
+    await mount();
 
     const secret = 'Never quote a discount above fifteen percent.';
 
@@ -182,7 +187,7 @@ describe('AgentList', () => {
   });
 
   it('does not put identifiers on screen as primary content', async () => {
-    mount();
+    await mount();
 
     const agent = summary();
 
@@ -194,7 +199,7 @@ describe('AgentList', () => {
   });
 
   it('reports a failed load and offers a retry that actually refetches', async () => {
-    mount();
+    await mount();
 
     expectList().flush({}, { status: 500, statusText: 'Server Error' });
     await settle();
@@ -216,7 +221,7 @@ describe('AgentList', () => {
   });
 
   it('shows no raw server internals when a load fails', async () => {
-    mount();
+    await mount();
 
     expectList().flush(
       { detail: 'Npgsql.PostgresException: relation "ai_agents" does not exist' },
@@ -230,7 +235,7 @@ describe('AgentList', () => {
 
   describe('pagination', () => {
     async function loadTwoPages(): Promise<void> {
-      mount();
+      await mount();
 
       expectList().flush({
         items: [summary(), summary()],
@@ -279,7 +284,7 @@ describe('AgentList', () => {
     });
 
     it('offers no pager when everything fits on one page', async () => {
-      mount();
+      await mount();
 
       expectList().flush({ items: [summary()], page: 1, pageSize: 20, totalCount: 1 });
       await settle();
@@ -290,7 +295,7 @@ describe('AgentList', () => {
   });
 
   it('offers a create action once the list has agents', async () => {
-    mount();
+    await mount();
 
     expectList().flush({ items: [summary()], page: 1, pageSize: 20, totalCount: 1 });
     await settle();

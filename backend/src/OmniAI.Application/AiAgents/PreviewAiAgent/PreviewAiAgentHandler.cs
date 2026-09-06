@@ -1,7 +1,10 @@
 using OmniAI.Application.Ai;
 using OmniAI.Application.AiAgents.Persistence;
+using OmniAI.Application.Authorization;
+using OmniAI.Application.Concurrency;
 using OmniAI.Application.Tenants;
 using OmniAI.Domain.AiAgents;
+using OmniAI.Domain.Authorization;
 using OmniAI.Domain.Tenants;
 
 namespace OmniAI.Application.AiAgents.PreviewAiAgent;
@@ -33,14 +36,14 @@ namespace OmniAI.Application.AiAgents.PreviewAiAgent;
 /// </remarks>
 public sealed class PreviewAiAgentHandler(
     IAiAgentRepository agents,
-    TenantAccessGuard access,
+    TenantAuthorizer authorizer,
     IAiTextGenerator generator)
 {
     private readonly IAiAgentRepository _agents =
         agents ?? throw new ArgumentNullException(nameof(agents));
 
-    private readonly TenantAccessGuard _access =
-        access ?? throw new ArgumentNullException(nameof(access));
+    private readonly TenantAuthorizer _authorizer =
+        authorizer ?? throw new ArgumentNullException(nameof(authorizer));
 
     private readonly IAiTextGenerator _generator =
         generator ?? throw new ArgumentNullException(nameof(generator));
@@ -92,20 +95,26 @@ public sealed class PreviewAiAgentHandler(
         // typed, rather than by a provider rejecting it later in its own words.
         AiTurn question = AiTurn.FromUser(command.Message);
 
-        // Membership before anything that costs money. This endpoint is the one
-        // place in the platform where a request reaches a paid third party, so a
-        // caller outside the tenant must be stopped here -- not merely denied the
-        // answer afterwards. Nothing below this line runs for a non-member: the
-        // agent is never read, its instructions are never loaded, and the
-        // generator is never called, so somebody else's workspace cannot be used
-        // to spend this deployment's provider budget or to have its instructions
-        // inferred from a reply.
-        if (!await _access.IsCurrentUserMemberAsync(tenantId, cancellationToken).ConfigureAwait(false))
+        // Authorisation before anything that costs money. This endpoint is the
+        // one place in the platform where a request reaches a paid third party,
+        // which is why previewing has a permission of its own rather than riding
+        // on the one that reads an agent: a workspace that wants to bound its
+        // provider spend needs to be able to withhold exactly this.
+        //
+        // Nothing below this line runs for a caller who fails here -- non-member
+        // or member without ai-agents.preview alike. The agent is never read, its
+        // instructions are never loaded, and the generator is never constructed
+        // or called. So neither somebody else's workspace nor a permission
+        // somebody was not given can be used to spend this deployment's provider
+        // budget, or to have an agent's instructions inferred from a reply.
+        if (!await _authorizer
+            .RequireAsync(tenantId, PlatformPermissions.AiAgentsPreview, cancellationToken)
+            .ConfigureAwait(false))
         {
             return null;
         }
 
-        VersionedAiAgent? stored = await _agents
+        Versioned<AiAgent>? stored = await _agents
             .FindAsync(tenantId, agentId, cancellationToken)
             .ConfigureAwait(false);
 
@@ -120,7 +129,7 @@ public sealed class PreviewAiAgentHandler(
         // this tenant, and from nowhere else. The command has no field that could
         // contribute to them.
         AiTextGenerationRequest request = AiTextGenerationRequest.Create(
-            stored.Agent.Instructions.Value,
+            stored.Value.Instructions.Value,
             [question]);
 
         AiTextGenerationResult result = await _generator

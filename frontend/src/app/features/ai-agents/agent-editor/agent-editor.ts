@@ -14,13 +14,15 @@ import { firstValueFrom } from 'rxjs';
 import { ApiError, toApiError } from '@app/core/api/api-error';
 import { ConfirmDialog } from '@app/core/feedback/confirm-dialog';
 import { ToastService } from '@app/core/feedback/toast-service';
+import { PermissionService } from '@app/core/authorization/permission-service';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
 import { EmptyState } from '@app/shared/empty-state/empty-state';
 import { Icon } from '@app/shared/icon/icon';
 import { PageHeader } from '@app/shared/page-header/page-header';
 import { AgentPreview } from './agent-preview';
 import { AGENT_LIMITS, CREATED_AGENT_STATE } from '../ai-agent-limits';
-import { AiAgent, AiAgentApi, VersionedAiAgent } from '../ai-agent-api';
+import { AiAgent, AiAgentApi } from '../ai-agent-api';
+import { Versioned } from '@app/core/api/versioned';
 
 /** Which save ran into a stale version. */
 type ConflictSource = 'name' | 'instructions' | 'lifecycle';
@@ -65,6 +67,7 @@ type ConflictSource = 'name' | 'instructions' | 'lifecycle';
 export class AgentEditor implements OnInit {
   private readonly api = inject(AiAgentApi);
   private readonly workspace = inject(WorkspaceContextService);
+  private readonly permissions = inject(PermissionService);
   private readonly toasts = inject(ToastService);
   private readonly router = inject(Router);
 
@@ -131,7 +134,32 @@ export class AgentEditor implements OnInit {
   );
 
   /** True while the screen has no usable version to write against. */
-  protected readonly cannotSave = computed(() => this.etag() === null);
+  /**
+   * Whether the reader may change this agent's name or instructions.
+   *
+   * Without it the fields become read-only rather than disappearing: somebody
+   * with `ai-agents.view` is entitled to read an agent's configuration, and
+   * hiding the text they came to read would be worse than showing it plainly.
+   */
+  protected readonly canEdit = computed(() => this.permissions.has('ai-agents.edit'));
+
+  /** Whether the reader may put this agent in or out of service. */
+  protected readonly canChangeLifecycle = computed(() =>
+    this.permissions.has('ai-agents.lifecycle'),
+  );
+
+  /** Whether to offer the preview panel at all. */
+  protected readonly canPreview = computed(() => this.permissions.has('ai-agents.preview'));
+
+  /**
+   * Whether a conditional write is possible.
+   *
+   * Two independent reasons it might not be: there is no entity tag to present,
+   * or the reader does not hold the editing permission. Both disable the same
+   * controls, so they are combined -- but the template distinguishes them, since
+   * "not yet loaded" and "not yours to change" need different words.
+   */
+  protected readonly cannotSave = computed(() => this.etag() === null || !this.canEdit());
 
   protected readonly tenantId = computed(() => this.workspace.tenantId() ?? '');
 
@@ -143,7 +171,7 @@ export class AgentEditor implements OnInit {
    */
   private readonly handedOver = this.router.currentNavigation()?.extras.state?.[
     CREATED_AGENT_STATE
-  ] as VersionedAiAgent | undefined;
+  ] as Versioned<AiAgent> | undefined;
 
   constructor() {
     this.name.valueChanges.subscribe((value) => this.nameValue.set(value));
@@ -383,20 +411,20 @@ export class AgentEditor implements OnInit {
     try {
       const current = await firstValueFrom(this.api.get(this.tenantId(), this.aiAgentId()));
 
-      this.agent.set(current.agent);
+      this.agent.set(current.value);
       this.etag.set(current.etag);
 
       // Only fields the reader is not editing are refreshed. Overwriting an
       // in-progress edit because a background read completed is exactly the
       // behaviour the conflict handling exists to avoid.
       if (!this.nameChanged()) {
-        this.name.setValue(current.agent.name, { emitEvent: false });
-        this.nameValue.set(current.agent.name);
+        this.name.setValue(current.value.name, { emitEvent: false });
+        this.nameValue.set(current.value.name);
       }
 
       if (!this.instructionsChanged()) {
-        this.instructions.setValue(current.agent.instructions, { emitEvent: false });
-        this.instructionsValue.set(current.agent.instructions);
+        this.instructions.setValue(current.value.instructions, { emitEvent: false });
+        this.instructionsValue.set(current.value.instructions);
       }
     } catch {
       // A failed background refresh is not worth interrupting the reader for.
@@ -405,14 +433,14 @@ export class AgentEditor implements OnInit {
   }
 
   /** Takes a server representation as the new canonical state. */
-  private adopt(versioned: VersionedAiAgent): void {
-    this.agent.set(versioned.agent);
+  private adopt(versioned: Versioned<AiAgent>): void {
+    this.agent.set(versioned.value);
     this.etag.set(versioned.etag);
 
-    this.name.setValue(versioned.agent.name, { emitEvent: false });
-    this.nameValue.set(versioned.agent.name);
+    this.name.setValue(versioned.value.name, { emitEvent: false });
+    this.nameValue.set(versioned.value.name);
 
-    this.instructions.setValue(versioned.agent.instructions, { emitEvent: false });
-    this.instructionsValue.set(versioned.agent.instructions);
+    this.instructions.setValue(versioned.value.instructions, { emitEvent: false });
+    this.instructionsValue.set(versioned.value.instructions);
   }
 }

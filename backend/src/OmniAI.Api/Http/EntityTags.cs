@@ -1,21 +1,31 @@
 using Microsoft.Extensions.Primitives;
 using OmniAI.Application.Concurrency;
 
-namespace OmniAI.Api.AiAgents;
+namespace OmniAI.Api.Http;
 
 /// <summary>
-/// The <c>ETag</c> and <c>If-Match</c> contract for the AI agent endpoints.
+/// The <c>ETag</c> and <c>If-Match</c> contract for every conditional endpoint in
+/// this API.
 /// </summary>
 /// <remarks>
 /// <para>
 /// <strong>Deliberately not a conditional-request engine.</strong> There is no
 /// middleware, no filter, no <c>If-None-Match</c>, no <c>If-Unmodified-Since</c>,
 /// no caching, no content negotiation and no reflection. It reads one header the
-/// one way these six endpoints need it read, and every rule below is a decision
+/// one way these endpoints need it read, and every rule below is a decision
 /// rather than a subset of RFC 9110 that happened to get implemented.
 /// </para>
 /// <para>
-/// The accepted contract for AI agent mutations:
+/// <strong>It moved out of the AI agent folder in Phase 13, and only then.</strong>
+/// Phase 7 wrote it beside the one slice that used it and recorded that a second
+/// conditional resource would be the trigger to generalise it. Tenant roles are
+/// that second resource, and not one line of the parsing changed -- what was
+/// always generic behaviour simply stopped living under a name that implied
+/// otherwise. Two copies of an entity-tag parser is how two endpoints end up
+/// accepting different preconditions.
+/// </para>
+/// <para>
+/// The accepted contract for every conditional mutation:
 /// </para>
 /// <list type="table">
 /// <item>
@@ -175,8 +185,8 @@ internal static class EntityTags
             title: "Precondition required",
             detail:
                 "This operation requires an If-Match header carrying the entity tag from the " +
-                "ETag response header of the agent you read. It prevents an edit based on an " +
-                "out-of-date view from silently overwriting somebody else's change.",
+                "ETag response header of the resource you read. It prevents an edit based on " +
+                "an out-of-date view from silently overwriting somebody else's change.",
             statusCode: StatusCodes.Status428PreconditionRequired);
 
     private static IResult Malformed(string detail) =>

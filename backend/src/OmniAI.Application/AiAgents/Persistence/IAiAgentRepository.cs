@@ -71,7 +71,7 @@ public interface IAiAgentRepository
     /// stack unwind and an error-level log.
     /// </para>
     /// </remarks>
-    Task<VersionedAiAgent?> FindAsync(
+    Task<Versioned<AiAgent>?> FindAsync(
         TenantId tenantId,
         AiAgentId agentId,
         CancellationToken cancellationToken = default);

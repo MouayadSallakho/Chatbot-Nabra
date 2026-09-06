@@ -4,78 +4,100 @@
     description="Give the agent a name and describe how it should reply. It starts as a draft, so nothing is in service until you activate it."
   />
 
-  <div class="page-section">
-    <form class="card create-form" [formGroup]="form" (ngSubmit)="create()" novalidate>
-      <div class="card-body">
-        <div class="field">
-          <label class="field-label field-required" for="agent-name">Agent name</label>
-          <input
-            id="agent-name"
-            class="input"
-            type="text"
-            formControlName="name"
-            autocomplete="off"
-            [attr.maxlength]="limits.nameMax"
-            [attr.aria-invalid]="showError('name') ? 'true' : null"
-            aria-describedby="agent-name-hint"
-            [attr.aria-errormessage]="showError('name') ? 'agent-name-error' : null"
-          />
-          <p class="field-hint" id="agent-name-hint">
-            How you will recognise this agent. {{ nameLength() }} of {{ limits.nameMax }} characters
-            used.
+  @if (!allowed()) {
+    <!--
+      Reachable only by typing the URL: the list hides this page from anybody
+      who cannot use it. Answering plainly is still better than presenting a
+      form whose submit is guaranteed to be refused.
+    -->
+    <div class="page-section">
+      <div class="card">
+        <div class="card-body">
+          <p class="text-body-strong">You cannot create AI agents</p>
+          <p class="text-small text-secondary">
+            Creating an agent needs a permission your roles do not include. Ask somebody who
+            administers this workspace if you need it.
           </p>
-          @if (showError('name')) {
-            <p class="field-error" id="agent-name-error" role="alert">
-              <app-icon name="alert" [strokeWidth]="1.75" />
-              <span>An agent name is required.</span>
-            </p>
-          }
+          <p><a class="btn btn-secondary btn-sm" routerLink="/ai-agents">Back to agents</a></p>
         </div>
-
-        <div class="field">
-          <label class="field-label field-required" for="agent-instructions">Instructions</label>
-          <textarea
-            id="agent-instructions"
-            class="textarea instructions-input"
-            formControlName="instructions"
-            rows="10"
-            [attr.maxlength]="limits.instructionsMax"
-            [attr.aria-invalid]="showError('instructions') ? 'true' : null"
-            aria-describedby="agent-instructions-hint"
-            [attr.aria-errormessage]="showError('instructions') ? 'agent-instructions-error' : null"
-          ></textarea>
-          <p class="field-hint" id="agent-instructions-hint">
-            Instructions control how this agent behaves — its tone, what it may promise, and when it
-            should hand over to a person. Line breaks are preserved.
-            <span class="counter" [class.counter-low]="instructionsRemaining() < 500">
-              {{ instructionsRemaining() }} of {{ limits.instructionsMax }} characters remaining.
-            </span>
-          </p>
-          @if (showError('instructions')) {
-            <p class="field-error" id="agent-instructions-error" role="alert">
-              <app-icon name="alert" [strokeWidth]="1.75" />
-              <span>Instructions are required.</span>
+      </div>
+    </div>
+  } @else {
+    <div class="page-section">
+      <form class="card create-form" [formGroup]="form" (ngSubmit)="create()" novalidate>
+        <div class="card-body">
+          <div class="field">
+            <label class="field-label field-required" for="agent-name">Agent name</label>
+            <input
+              id="agent-name"
+              class="input"
+              type="text"
+              formControlName="name"
+              autocomplete="off"
+              [attr.maxlength]="limits.nameMax"
+              [attr.aria-invalid]="showError('name') ? 'true' : null"
+              aria-describedby="agent-name-hint"
+              [attr.aria-errormessage]="showError('name') ? 'agent-name-error' : null"
+            />
+            <p class="field-hint" id="agent-name-hint">
+              How you will recognise this agent. {{ nameLength() }} of
+              {{ limits.nameMax }} characters used.
             </p>
-          }
-        </div>
-
-        @if (failure(); as error) {
-          <div class="alert alert-danger" role="alert">
-            <app-icon name="alert" [strokeWidth]="1.75" />
-            <span>{{ error.message }}</span>
+            @if (showError('name')) {
+              <p class="field-error" id="agent-name-error" role="alert">
+                <app-icon name="alert" [strokeWidth]="1.75" />
+                <span>An agent name is required.</span>
+              </p>
+            }
           </div>
-        }
-      </div>
 
-      <div class="create-actions">
-        <a class="btn btn-secondary" routerLink="/ai-agents">Cancel</a>
-        <button type="submit" class="btn btn-primary" [disabled]="submitting()">
-          @if (submitting()) {
-            <span class="spinner" aria-hidden="true"></span>
+          <div class="field">
+            <label class="field-label field-required" for="agent-instructions">Instructions</label>
+            <textarea
+              id="agent-instructions"
+              class="textarea instructions-input"
+              formControlName="instructions"
+              rows="10"
+              [attr.maxlength]="limits.instructionsMax"
+              [attr.aria-invalid]="showError('instructions') ? 'true' : null"
+              aria-describedby="agent-instructions-hint"
+              [attr.aria-errormessage]="
+                showError('instructions') ? 'agent-instructions-error' : null
+              "
+            ></textarea>
+            <p class="field-hint" id="agent-instructions-hint">
+              Instructions control how this agent behaves — its tone, what it may promise, and when
+              it should hand over to a person. Line breaks are preserved.
+              <span class="counter" [class.counter-low]="instructionsRemaining() < 500">
+                {{ instructionsRemaining() }} of {{ limits.instructionsMax }} characters remaining.
+              </span>
+            </p>
+            @if (showError('instructions')) {
+              <p class="field-error" id="agent-instructions-error" role="alert">
+                <app-icon name="alert" [strokeWidth]="1.75" />
+                <span>Instructions are required.</span>
+              </p>
+            }
+          </div>
+
+          @if (failure(); as error) {
+            <div class="alert alert-danger" role="alert">
+              <app-icon name="alert" [strokeWidth]="1.75" />
+              <span>{{ error.message }}</span>
+            </div>
           }
-          <span class="btn-label">{{ submitting() ? 'Creating…' : 'Create agent' }}</span>
-        </button>
-      </div>
-    </form>
-  </div>
+        </div>
+
+        <div class="create-actions">
+          <a class="btn btn-secondary" routerLink="/ai-agents">Cancel</a>
+          <button type="submit" class="btn btn-primary" [disabled]="submitting()">
+            @if (submitting()) {
+              <span class="spinner" aria-hidden="true"></span>
+            }
+            <span class="btn-label">{{ submitting() ? 'Creating…' : 'Create agent' }}</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  }
 </div>

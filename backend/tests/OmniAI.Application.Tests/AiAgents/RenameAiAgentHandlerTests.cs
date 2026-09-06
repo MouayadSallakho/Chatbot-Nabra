@@ -19,12 +19,12 @@ public sealed class RenameAiAgentHandlerTests
     {
         (TenantId tenant, AiAgent agent, InMemoryAiAgentRepository agents) = Arrange();
 
-        VersionedAiAgentView? renamed = await Handler(agents, Later).HandleAsync(
+        Versioned<AiAgentView>? renamed = await Handler(agents, Later).HandleAsync(
             new RenameAiAgentCommand(
                 tenant.Value, agent.Id.Value, "Pre-sales Assistant", agents.VersionOf(agent)));
 
         Assert.NotNull(renamed);
-        Assert.Equal("Pre-sales Assistant", renamed.View.Name);
+        Assert.Equal("Pre-sales Assistant", renamed.Value.Name);
         Assert.Equal("Pre-sales Assistant", agent.Name.Value);
     }
 
@@ -36,7 +36,7 @@ public sealed class RenameAiAgentHandlerTests
         (TenantId tenant, AiAgent agent, InMemoryAiAgentRepository agents) = Arrange();
         ConcurrencyToken before = agents.VersionOf(agent);
 
-        VersionedAiAgentView renamed = await Handler(agents, Later).HandleAsync(
+        Versioned<AiAgentView> renamed = await Handler(agents, Later).HandleAsync(
             new RenameAiAgentCommand(tenant.Value, agent.Id.Value, "Renamed", before))
             ?? throw new InvalidOperationException();
 
@@ -49,12 +49,12 @@ public sealed class RenameAiAgentHandlerTests
     {
         (TenantId tenant, AiAgent agent, InMemoryAiAgentRepository agents) = Arrange();
 
-        VersionedAiAgentView renamed = await Handler(agents, Later).HandleAsync(
+        Versioned<AiAgentView> renamed = await Handler(agents, Later).HandleAsync(
             new RenameAiAgentCommand(tenant.Value, agent.Id.Value, "Renamed", agents.VersionOf(agent)))
             ?? throw new InvalidOperationException();
 
-        Assert.Equal(Later, renamed.View.UpdatedAt);
-        Assert.Equal(Created, renamed.View.CreatedAt);
+        Assert.Equal(Later, renamed.Value.UpdatedAt);
+        Assert.Equal(Created, renamed.Value.CreatedAt);
     }
 
     [Fact]
@@ -65,12 +65,12 @@ public sealed class RenameAiAgentHandlerTests
         (TenantId tenant, AiAgent agent, InMemoryAiAgentRepository agents) = Arrange();
         ConcurrencyToken before = agents.VersionOf(agent);
 
-        VersionedAiAgentView renamed = await Handler(agents, Later).HandleAsync(
+        Versioned<AiAgentView> renamed = await Handler(agents, Later).HandleAsync(
             new RenameAiAgentCommand(tenant.Value, agent.Id.Value, "  Sales Assistant  ", before))
             ?? throw new InvalidOperationException();
 
-        Assert.Equal("Sales Assistant", renamed.View.Name);
-        Assert.Equal(Created, renamed.View.UpdatedAt);
+        Assert.Equal("Sales Assistant", renamed.Value.Name);
+        Assert.Equal(Created, renamed.Value.UpdatedAt);
         Assert.Equal(before, renamed.Version);
     }
 
@@ -144,13 +144,13 @@ public sealed class RenameAiAgentHandlerTests
         await Handler(agents, Later).HandleAsync(new RenameAiAgentCommand(
             tenant.Value, agent.Id.Value, "Renamed once", agents.VersionOf(agent)));
 
-        VersionedAiAgentView late = await Handler(agents, Created.AddMinutes(-30)).HandleAsync(
+        Versioned<AiAgentView> late = await Handler(agents, Created.AddMinutes(-30)).HandleAsync(
             new RenameAiAgentCommand(
                 tenant.Value, agent.Id.Value, "Arrived out of order", agents.VersionOf(agent)))
             ?? throw new InvalidOperationException();
 
-        Assert.Equal("Arrived out of order", late.View.Name);
-        Assert.Equal(Later, late.View.UpdatedAt);
+        Assert.Equal("Arrived out of order", late.Value.Name);
+        Assert.Equal(Later, late.Value.UpdatedAt);
     }
 
     [Theory]
@@ -175,7 +175,7 @@ public sealed class RenameAiAgentHandlerTests
     {
         InMemoryAiAgentRepository agents = new();
 
-        VersionedAiAgentView? renamed = await Handler(agents, Later).HandleAsync(
+        Versioned<AiAgentView>? renamed = await Handler(agents, Later).HandleAsync(
             new RenameAiAgentCommand(
                 Guid.CreateVersion7(), Guid.CreateVersion7(), "Renamed", SomeVersion));
 
@@ -193,7 +193,7 @@ public sealed class RenameAiAgentHandlerTests
         AiAgent agentB = GetAiAgentByIdHandlerTests.NewAgent(TenantId.New(), "Tenant B Assistant");
         InMemoryAiAgentRepository agents = new InMemoryAiAgentRepository().Seed(agentB);
 
-        VersionedAiAgentView? renamed = await Handler(agents, Later).HandleAsync(
+        Versioned<AiAgentView>? renamed = await Handler(agents, Later).HandleAsync(
             new RenameAiAgentCommand(tenantA.Value, agentB.Id.Value, "Hijacked", SomeVersion));
 
         Assert.Null(renamed);
@@ -212,11 +212,11 @@ public sealed class RenameAiAgentHandlerTests
         AiAgent agentB = GetAiAgentByIdHandlerTests.NewAgent(TenantId.New(), "Tenant B Assistant");
         InMemoryAiAgentRepository agents = new InMemoryAiAgentRepository().Seed(agentB);
 
-        VersionedAiAgentView? withRealVersion = await Handler(agents, Later).HandleAsync(
+        Versioned<AiAgentView>? withRealVersion = await Handler(agents, Later).HandleAsync(
             new RenameAiAgentCommand(
                 tenantA.Value, agentB.Id.Value, "Hijacked", agents.VersionOf(agentB)));
 
-        VersionedAiAgentView? withInventedVersion = await Handler(agents, Later).HandleAsync(
+        Versioned<AiAgentView>? withInventedVersion = await Handler(agents, Later).HandleAsync(
             new RenameAiAgentCommand(tenantA.Value, agentB.Id.Value, "Hijacked", SomeVersion));
 
         Assert.Null(withRealVersion);
@@ -280,5 +280,5 @@ public sealed class RenameAiAgentHandlerTests
     private static RenameAiAgentHandler Handler(
         InMemoryAiAgentRepository agents,
         DateTimeOffset now) =>
-        new(agents, TestAccess.Anywhere(), new FixedTimeProvider(now));
+        new(agents, TestAuthority.Anywhere(), new FixedTimeProvider(now));
 }

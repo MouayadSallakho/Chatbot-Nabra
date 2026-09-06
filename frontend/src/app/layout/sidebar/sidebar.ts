@@ -2,13 +2,16 @@ import {
   ChangeDetectionStrategy,
   Component,
   ElementRef,
+  computed,
+  inject,
   input,
   output,
   viewChild,
 } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 import { Icon } from '@app/shared/icon/icon';
-import { NAV_ITEMS } from '@app/layout/navigation';
+import { NAV_ITEMS, NavItem } from '@app/layout/navigation';
+import { PermissionService } from '@app/core/authorization/permission-service';
 
 /**
  * The product's primary navigation.
@@ -86,7 +89,27 @@ export class Sidebar {
    */
   readonly signedOut = output<void>();
 
-  protected readonly items = NAV_ITEMS;
+  private readonly permissions = inject(PermissionService);
+
+  /**
+   * The navigation entries this person has a reason to see.
+   *
+   * <strong>Not authorisation, and it must not be mistaken for it.</strong> A
+   * hidden link is still reachable by typing the URL, and the server refuses
+   * regardless. What this buys is a sidebar that does not advertise destinations
+   * that would answer 403 on arrival -- which is the difference between a
+   * product that looks tailored and one that looks broken.
+   *
+   * Entries with no permissions listed are shown to everyone. That is deliberate
+   * for the unbuilt areas: their placeholder pages say plainly that there is
+   * nothing there yet, which reveals nothing about the workspace and is more
+   * honest than a sidebar whose length varies for reasons nobody can see.
+   */
+  protected readonly items = computed<readonly NavItem[]>(() =>
+    NAV_ITEMS.filter(
+      (item) => item.permissions === undefined || this.permissions.hasAny(...item.permissions),
+    ),
+  );
 
   private readonly dismissButton = viewChild<ElementRef<HTMLButtonElement>>('dismissButton');
 

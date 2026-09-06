@@ -13,7 +13,7 @@ export type ApiErrorKind =
   | 'validation'
   /** Nobody is signed in, or the session has expired. */
   | 'unauthenticated'
-  /** Signed in, but not permitted. Unused today; see the note below. */
+  /** Signed in and a member, but no role of theirs grants this capability. */
   | 'forbidden'
   /** No such resource for this workspace. */
   | 'notFound'
@@ -56,7 +56,9 @@ export interface ApiError {
 const MESSAGES: Readonly<Record<ApiErrorKind, string>> = {
   validation: 'Some of the details were rejected. Check the highlighted fields and try again.',
   unauthenticated: 'Your session has ended. Sign in again to continue.',
-  forbidden: 'You do not have permission to do that.',
+  forbidden:
+    'You do not have permission to do this. Ask somebody who administers this ' +
+    'workspace if you need it.',
   notFound: 'That item no longer exists in this workspace.',
   conflict: 'That action is not available for this item right now.',
   stale: 'This item was updated somewhere else since you opened it.',
@@ -83,10 +85,17 @@ const MESSAGES: Readonly<Record<ApiErrorKind, string>> = {
  * Our own copy still covers a 401 with no body, which is what an expired session
  * produces.
  *
- * 403 is deliberately absent, and so is any behaviour that depends on it. The
- * platform hides resources the caller may not reach behind 404 rather than
- * admitting they exist; the kind is defined so a future permission check has
- * somewhere to land, not because anything produces one today.
+ * 403 is deliberately absent from the list, even though Phase 13 made it a real
+ * answer. The server's detail is safe -- it names the permission code and
+ * nothing else -- but a permission code is machine vocabulary, and an operator
+ * reading "It requires the 'ai-agents.lifecycle' permission" learns less than
+ * they do from a sentence telling them to ask an administrator. The code is
+ * still in the response for anybody debugging; it simply is not what the screen
+ * says.
+ *
+ * A 403 also never means the resource is missing or the account is broken, and
+ * the copy is written to say so: it is a statement about what this person may
+ * do, not about whether the thing exists.
  */
 const DETAIL_IS_USEFUL: ReadonlySet<number> = new Set([400, 401, 404, 409]);
 

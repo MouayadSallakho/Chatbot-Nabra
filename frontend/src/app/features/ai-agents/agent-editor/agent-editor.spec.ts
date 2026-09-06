@@ -5,7 +5,8 @@ import { provideRouter } from '@angular/router';
 import { LOCAL_STORAGE } from '@app/core/storage/local-storage';
 import { TenantApi } from '@app/core/api/tenant-api';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
-import { memoryStorage } from '@app/testing/test-doubles';
+import { memoryStorage, permissionApiGranting } from '@app/testing/test-doubles';
+import { PermissionApi } from '@app/core/authorization/permission-api';
 import { AiAgent, AiAgentApi } from '../ai-agent-api';
 import { AgentEditor } from './agent-editor';
 
@@ -40,6 +41,10 @@ describe('AgentEditor', () => {
     TestBed.configureTestingModule({
       imports: [AgentEditor],
       providers: [
+        // Selecting a workspace asks what the reader may do there. Without a
+        // double the request would be left open and every case in this file
+        // would fail on verify() for a reason unrelated to what it asserts.
+        { provide: PermissionApi, useValue: permissionApiGranting('*') },
         provideRouter([]),
         provideHttpClient(),
         provideHttpClientTesting(),
@@ -53,7 +58,7 @@ describe('AgentEditor', () => {
     });
 
     // The workspace is already resolved; this suite is about the editor.
-    TestBed.inject(WorkspaceContextService).adopt({
+    await TestBed.inject(WorkspaceContextService).adopt({
       id: tenantId,
       name: 'Acme Trading',
       slug: 'acme',
@@ -128,6 +133,10 @@ describe('AgentEditor', () => {
       TestBed.configureTestingModule({
         imports: [AgentEditor],
         providers: [
+          // Selecting a workspace asks what the reader may do there. Without a
+          // double the request would be left open and every case in this file
+          // would fail on verify() for a reason unrelated to what it asserts.
+          { provide: PermissionApi, useValue: permissionApiGranting('*') },
           provideRouter([]),
           provideHttpClient(),
           provideHttpClientTesting(),
@@ -137,7 +146,7 @@ describe('AgentEditor', () => {
         ],
       });
 
-      TestBed.inject(WorkspaceContextService).adopt({
+      await TestBed.inject(WorkspaceContextService).adopt({
         id: tenantId,
         name: 'Acme',
         slug: 'acme',

@@ -79,6 +79,13 @@ export const routes: Routes = [
         loadChildren: () =>
           import('@app/features/ai-agents/ai-agent.routes').then((m) => m.aiAgentRoutes),
       },
+      {
+        // Role administration, replacing the Phase 10 "Settings" placeholder.
+        // Lazily loaded like the AI agent feature: somebody who never opens it
+        // never downloads it.
+        path: 'roles',
+        loadChildren: () => import('@app/features/roles/roles.routes').then((m) => m.roleRoutes),
+      },
       ...placeholderRoutes,
       // Deliberate, and deliberately not a redirect: bouncing an unknown address
       // to the overview leaves the reader unsure whether their link was wrong or

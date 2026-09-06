@@ -32,7 +32,7 @@
   -->
   <nav class="sidebar-nav" aria-label="Primary">
     <ul>
-      @for (item of items; track item.path) {
+      @for (item of items(); track item.path) {
         <li>
           <a
             class="nav-item"

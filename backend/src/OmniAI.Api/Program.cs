@@ -1,5 +1,6 @@
 using OmniAI.Api.AiAgents;
 using OmniAI.Api.Auth;
+using OmniAI.Api.Authorization;
 using OmniAI.Api.Composition;
 using OmniAI.Api.Security;
 using OmniAI.Api.Tenants;
@@ -81,14 +82,20 @@ app.MapMeEndpoints();
 // first member, and reading one requires membership.
 app.MapTenantEndpoints();
 
+// Role administration and the capability catalogue, scoped to the workspace.
+// Reading needs roles.view, writing needs roles.manage, and neither implies the
+// other. There is deliberately no member-assignment surface here.
+app.MapRoleEndpoints();
+
 // AI agent configuration, scoped to the tenant that owns each agent.
 //
-// Authenticated, and membership-checked inside every use case. The tenant id in
-// the route is still supplied by the caller, but it is no longer believed: it
-// addresses a resource, and reaching that resource requires a membership row
-// pairing the signed-in person with that tenant. The database predicates that
-// scope every query to the tenant remain in place beneath that check, so two
-// independent layers would both have to fail for one tenant's data to reach
+// Authenticated, and both membership and permission are checked inside every use
+// case. The tenant id in the route is still supplied by the caller, but it is not
+// believed: it addresses a resource, and reaching that resource requires a
+// membership row pairing the signed-in person with that tenant, and a role of
+// theirs granting the capability the operation needs. The database predicates
+// that scope every query to the tenant remain in place beneath both checks, so
+// three independent layers would have to fail for one tenant's data to reach
 // another's request.
 app.MapAiAgentEndpoints();
 
