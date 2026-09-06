@@ -72,6 +72,39 @@ internal sealed class RecordingRoleRepository : ITenantRoleRepository
         return role;
     }
 
+    /// <summary>Replaces everything somebody holds with one role.</summary>
+    /// <remarks>
+    /// For the acceptance tests, where the point is that an inviter's authority
+    /// can change between issuing an invitation and somebody using it. Reassigning
+    /// through a use case would need the very member-assignment machinery those
+    /// tests are checking, so the state is arranged directly.
+    /// </remarks>
+    public TenantRole ReplaceAssignments(UserId userId, TenantRole role)
+    {
+        ArgumentNullException.ThrowIfNull(role);
+
+        _assignments.RemoveAll(assignment => assignment.UserId == userId);
+        _roles.RemoveAll(candidate => candidate.Id == role.Id);
+
+        _roles.Add(role);
+        _assignments.Add(TenantRoleAssignment.ForRole(userId, role, DateTimeOffset.UnixEpoch));
+
+        return role;
+    }
+
+    /// <summary>Removes a role, as deleting one would.</summary>
+    /// <remarks>
+    /// Role deletion is not implemented, so this models the state rather than the
+    /// operation: an invitation naming a role that has gone must not be
+    /// deliverable, and that has to be provable before deletion exists.
+    /// </remarks>
+    public void Forget(TenantRole role)
+    {
+        ArgumentNullException.ThrowIfNull(role);
+
+        _roles.RemoveAll(candidate => candidate.Id == role.Id);
+    }
+
     public Task<IReadOnlyList<TenantRole>> ListAssignedRolesAsync(
         UserId userId,
         TenantId tenantId,

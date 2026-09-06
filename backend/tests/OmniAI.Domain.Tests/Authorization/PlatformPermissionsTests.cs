@@ -108,6 +108,9 @@ public sealed class PlatformPermissionsTests
                 "ai-agents.preview",
                 "roles.view",
                 "roles.manage",
+                "members.view",
+                "members.invite",
+                "members.roles.manage",
             ],
             PlatformPermissions.AllCodes.Select(code => code.Value));
     }

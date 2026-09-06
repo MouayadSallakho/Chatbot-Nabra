@@ -4,6 +4,10 @@ import { Router, RouterLink } from '@angular/router';
 import { ApiError } from '@app/core/api/api-error';
 import { AuthService } from '@app/core/auth/auth-service';
 import { REGISTER_PATH } from '@app/core/auth/auth-guard';
+import {
+  ACCEPT_INVITATION_PATH,
+  InvitationHandoff,
+} from '@app/core/invitations/invitation-handoff';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
 import { WORKSPACE_SETUP_PATH } from '@app/core/workspace/workspace-guard';
 import { HOME_PATH } from '@app/layout/navigation';
@@ -34,6 +38,7 @@ import { Icon } from '@app/shared/icon/icon';
 export class Login {
   private readonly auth = inject(AuthService);
   private readonly workspace = inject(WorkspaceContextService);
+  private readonly invitations = inject(InvitationHandoff);
   private readonly router = inject(Router);
 
   protected readonly registerPath = REGISTER_PATH;
@@ -103,6 +108,18 @@ export class Login {
       // first would show the admin shell and then bounce it to the workspace
       // screen, which reads as a broken redirect.
       await this.workspace.load();
+
+      // An invitation waiting in memory means this sign-in was a step inside
+      // accepting one, so the reader goes back to finish it rather than to a
+      // workspace they may not have yet. Checked here rather than through a
+      // return-url parameter: the token must not travel in a URL, and inventing
+      // a general redirect mechanism for one case would be more machinery than
+      // the case needs.
+      if (this.invitations.pending()) {
+        await this.router.navigate(['/', ACCEPT_INVITATION_PATH]);
+
+        return;
+      }
 
       await this.router.navigate([
         '/',

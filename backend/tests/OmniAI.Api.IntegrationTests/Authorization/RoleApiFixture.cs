@@ -79,6 +79,98 @@ public sealed class RoleApiFixture : AiAgentApiFixture
     }
 
     /// <summary>
+    /// Registers an account with a known address and makes it a restricted member.
+    /// </summary>
+    /// <remarks>
+    /// The address matters for the invitation tests, where acceptance turns on
+    /// whether the signed-in account is the one that was invited. Everywhere else
+    /// a generated address is fine and this overload is unnecessary.
+    /// </remarks>
+    public async Task<(HttpClient Client, Guid UserId)> CreateMemberWithEmailAsync(
+        Guid tenantId,
+        string email,
+        params string[] permissions)
+    {
+        ArgumentNullException.ThrowIfNull(permissions);
+
+        HttpClient client = CreateClient();
+        Guid userId = await ApiAuthentication.RegisterAsync(client, email);
+
+        await SeedMembershipAsync(tenantId, userId, permissions);
+
+        return (client, userId);
+    }
+
+    /// <summary>
+    /// Registers an account with a known address and no workspace at all.
+    /// </summary>
+    /// <remarks>
+    /// The invitee, before they accept anything. They are a legitimate user of
+    /// the platform who simply belongs nowhere yet, which is exactly the state an
+    /// invitation is written for.
+    /// </remarks>
+    public async Task<(HttpClient Client, Guid UserId)> CreateAccountAsync(string email)
+    {
+        HttpClient client = CreateClient();
+        Guid userId = await ApiAuthentication.RegisterAsync(client, email);
+
+        return (client, userId);
+    }
+
+    /// <summary>
+    /// Takes somebody's membership away, as leaving a workspace would.
+    /// </summary>
+    /// <remarks>
+    /// There is no product surface that removes a member, deliberately. This
+    /// exists because a security question depends on it: an invitation must not
+    /// outlive the membership that issued it, and proving that over HTTP needs an
+    /// inviter who has gone. Written directly to the test database, like every
+    /// other arrangement here.
+    /// </remarks>
+    public async Task RemoveMembershipAsync(Guid tenantId, Guid userId)
+    {
+        await using OmniAiDbContext context = CreateDbContext();
+
+        await context.TenantRoleAssignments
+            .Where(assignment =>
+                assignment.TenantId == TenantId.From(tenantId)
+                && assignment.UserId == UserId.From(userId))
+            .ExecuteDeleteAsync();
+
+        await context.TenantMemberships
+            .Where(membership =>
+                membership.TenantId == TenantId.From(tenantId)
+                && membership.UserId == UserId.From(userId))
+            .ExecuteDeleteAsync();
+    }
+
+    /// <summary>
+    /// Replaces everything somebody holds with one role granting these permissions.
+    /// </summary>
+    /// <remarks>
+    /// For the acceptance tests, where the point is that an inviter's authority
+    /// can change between issuing an invitation and somebody using it.
+    /// </remarks>
+    public async Task ReplacePermissionsAsync(
+        Guid tenantId,
+        Guid userId,
+        params string[] permissions)
+    {
+        ArgumentNullException.ThrowIfNull(permissions);
+
+        await using (OmniAiDbContext clearing = CreateDbContext())
+        {
+            await clearing.TenantRoleAssignments
+                .Where(assignment =>
+                    assignment.TenantId == TenantId.From(tenantId)
+                    && assignment.UserId == UserId.From(userId))
+                .ExecuteDeleteAsync();
+        }
+
+        await SeedRoleAndAssignmentAsync(tenantId, userId, permissions);
+    }
+
+    /// <summary>
     /// The same restricted member, and the id of the role they hold.
     /// </summary>
     /// <remarks>
@@ -95,25 +187,58 @@ public sealed class RoleApiFixture : AiAgentApiFixture
         HttpClient client = await CreateSignedInClientAsync();
         Guid userId = await CurrentUserIdAsync(client);
 
+        Guid roleId = await SeedMembershipAsync(tenantId, userId, permissions);
+
+        return (client, roleId);
+    }
+
+    /// <summary>
+    /// Makes an account a member of a workspace, holding one role with these
+    /// permissions.
+    /// </summary>
+    /// <returns>The role's id.</returns>
+    private async Task<Guid> SeedMembershipAsync(
+        Guid tenantId,
+        Guid userId,
+        string[] permissions)
+    {
+        await using (OmniAiDbContext context = CreateDbContext())
+        {
+            context.TenantMemberships.Add(TenantMembership.Create(
+                UserId.From(userId),
+                TenantId.From(tenantId),
+                DateTimeOffset.UtcNow));
+
+            await context.SaveChangesAsync();
+        }
+
+        return await SeedRoleAndAssignmentAsync(tenantId, userId, permissions);
+    }
+
+    /// <summary>
+    /// Adds a role to a workspace and gives it to somebody already a member.
+    /// </summary>
+    /// <returns>The role's id.</returns>
+    private async Task<Guid> SeedRoleAndAssignmentAsync(
+        Guid tenantId,
+        Guid userId,
+        string[] permissions)
+    {
         TenantRole role = TenantRole.CreateCustom(
             TenantId.From(tenantId),
             TenantRoleName.Create($"Limited {Guid.NewGuid():N}"[..20]),
             [.. permissions.Select(PermissionCode.Create)],
             DateTimeOffset.UtcNow);
 
-        await using OmniAiDbContext context = CreateDbContext();
+        await using (OmniAiDbContext context = CreateDbContext())
+        {
+            context.TenantRoles.Add(role);
+            context.Entry(role)
+                .Property<string>("NormalisedName")
+                .CurrentValue = role.Name.Normalised;
 
-        context.TenantMemberships.Add(TenantMembership.Create(
-            UserId.From(userId),
-            TenantId.From(tenantId),
-            DateTimeOffset.UtcNow));
-
-        context.TenantRoles.Add(role);
-        context.Entry(role)
-            .Property<string>("NormalisedName")
-            .CurrentValue = role.Name.Normalised;
-
-        await context.SaveChangesAsync();
+            await context.SaveChangesAsync();
+        }
 
         // A second save, because the assignment's composite foreign keys require
         // both the membership and the role to be committed first.
@@ -126,7 +251,7 @@ public sealed class RoleApiFixture : AiAgentApiFixture
 
         await assigning.SaveChangesAsync();
 
-        return (client, role.Id.Value);
+        return role.Id.Value;
     }
 
     /// <summary>

@@ -4,6 +4,10 @@ import { Router, RouterLink } from '@angular/router';
 import { ApiError } from '@app/core/api/api-error';
 import { AuthService } from '@app/core/auth/auth-service';
 import { LOGIN_PATH } from '@app/core/auth/auth-guard';
+import {
+  ACCEPT_INVITATION_PATH,
+  InvitationHandoff,
+} from '@app/core/invitations/invitation-handoff';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
 import { WORKSPACE_SETUP_PATH } from '@app/core/workspace/workspace-guard';
 import { Icon } from '@app/shared/icon/icon';
@@ -40,6 +44,7 @@ const PASSWORD_MIN_LENGTH = 12;
 export class Register {
   private readonly auth = inject(AuthService);
   private readonly workspace = inject(WorkspaceContextService);
+  private readonly invitations = inject(InvitationHandoff);
   private readonly router = inject(Router);
 
   protected readonly loginPath = LOGIN_PATH;
@@ -90,10 +95,20 @@ export class Register {
         password: this.form.controls.password.value,
       });
 
-      // A brand new account belongs to no workspace, so this always lands on the
-      // workspace screen. The list is loaded anyway rather than assumed: the
-      // assumption would be right today and wrong the moment invitations exist.
+      // A brand new account belongs to no workspace. The list is loaded anyway
+      // rather than assumed, which is what makes the invitation case below work:
+      // registering to accept an invitation is now a real path, and the note that
+      // used to say "wrong the moment invitations exist" describes today.
       await this.workspace.load();
+
+      // Registering was a step inside accepting an invitation, so the reader goes
+      // back to finish it rather than to a workspace-creation screen they did not
+      // ask for.
+      if (this.invitations.pending()) {
+        await this.router.navigate(['/', ACCEPT_INVITATION_PATH]);
+
+        return;
+      }
 
       await this.router.navigate(['/', WORKSPACE_SETUP_PATH]);
     } catch (error) {

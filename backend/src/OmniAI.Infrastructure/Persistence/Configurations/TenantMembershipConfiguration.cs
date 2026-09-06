@@ -38,6 +38,24 @@ internal sealed class TenantMembershipConfiguration : IEntityTypeConfiguration<T
             .HasColumnType("timestamp with time zone")
             .IsRequired();
 
+        builder.Property(membership => membership.UpdatedAt)
+            .HasColumnName("updated_at")
+            .HasColumnType("timestamp with time zone")
+            .IsRequired();
+
+        // The row version behind a member's ETag, so two administrators editing
+        // one person's access cannot silently overwrite each other.
+        //
+        // xmin is PostgreSQL's own transaction stamp on every row: it is not a
+        // column this platform declares, stores or migrates, and it advances
+        // whenever the row is written. Mapped as a shadow property so nothing in
+        // the Domain knows it exists, exactly as roles and agents already do.
+        builder.Property<uint>(PersistenceSchema.XminConcurrencyToken)
+            .HasColumnName("xmin")
+            .HasColumnType("xid")
+            .ValueGeneratedOnAddOrUpdate()
+            .IsConcurrencyToken();
+
         // The tenant key, modelled the same way ai_agents models its own:
         // Restrict, so business data is never removed as a side effect of
         // removing something it points at.

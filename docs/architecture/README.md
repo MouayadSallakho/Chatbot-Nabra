@@ -30,7 +30,7 @@ case. No channel-provider architecture has been designed, and the platform is
 still not authorised for production deployment -- email verification, password
 recovery and member administration all remain ahead of it.
 
-Twelve areas have their own documents:
+Thirteen areas have their own documents:
 
 - [multi-tenancy-isolation.md](multi-tenancy-isolation.md) - tenant isolation
 - [conversation-domain.md](conversation-domain.md) - conversation and message modelling
@@ -44,6 +44,7 @@ Twelve areas have their own documents:
 - [admin-ai-agent-experience.md](admin-ai-agent-experience.md) - the development workspace and the AI agent admin workflow
 - [authentication-tenant-membership.md](authentication-tenant-membership.md) - accounts, the cookie session, antiforgery, and the membership authorization boundary
 - [tenant-rbac.md](tenant-rbac.md) - tenant-scoped roles, the permission catalogue, and what a member may do inside a workspace
+- [team-members-invitations.md](team-members-invitations.md) - member administration, secure invitations, and role assignment
 
 ---
 

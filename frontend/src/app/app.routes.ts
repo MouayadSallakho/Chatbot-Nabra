@@ -3,6 +3,8 @@ import { AppShell } from '@app/layout/app-shell/app-shell';
 import { HOME_PATH, NAV_ITEMS } from '@app/layout/navigation';
 import { LOGIN_PATH, REGISTER_PATH, anonymousGuard, authGuard } from '@app/core/auth/auth-guard';
 import { WORKSPACE_SETUP_PATH, workspaceGuard } from '@app/core/workspace/workspace-guard';
+import { ACCEPT_INVITATION_PATH } from '@app/core/invitations/invitation-handoff';
+import { TeamApi } from '@app/features/team/team-api';
 
 /**
  * One route per unbuilt product area, generated from the navigation model.
@@ -57,6 +59,19 @@ export const routes: Routes = [
     loadComponent: () => import('@app/features/auth/register/register').then((m) => m.Register),
   },
   {
+    // Outside the shell and behind no guard at all. Somebody opening an
+    // invitation may have no account, and somebody accepting their first one has
+    // no workspace -- either guard would bounce them and lose the invitation.
+    // The page itself asks them to sign in when they need to.
+    path: ACCEPT_INVITATION_PATH,
+    title: 'Accept invitation',
+    providers: [TeamApi],
+    loadComponent: () =>
+      import('@app/features/invitations/accept-invitation/accept-invitation').then(
+        (m) => m.AcceptInvitation,
+      ),
+  },
+  {
     path: WORKSPACE_SETUP_PATH,
     title: 'Choose workspace',
     canActivate: [authGuard],
@@ -85,6 +100,12 @@ export const routes: Routes = [
         // never downloads it.
         path: 'roles',
         loadChildren: () => import('@app/features/roles/roles.routes').then((m) => m.roleRoutes),
+      },
+      {
+        // Team administration. Lazily loaded like the other feature areas, so
+        // somebody who never opens it never downloads it.
+        path: 'team',
+        loadChildren: () => import('@app/features/team/team.routes').then((m) => m.teamRoutes),
       },
       ...placeholderRoutes,
       // Deliberate, and deliberately not a redirect: bouncing an unknown address

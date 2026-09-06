@@ -25,7 +25,10 @@ export type PermissionCode =
   | 'ai-agents.lifecycle'
   | 'ai-agents.preview'
   | 'roles.view'
-  | 'roles.manage';
+  | 'roles.manage'
+  | 'members.view'
+  | 'members.invite'
+  | 'members.roles.manage';
 
 /**
  * One capability, as the catalogue endpoint publishes it.

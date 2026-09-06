@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore.ChangeTracking;
 using OmniAI.Domain.AiAgents;
 using OmniAI.Domain.Authorization;
 using OmniAI.Domain.Conversations;
+using OmniAI.Domain.Invitations;
 using OmniAI.Domain.Tenants;
 using OmniAI.Domain.Users;
 using OmniAI.Infrastructure.Identity;
@@ -65,6 +66,16 @@ public sealed class OmniAiDbContext(DbContextOptions<OmniAiDbContext> options)
     /// says what they may do inside it.
     /// </summary>
     public DbSet<TenantRoleAssignment> TenantRoleAssignments => Set<TenantRoleAssignment>();
+
+    /// <summary>
+    /// Offers of membership that have not yet been taken up.
+    /// </summary>
+    /// <remarks>
+    /// An aggregate root, so it gets a set of its own. The roles an invitation
+    /// intends to grant are reached through it rather than separately, because a
+    /// grant only means anything as part of the invitation carrying it.
+    /// </remarks>
+    public DbSet<TenantInvitation> TenantInvitations => Set<TenantInvitation>();
 
     public DbSet<Conversation> Conversations => Set<Conversation>();
 

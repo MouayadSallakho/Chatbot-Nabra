@@ -1,0 +1,97 @@
+// A single-column form, capped the way the agent-create form is and for the same
+// reason: one email field running the width of a 1600px layout is harder to read
+// back, and there is nothing to put beside it.
+.page-narrow {
+  max-inline-size: 46rem;
+}
+
+// The design system's `.card` is a surface, not a padded box -- padding comes
+// from `.card-body`, or from a component that brings its own. These are styled
+// containers in their own right, so they carry it themselves, the way
+// `.role-options` does.
+.invite-form {
+  display: grid;
+  gap: var(--space-5);
+  padding: var(--space-5);
+}
+
+.field {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.section-note {
+  margin-block-end: var(--space-3);
+}
+
+.form-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.invite-created {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-5);
+}
+
+// The link itself. Shown rather than hidden behind a copy button alone: the
+// clipboard can be refused by permission or by an insecure context, and somebody
+// who cannot copy must still be able to select it by hand.
+//
+// `anywhere` rather than `break-all`: a long token has no spaces to break at, and
+// without this it forces the card wider than a phone's viewport, which is the
+// usual cause of a page that scrolls sideways.
+.invite-link {
+  margin: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background-color: var(--surface-muted);
+  color: var(--text-secondary);
+  font: var(--text-code, var(--text-small));
+  font-family: var(--font-mono, ui-monospace, monospace);
+  overflow-wrap: anywhere;
+}
+
+.invite-actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+// ----------------------------------------------------------------------------
+// Role options
+// ----------------------------------------------------------------------------
+// The same shape the member detail and the role editor use, so a checkbox list
+// reads the same wherever access is decided.
+.role-options {
+  display: grid;
+  gap: var(--space-4);
+  min-inline-size: 0;
+  padding: 0;
+  margin: 0;
+  border: 0;
+}
+
+.role-option {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-3);
+  align-items: start;
+  cursor: pointer;
+  padding-block: var(--space-1);
+}
+
+.role-option-text {
+  display: grid;
+  gap: var(--space-1);
+  min-inline-size: 0;
+}
+
+.role-name {
+  font: var(--text-body-strong);
+  overflow-wrap: anywhere;
+}

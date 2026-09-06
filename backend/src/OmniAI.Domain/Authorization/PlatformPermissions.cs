@@ -89,12 +89,34 @@ public static class PlatformPermissions
     /// <summary>Creating and editing the workspace's custom roles.</summary>
     /// <remarks>
     /// This is the most powerful capability a custom role can hold, because
-    /// somebody who has it can compose any other permission into a role. It does
-    /// <em>not</em> let them give that role to anybody, including themselves --
-    /// there is no member-assignment surface in this platform at all -- so holding
-    /// it is not a path to acquiring the permissions it can grant.
+    /// somebody who has it can compose any other permission into a role. What
+    /// stops that from being an escalation is the delegation ceiling: a role may
+    /// only be given permissions its editor already holds, which is enforced for
+    /// role editing and, from Phase 14, for handing roles to people as well.
     /// </remarks>
     public static readonly PermissionCode RolesManage = PermissionCode.Create("roles.manage");
+
+    /// <summary>Reading the workspace's members and its pending invitations.</summary>
+    public static readonly PermissionCode MembersView = PermissionCode.Create("members.view");
+
+    /// <summary>Inviting somebody to the workspace, and revoking an invitation.</summary>
+    /// <remarks>
+    /// On its own this invites somebody with no capabilities at all: they become a
+    /// member and can do nothing until an administrator gives them a role. Issuing
+    /// an invitation that carries roles additionally requires
+    /// <see cref="MembersRolesManage"/>, because that is what actually hands out
+    /// authority.
+    /// </remarks>
+    public static readonly PermissionCode MembersInvite = PermissionCode.Create("members.invite");
+
+    /// <summary>Changing which roles a member of the workspace holds.</summary>
+    /// <remarks>
+    /// The capability that turns a role definition into somebody's real authority.
+    /// It is bounded by the same ceiling as role editing: the holder may only give
+    /// away, and only take away, what they themselves can do.
+    /// </remarks>
+    public static readonly PermissionCode MembersRolesManage =
+        PermissionCode.Create("members.roles.manage");
 
     /// <summary>The workspace group's display name.</summary>
     public const string WorkspaceGroup = "Workspace";
@@ -104,6 +126,9 @@ public static class PlatformPermissions
 
     /// <summary>The role administration group's display name.</summary>
     public const string RolesGroup = "Roles and permissions";
+
+    /// <summary>The team administration group's display name.</summary>
+    public const string MembersGroup = "Team members";
 
     /// <summary>
     /// The catalogue, in the order it is published and rendered.
@@ -159,6 +184,24 @@ public static class PlatformPermissions
             "Manage roles",
             "Create custom roles and change their names and permissions. It does not "
             + "give roles to members."),
+        new(
+            MembersView,
+            MembersGroup,
+            "View team members",
+            "See who belongs to this workspace, which roles they hold, and which "
+            + "invitations are still open."),
+        new(
+            MembersInvite,
+            MembersGroup,
+            "Invite team members",
+            "Create and revoke invitations. On its own it invites somebody who can "
+            + "do nothing until they are given a role."),
+        new(
+            MembersRolesManage,
+            MembersGroup,
+            "Assign roles to team members",
+            "Decide which roles a member holds. You can only give away, and only "
+            + "take away, what your own roles let you do."),
     ];
 
     /// <summary>

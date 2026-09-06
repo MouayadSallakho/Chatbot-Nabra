@@ -342,6 +342,107 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                     b.ToTable("messages", (string)null);
                 });
 
+            modelBuilder.Entity("OmniAI.Domain.Invitations.InvitationRoleGrant", b =>
+                {
+                    b.Property<Guid>("InvitationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("invitation_id");
+
+                    b.Property<Guid>("RoleId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_role_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("InvitationId", "RoleId");
+
+                    b.HasIndex("InvitationId", "TenantId");
+
+                    b.HasIndex("RoleId", "TenantId")
+                        .HasDatabaseName("ix_invitation_roles_role");
+
+                    b.ToTable("invitation_roles", (string)null);
+                });
+
+            modelBuilder.Entity("OmniAI.Domain.Invitations.TenantInvitation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset?>("AcceptedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("accepted_at");
+
+                    b.Property<Guid?>("AcceptedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("accepted_by_user_id");
+
+                    b.Property<string>("CanonicalEmail")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("canonical_email");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("email");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<Guid>("InvitedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("invited_by_user_id");
+
+                    b.Property<DateTimeOffset?>("RevokedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("revoked_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<byte[]>("TokenHash")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("token_hash");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("Id", "TenantId")
+                        .HasName("ak_tenant_invitations_id_tenant");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_tenant_invitations_tenant");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique()
+                        .HasDatabaseName("ux_tenant_invitations_token_hash");
+
+                    b.HasIndex("TenantId", "CanonicalEmail")
+                        .IsUnique()
+                        .HasDatabaseName("ux_tenant_invitations_open")
+                        .HasFilter("status = 'Pending'");
+
+                    b.ToTable("tenant_invitations", (string)null);
+                });
+
             modelBuilder.Entity("OmniAI.Domain.Tenants.Tenant", b =>
                 {
                     b.Property<Guid>("Id")
@@ -394,6 +495,16 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
 
                     b.HasKey("UserId", "TenantId");
 
@@ -582,6 +693,35 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_messages_conversation");
                 });
 
+            modelBuilder.Entity("OmniAI.Domain.Invitations.InvitationRoleGrant", b =>
+                {
+                    b.HasOne("OmniAI.Domain.Invitations.TenantInvitation", null)
+                        .WithMany("Roles")
+                        .HasForeignKey("InvitationId", "TenantId")
+                        .HasPrincipalKey("Id", "TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_invitation_roles_invitation_tenant");
+
+                    b.HasOne("OmniAI.Domain.Authorization.TenantRole", null)
+                        .WithMany()
+                        .HasForeignKey("RoleId", "TenantId")
+                        .HasPrincipalKey("Id", "TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_invitation_roles_role");
+                });
+
+            modelBuilder.Entity("OmniAI.Domain.Invitations.TenantInvitation", b =>
+                {
+                    b.HasOne("OmniAI.Domain.Tenants.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_tenant_invitations_tenant");
+                });
+
             modelBuilder.Entity("OmniAI.Domain.Tenants.TenantMembership", b =>
                 {
                     b.HasOne("OmniAI.Domain.Tenants.Tenant", null)
@@ -600,6 +740,11 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("OmniAI.Domain.Conversations.Conversation", b =>
                 {
                     b.Navigation("Messages");
+                });
+
+            modelBuilder.Entity("OmniAI.Domain.Invitations.TenantInvitation", b =>
+                {
+                    b.Navigation("Roles");
                 });
 #pragma warning restore 612, 618
         }

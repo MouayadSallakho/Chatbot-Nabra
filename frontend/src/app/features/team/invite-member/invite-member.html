@@ -1,0 +1,165 @@
+<div class="page page-narrow">
+  <app-page-header
+    heading="Invite member"
+    description="Send somebody a link that adds them to this workspace. They join as the account that opens it, so the address here has to be theirs."
+  >
+    <a pageActions class="btn btn-secondary" routerLink="/team">Back to team</a>
+  </app-page-header>
+
+  <div class="page-section">
+    @if (!canInvite()) {
+      <div class="card">
+        <app-empty-state
+          icon="team"
+          heading="You cannot invite people"
+          description="Inviting somebody to this workspace needs a permission your roles do not include. Ask somebody who administers this workspace if you need it."
+        />
+      </div>
+    } @else if (created(); as invitation) {
+      <!--
+        The one time the link exists. It is on screen because there is nowhere
+        else it could be: it is not stored, and no later request will return it.
+      -->
+      <div class="card invite-created">
+        <h2 class="text-section-title">Invitation created</h2>
+        <p class="text-small text-secondary">
+          Send this link to <strong>{{ invitation.email }}</strong> however you normally reach them.
+          It works once, expires on its own, and only that address can use it.
+        </p>
+
+        <p class="invite-link" data-testid="invitation-link">{{ invitation.link }}</p>
+
+        <div class="invite-actions">
+          <button type="button" class="btn btn-primary" (click)="copy()">
+            Copy invitation link
+          </button>
+          <button type="button" class="btn btn-secondary" (click)="inviteAnother()">
+            Invite somebody else
+          </button>
+          <a class="btn btn-secondary" routerLink="/team">Back to team</a>
+        </div>
+
+        @if (copied()) {
+          <p class="text-small text-muted" role="status">Copied.</p>
+        }
+
+        <p class="text-small text-muted">
+          This link is shown only now. If it is lost, revoke the invitation from the team page and
+          create a new one.
+        </p>
+      </div>
+    } @else if (loading()) {
+      <div class="card card-body" aria-busy="true">
+        <p class="visually-hidden" role="status">Loading roles…</p>
+        <span class="skeleton skeleton-text"></span>
+      </div>
+    } @else if (loadFailure(); as error) {
+      <div class="card">
+        <app-empty-state
+          icon="alert"
+          tone="error"
+          heading="Could not prepare the invitation"
+          [description]="error.message"
+        >
+          <button stateActions type="button" class="btn btn-secondary btn-sm" (click)="load()">
+            Try again
+          </button>
+        </app-empty-state>
+      </div>
+    } @else {
+      <form class="card invite-form" [formGroup]="form" (ngSubmit)="submit()" novalidate>
+        <div class="field">
+          <label class="form-label" for="invite-email">Email address</label>
+          <input
+            id="invite-email"
+            class="form-control"
+            type="email"
+            formControlName="email"
+            autocomplete="off"
+            inputmode="email"
+          />
+          <p class="text-small text-muted">
+            They must sign in with this address to accept. An invitation cannot be used by a
+            different account.
+          </p>
+
+          @if (showEmailError()) {
+            <p class="form-error" role="alert">Enter the email address to invite.</p>
+          }
+        </div>
+
+        <div class="field">
+          <h2 class="text-section-title">Access</h2>
+
+          @if (!canAssign()) {
+            <!--
+              Legitimate and worth saying plainly rather than hiding the form:
+              somebody who may invite but not hand out access can still bring a
+              colleague in, and an administrator gives them access afterwards.
+            -->
+            <p class="text-small text-secondary">
+              You can invite somebody, but giving them access needs a further permission your roles
+              do not include. They will join able to see the workspace and nothing else, until an
+              administrator assigns them a role.
+            </p>
+          } @else if (assignable().length === 0) {
+            <p class="text-small text-secondary">
+              There are no roles you can assign yet. They will join without access until a role is
+              created and given to them.
+            </p>
+          } @else {
+            <p class="text-small text-secondary section-note">
+              Only roles your own access lets you hand out are listed. You can leave them all
+              unticked and assign access later.
+            </p>
+
+            <fieldset class="role-options">
+              <legend class="visually-hidden">Roles for this invitation</legend>
+
+              @for (role of assignable(); track role.id) {
+                <label class="role-option">
+                  <input
+                    type="checkbox"
+                    class="form-check-input"
+                    [checked]="isTicked(role.id)"
+                    (change)="toggle(role.id, $any($event.target).checked)"
+                  />
+                  <span class="role-option-text">
+                    <span class="role-name">{{ role.name }}</span>
+                    <span class="text-small text-muted">
+                      @if (role.permissionCount === 1) {
+                        1 permission
+                      } @else {
+                        {{ role.permissionCount }} permissions
+                      }
+                    </span>
+                  </span>
+                </label>
+              }
+            </fieldset>
+          }
+        </div>
+
+        @if (failure(); as error) {
+          <p class="alert alert-danger" role="alert">{{ error.message }}</p>
+        }
+
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary" [disabled]="submitting()">
+            {{ submitting() ? 'Creating…' : 'Create invitation' }}
+          </button>
+
+          <p class="text-small text-muted" aria-live="polite">
+            @if (selectedCount() === 0) {
+              Joins with no access
+            } @else if (selectedCount() === 1) {
+              1 role selected
+            } @else {
+              {{ selectedCount() }} roles selected
+            }
+          </p>
+        </div>
+      </form>
+    }
+  </div>
+</div>

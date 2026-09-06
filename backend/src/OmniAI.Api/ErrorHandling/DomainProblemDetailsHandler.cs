@@ -4,6 +4,8 @@ using OmniAI.Application.Ai;
 using OmniAI.Application.AiAgents.ListAiAgents;
 using OmniAI.Application.AiAgents;
 using OmniAI.Application.Authorization;
+using OmniAI.Application.Invitations;
+using OmniAI.Application.Members;
 using OmniAI.Application.Security;
 using OmniAI.Application.Tenants;
 using OmniAI.Domain;
@@ -255,6 +257,59 @@ internal sealed partial class DomainProblemDetailsHandler(
             StatusCodes.Status409Conflict,
             "Role name already exists",
             roleName.Message),
+
+        // A member's access is not at the version the caller said it was
+        // changing. 412, for the reason every other stale write gets one: the
+        // operation may be perfectly fine and the caller has simply not seen this
+        // person's roles as they stand.
+        TenantMemberVersionMismatchException staleMember => (
+            StatusCodes.Status412PreconditionFailed,
+            "Precondition failed",
+            staleMember.Message),
+
+        // An operation this platform will not perform on this member, whoever
+        // asks: the Owner's access is not administered from team management, and
+        // nobody edits their own. 409 rather than 403, because more permission
+        // would not help -- it is a rule about the target, not about the caller.
+        ProtectedMembershipException protectedMember => (
+            StatusCodes.Status409Conflict,
+            "Membership protected",
+            protectedMember.Message),
+
+        // The address invited is already on the team. 409: the request is
+        // well-formed and permitted, and the workspace is simply already in the
+        // state it asks for.
+        AlreadyAMemberException alreadyMember => (
+            StatusCodes.Status409Conflict,
+            "Already a member",
+            alreadyMember.Message),
+
+        // One open invitation per address. 409, not 412: re-reading changes
+        // nothing, and the caller must revoke the existing one or wait.
+        InvitationAlreadyOpenException openInvitation => (
+            StatusCodes.Status409Conflict,
+            "Invitation already open",
+            openInvitation.Message),
+
+        // A real invitation that has been used, withdrawn, expired, or whose
+        // issuing authority no longer stands. 410 rather than 404, because the
+        // distinction is useful to the person holding the link: 404 would have
+        // them checking it for typos, and this tells them to ask for a new one.
+        // It discloses nothing -- presenting the token is already proof of having
+        // been sent it.
+        InvitationNoLongerUsableException unusable => (
+            StatusCodes.Status410Gone,
+            "Invitation no longer available",
+            unusable.Message),
+
+        // Signed in as somebody other than the invited address. 403: the caller is
+        // authenticated and the invitation is real, and the refusal is about who
+        // they are rather than about whether the invitation exists. It names
+        // neither address.
+        InvitationNotForThisAccountException wrongAccount => (
+            StatusCodes.Status403Forbidden,
+            "Invitation is for a different account",
+            wrongAccount.Message),
 
         // A use case that needs a signed-in person was reached without one. 401,
         // never 404: the caller has not yet said who they are, and signing in may

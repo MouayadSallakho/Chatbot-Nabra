@@ -17,19 +17,42 @@ public sealed class TenantMembershipSchemaTests(PostgresTestDatabase database)
     : IClassFixture<PostgresTestDatabase>
 {
     [Fact]
-    public async Task The_membership_table_exists_with_exactly_three_columns()
+    public async Task The_membership_table_exists_with_exactly_four_columns()
     {
-        // Three, and no fourth. A role column, a permission set or an "is owner"
-        // flag would be a schema commitment made before anybody decided what the
-        // roles are; this is what would notice one being added quietly.
+        // Four, and no fifth. Still no role column, no permission set and no "is
+        // owner" flag: which roles somebody holds is a set, and it lives in its
+        // own table. This is what would notice one being added quietly.
+        //
+        // updated_at arrived in Phase 14, when role assignment became something
+        // two administrators can edit at once and a member needed a version to
+        // build an ETag from. It is a real business fact -- when this person's
+        // access last changed -- rather than a marker invented to make the row
+        // look dirty.
         object? columns = await database.ExecuteScalarAsync(
             "SELECT string_agg(column_name || ':' || data_type || ':' || is_nullable, ', ' "
             + "ORDER BY ordinal_position) FROM information_schema.columns "
             + "WHERE table_schema = 'public' AND table_name = 'tenant_memberships'");
 
         Assert.Equal(
-            "user_id:uuid:NO, tenant_id:uuid:NO, created_at:timestamp with time zone:NO",
+            "user_id:uuid:NO, tenant_id:uuid:NO, created_at:timestamp with time zone:NO, "
+            + "updated_at:timestamp with time zone:NO",
             columns as string);
+    }
+
+    [Fact]
+    public async Task The_membership_table_has_no_physical_xmin_column()
+    {
+        // A member's ETag is built from PostgreSQL's own per-row transaction id,
+        // which every table already has. Declaring a column called xmin would
+        // shadow the system one and quietly break the concurrency check it exists
+        // to serve -- and the scaffolder does emit one unless it is removed by
+        // hand, which is why this is asserted rather than assumed.
+        object? count = await database.ExecuteScalarAsync(
+            "SELECT count(*) FROM information_schema.columns "
+            + "WHERE table_schema = 'public' AND table_name = 'tenant_memberships' "
+            + "AND column_name = 'xmin'");
+
+        Assert.Equal(0L, count);
     }
 
     [Fact]
@@ -61,8 +84,8 @@ public sealed class TenantMembershipSchemaTests(PostgresTestDatabase database)
         // rather than as an exception this test would have to catch.
         object? refused = await database.ExecuteScalarAsync(
             "WITH attempted AS ("
-            + "  INSERT INTO tenant_memberships (user_id, tenant_id, created_at) "
-            + $"  VALUES ('{userId}', '{tenantId}', now()) "
+            + "  INSERT INTO tenant_memberships (user_id, tenant_id, created_at, updated_at) "
+            + $"  VALUES ('{userId}', '{tenantId}', now(), now()) "
             + "  ON CONFLICT DO NOTHING RETURNING 1) "
             + "SELECT count(*) FROM attempted");
 
@@ -107,8 +130,8 @@ public sealed class TenantMembershipSchemaTests(PostgresTestDatabase database)
         Assert.Equal(0L, orphans as long?);
 
         await Assert.ThrowsAnyAsync<Exception>(() => database.ExecuteScalarAsync(
-            "INSERT INTO tenant_memberships (user_id, tenant_id, created_at) "
-            + $"VALUES ('{Guid.CreateVersion7()}', '{tenantId}', now())"));
+            "INSERT INTO tenant_memberships (user_id, tenant_id, created_at, updated_at) "
+            + $"VALUES ('{Guid.CreateVersion7()}', '{tenantId}', now(), now())"));
     }
 
     [Fact]
@@ -195,8 +218,8 @@ public sealed class TenantMembershipSchemaTests(PostgresTestDatabase database)
             + $"VALUES ('{tenantId}', 'Acme', '{slug}', 'Active')");
 
         await database.ExecuteScalarAsync(
-            "INSERT INTO tenant_memberships (user_id, tenant_id, created_at) "
-            + $"VALUES ('{userId}', '{tenantId}', now())");
+            "INSERT INTO tenant_memberships (user_id, tenant_id, created_at, updated_at) "
+            + $"VALUES ('{userId}', '{tenantId}', now(), now())");
 
         return tenantId;
     }

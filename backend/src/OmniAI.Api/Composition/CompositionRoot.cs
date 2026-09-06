@@ -16,6 +16,15 @@ using OmniAI.Application.Authorization.ListTenantRoles;
 using OmniAI.Application.Authorization.RenameTenantRole;
 using OmniAI.Application.Authorization.ReplaceTenantRolePermissions;
 using OmniAI.Application.Authorization;
+using OmniAI.Application.Invitations.AcceptTenantInvitation;
+using OmniAI.Application.Invitations.CreateTenantInvitation;
+using OmniAI.Application.Invitations.ListTenantInvitations;
+using OmniAI.Application.Invitations.RevokeTenantInvitation;
+using OmniAI.Application.Invitations;
+using OmniAI.Application.Members.GetAssignableRoles;
+using OmniAI.Application.Members.GetTenantMemberById;
+using OmniAI.Application.Members.ListTenantMembers;
+using OmniAI.Application.Members.ReplaceTenantMemberRoles;
 using OmniAI.Application.Tenants.CreateTenant;
 using OmniAI.Application.Tenants.GetTenantById;
 using OmniAI.Application.Tenants.ListMyTenants;
@@ -130,6 +139,21 @@ internal static class CompositionRoot
         services.AddScoped<ReplaceTenantRolePermissionsHandler>();
         services.AddScoped<GetPermissionCatalogHandler>();
         services.AddScoped<GetMyTenantPermissionsHandler>();
+
+        // Team administration.
+        services.AddScoped<ListTenantMembersHandler>();
+        services.AddScoped<GetTenantMemberByIdHandler>();
+        services.AddScoped<GetAssignableRolesHandler>();
+        services.AddScoped<ReplaceTenantMemberRolesHandler>();
+        services.AddScoped<ListTenantInvitationsHandler>();
+        services.AddScoped<CreateTenantInvitationHandler>();
+        services.AddScoped<RevokeTenantInvitationHandler>();
+        services.AddScoped<AcceptTenantInvitationHandler>();
+
+        // How long an invitation stays open. A singleton value rather than a
+        // constant read at each use site, so the lifetime is configurable and so a
+        // test can issue one that has already expired without waiting a week.
+        services.AddSingleton(new InvitationPolicy());
         services.AddScoped<CreateAiAgentHandler>();
         services.AddScoped<GetAiAgentByIdHandler>();
         services.AddScoped<ListAiAgentsHandler>();

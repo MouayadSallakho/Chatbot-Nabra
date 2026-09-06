@@ -223,15 +223,11 @@ public sealed class TenantAuthorizer(
         // membership through the base permission check, which answers absence
         // before this is asked. An empty ceiling is still the correct reading if
         // it ever did, and refuses everything except the empty set.
-        HashSet<PermissionCode> ceiling = [.. held ?? []];
+        PermissionCode? beyond = EffectivePermissions.FirstBeyond(permissions, held ?? []);
 
-        foreach (PermissionCode permission in
-            PlatformPermissions.AllCodes.Where(permissions.ToHashSet().Contains))
+        if (beyond is not null)
         {
-            if (!ceiling.Contains(permission))
-            {
-                throw PermissionDeniedException.ForPermission(permission);
-            }
+            throw PermissionDeniedException.ForPermission(beyond.Value);
         }
     }
 
@@ -280,8 +276,6 @@ public sealed class TenantAuthorizer(
             .ListAssignedRolesAsync(userId, tenantId, cancellationToken)
             .ConfigureAwait(false);
 
-        HashSet<PermissionCode> held = [.. assigned.SelectMany(role => role.EffectivePermissions)];
-
-        return [.. PlatformPermissions.AllCodes.Where(held.Contains)];
+        return EffectivePermissions.Union(assigned);
     }
 }

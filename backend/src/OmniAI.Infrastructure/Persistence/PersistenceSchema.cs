@@ -56,6 +56,16 @@ internal static class PersistenceSchema
     public const string NormalisedRoleName = "NormalisedName";
 
     /// <summary>
+    /// The shadow property holding an invited address in its comparison form.
+    /// </summary>
+    /// <remarks>
+    /// A shadow property for the same reason the normalised role name is one: the
+    /// Domain already derives it, and a second column the Domain also knew about
+    /// would be two places that could disagree about what canonical means.
+    /// </remarks>
+    public const string CanonicalEmail = "CanonicalEmail";
+
+    /// <summary>
     /// PostgreSQL's per-row transaction id system column, used as an optimistic
     /// concurrency token. It already exists on every table; it is never created
     /// by a migration.

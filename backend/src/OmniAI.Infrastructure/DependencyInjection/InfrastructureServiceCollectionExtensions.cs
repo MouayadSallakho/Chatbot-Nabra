@@ -4,8 +4,14 @@ using Microsoft.Extensions.DependencyInjection;
 using OmniAI.Application.Ai;
 using OmniAI.Application.AiAgents.Persistence;
 using OmniAI.Application.Authorization.Persistence;
+using OmniAI.Application.Invitations.Persistence;
+using OmniAI.Application.Invitations;
+using OmniAI.Application.Members.Persistence;
+using OmniAI.Application.Security;
 using OmniAI.Application.Tenants.Persistence;
 using OmniAI.Infrastructure.Ai.OpenAi;
+using OmniAI.Infrastructure.Identity;
+using OmniAI.Infrastructure.Invitations;
 using OmniAI.Infrastructure.Ai;
 using OmniAI.Infrastructure.Persistence.Repositories;
 using OmniAI.Infrastructure.Persistence;
@@ -72,7 +78,18 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<ITenantRepository, TenantRepository>();
         services.AddScoped<ITenantMembershipRepository, TenantMembershipRepository>();
         services.AddScoped<ITenantRoleRepository, TenantRoleRepository>();
+        services.AddScoped<ITenantMemberRepository, TenantMemberRepository>();
+        services.AddScoped<ITenantInvitationRepository, TenantInvitationRepository>();
         services.AddScoped<IAiAgentRepository, AiAgentRepository>();
+
+        // The one account fact the product may read. Scoped, because it reads
+        // through the request's DbContext.
+        services.AddScoped<IAccountDirectory, IdentityAccountDirectory>();
+
+        // Minting invitation secrets holds no state and touches no request:
+        // RandomNumberGenerator and SHA-256 are both static and thread-safe, so a
+        // single instance serves every caller.
+        services.AddSingleton<IInvitationTokens, InvitationTokens>();
 
         return services;
     }

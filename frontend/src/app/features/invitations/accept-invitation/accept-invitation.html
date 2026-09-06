@@ -1,0 +1,77 @@
+<div class="auth">
+  <main class="auth-card card" id="main-content" tabindex="-1">
+    <div class="auth-brand">
+      <svg class="brand-mark" viewBox="0 0 28 28" aria-hidden="true" focusable="false">
+        <rect width="28" height="28" rx="8" fill="currentColor" />
+        <circle cx="11" cy="11.5" r="3.25" fill="var(--accent-contrast)" />
+        <circle cx="18" cy="17" r="2.25" fill="var(--accent-contrast)" fill-opacity="0.7" />
+      </svg>
+      <span class="brand-name">OmniAI</span>
+    </div>
+
+    @switch (state()) {
+      @case ('reading') {
+        <h1 class="text-page-title">Opening your invitation…</h1>
+        <p class="auth-lead text-body text-secondary" role="status">One moment.</p>
+      }
+
+      @case ('needsAccount') {
+        <!--
+          The expected case, not an error: most people opening an invitation do
+          not have an account yet. The token waits in memory while they sign in
+          or register, and acceptance continues by itself when they return.
+        -->
+        <h1 class="text-page-title">You have been invited</h1>
+        <p class="auth-lead text-body text-secondary">
+          Sign in with the address this invitation was sent to, or create an account with it, and
+          you will join the workspace straight away.
+        </p>
+
+        <div class="auth-actions">
+          <a class="btn btn-primary" [routerLink]="loginPath">Sign in</a>
+          <a class="btn btn-secondary" [routerLink]="registerPath">Create account</a>
+        </div>
+
+        <p class="auth-note text-small text-muted">
+          Keep this tab open. If you close it, open your invitation link again.
+        </p>
+      }
+
+      @case ('accepting') {
+        <h1 class="text-page-title">Joining the workspace…</h1>
+        <p class="auth-lead text-body text-secondary" role="status">One moment.</p>
+      }
+
+      @case ('accepted') {
+        <h1 class="text-page-title">You are in</h1>
+        <p class="auth-lead text-body text-secondary">
+          You have joined <strong>{{ workspaceName() }}</strong
+          >. What you can do there depends on the roles you were given — an administrator can change
+          them at any time.
+        </p>
+
+        <div class="auth-actions">
+          <button type="button" class="btn btn-primary" (click)="open()">Open workspace</button>
+        </div>
+      }
+
+      @case ('failed') {
+        <!--
+          One shape for every refusal. Whether the invitation was used, withdrawn,
+          expired, or written to a different account, the reader's next step is
+          the same: ask for a new one. The server's own sentence says which it
+          was; nothing here adds detail about somebody else's account.
+        -->
+        <h1 class="text-page-title">This invitation cannot be used</h1>
+
+        @if (failure(); as error) {
+          <p class="auth-alert alert alert-danger" role="alert">{{ error.message }}</p>
+        }
+
+        <div class="auth-actions">
+          <a class="btn btn-secondary" [routerLink]="homePath">Go to OmniAI</a>
+        </div>
+      }
+    }
+  </main>
+</div>

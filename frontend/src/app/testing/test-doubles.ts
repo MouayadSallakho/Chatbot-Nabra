@@ -214,4 +214,22 @@ export const EVERY_PERMISSION: readonly PermissionDefinition[] = [
     label: 'Manage roles',
     description: 'Create custom roles and change their names and permissions.',
   },
+  {
+    code: 'members.view',
+    group: 'Team members',
+    label: 'View team members',
+    description: 'See who belongs to this workspace and which roles they hold.',
+  },
+  {
+    code: 'members.invite',
+    group: 'Team members',
+    label: 'Invite team members',
+    description: 'Create and revoke invitations.',
+  },
+  {
+    code: 'members.roles.manage',
+    group: 'Team members',
+    label: 'Assign roles to team members',
+    description: 'Decide which roles a member holds.',
+  },
 ];

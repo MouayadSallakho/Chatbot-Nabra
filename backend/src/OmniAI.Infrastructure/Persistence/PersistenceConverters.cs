@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using OmniAI.Domain.AiAgents;
 using OmniAI.Domain.Authorization;
 using OmniAI.Domain.Conversations;
+using OmniAI.Domain.Invitations;
 using OmniAI.Domain.Tenants;
 using OmniAI.Domain.Users;
 
@@ -27,6 +28,44 @@ internal static class PersistenceConverters
 
     public static readonly ValueConverter<TenantRoleId, Guid> TenantRoleId =
         new(id => id.Value, value => Domain.Authorization.TenantRoleId.From(value));
+
+    public static readonly ValueConverter<TenantInvitationId, Guid> TenantInvitationId =
+        new(id => id.Value, value => Domain.Invitations.TenantInvitationId.From(value));
+
+    /// <summary>
+    /// An optional user id, for the account that accepted an invitation.
+    /// </summary>
+    /// <remarks>
+    /// A separate converter rather than a nullable use of the one above, because
+    /// EF Core matches converters by exact type and would otherwise store the
+    /// default struct as an empty GUID -- which the factory refuses to read back.
+    /// </remarks>
+    public static readonly ValueConverter<UserId?, Guid?> NullableUserId =
+        new(
+            id => id == null ? null : id.Value.Value,
+            value => value == null ? null : Domain.Users.UserId.From(value.Value));
+
+    /// <summary>
+    /// An email address, stored as it was written.
+    /// </summary>
+    /// <remarks>
+    /// The canonical form travels beside it in its own shadow column rather than
+    /// being re-derived on read: see <c>EmailAddress.FromStored</c> for why a row
+    /// keeps the form it was matched on.
+    /// </remarks>
+    public static readonly ValueConverter<EmailAddress, string> EmailAddress =
+        new(email => email.Value, value => Domain.Users.EmailAddress.Create(value));
+
+    /// <summary>
+    /// The digest of an invitation token, stored as raw bytes.
+    /// </summary>
+    /// <remarks>
+    /// <c>bytea</c> rather than text. There is deliberately no converter anywhere
+    /// in this file that could store an invitation's raw token, because no type in
+    /// the model holds one.
+    /// </remarks>
+    public static readonly ValueConverter<InvitationTokenHash, byte[]> InvitationTokenHash =
+        new(hash => hash.ToArray(), value => Domain.Invitations.InvitationTokenHash.From(value));
 
     /// <summary>
     /// A role name, stored as the display form the workspace typed.

@@ -1,0 +1,155 @@
+<div class="page">
+  <app-page-header
+    heading="Team"
+    description="The people who can reach this workspace, and what each of them may do. Access comes from the roles somebody holds."
+  >
+    @if (canInvite() && canView() && !loading()) {
+      <a pageActions class="btn btn-primary" routerLink="/team/invite">Invite member</a>
+    }
+  </app-page-header>
+
+  <div class="page-section">
+    @if (!canView()) {
+      <!--
+        Says what is true and what to do about it. No "403", no permission code,
+        and nothing implying the account is broken.
+      -->
+      <div class="card">
+        <app-empty-state
+          icon="team"
+          heading="You do not have access to the team"
+          description="Seeing who belongs to this workspace needs a permission your roles do not include. Ask somebody who administers this workspace if you need it."
+        />
+      </div>
+    } @else if (loading()) {
+      <div class="member-list" aria-busy="true">
+        <p class="visually-hidden" role="status">Loading the team…</p>
+        @for (row of skeletonRows; track row) {
+          <div class="member-row member-row-skeleton" aria-hidden="true">
+            <span class="skeleton skeleton-title"></span>
+            <span class="skeleton skeleton-text"></span>
+            <span class="skeleton skeleton-text"></span>
+          </div>
+        }
+      </div>
+    } @else if (failure(); as error) {
+      <div class="card">
+        <app-empty-state
+          icon="alert"
+          tone="error"
+          heading="Could not load the team"
+          [description]="error.message"
+        >
+          <button stateActions type="button" class="btn btn-secondary btn-sm" (click)="load()">
+            Try again
+          </button>
+        </app-empty-state>
+      </div>
+    } @else {
+      <h2 class="text-section-title">Members</h2>
+
+      <div class="member-list">
+        <div class="member-list-head" aria-hidden="true">
+          <span>Member</span>
+          <span>Roles</span>
+          <span>Joined</span>
+        </div>
+
+        <ul>
+          @for (member of members(); track member.userId) {
+            <li>
+              <a class="member-row" [routerLink]="['/team', member.userId]">
+                <span class="member-name">
+                  <span class="member-email">{{ member.email }}</span>
+
+                  @if (member.isOwner) {
+                    <!--
+                      Marked, not hidden. Somebody looking for "who owns this
+                      workspace" must be able to find them, and must be able to
+                      see at a glance that their access is not editable here.
+                    -->
+                    <span class="badge badge-neutral">Owner</span>
+                  }
+                </span>
+
+                <span class="member-roles text-small text-secondary">
+                  @if (member.roles.length === 0) {
+                    No roles yet
+                  } @else {
+                    {{ roleNames(member) }}
+                  }
+                </span>
+
+                <span class="member-joined text-small text-muted">
+                  <span class="member-joined-label">Joined&nbsp;</span>
+                  <time [attr.datetime]="member.joinedAt">{{
+                    member.joinedAt | date: 'mediumDate'
+                  }}</time>
+                </span>
+
+                <app-icon class="member-chevron" name="chevron-end" [strokeWidth]="1.75" />
+              </a>
+            </li>
+          }
+        </ul>
+      </div>
+
+      <h2 class="text-section-title invitations-heading">Pending invitations</h2>
+
+      @if (revokeFailure(); as error) {
+        <p class="alert alert-danger" role="alert">{{ error.message }}</p>
+      }
+
+      @if (pending().length === 0) {
+        <div class="card">
+          <div class="card-body">
+            <p class="text-small text-muted">
+              No invitations are waiting. Anybody you invite appears here until they accept.
+            </p>
+          </div>
+        </div>
+      } @else {
+        <div class="member-list">
+          <ul>
+            @for (invitation of pending(); track invitation.id) {
+              <li>
+                <div class="member-row invitation-row">
+                  <span class="member-name">
+                    <span class="member-email">{{ invitation.email }}</span>
+                    <span class="badge badge-neutral">Invited</span>
+                  </span>
+
+                  <span class="member-roles text-small text-secondary">
+                    @if (invitation.roles.length === 0) {
+                      Joins with no roles
+                    } @else {
+                      {{ invitation.roles.join(', ') }}
+                    }
+                  </span>
+
+                  <span class="member-joined text-small text-muted">
+                    <span class="member-joined-label">Expires&nbsp;</span>
+                    <time [attr.datetime]="invitation.expiresAt">{{
+                      invitation.expiresAt | date: 'mediumDate'
+                    }}</time>
+                  </span>
+
+                  @if (canInvite()) {
+                    <button
+                      type="button"
+                      class="btn btn-secondary btn-sm invitation-revoke"
+                      [disabled]="revoking() === invitation.id"
+                      (click)="revoke(invitation)"
+                    >
+                      {{ revoking() === invitation.id ? 'Revoking…' : 'Revoke' }}
+                    </button>
+                  }
+                </div>
+              </li>
+            }
+          </ul>
+        </div>
+      }
+    }
+  </div>
+</div>

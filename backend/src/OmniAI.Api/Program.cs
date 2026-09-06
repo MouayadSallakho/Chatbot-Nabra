@@ -3,6 +3,7 @@ using OmniAI.Api.Auth;
 using OmniAI.Api.Authorization;
 using OmniAI.Api.Composition;
 using OmniAI.Api.Security;
+using OmniAI.Api.Team;
 using OmniAI.Api.Tenants;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
@@ -86,6 +87,14 @@ app.MapTenantEndpoints();
 // Reading needs roles.view, writing needs roles.manage, and neither implies the
 // other. There is deliberately no member-assignment surface here.
 app.MapRoleEndpoints();
+
+// Team administration: members, their role assignments, and invitations.
+//
+// Reading needs members.view, inviting needs members.invite, and handing out
+// roles needs members.roles.manage -- none of which implies another. Invitation
+// acceptance is mapped by the same call but sits outside the workspace group,
+// because the person accepting is not a member yet.
+app.MapTeamEndpoints();
 
 // AI agent configuration, scoped to the tenant that owns each agent.
 //

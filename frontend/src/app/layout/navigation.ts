@@ -84,6 +84,19 @@ export const NAV_ITEMS: readonly NavItem[] = [
     implemented: true,
     permissions: ['roles.view'],
   },
+  {
+    // Beside Roles rather than inside it: a role is a definition of what may be
+    // done, and a team is the people who may do it. They are administered by
+    // different permissions and, in a real workspace, often by different people.
+    label: 'Team',
+    path: 'team',
+    icon: 'team',
+    implemented: true,
+    // Only members.view. Inviting and assigning are things done from inside this
+    // area, and somebody who can invite but not see the team would arrive at a
+    // page that could show them nothing.
+    permissions: ['members.view'],
+  },
 ];
 
 /** Where the application lands, and where "not found" sends people back to. */

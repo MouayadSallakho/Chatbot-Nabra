@@ -19,6 +19,8 @@ export type ApiErrorKind =
   | 'notFound'
   /** Well-formed, but contradicts the resource's current lifecycle state. */
   | 'conflict'
+  /** It existed and is finished with: an invitation used, withdrawn or expired. */
+  | 'gone'
   /** The caller's `If-Match` did not match: somebody else changed it first. */
   | 'stale'
   /** A conditional request was required and none was sent. */
@@ -61,6 +63,7 @@ const MESSAGES: Readonly<Record<ApiErrorKind, string>> = {
     'workspace if you need it.',
   notFound: 'That item no longer exists in this workspace.',
   conflict: 'That action is not available for this item right now.',
+  gone: 'This invitation is no longer available. Ask whoever invited you for a new one.',
   stale: 'This item was updated somewhere else since you opened it.',
   preconditionRequired: 'This item needs to be reloaded before it can be saved.',
   invalidResponse: 'The AI provider returned a response this platform could not use.',
@@ -97,7 +100,7 @@ const MESSAGES: Readonly<Record<ApiErrorKind, string>> = {
  * the copy is written to say so: it is a statement about what this person may
  * do, not about whether the thing exists.
  */
-const DETAIL_IS_USEFUL: ReadonlySet<number> = new Set([400, 401, 404, 409]);
+const DETAIL_IS_USEFUL: ReadonlySet<number> = new Set([400, 401, 404, 409, 410]);
 
 /**
  * Interprets a failed request.
@@ -137,6 +140,12 @@ function kindOf(status: number): ApiErrorKind {
       return 'notFound';
     case 409:
       return 'conflict';
+    // A resource that genuinely existed and is now finished with -- an
+    // invitation that was used, withdrawn or expired. Distinct from 404 because
+    // the difference matters to the reader: not-found has somebody checking the
+    // link for typos, while this tells them to ask for a new one.
+    case 410:
+      return 'gone';
     case 412:
       return 'stale';
     case 428:

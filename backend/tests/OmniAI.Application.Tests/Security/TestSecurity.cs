@@ -63,6 +63,20 @@ internal sealed class InMemoryTenantMembershipRepository : ITenantMembershipRepo
         return this;
     }
 
+    /// <summary>Takes somebody's memberships away.</summary>
+    /// <remarks>
+    /// There is no product surface that removes a member, and deliberately so.
+    /// This exists because a security question genuinely depends on it: an
+    /// invitation must not outlive the membership that issued it, and proving
+    /// that needs an inviter who has left.
+    /// </remarks>
+    public InMemoryTenantMembershipRepository Forget(UserId userId)
+    {
+        _rows.RemoveAll(row => row.Membership.UserId == userId);
+
+        return this;
+    }
+
     public Task<bool> ExistsAsync(
         UserId userId,
         TenantId tenantId,
