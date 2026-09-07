@@ -3,6 +3,7 @@ using OmniAI.Application.Conversations;
 using OmniAI.Application.Tests.AiAgents;
 using OmniAI.Application.WebChat;
 using OmniAI.Application.WebChat.Hosted;
+using OmniAI.Application.WebChat.Protection;
 using OmniAI.Domain;
 using OmniAI.Domain.AiAgents;
 using OmniAI.Domain.Conversations;
@@ -23,111 +24,37 @@ namespace OmniAI.Application.Tests.WebChat;
 /// </remarks>
 public sealed class WebChatRuntimeTests
 {
-    private static readonly DateTimeOffset Noon = new(2026, 9, 7, 12, 0, 0, TimeSpan.Zero);
-
-    /// <summary>Everything one scenario needs, wired the way production wires it.</summary>
-    private sealed class Harness
-    {
-        public required FakeWebChatWorld World { get; init; }
-        public required InMemoryAiAgentRepository Agents { get; init; }
-        public required RecordingGenerator Generator { get; init; }
-        public required FakeConversationLock Lock { get; init; }
-        public required TestWebChatTokens Tokens { get; init; }
-        public required StartWebChatConversationHandler Start { get; init; }
-        public required SendWebChatMessageHandler Send { get; init; }
-        public required ListWebChatMessagesHandler List { get; init; }
-        public required WebChatEndpoint Endpoint { get; init; }
-        public required AiAgent Agent { get; init; }
-        public required TenantId Workspace { get; init; }
-    }
+    /// <summary>
+    /// Everything one scenario needs, and the shorthands for driving it.
+    /// </summary>
+    /// <remarks>
+    /// Lifted into <see cref="Harness"/> when the protection suite needed the same
+    /// arrangement. Two copies of "an active agent behind an active endpoint with a
+    /// provider that counts its calls" would have drifted until the two suites were
+    /// exercising different objects.
+    /// </remarks>
+    private static readonly DateTimeOffset Noon = Harness.Noon;
 
     private static Harness Build(
         RecordingGenerator? generator = null,
         AiAgentStatus agentStatus = AiAgentStatus.Active,
         bool activateEndpoint = true,
         ConversationContextPolicy? context = null,
-        WebChatPolicy? policy = null)
-    {
-        TenantId workspace = TenantId.New();
+        WebChatPolicy? policy = null) =>
+        Harness.Build(generator, agentStatus, activateEndpoint, context, policy);
 
-        AiAgent agent = AiAgent.Create(
-            workspace,
-            AiAgentName.Create("Support"),
-            AgentInstructions.Create("Be helpful and concise."),
-            Noon);
+    private static StartWebChatConversationCommand Starting(string? publicKey) =>
+        Harness.Starting(publicKey);
 
-        if (agentStatus == AiAgentStatus.Active)
-        {
-            agent.Activate(Noon);
-        }
-        else if (agentStatus == AiAgentStatus.Disabled)
-        {
-            agent.Activate(Noon);
-            agent.Disable(Noon);
-        }
+    private static SendWebChatMessageCommand Sending(
+        Guid conversationId,
+        string? accessToken,
+        string? clientMessageId,
+        string? text) =>
+        Harness.Sending(conversationId, accessToken, clientMessageId, text);
 
-        FakeWebChatWorld world = new();
-        world.AddAgent(agent.Id, agent.Name.Value, agent.Status);
-
-        WebChatEndpoint endpoint = WebChatEndpoint.Create(
-            workspace,
-            agent.Id,
-            new TestWebChatPublicKeys().Create(),
-            Noon);
-
-        if (activateEndpoint)
-        {
-            endpoint.Activate(Noon);
-        }
-
-        world.AddEndpoint(endpoint);
-
-        InMemoryAiAgentRepository agents = new();
-        agents.Seed(agent);
-
-        RecordingGenerator recorder = generator ?? RecordingGenerator.Replying();
-        FakeConversationLock gate = new();
-        TestWebChatTokens tokens = new();
-        WebChatPolicy chatPolicy = policy ?? new WebChatPolicy();
-        ConversationContextPolicy contextPolicy = context ?? new ConversationContextPolicy();
-        PublicWebChatAccess access = new(world, tokens);
-        FakeTimeProvider clock = new(Noon);
-
-        return new Harness
-        {
-            World = world,
-            Agents = agents,
-            Generator = recorder,
-            Lock = gate,
-            Tokens = tokens,
-            Endpoint = endpoint,
-            Agent = agent,
-            Workspace = workspace,
-            Start = new StartWebChatConversationHandler(world, world, tokens, clock),
-            Send = new SendWebChatMessageHandler(
-                access,
-                world,
-                world,
-                world,
-                agents,
-                recorder,
-                gate,
-                contextPolicy,
-                chatPolicy,
-                clock),
-            List = new ListWebChatMessagesHandler(access, world, chatPolicy),
-        };
-    }
-
-    private static async Task<StartedWebChatSession> StartAsync(Harness harness)
-    {
-        StartedWebChatSession? started = await harness.Start.StartAsync(
-            new StartWebChatConversationCommand(harness.Endpoint.PublicKey.Value));
-
-        Assert.NotNull(started);
-
-        return started;
-    }
+    private static Task<StartedWebChatSession> StartAsync(Harness harness) =>
+        harness.StartAsync();
 
     // ---- Provider success -----------------------------------------------
 
@@ -137,7 +64,7 @@ public sealed class WebChatRuntimeTests
         Harness harness = Build();
         StartedWebChatSession session = await StartAsync(harness);
 
-        WebChatTurnResult? turn = await harness.Send.HandleAsync(new SendWebChatMessageCommand(
+        WebChatTurnResult? turn = await harness.Send.HandleAsync(Sending(
             session.Conversation.ConversationId,
             session.AccessToken,
             "m1",
@@ -165,7 +92,7 @@ public sealed class WebChatRuntimeTests
         Harness harness = Build();
         StartedWebChatSession session = await StartAsync(harness);
 
-        await harness.Send.HandleAsync(new SendWebChatMessageCommand(
+        await harness.Send.HandleAsync(Sending(
             session.Conversation.ConversationId, session.AccessToken, "m1", "Hello"));
 
         Assert.Equal("Be helpful and concise.", harness.Generator.Requests[0].Instructions);
@@ -174,7 +101,7 @@ public sealed class WebChatRuntimeTests
             AgentInstructions.Create("Answer only in French."),
             Noon.AddHours(1));
 
-        await harness.Send.HandleAsync(new SendWebChatMessageCommand(
+        await harness.Send.HandleAsync(Sending(
             session.Conversation.ConversationId, session.AccessToken, "m2", "Again"));
 
         Assert.Equal("Answer only in French.", harness.Generator.Requests[1].Instructions);
@@ -186,10 +113,10 @@ public sealed class WebChatRuntimeTests
         Harness harness = Build();
         StartedWebChatSession session = await StartAsync(harness);
 
-        await harness.Send.HandleAsync(new SendWebChatMessageCommand(
+        await harness.Send.HandleAsync(Sending(
             session.Conversation.ConversationId, session.AccessToken, "m1", "First question"));
 
-        await harness.Send.HandleAsync(new SendWebChatMessageCommand(
+        await harness.Send.HandleAsync(Sending(
             session.Conversation.ConversationId, session.AccessToken, "m2", "Second question"));
 
         IReadOnlyList<AiTurn> second = harness.Generator.Requests[1].Turns;
@@ -219,7 +146,7 @@ public sealed class WebChatRuntimeTests
         harness.World.SeedMessage(
             conversation, MessageSender.Customer, "Ingested third", Noon.AddHours(-9));
 
-        await harness.Send.HandleAsync(new SendWebChatMessageCommand(
+        await harness.Send.HandleAsync(Sending(
             session.Conversation.ConversationId, session.AccessToken, "m1", "Newest"));
 
         Assert.Equal(
@@ -235,7 +162,7 @@ public sealed class WebChatRuntimeTests
         Harness harness = Build();
         StartedWebChatSession session = await StartAsync(harness);
 
-        SendWebChatMessageCommand command = new(
+        SendWebChatMessageCommand command = Sending(
             session.Conversation.ConversationId, session.AccessToken, "same-id", "Hello");
 
         WebChatTurnResult? first = await harness.Send.HandleAsync(command);
@@ -264,7 +191,7 @@ public sealed class WebChatRuntimeTests
         Harness harness = Build();
         StartedWebChatSession session = await StartAsync(harness);
 
-        SendWebChatMessageCommand command = new(
+        SendWebChatMessageCommand command = Sending(
             session.Conversation.ConversationId, session.AccessToken, "same-id", "Hello");
 
         Task<WebChatTurnResult?>[] attempts =
@@ -305,7 +232,7 @@ public sealed class WebChatRuntimeTests
         Harness harness = Build(RecordingGenerator.Failing(() => new AiRuntimeUnavailableException()));
         StartedWebChatSession session = await StartAsync(harness);
 
-        SendWebChatMessageCommand command = new(
+        SendWebChatMessageCommand command = Sending(
             session.Conversation.ConversationId, session.AccessToken, "m1", "Hello");
 
         await Assert.ThrowsAsync<AiRuntimeUnavailableException>(
@@ -330,11 +257,11 @@ public sealed class WebChatRuntimeTests
         StartedWebChatSession session = await StartAsync(harness);
 
         Task<WebChatTurnResult?> first = Task.Run(() => harness.Send.HandleAsync(
-            new SendWebChatMessageCommand(
+            Sending(
                 session.Conversation.ConversationId, session.AccessToken, "m1", "First")));
 
         Task<WebChatTurnResult?> second = Task.Run(() => harness.Send.HandleAsync(
-            new SendWebChatMessageCommand(
+            Sending(
                 session.Conversation.ConversationId, session.AccessToken, "m2", "Second")));
 
         gate.SetResult();
@@ -372,11 +299,11 @@ public sealed class WebChatRuntimeTests
         StartedWebChatSession second = await StartAsync(harness);
 
         Task<WebChatTurnResult?> a = Task.Run(() => harness.Send.HandleAsync(
-            new SendWebChatMessageCommand(
+            Sending(
                 first.Conversation.ConversationId, first.AccessToken, "m1", "Hello")));
 
         Task<WebChatTurnResult?> b = Task.Run(() => harness.Send.HandleAsync(
-            new SendWebChatMessageCommand(
+            Sending(
                 second.Conversation.ConversationId, second.AccessToken, "m1", "Hello")));
 
         // Both reach the provider before either is allowed to finish, which is
@@ -409,7 +336,7 @@ public sealed class WebChatRuntimeTests
         ConversationId conversation = ConversationId.From(session.Conversation.ConversationId);
 
         await Assert.ThrowsAnyAsync<Exception>(() => harness.Send.HandleAsync(
-            new SendWebChatMessageCommand(
+            Sending(
                 session.Conversation.ConversationId, session.AccessToken, "m1", "Are you there?")));
 
         // What the customer said survives. Nothing fabricates an answer, and no
@@ -434,7 +361,7 @@ public sealed class WebChatRuntimeTests
         Harness harness = Build(activateEndpoint: false);
 
         await Assert.ThrowsAsync<WebChatUnavailableException>(() => harness.Start.StartAsync(
-            new StartWebChatConversationCommand(harness.Endpoint.PublicKey.Value)));
+            Starting(harness.Endpoint.PublicKey.Value)));
 
         Assert.Equal(0, harness.Generator.Calls);
     }
@@ -445,7 +372,7 @@ public sealed class WebChatRuntimeTests
         Harness harness = Build(agentStatus: AiAgentStatus.Draft);
 
         await Assert.ThrowsAsync<WebChatUnavailableException>(() => harness.Start.StartAsync(
-            new StartWebChatConversationCommand(harness.Endpoint.PublicKey.Value)));
+            Starting(harness.Endpoint.PublicKey.Value)));
     }
 
     [Fact]
@@ -454,7 +381,7 @@ public sealed class WebChatRuntimeTests
         Harness harness = Build(agentStatus: AiAgentStatus.Disabled);
 
         await Assert.ThrowsAsync<WebChatUnavailableException>(() => harness.Start.StartAsync(
-            new StartWebChatConversationCommand(harness.Endpoint.PublicKey.Value)));
+            Starting(harness.Endpoint.PublicKey.Value)));
     }
 
     [Fact]
@@ -465,13 +392,13 @@ public sealed class WebChatRuntimeTests
         Harness harness = Build();
         StartedWebChatSession session = await StartAsync(harness);
 
-        Assert.NotNull(await harness.Send.HandleAsync(new SendWebChatMessageCommand(
+        Assert.NotNull(await harness.Send.HandleAsync(Sending(
             session.Conversation.ConversationId, session.AccessToken, "m1", "Hello")));
 
         harness.Agent.Disable(Noon.AddHours(1));
 
         await Assert.ThrowsAsync<WebChatUnavailableException>(() => harness.Send.HandleAsync(
-            new SendWebChatMessageCommand(
+            Sending(
                 session.Conversation.ConversationId, session.AccessToken, "m2", "Still there?")));
 
         Assert.Equal(1, harness.Generator.Calls);
@@ -483,13 +410,13 @@ public sealed class WebChatRuntimeTests
         Harness harness = Build();
         StartedWebChatSession session = await StartAsync(harness);
 
-        Assert.NotNull(await harness.Send.HandleAsync(new SendWebChatMessageCommand(
+        Assert.NotNull(await harness.Send.HandleAsync(Sending(
             session.Conversation.ConversationId, session.AccessToken, "m1", "Hello")));
 
         harness.Endpoint.Disable(Noon.AddHours(1));
 
         await Assert.ThrowsAsync<WebChatUnavailableException>(() => harness.Send.HandleAsync(
-            new SendWebChatMessageCommand(
+            Sending(
                 session.Conversation.ConversationId, session.AccessToken, "m2", "Anyone?")));
 
         // The history a visitor already has is theirs. Withdrawing a channel is a
@@ -517,7 +444,7 @@ public sealed class WebChatRuntimeTests
         Assert.Null(await harness.List.HandleAsync(new ListWebChatMessagesQuery(
             b.Conversation.ConversationId, a.AccessToken, null, null)));
 
-        Assert.Null(await harness.Send.HandleAsync(new SendWebChatMessageCommand(
+        Assert.Null(await harness.Send.HandleAsync(Sending(
             b.Conversation.ConversationId, a.AccessToken, "m1", "Reading your mail")));
 
         Assert.Equal(0, harness.Generator.Calls);
@@ -532,13 +459,13 @@ public sealed class WebChatRuntimeTests
         Assert.Null(await harness.List.HandleAsync(new ListWebChatMessagesQuery(
             session.Conversation.ConversationId, null, null, null)));
 
-        Assert.Null(await harness.Send.HandleAsync(new SendWebChatMessageCommand(
+        Assert.Null(await harness.Send.HandleAsync(Sending(
             session.Conversation.ConversationId, null, "m1", "Hello")));
 
         // A well-formed but wrong credential is refused identically.
         string invented = new TestWebChatTokens().Create().Token;
 
-        Assert.Null(await harness.Send.HandleAsync(new SendWebChatMessageCommand(
+        Assert.Null(await harness.Send.HandleAsync(Sending(
             session.Conversation.ConversationId, invented, "m1", "Hello")));
 
         Assert.Equal(0, harness.Generator.Calls);
@@ -564,7 +491,7 @@ public sealed class WebChatRuntimeTests
 
         DomainValidationException failure =
             await Assert.ThrowsAsync<DomainValidationException>(() => harness.Send.HandleAsync(
-                new SendWebChatMessageCommand(
+                Sending(
                     session.Conversation.ConversationId,
                     session.AccessToken,
                     "m1",
@@ -586,7 +513,7 @@ public sealed class WebChatRuntimeTests
         StartedWebChatSession session = await StartAsync(harness);
 
         await Assert.ThrowsAsync<DomainValidationException>(() => harness.Send.HandleAsync(
-            new SendWebChatMessageCommand(
+            Sending(
                 session.Conversation.ConversationId, session.AccessToken, "m1", text)));
 
         Assert.Equal(0, harness.Generator.Calls);
@@ -599,7 +526,7 @@ public sealed class WebChatRuntimeTests
         StartedWebChatSession session = await StartAsync(harness);
 
         await Assert.ThrowsAsync<DomainValidationException>(() => harness.Send.HandleAsync(
-            new SendWebChatMessageCommand(
+            Sending(
                 session.Conversation.ConversationId, session.AccessToken, null, "Hello")));
 
         Assert.Empty(harness.World.Turns);

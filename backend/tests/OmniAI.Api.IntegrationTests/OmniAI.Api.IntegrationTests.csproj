@@ -27,6 +27,13 @@
   -->
   <ItemGroup>
     <Compile Include="..\Shared\PostgresTestDatabase.cs" Link="PostgresTestDatabase.cs" />
+    <!--
+      The throwaway Redis both suites measure the public chat protection against.
+      Shared for the same reason the PostgreSQL harness is: a second copy of
+      "find a server, namespace the keys, clean up" drifts until the two suites
+      are testing different things.
+    -->
+    <Compile Include="..\Shared\RedisTestServer.cs" Link="RedisTestServer.cs" />
     <!-- Reads assembly metadata without loading code, for the layer guards. -->
     <Compile Include="..\Shared\AssemblyReferenceReader.cs" Link="AssemblyReferenceReader.cs" />
     <!--

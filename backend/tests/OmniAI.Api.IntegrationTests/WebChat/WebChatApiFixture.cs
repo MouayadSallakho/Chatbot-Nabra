@@ -41,33 +41,6 @@ public sealed class WebChatApiFixture : RoleApiFixture
         services.Replace(ServiceDescriptor.Singleton<IAiTextGenerator>(_generator));
     }
 
-    /// <summary>
-    /// A browser with no OmniAI account, as a visitor's is.
-    /// </summary>
-    /// <remarks>
-    /// Cookies are kept between requests, which is the whole point: the
-    /// conversation credential is issued as one and has to travel back by itself.
-    /// The antiforgery pair is established first, exactly as the hosted page does.
-    /// </remarks>
-    public async Task<HttpClient> CreateVisitorAsync()
-    {
-        HttpClient client = CreateClient();
-
-        // Anonymous, and still antiforgery-checked. Being unauthenticated is not
-        // a reason to skip it: there is a session here, and it is precisely what a
-        // cross-site request would ride on.
-        HttpResponseMessage csrf = await client.GetAsync(new Uri("/api/auth/csrf", UriKind.Relative));
-
-        Assert.Equal(HttpStatusCode.NoContent, csrf.StatusCode);
-
-        if (ReadCookie(csrf, "XSRF-TOKEN") is string token)
-        {
-            client.DefaultRequestHeaders.Add("X-XSRF-TOKEN", token);
-        }
-
-        return client;
-    }
-
     /// <summary>Reads one cookie's value from a response, ignoring its attributes.</summary>
     public static string? ReadCookie(HttpResponseMessage response, string name)
     {
@@ -78,18 +51,41 @@ public sealed class WebChatApiFixture : RoleApiFixture
             : null;
     }
 
-    /// <summary>The whole <c>Set-Cookie</c> line, so its attributes can be asserted.</summary>
-    public static string? ReadSetCookie(HttpResponseMessage response, string name)
+    /// <summary>
+    /// The <c>Set-Cookie</c> line that actually sets a value, with its attributes.
+    /// </summary>
+    /// <remarks>
+    /// <strong>Skips deletions, and has to.</strong> Starting a conversation emits
+    /// two headers of the same name from Phase 16: one expiring whatever an
+    /// earlier release left at the broader path, and one carrying the credential
+    /// at this conversation's own path. Taking the first match would read the
+    /// expiry and assert on a cookie with no value, which is exactly the failure
+    /// that led here.
+    /// </remarks>
+    public static string? ReadSetCookie(HttpResponseMessage response, string name) =>
+        ReadSetCookies(response, name).FirstOrDefault(cookie =>
+            !cookie.StartsWith(name + "=;", StringComparison.Ordinal));
+
+    /// <summary>
+    /// Every <c>Set-Cookie</c> line of this name, deletions included.
+    /// </summary>
+    /// <remarks>
+    /// For the one test that asserts the legacy cookie really is expired, which is
+    /// invisible to <see cref="ReadSetCookie"/> by design.
+    /// </remarks>
+    public static IReadOnlyList<string> ReadSetCookies(HttpResponseMessage response, string name)
     {
         ArgumentNullException.ThrowIfNull(response);
 
         if (!response.Headers.TryGetValues("Set-Cookie", out IEnumerable<string>? cookies))
         {
-            return null;
+            return [];
         }
 
-        return cookies.FirstOrDefault(cookie =>
-            cookie.StartsWith(name + "=", StringComparison.Ordinal));
+        return
+        [
+            .. cookies.Where(cookie => cookie.StartsWith(name + "=", StringComparison.Ordinal)),
+        ];
     }
 
     /// <summary>Creates an active agent and an active chat endpoint for it.</summary>

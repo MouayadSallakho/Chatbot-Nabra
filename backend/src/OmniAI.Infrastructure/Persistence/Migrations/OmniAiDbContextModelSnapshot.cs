@@ -649,6 +649,10 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("web_chat_endpoint_id");
 
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid")
                         .HasColumnName("tenant_id");
@@ -658,6 +662,9 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                     b.HasIndex("AccessTokenHash")
                         .IsUnique()
                         .HasDatabaseName("ux_web_chat_sessions_access_token_hash");
+
+                    b.HasIndex("ExpiresAt")
+                        .HasDatabaseName("ix_web_chat_sessions_expires_at");
 
                     b.HasIndex("AiAgentId", "TenantId");
 

@@ -1,4 +1,6 @@
+using System.Net;
 using System.Text.Json;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -32,6 +34,14 @@ namespace OmniAI.Api.IntegrationTests.AiAgents;
 /// supply it -- as configuration -- so the composition root under test is the
 /// real one.
 /// </para>
+/// <para>
+/// <strong>A real Redis is configured too, from Phase 16.</strong> Public chat
+/// writes fail closed without a reachable protection store, so a host with none
+/// would answer 503 to every hosted-chat test for a reason that has nothing to do
+/// with what they assert. Each fixture instance gets its own key namespace and its
+/// own generated network-key secret, so classes running in parallel never share
+/// counters and nothing secret-shaped is committed.
+/// </para>
 /// </remarks>
 public class AiAgentApiFixture : IAsyncLifetime
 {
@@ -46,11 +56,17 @@ public class AiAgentApiFixture : IAsyncLifetime
     private const string ApiKeySetting = "OPENAI_API_KEY";
 
     private readonly PostgresTestDatabase _database = new();
+    private readonly RedisTestServer _redis = new();
 
     private WebApplicationFactory<Program>? _application;
 
     /// <summary>Direct database access, for asserting on stored rows.</summary>
     public PostgresTestDatabase Database => _database;
+
+    /// <summary>
+    /// The protection store this host counts in, for the assertions that read it.
+    /// </summary>
+    public RedisTestServer Redis => _redis;
 
     public async Task InitializeAsync()
     {
@@ -81,7 +97,34 @@ public class AiAgentApiFixture : IAsyncLifetime
                     builder.UseSetting(ApiKeySetting, string.Empty);
                 }
 
-                builder.ConfigureServices(ConfigureTestServices);
+                // Public chat protection, configured exactly as a deployment would
+                // configure it: a connection string, a secret from the
+                // environment, and a non-secret policy section. Nothing here
+                // replaces a service, so what the suite exercises is the real
+                // Redis-backed limiter and the real HMAC key derivation.
+                builder.UseSetting(RedisConnectionSetting, _redis.ConnectionString);
+                builder.UseSetting(NetworkKeySecretSetting, _redis.NetworkKeySecret);
+                builder.UseSetting(KeyPrefixSetting, _redis.KeyPrefix);
+
+                foreach ((string key, string value) in HostSettings)
+                {
+                    builder.UseSetting(key, value);
+                }
+
+                builder.ConfigureServices(services =>
+                {
+                    // Gives these in-memory requests a connection to have come
+                    // from. TestServer has no socket, so without this every public
+                    // chat write is refused for having no establishable origin --
+                    // which is the correct production behaviour and useless for a
+                    // suite asserting on anything else. See SimulatedPeerStartupFilter.
+                    services.AddSingleton<IStartupFilter>(
+                        new SimulatedPeerStartupFilter(
+                            SimulatedPeerStartupFilter.Default,
+                            honourHeader: true));
+
+                    ConfigureTestServices(services);
+                });
             });
     }
 
@@ -92,6 +135,9 @@ public class AiAgentApiFixture : IAsyncLifetime
             await _application.DisposeAsync();
         }
 
+        // Only this fixture's own keys, never a FLUSHDB: other test classes are
+        // running in parallel against the same server.
+        await _redis.ClearAsync();
         await _database.DisposeAsync();
     }
 
@@ -117,6 +163,57 @@ public class AiAgentApiFixture : IAsyncLifetime
     /// need to read what was actually persisted.
     /// </summary>
     public OmniAiDbContext CreateDbContext() => _database.CreateContext();
+
+    /// <summary>
+    /// A browser with no OmniAI account, as a visitor's is.
+    /// </summary>
+    /// <param name="peer">
+    /// The network this visitor appears to be on. Defaults to the host's own, and
+    /// is given explicitly by the tests that need two genuinely different networks
+    /// — a per-network limit cannot be shown to partition anything with only one.
+    /// See <see cref="SimulatedPeerStartupFilter"/> for why the connection has to
+    /// be simulated at all.
+    /// </param>
+    /// <remarks>
+    /// Cookies are kept between requests, which is the whole point: the
+    /// conversation credential is issued as one and has to travel back by itself.
+    /// The antiforgery pair is established first, exactly as the hosted page does.
+    /// <para>
+    /// Lives on the base fixture rather than the website-chat one because three
+    /// suites now need an anonymous browser, and a second copy of "establish the
+    /// antiforgery pair, keep the cookies" is exactly the duplicate that drifts.
+    /// </para>
+    /// </remarks>
+    public async Task<HttpClient> CreateVisitorAsync(IPAddress? peer = null)
+    {
+        HttpClient client = CreateClient();
+
+        if (peer is not null)
+        {
+            client.DefaultRequestHeaders.Add(
+                SimulatedPeerStartupFilter.HeaderName,
+                peer.ToString());
+        }
+
+        // Anonymous, and still antiforgery-checked. Being unauthenticated is not
+        // a reason to skip it: there is a session here, and it is precisely what a
+        // cross-site request would ride on.
+        using HttpResponseMessage csrf =
+            await client.GetAsync(new Uri("/api/auth/csrf", UriKind.Relative));
+
+        if (csrf.StatusCode != HttpStatusCode.NoContent)
+        {
+            throw new InvalidOperationException(
+                $"The antiforgery bootstrap answered {csrf.StatusCode}.");
+        }
+
+        if (WebChat.WebChatApiFixture.ReadCookie(csrf, "XSRF-TOKEN") is string token)
+        {
+            client.DefaultRequestHeaders.Add("X-XSRF-TOKEN", token);
+        }
+
+        return client;
+    }
 
     /// <summary>
     /// A client with a registered, signed-in account and a valid antiforgery
@@ -312,6 +409,30 @@ public class AiAgentApiFixture : IAsyncLifetime
     /// somebody deliberately says otherwise.
     /// </remarks>
     protected virtual bool DisableAiProvider => true;
+
+    /// <summary>Configuration key naming the protection store.</summary>
+    private const string RedisConnectionSetting = "ConnectionStrings:OmniAiProtectionRedis";
+
+    /// <summary>Configuration key holding the network-key secret.</summary>
+    private const string NetworkKeySecretSetting = "PUBLIC_CHAT_NETWORK_KEY_SECRET";
+
+    /// <summary>Configuration key naming this host's counter namespace.</summary>
+    private const string KeyPrefixSetting = "PublicChatProtection:KeyPrefix";
+
+    /// <summary>
+    /// Extra configuration this fixture wants the host to run with.
+    /// </summary>
+    /// <remarks>
+    /// <strong>Configuration, never a code path.</strong> The suites that need to
+    /// see a rate limit fire set a deliberately tiny one here, and the suites about
+    /// proxy trust name their trusted proxies here -- both exactly as an operator
+    /// would. Nothing in the application knows it is being tested: there is no
+    /// <c>IsDevelopment</c> branch, no test-only endpoint and no
+    /// way to switch the protection off — because a bypass that exists for tests
+    /// is a bypass that exists.
+    /// </remarks>
+    protected virtual IReadOnlyDictionary<string, string> HostSettings =>
+        new Dictionary<string, string>(StringComparer.Ordinal);
 
     /// <summary>
     /// Hook for the fixtures that need one service replaced.

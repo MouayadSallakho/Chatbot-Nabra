@@ -58,6 +58,22 @@
     <PackageVersion Include="OpenAI" Version="2.13.0" />
   </ItemGroup>
 
+  <ItemGroup Label="Public-chat protection">
+    <!--
+      Redis client for the distributed counters that protect the public chat
+      surface. Infrastructure only: the Application asks whether a public request
+      may proceed, and nothing above the adapter knows the answer comes from
+      Redis. An executable guard asserts the reference never reaches Application,
+      Domain or Api.
+
+      3.1.31 was the latest stable release on nuget.org when this phase ran.
+      StackExchange.Redis is the mature, maintained client for .NET and the one
+      the ecosystem standardises on; nothing here needs a second Redis library,
+      an ORM over Redis, or a distributed-cache abstraction.
+    -->
+    <PackageVersion Include="StackExchange.Redis" Version="3.1.31" />
+  </ItemGroup>
+
   <ItemGroup Label="Testing">
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <!--

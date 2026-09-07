@@ -78,7 +78,7 @@ public sealed class MigrationSchemaTests(PostgresTestDatabase database)
 
         string[] applied = [.. await context.Database.GetAppliedMigrationsAsync()];
 
-        Assert.Equal(6, applied.Length);
+        Assert.Equal(7, applied.Length);
         Assert.EndsWith("InitialPersistence", applied[0], StringComparison.Ordinal);
         Assert.EndsWith("AddAiAgents", applied[1], StringComparison.Ordinal);
         Assert.EndsWith("AddIdentityAndTenantMemberships", applied[2], StringComparison.Ordinal);
@@ -91,6 +91,7 @@ public sealed class MigrationSchemaTests(PostgresTestDatabase database)
             "AddWebsiteChatAndConversationRuntime",
             applied[5],
             StringComparison.Ordinal);
+        Assert.EndsWith("AddWebChatSessionExpiry", applied[6], StringComparison.Ordinal);
     }
 
     [Fact]

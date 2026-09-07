@@ -4,6 +4,7 @@ using OmniAI.Application.Concurrency;
 using OmniAI.Application.Conversations;
 using OmniAI.Application.Conversations.Persistence;
 using OmniAI.Application.WebChat.Persistence;
+using OmniAI.Application.WebChat.Protection;
 using OmniAI.Domain;
 using OmniAI.Domain.AiAgents;
 using OmniAI.Domain.Conversations;
@@ -16,11 +17,17 @@ namespace OmniAI.Application.WebChat.Hosted;
 /// <param name="AccessToken">The raw secret from the visitor's cookie.</param>
 /// <param name="ClientMessageId">The client's own name for this message.</param>
 /// <param name="Text">What the visitor typed.</param>
+/// <param name="Client">
+/// The pseudonymous network the request came from, established at the edge from
+/// the connection. Nullable because the edge may be unable to establish one, in
+/// which case the message is refused rather than counted in a shared bucket.
+/// </param>
 public sealed record SendWebChatMessageCommand(
     Guid ConversationId,
     string? AccessToken,
     string? ClientMessageId,
-    string? Text);
+    string? Text,
+    ClientNetworkKey? Client);
 
 /// <summary>
 /// One turn of a live website chat: store what was said, and answer it.
@@ -49,6 +56,26 @@ public sealed record SendWebChatMessageCommand(
 /// which holds no rows and is released by the database itself if this process
 /// dies.
 /// </para>
+/// <para>
+/// <strong>There are two rate limits here and they are at different depths, on
+/// purpose.</strong> The request limit is consumed at the top, before any
+/// credential is believed, because its job is to make a flood of doomed requests
+/// cheap. The generation budget is consumed at the very bottom — after the
+/// idempotency check, inside the lock, after the second idempotency check —
+/// because its job is to bound money, and only the one request that is about to
+/// call a provider is spending any. Put the generation budget any higher and a
+/// visitor whose browser retried a completed message would be charged for it
+/// again; put the request limit any lower and every refusal would cost a
+/// database round trip first.
+/// </para>
+/// <para>
+/// <strong>Nothing is spent on a refused turn.</strong> When the generation
+/// budget refuses, no customer message is stored, no turn row is written, and
+/// <c>IAiTextGenerator</c> is not reached. That ordering is what makes "a 429
+/// means zero provider calls" a property of the code rather than a hope: the
+/// budget is consulted before <c>BeginTurnAsync</c>, and the provider is only
+/// reachable through it.
+/// </para>
 /// </remarks>
 public sealed class SendWebChatMessageHandler(
     PublicWebChatAccess access,
@@ -58,6 +85,7 @@ public sealed class SendWebChatMessageHandler(
     IAiAgentRepository agents,
     IAiTextGenerator generator,
     IConversationLock conversationLock,
+    IPublicChatProtection protection,
     ConversationContextPolicy context,
     WebChatPolicy policy,
     TimeProvider clock)
@@ -83,6 +111,9 @@ public sealed class SendWebChatMessageHandler(
     private readonly IConversationLock _lock =
         conversationLock ?? throw new ArgumentNullException(nameof(conversationLock));
 
+    private readonly IPublicChatProtection _protection =
+        protection ?? throw new ArgumentNullException(nameof(protection));
+
     private readonly ConversationContextPolicy _context =
         context ?? throw new ArgumentNullException(nameof(context));
 
@@ -104,6 +135,13 @@ public sealed class SendWebChatMessageHandler(
     /// <exception cref="AiRuntimeUnavailableException">No AI runtime is configured.</exception>
     /// <exception cref="AiRuntimeTimeoutException">The provider did not answer in time.</exception>
     /// <exception cref="AiResponseInvalidException">The provider answered with nothing usable.</exception>
+    /// <exception cref="PublicChatRateLimitedException">
+    /// This network is asking too often, or this conversation or workspace has
+    /// reached its generation budget. Nothing is stored and no provider is called.
+    /// </exception>
+    /// <exception cref="PublicChatProtectionUnavailableException">
+    /// No trustworthy network identity, or no reachable protection store.
+    /// </exception>
     public async Task<WebChatTurnResult?> HandleAsync(
         SendWebChatMessageCommand command,
         CancellationToken cancellationToken = default)
@@ -116,6 +154,17 @@ public sealed class SendWebChatMessageHandler(
         // refused identically whether the conversation is real or not.
         ClientMessageId clientMessageId = ClientMessageId.Create(command.ClientMessageId);
         string text = RequireAcceptableText(command.Text);
+
+        // The cheap outer boundary, and deliberately the first thing that touches
+        // shared state. It runs before the credential is checked, so a flood of
+        // requests with a junk cookie is stopped by a counter rather than by a
+        // query each -- and it therefore counts requests that turn out to be
+        // unauthorised, which is exactly what an anti-flood limit should do.
+        ClientNetworkKey client = RequireClient(command.Client);
+
+        await RequireAllowedAsync(
+                () => _protection.AuthoriseRequestAsync(client, cancellationToken))
+            .ConfigureAwait(false);
 
         WebChatSession? session = await _access
             .AuthoriseAsync(conversationId, command.AccessToken, cancellationToken)
@@ -161,6 +210,20 @@ public sealed class SendWebChatMessageHandler(
         {
             return settled;
         }
+
+        // The expensive budget, consumed here and nowhere else: past both
+        // idempotency checks and inside the lock, so this request is the one that
+        // is genuinely about to call a provider. A duplicate never reaches this
+        // line -- it returned a replay above -- which is what makes the same
+        // message sent a hundred times cost one attempt.
+        //
+        // Before the customer's message is stored, so a refusal leaves no trace:
+        // no message, no turn, and nothing claiming a generation happened.
+        await RequireAllowedAsync(() => _protection.AuthoriseGenerationAsync(
+                session.TenantId,
+                conversationId,
+                cancellationToken))
+            .ConfigureAwait(false);
 
         DateTimeOffset now = _clock.GetUtcNow();
 
@@ -403,6 +466,43 @@ public sealed class SendWebChatMessageHandler(
 
         return trimmed;
     }
+
+    /// <summary>
+    /// Asks the protection store, and turns a refusal into the refusal.
+    /// </summary>
+    /// <remarks>
+    /// Written once rather than at each call site so that no future limit can be
+    /// added and then checked with an <c>if</c> that forgets to throw. An
+    /// unreachable store does not return from here at all: it raises
+    /// <see cref="PublicChatProtectionUnavailableException"/> from inside the
+    /// implementation, so there is no code path in which the answer is unknown and
+    /// the request proceeds anyway.
+    /// </remarks>
+    private static async Task RequireAllowedAsync(Func<Task<PublicChatDecision>> ask)
+    {
+        PublicChatDecision decision = await ask().ConfigureAwait(false);
+
+        if (!decision.Allowed)
+        {
+            throw new PublicChatRateLimitedException(decision.RetryAfter);
+        }
+    }
+
+    /// <summary>
+    /// The network this request came from, or a refusal.
+    /// </summary>
+    /// <remarks>
+    /// Fails closed for the same reason starting a conversation does: a request
+    /// with no establishable origin is one no per-network limit can bound, and an
+    /// "unknown" bucket would be the one unmetered lane through the policy.
+    /// </remarks>
+    private static ClientNetworkKey RequireClient(ClientNetworkKey? client) =>
+        client is ClientNetworkKey known && !known.IsEmpty
+            ? known
+            : throw new PublicChatProtectionUnavailableException(
+                "No trustworthy client network identity could be established for a public web "
+                + "chat write, so it was refused. Check the ForwardedHeaders trust "
+                + "configuration and that the deployment sits behind the proxy it names.");
 
     private static PublicChatMessageView ToView(ConversationMessageRef message, MessageSender sender) =>
         new(message.Id, sender.ToString(), message.Text, message.SentAt);

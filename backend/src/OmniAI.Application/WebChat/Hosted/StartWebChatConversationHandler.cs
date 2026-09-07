@@ -1,5 +1,6 @@
 using OmniAI.Application.AiAgents.Persistence;
 using OmniAI.Application.WebChat.Persistence;
+using OmniAI.Application.WebChat.Protection;
 using OmniAI.Domain.AiAgents;
 using OmniAI.Domain.Conversations;
 using OmniAI.Domain.WebChat;
@@ -12,13 +13,22 @@ public sealed record GetPublicWebChatQuery(string? PublicKey);
 
 /// <summary>Start a conversation on one hosted chat endpoint.</summary>
 /// <remarks>
-/// <strong>It carries a key and nothing else.</strong> There is no tenant, no
-/// agent and no channel in this command, because a visitor must not be able to
-/// choose any of them. The server reads all three from the endpoint the key
-/// names, which is the only reason a public URL cannot be edited into a request
-/// against somebody else's workspace.
+/// <strong>It carries a key and a network identity, and nothing else.</strong>
+/// There is no tenant, no agent and no channel in this command, because a visitor
+/// must not be able to choose any of them. The server reads all three from the
+/// endpoint the key names, which is the only reason a public URL cannot be edited
+/// into a request against somebody else's workspace.
 /// </remarks>
-public sealed record StartWebChatConversationCommand(string? PublicKey);
+/// <param name="PublicKey">The key from the page's address.</param>
+/// <param name="Client">
+/// The pseudonymous network the request came from, established at the edge from
+/// the connection rather than from anything the caller said. Nullable because the
+/// edge may genuinely be unable to establish one -- and the handler then refuses,
+/// rather than treating "unknown" as a bucket of its own.
+/// </param>
+public sealed record StartWebChatConversationCommand(
+    string? PublicKey,
+    ClientNetworkKey? Client);
 
 /// <summary>
 /// The public face of a hosted chat endpoint, and starting a conversation on it.
@@ -32,6 +42,8 @@ public sealed class StartWebChatConversationHandler(
     IWebChatEndpointRepository endpoints,
     IWebChatRuntimeStore store,
     IWebChatAccessTokens tokens,
+    IPublicChatProtection protection,
+    PublicChatProtectionOptions limits,
     TimeProvider clock)
 {
     private readonly IWebChatEndpointRepository _endpoints =
@@ -42,6 +54,12 @@ public sealed class StartWebChatConversationHandler(
 
     private readonly IWebChatAccessTokens _tokens =
         tokens ?? throw new ArgumentNullException(nameof(tokens));
+
+    private readonly IPublicChatProtection _protection =
+        protection ?? throw new ArgumentNullException(nameof(protection));
+
+    private readonly PublicChatProtectionOptions _limits =
+        limits ?? throw new ArgumentNullException(nameof(limits));
 
     private readonly TimeProvider _clock =
         clock ?? throw new ArgumentNullException(nameof(clock));
@@ -88,11 +106,25 @@ public sealed class StartWebChatConversationHandler(
     /// <exception cref="WebChatUnavailableException">
     /// The endpoint or its agent is not serving the public.
     /// </exception>
+    /// <exception cref="PublicChatRateLimitedException">
+    /// This network, or this endpoint in aggregate, is starting conversations too
+    /// quickly.
+    /// </exception>
+    /// <exception cref="PublicChatProtectionUnavailableException">
+    /// No trustworthy network identity, or no reachable protection store. Nothing
+    /// is created.
+    /// </exception>
     public async Task<StartedWebChatSession?> StartAsync(
         StartWebChatConversationCommand command,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(command);
+
+        // Fail closed before anything else. A request whose origin cannot be
+        // established is a request no per-network limit can bound, and creating a
+        // conversation row for it would be creating exactly the thing the limits
+        // exist to bound.
+        ClientNetworkKey client = RequireClient(command.Client);
 
         PublicWebChatEndpoint? endpoint = await ResolveAsync(command.PublicKey, cancellationToken)
             .ConfigureAwait(false);
@@ -111,6 +143,18 @@ public sealed class StartWebChatConversationHandler(
             throw new WebChatUnavailableException();
         }
 
+        // After the endpoint is known, because the aggregate limit is per
+        // endpoint -- and before anything is written, because this is the limit on
+        // writing. The two counters behind it are consumed together or not at all.
+        PublicChatDecision decision = await _protection
+            .AuthoriseConversationStartAsync(client, endpoint.Id, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (!decision.Allowed)
+        {
+            throw new PublicChatRateLimitedException(decision.RetryAfter);
+        }
+
         DateTimeOffset now = _clock.GetUtcNow();
 
         // The channel is decided here, not by the caller. A visitor cannot claim
@@ -125,13 +169,19 @@ public sealed class StartWebChatConversationHandler(
         // The agent is recorded on the session rather than followed through the
         // endpoint, so this conversation answers from the agent it started with
         // for the rest of its life.
+        //
+        // The expiry is computed once, here, and stored. Every later check reads
+        // the stored instant, so this credential's life is fixed at the moment it
+        // is issued rather than floating with whatever the deployment happens to
+        // be configured for when somebody next sends a message.
         WebChatSession session = WebChatSession.Open(
             conversation.Id,
             endpoint.TenantId,
             endpoint.Id,
             endpoint.AiAgentId,
             credential.Hash,
-            now);
+            now,
+            now + _limits.SessionLifetime);
 
         await _store
             .StartConversationAsync(conversation, session, cancellationToken)
@@ -171,6 +221,25 @@ public sealed class StartWebChatConversationHandler(
     private static bool IsServing(PublicWebChatEndpoint endpoint) =>
         endpoint.Status == WebChatEndpointStatus.Active
         && endpoint.AiAgentStatus == AiAgentStatus.Active;
+
+    /// <summary>
+    /// The network this request came from, or a refusal.
+    /// </summary>
+    /// <remarks>
+    /// <strong>Unknown is not a bucket.</strong> Putting every request with no
+    /// establishable origin into one shared counter would make that counter the
+    /// cheapest lane through the whole policy: an attacker who can suppress
+    /// whatever the edge reads gets an allowance shared with nobody else's real
+    /// traffic. Refusing costs a handful of genuinely unusual requests and closes
+    /// the lane.
+    /// </remarks>
+    private static ClientNetworkKey RequireClient(ClientNetworkKey? client) =>
+        client is ClientNetworkKey known && !known.IsEmpty
+            ? known
+            : throw new PublicChatProtectionUnavailableException(
+                "No trustworthy client network identity could be established for a public web "
+                + "chat write, so it was refused. Check the ForwardedHeaders trust "
+                + "configuration and that the deployment sits behind the proxy it names.");
 }
 
 /// <summary>A started conversation and the one copy of its credential.</summary>

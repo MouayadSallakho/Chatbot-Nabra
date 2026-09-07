@@ -38,6 +38,7 @@ using OmniAI.Application.Tenants.ListMyTenants;
 using OmniAI.Application.Tenants;
 using OmniAI.Infrastructure.DependencyInjection;
 using OmniAI.Infrastructure.Time;
+using OmniAI.Infrastructure.WebChat.Protection;
 
 namespace OmniAI.Api.Composition;
 
@@ -107,6 +108,24 @@ internal static class CompositionRoot
         // A create response would then report a createdAt that differs from the one
         // the very next read returns. See MicrosecondTimeProvider.
         services.AddSingleton<TimeProvider>(new MicrosecondTimeProvider(TimeProvider.System));
+
+        // Public chat protection: the distributed rate limits in front of the one
+        // surface where an anonymous stranger can create data and spend money.
+        //
+        // Infrastructure decides what the counters are and where they live -- this
+        // root names no store, no algorithm and no cryptographic primitive. It
+        // decides only where configuration comes from, and one thing Infrastructure
+        // deliberately has no opinion about: whether a missing network-key secret
+        // may be replaced by a random per-process one. That is true in Development
+        // and nowhere else, so that a developer who has just cloned the repository
+        // gets a working hosted chat without first being told about a setting.
+        //
+        // It is not a protection bypass and must not become one: every limit is
+        // enforced in full either way, and the only difference is that the buckets
+        // are renamed when the process restarts.
+        services.AddOmniAiPublicChatProtection(
+            configuration,
+            allowEphemeralNetworkKeySecret: environment.IsDevelopment());
 
         // The AI runtime. Infrastructure decides which implementation that is:
         // the OpenAI adapter when a key is configured in the environment, and an

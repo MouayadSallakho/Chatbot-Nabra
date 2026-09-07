@@ -6,6 +6,7 @@ import { WORKSPACE_SETUP_PATH, workspaceGuard } from '@app/core/workspace/worksp
 import { ACCEPT_INVITATION_PATH } from '@app/core/invitations/invitation-handoff';
 import { TeamApi } from '@app/features/team/team-api';
 import { HostedChatApi } from '@app/features/chat/hosted-chat-api';
+import { HostedChatSessionStore } from '@app/features/chat/hosted-chat-session';
 
 /**
  * One route per unbuilt product area, generated from the navigation model.
@@ -78,10 +79,12 @@ export const routes: Routes = [
     // would bounce them to a setup screen that means nothing to them.
     //
     // `HostedChatApi` is provided on the route so it lives in this chunk, and so
-    // no admin screen can reach the anonymous client by accident.
+    // no admin screen can reach the anonymous client by accident. The session
+    // store is provided beside it for the same reason: it is the only thing in the
+    // application that touches `sessionStorage`, and it belongs to this page alone.
     path: 'chat/:publicKey',
     title: 'Chat',
-    providers: [HostedChatApi],
+    providers: [HostedChatApi, HostedChatSessionStore],
     loadComponent: () =>
       import('@app/features/chat/hosted-chat/hosted-chat').then((m) => m.HostedChat),
   },

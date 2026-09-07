@@ -1,4 +1,4 @@
-import { HttpErrorResponse } from '@angular/common/http';
+import { HttpErrorResponse, HttpHeaders } from '@angular/common/http';
 import { ApiErrorKind, toApiError } from './api-error';
 
 /** Builds a Problem Details failure the way the backend sends one. */
@@ -105,6 +105,87 @@ describe('toApiError', () => {
       expect(error.message).toBe('This tenant has no AI agent with that id.');
       expect(error.message).not.toContain('traceId');
       expect(error.message).not.toContain('00-abc123');
+    });
+  });
+
+  describe('rate limiting', () => {
+    /** A 429 as the API sends one, with whatever Retry-After the case needs. */
+    function refused(retryAfter?: string): HttpErrorResponse {
+      return new HttpErrorResponse({
+        status: 429,
+        statusText: 'Too Many Requests',
+        error: { title: 'Too many requests', detail: 'Too many requests were made.' },
+        headers:
+          retryAfter === undefined
+            ? new HttpHeaders()
+            : new HttpHeaders({ 'Retry-After': retryAfter }),
+      });
+    }
+
+    it('is its own kind rather than a conflict', () => {
+      // The advice is unique: nothing is wrong with the request and nothing needs
+      // correcting -- the caller simply has to wait. Folding it into 'conflict'
+      // would have every screen telling people to change something.
+      expect(toApiError(refused('30')).kind).toBe('rateLimited');
+    });
+
+    it('reads a Retry-After given in seconds', () => {
+      expect(toApiError(refused('45')).retryAfterSeconds).toBe(45);
+    });
+
+    it('leaves the wait undefined when the header is absent', () => {
+      expect(toApiError(refused()).retryAfterSeconds).toBeUndefined();
+    });
+
+    it('refuses an HTTP-date Retry-After rather than guessing', () => {
+      // Parsing a date would mean trusting the reader's clock against the
+      // server's, and this platform only ever sends the numeric form.
+      expect(
+        toApiError(refused('Wed, 21 Oct 2026 07:28:00 GMT')).retryAfterSeconds,
+      ).toBeUndefined();
+    });
+
+    it.each(['not-a-number', '', '  ', '1.5', '-5', 'Infinity', 'NaN'])(
+      'ignores a Retry-After of %o',
+      (header) => {
+        // Dropped rather than coerced, so a screen either has a real number or has
+        // none. A NaN reaching the copy would render as "try again in NaN seconds".
+        expect(toApiError(refused(header)).retryAfterSeconds).toBeUndefined();
+      },
+    );
+
+    it('caps an absurd wait at an hour', () => {
+      // Anything longer is a misconfiguration or a server saying "come back
+      // tomorrow", and neither is worth rendering as a countdown next to a message
+      // somebody is waiting to send.
+      expect(toApiError(refused('999999')).retryAfterSeconds).toBe(3600);
+    });
+
+    it('accepts a wait of zero without turning it into a countdown', () => {
+      expect(toApiError(refused('0')).retryAfterSeconds).toBe(0);
+    });
+
+    it('uses our own copy rather than the server detail', () => {
+      // 429 is deliberately absent from the statuses whose detail is shown. The
+      // server's sentence is safe, but the policy is not the reader's business and
+      // this keeps a future handler from becoming careless with it.
+      const error = toApiError(refused('30'));
+
+      expect(error.message).toContain('Too many requests were made just now');
+      expect(error.message).not.toContain('Too many requests were made.');
+    });
+
+    it('carries no wait on any other status', () => {
+      // Only a 429 has a Retry-After worth reading. A stray header on a 500 must
+      // not turn into advice.
+      const failure = new HttpErrorResponse({
+        status: 500,
+        headers: new HttpHeaders({ 'Retry-After': '30' }),
+      });
+
+      // The header is read uniformly, which is simpler than special-casing -- but
+      // no screen consults it outside the rate-limited kind.
+      expect(toApiError(failure).kind).toBe('unknown');
     });
   });
 

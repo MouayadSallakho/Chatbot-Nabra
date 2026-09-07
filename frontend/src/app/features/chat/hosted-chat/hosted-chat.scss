@@ -158,3 +158,11 @@
   min-inline-size: 0;
   resize: none;
 }
+
+// Pushed to the far end of the header, so the agent's name stays the first thing
+// read and the action never crowds it on a narrow screen.
+.chat-restart {
+  margin-inline-start: auto;
+  flex: none;
+  white-space: nowrap;
+}

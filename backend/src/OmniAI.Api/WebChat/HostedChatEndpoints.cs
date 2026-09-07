@@ -1,5 +1,7 @@
+using System.Globalization;
 using OmniAI.Api.Security;
 using OmniAI.Application.WebChat.Hosted;
+using OmniAI.Application.WebChat.Protection;
 
 namespace OmniAI.Api.WebChat;
 
@@ -29,29 +31,55 @@ namespace OmniAI.Api.WebChat;
 /// use this at all; it will need its own cross-origin transport, decided with the
 /// widget. Nothing here is weakened in advance to accommodate it.
 /// </para>
+/// <para>
+/// <strong>One credential cookie per conversation, and the path is what makes
+/// that possible.</strong> A single cookie scoped to the whole chat API could
+/// only ever hold one conversation's secret, so starting a second conversation in
+/// the same browser silently took away access to the first — somebody with two
+/// tabs open lost one of them. Each credential is now written at the path of the
+/// conversation it opens, so several coexist in one cookie jar and the browser
+/// sends exactly the one that matches the conversation being addressed. The name
+/// stays the same for all of them: putting the conversation id in the cookie name
+/// would work too, but a name derived from the resource is not a name a server can
+/// look up without already knowing the answer, and putting the <em>secret</em> in
+/// a name would be indefensible.
+/// </para>
+/// <para>
+/// <strong>The writes are still per-visitor isolated.</strong> Paths separate one
+/// conversation from another inside one browser; they are not an authorisation
+/// mechanism and are not treated as one. A credential is still only accepted for
+/// the conversation whose stored digest it matches, so a visitor who copies
+/// another conversation's cookie into the right path is still refused.
+/// </para>
 /// </remarks>
 internal static class HostedChatEndpoints
 {
     /// <summary>The cookie carrying one visitor's conversation credential.</summary>
     internal const string SessionCookieName = "omniai.webchat";
 
+    /// <summary>The hosted chat's own API, and the group everything below is in.</summary>
+    internal const string RoutePrefix = "/api/public/webchat";
+
     /// <summary>
-    /// The only path the credential is sent to.
+    /// The path prefix earlier releases scoped the credential to.
     /// </summary>
     /// <remarks>
-    /// Narrow on purpose. The browser attaches this cookie to the hosted chat's
-    /// own API and to nothing else — not to the admin API, not to the sign-in
-    /// routes, not to the page itself. A credential that is never sent where it is
-    /// not needed cannot be captured there either.
+    /// Kept only so it can be deleted. A browser that talked to an earlier
+    /// release still holds a cookie of the same name at this broader path, and
+    /// that cookie also matches every per-conversation path — so a request would
+    /// carry two cookies called <c>omniai.webchat</c> and the server would read
+    /// whichever the browser listed first. Rather than reason about that ordering,
+    /// the old cookie is expired the moment a conversation is started. One
+    /// release's worth of tidying, with an explicit reason.
     /// </remarks>
-    internal const string SessionCookiePath = "/api/public/webchat";
+    internal const string LegacySessionCookiePath = RoutePrefix;
 
     public static IEndpointRouteBuilder MapHostedChatEndpoints(this IEndpointRouteBuilder endpoints)
     {
         ArgumentNullException.ThrowIfNull(endpoints);
 
         RouteGroupBuilder chat = endpoints
-            .MapGroup(SessionCookiePath)
+            .MapGroup(RoutePrefix)
             .WithTags("Hosted chat")
             .AllowAnonymous();
 
@@ -96,13 +124,18 @@ internal static class HostedChatEndpoints
         string publicKey,
         HttpContext http,
         StartWebChatConversationHandler handler,
+        IClientNetworkKeys networkKeys,
         IHostEnvironment environment,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(http);
 
         StartedWebChatSession? started = await handler
-            .StartAsync(new StartWebChatConversationCommand(publicKey), cancellationToken)
+            .StartAsync(
+                new StartWebChatConversationCommand(
+                    publicKey,
+                    ClientNetworkIdentity.Resolve(http, networkKeys)),
+                cancellationToken)
             .ConfigureAwait(false);
 
         if (started is null)
@@ -110,22 +143,38 @@ internal static class HostedChatEndpoints
             return Results.NotFound();
         }
 
+        Guid conversationId = started.Conversation.ConversationId;
+
+        // Expire whatever an earlier release left at the broader path, so a
+        // browser upgrading across this change never sends two cookies of the same
+        // name on one request.
+        //
+        // <strong>Before the append, and the order is not cosmetic.</strong>
+        // Deleting a cookie removes any pending Set-Cookie for the same name from
+        // this response, matching the path as a substring -- and every
+        // per-conversation path begins with the legacy one, so doing this second
+        // would silently strip the credential that was just issued and hand the
+        // visitor a conversation they could never reach. Found by the cookie test
+        // failing, which is why it is written down here rather than left as an
+        // arrangement that happens to work.
+        http.Response.Cookies.Delete(
+            SessionCookieName,
+            new CookieOptions { Path = LegacySessionCookiePath });
+
         // The one moment the raw credential exists outside the visitor's browser.
         // It goes into a cookie and nowhere else -- not into the body below, which
         // has no field for it.
         http.Response.Cookies.Append(
             SessionCookieName,
             started.AccessToken,
-            SessionCookieOptions(environment));
+            SessionCookieOptions(environment, ConversationCookiePath(conversationId)));
 
         // The credential must never be cached by anything between here and the
         // browser.
         http.Response.Headers.CacheControl = "no-store";
 
         return Results.Ok(
-            new StartedConversationResponse(
-                started.Conversation.ConversationId,
-                started.Conversation.AgentName));
+            new StartedConversationResponse(conversationId, started.Conversation.AgentName));
     }
 
     /// <summary><c>GET /api/public/webchat/conversations/{conversationId}/messages</c>.</summary>
@@ -166,6 +215,7 @@ internal static class HostedChatEndpoints
         SendChatMessageRequest? request,
         HttpContext http,
         SendWebChatMessageHandler handler,
+        IClientNetworkKeys networkKeys,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(http);
@@ -176,7 +226,8 @@ internal static class HostedChatEndpoints
                     conversationId,
                     ReadCredential(http),
                     request?.ClientMessageId,
-                    request?.Text),
+                    request?.Text,
+                    ClientNetworkIdentity.Resolve(http, networkKeys)),
                 cancellationToken)
             .ConfigureAwait(false);
 
@@ -206,6 +257,26 @@ internal static class HostedChatEndpoints
         http.Request.Cookies.TryGetValue(SessionCookieName, out string? token) ? token : null;
 
     /// <summary>
+    /// The path one conversation's credential is scoped to.
+    /// </summary>
+    /// <remarks>
+    /// Exactly the prefix of that conversation's own two routes — reading its
+    /// transcript and sending into it. Narrower than the group: this cookie is not
+    /// sent when the page reads the endpoint's public face, not sent when a
+    /// conversation is started, and not sent to any other conversation's routes. A
+    /// credential that never travels where it is not needed cannot be captured
+    /// there either.
+    /// <para>
+    /// The id is formatted invariantly and without braces or dashes so the path
+    /// matches the route the router produced, whatever the host's culture.
+    /// </para>
+    /// </remarks>
+    internal static string ConversationCookiePath(Guid conversationId) =>
+        string.Create(
+            CultureInfo.InvariantCulture,
+            $"{RoutePrefix}/conversations/{conversationId:D}");
+
+    /// <summary>
     /// How the credential cookie is written.
     /// </summary>
     /// <remarks>
@@ -227,14 +298,22 @@ internal static class HostedChatEndpoints
     /// stranger's conversation reachable on a shared computer long after they had
     /// walked away, which is a worse failure than having to start a new chat.
     /// </para>
+    /// <para>
+    /// <strong>The cookie's lifetime is not the session's.</strong> The browser
+    /// forgets this when it closes; the server independently refuses it once the
+    /// stored session expiry has passed. Two bounds rather than one, because a
+    /// cookie's lifetime is entirely under the holder's control — a copied cookie
+    /// value has no browser session to end — and only the server-side one is a
+    /// guarantee.
+    /// </para>
     /// </remarks>
-    private static CookieOptions SessionCookieOptions(IHostEnvironment environment) =>
+    private static CookieOptions SessionCookieOptions(IHostEnvironment environment, string path) =>
         new()
         {
             HttpOnly = true,
             Secure = !environment.IsDevelopment(),
             SameSite = SameSiteMode.Lax,
-            Path = SessionCookiePath,
+            Path = path,
             IsEssential = true,
         };
 }

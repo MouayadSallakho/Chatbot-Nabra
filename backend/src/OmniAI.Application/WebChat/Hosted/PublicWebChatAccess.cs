@@ -27,16 +27,27 @@ namespace OmniAI.Application.WebChat.Hosted;
 /// confirm that a conversation id is real, which is exactly the fact somebody
 /// walking ids is trying to learn.
 /// </para>
+/// <para>
+/// <strong>An expired session is refused the same way.</strong> Not "this
+/// conversation exists but your credential has expired", which would confirm the
+/// id and tell somebody holding a stale copy that they had once held a real one.
+/// One answer covers a conversation that never existed, a credential for a
+/// different conversation, a malformed cookie and a session that has run out.
+/// </para>
 /// </remarks>
 public sealed class PublicWebChatAccess(
     IWebChatRuntimeStore store,
-    IWebChatAccessTokens tokens)
+    IWebChatAccessTokens tokens,
+    TimeProvider clock)
 {
     private readonly IWebChatRuntimeStore _store =
         store ?? throw new ArgumentNullException(nameof(store));
 
     private readonly IWebChatAccessTokens _tokens =
         tokens ?? throw new ArgumentNullException(nameof(tokens));
+
+    private readonly TimeProvider _clock =
+        clock ?? throw new ArgumentNullException(nameof(clock));
 
     /// <summary>
     /// The session a presented secret opens on this conversation, if it does.
@@ -48,8 +59,8 @@ public sealed class PublicWebChatAccess(
     /// </param>
     /// <returns>
     /// The session, or <see langword="null"/> when the secret is missing,
-    /// malformed, belongs to a different conversation, or names a conversation
-    /// that does not exist.
+    /// malformed, belongs to a different conversation, names a conversation that
+    /// does not exist, or opens one whose session has expired.
     /// </returns>
     public async Task<WebChatSession?> AuthoriseAsync(
         ConversationId conversationId,
@@ -76,6 +87,20 @@ public sealed class PublicWebChatAccess(
         // conversation A's secret against conversation B loads B's session, whose
         // digest does not match, and the answer is not-found.
         if (session is null || !session.Admits(presented))
+        {
+            return null;
+        }
+
+        // Checked after the digest comparison, not before. Doing it the other way
+        // round would answer faster for an expired session than for a wrong
+        // credential, which is a difference somebody probing can measure -- and it
+        // would mean the platform read a session's expiry before establishing that
+        // the caller had any right to it.
+        //
+        // The stored instant decides, not the current configuration: a deployment
+        // that lengthens the session lifetime tomorrow does not thereby revive
+        // credentials that expired today.
+        if (session.HasExpired(_clock.GetUtcNow()))
         {
             return null;
         }

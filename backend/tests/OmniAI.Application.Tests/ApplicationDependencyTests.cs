@@ -103,6 +103,26 @@ public sealed class ApplicationDependencyTests
     }
 
     [Fact]
+    public void Application_references_no_protection_store_technology()
+    {
+        // Phase 16 gave the Application layer an opinion about whether a public
+        // request may proceed, and the whole value of IPublicChatProtection is
+        // that it names no store. A reference to a Redis client here would mean a
+        // use case had started dealing in keys, TTLs, Lua or an IDatabase -- and
+        // that the counting policy had begun leaking out of the one adapter that
+        // is allowed to know it.
+        string[] forbidden = ["StackExchange.Redis"];
+
+        string[] offenders =
+        [
+            .. AssemblyReferenceReader.ReferencedAssemblyNames("OmniAI.Application.dll")
+                .Where(name => forbidden.Contains(name, StringComparer.Ordinal))
+        ];
+
+        Assert.Empty(offenders);
+    }
+
+    [Fact]
     public void Application_references_no_web_or_transport_framework()
     {
         // The Application layer decides outcomes, not status codes. An ASP.NET

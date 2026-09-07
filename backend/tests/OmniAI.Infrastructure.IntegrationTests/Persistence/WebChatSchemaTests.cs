@@ -45,7 +45,7 @@ public sealed class WebChatSchemaTests(PostgresTestDatabase database)
 
         Assert.Equal(
             "conversation_id, tenant_id, web_chat_endpoint_id, ai_agent_id, "
-            + "access_token_hash, created_at",
+            + "access_token_hash, created_at, expires_at",
             columns as string);
     }
 

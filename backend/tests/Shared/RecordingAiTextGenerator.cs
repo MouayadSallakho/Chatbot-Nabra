@@ -32,6 +32,9 @@ namespace OmniAI.Testing;
 internal sealed class RecordingAiTextGenerator : IAiTextGenerator
 {
     private readonly List<AiTextGenerationRequest> _requests = [];
+    private readonly Lock _sync = new();
+
+    private int _calls;
 
     /// <summary>The reply every call returns.</summary>
     /// <remarks>
@@ -60,14 +63,39 @@ internal sealed class RecordingAiTextGenerator : IAiTextGenerator
     /// must leave this at zero, which proves the agent's instructions were never
     /// assembled into a request, let alone handed to something that would send
     /// them somewhere.
+    /// <para>
+    /// <strong>Counted atomically, from Phase 16.</strong> The workspace budget
+    /// tests launch genuinely concurrent turns against one host, so several calls
+    /// can land here at once — and this count is the assertion those tests turn
+    /// on. A lost increment would understate what was spent and quietly make the
+    /// most important test in the suite pass when the budget had leaked.
+    /// </para>
     /// </remarks>
-    public int Calls { get; private set; }
+    public int Calls => Volatile.Read(ref _calls);
 
     /// <summary>Every request received, in order.</summary>
-    public IReadOnlyList<AiTextGenerationRequest> Requests => _requests;
+    public IReadOnlyList<AiTextGenerationRequest> Requests
+    {
+        get
+        {
+            lock (_sync)
+            {
+                return [.. _requests];
+            }
+        }
+    }
 
     /// <summary>The most recent request, or null if there was none.</summary>
-    public AiTextGenerationRequest? LastRequest => _requests.Count == 0 ? null : _requests[^1];
+    public AiTextGenerationRequest? LastRequest
+    {
+        get
+        {
+            lock (_sync)
+            {
+                return _requests.Count == 0 ? null : _requests[^1];
+            }
+        }
+    }
 
     /// <summary>The cancellation token the last call was given.</summary>
     /// <remarks>
@@ -86,8 +114,13 @@ internal sealed class RecordingAiTextGenerator : IAiTextGenerator
     /// </remarks>
     public void Reset()
     {
-        _requests.Clear();
-        Calls = 0;
+        lock (_sync)
+        {
+            _requests.Clear();
+        }
+
+        Interlocked.Exchange(ref _calls, 0);
+
         LastCancellationToken = default;
         Reply = "I can certainly help you choose.";
         PretendUnavailable = false;
@@ -98,12 +131,16 @@ internal sealed class RecordingAiTextGenerator : IAiTextGenerator
         AiTextGenerationRequest request,
         CancellationToken cancellationToken = default)
     {
-        Calls++;
+        Interlocked.Increment(ref _calls);
+
         LastCancellationToken = cancellationToken;
 
         if (request is not null)
         {
-            _requests.Add(request);
+            lock (_sync)
+            {
+                _requests.Add(request);
+            }
         }
 
         // Observed rather than ignored, so a cancelled caller is answered the way

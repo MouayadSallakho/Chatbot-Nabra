@@ -6,6 +6,7 @@ using OmniAI.Application.Conversations;
 using OmniAI.Application.Conversations.Persistence;
 using OmniAI.Application.WebChat;
 using OmniAI.Application.WebChat.Persistence;
+using OmniAI.Application.WebChat.Protection;
 using OmniAI.Domain.AiAgents;
 using OmniAI.Domain.Conversations;
 using OmniAI.Domain.Tenants;
@@ -256,6 +257,38 @@ internal sealed class FakeWebChatWorld : IWebChatEndpointRepository, IWebChatRun
                 text,
                 sentAt,
                 ++_sequence));
+        }
+    }
+
+    /// <summary>
+    /// The conversations started, for asserting that a refusal created none.
+    /// </summary>
+    /// <remarks>
+    /// The protection suite needs to state "nothing was created" rather than
+    /// "nothing was answered". A rate-limited start that still wrote a
+    /// conversation row would be the empty-conversation problem all over again,
+    /// with a rate limit on top of it.
+    /// </remarks>
+    public IReadOnlyList<Conversation> Conversations
+    {
+        get
+        {
+            lock (_sync)
+            {
+                return [.. _conversations];
+            }
+        }
+    }
+
+    /// <summary>The anonymous claims opened, for asserting session lifetimes.</summary>
+    public IReadOnlyList<WebChatSession> Sessions
+    {
+        get
+        {
+            lock (_sync)
+            {
+                return [.. _sessions];
+            }
         }
     }
 
@@ -585,4 +618,83 @@ internal sealed class FakeWebChatWorld : IWebChatEndpointRepository, IWebChatRun
 
     private static ConversationMessageRecord Record(StoredMessage message) =>
         new(message.Id, message.Sender, message.Text, message.SentAt, message.Sequence);
+}
+
+/// <summary>
+/// Public-chat protection the test drives, and which records what it was asked.
+/// </summary>
+/// <remarks>
+/// <strong>What it is really for is the ordering.</strong> Whether a limit refuses
+/// is the easy half; the hard half is <em>when</em> each limit is consulted, and
+/// that is a correctness property with money attached. A generation budget
+/// consulted before the idempotency check would charge a workspace for every
+/// retry of a message it had already answered. So this double records the
+/// sequence of questions it was asked, and the suite asserts on it.
+/// <para>
+/// It also models the one thing the production contract insists on: an
+/// unreachable store raises rather than returning an answer, so a test can prove
+/// the handler fails closed without having a Redis to switch off.
+/// </para>
+/// </remarks>
+internal sealed class FakePublicChatProtection : IPublicChatProtection
+{
+    /// <summary>The questions asked, in order.</summary>
+    public List<string> Calls { get; } = [];
+
+    /// <summary>How many new generation attempts were charged for.</summary>
+    public int Generations { get; private set; }
+
+    /// <summary>What to answer the cheap per-request limit.</summary>
+    public PublicChatDecision Request { get; set; } = PublicChatDecision.Allow;
+
+    /// <summary>What to answer the conversation-start limit.</summary>
+    public PublicChatDecision Start { get; set; } = PublicChatDecision.Allow;
+
+    /// <summary>What to answer the generation budget.</summary>
+    public PublicChatDecision Generation { get; set; } = PublicChatDecision.Allow;
+
+    /// <summary>When set, every question raises this instead of answering.</summary>
+    public Func<Exception>? Unreachable { get; set; }
+
+    /// <summary>The workspace the generation budget was last asked about.</summary>
+    public TenantId? ChargedWorkspace { get; private set; }
+
+    /// <summary>The conversation the generation budget was last asked about.</summary>
+    public ConversationId? ChargedConversation { get; private set; }
+
+    public Task<PublicChatDecision> AuthoriseConversationStartAsync(
+        ClientNetworkKey client,
+        WebChatEndpointId endpointId,
+        CancellationToken cancellationToken = default) =>
+        Answer("start", Start);
+
+    public Task<PublicChatDecision> AuthoriseRequestAsync(
+        ClientNetworkKey client,
+        CancellationToken cancellationToken = default) =>
+        Answer("request", Request);
+
+    public Task<PublicChatDecision> AuthoriseGenerationAsync(
+        TenantId tenantId,
+        ConversationId conversationId,
+        CancellationToken cancellationToken = default)
+    {
+        ChargedWorkspace = tenantId;
+        ChargedConversation = conversationId;
+
+        if (Unreachable is null && Generation.Allowed)
+        {
+            Generations++;
+        }
+
+        return Answer("generation", Generation);
+    }
+
+    private Task<PublicChatDecision> Answer(string question, PublicChatDecision decision)
+    {
+        Calls.Add(question);
+
+        return Unreachable is null
+            ? Task.FromResult(decision)
+            : Task.FromException<PublicChatDecision>(Unreachable());
+    }
 }

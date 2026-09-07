@@ -1,6 +1,5 @@
 using System.Collections.Concurrent;
 using System.Net;
-using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
@@ -43,6 +42,7 @@ public abstract class ProductionApiFixture : IAsyncLifetime
     private const string ApiKeySetting = "OPENAI_API_KEY";
 
     private readonly PostgresTestDatabase _database = new();
+    private readonly RedisTestServer _redis = new();
     private readonly ConcurrentBag<string> _failures = [];
 
     private WebApplicationFactory<Program>? _application;
@@ -59,6 +59,23 @@ public abstract class ProductionApiFixture : IAsyncLifetime
     /// </remarks>
     protected virtual IReadOnlyList<string> TrustedProxies => [];
 
+    /// <summary>
+    /// The protection store this host counts in, for the assertions that read it.
+    /// </summary>
+    /// <remarks>
+    /// A Production host has one because that is what makes the forwarded-header
+    /// tests observable: whether a spoofed <c>X-Forwarded-For</c> was believed is
+    /// invisible in a response, and entirely visible in whether two requests
+    /// carrying different forged addresses landed in the same rate-limit bucket.
+    /// </remarks>
+    protected RedisTestServer Redis => _redis;
+
+    /// <summary>
+    /// Extra protection policy this fixture wants, as ordinary configuration.
+    /// </summary>
+    protected virtual IReadOnlyDictionary<string, string> HostSettings =>
+        new Dictionary<string, string>(StringComparer.Ordinal);
+
     public async Task InitializeAsync()
     {
         await _database.InitializeAsync();
@@ -69,6 +86,17 @@ public abstract class ProductionApiFixture : IAsyncLifetime
                 builder.UseEnvironment("Production");
                 builder.UseSetting(ConnectionStringSetting, _database.ConnectionString);
                 builder.UseSetting(ApiKeySetting, string.Empty);
+
+                builder.UseSetting(
+                    "ConnectionStrings:OmniAiProtectionRedis",
+                    _redis.ConnectionString);
+                builder.UseSetting("PUBLIC_CHAT_NETWORK_KEY_SECRET", _redis.NetworkKeySecret);
+                builder.UseSetting("PublicChatProtection:KeyPrefix", _redis.KeyPrefix);
+
+                foreach ((string key, string value) in HostSettings)
+                {
+                    builder.UseSetting(key, value);
+                }
 
                 for (int index = 0; index < TrustedProxies.Count; index++)
                 {
@@ -89,8 +117,13 @@ public abstract class ProductionApiFixture : IAsyncLifetime
                     // Sets the peer address before any application middleware sees
                     // the request. IStartupFilter is the supported way to get in
                     // front of the pipeline Program.cs builds.
+                    //
+                    // No header override here, unlike the ordinary API fixture:
+                    // these suites exist to prove that what a caller *says* about
+                    // its address changes nothing, so the peer must be the
+                    // fixture's statement and nobody else's.
                     services.AddSingleton<IStartupFilter>(
-                        new RemoteAddressStartupFilter(RemoteAddress));
+                        new SimulatedPeerStartupFilter(RemoteAddress, honourHeader: false));
                 });
             });
     }
@@ -102,6 +135,9 @@ public abstract class ProductionApiFixture : IAsyncLifetime
             await _application.DisposeAsync();
         }
 
+        // Only this fixture's own keys, never a FLUSHDB: other test classes are
+        // running in parallel against the same server.
+        await _redis.ClearAsync();
         await _database.DisposeAsync();
     }
 
@@ -130,23 +166,6 @@ public abstract class ProductionApiFixture : IAsyncLifetime
     public string ServerErrors => _failures.IsEmpty
         ? "(the server logged no errors)"
         : string.Join(" | ", _failures);
-
-    /// <summary>Stamps every request with a simulated peer address.</summary>
-    private sealed class RemoteAddressStartupFilter(IPAddress address) : IStartupFilter
-    {
-        public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next) =>
-            builder =>
-            {
-                builder.Use(async (context, proceed) =>
-                {
-                    context.Connection.RemoteIpAddress = address;
-
-                    await proceed().ConfigureAwait(false);
-                });
-
-                next(builder);
-            };
-    }
 
     /// <summary>Records error-level log entries so a test can quote them.</summary>
     private sealed class CapturingLoggerProvider(ConcurrentBag<string> failures) : ILoggerProvider

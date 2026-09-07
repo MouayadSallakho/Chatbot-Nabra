@@ -26,12 +26,19 @@ a route addresses a resource rather than granting access to it. Phase 13 replace
 that membership's all-or-nothing meaning with tenant-scoped roles: a protected
 Owner whose authority is the platform's whole capability catalogue, custom roles a
 workspace composes from it, and a permission check inside every tenant-scoped use
-case. No channel-provider architecture has been designed, and the platform is
-still not authorised for production deployment -- email verification and password
-recovery remain ahead of it, and the first real conversational surface (Phase 15)
-has no rate limiting or abuse protection.
+case. Phase 14 built team administration on top of those roles: members, secure
+invitations and role assignment. Phase 15 delivered the first real conversational
+surface -- a hosted website chat an anonymous visitor can hold a real AI
+conversation on -- deliberately without abuse protection. Phase 16 protected it:
+Redis-backed distributed rate limits, a pseudonymous client-network identity
+derived from a genuinely trusted address, a workspace generation-attempt safety
+budget, lazy conversation creation, per-conversation credential cookies and an
+absolute public session lifetime. No channel-provider architecture has been
+designed, and the platform is still not authorised for production deployment --
+email verification and password recovery remain ahead of it, and there is no
+provider usage accounting, billing or alerting behind the safety budget.
 
-Fourteen areas have their own documents:
+Fifteen areas have their own documents:
 
 - [multi-tenancy-isolation.md](multi-tenancy-isolation.md) - tenant isolation
 - [conversation-domain.md](conversation-domain.md) - conversation and message modelling
@@ -47,6 +54,7 @@ Fourteen areas have their own documents:
 - [tenant-rbac.md](tenant-rbac.md) - tenant-scoped roles, the permission catalogue, and what a member may do inside a workspace
 - [team-members-invitations.md](team-members-invitations.md) - member administration, secure invitations, and role assignment
 - [conversation-runtime-website-chat.md](conversation-runtime-website-chat.md) - the conversation runtime, hosted website chat, and the anonymous visitor boundary
+- [public-chat-protection.md](public-chat-protection.md) - distributed rate limiting, client-network identity, cost safety and the public session lifecycle
 
 ---
 

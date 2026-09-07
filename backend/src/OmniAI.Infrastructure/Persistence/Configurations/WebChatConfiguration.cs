@@ -162,6 +162,16 @@ internal sealed class WebChatSessionConfiguration : IEntityTypeConfiguration<Web
             .HasColumnType("timestamp with time zone")
             .IsRequired();
 
+        // Stored rather than derived. The alternative -- computing the expiry from
+        // created_at and the current configuration on every check -- would mean
+        // changing the platform's session lifetime retroactively lengthened or
+        // revoked credentials people were already holding, and would leave no
+        // record of what any given session was actually promised.
+        builder.Property(session => session.ExpiresAt)
+            .HasColumnName("expires_at")
+            .HasColumnType("timestamp with time zone")
+            .IsRequired();
+
         builder.HasOne<Conversation>()
             .WithMany()
             .HasForeignKey(session => session.ConversationId)
@@ -193,6 +203,16 @@ internal sealed class WebChatSessionConfiguration : IEntityTypeConfiguration<Web
         builder.HasIndex(session => session.AccessTokenHash)
             .IsUnique()
             .HasDatabaseName("ux_web_chat_sessions_access_token_hash");
+
+        // Not for the access check, which finds a session by its conversation and
+        // then reads the expiry from the row it already has. This exists for the
+        // operational question -- how many public sessions are still live, which
+        // ones have lapsed -- and for whatever eventually retires them. There is
+        // deliberately no such worker in this release: nothing depends on expired
+        // rows being removed, because an expired session is already refused by the
+        // stored instant rather than by its absence.
+        builder.HasIndex(session => session.ExpiresAt)
+            .HasDatabaseName("ix_web_chat_sessions_expires_at");
     }
 }
 

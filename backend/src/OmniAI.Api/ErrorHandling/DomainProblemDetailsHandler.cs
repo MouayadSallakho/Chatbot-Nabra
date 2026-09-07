@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 using OmniAI.Application.Ai;
@@ -7,6 +8,7 @@ using OmniAI.Application.Authorization;
 using OmniAI.Application.Invitations;
 using OmniAI.Application.Members;
 using OmniAI.Application.WebChat;
+using OmniAI.Application.WebChat.Protection;
 using OmniAI.Application.Security;
 using OmniAI.Application.Tenants;
 using OmniAI.Domain;
@@ -61,9 +63,25 @@ internal sealed partial class DomainProblemDetailsHandler(
 
         (int status, string title, string detail) = mapped.Value;
 
-        LogOutcome(logger, status, detail);
+        // What the operator is told, which is not always what the caller is told.
+        // A protection-store failure sends a visitor a deliberately vague
+        // sentence; the log gets the setting or dependency that is actually at
+        // fault, because that is the only place it is useful and the only place it
+        // is safe.
+        LogOutcome(logger, status, OperatorReason(exception, detail));
 
         httpContext.Response.StatusCode = status;
+
+        // A refusal that says "too many" without saying "for how long" invites the
+        // client to retry immediately, which is the behaviour the refusal exists
+        // to stop. The value is the remaining life of whichever counter refused,
+        // floored at a second so it can never read as "retry now".
+        if (exception is PublicChatRateLimitedException limited)
+        {
+            httpContext.Response.Headers.RetryAfter = Math
+                .Max(1, (int)Math.Ceiling(limited.RetryAfter.TotalSeconds))
+                .ToString(CultureInfo.InvariantCulture);
+        }
 
         return await problemDetails.TryWriteAsync(new ProblemDetailsContext
         {
@@ -77,6 +95,22 @@ internal sealed partial class DomainProblemDetailsHandler(
             },
         }).ConfigureAwait(false);
     }
+
+    /// <summary>
+    /// What to write in the log, which may be more than the caller is told.
+    /// </summary>
+    /// <remarks>
+    /// Every mapped exception's message is safe to log, and for almost all of them
+    /// it is also the most useful thing to log. The exception is a public-chat
+    /// protection failure: its message is written for a stranger and says nothing,
+    /// so logging it would leave an operator with an outage and no cause. Its
+    /// <c>Reason</c> names the missing setting or the unreachable dependency and
+    /// carries no address, credential or customer text.
+    /// </remarks>
+    private static string OperatorReason(Exception exception, string detail) =>
+        exception is PublicChatProtectionUnavailableException unprotected
+            ? unprotected.Reason
+            : detail;
 
     /// <summary>
     /// Records an expected outcome at the level its status deserves.
@@ -340,6 +374,35 @@ internal sealed partial class DomainProblemDetailsHandler(
             StatusCodes.Status409Conflict,
             "Message already attempted",
             alreadyFailed.Message),
+
+        // A public caller asking too often. 429, which is exactly what it means,
+        // and paired with a Retry-After above.
+        //
+        // Deliberately not 503: the service is perfectly healthy and this caller
+        // specifically is being asked to slow down. Deliberately not 403 either,
+        // which would say the request is not permitted -- it is, just not yet.
+        //
+        // The detail is the exception's fixed sentence and names no quota, window,
+        // counter, workspace or address. A caller learns that they should wait and
+        // roughly how long, and nothing about the policy they are hitting.
+        PublicChatRateLimitedException rateLimited => (
+            StatusCodes.Status429TooManyRequests,
+            "Too many requests",
+            rateLimited.Message),
+
+        // A public write that could not be protected, so it was not performed.
+        // 503, and it is the honest one: the platform could have done the work and
+        // deliberately declined because it could not tell whether it should.
+        //
+        // Same status and same wording as a chat that is switched off, which is
+        // intentional -- a visitor must not be able to tell an unreachable counter
+        // store from a withdrawn endpoint, because the difference is a fact about
+        // this deployment's internals. The operator's copy of the difference is in
+        // the log.
+        PublicChatProtectionUnavailableException unprotected => (
+            StatusCodes.Status503ServiceUnavailable,
+            "Chat unavailable",
+            unprotected.Message),
 
         // The chat is not serving the public: a draft or withdrawn endpoint, or an
         // agent that is not active. 503 -- it is a statement about this service

@@ -21,6 +21,14 @@
       implements it.
     -->
     <PackageReference Include="OpenAI" />
+    <!--
+      The Redis client behind the public-chat protection counters. Like the
+      OpenAI SDK above, it appears in this project and nowhere else: the
+      Application owns IPublicChatProtection and asks whether a public request
+      may proceed, and this is the only assembly that knows the answer is a Lua
+      script against Redis.
+    -->
+    <PackageReference Include="StackExchange.Redis" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>

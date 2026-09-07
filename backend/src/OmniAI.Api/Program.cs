@@ -21,19 +21,31 @@ builder.Services.AddOmniAi(builder.Configuration, builder.Environment);
 
 WebApplication app = builder.Build();
 
-// FIRST, and the order is not negotiable.
+// FIRST, and the order is not negotiable -- including the order of these two.
 //
 // TLS is terminated by the reverse proxy, so the connection this process accepts
-// is plain HTTP even when the browser spoke HTTPS. This restores the browser's
-// scheme from X-Forwarded-Proto -- but only when the connection came from a
-// trusted proxy, because that header is attacker-controlled input. See
-// ForwardedHeadersSetup.
+// is plain HTTP even when the browser spoke HTTPS. The first pass restores the
+// browser's scheme from X-Forwarded-Proto; the second resolves the real client
+// address from X-Forwarded-For, which the public chat rate limits need. Both
+// believe their header only when the connection came from a trusted proxy,
+// because both headers are attacker-controlled input. See ForwardedHeadersSetup.
+//
+// Two passes rather than one, and scheme before address. One pass opted in to
+// both headers abandons all of its work at the first unparsable address, which
+// would let a proxy forwarding one malformed value cost every request its scheme
+// and take the whole deployment down. And the address pass rewrites the peer
+// address that both trust checks read, so running it first would have the scheme
+// pass compare the client's address to the trusted-proxy list and silently
+// discard the scheme.
 //
 // Everything after this point may read Request.Scheme: the antiforgery service
 // refuses to issue a token under a Secure cookie policy over a non-HTTPS request,
 // and the cookie handler decides whether to mark cookies Secure. Both would be
 // deciding from a false premise if this ran later.
-app.UseForwardedHeaders();
+ForwardedHeaderPolicy forwarded = app.Services.GetRequiredService<ForwardedHeaderPolicy>();
+
+app.UseForwardedHeaders(forwarded.Scheme);
+app.UseForwardedHeaders(forwarded.ClientAddress);
 
 // The fail-safe. Outside Development, a request that did not arrive over HTTPS is
 // refused rather than served with downgraded cookies -- see

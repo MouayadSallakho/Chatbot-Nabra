@@ -29,6 +29,8 @@ export type ApiErrorKind =
   | 'invalidResponse'
   /** No AI provider is configured on this deployment. */
   | 'providerUnavailable'
+  /** Too many requests were made. The caller must wait before retrying. */
+  | 'rateLimited'
   /** The AI provider did not answer in time. */
   | 'providerTimeout'
   /** The browser could not reach the backend at all. */
@@ -42,6 +44,16 @@ export interface ApiError {
 
   /** The HTTP status, or 0 when the request never reached the server. */
   readonly status: number;
+
+  /**
+   * How long to wait before trying again, in seconds, when the server said so.
+   *
+   * Only ever populated from a `Retry-After` header carrying a plain number of
+   * seconds. A missing, malformed, absurd or HTTP-date value leaves it
+   * `undefined` rather than guessing: a screen that shows "try again in
+   * 1,000,000 seconds" is worse than one that just says to wait a moment.
+   */
+  readonly retryAfterSeconds?: number;
 
   /**
    * A sentence safe to show a reader.
@@ -69,6 +81,7 @@ const MESSAGES: Readonly<Record<ApiErrorKind, string>> = {
   invalidResponse: 'The AI provider returned a response this platform could not use.',
   providerUnavailable: 'AI preview is currently unavailable because no provider is configured.',
   providerTimeout: 'The AI provider took too long to respond. Try again.',
+  rateLimited: 'Too many requests were made just now. Wait a moment and try again.',
   offline: 'Could not reach the OmniAI backend. Check that it is running, then try again.',
   unknown: 'Something went wrong. Try again, and contact an administrator if it continues.',
 };
@@ -124,8 +137,51 @@ export function toApiError(failure: unknown): ApiError {
   return {
     kind,
     status: failure.status,
+    retryAfterSeconds: readRetryAfter(failure),
     message: readableMessage(failure, kind),
   };
+}
+
+/**
+ * The largest `Retry-After` this client will repeat to a reader.
+ *
+ * An hour. Anything longer is either a misconfiguration or a server telling
+ * somebody to come back tomorrow, and neither is worth rendering as a countdown
+ * next to a message they are waiting to send.
+ */
+const MAX_RETRY_AFTER_SECONDS = 3_600;
+
+/**
+ * Reads `Retry-After`, and only in its seconds form.
+ *
+ * The header may also carry an HTTP date, which is deliberately not parsed: it
+ * would mean trusting the reader's clock against the server's, and this platform
+ * only ever sends the numeric form. An unparseable value is dropped rather than
+ * coerced, so a screen either has a real number or has none.
+ */
+function readRetryAfter(failure: HttpErrorResponse): number | undefined {
+  const header = failure.headers?.get('Retry-After');
+
+  if (header === null || header === undefined) {
+    return undefined;
+  }
+
+  const trimmed = header.trim();
+
+  // Checked before `Number`, which reads both '' and '   ' as zero -- so a blank
+  // header would otherwise become a wait of no seconds, which is precisely the
+  // "retry now" the floor on this value exists to prevent.
+  if (trimmed.length === 0) {
+    return undefined;
+  }
+
+  const seconds = Number(trimmed);
+
+  if (!Number.isFinite(seconds) || !Number.isInteger(seconds) || seconds < 0) {
+    return undefined;
+  }
+
+  return Math.min(seconds, MAX_RETRY_AFTER_SECONDS);
 }
 
 function kindOf(status: number): ApiErrorKind {
@@ -150,6 +206,12 @@ function kindOf(status: number): ApiErrorKind {
       return 'stale';
     case 428:
       return 'preconditionRequired';
+    // Too many requests. Its own kind rather than a conflict, because the advice
+    // is unique: nothing is wrong with the request and nothing needs correcting
+    // -- the caller simply has to wait. Never retried automatically here; see
+    // the hosted chat for why a paid request is the reader's decision.
+    case 429:
+      return 'rateLimited';
     case 502:
       return 'invalidResponse';
     case 503:
