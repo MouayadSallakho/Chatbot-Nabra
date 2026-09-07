@@ -1,0 +1,66 @@
+// Warning-toned rather than danger-toned, matching the role and member editors:
+// nothing has gone wrong and nothing was lost -- somebody else simply got there
+// first, and the reader has a decision to make.
+.conflict {
+  display: grid;
+  gap: var(--space-2);
+  border-color: var(--border-warning, var(--border-default));
+  background-color: var(--surface-warning, var(--surface-muted));
+}
+
+.conflict-title {
+  font: var(--text-body-strong);
+  margin: 0;
+}
+
+.conflict-actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  margin-block-start: var(--space-1);
+}
+
+// Four facts across on a wide screen, stacked on a phone.
+.facts {
+  display: grid;
+  gap: var(--space-4);
+
+  p {
+    margin: 0;
+  }
+
+  @media (min-width: 768px) {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.section-note {
+  margin-block-end: var(--space-3);
+}
+
+.link-card {
+  display: grid;
+  gap: var(--space-3);
+}
+
+// `anywhere`, because a chat link has no spaces to break at and without this it
+// forces the page wider than a phone's viewport -- the usual cause of a screen
+// that scrolls sideways.
+.chat-link {
+  margin: 0;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.875rem;
+  overflow-wrap: anywhere;
+}
+
+.link-actions,
+.form-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.form-actions p {
+  margin: 0;
+}

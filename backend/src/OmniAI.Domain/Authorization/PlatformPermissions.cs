@@ -118,6 +118,38 @@ public static class PlatformPermissions
     public static readonly PermissionCode MembersRolesManage =
         PermissionCode.Create("members.roles.manage");
 
+    /// <summary>Reading the workspace's customer conversations.</summary>
+    /// <remarks>
+    /// A conversation is the most sensitive business data this platform holds: it
+    /// is what a customer actually said, in their own words, to a business they
+    /// were probably not expecting to be read by everybody who works there. So
+    /// reading them is its own capability rather than something the workspace
+    /// permission or an agent permission carries along.
+    /// <para>
+    /// It grants reading only. Replying, assigning, exporting and deleting are
+    /// deliberately absent from the catalogue because none of those operations
+    /// exists yet, and a permission that grants nothing today would be a promise
+    /// this platform has not made.
+    /// </para>
+    /// </remarks>
+    public static readonly PermissionCode ConversationsView =
+        PermissionCode.Create("conversations.view");
+
+    /// <summary>Reading how the workspace's website chat is configured.</summary>
+    public static readonly PermissionCode WebsiteChatView =
+        PermissionCode.Create("website-chat.view");
+
+    /// <summary>Creating website chat endpoints and taking them in and out of service.</summary>
+    /// <remarks>
+    /// This is what publishes a workspace's AI to the public internet, and what
+    /// withdraws it again. Separate from <see cref="WebsiteChatView"/> because
+    /// seeing that a chat endpoint exists and deciding whether the world can talk
+    /// to it are different responsibilities — and because activating one starts
+    /// spending the workspace's provider budget on whoever finds the link.
+    /// </remarks>
+    public static readonly PermissionCode WebsiteChatManage =
+        PermissionCode.Create("website-chat.manage");
+
     /// <summary>The workspace group's display name.</summary>
     public const string WorkspaceGroup = "Workspace";
 
@@ -129,6 +161,12 @@ public static class PlatformPermissions
 
     /// <summary>The team administration group's display name.</summary>
     public const string MembersGroup = "Team members";
+
+    /// <summary>The conversations group's display name.</summary>
+    public const string ConversationsGroup = "Conversations";
+
+    /// <summary>The channel administration group's display name.</summary>
+    public const string ChannelsGroup = "Channels";
 
     /// <summary>
     /// The catalogue, in the order it is published and rendered.
@@ -202,6 +240,24 @@ public static class PlatformPermissions
             "Assign roles to team members",
             "Decide which roles a member holds. You can only give away, and only "
             + "take away, what your own roles let you do."),
+        new(
+            ConversationsView,
+            ConversationsGroup,
+            "View conversations",
+            "Read the conversations customers have had with this workspace, "
+            + "including everything they wrote."),
+        new(
+            WebsiteChatView,
+            ChannelsGroup,
+            "View website chat",
+            "See how this workspace's website chat is set up and which agent "
+            + "answers on it."),
+        new(
+            WebsiteChatManage,
+            ChannelsGroup,
+            "Manage website chat",
+            "Create website chat links and decide whether the public can use "
+            + "them."),
     ];
 
     /// <summary>

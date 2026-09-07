@@ -1,0 +1,136 @@
+<div class="page">
+  @if (!canView()) {
+    <app-page-header heading="Website chat" />
+
+    <div class="page-section">
+      <div class="card">
+        <app-empty-state
+          icon="channels"
+          heading="You do not have access to website chat"
+          description="Seeing how this workspace's website chat is set up needs a permission your roles do not include. Ask somebody who administers this workspace if you need it."
+        />
+      </div>
+    </div>
+  } @else {
+    <app-page-header
+      heading="Website chat"
+      description="A chat page you can link to from your own site. Each link connects visitors to one AI agent."
+    >
+      <a pageActions class="btn btn-secondary" routerLink="/channels">Back to channels</a>
+    </app-page-header>
+
+    @if (loading()) {
+      <div class="page-section" aria-busy="true">
+        <p class="visually-hidden" role="status">Loading website chat…</p>
+        <div class="card card-body">
+          <span class="skeleton skeleton-title"></span>
+          <span class="skeleton skeleton-text"></span>
+        </div>
+      </div>
+    } @else if (failure(); as error) {
+      <div class="page-section">
+        <div class="card">
+          <app-empty-state
+            icon="alert"
+            tone="error"
+            heading="Could not load website chat"
+            [description]="error.message"
+          >
+            <button stateActions type="button" class="btn btn-secondary btn-sm" (click)="load()">
+              Try again
+            </button>
+          </app-empty-state>
+        </div>
+      </div>
+    } @else {
+      <div class="page-section">
+        <h2 class="text-section-title">Chat links</h2>
+
+        @if (endpoints().length === 0) {
+          <div class="card">
+            <app-empty-state
+              icon="channels"
+              heading="No chat links yet"
+              description="Create one below to give an AI agent a page your visitors can talk to."
+            />
+          </div>
+        } @else {
+          <ul class="endpoint-list">
+            @for (endpoint of endpoints(); track endpoint.id) {
+              <li>
+                <a class="endpoint" [routerLink]="['/channels/website-chat', endpoint.id]">
+                  <span class="endpoint-agent">{{ endpoint.aiAgentName }}</span>
+
+                  <span
+                    class="badge"
+                    [class.badge-success]="endpoint.status === 'Active'"
+                    [class.badge-neutral]="endpoint.status !== 'Active'"
+                  >
+                    {{ endpoint.status }}
+                  </span>
+
+                  @if (endpoint.status === 'Active' && endpoint.aiAgentStatus !== 'Active') {
+                    <span class="badge badge-warning">Agent not active</span>
+                  }
+
+                  <span class="endpoint-chevron" aria-hidden="true">›</span>
+                </a>
+              </li>
+            }
+          </ul>
+        }
+      </div>
+
+      @if (canManage()) {
+        <div class="page-section">
+          <h2 class="text-section-title">Create a chat link</h2>
+          <p class="text-small text-secondary section-note">
+            A new link is created switched off. You publish it from its own page, so a wrong
+            selection is never live the moment it is saved. Only an active agent can answer
+            visitors.
+          </p>
+
+          @if (available().length === 0) {
+            <div class="card card-body">
+              <p class="text-small text-muted">
+                Every AI agent in this workspace already has a chat link. Create another agent
+                first.
+              </p>
+            </div>
+          } @else {
+            <div class="card card-body create">
+              <label class="field">
+                <span class="text-label">AI agent</span>
+                <select
+                  class="form-select"
+                  [value]="selectedAgentId()"
+                  (change)="choose($any($event.target).value)"
+                >
+                  <option value="">Choose an agent…</option>
+                  @for (agent of available(); track agent.id) {
+                    <option [value]="agent.id">{{ agent.name }} — {{ agent.status }}</option>
+                  }
+                </select>
+              </label>
+
+              @if (createFailure(); as error) {
+                <p class="alert alert-danger" role="alert">{{ error.message }}</p>
+              }
+
+              <div class="form-actions">
+                <button
+                  type="button"
+                  class="btn btn-primary"
+                  [disabled]="!selectedAgentId() || creating()"
+                  (click)="create()"
+                >
+                  {{ creating() ? 'Creating…' : 'Create chat link' }}
+                </button>
+              </div>
+            </div>
+          }
+        </div>
+      }
+    }
+  }
+</div>

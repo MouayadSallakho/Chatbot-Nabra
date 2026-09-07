@@ -6,6 +6,7 @@ using OmniAI.Application.AiAgents;
 using OmniAI.Application.Authorization;
 using OmniAI.Application.Invitations;
 using OmniAI.Application.Members;
+using OmniAI.Application.WebChat;
 using OmniAI.Application.Security;
 using OmniAI.Application.Tenants;
 using OmniAI.Domain;
@@ -310,6 +311,44 @@ internal sealed partial class DomainProblemDetailsHandler(
             StatusCodes.Status403Forbidden,
             "Invitation is for a different account",
             wrongAccount.Message),
+
+        // A website chat endpoint was not at the version the caller said it was.
+        // 412, like every other stale conditional write.
+        WebChatEndpointVersionMismatchException staleEndpoint => (
+            StatusCodes.Status412PreconditionFailed,
+            "Precondition failed",
+            staleEndpoint.Message),
+
+        // The agent named for a chat link cannot carry one -- it belongs to
+        // another workspace, or already has a link. 409: the request is
+        // well-formed and permitted, and contradicts the state of the workspace.
+        WebChatAgentUnusableException agentUnusable => (
+            StatusCodes.Status409Conflict,
+            "AI agent unavailable",
+            agentUnusable.Message),
+
+        // A visitor sent the same message twice while the first was still being
+        // answered, or re-sent one that already failed. 409 rather than an error:
+        // nothing is broken, and the caller must not be encouraged to retry --
+        // every reply costs the workspace money.
+        WebChatTurnInProgressException inProgress => (
+            StatusCodes.Status409Conflict,
+            "Message already being answered",
+            inProgress.Message),
+
+        WebChatTurnAlreadyFailedException alreadyFailed => (
+            StatusCodes.Status409Conflict,
+            "Message already attempted",
+            alreadyFailed.Message),
+
+        // The chat is not serving the public: a draft or withdrawn endpoint, or an
+        // agent that is not active. 503 -- it is a statement about this service
+        // being unavailable right now, not about the request being wrong, and the
+        // message deliberately does not say which of the causes applies.
+        WebChatUnavailableException chatUnavailable => (
+            StatusCodes.Status503ServiceUnavailable,
+            "Chat unavailable",
+            chatUnavailable.Message),
 
         // A use case that needs a signed-in person was reached without one. 401,
         // never 404: the caller has not yet said who they are, and signing in may

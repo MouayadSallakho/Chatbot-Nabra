@@ -1,0 +1,160 @@
+// The hosted chat page. Outside the admin shell, so it brings its own frame --
+// but it uses the same tokens, so it inherits the platform's light and dark
+// palettes without stating a single colour of its own.
+.chat {
+  min-block-size: 100dvh;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  padding: 0;
+  background-color: var(--surface-sunken, var(--surface-muted));
+
+  // On anything wider than a phone the chat becomes a panel with room around it;
+  // on a phone it fills the screen, because a floating card with margins wastes
+  // the space a composer needs.
+  @media (min-width: 640px) {
+    padding: var(--space-6) var(--space-4);
+    align-items: center;
+  }
+}
+
+.chat-panel {
+  display: flex;
+  flex-direction: column;
+  inline-size: 100%;
+  max-inline-size: 42rem;
+  min-block-size: 100dvh;
+  background-color: var(--surface-default);
+
+  @media (min-width: 640px) {
+    min-block-size: 0;
+    block-size: min(44rem, calc(100dvh - var(--space-6) * 2));
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-subtle);
+    overflow: hidden;
+  }
+}
+
+.chat-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border-block-end: 1px solid var(--border-default);
+  flex: none;
+}
+
+.brand-mark {
+  inline-size: 1.75rem;
+  block-size: 1.75rem;
+  color: var(--accent-default);
+  flex: none;
+}
+
+.chat-heading {
+  min-inline-size: 0;
+}
+
+.chat-title {
+  font: var(--text-section-title);
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.chat-subtitle {
+  margin: 0;
+}
+
+// The states that replace the transcript entirely.
+.chat-state {
+  flex: 1;
+  display: grid;
+  gap: var(--space-3);
+  align-content: center;
+  justify-items: center;
+  text-align: center;
+  padding: var(--space-6) var(--space-5);
+
+  p {
+    margin: 0;
+  }
+}
+
+.transcript {
+  flex: 1;
+  display: grid;
+  gap: var(--space-3);
+  align-content: start;
+  margin: 0;
+  padding: var(--space-5);
+  list-style: none;
+  overflow-y: auto;
+}
+
+// Sender is carried by a name and by alignment, never by colour alone.
+.bubble {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-lg);
+  max-inline-size: 85%;
+  border: 1px solid var(--border-default);
+}
+
+.bubble-customer {
+  justify-self: end;
+  background-color: var(--surface-muted);
+}
+
+.bubble-agent {
+  justify-self: start;
+  background-color: var(--surface-default);
+}
+
+.bubble-sender {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
+}
+
+// Interior spacing and line breaks carry meaning in a message, so they are
+// preserved; a long unbroken string wraps rather than forcing the page sideways.
+.bubble-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.chat-empty {
+  justify-self: center;
+  text-align: center;
+  padding-block: var(--space-6);
+}
+
+.chat-status,
+.chat-error {
+  margin: 0;
+  padding-inline: var(--space-5);
+  flex: none;
+}
+
+.chat-error {
+  margin-inline: var(--space-5);
+  padding-inline: var(--space-4);
+}
+
+.composer {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-end;
+  padding: var(--space-4) var(--space-5);
+  border-block-start: 1px solid var(--border-default);
+  flex: none;
+}
+
+.composer-input {
+  flex: 1;
+  min-inline-size: 0;
+  resize: none;
+}

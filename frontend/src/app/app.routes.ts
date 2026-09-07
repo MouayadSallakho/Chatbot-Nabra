@@ -5,6 +5,7 @@ import { LOGIN_PATH, REGISTER_PATH, anonymousGuard, authGuard } from '@app/core/
 import { WORKSPACE_SETUP_PATH, workspaceGuard } from '@app/core/workspace/workspace-guard';
 import { ACCEPT_INVITATION_PATH } from '@app/core/invitations/invitation-handoff';
 import { TeamApi } from '@app/features/team/team-api';
+import { HostedChatApi } from '@app/features/chat/hosted-chat-api';
 
 /**
  * One route per unbuilt product area, generated from the navigation model.
@@ -72,6 +73,19 @@ export const routes: Routes = [
       ),
   },
   {
+    // The hosted chat page. Outside the shell and behind no guard at all: a
+    // customer has no OmniAI account and never will, and the workspace guard
+    // would bounce them to a setup screen that means nothing to them.
+    //
+    // `HostedChatApi` is provided on the route so it lives in this chunk, and so
+    // no admin screen can reach the anonymous client by accident.
+    path: 'chat/:publicKey',
+    title: 'Chat',
+    providers: [HostedChatApi],
+    loadComponent: () =>
+      import('@app/features/chat/hosted-chat/hosted-chat').then((m) => m.HostedChat),
+  },
+  {
     path: WORKSPACE_SETUP_PATH,
     title: 'Choose workspace',
     canActivate: [authGuard],
@@ -106,6 +120,21 @@ export const routes: Routes = [
         // somebody who never opens it never downloads it.
         path: 'team',
         loadChildren: () => import('@app/features/team/team.routes').then((m) => m.teamRoutes),
+      },
+      {
+        // The conversation inbox. Real from Phase 15 -- these are the
+        // conversations customers have actually had.
+        path: 'conversations',
+        loadChildren: () =>
+          import('@app/features/conversations/conversations.routes').then(
+            (m) => m.conversationRoutes,
+          ),
+      },
+      {
+        // Channels, of which website chat is the first that is built.
+        path: 'channels',
+        loadChildren: () =>
+          import('@app/features/channels/channels.routes').then((m) => m.channelRoutes),
       },
       ...placeholderRoutes,
       // Deliberate, and deliberately not a redirect: bouncing an unknown address

@@ -1,0 +1,128 @@
+<div class="page">
+  @if (!canView()) {
+    <app-page-header heading="Conversation" />
+
+    <div class="page-section">
+      <div class="card">
+        <app-empty-state
+          icon="conversations"
+          heading="You do not have access to conversations"
+          description="Reading what customers said to this workspace needs a permission your roles do not include."
+        />
+      </div>
+    </div>
+  } @else if (loading()) {
+    <app-page-header heading="Conversation" />
+
+    <div class="page-section" aria-busy="true">
+      <p class="visually-hidden" role="status">Loading conversation…</p>
+      <div class="card card-body">
+        <span class="skeleton skeleton-title"></span>
+        <span class="skeleton skeleton-text"></span>
+      </div>
+    </div>
+  } @else if (failure(); as error) {
+    <app-page-header heading="Conversation" />
+
+    <div class="page-section">
+      <div class="card">
+        <app-empty-state
+          icon="alert"
+          tone="error"
+          [heading]="
+            error.kind === 'notFound' ? 'Conversation not found' : 'Could not load conversation'
+          "
+          [description]="error.message"
+        >
+          <a stateActions class="btn btn-secondary btn-sm" routerLink="/conversations">
+            Back to conversations
+          </a>
+        </app-empty-state>
+      </div>
+    </div>
+  } @else if (conversation(); as current) {
+    <app-page-header
+      heading="Conversation"
+      [description]="
+        current.channel === 'WebChat'
+          ? 'A website chat conversation.'
+          : 'A conversation on ' + current.channel + '.'
+      "
+    >
+      <button pageActions type="button" class="btn btn-secondary" (click)="load()">Refresh</button>
+      <a pageActions class="btn btn-secondary" routerLink="/conversations">Back to conversations</a>
+    </app-page-header>
+
+    <div class="page-section">
+      <div class="card card-body facts">
+        <div>
+          <p class="text-label text-muted">Channel</p>
+          <p class="text-body">
+            {{ current.channel === 'WebChat' ? 'Website chat' : current.channel }}
+          </p>
+        </div>
+        <div>
+          <p class="text-label text-muted">Agent</p>
+          <p class="text-body">{{ current.agentName ?? '—' }}</p>
+        </div>
+        <div>
+          <p class="text-label text-muted">Started</p>
+          <p class="text-body">{{ current.startedAt | date: 'medium' }}</p>
+        </div>
+        <div>
+          <p class="text-label text-muted">Last activity</p>
+          <p class="text-body">{{ current.lastActivityAt | date: 'medium' }}</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="page-section">
+      <h2 class="text-section-title">Transcript</h2>
+
+      @if (messages().length === 0) {
+        <div class="card card-body">
+          <p class="text-small text-muted">
+            This conversation has no messages. Somebody opened the chat and did not say anything.
+          </p>
+        </div>
+      } @else {
+        <!--
+          In ingestion order, oldest first -- the order this platform received the
+          messages, which is the only order it guarantees. Never sorted by the
+          timestamp shown beside each one.
+
+          Sender is carried by a label and by layout, not by colour alone, so the
+          distinction survives for anybody who cannot rely on hue.
+        -->
+        <ol class="transcript">
+          @for (message of messages(); track message.id) {
+            <li
+              class="message"
+              [class.message-customer]="message.sender === 'Customer'"
+              [class.message-agent]="message.sender === 'AiAgent'"
+            >
+              <p class="message-meta">
+                <span class="message-sender">{{ senderName(message) }}</span>
+                <span class="text-muted">{{ message.sentAt | date: 'medium' }}</span>
+              </p>
+              <p class="message-text">{{ message.text }}</p>
+            </li>
+          }
+        </ol>
+
+        @if (hasMore()) {
+          <div class="transcript-more">
+            <button
+              type="button"
+              class="btn btn-secondary btn-sm"
+              [disabled]="loadingMore()"
+              (click)="loadMore()"
+            >
+              {{ loadingMore() ? 'Loading…' : 'Load older messages' }}
+            </button>
+          </div>
+        }
+      }
+    </div>
+  }
+</div>

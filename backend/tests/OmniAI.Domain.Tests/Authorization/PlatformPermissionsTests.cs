@@ -70,8 +70,15 @@ public sealed class PlatformPermissionsTests
         // Listing a permission for a product area that does not exist would let
         // an administrator grant authority over nothing and then wonder why it
         // had no effect. Each arrives with the use cases it governs.
+        //
+        // Conversations and website chat left this list in Phase 15, when the
+        // conversation runtime and the hosted chat endpoint were built. The codes
+        // that arrived with them cover reading conversations and administering a
+        // chat endpoint, and nothing else: replying, assigning, exporting and
+        // handing off are still absent, because those workflows still do not
+        // exist.
         string[] unimplemented =
-            ["conversations", "knowledge", "channels", "billing", "integrations", "analytics"];
+            ["knowledge", "billing", "integrations", "analytics"];
 
         Assert.All(PlatformPermissions.AllCodes, code =>
             Assert.DoesNotContain(
@@ -111,6 +118,9 @@ public sealed class PlatformPermissionsTests
                 "members.view",
                 "members.invite",
                 "members.roles.manage",
+                "conversations.view",
+                "website-chat.view",
+                "website-chat.manage",
             ],
             PlatformPermissions.AllCodes.Select(code => code.Value));
     }

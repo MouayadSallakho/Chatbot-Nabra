@@ -1,0 +1,39 @@
+<div class="page">
+  @if (!canView()) {
+    <app-page-header heading="Channels" />
+
+    <div class="page-section">
+      <div class="card">
+        <app-empty-state
+          icon="channels"
+          heading="You do not have access to channels"
+          description="Seeing how this workspace is reachable needs a permission your roles do not include. Ask somebody who administers this workspace if you need it."
+        />
+      </div>
+    </div>
+  } @else {
+    <app-page-header
+      heading="Channels"
+      description="Where customers can reach this workspace. Each channel connects an AI agent to somewhere people already are."
+    />
+
+    <div class="page-section">
+      <ul class="channel-list">
+        @for (channel of channels; track channel.name) {
+          <li class="card card-body channel">
+            <div class="channel-text">
+              <p class="channel-name">{{ channel.name }}</p>
+              <p class="text-small text-secondary">{{ channel.description }}</p>
+            </div>
+
+            @if (channel.available && channel.path) {
+              <a class="btn btn-secondary btn-sm" [routerLink]="channel.path">Set up</a>
+            } @else {
+              <span class="badge badge-neutral">Not built yet</span>
+            }
+          </li>
+        }
+      </ul>
+    </div>
+  }
+</div>

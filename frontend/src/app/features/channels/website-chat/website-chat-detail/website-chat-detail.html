@@ -1,0 +1,174 @@
+<div class="page">
+  @if (!canView()) {
+    <app-page-header heading="Website chat" />
+
+    <div class="page-section">
+      <div class="card">
+        <app-empty-state
+          icon="channels"
+          heading="You do not have access to website chat"
+          description="Seeing how this workspace's website chat is set up needs a permission your roles do not include."
+        />
+      </div>
+    </div>
+  } @else if (loading()) {
+    <app-page-header heading="Website chat" />
+
+    <div class="page-section" aria-busy="true">
+      <p class="visually-hidden" role="status">Loading chat link…</p>
+      <div class="card card-body">
+        <span class="skeleton skeleton-title"></span>
+        <span class="skeleton skeleton-text"></span>
+      </div>
+    </div>
+  } @else if (failure(); as error) {
+    <app-page-header heading="Website chat" />
+
+    <div class="page-section">
+      <div class="card">
+        <app-empty-state
+          icon="alert"
+          tone="error"
+          [heading]="error.kind === 'notFound' ? 'Chat link not found' : 'Could not load chat link'"
+          [description]="error.message"
+        >
+          <a stateActions class="btn btn-secondary btn-sm" routerLink="/channels/website-chat">
+            Back to website chat
+          </a>
+        </app-empty-state>
+      </div>
+    </div>
+  } @else if (endpoint(); as current) {
+    <app-page-header
+      [heading]="current.aiAgentName"
+      description="A website chat link. Visitors who open it talk to this agent."
+    >
+      <a pageActions class="btn btn-secondary" routerLink="/channels/website-chat">
+        Back to website chat
+      </a>
+    </app-page-header>
+
+    <!--
+      The stale-write banner. Deliberately not an error beside a button: this
+      endpoint moved underneath the whole screen, and only re-reading fixes it.
+      Nothing was changed, so there is nothing of the reader's to lose.
+    -->
+    @if (stale()) {
+      <div class="page-section">
+        <div class="card card-body conflict" role="alert">
+          <p class="conflict-title">This chat link was updated elsewhere.</p>
+          <p class="text-small text-secondary">
+            Nothing was changed. Reload to see how it stands now, then try again.
+          </p>
+          <div class="conflict-actions">
+            <button type="button" class="btn btn-primary btn-sm" (click)="load()">
+              Reload latest
+            </button>
+          </div>
+        </div>
+      </div>
+    }
+
+    <div class="page-section">
+      <div class="card card-body facts">
+        <div>
+          <p class="text-label text-muted">Status</p>
+          <p class="text-body">
+            <span
+              class="badge"
+              [class.badge-success]="isActive()"
+              [class.badge-neutral]="!isActive()"
+            >
+              {{ current.status }}
+            </span>
+          </p>
+        </div>
+        <div>
+          <p class="text-label text-muted">Agent status</p>
+          <p class="text-body">{{ current.aiAgentStatus }}</p>
+        </div>
+        <div>
+          <p class="text-label text-muted">Created</p>
+          <p class="text-body">{{ current.createdAt | date: 'medium' }}</p>
+        </div>
+        <div>
+          <p class="text-label text-muted">Last changed</p>
+          <p class="text-body">{{ current.updatedAt | date: 'medium' }}</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="page-section">
+      <h2 class="text-section-title">Chat link</h2>
+      <p class="text-small text-secondary section-note">
+        Send this to visitors, or link to it from your own website. It is not a secret — anybody who
+        opens it can talk to this agent, and it gives them nothing else.
+      </p>
+
+      <div class="card card-body link-card">
+        <!--
+          Shown as text as well as offered to the clipboard. The clipboard can be
+          refused by permission or by an insecure context, and somebody who
+          cannot copy must still be able to select it by hand.
+        -->
+        <p class="chat-link">{{ chatUrl() }}</p>
+
+        <div class="link-actions">
+          <button type="button" class="btn btn-secondary btn-sm" (click)="copy()">
+            Copy chat link
+          </button>
+
+          @if (copied()) {
+            <span class="text-small text-muted" role="status">Copied.</span>
+          }
+        </div>
+      </div>
+    </div>
+
+    @if (canManage()) {
+      <div class="page-section">
+        <h2 class="text-section-title">Availability</h2>
+
+        @if (agentNotActive()) {
+          <p class="alert alert-warning" role="status">
+            This agent is {{ current.aiAgentStatus | lowercase }}. Only an active agent answers
+            visitors, so the chat page will say it is unavailable until the agent is activated.
+          </p>
+        }
+
+        @if (saveFailure(); as error) {
+          <p class="alert alert-danger" role="alert">{{ error.message }}</p>
+        }
+
+        <div class="form-actions">
+          @if (isActive()) {
+            <button
+              type="button"
+              class="btn btn-secondary"
+              [disabled]="saving()"
+              (click)="setStatus(false)"
+            >
+              {{ saving() ? 'Saving…' : 'Disable chat' }}
+            </button>
+            <p class="text-small text-muted">
+              Disabling stops new conversations and new replies. Transcripts people already have
+              stay readable to them.
+            </p>
+          } @else {
+            <button
+              type="button"
+              class="btn btn-primary"
+              [disabled]="saving()"
+              (click)="setStatus(true)"
+            >
+              {{ saving() ? 'Saving…' : 'Publish chat' }}
+            </button>
+            <p class="text-small text-muted">
+              Publishing lets anybody with the link start talking.
+            </p>
+          }
+        </div>
+      </div>
+    }
+  }
+</div>

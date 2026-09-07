@@ -99,6 +99,15 @@ internal sealed class AiAgentConfiguration : IEntityTypeConfiguration<AiAgent>
         builder.HasIndex(agent => agent.TenantId)
             .HasDatabaseName("ix_ai_agents_tenant");
 
+        // Added in Phase 15, and not to prevent duplicates -- id is already the
+        // primary key, so this pair can never repeat. PostgreSQL requires a unique
+        // constraint on the columns a foreign key references, and both
+        // web_chat_endpoints and web_chat_sessions reference exactly this pair so
+        // that an endpoint's agent and its workspace cannot disagree. The same
+        // construction tenant_roles already uses for role assignments.
+        builder.HasAlternateKey(agent => new { agent.Id, agent.TenantId })
+            .HasName("ak_ai_agents_id_tenant");
+
         // An agent is mutable -- name, instructions and status all change -- so
         // it carries the same optimistic concurrency token as the tenant and the
         // conversation. xmin is PostgreSQL's own per-row transaction id: it

@@ -27,10 +27,11 @@ that membership's all-or-nothing meaning with tenant-scoped roles: a protected
 Owner whose authority is the platform's whole capability catalogue, custom roles a
 workspace composes from it, and a permission check inside every tenant-scoped use
 case. No channel-provider architecture has been designed, and the platform is
-still not authorised for production deployment -- email verification, password
-recovery and member administration all remain ahead of it.
+still not authorised for production deployment -- email verification and password
+recovery remain ahead of it, and the first real conversational surface (Phase 15)
+has no rate limiting or abuse protection.
 
-Thirteen areas have their own documents:
+Fourteen areas have their own documents:
 
 - [multi-tenancy-isolation.md](multi-tenancy-isolation.md) - tenant isolation
 - [conversation-domain.md](conversation-domain.md) - conversation and message modelling
@@ -45,6 +46,7 @@ Thirteen areas have their own documents:
 - [authentication-tenant-membership.md](authentication-tenant-membership.md) - accounts, the cookie session, antiforgery, and the membership authorization boundary
 - [tenant-rbac.md](tenant-rbac.md) - tenant-scoped roles, the permission catalogue, and what a member may do inside a workspace
 - [team-members-invitations.md](team-members-invitations.md) - member administration, secure invitations, and role assignment
+- [conversation-runtime-website-chat.md](conversation-runtime-website-chat.md) - the conversation runtime, hosted website chat, and the anonymous visitor boundary
 
 ---
 

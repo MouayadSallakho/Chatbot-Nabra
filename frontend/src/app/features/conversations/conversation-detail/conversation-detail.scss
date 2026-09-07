@@ -1,0 +1,73 @@
+.facts {
+  display: grid;
+  gap: var(--space-4);
+
+  p {
+    margin: 0;
+  }
+
+  @media (min-width: 768px) {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.transcript {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+// Sender is carried by a label, by alignment and by surface -- never by colour
+// alone. Anybody who cannot rely on hue still reads who said what from the name
+// above each message.
+.message {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-4);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background-color: var(--surface-default);
+  max-inline-size: 46rem;
+
+  p {
+    margin: 0;
+  }
+}
+
+.message-customer {
+  border-inline-start: 3px solid var(--border-strong, var(--border-default));
+}
+
+.message-agent {
+  background-color: var(--surface-muted);
+  margin-inline-start: auto;
+}
+
+.message-meta {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  align-items: baseline;
+  font-size: 0.8125rem;
+}
+
+.message-sender {
+  font: var(--text-body-strong);
+  font-size: 0.8125rem;
+}
+
+// Whole message, wrapped. Interior spacing and line breaks carry meaning in a
+// message, so they are preserved rather than collapsed -- and a long unbroken
+// string wraps instead of forcing the page sideways.
+.message-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.transcript-more {
+  display: flex;
+  justify-content: center;
+  margin-block-start: var(--space-4);
+}

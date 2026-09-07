@@ -1,0 +1,114 @@
+<div class="page">
+  @if (!canView()) {
+    <app-page-header heading="Conversations" />
+
+    <div class="page-section">
+      <div class="card">
+        <app-empty-state
+          icon="conversations"
+          heading="You do not have access to conversations"
+          description="Reading what customers said to this workspace needs a permission your roles do not include. Ask somebody who administers this workspace if you need it."
+        />
+      </div>
+    </div>
+  } @else {
+    <app-page-header
+      heading="Conversations"
+      description="What customers have said to this workspace, and what its AI agents answered."
+    >
+      <button pageActions type="button" class="btn btn-secondary" (click)="load()">Refresh</button>
+    </app-page-header>
+
+    @if (loading()) {
+      <div class="page-section" aria-busy="true">
+        <p class="visually-hidden" role="status">Loading conversations…</p>
+        <div class="conversation-list">
+          @for (row of skeletonRows; track row) {
+            <div class="conversation-row conversation-row-skeleton" aria-hidden="true">
+              <span class="skeleton skeleton-title"></span>
+              <span class="skeleton skeleton-text"></span>
+            </div>
+          }
+        </div>
+      </div>
+    } @else if (failure(); as error) {
+      <div class="page-section">
+        <div class="card">
+          <app-empty-state
+            icon="alert"
+            tone="error"
+            heading="Could not load conversations"
+            [description]="error.message"
+          >
+            <button stateActions type="button" class="btn btn-secondary btn-sm" (click)="load()">
+              Try again
+            </button>
+          </app-empty-state>
+        </div>
+      </div>
+    } @else if (conversations().length === 0) {
+      <div class="page-section">
+        <div class="card">
+          <app-empty-state
+            icon="conversations"
+            heading="No conversations yet"
+            description="When somebody opens one of this workspace's chat links and says something, the conversation appears here."
+          />
+        </div>
+      </div>
+    } @else {
+      <div class="page-section">
+        <!--
+          One markup, two layouts -- the same approach the agent, role and member
+          lists take. Rows are a list of links, styled as an aligned grid on wide
+          screens and as stacked cards on narrow ones, because these are
+          navigational rather than tabular data somebody compares column by
+          column.
+        -->
+        <div class="conversation-list">
+          <div class="conversation-head" aria-hidden="true">
+            <span>Conversation</span>
+            <span>Channel</span>
+            <span>Agent</span>
+            <span>Last activity</span>
+          </div>
+
+          @for (conversation of conversations(); track conversation.id) {
+            <a class="conversation-row" [routerLink]="['/conversations', conversation.id]">
+              <span class="conversation-preview">
+                @if (conversation.lastMessagePreview) {
+                  <span class="preview-sender">{{
+                    senderLabel(conversation.lastMessageSender)
+                  }}</span>
+                  <span class="preview-text">{{ conversation.lastMessagePreview }}</span>
+                } @else {
+                  <span class="text-muted">No messages yet</span>
+                }
+              </span>
+
+              <span class="conversation-channel">
+                <span class="badge badge-neutral">
+                  {{ conversation.channel === 'WebChat' ? 'Website chat' : conversation.channel }}
+                </span>
+              </span>
+
+              <span class="conversation-agent">{{ conversation.agentName ?? '—' }}</span>
+
+              <span class="conversation-activity">
+                {{ conversation.lastActivityAt | date: 'medium' }}
+              </span>
+            </a>
+          }
+        </div>
+
+        <p class="text-small text-muted count">
+          @if (total() === 1) {
+            1 conversation
+          } @else {
+            {{ total() }} conversations
+          }
+        </p>
+      </div>
+    }
+  }
+</div>

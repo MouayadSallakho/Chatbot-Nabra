@@ -1,17 +1,24 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Npgsql;
 using OmniAI.Application.Ai;
 using OmniAI.Application.AiAgents.Persistence;
 using OmniAI.Application.Authorization.Persistence;
+using OmniAI.Application.Conversations;
+using OmniAI.Application.Conversations.Persistence;
 using OmniAI.Application.Invitations.Persistence;
 using OmniAI.Application.Invitations;
 using OmniAI.Application.Members.Persistence;
 using OmniAI.Application.Security;
 using OmniAI.Application.Tenants.Persistence;
+using OmniAI.Application.WebChat;
+using OmniAI.Application.WebChat.Persistence;
 using OmniAI.Infrastructure.Ai.OpenAi;
 using OmniAI.Infrastructure.Identity;
+using OmniAI.Infrastructure.Conversations;
 using OmniAI.Infrastructure.Invitations;
+using OmniAI.Infrastructure.WebChat;
 using OmniAI.Infrastructure.Ai;
 using OmniAI.Infrastructure.Persistence.Repositories;
 using OmniAI.Infrastructure.Persistence;
@@ -90,6 +97,38 @@ public static class InfrastructureServiceCollectionExtensions
         // RandomNumberGenerator and SHA-256 are both static and thread-safe, so a
         // single instance serves every caller.
         services.AddSingleton<IInvitationTokens, InvitationTokens>();
+
+        // Website chat.
+        services.AddScoped<IWebChatEndpointRepository, WebChatEndpointRepository>();
+        services.AddScoped<IWebChatRuntimeStore, WebChatRuntimeStore>();
+        services.AddScoped<IConversationRepository, ConversationRepository>();
+
+        // Both mint values, neither holds state, and the primitives behind them
+        // are static and thread-safe -- so one instance serves every caller. They
+        // are separate services because one produces something published and the
+        // other something secret, and the call sites must not be interchangeable.
+        services.AddSingleton<IWebChatPublicKeys, WebChatPublicKeys>();
+        services.AddSingleton<IWebChatAccessTokens, WebChatAccessTokens>();
+
+        // The conversation lock needs a connection of its own -- one it can hold
+        // across a provider call without holding a transaction -- so it takes a
+        // data source rather than the request's DbContext.
+        //
+        // Registered unconditionally, and built lazily, for the same reason the
+        // DbContext above tolerates a blank connection string: a deployment with
+        // no database configured must still start, so that endpoints needing no
+        // database still work and the failure appears where the database is
+        // actually used, naming what is missing. Registering this only when a
+        // connection string was supplied would instead fail the whole application
+        // at startup with a dependency-injection error that says nothing about
+        // configuration.
+        services.AddSingleton(_ => string.IsNullOrWhiteSpace(connectionString)
+            ? throw new InvalidOperationException(
+                "Website chat needs a database connection string. Set "
+                + "ConnectionStrings:OmniAiDatabase.")
+            : NpgsqlDataSource.Create(connectionString));
+
+        services.AddScoped<IConversationLock, PostgresConversationLock>();
 
         return services;
     }

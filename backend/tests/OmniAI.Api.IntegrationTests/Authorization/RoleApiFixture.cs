@@ -26,7 +26,10 @@ namespace OmniAI.Api.IntegrationTests.Authorization;
 /// every assertion is about what the API answers.
 /// </para>
 /// </remarks>
-public sealed class RoleApiFixture : AiAgentApiFixture
+// Unsealed in Phase 15 so the website chat fixture can inherit its workspace,
+// membership and permission helpers rather than copying them. It adds no members
+// and overrides nothing here; what it adds is an AI provider double of its own.
+public class RoleApiFixture : AiAgentApiFixture
 {
     /// <summary>
     /// Registers an account, gives it a workspace, and returns both.

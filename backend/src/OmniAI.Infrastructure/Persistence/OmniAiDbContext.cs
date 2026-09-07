@@ -7,6 +7,7 @@ using OmniAI.Domain.Conversations;
 using OmniAI.Domain.Invitations;
 using OmniAI.Domain.Tenants;
 using OmniAI.Domain.Users;
+using OmniAI.Domain.WebChat;
 using OmniAI.Infrastructure.Identity;
 
 namespace OmniAI.Infrastructure.Persistence;
@@ -78,6 +79,23 @@ public sealed class OmniAiDbContext(DbContextOptions<OmniAiDbContext> options)
     public DbSet<TenantInvitation> TenantInvitations => Set<TenantInvitation>();
 
     public DbSet<Conversation> Conversations => Set<Conversation>();
+
+    /// <summary>
+    /// The durable record of each answered turn.
+    /// </summary>
+    /// <remarks>
+    /// Its own set rather than a navigation on <c>Conversation</c>: a turn is
+    /// runtime bookkeeping, and hanging it off the aggregate would mean loading it
+    /// whenever a conversation is read and would put an idempotency key into the
+    /// business model.
+    /// </remarks>
+    public DbSet<ConversationTurn> ConversationTurns => Set<ConversationTurn>();
+
+    /// <summary>Website chat endpoints: where a workspace's AI is reachable from.</summary>
+    public DbSet<WebChatEndpoint> WebChatEndpoints => Set<WebChatEndpoint>();
+
+    /// <summary>Anonymous visitors' claims on their own conversations.</summary>
+    public DbSet<WebChatSession> WebChatSessions => Set<WebChatSession>();
 
     public DbSet<AiAgent> AiAgents => Set<AiAgent>();
 

@@ -28,7 +28,10 @@ export type PermissionCode =
   | 'roles.manage'
   | 'members.view'
   | 'members.invite'
-  | 'members.roles.manage';
+  | 'members.roles.manage'
+  | 'conversations.view'
+  | 'website-chat.view'
+  | 'website-chat.manage';
 
 /**
  * One capability, as the catalogue endpoint publishes it.

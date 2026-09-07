@@ -2,6 +2,8 @@ using OmniAI.Api.AiAgents;
 using OmniAI.Api.Auth;
 using OmniAI.Api.Authorization;
 using OmniAI.Api.Composition;
+using OmniAI.Api.Conversations;
+using OmniAI.Api.WebChat;
 using OmniAI.Api.Security;
 using OmniAI.Api.Team;
 using OmniAI.Api.Tenants;
@@ -107,6 +109,22 @@ app.MapTeamEndpoints();
 // three independent layers would have to fail for one tenant's data to reach
 // another's request.
 app.MapAiAgentEndpoints();
+
+// Website chat administration: which agent is reachable from the public web, and
+// whether it is switched on. Authenticated, and permission-checked inside every
+// use case.
+app.MapWebChatEndpoints();
+
+// Reading the conversations customers have actually had. Read-only in this
+// release: there is no reply, no assignment and no handoff yet.
+app.MapConversationEndpoints();
+
+// The hosted chat page's own API. Anonymous by design -- a customer has no
+// account -- and the only surface in the platform where an unauthenticated
+// request reaches an AI provider. Access to a conversation comes from a
+// per-conversation credential in an HttpOnly cookie, never from a session, and it
+// grants nothing beyond that one conversation.
+app.MapHostedChatEndpoints();
 
 // TLS is terminated by the reverse proxy in front of this process, so the
 // application deliberately does not perform its own HTTPS redirection -- there is

@@ -146,6 +146,9 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasAlternateKey("Id", "TenantId")
+                        .HasName("ak_ai_agents_id_tenant");
+
                     b.HasIndex("TenantId")
                         .HasDatabaseName("ix_ai_agents_tenant");
 
@@ -295,6 +298,57 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_conversations_tenant_last_activity");
 
                     b.ToTable("conversations", (string)null);
+                });
+
+            modelBuilder.Entity("OmniAI.Domain.Conversations.ConversationTurn", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("ClientMessageId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("client_message_id");
+
+                    b.Property<Guid>("ConversationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("conversation_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("CustomerMessageId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("customer_message_id");
+
+                    b.Property<Guid?>("ReplyMessageId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("reply_message_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("status");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CustomerMessageId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_conversation_turns_customer_message");
+
+                    b.HasIndex("ConversationId", "ClientMessageId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_conversation_turns_client_message");
+
+                    b.ToTable("conversation_turns", (string)null);
                 });
 
             modelBuilder.Entity("OmniAI.Domain.Conversations.Message", b =>
@@ -514,6 +568,104 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                     b.ToTable("tenant_memberships", (string)null);
                 });
 
+            modelBuilder.Entity("OmniAI.Domain.WebChat.WebChatEndpoint", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AiAgentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("ai_agent_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("PublicKey")
+                        .IsRequired()
+                        .HasMaxLength(22)
+                        .HasColumnType("character varying(22)")
+                        .HasColumnName("public_key");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("Id", "TenantId")
+                        .HasName("ak_web_chat_endpoints_id_tenant");
+
+                    b.HasIndex("PublicKey")
+                        .IsUnique()
+                        .HasDatabaseName("ux_web_chat_endpoints_public_key");
+
+                    b.HasIndex("AiAgentId", "TenantId");
+
+                    b.HasIndex("TenantId", "AiAgentId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_web_chat_endpoints_tenant_agent");
+
+                    b.ToTable("web_chat_endpoints", (string)null);
+                });
+
+            modelBuilder.Entity("OmniAI.Domain.WebChat.WebChatSession", b =>
+                {
+                    b.Property<Guid>("ConversationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("conversation_id");
+
+                    b.Property<byte[]>("AccessTokenHash")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("access_token_hash");
+
+                    b.Property<Guid>("AiAgentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("ai_agent_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("EndpointId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("web_chat_endpoint_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("ConversationId");
+
+                    b.HasIndex("AccessTokenHash")
+                        .IsUnique()
+                        .HasDatabaseName("ux_web_chat_sessions_access_token_hash");
+
+                    b.HasIndex("AiAgentId", "TenantId");
+
+                    b.HasIndex("EndpointId", "TenantId");
+
+                    b.ToTable("web_chat_sessions", (string)null);
+                });
+
             modelBuilder.Entity("OmniAI.Infrastructure.Identity.OmniAiUser", b =>
                 {
                     b.Property<Guid>("Id")
@@ -683,6 +835,23 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_conversations_tenant");
                 });
 
+            modelBuilder.Entity("OmniAI.Domain.Conversations.ConversationTurn", b =>
+                {
+                    b.HasOne("OmniAI.Domain.Conversations.Conversation", null)
+                        .WithMany()
+                        .HasForeignKey("ConversationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_conversation_turns_conversation");
+
+                    b.HasOne("OmniAI.Domain.Conversations.Message", null)
+                        .WithMany()
+                        .HasForeignKey("CustomerMessageId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_conversation_turns_customer_message");
+                });
+
             modelBuilder.Entity("OmniAI.Domain.Conversations.Message", b =>
                 {
                     b.HasOne("OmniAI.Domain.Conversations.Conversation", null)
@@ -730,6 +899,50 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_tenant_memberships_tenant");
+                });
+
+            modelBuilder.Entity("OmniAI.Domain.WebChat.WebChatEndpoint", b =>
+                {
+                    b.HasOne("OmniAI.Domain.Tenants.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_web_chat_endpoints_tenant");
+
+                    b.HasOne("OmniAI.Domain.AiAgents.AiAgent", null)
+                        .WithMany()
+                        .HasForeignKey("AiAgentId", "TenantId")
+                        .HasPrincipalKey("Id", "TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_web_chat_endpoints_agent");
+                });
+
+            modelBuilder.Entity("OmniAI.Domain.WebChat.WebChatSession", b =>
+                {
+                    b.HasOne("OmniAI.Domain.Conversations.Conversation", null)
+                        .WithMany()
+                        .HasForeignKey("ConversationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_web_chat_sessions_conversation");
+
+                    b.HasOne("OmniAI.Domain.AiAgents.AiAgent", null)
+                        .WithMany()
+                        .HasForeignKey("AiAgentId", "TenantId")
+                        .HasPrincipalKey("Id", "TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_web_chat_sessions_agent");
+
+                    b.HasOne("OmniAI.Domain.WebChat.WebChatEndpoint", null)
+                        .WithMany()
+                        .HasForeignKey("EndpointId", "TenantId")
+                        .HasPrincipalKey("Id", "TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_web_chat_sessions_endpoint");
                 });
 
             modelBuilder.Entity("OmniAI.Domain.Authorization.TenantRole", b =>

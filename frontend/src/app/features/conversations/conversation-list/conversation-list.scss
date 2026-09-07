@@ -1,0 +1,92 @@
+// One markup, two layouts -- the same approach the agent, role and member lists
+// take, for the same reason. A real <table> would have meant either a second
+// copy of the markup for mobile or a horizontally scrolling table on a phone,
+// and these rows are navigational rather than tabular data somebody compares
+// column by column.
+.conversation-list {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background-color: var(--surface-default);
+}
+
+.conversation-head {
+  display: none;
+}
+
+.conversation-row {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-5);
+  text-decoration: none;
+  color: inherit;
+
+  & + & {
+    border-block-start: 1px solid var(--border-default);
+  }
+
+  &:hover {
+    background-color: var(--surface-muted);
+  }
+}
+
+.conversation-row-skeleton {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.conversation-preview {
+  display: flex;
+  gap: var(--space-2);
+  min-inline-size: 0;
+  align-items: baseline;
+}
+
+.preview-sender {
+  font: var(--text-label);
+  color: var(--text-muted);
+  flex: none;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+}
+
+// One line, cut with an ellipsis. A preview that wrapped to four lines would
+// make the list impossible to scan.
+.preview-text {
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.conversation-agent,
+.conversation-activity {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  min-inline-size: 0;
+  overflow-wrap: anywhere;
+}
+
+.count {
+  margin-block-start: var(--space-3);
+}
+
+@media (min-width: 900px) {
+  .conversation-head,
+  .conversation-row {
+    display: grid;
+    grid-template-columns: minmax(0, 3fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.2fr);
+    align-items: center;
+    gap: var(--space-4);
+  }
+
+  .conversation-head {
+    padding: var(--space-3) var(--space-5);
+    background-color: var(--surface-muted);
+    border-block-end: 1px solid var(--border-default);
+    font: var(--text-label);
+    color: var(--text-muted);
+    text-transform: uppercase;
+    font-size: 0.75rem;
+  }
+}

@@ -5,6 +5,7 @@ using OmniAI.Domain.Conversations;
 using OmniAI.Domain.Invitations;
 using OmniAI.Domain.Tenants;
 using OmniAI.Domain.Users;
+using OmniAI.Domain.WebChat;
 
 namespace OmniAI.Infrastructure.Persistence;
 
@@ -88,6 +89,53 @@ internal static class PersistenceConverters
 
     public static readonly ValueConverter<MessageId, Guid> MessageId =
         new(id => id.Value, value => Domain.Conversations.MessageId.From(value));
+
+    public static readonly ValueConverter<WebChatEndpointId, Guid> WebChatEndpointId =
+        new(id => id.Value, value => Domain.WebChat.WebChatEndpointId.From(value));
+
+    public static readonly ValueConverter<ConversationTurnId, Guid> ConversationTurnId =
+        new(id => id.Value, value => Domain.Conversations.ConversationTurnId.From(value));
+
+    /// <summary>
+    /// An optional message id, for a turn that has no reply yet.
+    /// </summary>
+    /// <remarks>
+    /// A separate converter rather than a nullable use of the one above, because
+    /// EF Core matches converters by exact type and would otherwise store the
+    /// default struct as an empty GUID -- which the factory refuses to read back.
+    /// </remarks>
+    public static readonly ValueConverter<MessageId?, Guid?> NullableMessageId =
+        new(
+            id => id == null ? null : id.Value.Value,
+            value => value == null ? null : Domain.Conversations.MessageId.From(value.Value));
+
+    /// <summary>
+    /// A website chat public key, stored as the text it is published as.
+    /// </summary>
+    /// <remarks>
+    /// In the clear, deliberately. It appears in every hosted chat URL, so a
+    /// digest would protect nothing and would only stop the public lookup being an
+    /// index seek on the value itself.
+    /// </remarks>
+    public static readonly ValueConverter<WebChatPublicKey, string> WebChatPublicKey =
+        new(key => key.Value, value => Domain.WebChat.WebChatPublicKey.Create(value));
+
+    /// <summary>
+    /// A client's idempotency key, stored as the text it sent.
+    /// </summary>
+    public static readonly ValueConverter<ClientMessageId, string> ClientMessageId =
+        new(id => id.Value, value => Domain.Conversations.ClientMessageId.Create(value));
+
+    /// <summary>
+    /// The digest of an anonymous conversation credential, stored as raw bytes.
+    /// </summary>
+    /// <remarks>
+    /// <c>bytea</c> rather than text. There is deliberately no converter anywhere
+    /// in this file that could store a raw conversation secret, because no type in
+    /// the model holds one.
+    /// </remarks>
+    public static readonly ValueConverter<WebChatAccessTokenHash, byte[]> WebChatAccessTokenHash =
+        new(hash => hash.ToArray(), value => Domain.WebChat.WebChatAccessTokenHash.From(value));
 
     public static readonly ValueConverter<AiAgentId, Guid> AiAgentId =
         new(id => id.Value, value => Domain.AiAgents.AiAgentId.From(value));

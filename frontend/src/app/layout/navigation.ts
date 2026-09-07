@@ -68,9 +68,28 @@ export const NAV_ITEMS: readonly NavItem[] = [
       'ai-agents.preview',
     ],
   },
-  { label: 'Conversations', path: 'conversations', icon: 'conversations', implemented: false },
+  {
+    // Real from Phase 15: these are the conversations customers have actually
+    // had, not a placeholder. Read-only -- replying, assigning and handing off do
+    // not exist yet, and the screen says so rather than showing controls that
+    // would fail.
+    label: 'Conversations',
+    path: 'conversations',
+    icon: 'conversations',
+    implemented: true,
+    permissions: ['conversations.view'],
+  },
   { label: 'Knowledge', path: 'knowledge', icon: 'knowledge', implemented: false },
-  { label: 'Channels', path: 'channels', icon: 'channels', implemented: false },
+  {
+    // Website chat is the first real channel. The others are still honestly
+    // labelled as not built rather than shown as empty screens, which is why the
+    // area is entered through a list rather than straight into one channel.
+    label: 'Channels',
+    path: 'channels',
+    icon: 'channels',
+    implemented: true,
+    permissions: ['website-chat.view'],
+  },
   { label: 'Integrations', path: 'integrations', icon: 'integrations', implemented: false },
   { label: 'Analytics', path: 'analytics', icon: 'analytics', implemented: false },
   {

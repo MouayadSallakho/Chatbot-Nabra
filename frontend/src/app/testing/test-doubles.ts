@@ -232,4 +232,22 @@ export const EVERY_PERMISSION: readonly PermissionDefinition[] = [
     label: 'Assign roles to team members',
     description: 'Decide which roles a member holds.',
   },
+  {
+    code: 'conversations.view',
+    group: 'Conversations',
+    label: 'View conversations',
+    description: 'Read the conversations customers have had with this workspace.',
+  },
+  {
+    code: 'website-chat.view',
+    group: 'Channels',
+    label: 'View website chat',
+    description: "See how this workspace's website chat is set up.",
+  },
+  {
+    code: 'website-chat.manage',
+    group: 'Channels',
+    label: 'Manage website chat',
+    description: 'Create website chat links and decide whether the public can use them.',
+  },
 ];

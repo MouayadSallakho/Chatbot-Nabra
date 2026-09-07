@@ -25,7 +25,14 @@ using OmniAI.Application.Members.GetAssignableRoles;
 using OmniAI.Application.Members.GetTenantMemberById;
 using OmniAI.Application.Members.ListTenantMembers;
 using OmniAI.Application.Members.ReplaceTenantMemberRoles;
+using OmniAI.Application.Conversations;
 using OmniAI.Application.Tenants.CreateTenant;
+using OmniAI.Application.WebChat.CreateWebChatEndpoint;
+using OmniAI.Application.WebChat.GetWebChatEndpointById;
+using OmniAI.Application.WebChat.Hosted;
+using OmniAI.Application.WebChat.ListWebChatEndpoints;
+using OmniAI.Application.WebChat.SetWebChatEndpointStatus;
+using OmniAI.Application.WebChat;
 using OmniAI.Application.Tenants.GetTenantById;
 using OmniAI.Application.Tenants.ListMyTenants;
 using OmniAI.Application.Tenants;
@@ -154,6 +161,28 @@ internal static class CompositionRoot
         // constant read at each use site, so the lifetime is configurable and so a
         // test can issue one that has already expired without waiting a week.
         services.AddSingleton(new InvitationPolicy());
+
+        // Website chat administration.
+        services.AddScoped<ListWebChatEndpointsHandler>();
+        services.AddScoped<GetWebChatEndpointByIdHandler>();
+        services.AddScoped<CreateWebChatEndpointHandler>();
+        services.AddScoped<SetWebChatEndpointStatusHandler>();
+
+        // The hosted chat runtime.
+        services.AddScoped<PublicWebChatAccess>();
+        services.AddScoped<StartWebChatConversationHandler>();
+        services.AddScoped<SendWebChatMessageHandler>();
+        services.AddScoped<ListWebChatMessagesHandler>();
+
+        // Reading conversations from the admin.
+        services.AddScoped<ReadConversationsHandler>();
+
+        // Resource policies. Singletons rather than constants read at each use
+        // site, so the limits are configurable and a test can drive a tiny window
+        // without waiting for a real conversation to grow.
+        services.AddSingleton(new WebChatPolicy());
+        services.AddSingleton(new ConversationContextPolicy());
+        services.AddSingleton(new ConversationReadPolicy());
         services.AddScoped<CreateAiAgentHandler>();
         services.AddScoped<GetAiAgentByIdHandler>();
         services.AddScoped<ListAiAgentsHandler>();
