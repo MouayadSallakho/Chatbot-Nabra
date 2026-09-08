@@ -15,8 +15,17 @@ public sealed class AiRuntimeContractTests
     /// <summary>The only roles a conversational turn may carry.</summary>
     private static readonly AiTurnRole[] SupportedRoles = [AiTurnRole.User, AiTurnRole.Assistant];
 
-    /// <summary>The only properties a generation request may expose.</summary>
-    private static readonly string[] RequestProperties = ["Instructions", "Turns"];
+    /// <summary>
+    /// The only properties a generation request may expose.
+    /// </summary>
+    /// <remarks>
+    /// Grounding joined the two original slots in Phase 17. It is content rather
+    /// than provider configuration -- reference material the answer may draw on --
+    /// and it is a third property precisely so it can never be merged into either
+    /// of the other two.
+    /// </remarks>
+    private static readonly string[] RequestProperties =
+        ["Grounding", "Instructions", "Turns"];
 
     /// <summary>The turns a three-turn ordering check expects, in order.</summary>
     private static readonly string[] OrderedTurns = ["First", "Second", "Third"];

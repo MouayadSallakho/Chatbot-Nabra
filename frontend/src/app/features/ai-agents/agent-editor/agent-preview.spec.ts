@@ -161,7 +161,7 @@ describe('AgentPreview', () => {
     it('explains an unconfigured provider (503) usefully', async () => {
       await fail(503);
 
-      expect(host().textContent).toContain('no provider is configured');
+      expect(host().textContent).toContain('none is configured on this deployment');
     });
 
     it('explains a timeout (504) and does not retry it', async () => {

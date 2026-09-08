@@ -7,6 +7,7 @@ import { TenantApi } from '@app/core/api/tenant-api';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
 import { memoryStorage, permissionApiGranting } from '@app/testing/test-doubles';
 import { PermissionApi } from '@app/core/authorization/permission-api';
+import { KnowledgeApi } from '@app/features/knowledge/knowledge-api';
 import { AiAgent, AiAgentApi } from '../ai-agent-api';
 import { AgentEditor } from './agent-editor';
 
@@ -22,6 +23,7 @@ describe('AgentEditor', () => {
   const tenantId = '11111111-1111-1111-1111-111111111111';
   const agentId = '22222222-2222-2222-2222-222222222222';
   const agentUrl = `/api/tenants/${tenantId}/ai-agents/${agentId}`;
+  const agentKnowledgeUrl = `${agentUrl}/knowledge`;
 
   const draft: AiAgent = {
     id: agentId,
@@ -49,6 +51,10 @@ describe('AgentEditor', () => {
         provideHttpClient(),
         provideHttpClientTesting(),
         AiAgentApi,
+        // The editor hosts the knowledge section from Phase 17, which reads what
+        // this agent may draw on. A real client over the testing backend, not a
+        // double: the point of these tests is the editor as it actually renders.
+        KnowledgeApi,
         { provide: LOCAL_STORAGE, useValue: memoryStorage() },
         {
           provide: TenantApi,
@@ -73,6 +79,29 @@ describe('AgentEditor', () => {
 
     http.expectOne(agentUrl).flush(agent, { headers: { ETag: etag } });
     await settle();
+
+    // The knowledge section loads alongside the agent. Answered with an empty
+    // workspace so it settles quietly: what it does with real documents is its
+    // own suite's business, and leaving the request open would fail every case
+    // in this file on verify() for a reason unrelated to what it asserts.
+    flushKnowledge(etag);
+
+    await settle();
+  }
+
+  /**
+   * Answers the knowledge section's read of what this agent may draw on.
+   *
+   * The section is a child of the editor and loads when it is created, so this
+   * has to be answered on the first render and again after any reload -- a
+   * reload replaces the whole editor body, which re-creates the section and
+   * makes it read the latest assignment. That is the intended behaviour: somebody
+   * asking for the latest version should see the latest assignment too.
+   */
+  function flushKnowledge(etag: string): void {
+    http
+      .expectOne(agentKnowledgeUrl)
+      .flush({ aiAgentId: agentId, documents: [] }, { headers: { ETag: etag } });
   }
 
   async function settle(): Promise<void> {
@@ -424,6 +453,9 @@ describe('AgentEditor', () => {
         { ...draft, instructions: "Somebody else's version." },
         { headers: { ETag: '"v7"' } },
       );
+      await settle();
+
+      flushKnowledge('"v7"');
       await settle();
 
       expect(instructionsBox().value).toBe("Somebody else's version.");

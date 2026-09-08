@@ -283,8 +283,8 @@ export class HostedChat implements OnInit {
    * Says what happened in words a customer can act on.
    *
    * <strong>The shared copy is written for administrators, and here that is
-   * wrong.</strong> "AI preview is currently unavailable because no provider is
-   * configured" is a sentence about this platform's deployment: it tells somebody
+   * wrong.</strong> "This needs an AI provider, and none is configured on this
+   * deployment" is a sentence about this platform's deployment: it tells somebody
    * who came to ask about a delivery that a *provider* is not *configured*, which
    * is meaningless to them and is internal operational detail they have no
    * business being given. A customer needs to know that the answer did not

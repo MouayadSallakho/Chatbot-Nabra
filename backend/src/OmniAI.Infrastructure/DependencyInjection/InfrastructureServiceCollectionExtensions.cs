@@ -8,6 +8,8 @@ using OmniAI.Application.Authorization.Persistence;
 using OmniAI.Application.Conversations;
 using OmniAI.Application.Conversations.Persistence;
 using OmniAI.Application.Invitations.Persistence;
+using OmniAI.Application.Knowledge;
+using OmniAI.Application.Knowledge.Persistence;
 using OmniAI.Application.Invitations;
 using OmniAI.Application.Members.Persistence;
 using OmniAI.Application.Security;
@@ -18,6 +20,7 @@ using OmniAI.Infrastructure.Ai.OpenAi;
 using OmniAI.Infrastructure.Identity;
 using OmniAI.Infrastructure.Conversations;
 using OmniAI.Infrastructure.Invitations;
+using OmniAI.Infrastructure.Knowledge;
 using OmniAI.Infrastructure.WebChat;
 using OmniAI.Infrastructure.Ai;
 using OmniAI.Infrastructure.Persistence.Repositories;
@@ -88,6 +91,10 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<ITenantMemberRepository, TenantMemberRepository>();
         services.AddScoped<ITenantInvitationRepository, TenantInvitationRepository>();
         services.AddScoped<IAiAgentRepository, AiAgentRepository>();
+        services.AddScoped<IKnowledgeDocumentRepository, KnowledgeDocumentRepository>();
+        services.AddScoped<IAgentKnowledgeRepository, AgentKnowledgeRepository>();
+        services.AddScoped<IKnowledgeIndexStore, KnowledgeIndexStore>();
+        services.AddScoped<IKnowledgeSearchStore, KnowledgeSearchStore>();
 
         // The one account fact the product may read. Scoped, because it reads
         // through the request's DbContext.
@@ -190,10 +197,28 @@ public static class InfrastructureServiceCollectionExtensions
 
         string? apiKey = configuration[OpenAiOptions.ApiKeyVariable];
 
+        // The embedding profile is registered whichever branch is taken. How this
+        // deployment is configured to make vectors is a fact about the deployment,
+        // not about whether a credential happens to be present -- and without it
+        // the knowledge screens could not report readiness at all on a deployment
+        // with no key, which is exactly the deployment somebody is most likely to
+        // be looking at first.
+        EmbeddingOptions embeddingOptions = ReadEmbeddingOptions(configuration);
+
+        services.AddSingleton(embeddingOptions);
+        services.AddSingleton(EmbeddingProfile.Create(
+            embeddingOptions.ProfileId,
+            EmbeddingOptions.Dimensions,
+            embeddingOptions.MaxBatchSize,
+            embeddingOptions.MaxInputCharacters));
+
         if (string.IsNullOrWhiteSpace(apiKey))
         {
-            // No provider. The honest refusal, exactly as before.
+            // No provider. The honest refusal, exactly as before -- and now for
+            // embeddings too, which means a document can never become ready
+            // without a real index behind it.
             services.AddSingleton<IAiTextGenerator, UnconfiguredAiTextGenerator>();
+            services.AddSingleton<ITextEmbeddingGenerator, UnconfiguredTextEmbeddingGenerator>();
 
             return services;
         }
@@ -226,7 +251,46 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddSingleton(OpenAiClientFactory.Create(apiKey, options));
         services.AddSingleton<IAiTextGenerator, OpenAiTextGenerator>();
 
+        services.AddSingleton(OpenAiEmbeddingClientFactory.Create(apiKey, embeddingOptions));
+        services.AddSingleton<ITextEmbeddingGenerator, OpenAiTextEmbeddingGenerator>();
+
         return services;
+    }
+
+    /// <summary>
+    /// Reads the embedding settings, validating them at startup.
+    /// </summary>
+    /// <remarks>
+    /// The dimension is deliberately not among them. It is a constant, because
+    /// the database column is declared for it: a settings value that disagreed
+    /// would fail on the first insert, deep inside an index transaction, with a
+    /// message about a column type rather than about configuration.
+    /// </remarks>
+    private static EmbeddingOptions ReadEmbeddingOptions(IConfiguration configuration)
+    {
+        IConfigurationSection section = configuration.GetSection(EmbeddingOptions.SectionName);
+
+        EmbeddingOptions options = new()
+        {
+            Model = Setting(section, nameof(EmbeddingOptions.Model))
+                ?? EmbeddingOptions.DefaultModel,
+            MaxBatchSize = Number(
+                section,
+                nameof(EmbeddingOptions.MaxBatchSize),
+                EmbeddingOptions.DefaultMaxBatchSize),
+            MaxInputCharacters = Number(
+                section,
+                nameof(EmbeddingOptions.MaxInputCharacters),
+                EmbeddingOptions.DefaultMaxInputCharacters),
+            TimeoutSeconds = Number(
+                section,
+                nameof(EmbeddingOptions.TimeoutSeconds),
+                EmbeddingOptions.DefaultTimeoutSeconds),
+        };
+
+        options.Validate();
+
+        return options;
     }
 
     /// <summary>A configured string, or null when it is absent or blank.</summary>
@@ -258,6 +322,6 @@ public static class InfrastructureServiceCollectionExtensions
         return int.TryParse(value, CultureInfo.InvariantCulture, out int parsed)
             ? parsed
             : throw new InvalidOperationException(
-                $"{OpenAiOptions.SectionName}:{key} must be a whole number.");
+                $"{section.Key}:{key} must be a whole number.");
     }
 }

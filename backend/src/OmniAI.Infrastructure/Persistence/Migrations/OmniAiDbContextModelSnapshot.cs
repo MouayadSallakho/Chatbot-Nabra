@@ -497,6 +497,103 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                     b.ToTable("tenant_invitations", (string)null);
                 });
 
+            modelBuilder.Entity("OmniAI.Domain.Knowledge.AgentKnowledgeAssignment", b =>
+                {
+                    b.Property<Guid>("AiAgentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("ai_agent_id");
+
+                    b.Property<Guid>("KnowledgeDocumentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("knowledge_document_id");
+
+                    b.Property<DateTimeOffset>("AssignedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("assigned_at");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("AiAgentId", "KnowledgeDocumentId")
+                        .HasName("pk_ai_agent_knowledge_documents");
+
+                    b.HasIndex("AiAgentId", "TenantId");
+
+                    b.HasIndex("KnowledgeDocumentId", "TenantId");
+
+                    b.ToTable("ai_agent_knowledge_documents", (string)null);
+                });
+
+            modelBuilder.Entity("OmniAI.Domain.Knowledge.KnowledgeDocument", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasMaxLength(100000)
+                        .HasColumnType("character varying(100000)")
+                        .HasColumnName("content");
+
+                    b.Property<byte[]>("ContentFingerprint")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("content_fingerprint");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset?>("IndexedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("indexed_at");
+
+                    b.Property<byte[]>("IndexedFingerprint")
+                        .HasColumnType("bytea")
+                        .HasColumnName("indexed_fingerprint");
+
+                    b.Property<string>("IndexedProfile")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("indexed_profile");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_enabled");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("title");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("Id", "TenantId")
+                        .HasName("ak_knowledge_documents_id_tenant");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_knowledge_documents_tenant");
+
+                    b.ToTable("knowledge_documents", (string)null);
+                });
+
             modelBuilder.Entity("OmniAI.Domain.Tenants.Tenant", b =>
                 {
                     b.Property<Guid>("Id")
@@ -896,6 +993,35 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_tenant_invitations_tenant");
+                });
+
+            modelBuilder.Entity("OmniAI.Domain.Knowledge.AgentKnowledgeAssignment", b =>
+                {
+                    b.HasOne("OmniAI.Domain.AiAgents.AiAgent", null)
+                        .WithMany()
+                        .HasForeignKey("AiAgentId", "TenantId")
+                        .HasPrincipalKey("Id", "TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_ai_agent_knowledge_documents_agent");
+
+                    b.HasOne("OmniAI.Domain.Knowledge.KnowledgeDocument", null)
+                        .WithMany()
+                        .HasForeignKey("KnowledgeDocumentId", "TenantId")
+                        .HasPrincipalKey("Id", "TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_ai_agent_knowledge_documents_document");
+                });
+
+            modelBuilder.Entity("OmniAI.Domain.Knowledge.KnowledgeDocument", b =>
+                {
+                    b.HasOne("OmniAI.Domain.Tenants.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_knowledge_documents_tenant");
                 });
 
             modelBuilder.Entity("OmniAI.Domain.Tenants.TenantMembership", b =>

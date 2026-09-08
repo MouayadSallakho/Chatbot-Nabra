@@ -1,4 +1,5 @@
 using OmniAI.Api.Http;
+using OmniAI.Api.Knowledge;
 using OmniAI.Api.Security;
 using OmniAI.Application.AiAgents.ActivateAiAgent;
 using OmniAI.Application.AiAgents.CreateAiAgent;
@@ -10,6 +11,8 @@ using OmniAI.Application.AiAgents.RenameAiAgent;
 using OmniAI.Application.AiAgents.UpdateAiAgentInstructions;
 using OmniAI.Application.AiAgents;
 using OmniAI.Application.Concurrency;
+using OmniAI.Application.Knowledge.AgentKnowledge;
+using OmniAI.Application.Knowledge.SearchAgentKnowledge;
 
 namespace OmniAI.Api.AiAgents;
 
@@ -122,6 +125,20 @@ internal static class AiAgentEndpoints
         // message may legitimately produce a different answer each time.
         agents.MapPost("/{aiAgentId:guid}/preview", PreviewAsync)
             .WithName("PreviewAiAgent");
+
+        // Knowledge assignment lives under the agent rather than under knowledge,
+        // because it is a property of the agent: it is edited on the agent's
+        // screen, saved against the agent's entity tag, and moves the agent's
+        // version. Putting it under /knowledge would have made the resource it
+        // belongs to invisible in its own address.
+        agents.MapGet("/{aiAgentId:guid}/knowledge", GetKnowledgeAsync)
+            .WithName("GetAiAgentKnowledge");
+
+        agents.MapPut("/{aiAgentId:guid}/knowledge", ReplaceKnowledgeAsync)
+            .WithName("ReplaceAiAgentKnowledge");
+
+        agents.MapPost("/{aiAgentId:guid}/knowledge/search", SearchKnowledgeAsync)
+            .WithName("SearchAiAgentKnowledge");
 
         return endpoints;
     }
@@ -395,6 +412,96 @@ internal static class AiAgentEndpoints
     /// changed nothing.
     /// </para>
     /// </remarks>
+    /// <summary>Reads which documents this agent may draw on.</summary>
+    /// <remarks>
+    /// The entity tag it sets is the <em>agent's</em>, not one of its own, because
+    /// that is the version the corresponding write is checked against.
+    /// </remarks>
+    private static async Task<IResult> GetKnowledgeAsync(
+        HttpContext http,
+        Guid tenantId,
+        Guid aiAgentId,
+        GetAgentKnowledgeHandler handler,
+        CancellationToken cancellationToken)
+    {
+        Versioned<AgentKnowledgeView>? knowledge = await handler
+            .HandleAsync(new GetAgentKnowledgeQuery(tenantId, aiAgentId), cancellationToken)
+            .ConfigureAwait(false);
+
+        if (knowledge is null)
+        {
+            return AgentNotFound(aiAgentId);
+        }
+
+        SetETag(http, knowledge.Version);
+
+        return Results.Ok(AgentKnowledgeResponse.From(knowledge.Value));
+    }
+
+    /// <summary>Replaces which documents this agent may draw on.</summary>
+    private static async Task<IResult> ReplaceKnowledgeAsync(
+        HttpContext http,
+        Guid tenantId,
+        Guid aiAgentId,
+        AgentKnowledgeRequest request,
+        ReplaceAgentKnowledgeHandler handler,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        if (EntityTags.ReadIfMatch(http.Request, out ConcurrencyToken expected) is IResult failure)
+        {
+            return failure;
+        }
+
+        Versioned<AgentKnowledgeView>? replaced = await handler
+            .HandleAsync(
+                new ReplaceAgentKnowledgeCommand(
+                    tenantId,
+                    aiAgentId,
+                    request.KnowledgeDocumentIds,
+                    expected),
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        if (replaced is null)
+        {
+            return AgentNotFound(aiAgentId);
+        }
+
+        SetETag(http, replaced.Version);
+
+        return Results.Ok(AgentKnowledgeResponse.From(replaced.Value));
+    }
+
+    /// <summary>
+    /// Shows what this agent would retrieve for a question.
+    /// </summary>
+    /// <remarks>
+    /// It reads and changes nothing, so it takes no precondition and returns no
+    /// entity tag. It does cost one embedding call when the agent has ready
+    /// knowledge, and nothing at all when it has none.
+    /// </remarks>
+    private static async Task<IResult> SearchKnowledgeAsync(
+        Guid tenantId,
+        Guid aiAgentId,
+        KnowledgeSearchRequest request,
+        SearchAgentKnowledgeHandler handler,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        KnowledgeSearchResult? result = await handler
+            .HandleAsync(
+                new SearchAgentKnowledgeQuery(tenantId, aiAgentId, request.Question),
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        return result is null
+            ? AgentNotFound(aiAgentId)
+            : Results.Ok(KnowledgeSearchResponse.From(result));
+    }
+
     private static IResult Respond(HttpContext http, Versioned<AiAgentView>? agent, Guid aiAgentId)
     {
         if (agent is null)

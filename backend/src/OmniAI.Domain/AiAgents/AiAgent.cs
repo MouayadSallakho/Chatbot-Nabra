@@ -264,6 +264,38 @@ public sealed class AiAgent
     }
 
     /// <summary>
+    /// Records that something the agent depends on, but does not itself own, has
+    /// been changed.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <strong>This adds no state to the aggregate, and that is the point.</strong>
+    /// Which knowledge documents an agent may draw on is a relationship, kept in
+    /// its own table rather than accumulated here -- but it is still part of how
+    /// this agent behaves, and it is edited on the same screen, against the same
+    /// entity tag, as the name and the instructions.
+    /// </para>
+    /// <para>
+    /// <strong>Without it, one editor could silently undo another.</strong> Two
+    /// people open the agent at version 7. One changes the instructions and saves;
+    /// the other changes the assigned knowledge and saves. If the second write
+    /// touched only the join table, it would succeed against a version that no
+    /// longer describes the agent it was deciding about -- and the first person
+    /// would never learn that the configuration they had just written was
+    /// answered from different documents. Moving the version means the second
+    /// write is refused with a precondition failure, and the person is asked to
+    /// look again.
+    /// </para>
+    /// <para>
+    /// It says only that the agent's wider configuration changed at an instant.
+    /// It does not say what changed, and nothing here knows.
+    /// </para>
+    /// </remarks>
+    /// <exception cref="DomainValidationException">The instant is not a real point in time.</exception>
+    public void MarkConfigurationChanged(DateTimeOffset changedAt) =>
+        RecordUpdate(RequireInstant(changedAt, "configuration change instant"));
+
+    /// <summary>
     /// Advances the update high-water mark, never regressing it. Called only
     /// after something has actually changed.
     /// </summary>

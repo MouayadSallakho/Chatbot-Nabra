@@ -250,4 +250,20 @@ export const EVERY_PERMISSION: readonly PermissionDefinition[] = [
     label: 'Manage website chat',
     description: 'Create website chat links and decide whether the public can use them.',
   },
+  {
+    code: 'knowledge.view',
+    group: 'Knowledge',
+    label: 'View knowledge',
+    description:
+      "Read the workspace's knowledge documents, see whether each one is indexed, and test " +
+      'what an agent would retrieve for a question.',
+  },
+  {
+    code: 'knowledge.manage',
+    group: 'Knowledge',
+    label: 'Manage knowledge',
+    description:
+      'Write and edit knowledge documents, index them, switch them on and off, and choose ' +
+      'which AI agents may draw on them.',
+  },
 ];

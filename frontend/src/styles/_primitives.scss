@@ -484,6 +484,19 @@
   color: var(--info-fg);
 }
 
+// For a message that is neither a failure nor an aside: something the reader has
+// to act on, but which has broken nothing. A stale version somebody must reload,
+// a rate limit they must wait out, a document that needs indexing.
+//
+// The tokens existed and this rule did not, so three earlier usages of the class
+// were rendering as an unstyled alert. Adding it here rather than in a feature
+// stylesheet, because that is where every other alert variant lives.
+.alert-warning {
+  background-color: var(--warning-bg);
+  border-color: var(--warning-border);
+  color: var(--warning-fg);
+}
+
 // Skeletons. A shape that matches what is coming, so the layout does not jump
 // when it arrives. The sheen is a slow sweep rather than a pulse -- and it stops
 // entirely under prefers-reduced-motion via the global rule in the base layer.

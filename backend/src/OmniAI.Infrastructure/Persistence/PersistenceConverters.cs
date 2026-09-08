@@ -3,6 +3,7 @@ using OmniAI.Domain.AiAgents;
 using OmniAI.Domain.Authorization;
 using OmniAI.Domain.Conversations;
 using OmniAI.Domain.Invitations;
+using OmniAI.Domain.Knowledge;
 using OmniAI.Domain.Tenants;
 using OmniAI.Domain.Users;
 using OmniAI.Domain.WebChat;
@@ -173,4 +174,27 @@ internal static class PersistenceConverters
     /// </remarks>
     public static readonly ValueConverter<AgentInstructions, string> AgentInstructions =
         new(instructions => instructions.Value, value => Domain.AiAgents.AgentInstructions.Create(value));
+
+    public static readonly ValueConverter<KnowledgeDocumentId, Guid> KnowledgeDocumentId =
+        new(id => id.Value, value => Domain.Knowledge.KnowledgeDocumentId.From(value));
+
+    public static readonly ValueConverter<KnowledgeTitle, string> KnowledgeTitle =
+        new(title => title.Value, value => Domain.Knowledge.KnowledgeTitle.Create(value));
+
+    public static readonly ValueConverter<KnowledgeContent, string> KnowledgeContent =
+        new(content => content.Value, value => Domain.Knowledge.KnowledgeContent.Create(value));
+
+    // Nullable on both sides: a document that has never been indexed has neither
+    // a fingerprint nor a profile, and null is what "never indexed" means. A
+    // converter that mapped null to an empty value would make "not indexed" and
+    // "indexed as nothing" the same row.
+    public static readonly ValueConverter<ContentFingerprint?, byte[]?> NullableContentFingerprint =
+        new(
+            fingerprint => fingerprint == null ? null : fingerprint.ToArray(),
+            value => value == null ? null : Domain.Knowledge.ContentFingerprint.From(value));
+
+    public static readonly ValueConverter<EmbeddingProfileId?, string?> NullableEmbeddingProfileId =
+        new(
+            profile => profile == null ? null : profile.Value,
+            value => value == null ? null : Domain.Knowledge.EmbeddingProfileId.Create(value));
 }

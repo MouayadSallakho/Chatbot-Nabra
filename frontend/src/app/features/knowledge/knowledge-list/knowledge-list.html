@@ -1,0 +1,147 @@
+<div class="page">
+  <app-page-header
+    heading="Knowledge"
+    description="Knowledge is written business information your AI agents can draw on — opening hours, a returns policy, how a service works. A document answers questions only once it has been indexed and assigned to an agent."
+  >
+    @if (hasDocuments() && canManage()) {
+      <a pageActions class="btn btn-primary" routerLink="/knowledge/new">New document</a>
+    }
+  </app-page-header>
+
+  <div class="page-section">
+    @if (!canView()) {
+      <!--
+        The permission-denied state. It says what is true and what to do about
+        it, and deliberately does not say "403", does not name a permission code,
+        and does not imply the account is broken.
+      -->
+      <div class="card">
+        <app-empty-state
+          icon="knowledge"
+          heading="You do not have access to knowledge"
+          description="Seeing this workspace's knowledge needs a permission your roles do not include. Ask somebody who administers this workspace if you need it."
+        />
+      </div>
+    } @else if (loading()) {
+      <div class="knowledge-list" aria-busy="true">
+        <p class="visually-hidden" role="status">Loading knowledge…</p>
+        @for (row of skeletonRows; track row) {
+          <div class="knowledge-row knowledge-row-skeleton" aria-hidden="true">
+            <span class="skeleton skeleton-title"></span>
+            <span class="skeleton skeleton-text"></span>
+            <span class="skeleton skeleton-text"></span>
+          </div>
+        }
+      </div>
+    } @else if (failure(); as error) {
+      <div class="card">
+        <app-empty-state
+          icon="alert"
+          tone="error"
+          heading="Could not load knowledge"
+          [description]="error.message"
+        >
+          <button stateActions type="button" class="btn btn-secondary btn-sm" (click)="load()">
+            Try again
+          </button>
+        </app-empty-state>
+      </div>
+    } @else if (!hasDocuments()) {
+      <div class="card">
+        <app-empty-state
+          icon="knowledge"
+          heading="No knowledge yet"
+          description="Write down something your agents should know — a returns policy, delivery times, what a plan includes. Index it, assign it to an agent, and the agent can answer from it."
+        >
+          @if (canManage()) {
+            <a stateActions class="btn btn-primary btn-sm" routerLink="/knowledge/new">
+              Write your first document
+            </a>
+          }
+        </app-empty-state>
+      </div>
+    } @else {
+      <div class="knowledge-list">
+        <div class="knowledge-list-head" aria-hidden="true">
+          <span>Title</span>
+          <span>State</span>
+          <span>Last indexed</span>
+          <span>Last updated</span>
+        </div>
+
+        <ul>
+          @for (document of page()!.items; track document.id) {
+            <li>
+              <a class="knowledge-row" [routerLink]="['/knowledge', document.id]">
+                <span class="knowledge-title">{{ document.title }}</span>
+
+                <span class="knowledge-state">
+                  <span
+                    class="badge"
+                    [class.badge-success]="document.readiness === 'Ready'"
+                    [class.badge-warning]="document.readiness === 'NeedsIndex'"
+                    [class.badge-neutral]="document.readiness === 'Disabled'"
+                  >
+                    {{ label(document.readiness) }}
+                  </span>
+                </span>
+
+                <span class="knowledge-indexed text-small text-muted">
+                  <span class="knowledge-cell-label">Indexed&nbsp;</span>
+                  @if (document.indexedAt; as indexed) {
+                    <time [attr.datetime]="indexed">{{ indexed | date: 'medium' }}</time>
+                  } @else {
+                    <span>Never</span>
+                  }
+                </span>
+
+                <span class="knowledge-updated text-small text-muted">
+                  <span class="knowledge-cell-label">Updated&nbsp;</span>
+                  <time [attr.datetime]="document.updatedAt">{{
+                    document.updatedAt | date: 'medium'
+                  }}</time>
+                </span>
+
+                <app-icon class="knowledge-chevron" name="chevron-end" [strokeWidth]="1.75" />
+              </a>
+            </li>
+          }
+        </ul>
+      </div>
+
+      @if (range(); as shown) {
+        <nav class="pager" aria-label="Knowledge list pages">
+          <p class="text-small text-muted" aria-live="polite">
+            Showing {{ shown.first }}–{{ shown.last }} of {{ shown.total }}
+          </p>
+
+          @if (totalPages() > 1) {
+            <div class="pager-controls">
+              <button
+                type="button"
+                class="btn btn-secondary btn-sm"
+                (click)="goTo(currentPage() - 1)"
+                [disabled]="currentPage() <= 1"
+              >
+                <app-icon name="chevron-start" [strokeWidth]="1.75" />
+                <span>Previous</span>
+              </button>
+              <span class="text-small text-secondary">
+                Page {{ currentPage() }} of {{ totalPages() }}
+              </span>
+              <button
+                type="button"
+                class="btn btn-secondary btn-sm"
+                (click)="goTo(currentPage() + 1)"
+                [disabled]="currentPage() >= totalPages()"
+              >
+                <span>Next</span>
+                <app-icon name="arrow-end" [strokeWidth]="1.75" />
+              </button>
+            </div>
+          }
+        </nav>
+      }
+    }
+  </div>
+</div>

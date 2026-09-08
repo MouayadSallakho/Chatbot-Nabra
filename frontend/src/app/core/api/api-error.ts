@@ -79,7 +79,13 @@ const MESSAGES: Readonly<Record<ApiErrorKind, string>> = {
   stale: 'This item was updated somewhere else since you opened it.',
   preconditionRequired: 'This item needs to be reloaded before it can be saved.',
   invalidResponse: 'The AI provider returned a response this platform could not use.',
-  providerUnavailable: 'AI preview is currently unavailable because no provider is configured.',
+  // Deliberately not "preview": from Phase 17 this same status also answers a
+  // knowledge index, and a sentence naming one capability is simply wrong on
+  // the other screen. The hosted chat overrides it entirely, because none of
+  // this is a customer's business.
+  providerUnavailable:
+    'This needs an AI provider, and none is configured on this deployment. Nothing was ' +
+    'sent and nothing was changed.',
   providerTimeout: 'The AI provider took too long to respond. Try again.',
   rateLimited: 'Too many requests were made just now. Wait a moment and try again.',
   offline: 'Could not reach the OmniAI backend. Check that it is running, then try again.',

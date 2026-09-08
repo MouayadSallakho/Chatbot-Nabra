@@ -1,5 +1,6 @@
 using OmniAI.Application.Ai;
 using OmniAI.Application.Conversations;
+using OmniAI.Application.Knowledge;
 using OmniAI.Application.Conversations.Persistence;
 using OmniAI.Domain.Conversations;
 
@@ -254,9 +255,22 @@ public sealed class ConversationContextPolicyTests
         // Pinned because they are a cost decision, not an implementation detail:
         // changing them changes what every reply costs and how much a customer can
         // refer back to.
+        //
+        // The character bound came down from 24,000 to 16,000 in Phase 17, when
+        // knowledge retrieval arrived. Knowledge may contribute up to 8,000
+        // characters of its own, so the combined budget is the same 24,000 this
+        // platform sent before any of it existed -- rather than half as much again
+        // on every grounded turn, which is what leaving this alone would have
+        // meant.
         ConversationContextPolicy policy = new();
 
         Assert.Equal(40, policy.MaxMessages);
-        Assert.Equal(24_000, policy.MaxTotalCharacters);
+        Assert.Equal(16_000, policy.MaxTotalCharacters);
+
+        // The two halves of one budget, stated together so a change to either is
+        // visibly a change to the total.
+        Assert.Equal(
+            24_000,
+            policy.MaxTotalCharacters + new KnowledgeRetrievalPolicy().MaxContextCharacters);
     }
 }

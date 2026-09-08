@@ -1,0 +1,97 @@
+<div class="page page-narrow">
+  <app-page-header
+    heading="New knowledge document"
+    description="Write something your agents should know. Saving costs nothing — indexing it, which is what makes it answerable, is a separate step on the next screen."
+  />
+
+  @if (!allowed()) {
+    <div class="page-section">
+      <div class="card">
+        <div class="card-body">
+          <p class="text-body-strong">You cannot write knowledge</p>
+          <p class="text-small text-secondary">
+            Writing a knowledge document needs a permission your roles do not include. Ask somebody
+            who administers this workspace if you need it.
+          </p>
+          <p><a class="btn btn-secondary btn-sm" routerLink="/knowledge">Back to knowledge</a></p>
+        </div>
+      </div>
+    </div>
+  } @else {
+    <div class="page-section">
+      <form class="card create-form" [formGroup]="form" (ngSubmit)="create()" novalidate>
+        <div class="card-body">
+          <div class="field">
+            <label class="field-label field-required" for="knowledge-title">Title</label>
+            <input
+              id="knowledge-title"
+              class="input"
+              type="text"
+              formControlName="title"
+              autocomplete="off"
+              [attr.maxlength]="limits.titleMax"
+              [attr.aria-invalid]="showError('title') ? 'true' : null"
+              aria-describedby="knowledge-title-hint"
+              [attr.aria-errormessage]="showError('title') ? 'knowledge-title-error' : null"
+            />
+            <p class="field-hint" id="knowledge-title-hint">
+              How you and your agents will recognise this document. {{ titleLength() }} of
+              {{ limits.titleMax }} characters used.
+            </p>
+            @if (showError('title')) {
+              <p class="field-error" id="knowledge-title-error" role="alert">
+                <app-icon name="alert" [strokeWidth]="1.75" />
+                <span>A title is required.</span>
+              </p>
+            }
+          </div>
+
+          <div class="field">
+            <label class="field-label field-required" for="knowledge-content">Content</label>
+            <textarea
+              id="knowledge-content"
+              class="textarea content-input"
+              formControlName="content"
+              rows="16"
+              [attr.maxlength]="limits.contentMax"
+              [attr.aria-invalid]="showError('content') ? 'true' : null"
+              aria-describedby="knowledge-content-hint"
+              [attr.aria-errormessage]="showError('content') ? 'knowledge-content-error' : null"
+            ></textarea>
+            <p class="field-hint" id="knowledge-content-hint">
+              Plain text. Blank lines separate paragraphs, and indexing respects them. Keep it to
+              information that changes rarely — prices and order statuses belong in a live system,
+              not here.
+              <span class="counter" [class.counter-low]="contentRemaining() < 2000">
+                {{ contentRemaining() }} of {{ limits.contentMax }} characters remaining.
+              </span>
+            </p>
+            @if (showError('content')) {
+              <p class="field-error" id="knowledge-content-error" role="alert">
+                <app-icon name="alert" [strokeWidth]="1.75" />
+                <span>Some content is required.</span>
+              </p>
+            }
+          </div>
+
+          @if (failure(); as error) {
+            <div class="alert alert-danger" role="alert">
+              <app-icon name="alert" [strokeWidth]="1.75" />
+              <span>{{ error.message }}</span>
+            </div>
+          }
+        </div>
+
+        <div class="create-actions">
+          <a class="btn btn-secondary" routerLink="/knowledge">Cancel</a>
+          <button type="submit" class="btn btn-primary" [disabled]="submitting()">
+            @if (submitting()) {
+              <span class="spinner" aria-hidden="true"></span>
+            }
+            <span class="btn-label">{{ submitting() ? 'Saving…' : 'Save document' }}</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  }
+</div>

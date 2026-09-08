@@ -1,0 +1,95 @@
+.knowledge-options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+// The whole row is the label, so the tap target is the row rather than a 16px
+// box beside it. Padding is generous for the same reason.
+.knowledge-option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+
+  &:hover {
+    background-color: var(--surface-hover);
+  }
+
+  // A real focus ring on the row when the input inside it is focused, since the
+  // input itself is visually small.
+  &:has(:focus-visible) {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+  }
+}
+
+.knowledge-option input[disabled] {
+  cursor: not-allowed;
+}
+
+.knowledge-option-title {
+  flex: 1 1 auto;
+  overflow-wrap: anywhere;
+}
+
+.assignment-summary {
+  margin: 0 0 var(--space-4);
+}
+
+.search-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: flex-start;
+}
+
+.search-form .input {
+  flex: 1 1 18rem;
+  min-inline-size: 0;
+}
+
+.hits {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: var(--space-4) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.hit {
+  padding: var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background-color: var(--surface-inset);
+}
+
+.hit-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+  align-items: baseline;
+  margin-block-end: var(--space-2);
+}
+
+.hit-title {
+  font: var(--text-body-strong);
+  overflow-wrap: anywhere;
+}
+
+// Retrieved text is tenant-authored and untrusted. It is rendered as text --
+// pre-wrap preserves the paragraphs somebody wrote without any markup being
+// interpreted.
+.hit-excerpt {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: var(--text-small);
+  color: var(--text-secondary);
+}

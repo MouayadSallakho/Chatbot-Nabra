@@ -134,6 +134,13 @@ export const routes: Routes = [
           ),
       },
       {
+        // Knowledge: the documents agents draw on. Lazily loaded like the other
+        // feature areas, so somebody who never opens it never downloads it.
+        path: 'knowledge',
+        loadChildren: () =>
+          import('@app/features/knowledge/knowledge.routes').then((m) => m.knowledgeRoutes),
+      },
+      {
         // Channels, of which website chat is the first that is built.
         path: 'channels',
         loadChildren: () =>

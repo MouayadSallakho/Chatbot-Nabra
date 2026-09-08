@@ -77,8 +77,13 @@ public sealed class PlatformPermissionsTests
         // chat endpoint, and nothing else: replying, assigning, exporting and
         // handing off are still absent, because those workflows still do not
         // exist.
-        string[] unimplemented =
-            ["knowledge", "billing", "integrations", "analytics"];
+        //
+        // Knowledge left it in Phase 17, when documents, indexing, agent
+        // assignment and retrieval were built. Its two codes cover reading and
+        // administering written documents, and nothing else: file upload, crawling
+        // and external connectors are still absent, and have no permission
+        // advertising them.
+        string[] unimplemented = ["billing", "integrations", "analytics"];
 
         Assert.All(PlatformPermissions.AllCodes, code =>
             Assert.DoesNotContain(
@@ -121,6 +126,8 @@ public sealed class PlatformPermissionsTests
                 "conversations.view",
                 "website-chat.view",
                 "website-chat.manage",
+                "knowledge.view",
+                "knowledge.manage",
             ],
             PlatformPermissions.AllCodes.Select(code => code.Value));
     }

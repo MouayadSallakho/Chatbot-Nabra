@@ -1,4 +1,6 @@
 using OmniAI.Application.Conversations;
+using OmniAI.Application.Knowledge;
+using OmniAI.Application.Tests.Knowledge;
 using OmniAI.Application.Tests.AiAgents;
 using OmniAI.Application.WebChat;
 using OmniAI.Application.WebChat.Hosted;
@@ -76,6 +78,19 @@ internal sealed class Harness
     /// <summary>The limits this scenario was built with.</summary>
     public required PublicChatProtectionOptions Limits { get; init; }
 
+    /// <summary>
+    /// The embedding provider this scenario would spend money at.
+    /// </summary>
+    /// <remarks>
+    /// Present in every scenario, including the ones with no knowledge at all,
+    /// because "it was never called" is exactly what most of these tests need to
+    /// assert.
+    /// </remarks>
+    public required RecordingEmbeddingGenerator Embeddings { get; init; }
+
+    /// <summary>The knowledge this agent can draw on. Empty unless a test fills it.</summary>
+    public required FakeKnowledgeSearchStore Knowledge { get; init; }
+
     public static Harness Build(
         RecordingGenerator? generator = null,
         AiAgentStatus agentStatus = AiAgentStatus.Active,
@@ -84,7 +99,10 @@ internal sealed class Harness
         WebChatPolicy? policy = null,
         FakePublicChatProtection? protection = null,
         PublicChatProtectionOptions? limits = null,
-        FixedTimeProvider? clock = null)
+        FixedTimeProvider? clock = null,
+        FakeKnowledgeSearchStore? knowledge = null,
+        RecordingEmbeddingGenerator? embeddings = null,
+        KnowledgeRetrievalPolicy? retrieval = null)
     {
         TenantId workspace = TenantId.New();
 
@@ -133,6 +151,14 @@ internal sealed class Harness
         FixedTimeProvider time = clock ?? new FixedTimeProvider(Noon);
         PublicWebChatAccess access = new(world, tokens, time);
 
+        FakeKnowledgeSearchStore library = knowledge ?? new FakeKnowledgeSearchStore();
+        RecordingEmbeddingGenerator embedder = embeddings ?? new RecordingEmbeddingGenerator();
+
+        KnowledgeRetriever retriever = new(
+            library,
+            embedder,
+            retrieval ?? new KnowledgeRetrievalPolicy());
+
         return new Harness
         {
             World = world,
@@ -146,6 +172,8 @@ internal sealed class Harness
             Workspace = workspace,
             Clock = time,
             Limits = bounds,
+            Embeddings = embedder,
+            Knowledge = library,
             Start = new StartWebChatConversationHandler(
                 world,
                 world,
@@ -162,6 +190,7 @@ internal sealed class Harness
                 recorder,
                 gate,
                 guard,
+                retriever,
                 contextPolicy,
                 chatPolicy,
                 time),

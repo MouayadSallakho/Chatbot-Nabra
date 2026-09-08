@@ -1,0 +1,190 @@
+@if (canView()) {
+  <section class="card" aria-labelledby="agent-knowledge-heading">
+    <div class="card-header">
+      <h2 id="agent-knowledge-heading" class="text-card-title">Knowledge</h2>
+    </div>
+
+    <div class="card-body">
+      <p class="text-small text-muted assignment-summary">
+        Choose what this agent may draw on. Nothing is shared automatically — an agent starts with
+        no knowledge and answers only from documents you give it here.
+      </p>
+
+      @if (loading()) {
+        <p class="text-small text-muted" role="status" aria-busy="true">Loading knowledge…</p>
+      } @else if (loadFailure(); as error) {
+        <div class="alert alert-danger" role="alert">
+          <app-icon name="alert" [strokeWidth]="1.75" />
+          <span>{{ error.message }}</span>
+        </div>
+        <p>
+          <button type="button" class="btn btn-secondary btn-sm" (click)="load()">Try again</button>
+        </p>
+      } @else if (!hasDocuments()) {
+        <p class="text-small text-secondary">
+          This workspace has no knowledge documents yet.
+          <a routerLink="/knowledge">Write one</a> and it will appear here.
+        </p>
+      } @else {
+        @if (stale()) {
+          <!--
+            The ticks are untouched and nothing was retried. Reloading is offered
+            as a deliberate choice, because it would replace the selection the
+            reader was in the middle of making.
+          -->
+          <div class="alert alert-warning" role="alert" data-testid="assignment-stale">
+            <app-icon name="alert" [strokeWidth]="1.75" />
+            <div>
+              <p class="text-body-strong">This agent was updated elsewhere</p>
+              <p class="text-small">
+                Somebody else changed this agent since you opened it, so your assignment was not
+                saved. Your selection below is exactly as you left it. Reload to see the latest
+                version, which will replace it.
+              </p>
+              <button type="button" class="btn btn-secondary btn-sm" (click)="load()">
+                Reload latest
+              </button>
+            </div>
+          </div>
+        }
+
+        <p class="text-small text-secondary" aria-live="polite" data-testid="assignment-summary">
+          {{ assignedCount() }} assigned, {{ readyCount() }} ready to answer.
+          @if (assignedCount() > readyCount()) {
+            The rest need indexing or have been switched off, so they will not be used yet.
+          }
+        </p>
+
+        <ul class="knowledge-options">
+          @for (option of options(); track option.knowledgeDocumentId) {
+            <li>
+              <label class="knowledge-option">
+                <input
+                  type="checkbox"
+                  [checked]="isSelected(option.knowledgeDocumentId)"
+                  [disabled]="!canEdit()"
+                  (change)="toggle(option.knowledgeDocumentId, $any($event.target).checked)"
+                />
+                <span class="knowledge-option-title">{{ option.title }}</span>
+                <!--
+                  The real state, never a flattering one. Showing an unindexed
+                  document as usable would leave somebody believing their agent
+                  knows something it does not.
+                -->
+                <span
+                  class="badge"
+                  [class.badge-success]="option.readiness === 'Ready'"
+                  [class.badge-warning]="option.readiness === 'NeedsIndex'"
+                  [class.badge-neutral]="option.readiness === 'Disabled'"
+                >
+                  {{ label(option.readiness) }}
+                </span>
+              </label>
+            </li>
+          }
+        </ul>
+
+        @if (saveFailure(); as error) {
+          <div class="alert alert-danger" role="alert">
+            <app-icon name="alert" [strokeWidth]="1.75" />
+            <span>{{ error.message }}</span>
+          </div>
+        }
+      }
+    </div>
+
+    @if (canEdit() && hasDocuments() && !loading()) {
+      <div class="card-actions">
+        <button
+          type="button"
+          class="btn btn-secondary"
+          (click)="reset()"
+          [disabled]="!dirty() || saving()"
+        >
+          Discard changes
+        </button>
+        <button
+          type="button"
+          class="btn btn-primary"
+          (click)="save()"
+          [disabled]="!dirty() || saving() || !agentETag()"
+          data-testid="save-assignment"
+        >
+          @if (saving()) {
+            <span class="spinner" aria-hidden="true"></span>
+          }
+          <span class="btn-label">{{ saving() ? 'Saving…' : 'Save knowledge' }}</span>
+        </button>
+      </div>
+    }
+  </section>
+
+  <section class="card" aria-labelledby="retrieval-heading">
+    <div class="card-header">
+      <h2 id="retrieval-heading" class="text-card-title">Test retrieval</h2>
+    </div>
+
+    <div class="card-body">
+      <p class="text-small text-muted">
+        Ask a question and see exactly which passages this agent would be given. This runs the same
+        retrieval a real conversation runs, with the same filters and the same limits.
+      </p>
+
+      <form class="search-form" [formGroup]="search" (ngSubmit)="runSearch()" novalidate>
+        <label class="visually-hidden" for="retrieval-question">Question</label>
+        <input
+          id="retrieval-question"
+          class="input"
+          type="text"
+          formControlName="question"
+          autocomplete="off"
+          placeholder="What would a customer ask?"
+          [attr.maxlength]="limits.questionMax"
+          data-testid="retrieval-question"
+        />
+        <button type="submit" class="btn btn-secondary" [disabled]="searching()">
+          @if (searching()) {
+            <span class="spinner" aria-hidden="true"></span>
+          }
+          <span class="btn-label">{{ searching() ? 'Searching…' : 'Test retrieval' }}</span>
+        </button>
+      </form>
+
+      @if (searchFailure(); as error) {
+        <div class="alert alert-danger" role="alert" data-testid="retrieval-error">
+          <app-icon name="alert" [strokeWidth]="1.75" />
+          <span>{{ error.message }}</span>
+        </div>
+      }
+
+      @if (hits(); as results) {
+        @if (results.length === 0) {
+          <p class="text-small text-secondary" role="status" data-testid="retrieval-empty">
+            Nothing was retrieved. This agent has no ready knowledge assigned, or none of it
+            matched.
+          </p>
+        } @else {
+          <ul class="hits" data-testid="retrieval-hits">
+            @for (hit of results; track hit.knowledgeDocumentId + '-' + hit.ordinal) {
+              <li class="hit">
+                <div class="hit-head">
+                  <span class="hit-title">{{ hit.title }}</span>
+                  <span class="text-small text-muted">
+                    #{{ hit.rank }} · {{ percent(hit.similarity) }}% match · piece
+                    {{ hit.ordinal + 1 }}
+                  </span>
+                </div>
+                <!--
+                  Interpolated, never innerHTML. A knowledge document is
+                  tenant-authored and untrusted; anything that rendered it as
+                  markup would turn a document into a script.
+                -->
+                <p class="hit-excerpt">{{ hit.excerpt }}</p>
+              </li>
+            }
+          </ul>
+        }
+      }
+    </div>
+  </section>
+}

@@ -5,12 +5,14 @@ namespace OmniAI.Application.Ai;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <strong>Two slots, and keeping them apart is the whole point.</strong>
+/// <strong>Three slots, and keeping them apart is the whole point.</strong>
 /// <see cref="Instructions"/> is the privileged layer: what the business
 /// configured this agent to be and do. <see cref="Turns"/> is conversational
-/// content: what people said. They are separate properties of separate types, so
-/// there is no single untyped prompt string in which the boundary between them
-/// could be lost, and no code path that turns one into the other.
+/// content: what people said. <see cref="Grounding"/> is reference material the
+/// answer may draw on, and is the least trusted of the three. They are separate
+/// properties of separate types, so there is no single untyped prompt string in
+/// which the boundaries between them could be lost, and no code path that turns
+/// one into another.
 /// </para>
 /// <para>
 /// <strong>Nothing here concatenates.</strong> This type never produces
@@ -40,10 +42,14 @@ namespace OmniAI.Application.Ai;
 /// </remarks>
 public sealed class AiTextGenerationRequest
 {
-    private AiTextGenerationRequest(string instructions, IReadOnlyList<AiTurn> turns)
+    private AiTextGenerationRequest(
+        string instructions,
+        IReadOnlyList<AiTurn> turns,
+        IReadOnlyList<GroundingItem> grounding)
     {
         Instructions = instructions;
         Turns = turns;
+        Grounding = grounding;
     }
 
     /// <summary>
@@ -55,6 +61,12 @@ public sealed class AiTextGenerationRequest
     /// depend on the AI agent aggregate. The caller is responsible for taking this
     /// value from a source it has already established the caller is entitled to --
     /// which, for agent preview, means after tenant ownership has been resolved.
+    /// <para>
+    /// <strong>Nothing retrieved is ever added to this.</strong> Reference
+    /// material travels in <see cref="Grounding"/>, and an adapter that merged the
+    /// two would erase the only distinction that stops a knowledge document from
+    /// being able to reprogram an agent.
+    /// </para>
     /// </remarks>
     public string Instructions { get; }
 
@@ -70,10 +82,28 @@ public sealed class AiTextGenerationRequest
     public IReadOnlyList<AiTurn> Turns { get; }
 
     /// <summary>
+    /// Reference material this answer may draw on. Untrusted, and usually empty.
+    /// </summary>
+    /// <remarks>
+    /// A separate collection rather than extra turns, because it is not part of
+    /// the conversation: nobody said it, it has no position in time, and inserting
+    /// it among the turns would make the transcript a record of things that were
+    /// never exchanged. An adapter renders it through a channel that carries no
+    /// authority -- see the OpenAI adapter for how, and
+    /// <see cref="GroundingPolicy"/> for what the model is told about it.
+    /// </remarks>
+    public IReadOnlyList<GroundingItem> Grounding { get; }
+
+    /// <summary>
     /// Builds a generation request.
     /// </summary>
     /// <param name="instructions">The agent's configured instructions.</param>
     /// <param name="turns">The conversation, oldest first. At least one turn.</param>
+    /// <param name="grounding">
+    /// Reference material, or nothing. Optional so that every caller which has no
+    /// knowledge to supply -- agent preview, and any agent with none assigned --
+    /// stays exactly as it was.
+    /// </param>
     /// <remarks>
     /// The turns are copied, so a caller cannot alter the request after handing it
     /// over -- which matters when the recipient is an adapter that may hold the
@@ -88,7 +118,10 @@ public sealed class AiTextGenerationRequest
     /// <see cref="AiTurnValidationException"/> for that reason -- the caller's
     /// input was already validated where a person could see the message.
     /// </exception>
-    public static AiTextGenerationRequest Create(string instructions, IReadOnlyList<AiTurn> turns)
+    public static AiTextGenerationRequest Create(
+        string instructions,
+        IReadOnlyList<AiTurn> turns,
+        IReadOnlyList<GroundingItem>? grounding = null)
     {
         if (string.IsNullOrWhiteSpace(instructions))
         {
@@ -110,6 +143,13 @@ public sealed class AiTextGenerationRequest
             throw new ArgumentException("A turn must not be null.", nameof(turns));
         }
 
-        return new AiTextGenerationRequest(instructions, copy);
+        GroundingItem[] items = grounding is null ? [] : [.. grounding];
+
+        if (Array.IndexOf(items, null) >= 0)
+        {
+            throw new ArgumentException("A grounding item must not be null.", nameof(grounding));
+        }
+
+        return new AiTextGenerationRequest(instructions, copy, items);
     }
 }

@@ -31,7 +31,9 @@ export type PermissionCode =
   | 'members.roles.manage'
   | 'conversations.view'
   | 'website-chat.view'
-  | 'website-chat.manage';
+  | 'website-chat.manage'
+  | 'knowledge.view'
+  | 'knowledge.manage';
 
 /**
  * One capability, as the catalogue endpoint publishes it.

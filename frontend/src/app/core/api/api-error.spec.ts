@@ -71,7 +71,9 @@ describe('toApiError', () => {
 
       expect(error.message).not.toContain('OpenAI');
       expect(error.message).not.toContain('org-1234');
-      expect(error.message).toContain('no provider is configured');
+      // The reader still learns the useful part -- that this deployment has no
+      // provider -- without a word of what the provider said.
+      expect(error.message).toContain('none is configured on this deployment');
     });
 
     it('explains a timeout without inviting an automatic retry', () => {

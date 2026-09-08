@@ -596,7 +596,13 @@ public sealed class AiAgentTests
                 .Order(StringComparer.Ordinal)
         ];
 
-        Assert.Equal(["Activate", "Disable", "Rename", "UpdateInstructions"], operations);
+        // MarkConfigurationChanged arrived with knowledge assignment. It adds no
+        // state to the aggregate and learns nothing about what changed -- it moves
+        // the update instant, so a change to something the agent depends on but
+        // does not own still advances the version an editor is checked against.
+        Assert.Equal(
+            ["Activate", "Disable", "MarkConfigurationChanged", "Rename", "UpdateInstructions"],
+            operations);
     }
 
     // ------------------------------------------------- provider independence

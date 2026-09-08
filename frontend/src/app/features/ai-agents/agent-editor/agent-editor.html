@@ -264,6 +264,19 @@
         </section>
 
         <!--
+          Which knowledge this agent may draw on. It writes against the agent's
+          own entity tag, so a successful save advances the version this editor
+          is holding -- which is why it reports the new one back rather than
+          leaving the editor to discover it on its next refused save.
+        -->
+        <app-agent-knowledge
+          [tenantId]="tenantId()"
+          [aiAgentId]="aiAgentId()"
+          [agentETag]="etag()"
+          (versionChanged)="adoptVersion($event)"
+        />
+
+        <!--
           The preview panel is the one place a request reaches a paid third
           party, so it has a permission of its own. Without it the panel is
           replaced by an explanation rather than shown disabled: a text box that

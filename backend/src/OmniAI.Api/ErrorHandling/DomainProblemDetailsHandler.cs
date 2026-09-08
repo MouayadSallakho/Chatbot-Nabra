@@ -6,6 +6,8 @@ using OmniAI.Application.AiAgents.ListAiAgents;
 using OmniAI.Application.AiAgents;
 using OmniAI.Application.Authorization;
 using OmniAI.Application.Invitations;
+using OmniAI.Application.Knowledge;
+using OmniAI.Application.Knowledge.ListKnowledgeDocuments;
 using OmniAI.Application.Members;
 using OmniAI.Application.WebChat;
 using OmniAI.Application.WebChat.Protection;
@@ -243,6 +245,31 @@ internal sealed partial class DomainProblemDetailsHandler(
         //
         // Nothing is retried automatically; see AiAgentVersionMismatchException
         // for why replaying the write would destroy the other writer's change.
+        KnowledgeDocumentVersionMismatchException staleKnowledge => (
+            StatusCodes.Status412PreconditionFailed,
+            "Precondition failed",
+            staleKnowledge.Message),
+        KnowledgeDocumentPageValidationException knowledgePaging => (
+            StatusCodes.Status400BadRequest,
+            "Invalid page request",
+            knowledgePaging.Message),
+        // The embedding family maps to the same three statuses as text
+        // generation, and for the same reasons: unavailable is the deployment's
+        // problem, a timeout is the provider's, and an unusable answer is a bad
+        // gateway. They are separate exception types so an operator reading a log
+        // can tell which capability failed.
+        EmbeddingUnavailableException embeddingUnavailable => (
+            StatusCodes.Status503ServiceUnavailable,
+            "Knowledge indexing unavailable",
+            embeddingUnavailable.Message),
+        EmbeddingTimeoutException embeddingTimeout => (
+            StatusCodes.Status504GatewayTimeout,
+            "Knowledge indexing timed out",
+            embeddingTimeout.Message),
+        EmbeddingResponseInvalidException embeddingInvalid => (
+            StatusCodes.Status502BadGateway,
+            "Knowledge indexing failed",
+            embeddingInvalid.Message),
         AiAgentVersionMismatchException stale => (
             StatusCodes.Status412PreconditionFailed,
             "Precondition failed",

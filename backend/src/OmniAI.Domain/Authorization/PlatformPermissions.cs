@@ -150,6 +150,14 @@ public static class PlatformPermissions
     public static readonly PermissionCode WebsiteChatManage =
         PermissionCode.Create("website-chat.manage");
 
+    /// <summary>Read the workspace's knowledge and try retrieval out.</summary>
+    public static readonly PermissionCode KnowledgeView = PermissionCode.Create("knowledge.view");
+
+    /// <summary>Write knowledge, index it, switch it on and off, and decide which
+    /// agents may draw on it.</summary>
+    public static readonly PermissionCode KnowledgeManage =
+        PermissionCode.Create("knowledge.manage");
+
     /// <summary>The workspace group's display name.</summary>
     public const string WorkspaceGroup = "Workspace";
 
@@ -167,6 +175,8 @@ public static class PlatformPermissions
 
     /// <summary>The channel administration group's display name.</summary>
     public const string ChannelsGroup = "Channels";
+
+    public const string KnowledgeGroup = "Knowledge";
 
     /// <summary>
     /// The catalogue, in the order it is published and rendered.
@@ -258,6 +268,19 @@ public static class PlatformPermissions
             "Manage website chat",
             "Create website chat links and decide whether the public can use "
             + "them."),
+        new(
+            KnowledgeView,
+            KnowledgeGroup,
+            "View knowledge",
+            "Read the workspace's knowledge documents, see whether each one is "
+            + "indexed, and test what an agent would retrieve for a question."),
+        new(
+            KnowledgeManage,
+            KnowledgeGroup,
+            "Manage knowledge",
+            "Write and edit knowledge documents, index them, switch them on and "
+            + "off, and choose which AI agents may draw on them. Indexing sends "
+            + "the document's text to the AI provider and costs money."),
     ];
 
     /// <summary>

@@ -33,10 +33,15 @@ conversation on -- deliberately without abuse protection. Phase 16 protected it:
 Redis-backed distributed rate limits, a pseudonymous client-network identity
 derived from a genuinely trusted address, a workspace generation-attempt safety
 budget, lazy conversation creation, per-conversation credential cookies and an
-absolute public session lifetime. No channel-provider architecture has been
-designed, and the platform is still not authorised for production deployment --
-email verification and password recovery remain ahead of it, and there is no
-provider usage accounting, billing or alerting behind the safety budget.
+absolute public session lifetime. Phase 17 gave agents something to draw on: a
+tenant knowledge base of written documents, deterministic chunking, an embedding
+abstraction with an OpenAI adapter, pgvector storage and retrieval in the same
+PostgreSQL, explicit agent-by-agent assignment, and a grounding contract that
+keeps retrieved text structurally separate from an agent's own instructions. No
+channel-provider architecture has been designed, and the platform is still not
+authorised for production deployment -- email verification and password recovery
+remain ahead of it, and there is no provider usage accounting, billing or alerting
+behind the safety budget or behind embedding spend.
 
 Fifteen areas have their own documents:
 
@@ -55,6 +60,7 @@ Fifteen areas have their own documents:
 - [team-members-invitations.md](team-members-invitations.md) - member administration, secure invitations, and role assignment
 - [conversation-runtime-website-chat.md](conversation-runtime-website-chat.md) - the conversation runtime, hosted website chat, and the anonymous visitor boundary
 - [public-chat-protection.md](public-chat-protection.md) - distributed rate limiting, client-network identity, cost safety and the public session lifecycle
+- [knowledge-base-rag.md](knowledge-base-rag.md) - knowledge documents, deterministic chunking, pgvector retrieval and the grounding privilege boundary
 
 ---
 

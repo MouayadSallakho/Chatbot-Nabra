@@ -3,6 +3,7 @@ using OmniAI.Application.AiAgents.Persistence;
 using OmniAI.Application.Concurrency;
 using OmniAI.Application.Conversations;
 using OmniAI.Application.Conversations.Persistence;
+using OmniAI.Application.Knowledge;
 using OmniAI.Application.WebChat.Persistence;
 using OmniAI.Application.WebChat.Protection;
 using OmniAI.Domain;
@@ -86,6 +87,7 @@ public sealed class SendWebChatMessageHandler(
     IAiTextGenerator generator,
     IConversationLock conversationLock,
     IPublicChatProtection protection,
+    KnowledgeRetriever knowledge,
     ConversationContextPolicy context,
     WebChatPolicy policy,
     TimeProvider clock)
@@ -113,6 +115,9 @@ public sealed class SendWebChatMessageHandler(
 
     private readonly IPublicChatProtection _protection =
         protection ?? throw new ArgumentNullException(nameof(protection));
+
+    private readonly KnowledgeRetriever _knowledge =
+        knowledge ?? throw new ArgumentNullException(nameof(knowledge));
 
     private readonly ConversationContextPolicy _context =
         context ?? throw new ArgumentNullException(nameof(context));
@@ -259,16 +264,26 @@ public sealed class SendWebChatMessageHandler(
         DateTimeOffset sentAt,
         CancellationToken cancellationToken)
     {
-        AiTextGenerationRequest request = await BuildRequestAsync(
-                session,
-                agent,
-                cancellationToken)
-            .ConfigureAwait(false);
-
         AiTextGenerationResult result;
 
         try
         {
+            // Inside the try, and that placement is the design. Building the
+            // request now includes retrieving knowledge, which means embedding the
+            // customer's message -- a call to a paid provider that can fail. When
+            // it does, the turn has to end up durably failed like any other
+            // provider failure: the customer's message stays, no reply is
+            // invented, and the same client message id cannot silently buy another
+            // attempt. Leaving this outside the try would have left the turn
+            // pending forever and the visitor waiting on a reply that was never
+            // coming.
+            AiTextGenerationRequest request = await BuildRequestAsync(
+                    session,
+                    agent,
+                    text,
+                    cancellationToken)
+                .ConfigureAwait(false);
+
             result = await _generator
                 .GenerateAsync(request, cancellationToken)
                 .ConfigureAwait(false);
@@ -327,6 +342,7 @@ public sealed class SendWebChatMessageHandler(
     private async Task<AiTextGenerationRequest> BuildRequestAsync(
         WebChatSession session,
         AiAgent agent,
+        string question,
         CancellationToken cancellationToken)
     {
         // One more row than the policy will keep, so the policy always decides the
@@ -349,7 +365,36 @@ public sealed class SendWebChatMessageHandler(
             throw new AiResponseInvalidException();
         }
 
-        return AiTextGenerationRequest.Create(agent.Instructions.Value, turns);
+        // Retrieved after the customer's message is committed and after the
+        // generation budget has already been consumed, so a turn refused by Phase
+        // 16 costs no embedding call either. The retriever asks whether this agent
+        // has any eligible knowledge before it embeds anything, so an agent with
+        // none -- which is every agent until somebody assigns some -- reaches the
+        // provider exactly as it did before this feature existed.
+        //
+        // The customer's current message is the query. No rewriting, no history
+        // summarisation, no second model call: each of those is a design decision
+        // in its own right, and inventing one here would have been guessing.
+        IReadOnlyList<KnowledgeExcerpt> excerpts = await _knowledge
+            .RetrieveAsync(
+                session.TenantId,
+                session.AiAgentId,
+                question,
+                limit: null,
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        GroundingItem[] grounding =
+        [
+            .. excerpts.Select(excerpt =>
+                GroundingItem.Create(excerpt.DocumentTitle, excerpt.Text)),
+        ];
+
+        // Three arguments, three privilege levels, and they never merge. The
+        // instructions are the workspace's own configuration; the turns are what
+        // was actually said; the grounding is untrusted reference material that
+        // the adapter renders through a channel carrying no authority.
+        return AiTextGenerationRequest.Create(agent.Instructions.Value, turns, grounding);
     }
 
     /// <summary>

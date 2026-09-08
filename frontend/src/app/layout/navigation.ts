@@ -79,7 +79,16 @@ export const NAV_ITEMS: readonly NavItem[] = [
     implemented: true,
     permissions: ['conversations.view'],
   },
-  { label: 'Knowledge', path: 'knowledge', icon: 'knowledge', implemented: false },
+  {
+    // Real from Phase 17: written documents an agent can actually answer from,
+    // not a placeholder. File upload, crawling and connectors are still absent,
+    // and the screens say so rather than showing controls that would fail.
+    label: 'Knowledge',
+    path: 'knowledge',
+    icon: 'knowledge',
+    implemented: true,
+    permissions: ['knowledge.view'],
+  },
   {
     // Website chat is the first real channel. The others are still honestly
     // labelled as not built rather than shown as empty screens, which is why the

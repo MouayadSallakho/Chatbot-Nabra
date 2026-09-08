@@ -71,4 +71,19 @@ internal static class PersistenceSchema
     /// by a migration.
     /// </summary>
     public const string XminConcurrencyToken = "xmin";
+
+    /// <summary>
+    /// Shadow property holding the fingerprint of a knowledge document's current
+    /// content.
+    /// </summary>
+    /// <remarks>
+    /// A column because the retrieval query compares it against the indexed
+    /// fingerprint inside the database. That comparison is what keeps an edited
+    /// document out of every search until it is indexed again, and it cannot be
+    /// done in memory without loading every document's full text on every turn.
+    /// Shadow rather than a property on the aggregate, because the aggregate
+    /// derives it from its content and must never be able to hold one that
+    /// disagrees.
+    /// </remarks>
+    public const string KnowledgeContentFingerprint = "ContentFingerprint";
 }

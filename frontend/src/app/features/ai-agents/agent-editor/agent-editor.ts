@@ -19,6 +19,7 @@ import { WorkspaceContextService } from '@app/core/workspace/workspace-context-s
 import { EmptyState } from '@app/shared/empty-state/empty-state';
 import { Icon } from '@app/shared/icon/icon';
 import { PageHeader } from '@app/shared/page-header/page-header';
+import { AgentKnowledgeSection } from '@app/features/knowledge/agent-knowledge/agent-knowledge';
 import { AgentPreview } from './agent-preview';
 import { AGENT_LIMITS, CREATED_AGENT_STATE } from '../ai-agent-limits';
 import { AiAgent, AiAgentApi } from '../ai-agent-api';
@@ -60,6 +61,7 @@ type ConflictSource = 'name' | 'instructions' | 'lifecycle';
     Icon,
     ConfirmDialog,
     AgentPreview,
+    AgentKnowledgeSection,
   ],
   templateUrl: './agent-editor.html',
   styleUrl: './agent-editor.scss',
@@ -430,6 +432,18 @@ export class AgentEditor implements OnInit {
       // A failed background refresh is not worth interrupting the reader for.
       // The primary failure they were shown still stands.
     }
+  }
+
+  /**
+   * Accepts a new version produced by something else that writes to this agent.
+   *
+   * Knowledge assignment lives in its own component but is written against this
+   * agent's entity tag and advances it. Without this the editor would keep
+   * holding a tag that is one version behind, and the reader's next save of the
+   * name or the instructions would be refused for a change they made themselves.
+   */
+  protected adoptVersion(etag: string): void {
+    this.etag.set(etag);
   }
 
   /** Takes a server representation as the new canonical state. */

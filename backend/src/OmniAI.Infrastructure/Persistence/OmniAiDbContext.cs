@@ -5,6 +5,7 @@ using OmniAI.Domain.AiAgents;
 using OmniAI.Domain.Authorization;
 using OmniAI.Domain.Conversations;
 using OmniAI.Domain.Invitations;
+using OmniAI.Domain.Knowledge;
 using OmniAI.Domain.Tenants;
 using OmniAI.Domain.Users;
 using OmniAI.Domain.WebChat;
@@ -98,6 +99,21 @@ public sealed class OmniAiDbContext(DbContextOptions<OmniAiDbContext> options)
     public DbSet<WebChatSession> WebChatSessions => Set<WebChatSession>();
 
     public DbSet<AiAgent> AiAgents => Set<AiAgent>();
+
+    public DbSet<KnowledgeDocument> KnowledgeDocuments => Set<KnowledgeDocument>();
+
+    /// <summary>
+    /// Which agents may draw on which documents.
+    /// </summary>
+    /// <remarks>
+    /// There is deliberately no <c>KnowledgeChunks</c> beside this. Chunks carry
+    /// the embeddings, and keeping them out of the model is what makes it
+    /// impossible for a query or a projection anywhere in the solution to load or
+    /// publish a vector by accident. They are written and read by
+    /// <c>KnowledgeIndexStore</c> and <c>KnowledgeSearchStore</c>, in SQL.
+    /// </remarks>
+    public DbSet<AgentKnowledgeAssignment> AgentKnowledgeAssignments =>
+        Set<AgentKnowledgeAssignment>();
 
     public override int SaveChanges()
     {

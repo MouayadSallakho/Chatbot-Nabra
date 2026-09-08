@@ -1,0 +1,326 @@
+<div class="page">
+  @if (loading()) {
+    <div class="page-section" aria-busy="true">
+      <p class="visually-hidden" role="status">Loading document…</p>
+      <div class="card">
+        <div class="card-body editor-skeleton" aria-hidden="true">
+          <span class="skeleton skeleton-title"></span>
+          <span class="skeleton skeleton-text"></span>
+          <span class="skeleton skeleton-text"></span>
+        </div>
+      </div>
+    </div>
+  } @else if (loadFailure(); as error) {
+    <div class="page-section">
+      <div class="card">
+        <app-empty-state
+          icon="alert"
+          tone="error"
+          heading="Could not load this document"
+          [description]="error.message"
+        >
+          <button stateActions type="button" class="btn btn-secondary btn-sm" (click)="load()">
+            Try again
+          </button>
+          <a stateActions class="btn btn-secondary btn-sm" routerLink="/knowledge">
+            Back to knowledge
+          </a>
+        </app-empty-state>
+      </div>
+    </div>
+  } @else if (document(); as doc) {
+    <app-page-header [heading]="doc.title" description="">
+      <a pageActions class="btn btn-secondary" routerLink="/knowledge">Back to knowledge</a>
+    </app-page-header>
+
+    <!--
+      The state banner. It is the first thing on the page because it answers the
+      question somebody opens this screen with: is this document actually
+      answering anything?
+    -->
+    <div class="page-section">
+      <div
+        class="card state-card"
+        [class.state-ready]="doc.readiness === 'Ready'"
+        [class.state-needs-index]="doc.readiness === 'NeedsIndex'"
+        [class.state-disabled]="doc.readiness === 'Disabled'"
+      >
+        <div class="card-body state-body">
+          <span
+            class="badge"
+            [class.badge-success]="doc.readiness === 'Ready'"
+            [class.badge-warning]="doc.readiness === 'NeedsIndex'"
+            [class.badge-neutral]="doc.readiness === 'Disabled'"
+            data-testid="readiness"
+          >
+            {{
+              doc.readiness === 'Ready'
+                ? 'Ready'
+                : doc.readiness === 'Disabled'
+                  ? 'Disabled'
+                  : 'Needs index'
+            }}
+          </span>
+
+          <p class="text-small text-secondary state-explanation">
+            @if (doc.readiness === 'Ready') {
+              This document is indexed and in use. Agents it is assigned to can answer from it.
+            } @else if (doc.readiness === 'Disabled') {
+              This document is switched off. No agent will draw on it, whatever it is assigned to.
+              Its text and its index are kept.
+            } @else {
+              This document is not answering anything yet. Index it to make its current text
+              searchable.
+            }
+          </p>
+
+          <p class="text-small text-muted state-times">
+            <span>
+              Updated
+              <time [attr.datetime]="doc.updatedAt">{{ doc.updatedAt | date: 'medium' }}</time>
+            </span>
+            <span>
+              @if (doc.indexedAt; as indexed) {
+                Indexed
+                <time [attr.datetime]="indexed">{{ indexed | date: 'medium' }}</time>
+              } @else {
+                Never indexed
+              }
+            </span>
+          </p>
+        </div>
+      </div>
+    </div>
+
+    @if (conflict(); as source) {
+      <!--
+        The stale-version banner. The reader's text is untouched and nothing is
+        retried; reloading is offered as a deliberate choice, and warns first if
+        it would discard work.
+      -->
+      <div class="page-section">
+        <div class="alert alert-warning" role="alert">
+          <app-icon name="alert" [strokeWidth]="1.75" />
+          <div>
+            <p class="text-body-strong">This document was updated elsewhere</p>
+            <p class="text-small">
+              Somebody else changed it since you opened this page, so your
+              {{
+                source === 'content' ? 'save' : source === 'index' ? 'indexing request' : 'change'
+              }}
+              was refused. Nothing you have typed has been lost or overwritten. Reload to see the
+              latest version — you will be asked first if that would replace unsaved changes.
+            </p>
+            <button type="button" class="btn btn-secondary btn-sm" (click)="reloadLatest()">
+              Reload latest
+            </button>
+          </div>
+        </div>
+      </div>
+    }
+
+    <!-- The document itself. -->
+    <div class="page-section">
+      <form class="card" [formGroup]="form" (ngSubmit)="save()" novalidate>
+        <div class="card-header">
+          <h2 class="card-title">Document</h2>
+          @if (!canManage()) {
+            <p class="text-small text-muted">You can read this document but not change it.</p>
+          }
+        </div>
+
+        <div class="card-body editor-body">
+          <div class="field">
+            <label class="field-label field-required" for="knowledge-title">Title</label>
+            <input
+              id="knowledge-title"
+              class="input"
+              type="text"
+              formControlName="title"
+              autocomplete="off"
+              [attr.maxlength]="limits.titleMax"
+              [readonly]="!canManage()"
+            />
+            <p class="field-hint">
+              Renaming a document does not affect its index — only the content does.
+            </p>
+          </div>
+
+          <div class="field">
+            <label class="field-label field-required" for="knowledge-content">Content</label>
+            <!--
+              Plain text, bound through interpolation into a form control. Nothing
+              here renders markup: a knowledge document is tenant-authored and
+              untrusted, and innerHTML would turn a document into a script.
+            -->
+            <textarea
+              id="knowledge-content"
+              class="textarea content-input"
+              formControlName="content"
+              rows="18"
+              [attr.maxlength]="limits.contentMax"
+              [readonly]="!canManage()"
+              aria-describedby="knowledge-content-hint"
+              data-testid="content"
+            ></textarea>
+            <p class="field-hint" id="knowledge-content-hint">
+              Blank lines separate paragraphs, and indexing respects them.
+              <span class="counter" [class.counter-low]="contentRemaining() < 2000">
+                {{ contentRemaining() }} of {{ limits.contentMax }} characters remaining.
+              </span>
+            </p>
+          </div>
+
+          @if (contentChanged()) {
+            <p class="text-small text-secondary dirty-note" role="status">
+              <app-icon name="alert" [strokeWidth]="1.75" />
+              <span>
+                Unsaved changes to the content. Saving them will mean this document needs indexing
+                again.
+              </span>
+            </p>
+          }
+
+          @if (saveFailure(); as error) {
+            <div class="alert alert-danger" role="alert">
+              <app-icon name="alert" [strokeWidth]="1.75" />
+              <span>{{ error.message }}</span>
+            </div>
+          }
+        </div>
+
+        @if (canManage()) {
+          <div class="card-actions">
+            <button
+              type="button"
+              class="btn btn-secondary"
+              (click)="reset()"
+              [disabled]="!dirty() || saving()"
+            >
+              Discard changes
+            </button>
+            <button
+              type="submit"
+              class="btn btn-primary"
+              [disabled]="!dirty() || saving() || cannotWrite()"
+            >
+              @if (saving()) {
+                <span class="spinner" aria-hidden="true"></span>
+              }
+              <span class="btn-label">{{ saving() ? 'Saving…' : 'Save document' }}</span>
+            </button>
+          </div>
+        }
+      </form>
+    </div>
+
+    <!-- Indexing: the one control on this page that costs money. -->
+    <div class="page-section">
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">Indexing</h2>
+          <p class="text-small text-muted">
+            Indexing turns this document into searchable pieces using the AI provider. It costs
+            money, so it only ever happens when you ask for it — and re-indexing text that has not
+            changed costs nothing at all.
+          </p>
+        </div>
+
+        <div class="card-body">
+          @if (lastIndex(); as result) {
+            <p class="text-small text-secondary" role="status" data-testid="index-result">
+              @if (result.current) {
+                Already up to date. No request was sent to the AI provider.
+              } @else {
+                Indexed into {{ result.chunks }}
+                {{ result.chunks === 1 ? 'piece' : 'pieces' }} using {{ result.calls }} provider
+                {{ result.calls === 1 ? 'request' : 'requests' }}.
+              }
+            </p>
+          } @else if (!indexWouldWork()) {
+            <p class="text-small text-secondary">
+              The saved text is already indexed. Re-indexing it would send nothing and change
+              nothing.
+            </p>
+          }
+
+          @if (indexFailure(); as error) {
+            <div class="alert alert-danger" role="alert" data-testid="index-error">
+              <app-icon name="alert" [strokeWidth]="1.75" />
+              <span>{{ error.message }}</span>
+            </div>
+          }
+        </div>
+
+        @if (canManage()) {
+          <div class="card-actions">
+            <button
+              type="button"
+              class="btn btn-primary"
+              (click)="index()"
+              [disabled]="indexing() || cannotWrite()"
+              data-testid="index-button"
+            >
+              @if (indexing()) {
+                <span class="spinner" aria-hidden="true"></span>
+              }
+              <span class="btn-label">
+                {{
+                  indexing() ? 'Indexing…' : doc.indexedAt ? 'Reindex knowledge' : 'Index knowledge'
+                }}
+              </span>
+            </button>
+          </div>
+        }
+      </div>
+    </div>
+
+    <!-- Availability. -->
+    <div class="page-section">
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">Availability</h2>
+          <p class="text-small text-muted">
+            Switching a document off stops every agent drawing on it immediately. The text and the
+            index are kept, so switching it back on costs nothing.
+          </p>
+        </div>
+
+        @if (availabilityFailure(); as error) {
+          <div class="card-body">
+            <div class="alert alert-danger" role="alert">
+              <app-icon name="alert" [strokeWidth]="1.75" />
+              <span>{{ error.message }}</span>
+            </div>
+          </div>
+        }
+
+        @if (canManage()) {
+          <div class="card-actions">
+            @if (doc.isEnabled) {
+              <button
+                type="button"
+                class="btn btn-secondary"
+                (click)="setAvailability(false)"
+                [disabled]="changingAvailability() || cannotWrite()"
+                data-testid="disable-button"
+              >
+                Take out of use
+              </button>
+            } @else {
+              <button
+                type="button"
+                class="btn btn-primary"
+                (click)="setAvailability(true)"
+                [disabled]="changingAvailability() || cannotWrite()"
+                data-testid="enable-button"
+              >
+                Put back in use
+              </button>
+            }
+          </div>
+        }
+      </div>
+    </div>
+  }
+</div>

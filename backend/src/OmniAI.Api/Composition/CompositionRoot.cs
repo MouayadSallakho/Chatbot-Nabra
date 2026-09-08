@@ -21,6 +21,15 @@ using OmniAI.Application.Invitations.CreateTenantInvitation;
 using OmniAI.Application.Invitations.ListTenantInvitations;
 using OmniAI.Application.Invitations.RevokeTenantInvitation;
 using OmniAI.Application.Invitations;
+using OmniAI.Application.Knowledge;
+using OmniAI.Application.Knowledge.AgentKnowledge;
+using OmniAI.Application.Knowledge.CreateKnowledgeDocument;
+using OmniAI.Application.Knowledge.GetKnowledgeDocumentById;
+using OmniAI.Application.Knowledge.IndexKnowledgeDocument;
+using OmniAI.Application.Knowledge.ListKnowledgeDocuments;
+using OmniAI.Application.Knowledge.SearchAgentKnowledge;
+using OmniAI.Application.Knowledge.SetKnowledgeDocumentStatus;
+using OmniAI.Application.Knowledge.UpdateKnowledgeDocument;
 using OmniAI.Application.Members.GetAssignableRoles;
 using OmniAI.Application.Members.GetTenantMemberById;
 using OmniAI.Application.Members.ListTenantMembers;
@@ -210,6 +219,25 @@ internal static class CompositionRoot
         services.AddScoped<ActivateAiAgentHandler>();
         services.AddScoped<DisableAiAgentHandler>();
         services.AddScoped<PreviewAiAgentHandler>();
+
+        services.AddScoped<ListKnowledgeDocumentsHandler>();
+        services.AddScoped<GetKnowledgeDocumentByIdHandler>();
+        services.AddScoped<CreateKnowledgeDocumentHandler>();
+        services.AddScoped<UpdateKnowledgeDocumentHandler>();
+        services.AddScoped<IndexKnowledgeDocumentHandler>();
+        services.AddScoped<SetKnowledgeDocumentStatusHandler>();
+        services.AddScoped<GetAgentKnowledgeHandler>();
+        services.AddScoped<ReplaceAgentKnowledgeHandler>();
+        services.AddScoped<SearchAgentKnowledgeHandler>();
+
+        services.AddScoped<KnowledgeRetriever>();
+
+        // Singletons because they are pure policy: no state, no clock, no
+        // connection. The chunker in particular is a pure function of its input,
+        // which is what makes an index reproducible.
+        services.AddSingleton(new KnowledgeChunkingPolicy());
+        services.AddSingleton(new KnowledgeRetrievalPolicy());
+        services.AddSingleton<KnowledgeChunker>();
 
         // The antiforgery filter. Registered so route groups can resolve it by
         // type; it is applied at the mapping sites rather than globally, so a

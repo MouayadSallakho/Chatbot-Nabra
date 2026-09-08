@@ -176,9 +176,13 @@ describe('AppShell', () => {
     });
 
     it('renders a placeholder for an area that is not built, naming the area', async () => {
-      await render('/knowledge');
+      // Integrations rather than Knowledge: Knowledge stopped being a
+      // placeholder in Phase 17, and a test pinned to a particular unbuilt area
+      // has to move as areas get built. That is the point of it -- it proves the
+      // placeholder mechanism still works for whatever is left.
+      await render('/integrations');
 
-      expect(query('h1')?.textContent).toContain('Knowledge');
+      expect(query('h1')?.textContent).toContain('Integrations');
       // The point of the page: it says plainly that nothing is there.
       expect(host().textContent).toContain('Not implemented yet');
     });

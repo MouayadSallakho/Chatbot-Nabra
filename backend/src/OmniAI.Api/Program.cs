@@ -3,6 +3,7 @@ using OmniAI.Api.Auth;
 using OmniAI.Api.Authorization;
 using OmniAI.Api.Composition;
 using OmniAI.Api.Conversations;
+using OmniAI.Api.Knowledge;
 using OmniAI.Api.WebChat;
 using OmniAI.Api.Security;
 using OmniAI.Api.Team;
@@ -125,6 +126,7 @@ app.MapAiAgentEndpoints();
 // Website chat administration: which agent is reachable from the public web, and
 // whether it is switched on. Authenticated, and permission-checked inside every
 // use case.
+app.MapKnowledgeEndpoints();
 app.MapWebChatEndpoints();
 
 // Reading the conversations customers have actually had. Read-only in this
