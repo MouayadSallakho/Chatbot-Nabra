@@ -125,6 +125,13 @@
       </div>
     </div>
 
+    <!--
+      Installing the widget on a website, and how it looks there. Its own
+      component with its own read and its own conditional write: four forms and
+      a security allowlist do not belong in the page that publishes the link.
+    -->
+    <app-website-chat-widget [webChatEndpointId]="webChatEndpointId()" (saved)="load()" />
+
     @if (canManage()) {
       <div class="page-section">
         <h2 class="text-section-title">Availability</h2>

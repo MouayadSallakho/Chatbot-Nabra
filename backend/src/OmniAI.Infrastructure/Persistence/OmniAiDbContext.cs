@@ -98,6 +98,16 @@ public sealed class OmniAiDbContext(DbContextOptions<OmniAiDbContext> options)
     /// <summary>Anonymous visitors' claims on their own conversations.</summary>
     public DbSet<WebChatSession> WebChatSessions => Set<WebChatSession>();
 
+    /// <summary>
+    /// The websites each widget may be embedded on.
+    /// </summary>
+    /// <remarks>
+    /// A set of its own as well as a collection on the endpoint, so the embedded
+    /// runtime can ask "is this origin still approved" without loading an
+    /// aggregate it does not otherwise need.
+    /// </remarks>
+    public DbSet<WebChatAllowedOrigin> WebChatAllowedOrigins => Set<WebChatAllowedOrigin>();
+
     public DbSet<AiAgent> AiAgents => Set<AiAgent>();
 
     public DbSet<KnowledgeDocument> KnowledgeDocuments => Set<KnowledgeDocument>();

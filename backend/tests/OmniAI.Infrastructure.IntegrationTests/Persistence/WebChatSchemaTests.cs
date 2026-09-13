@@ -43,9 +43,13 @@ public sealed class WebChatSchemaTests(PostgresTestDatabase database)
             + "FROM information_schema.columns "
             + "WHERE table_schema = 'public' AND table_name = 'web_chat_sessions'");
 
+        // Phase 18 added two, and only two: which transport the session was opened
+        // through, and -- for an embedded one -- the website it was opened on.
+        // Neither identifies a person; the origin identifies the customer's own
+        // site, and it is there so removing that site can revoke the session.
         Assert.Equal(
             "conversation_id, tenant_id, web_chat_endpoint_id, ai_agent_id, "
-            + "access_token_hash, created_at, expires_at",
+            + "access_token_hash, created_at, expires_at, client_mode, embedded_origin",
             columns as string);
     }
 

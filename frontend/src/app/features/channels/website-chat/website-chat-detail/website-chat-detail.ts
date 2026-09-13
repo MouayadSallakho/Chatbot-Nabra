@@ -7,6 +7,7 @@ import {
   inject,
   input,
   signal,
+  viewChild,
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
@@ -16,6 +17,7 @@ import { WorkspaceContextService } from '@app/core/workspace/workspace-context-s
 import { EmptyState } from '@app/shared/empty-state/empty-state';
 import { PageHeader } from '@app/shared/page-header/page-header';
 import { WebChatAdminApi, WebChatEndpoint, hostedChatUrl } from '../../website-chat-api';
+import { WebsiteChatWidget } from '../website-chat-widget/website-chat-widget';
 
 /**
  * One website chat link: its address, and whether the public may use it.
@@ -29,7 +31,7 @@ import { WebChatAdminApi, WebChatEndpoint, hostedChatUrl } from '../../website-c
 @Component({
   selector: 'app-website-chat-detail',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DatePipe, LowerCasePipe, RouterLink, PageHeader, EmptyState],
+  imports: [DatePipe, LowerCasePipe, RouterLink, PageHeader, EmptyState, WebsiteChatWidget],
   templateUrl: './website-chat-detail.html',
   styleUrl: './website-chat-detail.scss',
 })
@@ -48,6 +50,15 @@ export class WebsiteChatDetail implements OnInit {
   protected readonly saveFailure = signal<ApiError | null>(null);
   protected readonly stale = signal(false);
   protected readonly copied = signal(false);
+
+  /**
+   * The widget section, when the reader is allowed to see this endpoint.
+   *
+   * It reads and writes the same aggregate, so publishing the link from here
+   * changes the version it holds. Telling it so is what stops a reader being
+   * shown a stale conflict for something they did themselves a moment earlier.
+   */
+  private readonly widgetSection = viewChild(WebsiteChatWidget);
 
   /** The version the next conditional write must present. */
   private readonly version = signal<string | null>(null);
@@ -87,7 +98,14 @@ export class WebsiteChatDetail implements OnInit {
       return;
     }
 
-    this.loading.set(true);
+    // Only show the skeleton when there is nothing on screen yet.
+    //
+    // <strong>Found in the browser.</strong> Saving the widget settings re-reads
+    // this endpoint, and flipping to the loading branch destroyed and re-created
+    // the widget section underneath the reader -- taking its "Saved." confirmation
+    // with it, and, had they been part-way through another field, their edits too.
+    // A refresh of something already displayed is not a load.
+    this.loading.set(this.endpoint() === null);
     this.failure.set(null);
     this.stale.set(false);
 
@@ -122,6 +140,11 @@ export class WebsiteChatDetail implements OnInit {
 
       this.endpoint.set(updated.value);
       this.version.set(updated.etag);
+
+      // Same aggregate, same version. The widget section decides for itself
+      // whether it can safely re-read: it will not throw away edits somebody is
+      // in the middle of making.
+      this.widgetSection()?.refresh();
     } catch (error) {
       const failure = toApiError(error);
 

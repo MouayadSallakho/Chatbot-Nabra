@@ -139,6 +139,8 @@ app.MapConversationEndpoints();
 // per-conversation credential in an HttpOnly cookie, never from a session, and it
 // grants nothing beyond that one conversation.
 app.MapHostedChatEndpoints();
+app.MapEmbeddedChatEndpoints();
+app.MapWidgetLoaderEndpoints();
 
 // TLS is terminated by the reverse proxy in front of this process, so the
 // application deliberately does not perform its own HTTPS redirection -- there is

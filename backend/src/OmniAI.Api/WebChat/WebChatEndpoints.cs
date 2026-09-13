@@ -1,6 +1,8 @@
 using OmniAI.Api.Http;
 using OmniAI.Api.Security;
 using OmniAI.Application.Concurrency;
+using OmniAI.Application.WebChat.GetWebChatWidget;
+using OmniAI.Application.WebChat.UpdateWebChatWidget;
 using OmniAI.Application.WebChat;
 using OmniAI.Application.WebChat.CreateWebChatEndpoint;
 using OmniAI.Application.WebChat.GetWebChatEndpointById;
@@ -58,7 +60,94 @@ internal static class WebChatEndpoints
         workspace.MapPost("/{webChatEndpointId:guid}/disable", DisableAsync)
             .WithName("DisableWebChatEndpoint");
 
+        // The widget's appearance and the websites it may be embedded on. Inside
+        // the same authenticated, antiforgery-checked group as everything else
+        // here: deciding where a widget may run is workspace administration, not
+        // something the public surface exposes.
+        workspace.MapGet("/{webChatEndpointId:guid}/widget", GetWidgetAsync)
+            .WithName("GetWebChatWidget");
+
+        workspace.MapPut("/{webChatEndpointId:guid}/widget", UpdateWidgetAsync)
+            .WithName("UpdateWebChatWidget");
+
         return endpoints;
+    }
+
+    /// <summary>Reads a widget's appearance and the websites it may be embedded on.</summary>
+    private static async Task<IResult> GetWidgetAsync(
+        HttpContext http,
+        Guid tenantId,
+        Guid webChatEndpointId,
+        GetWebChatWidgetHandler handler,
+        CancellationToken cancellationToken)
+    {
+        Versioned<WebChatWidgetConfigurationView>? widget = await handler
+            .HandleAsync(
+                new GetWebChatWidgetQuery(tenantId, webChatEndpointId),
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        return RespondWithWidget(http, widget, webChatEndpointId);
+    }
+
+    /// <summary>
+    /// Replaces a widget's appearance and the websites it may be embedded on.
+    /// </summary>
+    /// <remarks>
+    /// Conditional like every other write here. Removing a website is a security
+    /// action, and a security action applied to a version somebody else has already
+    /// replaced is an action that did not do what the person intended.
+    /// </remarks>
+    private static async Task<IResult> UpdateWidgetAsync(
+        HttpContext http,
+        Guid tenantId,
+        Guid webChatEndpointId,
+        UpdateWebChatWidgetRequest request,
+        UpdateWebChatWidgetHandler handler,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        if (EntityTags.ReadIfMatch(http.Request, out ConcurrencyToken expected) is IResult failure)
+        {
+            return failure;
+        }
+
+        Versioned<WebChatWidgetConfigurationView>? updated = await handler
+            .HandleAsync(
+                new UpdateWebChatWidgetCommand(
+                    tenantId,
+                    webChatEndpointId,
+                    request.Greeting,
+                    request.AccentColor,
+                    request.LauncherPosition,
+                    request.Theme,
+                    request.AllowedOrigins,
+                    expected),
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        return RespondWithWidget(http, updated, webChatEndpointId);
+    }
+
+    private static IResult RespondWithWidget(
+        HttpContext http,
+        Versioned<WebChatWidgetConfigurationView>? widget,
+        Guid webChatEndpointId)
+    {
+        ArgumentNullException.ThrowIfNull(http);
+
+        if (widget is null)
+        {
+            return Results.Problem(
+                title: "Website chat endpoint not found",
+                detail: $"This workspace has no website chat endpoint with id '{webChatEndpointId}'.",
+                statusCode: StatusCodes.Status404NotFound);
+        }
+
+        http.Response.Headers.ETag = EntityTags.Format(widget.Version);
+
+        return Results.Ok(WebChatWidgetConfigurationResponse.From(widget.Value, http.Request));
     }
 
     /// <summary><c>GET /api/tenants/{tenantId}/website-chat</c>.</summary>

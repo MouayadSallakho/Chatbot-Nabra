@@ -89,6 +89,15 @@ export const routes: Routes = [
       import('@app/features/chat/hosted-chat/hosted-chat').then((m) => m.HostedChat),
   },
   {
+    // The embedded widget's own document, served into an iframe on a customer's
+    // website. Outside the shell and behind no guard, for the same reason the
+    // hosted page is: the visitor is a member of nobody's workspace. What decides
+    // whether it may run is the workspace's origin allowlist, checked on the
+    // server against a website the browser reported.
+    path: 'embed',
+    loadChildren: () => import('@app/features/embed/embed.routes').then((m) => m.embedRoutes),
+  },
+  {
     path: WORKSPACE_SETUP_PATH,
     title: 'Choose workspace',
     canActivate: [authGuard],

@@ -38,9 +38,12 @@ using OmniAI.Application.Conversations;
 using OmniAI.Application.Tenants.CreateTenant;
 using OmniAI.Application.WebChat.CreateWebChatEndpoint;
 using OmniAI.Application.WebChat.GetWebChatEndpointById;
+using OmniAI.Application.WebChat.Embedded;
+using OmniAI.Application.WebChat.GetWebChatWidget;
 using OmniAI.Application.WebChat.Hosted;
 using OmniAI.Application.WebChat.ListWebChatEndpoints;
 using OmniAI.Application.WebChat.SetWebChatEndpointStatus;
+using OmniAI.Application.WebChat.UpdateWebChatWidget;
 using OmniAI.Application.WebChat;
 using OmniAI.Application.Tenants.GetTenantById;
 using OmniAI.Application.Tenants.ListMyTenants;
@@ -142,7 +145,16 @@ internal static class CompositionRoot
         // The composition root only says where non-secret configuration comes
         // from -- it names no vendor, reads no key, and does not know which of the
         // two it just registered.
-        services.AddOmniAiRuntime(configuration);
+        //
+        // In Development it says one thing more, and for the same reason it says
+        // it about the network-key secret above: a developer machine is not a
+        // deployment. A key inherited from the shell that started the process is
+        // not a decision anybody made, and treating it as one has already cost
+        // real money once. Development therefore requires a deliberate opt-in
+        // alongside the key; production does not, and must not.
+        services.AddOmniAiRuntime(
+            configuration,
+            requireLiveProviderOptIn: environment.IsDevelopment());
 
         // Application use cases. Registered as their concrete types, because
         // nothing substitutes them at runtime -- an interface per handler would be
@@ -197,6 +209,10 @@ internal static class CompositionRoot
         services.AddScoped<SetWebChatEndpointStatusHandler>();
 
         // The hosted chat runtime.
+        services.AddScoped<GetWebChatWidgetHandler>();
+        services.AddScoped<UpdateWebChatWidgetHandler>();
+        services.AddScoped<EmbeddedWebChatHandler>();
+
         services.AddScoped<PublicWebChatAccess>();
         services.AddScoped<StartWebChatConversationHandler>();
         services.AddScoped<SendWebChatMessageHandler>();

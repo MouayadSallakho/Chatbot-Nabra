@@ -23,12 +23,18 @@ namespace OmniAI.Application.WebChat.Hosted;
 /// the connection. Nullable because the edge may be unable to establish one, in
 /// which case the message is refused rather than counted in a shared bucket.
 /// </param>
+/// <param name="Mode">
+/// Which transport this send arrived through. Set by the endpoint that received
+/// the request and never by the caller, so a credential presented at the wrong
+/// door is refused before anything is spent.
+/// </param>
 public sealed record SendWebChatMessageCommand(
     Guid ConversationId,
     string? AccessToken,
     string? ClientMessageId,
     string? Text,
-    ClientNetworkKey? Client);
+    ClientNetworkKey? Client,
+    WebChatClientMode Mode = WebChatClientMode.Hosted);
 
 /// <summary>
 /// One turn of a live website chat: store what was said, and answer it.
@@ -172,7 +178,7 @@ public sealed class SendWebChatMessageHandler(
             .ConfigureAwait(false);
 
         WebChatSession? session = await _access
-            .AuthoriseAsync(conversationId, command.AccessToken, cancellationToken)
+            .AuthoriseAsync(conversationId, command.AccessToken, command.Mode, cancellationToken)
             .ConfigureAwait(false);
 
         if (session is null)

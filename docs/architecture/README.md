@@ -37,13 +37,17 @@ absolute public session lifetime. Phase 17 gave agents something to draw on: a
 tenant knowledge base of written documents, deterministic chunking, an embedding
 abstraction with an OpenAI adapter, pgvector storage and retrieval in the same
 PostgreSQL, explicit agent-by-agent assignment, and a grounding contract that
-keeps retrieved text structurally separate from an agent's own instructions. No
-channel-provider architecture has been designed, and the platform is still not
-authorised for production deployment -- email verification and password recovery
-remain ahead of it, and there is no provider usage accounting, billing or alerting
-behind the safety budget or behind embedding spend.
+keeps retrieved text structurally separate from an agent's own instructions.
+Phase 18 put that runtime onto other people's websites: a versioned loader script,
+a cross-origin iframe on the OmniAI origin, a per-endpoint allowlist of exact
+origins, a header-borne conversation credential that needs no third-party cookie,
+and a postMessage channel that carries nothing but how big the rectangle should
+be. No channel-provider architecture has been designed, and the platform is still
+not authorised for production deployment -- email verification and password
+recovery remain ahead of it, and there is no provider usage accounting, billing or
+alerting behind the safety budget or behind embedding spend.
 
-Fifteen areas have their own documents:
+Sixteen areas have their own documents:
 
 - [multi-tenancy-isolation.md](multi-tenancy-isolation.md) - tenant isolation
 - [conversation-domain.md](conversation-domain.md) - conversation and message modelling
@@ -61,6 +65,7 @@ Fifteen areas have their own documents:
 - [conversation-runtime-website-chat.md](conversation-runtime-website-chat.md) - the conversation runtime, hosted website chat, and the anonymous visitor boundary
 - [public-chat-protection.md](public-chat-protection.md) - distributed rate limiting, client-network identity, cost safety and the public session lifecycle
 - [knowledge-base-rag.md](knowledge-base-rag.md) - knowledge documents, deterministic chunking, pgvector retrieval and the grounding privilege boundary
+- [embeddable-web-chat-widget.md](embeddable-web-chat-widget.md) - the loader, the cross-origin iframe, origin allowlisting, the wall between the hosted and embedded transports, and the Development opt-in that keeps an inherited `OPENAI_API_KEY` from spending money
 
 ---
 

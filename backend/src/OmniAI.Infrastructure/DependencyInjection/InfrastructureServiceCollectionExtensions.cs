@@ -187,15 +187,66 @@ public static class InfrastructureServiceCollectionExtensions
     /// reusable and thread-safe, and it owns an HTTP stack: building one per
     /// request would exhaust sockets under any real load.
     /// </para>
+    /// <para>
+    /// <strong>In Development the key is necessary but not sufficient.</strong>
+    /// See <paramref name="requireLiveProviderOptIn"/>.
+    /// </para>
     /// </remarks>
+    /// <param name="requireLiveProviderOptIn">
+    /// <para>
+    /// When <see langword="true"/>, a configured key alone does not compose the
+    /// OpenAI adapters: <see cref="OpenAiOptions.LiveProviderOptInVariable"/> must
+    /// also be exactly <see cref="OpenAiOptions.LiveProviderOptInValue"/>.
+    /// </para>
+    /// <para>
+    /// <strong>This exists because a key was inherited once and cost real
+    /// money.</strong> A developer machine commonly has <c>OPENAI_API_KEY</c> in
+    /// its environment for some other project; anything started from that shell
+    /// inherits it, so a verification run intended to exercise the
+    /// provider-unconfigured path quietly made a live request instead — and the
+    /// only symptom was that it succeeded. Unsetting the variable by hand for one
+    /// session is not a safeguard, because the next session starts from the same
+    /// shell.
+    /// </para>
+    /// <para>
+    /// <strong>The composition root passes Development here and nothing
+    /// else.</strong> Production must not require a second flag: a deployment that
+    /// has deliberately configured a provider would be taken offline by somebody
+    /// forgetting one, and this is a cost guard for developer machines, not a
+    /// security control for deployments.
+    /// </para>
+    /// </param>
     public static IServiceCollection AddOmniAiRuntime(
         this IServiceCollection services,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        bool requireLiveProviderOptIn = false)
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configuration);
 
         string? apiKey = configuration[OpenAiOptions.ApiKeyVariable];
+
+        // Read through IConfiguration exactly as the key is, so a test can prove
+        // every combination without mutating the process environment -- which is
+        // global state shared with every other test running in parallel.
+        //
+        // An exact match on "1". Not "true", not "yes", not "any non-empty value":
+        // a guard whose vocabulary is generous is a guard somebody defeats by
+        // accident, which is the failure it exists to prevent.
+        bool optedIn = string.Equals(
+            configuration[OpenAiOptions.LiveProviderOptInVariable],
+            OpenAiOptions.LiveProviderOptInValue,
+            StringComparison.Ordinal);
+
+        if (requireLiveProviderOptIn && !optedIn)
+        {
+            // A key is present but has not been opted into. Both providers stay
+            // unconfigured -- the text generator and the embedding generator, not
+            // one of them -- and the application behaves exactly as it does on a
+            // machine with no key at all: the existing explicit refusal, no
+            // outbound request, and nothing spent.
+            apiKey = null;
+        }
 
         // The embedding profile is registered whichever branch is taken. How this
         // deployment is configured to make vectors is a fact about the deployment,

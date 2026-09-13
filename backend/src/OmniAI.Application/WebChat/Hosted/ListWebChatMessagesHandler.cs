@@ -9,11 +9,17 @@ namespace OmniAI.Application.WebChat.Hosted;
 /// <param name="AccessToken">The raw secret from the visitor's cookie.</param>
 /// <param name="AfterSequence">Where to continue from, or the beginning.</param>
 /// <param name="Limit">How many messages to return.</param>
+/// <param name="Mode">
+/// Which transport this read arrived through. Set by the endpoint that received
+/// the request, never by the caller, so a credential presented at the wrong door
+/// is refused before anything is read.
+/// </param>
 public sealed record ListWebChatMessagesQuery(
     Guid ConversationId,
     string? AccessToken,
     long? AfterSequence,
-    int? Limit);
+    int? Limit,
+    WebChatClientMode Mode = WebChatClientMode.Hosted);
 
 /// <summary>
 /// A visitor's own transcript, and only their own.
@@ -54,7 +60,7 @@ public sealed class ListWebChatMessagesHandler(
         ConversationId conversationId = ConversationId.From(query.ConversationId);
 
         WebChatSession? session = await _access
-            .AuthoriseAsync(conversationId, query.AccessToken, cancellationToken)
+            .AuthoriseAsync(conversationId, query.AccessToken, query.Mode, cancellationToken)
             .ConfigureAwait(false);
 
         if (session is null)

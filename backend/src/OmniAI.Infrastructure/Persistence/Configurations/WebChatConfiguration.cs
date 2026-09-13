@@ -50,6 +50,44 @@ internal sealed class WebChatEndpointConfiguration : IEntityTypeConfiguration<We
             .HasMaxLength(32)
             .IsRequired();
 
+        // The widget's appearance lives on the endpoint rather than in a table of
+        // its own: it is exactly one row's worth of settings, it is read on every
+        // embedded bootstrap, and a join to fetch four columns would buy nothing.
+        //
+        // Each is a bounded value with a closed set of possibilities. There is no
+        // column here that could carry CSS, markup or a script, and none may be
+        // added -- a widget whose appearance is tenant-supplied markup is a widget
+        // whose appearance is a stored cross-site scripting vector.
+        builder.ComplexProperty(
+            endpoint => endpoint.Widget,
+            widget =>
+            {
+                widget.Property(settings => settings.Greeting)
+                    .HasColumnName("widget_greeting")
+                    .HasConversion(PersistenceConverters.NullableWebChatGreeting)
+                    .HasMaxLength(WebChatGreeting.MaxLength);
+
+                widget.Property(settings => settings.Accent)
+                    .HasColumnName("widget_accent_color")
+                    .HasConversion(PersistenceConverters.WebChatAccentColor)
+                    .HasMaxLength(7)
+                    .IsRequired();
+
+                // Stored as the name, never the ordinal. A reordered enum would
+                // silently repoint every existing row.
+                widget.Property(settings => settings.Position)
+                    .HasColumnName("widget_launcher_position")
+                    .HasConversion<string>()
+                    .HasMaxLength(16)
+                    .IsRequired();
+
+                widget.Property(settings => settings.Theme)
+                    .HasColumnName("widget_theme")
+                    .HasConversion<string>()
+                    .HasMaxLength(16)
+                    .IsRequired();
+            });
+
         builder.Property(endpoint => endpoint.CreatedAt)
             .HasColumnName("created_at")
             .HasColumnType("timestamp with time zone")
@@ -110,6 +148,22 @@ internal sealed class WebChatEndpointConfiguration : IEntityTypeConfiguration<We
         builder.HasIndex(endpoint => new { endpoint.TenantId, endpoint.AiAgentId })
             .IsUnique()
             .HasDatabaseName("ux_web_chat_endpoints_tenant_agent");
+
+        // The approved websites are part of this aggregate, so they load and save
+        // with it and are covered by its entity tag. Changing the list moves the
+        // endpoint's version, which is what makes the admin screen's precondition
+        // mean something.
+        builder.HasMany(endpoint => endpoint.AllowedOrigins)
+            .WithOne()
+            .HasForeignKey(allowed => new { allowed.EndpointId, allowed.TenantId })
+            .HasPrincipalKey(endpoint => new { endpoint.Id, endpoint.TenantId })
+            .HasConstraintName("fk_web_chat_allowed_origins_endpoint")
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Navigation(endpoint => endpoint.AllowedOrigins)
+            .HasField("_allowedOrigins")
+            .UsePropertyAccessMode(PropertyAccessMode.Field)
+            .AutoInclude();
     }
 }
 
@@ -171,6 +225,24 @@ internal sealed class WebChatSessionConfiguration : IEntityTypeConfiguration<Web
             .HasColumnName("expires_at")
             .HasColumnType("timestamp with time zone")
             .IsRequired();
+
+        // Which transport opened this session, and therefore which may use it.
+        // Stored as the name so a row is readable in a query and so reordering the
+        // enum cannot silently reclassify every existing session.
+        builder.Property(session => session.Mode)
+            .HasColumnName("client_mode")
+            .HasConversion<string>()
+            .HasMaxLength(16)
+            .IsRequired();
+
+        // The origin only -- never the page address. A path can carry an order
+        // number, a search term or a customer identifier, and none of that is this
+        // platform's business. Null for a hosted session, and a check constraint
+        // in the migration keeps the two columns agreeing with each other.
+        builder.Property(session => session.EmbeddedOrigin)
+            .HasColumnName("embedded_origin")
+            .HasConversion(PersistenceConverters.NullableWebChatOrigin)
+            .HasMaxLength(WebChatOrigin.MaxLength);
 
         builder.HasOne<Conversation>()
             .WithMany()
@@ -297,5 +369,56 @@ internal sealed class ConversationTurnConfiguration : IEntityTypeConfiguration<C
         builder.HasIndex(turn => turn.CustomerMessageId)
             .IsUnique()
             .HasDatabaseName("ux_conversation_turns_customer_message");
+    }
+}
+
+/// <summary>
+/// The websites a widget may be embedded on.
+/// </summary>
+/// <remarks>
+/// <para>
+/// A table rather than a JSON column on the endpoint. That is what lets the
+/// database refuse a duplicate outright, and it is what makes the list something
+/// a query can filter on rather than a string something has to parse.
+/// </para>
+/// <para>
+/// <strong>The primary key is the tenant boundary and the uniqueness rule at
+/// once.</strong> (endpoint, origin) makes the same website twice impossible; the
+/// composite foreign key onto (id, tenant_id) makes an origin belonging to another
+/// workspace's endpoint impossible. Neither depends on a handler remembering.
+/// </para>
+/// </remarks>
+internal sealed class WebChatAllowedOriginConfiguration
+    : IEntityTypeConfiguration<WebChatAllowedOrigin>
+{
+    public void Configure(EntityTypeBuilder<WebChatAllowedOrigin> builder)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+
+        builder.ToTable(PersistenceSchema.WebChatAllowedOriginsTable);
+
+        builder.HasKey(allowed => new { allowed.EndpointId, allowed.Origin })
+            .HasName("pk_web_chat_allowed_origins");
+
+        builder.Property(allowed => allowed.EndpointId)
+            .HasColumnName("web_chat_endpoint_id")
+            .HasConversion(PersistenceConverters.WebChatEndpointId)
+            .IsRequired();
+
+        builder.Property(allowed => allowed.TenantId)
+            .HasColumnName("tenant_id")
+            .HasConversion(PersistenceConverters.TenantId)
+            .IsRequired();
+
+        builder.Property(allowed => allowed.Origin)
+            .HasColumnName("origin")
+            .HasConversion(PersistenceConverters.WebChatOrigin)
+            .HasMaxLength(WebChatOrigin.MaxLength)
+            .IsRequired();
+
+        builder.Property(allowed => allowed.AllowedAt)
+            .HasColumnName("allowed_at")
+            .HasColumnType("timestamp with time zone")
+            .IsRequired();
     }
 }

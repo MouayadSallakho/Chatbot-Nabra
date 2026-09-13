@@ -1,4 +1,10 @@
 {
+  "/widget": {
+    "target": "http://localhost:5027",
+    "secure": false,
+    "changeOrigin": false,
+    "logLevel": "warn"
+  },
   "/api": {
     "target": "http://localhost:5027",
     "secure": false,

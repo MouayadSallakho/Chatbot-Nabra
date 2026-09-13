@@ -1,0 +1,286 @@
+// =============================================================================
+// The embedded chat widget
+// =============================================================================
+//
+// This stylesheet paints the inside of an iframe that is 84x84 when closed and
+// panel-sized when open. The frame's dimensions are the loader's business; this
+// file only fills whatever room it has been given, and keeps everything it draws
+// inside it.
+//
+// Colours resolve through the product's tokens, so Light and Dark are the same
+// palettes the admin application uses. The single exception is `--embed-accent`,
+// which the component sets from the workspace's configured colour, paired with a
+// foreground computed to be readable on it.
+// -----------------------------------------------------------------------------
+
+:host {
+  // Defaults, so the widget is never unstyled between the first paint and the
+  // configuration arriving.
+  --embed-accent: #2563eb;
+  --embed-accent-contrast: #fff;
+
+  display: block;
+  block-size: 100%;
+  overflow: hidden;
+  font: var(--text-body);
+  color: var(--text-primary);
+}
+
+// -----------------------------------------------------------------------------
+// The launcher
+// -----------------------------------------------------------------------------
+// Bottom-right by default, bottom-left when the workspace chose that corner. The
+// frame itself is already in the right corner of the host page; this places the
+// circle within the frame so its shadow has room and does not get clipped.
+.embed-launcher {
+  position: absolute;
+  inset-block-end: 16px;
+  inset-inline-end: 16px;
+  inline-size: 56px;
+  block-size: 56px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background-color: var(--embed-accent);
+  color: var(--embed-accent-contrast);
+  box-shadow: var(--shadow-raised);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: transform var(--motion-fast) ease;
+
+  svg {
+    inline-size: 26px;
+    block-size: 26px;
+  }
+
+  &:hover {
+    transform: scale(1.05);
+  }
+}
+
+// One focus ring for everything drawn on a surface, declared once. Three copies
+// of the same two declarations were three places a change could be half-applied.
+.embed-launcher,
+.embed-input,
+.embed-send {
+  &:focus-visible {
+    outline: 2px solid var(--embed-accent);
+    outline-offset: 2px;
+  }
+}
+
+:host(.embed-left) .embed-launcher {
+  inset-inline: 16px auto;
+}
+
+// -----------------------------------------------------------------------------
+// The panel
+// -----------------------------------------------------------------------------
+.embed-panel {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  background-color: var(--surface-default);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+// On a phone the frame is already the whole screen, so rounded corners and a
+// border would only draw a box around the viewport.
+:host(.embed-compact) .embed-panel {
+  border: 0;
+  border-radius: 0;
+}
+
+.embed-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  background-color: var(--embed-accent);
+  color: var(--embed-accent-contrast);
+}
+
+.embed-heading {
+  flex: 1;
+  min-inline-size: 0;
+}
+
+.embed-title {
+  font: var(--text-card-title);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.embed-subtitle,
+.embed-sender {
+  font: var(--text-small);
+  opacity: 0.8;
+}
+
+// Header buttons sit on the accent, so they borrow its foreground rather than
+// the surface's — a token colour here would be unreadable on half the palette.
+.embed-action,
+.embed-icon-button {
+  border: 1px solid currentColor;
+  background-color: transparent;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.85;
+
+  &:hover {
+    opacity: 1;
+  }
+
+  &:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 2px;
+  }
+}
+
+.embed-action {
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-md);
+  font: var(--text-small);
+  white-space: nowrap;
+}
+
+.embed-icon-button {
+  inline-size: 30px;
+  block-size: 30px;
+  border-radius: var(--radius-md);
+  display: grid;
+  place-items: center;
+
+  svg {
+    inline-size: 16px;
+    block-size: 16px;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// The transcript
+// -----------------------------------------------------------------------------
+.embed-transcript,
+.embed-status {
+  background-color: var(--surface-page);
+}
+
+.embed-transcript {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  overflow-y: auto;
+}
+
+.embed-greeting {
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background-color: var(--surface-muted);
+  color: var(--text-secondary);
+  font: var(--text-small);
+}
+
+.embed-bubble {
+  display: flex;
+  flex-direction: column;
+  max-inline-size: 85%;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  // Customer text can be one very long unbroken string. Without this it would
+  // push the bubble past the panel and produce a horizontal scrollbar.
+  overflow-wrap: anywhere;
+}
+
+.embed-bubble-customer {
+  align-self: flex-end;
+  background-color: var(--embed-accent);
+  color: var(--embed-accent-contrast);
+}
+
+.embed-bubble-agent {
+  align-self: flex-start;
+  background-color: var(--surface-default);
+  border: 1px solid var(--border-subtle);
+}
+
+.embed-text {
+  white-space: pre-wrap;
+}
+
+.embed-status {
+  padding: 0 var(--space-4) var(--space-2);
+  color: var(--text-muted);
+  font: var(--text-small);
+}
+
+.embed-error {
+  margin: 0 var(--space-4) var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--danger-border);
+  background-color: var(--danger-bg);
+  color: var(--danger-fg);
+  font: var(--text-small);
+}
+
+.embed-error-warning {
+  border-color: var(--warning-border);
+  background-color: var(--warning-bg);
+  color: var(--warning-fg);
+}
+
+// -----------------------------------------------------------------------------
+// The composer
+// -----------------------------------------------------------------------------
+.embed-composer {
+  display: flex;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-block-start: 1px solid var(--border-subtle);
+  background-color: var(--surface-default);
+}
+
+.embed-input {
+  flex: 1;
+  min-inline-size: 0;
+  padding: var(--space-2);
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius-sm);
+  background-color: var(--surface-inset);
+  color: var(--text-primary);
+  font: var(--text-body);
+  resize: none;
+}
+
+.embed-send {
+  padding: var(--space-2) var(--space-4);
+  border: 0;
+  border-radius: var(--radius-md);
+  background-color: var(--embed-accent);
+  color: var(--embed-accent-contrast);
+  font: var(--text-body-strong);
+  cursor: pointer;
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Opened directly, rather than embedded
+// -----------------------------------------------------------------------------
+// The empty-state primitive does the whole job here, so this only has to give it
+// a page to sit on. Re-declaring a centred stack would be a second definition of
+// something the product already has one of.
+.embed-standalone {
+  block-size: 100%;
+  display: grid;
+  align-content: center;
+}

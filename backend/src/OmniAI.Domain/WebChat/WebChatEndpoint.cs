@@ -44,9 +44,21 @@ public sealed class WebChatEndpoint
         AiAgentId = aiAgentId;
         PublicKey = publicKey;
         Status = WebChatEndpointStatus.Draft;
+        Widget = WebChatWidgetSettings.Default;
         CreatedAt = createdAt;
         UpdatedAt = createdAt;
     }
+
+    /// <summary>
+    /// The websites this widget may be embedded on.
+    /// </summary>
+    /// <remarks>
+    /// Empty means the widget is embeddable nowhere, which is the correct default:
+    /// a workspace that has not said where its widget belongs has not authorised
+    /// anywhere. It does not affect the hosted page, which is a first-party OmniAI
+    /// address and has no embedder to check.
+    /// </remarks>
+    private readonly List<WebChatAllowedOrigin> _allowedOrigins = [];
 
     /// <summary>Identity. Fixed for the lifetime of the endpoint.</summary>
     public WebChatEndpointId Id { get; }
@@ -76,6 +88,12 @@ public sealed class WebChatEndpoint
     /// <summary>Current lifecycle state.</summary>
     public WebChatEndpointStatus Status { get; private set; }
 
+    /// <summary>How the embedded widget looks. Never markup, never CSS.</summary>
+    public WebChatWidgetSettings Widget { get; private set; }
+
+    /// <summary>The websites this widget may be embedded on, in canonical form.</summary>
+    public IReadOnlyList<WebChatAllowedOrigin> AllowedOrigins => _allowedOrigins;
+
     /// <summary>When the endpoint was created, in UTC.</summary>
     public DateTimeOffset CreatedAt { get; }
 
@@ -91,6 +109,17 @@ public sealed class WebChatEndpoint
     /// cannot silently start serving from it.
     /// </remarks>
     public bool IsServingPublicTraffic => Status == WebChatEndpointStatus.Active;
+
+    /// <summary>
+    /// The most websites one widget may be approved for.
+    /// </summary>
+    /// <remarks>
+    /// Twenty covers a business with a main site, a shop, a few country domains
+    /// and a staging environment. It is a bound rather than a guess at a limit
+    /// somebody will meet: an unbounded list is an unbounded row count and an
+    /// unbounded comparison on every embedded request.
+    /// </remarks>
+    public const int MaxAllowedOrigins = 20;
 
     /// <summary>Configures a website chat endpoint. It begins as a draft.</summary>
     /// <exception cref="DomainValidationException">
@@ -141,13 +170,117 @@ public sealed class WebChatEndpoint
         AiAgentId aiAgentId,
         WebChatPublicKey publicKey,
         WebChatEndpointStatus status,
+        WebChatWidgetSettings widget,
         DateTimeOffset createdAt,
         DateTimeOffset updatedAt) =>
         new(id, tenantId, aiAgentId, publicKey, createdAt)
         {
             Status = status,
+            Widget = widget ?? WebChatWidgetSettings.Default,
             UpdatedAt = updatedAt,
         };
+
+    /// <summary>
+    /// Replaces the widget's appearance and the websites it may be embedded on,
+    /// together.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <strong>One operation, because they are one screen and one decision.</strong>
+    /// Appearance and allowed websites are both "how this widget is deployed", they
+    /// are saved by one button against one entity tag, and splitting them would
+    /// mean two writes where the second could fail leaving a half-configured
+    /// widget live.
+    /// </para>
+    /// <para>
+    /// <strong>A replacement, not a difference.</strong> The screen reads the
+    /// current list, somebody adds and removes, and the whole intended list comes
+    /// back. Sending only the change would mean the client computing it from a view
+    /// that may already be out of date -- and an origin somebody thought they had
+    /// removed still being allowed is exactly the failure this list exists to
+    /// prevent.
+    /// </para>
+    /// <para>
+    /// Duplicates are collapsed rather than refused. Two spellings of one origin
+    /// canonicalise to the same value, and somebody who typed
+    /// <c>https://example.com</c> and <c>https://EXAMPLE.com/</c> meant one website,
+    /// not an error.
+    /// </para>
+    /// </remarks>
+    /// <exception cref="DomainValidationException">More origins than the bound allows.</exception>
+    public void Configure(
+        WebChatWidgetSettings widget,
+        IReadOnlyList<WebChatOrigin> allowedOrigins,
+        DateTimeOffset configuredAt)
+    {
+        ArgumentNullException.ThrowIfNull(widget);
+        ArgumentNullException.ThrowIfNull(allowedOrigins);
+
+        DateTimeOffset instant = RequireInstant(configuredAt, "configuration instant");
+
+        List<WebChatOrigin> distinct = [];
+
+        foreach (WebChatOrigin origin in allowedOrigins)
+        {
+            ArgumentNullException.ThrowIfNull(origin);
+
+            if (!distinct.Contains(origin))
+            {
+                distinct.Add(origin);
+            }
+        }
+
+        if (distinct.Count > MaxAllowedOrigins)
+        {
+            throw new DomainValidationException(
+                $"A website chat widget may be allowed on at most {MaxAllowedOrigins} websites; "
+                + $"{distinct.Count} were supplied.");
+        }
+
+        Widget = widget;
+
+        // Rows that are staying are left alone, so the instant somebody first
+        // approved a website survives an unrelated change of accent colour.
+        _allowedOrigins.RemoveAll(existing => !distinct.Contains(existing.Origin));
+
+        foreach (WebChatOrigin origin in distinct)
+        {
+            if (!_allowedOrigins.Exists(existing => existing.Origin == origin))
+            {
+                _allowedOrigins.Add(
+                    WebChatAllowedOrigin.For(Id, TenantId, origin, instant));
+            }
+        }
+
+        RecordChange(instant);
+    }
+
+    /// <summary>
+    /// Whether this widget may be embedded on a website.
+    /// </summary>
+    /// <remarks>
+    /// Exact canonical comparison against the stored list. No prefix matching, no
+    /// suffix matching, no wildcards -- the whole point of canonicalising on the
+    /// way in is that this can be equality and nothing cleverer.
+    /// </remarks>
+    public bool Allows(WebChatOrigin? origin) =>
+        origin is not null && _allowedOrigins.Exists(allowed => allowed.Origin == origin);
+
+    /// <summary>
+    /// Restores the approved websites from storage.
+    /// </summary>
+    /// <remarks>
+    /// For the persistence layer only. It performs no validation because the rows
+    /// it replays were validated when they were written, and re-running the rules
+    /// on read would mean a tightened rule silently emptied somebody's list.
+    /// </remarks>
+    public void RestoreAllowedOrigins(IEnumerable<WebChatAllowedOrigin> origins)
+    {
+        ArgumentNullException.ThrowIfNull(origins);
+
+        _allowedOrigins.Clear();
+        _allowedOrigins.AddRange(origins);
+    }
 
     /// <summary>
     /// Puts the endpoint into service. Idempotent.

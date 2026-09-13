@@ -61,9 +61,13 @@ public sealed class WebChatSession
         WebChatEndpointId endpointId,
         AiAgentId aiAgentId,
         WebChatAccessTokenHash accessTokenHash,
+        WebChatClientMode mode,
+        WebChatOrigin? embeddedOrigin,
         DateTimeOffset createdAt,
         DateTimeOffset expiresAt)
     {
+        Mode = mode;
+        EmbeddedOrigin = embeddedOrigin;
         ConversationId = conversationId;
         TenantId = tenantId;
         EndpointId = endpointId;
@@ -95,6 +99,39 @@ public sealed class WebChatSession
     /// <summary>The digest of the visitor's credential. The raw secret is never here.</summary>
     public WebChatAccessTokenHash AccessTokenHash { get; }
 
+    /// <summary>
+    /// Which transport opened this session, and therefore which may use it.
+    /// </summary>
+    /// <remarks>
+    /// Checked before the credential is compared. A hosted cookie arriving at an
+    /// embedded route and an embedded credential arriving at a hosted one are both
+    /// refused here, so neither transport can ever be authenticated by the other's
+    /// secret.
+    /// </remarks>
+    public WebChatClientMode Mode { get; }
+
+    /// <summary>
+    /// The website this embedded session was opened from, or <c>null</c> for a
+    /// hosted one.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The canonical origin only -- never the full address of the page. A path can
+    /// carry an order number, a search term or a customer identifier, and none of
+    /// that is any of this platform's business. The origin is what the browser
+    /// reports and what the allowlist is written in.
+    /// </para>
+    /// <para>
+    /// Stored so it can be re-checked. When somebody removes a website from the
+    /// allowlist, the sessions already open on it have to stop working, and
+    /// answering that question needs to know where each one came from.
+    /// </para>
+    /// </remarks>
+    public WebChatOrigin? EmbeddedOrigin { get; }
+
+    /// <summary>Whether this session belongs to a widget on a customer's website.</summary>
+    public bool IsEmbedded => Mode == WebChatClientMode.Embedded;
+
     /// <summary>When the visitor started, in UTC.</summary>
     public DateTimeOffset CreatedAt { get; }
 
@@ -113,12 +150,102 @@ public sealed class WebChatSession
     /// An identifier is empty, the digest is missing, or the instant is not a
     /// real point in time.
     /// </exception>
+    /// <summary>
+    /// Opens a session for the page OmniAI hosts itself.
+    /// </summary>
+    /// <remarks>
+    /// Unchanged from Phase 15 in everything it does; the mode it records is what
+    /// keeps its cookie from ever being accepted by the embedded routes.
+    /// </remarks>
     public static WebChatSession Open(
         ConversationId conversationId,
         TenantId tenantId,
         WebChatEndpointId endpointId,
         AiAgentId aiAgentId,
         WebChatAccessTokenHash accessTokenHash,
+        DateTimeOffset createdAt,
+        DateTimeOffset expiresAt) =>
+        OpenCore(
+            conversationId,
+            tenantId,
+            endpointId,
+            aiAgentId,
+            accessTokenHash,
+            WebChatClientMode.Hosted,
+            embeddedOrigin: null,
+            createdAt,
+            expiresAt);
+
+    /// <summary>
+    /// Opens a session for a widget embedded on a customer's website.
+    /// </summary>
+    /// <remarks>
+    /// The origin is required and is the canonical one the browser reported. A
+    /// session that did not know where it came from could not be revoked when that
+    /// website is removed from the allowlist, so there is no way to open one
+    /// without it.
+    /// </remarks>
+    public static WebChatSession OpenEmbedded(
+        ConversationId conversationId,
+        TenantId tenantId,
+        WebChatEndpointId endpointId,
+        AiAgentId aiAgentId,
+        WebChatAccessTokenHash accessTokenHash,
+        WebChatOrigin embeddedOrigin,
+        DateTimeOffset createdAt,
+        DateTimeOffset expiresAt)
+    {
+        ArgumentNullException.ThrowIfNull(embeddedOrigin);
+
+        return OpenCore(
+            conversationId,
+            tenantId,
+            endpointId,
+            aiAgentId,
+            accessTokenHash,
+            WebChatClientMode.Embedded,
+            embeddedOrigin,
+            createdAt,
+            expiresAt);
+    }
+
+    /// <summary>
+    /// Rebuilds a session from storage.
+    /// </summary>
+    /// <remarks>
+    /// Present so persistence can restore a row exactly as it was written. It runs
+    /// the same invariant check on mode and origin, because a row that disagreed
+    /// with itself would be a row the runtime could not reason about.
+    /// </remarks>
+    public static WebChatSession Restore(
+        ConversationId conversationId,
+        TenantId tenantId,
+        WebChatEndpointId endpointId,
+        AiAgentId aiAgentId,
+        WebChatAccessTokenHash accessTokenHash,
+        WebChatClientMode mode,
+        WebChatOrigin? embeddedOrigin,
+        DateTimeOffset createdAt,
+        DateTimeOffset expiresAt) =>
+        OpenCore(
+            conversationId,
+            tenantId,
+            endpointId,
+            aiAgentId,
+            accessTokenHash,
+            mode,
+            embeddedOrigin,
+            createdAt,
+            expiresAt);
+
+    private static WebChatSession OpenCore(
+        ConversationId conversationId,
+        TenantId tenantId,
+        WebChatEndpointId endpointId,
+        AiAgentId aiAgentId,
+        WebChatAccessTokenHash accessTokenHash,
+        WebChatClientMode mode,
+        WebChatOrigin? embeddedOrigin,
         DateTimeOffset createdAt,
         DateTimeOffset expiresAt)
     {
@@ -158,12 +285,29 @@ public sealed class WebChatSession
                 "A web chat session must expire after it was created.");
         }
 
+        // Mode and origin are one fact, not two. An embedded session that does not
+        // know its website cannot be revoked with that website; a hosted one that
+        // claims a website is claiming something that never happened.
+        if (mode == WebChatClientMode.Embedded && embeddedOrigin is null)
+        {
+            throw new DomainValidationException(
+                "An embedded web chat session must record the website it was opened from.");
+        }
+
+        if (mode == WebChatClientMode.Hosted && embeddedOrigin is not null)
+        {
+            throw new DomainValidationException(
+                "A hosted web chat session has no embedding website.");
+        }
+
         return new WebChatSession(
             conversationId,
             tenantId,
             endpointId,
             aiAgentId,
             accessTokenHash,
+            mode,
+            embeddedOrigin,
             createdAt.ToUniversalTime(),
             expiresAt.ToUniversalTime());
     }
@@ -179,6 +323,16 @@ public sealed class WebChatSession
     /// </remarks>
     public bool Admits(WebChatAccessTokenHash? presented) =>
         presented is not null && AccessTokenHash == presented;
+
+    /// <summary>
+    /// Whether this session may be used through a given transport.
+    /// </summary>
+    /// <remarks>
+    /// The structural half of the check, asked before the credential is compared
+    /// at all. Presenting the right secret through the wrong door is still the
+    /// wrong door.
+    /// </remarks>
+    public bool AdmitsMode(WebChatClientMode mode) => Mode == mode;
 
     /// <summary>
     /// Whether this claim has run out at the given instant.

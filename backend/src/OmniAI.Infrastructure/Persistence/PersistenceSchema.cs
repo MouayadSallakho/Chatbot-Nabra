@@ -86,4 +86,7 @@ internal static class PersistenceSchema
     /// disagrees.
     /// </remarks>
     public const string KnowledgeContentFingerprint = "ContentFingerprint";
+
+    /// <summary>The table holding the websites a widget may be embedded on.</summary>
+    public const string WebChatAllowedOriginsTable = "web_chat_allowed_origins";
 }

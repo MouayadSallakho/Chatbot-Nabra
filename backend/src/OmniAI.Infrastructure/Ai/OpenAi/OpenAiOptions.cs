@@ -30,6 +30,30 @@ internal sealed class OpenAiOptions
     public const string ApiKeyVariable = "OPENAI_API_KEY";
 
     /// <summary>
+    /// The Development-only opt-in that permits paid provider traffic.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <strong>A developer machine usually has a key in its environment for some
+    /// other reason.</strong> Anything started from that shell inherits it, so
+    /// "no key is configured" is not a state a developer can rely on having: a
+    /// verification run that was supposed to exercise the refusal path silently
+    /// spends money instead, and the only symptom is that it worked.
+    /// </para>
+    /// <para>
+    /// So in Development the key is necessary but not sufficient. This variable
+    /// must also be exactly <c>"1"</c>, which is a thing somebody can only do on
+    /// purpose. Outside Development it is not consulted at all — production
+    /// configures its provider deliberately, and requiring a second flag there
+    /// would be a way to take a live deployment offline by forgetting it.
+    /// </para>
+    /// </remarks>
+    public const string LiveProviderOptInVariable = "OMNIAI_LIVE_OPENAI";
+
+    /// <summary>The only value of that variable which permits live traffic.</summary>
+    public const string LiveProviderOptInValue = "1";
+
+    /// <summary>
     /// The model that answers preview requests.
     /// </summary>
     /// <remarks>

@@ -25,6 +25,45 @@ export interface WebChatEndpoint {
   readonly updatedAt: string;
 }
 
+/** The four appearance settings a workspace may choose. */
+export interface WebChatWidget {
+  readonly greeting: string | null;
+  readonly accentColor: string;
+  readonly launcherPosition: 'Left' | 'Right';
+  readonly theme: 'System' | 'Light' | 'Dark';
+}
+
+/** Everything the widget configuration screen reads. */
+export interface WebChatWidgetConfiguration {
+  readonly id: string;
+  readonly publicKey: string;
+  readonly status: WebChatEndpointStatus;
+  readonly widget: WebChatWidget;
+  /** The websites this widget may be embedded on. Exact origins, nothing else. */
+  readonly allowedOrigins: readonly string[];
+  readonly maxAllowedOrigins: number;
+  /** The exact text to paste into a website, composed by the server. */
+  readonly installSnippet: string;
+  readonly loaderUrl: string;
+}
+
+/**
+ * What replacing a widget's configuration sends.
+ *
+ * The whole intended list of websites, not a difference. The screen read the
+ * current list, somebody added and removed, and this is what they now want --
+ * computing a change on the client would mean computing it from a view that may
+ * already be out of date, and an origin somebody thought they had removed still
+ * being allowed is exactly the failure this list exists to prevent.
+ */
+export interface UpdateWebChatWidgetRequest {
+  readonly greeting: string | null;
+  readonly accentColor: string;
+  readonly launcherPosition: 'Left' | 'Right';
+  readonly theme: 'System' | 'Light' | 'Dark';
+  readonly allowedOrigins: readonly string[];
+}
+
 /**
  * Administering this workspace's website chat.
  *
@@ -75,6 +114,42 @@ export class WebChatAdminApi {
       .post<WebChatEndpoint>(
         `/api/tenants/${tenantId}/website-chat/${endpointId}/${activate ? 'activate' : 'disable'}`,
         {},
+        { observe: 'response', headers: { 'If-Match': version } },
+      )
+      .pipe(map(withEntityTag));
+  }
+
+  /** The widget's appearance, its websites, and the install snippet. */
+  getWidget(
+    tenantId: string,
+    endpointId: string,
+  ): Observable<Versioned<WebChatWidgetConfiguration>> {
+    return this.http
+      .get<WebChatWidgetConfiguration>(
+        `/api/tenants/${tenantId}/website-chat/${endpointId}/widget`,
+        { observe: 'response' },
+      )
+      .pipe(map(withEntityTag));
+  }
+
+  /**
+   * Replaces the widget's configuration, if it is still at this version.
+   *
+   * Conditional like every other write here, and for a stronger reason than
+   * usual: removing a website is a security action, and one applied to a version
+   * somebody else has already replaced is an action that did not do what the
+   * person intended.
+   */
+  updateWidget(
+    tenantId: string,
+    endpointId: string,
+    request: UpdateWebChatWidgetRequest,
+    version: string,
+  ): Observable<Versioned<WebChatWidgetConfiguration>> {
+    return this.http
+      .put<WebChatWidgetConfiguration>(
+        `/api/tenants/${tenantId}/website-chat/${endpointId}/widget`,
+        request,
         { observe: 'response', headers: { 'If-Match': version } },
       )
       .pipe(map(withEntityTag));

@@ -13,4 +13,15 @@
     <ProjectReference Include="..\OmniAI.Infrastructure\OmniAI.Infrastructure.csproj" />
   </ItemGroup>
 
+
+  <!--
+    The widget loader, compiled into the assembly and served by
+    WidgetLoaderEndpoints. An embedded resource rather than a file under a static
+    root: this application has no static-file middleware, and serving a directory
+    would mean serving whatever ends up in it.
+  -->
+  <ItemGroup>
+    <EmbeddedResource Include="Widget\v1.js" LogicalName="OmniAI.Api.Widget.v1.js" />
+  </ItemGroup>
+
 </Project>

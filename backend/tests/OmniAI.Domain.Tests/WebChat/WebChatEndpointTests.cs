@@ -117,6 +117,7 @@ public sealed class WebChatEndpointTests
             Agent,
             Key(),
             WebChatEndpointStatus.Disabled,
+            WebChatWidgetSettings.Default,
             Noon,
             Noon.AddDays(1));
 

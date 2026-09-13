@@ -121,6 +121,25 @@ internal static class PersistenceConverters
     public static readonly ValueConverter<WebChatPublicKey, string> WebChatPublicKey =
         new(key => key.Value, value => Domain.WebChat.WebChatPublicKey.Create(value));
 
+    public static readonly ValueConverter<WebChatOrigin, string> WebChatOrigin =
+        new(origin => origin.Value, value => Domain.WebChat.WebChatOrigin.Create(value));
+
+    // Nullable on both sides: a hosted session has no embedding website, and null
+    // is what "not embedded anywhere" means. A converter that mapped null to an
+    // empty string would make the two indistinguishable.
+    public static readonly ValueConverter<WebChatOrigin?, string?> NullableWebChatOrigin =
+        new(
+            origin => origin == null ? null : origin.Value,
+            value => value == null ? null : Domain.WebChat.WebChatOrigin.Create(value));
+
+    public static readonly ValueConverter<WebChatAccentColor, string> WebChatAccentColor =
+        new(colour => colour.Value, value => Domain.WebChat.WebChatAccentColor.Create(value));
+
+    public static readonly ValueConverter<WebChatGreeting?, string?> NullableWebChatGreeting =
+        new(
+            greeting => greeting == null ? null : greeting.Value,
+            value => Domain.WebChat.WebChatGreeting.CreateOrNone(value));
+
     /// <summary>
     /// A client's idempotency key, stored as the text it sent.
     /// </summary>

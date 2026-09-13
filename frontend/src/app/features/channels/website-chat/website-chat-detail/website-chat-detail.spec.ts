@@ -68,6 +68,35 @@ describe('WebsiteChatDetail', () => {
   const host = (): HTMLElement => fixture.nativeElement as HTMLElement;
   const text = (): string => host().textContent ?? '';
 
+  /**
+   * The widget section's own read.
+   *
+   * It is a child of this page with its own request and its own version, so every
+   * render of the page makes exactly one of these. Flushing it here keeps these
+   * tests about the page while still proving the section is mounted.
+   */
+  async function flushWidget(etag = '"v1"'): Promise<void> {
+    http.expectOne(`${url}/widget`).flush(
+      {
+        id: endpointId,
+        publicKey: 'aaaaaaaaaaaaaaaaaaaaaa',
+        status: 'Active',
+        widget: {
+          greeting: null,
+          accentColor: '#2563eb',
+          launcherPosition: 'Right',
+          theme: 'System',
+        },
+        allowedOrigins: [],
+        maxAllowedOrigins: 20,
+        installSnippet: '<script async src="https://omniai.test/widget/v1.js"></script>',
+        loaderUrl: 'https://omniai.test/widget/v1.js',
+      },
+      { headers: { ETag: etag } },
+    );
+    await settle();
+  }
+
   const button = (label: string): HTMLButtonElement | undefined =>
     [...host().querySelectorAll('button')].find((candidate) =>
       candidate.textContent?.includes(label),
@@ -80,6 +109,7 @@ describe('WebsiteChatDetail', () => {
 
     http.expectOne(url).flush(endpoint('Active'), { headers: { ETag: '"v1"' } });
     await settle();
+    await flushWidget();
 
     expect(text()).toContain(`/chat/aaaaaaaaaaaaaaaaaaaaaa`);
     expect(button('Copy chat link')).toBeTruthy();
@@ -90,6 +120,7 @@ describe('WebsiteChatDetail', () => {
 
     http.expectOne(url).flush(endpoint('Draft'), { headers: { ETag: '"v1"' } });
     await settle();
+    await flushWidget();
 
     button('Publish chat')!.click();
     await settle();
@@ -100,6 +131,10 @@ describe('WebsiteChatDetail', () => {
 
     request.flush(endpoint('Active'), { headers: { ETag: '"v2"' } });
     await settle();
+
+    // Publishing changed the same aggregate the widget section holds a version
+    // of, so it re-reads. It only does that because nothing was typed there.
+    await flushWidget('"v2"');
 
     expect(text()).toContain('Disable chat');
 
@@ -113,6 +148,7 @@ describe('WebsiteChatDetail', () => {
 
     disable.flush(endpoint('Draft'), { headers: { ETag: '"v3"' } });
     await settle();
+    await flushWidget('"v3"');
   });
 
   it('offers a deliberate reload after a stale write, and retries nothing', async () => {
@@ -120,6 +156,7 @@ describe('WebsiteChatDetail', () => {
 
     http.expectOne(url).flush(endpoint('Draft'), { headers: { ETag: '"v1"' } });
     await settle();
+    await flushWidget();
 
     button('Publish chat')!.click();
     await settle();
@@ -138,11 +175,38 @@ describe('WebsiteChatDetail', () => {
     // Nothing was retried: verify() in afterEach would fail on a second request.
   });
 
+  it('does not tear down the widget section when it re-reads after a change', async () => {
+    // Found in the browser: publishing re-read this endpoint, and flipping to the
+    // loading branch destroyed and re-created the widget section underneath the
+    // reader -- taking its "Saved." confirmation, and any part-typed allowlist,
+    // with it. A refresh of something already on screen is not a load.
+    await mount('website-chat.view', 'website-chat.manage');
+
+    http.expectOne(url).flush(endpoint('Draft'), { headers: { ETag: '"v1"' } });
+    await settle();
+    await flushWidget();
+
+    const section = host().querySelector('app-website-chat-widget');
+
+    expect(section).not.toBeNull();
+
+    button('Publish chat')!.click();
+    await settle();
+
+    http.expectOne(`${url}/activate`).flush(endpoint('Active'), { headers: { ETag: '"v2"' } });
+    await settle();
+    await flushWidget('"v2"');
+
+    expect(host().querySelector('.skeleton')).toBeNull();
+    expect(host().querySelector('app-website-chat-widget')).toBe(section);
+  });
+
   it('warns when publishing an endpoint whose agent is not active', async () => {
     await mount('website-chat.view', 'website-chat.manage');
 
     http.expectOne(url).flush(endpoint('Draft', 'Draft'), { headers: { ETag: '"v1"' } });
     await settle();
+    await flushWidget();
 
     expect(text()).toContain('Only an active agent answers visitors');
   });
@@ -152,6 +216,7 @@ describe('WebsiteChatDetail', () => {
 
     http.expectOne(url).flush(endpoint('Active'), { headers: { ETag: '"v1"' } });
     await settle();
+    await flushWidget();
 
     expect(text()).toContain('/chat/');
     expect(button('Disable chat')).toBeUndefined();

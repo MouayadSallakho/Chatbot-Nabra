@@ -1,3 +1,4 @@
+using OmniAI.Application.Concurrency;
 using OmniAI.Application.WebChat.Persistence;
 using OmniAI.Domain.Conversations;
 using OmniAI.Domain.WebChat;
@@ -37,11 +38,15 @@ namespace OmniAI.Application.WebChat.Hosted;
 /// </remarks>
 public sealed class PublicWebChatAccess(
     IWebChatRuntimeStore store,
+    IWebChatEndpointRepository endpoints,
     IWebChatAccessTokens tokens,
     TimeProvider clock)
 {
     private readonly IWebChatRuntimeStore _store =
         store ?? throw new ArgumentNullException(nameof(store));
+
+    private readonly IWebChatEndpointRepository _endpoints =
+        endpoints ?? throw new ArgumentNullException(nameof(endpoints));
 
     private readonly IWebChatAccessTokens _tokens =
         tokens ?? throw new ArgumentNullException(nameof(tokens));
@@ -62,9 +67,24 @@ public sealed class PublicWebChatAccess(
     /// malformed, belongs to a different conversation, names a conversation that
     /// does not exist, or opens one whose session has expired.
     /// </returns>
+    /// <remarks>
+    /// <para>
+    /// <strong>The transport is checked before the secret is compared.</strong> A
+    /// hosted cookie arriving at an embedded route, or an embedded credential
+    /// arriving at a hosted one, is refused outright. Without that the two would
+    /// share one authority surface and whichever was easier to attack would become
+    /// the strength of both.
+    /// </para>
+    /// <para>
+    /// <strong>An embedded session re-checks its website on every request.</strong>
+    /// The allowlist is read now rather than trusted from when the session opened,
+    /// so removing a website in the admin stops the widgets already open on it.
+    /// </para>
+    /// </remarks>
     public async Task<WebChatSession?> AuthoriseAsync(
         ConversationId conversationId,
         string? presentedToken,
+        WebChatClientMode mode,
         CancellationToken cancellationToken = default)
     {
         // Shape first, so a junk cookie costs a string comparison rather than a
@@ -86,7 +106,7 @@ public sealed class PublicWebChatAccess(
         // makes a credential useless anywhere but where it was issued: presenting
         // conversation A's secret against conversation B loads B's session, whose
         // digest does not match, and the answer is not-found.
-        if (session is null || !session.Admits(presented))
+        if (session is null || !session.AdmitsMode(mode) || !session.Admits(presented))
         {
             return null;
         }
@@ -105,6 +125,28 @@ public sealed class PublicWebChatAccess(
             return null;
         }
 
+        // Last, because it costs a second query and only embedded sessions need
+        // it. A widget whose website has been removed from the allowlist stops
+        // here -- the conversation survives and stays visible in the admin,
+        // because the customer really did say those things.
+        if (session.IsEmbedded
+            && !await IsStillAllowedAsync(session, cancellationToken).ConfigureAwait(false))
+        {
+            return null;
+        }
+
         return session;
+    }
+
+    /// <summary>Whether this embedded session's website is still approved.</summary>
+    private async Task<bool> IsStillAllowedAsync(
+        WebChatSession session,
+        CancellationToken cancellationToken)
+    {
+        Versioned<WebChatEndpoint>? endpoint = await _endpoints
+            .FindAsync(session.TenantId, session.EndpointId, cancellationToken)
+            .ConfigureAwait(false);
+
+        return endpoint is not null && endpoint.Value.Allows(session.EmbeddedOrigin);
     }
 }

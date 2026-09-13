@@ -51,25 +51,25 @@ public sealed class ConversationContextPolicy
     public int MaxMessages { get; init; } = 40;
 
     /// <summary>
-    /// The most characters replayed on one turn, across all messages.
+    /// The most characters of conversation history replayed on one turn, across
+    /// all messages.
     /// </summary>
     /// <remarks>
-    /// Twenty-four thousand characters is a large conversation by any ordinary
-    /// measure and still a bounded request. It is counted over message text only:
-    /// the agent's instructions are sent separately and are never traded off
-    /// against history, because an agent that loses its instructions to make room
-    /// for chat stops being the agent the workspace configured.
-    /// </remarks>
-    /// <summary>
-    /// The most characters of conversation history one request may carry.
-    /// </summary>
-    /// <remarks>
+    /// <para>
+    /// Sixteen thousand characters is a large conversation by any ordinary measure
+    /// and still a bounded request. It is counted over message text only: the
+    /// agent's instructions are sent separately and are never traded off against
+    /// history, because an agent that loses its instructions to make room for chat
+    /// stops being the agent the workspace configured.
+    /// </para>
+    /// <para>
     /// <strong>Reduced from 24,000 when knowledge retrieval arrived, deliberately.</strong>
     /// Knowledge may contribute up to 8,000 characters of its own, and leaving
     /// this at 24,000 would have raised the size -- and therefore the cost -- of
     /// every grounded turn by half without anybody deciding to. The combined
     /// budget is what it always was: 16,000 of history plus 8,000 of knowledge is
     /// the same 24,000 this platform sent before any of this existed.
+    /// </para>
     /// <para>
     /// Whole messages are dropped from the oldest end when the window is tight,
     /// never shortened, and the order they are sent in stays ingestion order.

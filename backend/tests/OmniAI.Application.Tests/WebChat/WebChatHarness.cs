@@ -3,6 +3,7 @@ using OmniAI.Application.Knowledge;
 using OmniAI.Application.Tests.Knowledge;
 using OmniAI.Application.Tests.AiAgents;
 using OmniAI.Application.WebChat;
+using OmniAI.Application.WebChat.Embedded;
 using OmniAI.Application.WebChat.Hosted;
 using OmniAI.Application.WebChat.Protection;
 using OmniAI.Domain.AiAgents;
@@ -65,6 +66,16 @@ internal sealed class Harness
     public required SendWebChatMessageHandler Send { get; init; }
 
     public required ListWebChatMessagesHandler List { get; init; }
+
+    /// <summary>
+    /// The embedded widget's doorway.
+    /// </summary>
+    /// <remarks>
+    /// Built from the same collaborators as the hosted handlers, because it is the
+    /// same runtime reached by a different transport. A separate arrangement would
+    /// be a second world in which the two could agree while production disagreed.
+    /// </remarks>
+    public required EmbeddedWebChatHandler Embed { get; init; }
 
     public required WebChatEndpoint Endpoint { get; init; }
 
@@ -149,7 +160,11 @@ internal sealed class Harness
         FakePublicChatProtection guard = protection ?? new FakePublicChatProtection();
         PublicChatProtectionOptions bounds = limits ?? new PublicChatProtectionOptions();
         FixedTimeProvider time = clock ?? new FixedTimeProvider(Noon);
-        PublicWebChatAccess access = new(world, tokens, time);
+        // The endpoint repository is passed as well as the runtime store: an
+        // embedded session is re-checked against its endpoint's allowlist on every
+        // turn, so revoking a website takes effect at once rather than when the
+        // session happens to expire.
+        PublicWebChatAccess access = new(world, world, tokens, time);
 
         FakeKnowledgeSearchStore library = knowledge ?? new FakeKnowledgeSearchStore();
         RecordingEmbeddingGenerator embedder = embeddings ?? new RecordingEmbeddingGenerator();
@@ -195,6 +210,7 @@ internal sealed class Harness
                 chatPolicy,
                 time),
             List = new ListWebChatMessagesHandler(access, world, chatPolicy),
+            Embed = new EmbeddedWebChatHandler(world, world, tokens, guard, bounds, time),
         };
     }
 
@@ -216,6 +232,46 @@ internal sealed class Harness
         string? clientMessageId,
         string? text) =>
         new(conversationId, accessToken, clientMessageId, text, Visitor);
+
+    /// <summary>A send command from a widget embedded on a customer's website.</summary>
+    public static SendWebChatMessageCommand SendingEmbedded(
+        Guid conversationId,
+        string? accessToken,
+        string? clientMessageId,
+        string? text) =>
+        new(
+            conversationId,
+            accessToken,
+            clientMessageId,
+            text,
+            Visitor,
+            WebChatClientMode.Embedded);
+
+    /// <summary>A transcript read from an embedded widget.</summary>
+    public static ListWebChatMessagesQuery ListingEmbedded(
+        Guid conversationId,
+        string? accessToken) =>
+        new(conversationId, accessToken, null, null, WebChatClientMode.Embedded);
+
+    /// <summary>Approves one website on this scenario's endpoint.</summary>
+    public void Allow(params string[] origins)
+    {
+        Endpoint.Configure(
+            Endpoint.Widget,
+            [.. origins.Select(WebChatOrigin.Create)],
+            Clock.GetUtcNow());
+    }
+
+    /// <summary>Starts an embedded conversation from an approved website.</summary>
+    public async Task<StartedEmbeddedConversation> StartEmbeddedAsync(string origin)
+    {
+        StartedEmbeddedConversation? started = await Embed.StartAsync(
+            new StartEmbeddedConversationCommand(Endpoint.PublicKey.Value, origin, Visitor));
+
+        Assert.NotNull(started);
+
+        return started;
+    }
 
     /// <summary>Starts a conversation on this scenario's endpoint.</summary>
     public async Task<StartedWebChatSession> StartAsync()
