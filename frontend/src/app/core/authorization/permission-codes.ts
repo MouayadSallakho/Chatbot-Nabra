@@ -35,6 +35,8 @@ export type PermissionCode =
   | 'conversations.assign'
   | 'website-chat.view'
   | 'website-chat.manage'
+  | 'whatsapp.view'
+  | 'whatsapp.manage'
   | 'knowledge.view'
   | 'knowledge.manage';
 

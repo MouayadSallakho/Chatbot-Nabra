@@ -1,0 +1,183 @@
+<div class="page">
+  @if (!canView()) {
+    <app-page-header heading="WhatsApp" />
+
+    <div class="page-section">
+      <div class="card">
+        <app-empty-state
+          icon="channels"
+          heading="You do not have access to WhatsApp"
+          description="Seeing how this workspace's WhatsApp numbers are set up needs a permission your roles do not include. Ask somebody who administers this workspace if you need it."
+        />
+      </div>
+    </div>
+  } @else {
+    <app-page-header
+      heading="WhatsApp"
+      description="Numbers customers can message you on. Each number connects to one AI agent, and conversations arrive in the same inbox as every other channel."
+    >
+      <a pageActions class="btn btn-secondary" routerLink="/channels">Back to channels</a>
+    </app-page-header>
+
+    @if (loading()) {
+      <div class="page-section" aria-busy="true">
+        <p class="visually-hidden" role="status">Loading WhatsApp numbers…</p>
+        <div class="card card-body">
+          <span class="skeleton skeleton-title"></span>
+          <span class="skeleton skeleton-text"></span>
+        </div>
+      </div>
+    } @else if (failure(); as error) {
+      <div class="page-section">
+        <div class="card">
+          <app-empty-state
+            icon="alert"
+            tone="error"
+            heading="Could not load WhatsApp numbers"
+            [description]="error.message"
+          >
+            <button stateActions type="button" class="btn btn-secondary btn-sm" (click)="load()">
+              Try again
+            </button>
+          </app-empty-state>
+        </div>
+      </div>
+    } @else {
+      <div class="page-section">
+        <h2 class="text-section-title">Connected numbers</h2>
+
+        @if (connections().length === 0) {
+          <div class="card">
+            <app-empty-state
+              icon="channels"
+              heading="No numbers connected yet"
+              description="Connect one below to let customers reach an AI agent on WhatsApp."
+            />
+          </div>
+        } @else {
+          <ul class="connection-list">
+            @for (connection of connections(); track connection.id) {
+              <li>
+                <a class="connection" [routerLink]="['/channels/whatsapp', connection.id]">
+                  <span class="connection-name">
+                    {{ connection.displayPhoneNumber || connection.phoneNumberId }}
+                  </span>
+
+                  <span class="text-small text-secondary connection-agent">
+                    {{ connection.aiAgentName || 'Agent removed' }}
+                  </span>
+
+                  <span
+                    class="badge"
+                    [class.badge-success]="connection.status === 'Active'"
+                    [class.badge-neutral]="connection.status !== 'Active'"
+                  >
+                    {{ connection.status }}
+                  </span>
+
+                  @if (!connection.hasCredential) {
+                    <span class="badge badge-warning">No access token</span>
+                  }
+
+                  <span class="connection-chevron" aria-hidden="true">›</span>
+                </a>
+              </li>
+            }
+          </ul>
+        }
+      </div>
+
+      @if (canManage()) {
+        <div class="page-section">
+          <h2 class="text-section-title">Connect a number</h2>
+          <p class="text-small text-secondary section-note">
+            A new connection is created switched off. Add its access token on the connection's own
+            page, then put it into service — so a mistyped number is never live the moment it is
+            saved.
+          </p>
+
+          <div class="card card-body create">
+            <label class="field">
+              <span class="text-label">AI agent</span>
+              <select
+                class="form-select"
+                [value]="agentId()"
+                (change)="agentId.set($any($event.target).value)"
+              >
+                <option value="">Choose an agent…</option>
+                @for (agent of agentOptions(); track agent.id) {
+                  <option [value]="agent.id">{{ agent.name }} — {{ agent.status }}</option>
+                }
+              </select>
+            </label>
+
+            <label class="field">
+              <span class="text-label">WhatsApp Business Account ID</span>
+              <input
+                class="form-control"
+                type="text"
+                inputmode="numeric"
+                autocomplete="off"
+                [value]="wabaId()"
+                (input)="wabaId.set($any($event.target).value)"
+                aria-describedby="waba-hint"
+              />
+              <span id="waba-hint" class="text-small text-muted">
+                Digits only, from your Meta app's WhatsApp settings.
+              </span>
+            </label>
+
+            <label class="field">
+              <span class="text-label">Phone number ID</span>
+              <input
+                class="form-control"
+                type="text"
+                inputmode="numeric"
+                autocomplete="off"
+                [value]="phoneNumberId()"
+                (input)="phoneNumberId.set($any($event.target).value)"
+                aria-describedby="phone-id-hint"
+              />
+              <span id="phone-id-hint" class="text-small text-muted">
+                Digits only. This is the identifier Meta sends with every message, not the phone
+                number itself — it is how an incoming message is matched to this workspace.
+              </span>
+            </label>
+
+            <label class="field">
+              <span class="text-label"
+                >Display number <span class="text-muted">(optional)</span></span
+              >
+              <input
+                class="form-control"
+                type="text"
+                autocomplete="off"
+                [value]="displayPhoneNumber()"
+                (input)="displayPhoneNumber.set($any($event.target).value)"
+                aria-describedby="display-hint"
+              />
+              <span id="display-hint" class="text-small text-muted">
+                Shown here so you can tell two numbers apart. It is never used for routing.
+              </span>
+            </label>
+
+            @if (createFailure(); as error) {
+              <p class="alert alert-danger" role="alert">{{ error.message }}</p>
+            }
+
+            <div class="form-actions">
+              <button
+                type="button"
+                class="btn btn-primary"
+                [disabled]="!ready() || creating()"
+                (click)="create()"
+              >
+                {{ creating() ? 'Connecting…' : 'Connect number' }}
+              </button>
+            </div>
+          </div>
+        </div>
+      }
+    }
+  }
+</div>

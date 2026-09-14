@@ -29,6 +29,11 @@
       script against Redis.
     -->
     <PackageReference Include="StackExchange.Redis" />
+    <!--
+      IHttpClientFactory for the WhatsApp Cloud API adapter. Like the OpenAI SDK
+      and the Redis client above, the vendor's transport stops in this project.
+    -->
+    <PackageReference Include="Microsoft.Extensions.Http" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>

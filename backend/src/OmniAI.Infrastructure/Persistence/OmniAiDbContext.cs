@@ -9,6 +9,7 @@ using OmniAI.Domain.Knowledge;
 using OmniAI.Domain.Tenants;
 using OmniAI.Domain.Users;
 using OmniAI.Domain.WebChat;
+using OmniAI.Domain.WhatsApp;
 using OmniAI.Infrastructure.Identity;
 
 namespace OmniAI.Infrastructure.Persistence;
@@ -134,6 +135,30 @@ public sealed class OmniAiDbContext(DbContextOptions<OmniAiDbContext> options)
     /// </remarks>
     public DbSet<AgentKnowledgeAssignment> AgentKnowledgeAssignments =>
         Set<AgentKnowledgeAssignment>();
+
+    public DbSet<WhatsAppConnection> WhatsAppConnections => Set<WhatsAppConnection>();
+
+    /// <summary>
+    /// Webhook messages the platform has accepted and not yet finished with.
+    /// </summary>
+    public DbSet<InboundWhatsAppMessage> InboundWhatsAppMessages =>
+        Set<InboundWhatsAppMessage>();
+
+    /// <summary>Messages owed to WhatsApp customers, and what became of them.</summary>
+    public DbSet<WhatsAppDelivery> WhatsAppDeliveries => Set<WhatsAppDelivery>();
+
+    /// <summary>Which conversation each WhatsApp customer is talking in.</summary>
+    public DbSet<WhatsAppContact> WhatsAppContacts => Set<WhatsAppContact>();
+
+    /// <summary>
+    /// The protected WhatsApp access tokens.
+    /// </summary>
+    /// <remarks>
+    /// Internal, unlike every other set here, and that is the point: a credential
+    /// should be reachable from one repository rather than from anything holding
+    /// a context. It is a set at all only because the rows need a table.
+    /// </remarks>
+    internal DbSet<WhatsAppCredentialRow> WhatsAppCredentials => Set<WhatsAppCredentialRow>();
 
     public override int SaveChanges()
     {

@@ -1,0 +1,269 @@
+<div class="page">
+  @if (!canView()) {
+    <app-page-header heading="WhatsApp number" />
+
+    <div class="page-section">
+      <div class="card">
+        <app-empty-state
+          icon="channels"
+          heading="You do not have access to WhatsApp"
+          description="Seeing how this workspace's WhatsApp numbers are set up needs a permission your roles do not include. Ask somebody who administers this workspace if you need it."
+        />
+      </div>
+    </div>
+  } @else if (loading()) {
+    <app-page-header heading="WhatsApp number" />
+
+    <div class="page-section" aria-busy="true">
+      <p class="visually-hidden" role="status">Loading this connection…</p>
+      <div class="card card-body">
+        <span class="skeleton skeleton-title"></span>
+        <span class="skeleton skeleton-text"></span>
+      </div>
+    </div>
+  } @else if (failure(); as error) {
+    <app-page-header heading="WhatsApp number" />
+
+    <div class="page-section">
+      <div class="card">
+        <app-empty-state
+          icon="alert"
+          tone="error"
+          heading="Could not load this connection"
+          [description]="error.message"
+        >
+          <button stateActions type="button" class="btn btn-secondary btn-sm" (click)="load()">
+            Try again
+          </button>
+        </app-empty-state>
+      </div>
+    </div>
+  } @else if (connection(); as current) {
+    <app-page-header
+      [heading]="current.displayPhoneNumber || current.phoneNumberId"
+      description="One WhatsApp number, one AI agent. Conversations on it appear in the shared inbox."
+    >
+      <a pageActions class="btn btn-secondary" routerLink="/channels/whatsapp">Back to WhatsApp</a>
+    </app-page-header>
+
+    <div class="page-section">
+      <div class="card card-body status-card">
+        <div class="status-row">
+          <span
+            class="badge"
+            [class.badge-success]="isActive()"
+            [class.badge-neutral]="!isActive()"
+            >{{ current.status }}</span
+          >
+
+          <span
+            class="badge"
+            [class.badge-success]="hasCredential()"
+            [class.badge-warning]="!hasCredential()"
+          >
+            Access token: {{ hasCredential() ? 'configured' : 'not configured' }}
+          </span>
+
+          <span class="text-small text-secondary">
+            Answered by {{ current.aiAgentName || 'an agent that no longer exists' }}
+          </span>
+        </div>
+
+        @if (stale()) {
+          <p class="alert alert-warning" role="alert">
+            This connection was updated somewhere else while you were editing. Your changes are
+            still here — reload to see the current settings, then save again if you still want them.
+            <button type="button" class="btn btn-secondary btn-sm" (click)="load()">Reload</button>
+          </p>
+        }
+
+        @if (saveFailure(); as error) {
+          <p class="alert alert-danger" role="alert">{{ error.message }}</p>
+        }
+
+        @if (canManage()) {
+          <div class="form-actions">
+            @if (isActive()) {
+              <button
+                type="button"
+                class="btn btn-secondary"
+                [disabled]="saving()"
+                (click)="setStatus(false)"
+              >
+                Take out of service
+              </button>
+            } @else {
+              <button
+                type="button"
+                class="btn btn-primary"
+                [disabled]="saving() || !hasCredential()"
+                (click)="setStatus(true)"
+              >
+                Put into service
+              </button>
+            }
+          </div>
+
+          @if (!hasCredential()) {
+            <p class="text-small text-muted">
+              Add an access token before putting this number into service. Without one it could
+              receive messages and never answer them.
+            </p>
+          }
+        }
+      </div>
+    </div>
+
+    <div class="page-section">
+      <h2 class="text-section-title">Access token</h2>
+      <p class="text-small text-secondary section-note">
+        Stored encrypted and never shown again — not here, and not by any part of this application.
+        If you lose it, enter a new one.
+      </p>
+
+      <div class="card card-body form">
+        <label class="field">
+          <span class="text-label">New access token</span>
+          <input
+            class="form-control"
+            type="password"
+            autocomplete="off"
+            spellcheck="false"
+            [value]="accessToken()"
+            [disabled]="!canManage()"
+            (input)="accessToken.set($any($event.target).value)"
+            aria-describedby="token-hint"
+          />
+          <span id="token-hint" class="text-small text-muted">
+            From your Meta app. Entering a new one replaces whatever is stored.
+          </span>
+        </label>
+
+        @if (credentialStale()) {
+          <p class="alert alert-warning" role="alert">
+            This connection was updated somewhere else. Reload, then enter the token again.
+            <button type="button" class="btn btn-secondary btn-sm" (click)="load()">Reload</button>
+          </p>
+        }
+
+        @if (credentialFailure(); as error) {
+          <p class="alert alert-danger" role="alert">{{ error.message }}</p>
+        }
+
+        @if (credentialSaved()) {
+          <p class="alert alert-success" role="status">
+            Saved. The token is stored encrypted and cannot be displayed again.
+          </p>
+        }
+
+        @if (canManage()) {
+          <div class="form-actions">
+            <button
+              type="button"
+              class="btn btn-primary"
+              [disabled]="accessToken().trim() === '' || credentialSaving()"
+              (click)="storeCredential()"
+            >
+              {{ credentialSaving() ? 'Saving…' : 'Save access token' }}
+            </button>
+          </div>
+        }
+      </div>
+    </div>
+
+    <div class="page-section">
+      <h2 class="text-section-title">Settings</h2>
+      <p class="text-small text-secondary section-note">
+        Take the number out of service before changing these: editing them while messages are
+        arriving would reroute a conversation mid-sentence.
+      </p>
+
+      <div class="card card-body form">
+        <label class="field">
+          <span class="text-label">AI agent</span>
+          <select
+            class="form-select"
+            [value]="agentId()"
+            [disabled]="!canManage() || isActive()"
+            (change)="agentId.set($any($event.target).value)"
+          >
+            @for (agent of agentOptions(); track agent.id) {
+              <option [value]="agent.id">{{ agent.name }} — {{ agent.status }}</option>
+            }
+          </select>
+        </label>
+
+        <label class="field">
+          <span class="text-label">WhatsApp Business Account ID</span>
+          <input
+            class="form-control"
+            type="text"
+            inputmode="numeric"
+            autocomplete="off"
+            [value]="wabaId()"
+            [disabled]="!canManage() || isActive()"
+            (input)="wabaId.set($any($event.target).value)"
+          />
+        </label>
+
+        <label class="field">
+          <span class="text-label">Phone number ID</span>
+          <input
+            class="form-control"
+            type="text"
+            inputmode="numeric"
+            autocomplete="off"
+            [value]="phoneNumberId()"
+            [disabled]="!canManage() || isActive()"
+            (input)="phoneNumberId.set($any($event.target).value)"
+          />
+        </label>
+
+        <label class="field">
+          <span class="text-label">Display number <span class="text-muted">(optional)</span></span>
+          <input
+            class="form-control"
+            type="text"
+            autocomplete="off"
+            [value]="displayPhoneNumber()"
+            [disabled]="!canManage() || isActive()"
+            (input)="displayPhoneNumber.set($any($event.target).value)"
+          />
+        </label>
+
+        @if (saved()) {
+          <p class="alert alert-success" role="status">Saved.</p>
+        }
+
+        @if (canManage()) {
+          <div class="form-actions">
+            <button
+              type="button"
+              class="btn btn-primary"
+              [disabled]="!ready() || saving() || isActive()"
+              (click)="save()"
+            >
+              {{ saving() ? 'Saving…' : 'Save settings' }}
+            </button>
+          </div>
+        }
+      </div>
+    </div>
+
+    <div class="page-section">
+      <h2 class="text-section-title">Webhook</h2>
+      <p class="text-small text-secondary section-note">
+        Point your Meta app's WhatsApp webhook at this address. It is a public route, defended by
+        the signature Meta sends with every request — it is not a secret and grants nothing.
+      </p>
+
+      <div class="card card-body">
+        <code class="webhook">{{ webhookUrl() }}</code>
+        <p class="text-small text-muted">
+          The app secret and the verify token are configured on the server by whoever runs this
+          deployment. They are the same for every workspace and are never entered here.
+        </p>
+      </div>
+    </div>
+  }
+</div>

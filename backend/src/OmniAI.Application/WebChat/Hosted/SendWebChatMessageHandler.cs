@@ -87,15 +87,9 @@ public sealed record SendWebChatMessageCommand(
 public sealed class SendWebChatMessageHandler(
     PublicWebChatAccess access,
     IWebChatEndpointRepository endpoints,
-    IWebChatRuntimeStore store,
-    IConversationRepository conversations,
     IAiAgentRepository agents,
-    IAiTextGenerator generator,
-    IConversationLock conversationLock,
+    CustomerTurnRunner runner,
     IPublicChatProtection protection,
-    IConversationRealtimeNotifier realtime,
-    KnowledgeRetriever knowledge,
-    ConversationContextPolicy context,
     WebChatPolicy policy,
     TimeProvider clock)
 {
@@ -105,32 +99,14 @@ public sealed class SendWebChatMessageHandler(
     private readonly IWebChatEndpointRepository _endpoints =
         endpoints ?? throw new ArgumentNullException(nameof(endpoints));
 
-    private readonly IWebChatRuntimeStore _store =
-        store ?? throw new ArgumentNullException(nameof(store));
-
-    private readonly IConversationRepository _conversations =
-        conversations ?? throw new ArgumentNullException(nameof(conversations));
-
     private readonly IAiAgentRepository _agents =
         agents ?? throw new ArgumentNullException(nameof(agents));
 
-    private readonly IAiTextGenerator _generator =
-        generator ?? throw new ArgumentNullException(nameof(generator));
-
-    private readonly IConversationLock _lock =
-        conversationLock ?? throw new ArgumentNullException(nameof(conversationLock));
+    private readonly CustomerTurnRunner _runner =
+        runner ?? throw new ArgumentNullException(nameof(runner));
 
     private readonly IPublicChatProtection _protection =
         protection ?? throw new ArgumentNullException(nameof(protection));
-
-    private readonly IConversationRealtimeNotifier _realtime =
-        realtime ?? throw new ArgumentNullException(nameof(realtime));
-
-    private readonly KnowledgeRetriever _knowledge =
-        knowledge ?? throw new ArgumentNullException(nameof(knowledge));
-
-    private readonly ConversationContextPolicy _context =
-        context ?? throw new ArgumentNullException(nameof(context));
 
     private readonly WebChatPolicy _policy =
         policy ?? throw new ArgumentNullException(nameof(policy));
@@ -197,359 +173,54 @@ public sealed class SendWebChatMessageHandler(
         AiAgent agent = await RequireServingAgentAsync(session, cancellationToken)
             .ConfigureAwait(false);
 
-        // The cheap path for the overwhelmingly common duplicate: a retry of a
-        // request whose answer was already produced. Answered without taking the
-        // lock, so a repeat never waits behind a live turn.
-        WebChatTurnResult? settled = await ReplayIfSettledAsync(
-                conversationId,
-                clientMessageId,
-                cancellationToken)
-            .ConfigureAwait(false);
-
-        if (settled is not null)
-        {
-            return settled;
-        }
-
-        await using IAsyncDisposable hold = await _lock
-            .AcquireAsync(conversationId.Value, cancellationToken)
-            .ConfigureAwait(false);
-
-        // Asked again inside the lock. The first check raced with anything already
-        // running; this one cannot, so two requests carrying the same id can never
-        // both go on to call the provider.
-        settled = await ReplayIfSettledAsync(conversationId, clientMessageId, cancellationToken)
-            .ConfigureAwait(false);
-
-        if (settled is not null)
-        {
-            return settled;
-        }
-
-        // Who is answering, read inside the lock. Earlier would be reading a
-        // value a takeover is free to change while this request queues, and
-        // acting on it would mean generating a reply for a conversation somebody
-        // has already taken over -- the exact contradiction the lock exists to
-        // rule out.
-        ConversationHandling handling =
-            await _store.ReadHandlingAsync(conversationId, cancellationToken).ConfigureAwait(false)
-            ?? ConversationHandling.Ai;
-
-        bool answeredByAi = handling == ConversationHandling.Ai;
-
-        // The expensive budget, consumed here and nowhere else: past both
-        // idempotency checks and inside the lock, so this request is the one that
-        // is genuinely about to call a provider. A duplicate never reaches this
-        // line -- it returned a replay above -- which is what makes the same
-        // message sent a hundred times cost one attempt.
+        // Everything from here is the conversation runtime rather than this
+        // transport: the idempotency replay, the advisory lock, the human-mode
+        // check, the customer message, retrieval and generation. It lives in
+        // CustomerTurnRunner so WhatsApp runs exactly the same code rather than
+        // a copy of it that could drift.
         //
-        // Before the customer's message is stored, so a refusal leaves no trace:
-        // no message, no turn, and nothing claiming a generation happened.
-        //
-        // Not consumed at all when a person is handling the conversation: the
-        // budget counts generation attempts, and there is not going to be one.
-        // Charging a workspace for turns its own staff answer by hand would make
-        // taking a conversation over cost money. The per-client request limit
-        // still applies -- it was checked above, before any of this -- so human
-        // mode is not a way around the protection, only around the part of it
-        // that meters spending.
-        if (answeredByAi)
-        {
-            await RequireAllowedAsync(() => _protection.AuthoriseGenerationAsync(
+        // What stays here is what only website chat knows: the network key, the
+        // per-client flood limit, the session credential, the serving endpoint,
+        // and the shape of the answer a browser expects.
+        CustomerTurnOutcome outcome = await _runner
+            .RunAsync(
+                new CustomerTurn(
                     session.TenantId,
                     conversationId,
-                    cancellationToken))
-                .ConfigureAwait(false);
-        }
-
-        DateTimeOffset now = _clock.GetUtcNow();
-
-        // Committed before the provider is called. What the customer said is a
-        // fact from the moment they said it, and it must outlive a failed reply.
-        ConversationTurn? turn = await _store
-            .BeginTurnAsync(conversationId, clientMessageId, text, now, cancellationToken)
-            .ConfigureAwait(false);
-
-        if (turn is null)
-        {
-            // The unique index refused it: a duplicate committed between the check
-            // above and this write. Nothing has been spent and nothing stored.
-            throw new WebChatTurnInProgressException();
-        }
-
-        if (!answeredByAi)
-        {
-            return await LeaveForHumanAsync(session, turn, text, now, cancellationToken)
-                .ConfigureAwait(false);
-        }
-
-        return await AnswerAsync(session, agent, turn, text, now, cancellationToken)
-            .ConfigureAwait(false);
-    }
-
-    /// <summary>
-    /// Closes a turn a person is going to answer, without retrieving or
-    /// generating anything.
-    /// </summary>
-    /// <remarks>
-    /// <strong>This is the whole of human mode on the customer's side.</strong>
-    /// The message is stored -- it was stored before this method was reached --
-    /// the turn is settled so a retry replays rather than restarts, and the
-    /// result says a person is handling it. No embedding is requested, no
-    /// provider is called, and nothing is spent.
-    /// <para>
-    /// <strong>It is a success, not a failure.</strong> Reporting 503 here
-    /// because the AI was deliberately bypassed would tell a visitor their
-    /// message did not arrive, when it did, and would put a non-incident into
-    /// every count of how often the runtime breaks.
-    /// </para>
-    /// <para>
-    /// The workspace is told, so whoever took the conversation over sees the new
-    /// message without doing anything. That announcement carries an identifier
-    /// and no text.
-    /// </para>
-    /// </remarks>
-    private async Task<WebChatTurnResult> LeaveForHumanAsync(
-        WebChatSession session,
-        ConversationTurn turn,
-        string text,
-        DateTimeOffset sentAt,
-        CancellationToken cancellationToken)
-    {
-        await _store
-            .SettleWithoutReplyAsync(turn, _clock.GetUtcNow(), cancellationToken)
-            .ConfigureAwait(false);
-
-        await _realtime
-            .AnnounceQuietlyAsync(session.TenantId, session.ConversationId, cancellationToken)
-            .ConfigureAwait(false);
-
-        return new WebChatTurnResult(
-            new PublicChatMessageView(
-                turn.CustomerMessageId.Value,
-                nameof(MessageSender.Customer),
-                text,
-                sentAt),
-            Reply: null,
-            nameof(ConversationHandling.Human));
-    }
-
-    /// <summary>
-    /// Produces the reply, and settles the turn either way.
-    /// </summary>
-    /// <remarks>
-    /// The customer's message is already stored and committed when this begins, so
-    /// every path out of here leaves a transcript that shows what they said.
-    /// </remarks>
-    private async Task<WebChatTurnResult> AnswerAsync(
-        WebChatSession session,
-        AiAgent agent,
-        ConversationTurn turn,
-        string text,
-        DateTimeOffset sentAt,
-        CancellationToken cancellationToken)
-    {
-        AiTextGenerationResult result;
-
-        try
-        {
-            // Inside the try, and that placement is the design. Building the
-            // request now includes retrieving knowledge, which means embedding the
-            // customer's message -- a call to a paid provider that can fail. When
-            // it does, the turn has to end up durably failed like any other
-            // provider failure: the customer's message stays, no reply is
-            // invented, and the same client message id cannot silently buy another
-            // attempt. Leaving this outside the try would have left the turn
-            // pending forever and the visitor waiting on a reply that was never
-            // coming.
-            AiTextGenerationRequest request = await BuildRequestAsync(
-                    session,
                     agent,
+                    clientMessageId,
                     text,
-                    cancellationToken)
-                .ConfigureAwait(false);
+                    _clock.GetUtcNow()),
 
-            result = await _generator
-                .GenerateAsync(request, cancellationToken)
-                .ConfigureAwait(false);
-
-            // The result type refuses blank text at construction, so an adapter
-            // cannot build one. It could still return null, which no contract can
-            // prevent, and a null dereference here would surface as an unexplained
-            // fault rather than as the upstream breach it is.
-            if (result is null)
-            {
-                throw new AiResponseInvalidException();
-            }
-        }
-        catch (Exception failure) when (failure is not OperationCanceledException)
-        {
-            // Recorded as failed, and the failure is then re-raised unchanged so
-            // the edge can translate it into the status the visitor deserves.
-            // Nothing is invented: no reply is stored, and no placeholder message
-            // appears in anybody's transcript.
-            await _store
-                .FailTurnAsync(turn, _clock.GetUtcNow(), CancellationToken.None)
-                .ConfigureAwait(false);
-
-            throw;
-        }
-
-        ConversationMessageRef reply = await _store
-            .CompleteTurnAsync(turn, result.Text, _clock.GetUtcNow(), cancellationToken)
+                // The expensive budget, consumed past both idempotency checks,
+                // inside the lock, and only when a provider is genuinely about
+                // to be called. Passed as a hook rather than built into the
+                // runner because it meters anonymous public traffic, which is a
+                // property of this transport and not of a conversation.
+                beforeGeneration: token => RequireAllowedAsync(
+                    () => _protection.AuthoriseGenerationAsync(
+                        session.TenantId,
+                        conversationId,
+                        token)),
+                cancellationToken)
             .ConfigureAwait(false);
 
-        // The workspace's own screens are watching this conversation too, and an
-        // AI turn changes it as much as a human one does.
-        await _realtime
-            .AnnounceQuietlyAsync(session.TenantId, session.ConversationId, cancellationToken)
-            .ConfigureAwait(false);
-
-        return new WebChatTurnResult(
-            new PublicChatMessageView(
-                turn.CustomerMessageId.Value,
-                nameof(MessageSender.Customer),
-                text,
-                sentAt),
-            ToView(reply, MessageSender.AiAgent),
-            nameof(ConversationHandling.Ai));
+        return ToTurnResult(outcome);
     }
 
     /// <summary>
-    /// Assembles the provider request from the agent's current configuration and
-    /// the conversation so far.
+    /// Shapes a runtime outcome into what a browser expects.
     /// </summary>
     /// <remarks>
-    /// <strong>The instructions are read now, not snapshotted when the
-    /// conversation started.</strong> A workspace that corrects its agent's
-    /// instructions expects the correction to take effect, and it does — from the
-    /// next turn onwards. Earlier replies are left as they were said, because
-    /// rewriting them would be rewriting history.
-    /// <para>
-    /// <strong>History is read in ingestion order and never sorted.</strong> The
-    /// tail is fetched, bounded by the context policy, and handed to the policy in
-    /// exactly the order the platform stored it.
-    /// </para>
+    /// The one thing this handler still does with an answered turn. A visitor's
+    /// client is told the customer's own message, the reply if there is one, and
+    /// who is answering — never an employee, never a workspace.
     /// </remarks>
-    private async Task<AiTextGenerationRequest> BuildRequestAsync(
-        WebChatSession session,
-        AiAgent agent,
-        string question,
-        CancellationToken cancellationToken)
-    {
-        // One more row than the policy will keep, so the policy always decides the
-        // boundary rather than inheriting whatever the query happened to return.
-        IReadOnlyList<ConversationMessageRecord> history = await _conversations
-            .ListRecentMessagesAsync(
-                session.ConversationId,
-                _context.MaxMessages + 1,
-                cancellationToken)
-            .ConfigureAwait(false);
-
-        IReadOnlyList<AiTurn> turns = _context.SelectTurns(history);
-
-        if (turns.Count == 0)
-        {
-            // Unreachable in practice: the customer's message was committed a
-            // moment ago and is always eligible. Raised rather than papered over,
-            // because an empty request would ask a provider to answer nothing and
-            // bill for it.
-            throw new AiResponseInvalidException();
-        }
-
-        // Retrieved after the customer's message is committed and after the
-        // generation budget has already been consumed, so a turn refused by Phase
-        // 16 costs no embedding call either. The retriever asks whether this agent
-        // has any eligible knowledge before it embeds anything, so an agent with
-        // none -- which is every agent until somebody assigns some -- reaches the
-        // provider exactly as it did before this feature existed.
-        //
-        // The customer's current message is the query. No rewriting, no history
-        // summarisation, no second model call: each of those is a design decision
-        // in its own right, and inventing one here would have been guessing.
-        IReadOnlyList<KnowledgeExcerpt> excerpts = await _knowledge
-            .RetrieveAsync(
-                session.TenantId,
-                session.AiAgentId,
-                question,
-                limit: null,
-                cancellationToken)
-            .ConfigureAwait(false);
-
-        GroundingItem[] grounding =
-        [
-            .. excerpts.Select(excerpt =>
-                GroundingItem.Create(excerpt.DocumentTitle, excerpt.Text)),
-        ];
-
-        // Three arguments, three privilege levels, and they never merge. The
-        // instructions are the workspace's own configuration; the turns are what
-        // was actually said; the grounding is untrusted reference material that
-        // the adapter renders through a channel carrying no authority.
-        return AiTextGenerationRequest.Create(agent.Instructions.Value, turns, grounding);
-    }
-
-    /// <summary>
-    /// The turn's stored outcome, when this message has already been dealt with.
-    /// </summary>
-    /// <returns>
-    /// The original result for a completed turn; <see langword="null"/> when this
-    /// message is new and should be answered.
-    /// </returns>
-    private async Task<WebChatTurnResult?> ReplayIfSettledAsync(
-        ConversationId conversationId,
-        ClientMessageId clientMessageId,
-        CancellationToken cancellationToken)
-    {
-        ConversationTurn? existing = await _store
-            .FindTurnAsync(conversationId, clientMessageId, cancellationToken)
-            .ConfigureAwait(false);
-
-        if (existing is null)
-        {
-            return null;
-        }
-
-        switch (existing.Status)
-        {
-            case ConversationTurnStatus.Completed:
-                ConversationMessageRef? reply = await _store
-                    .FindReplyAsync(existing, cancellationToken)
-                    .ConfigureAwait(false);
-
-                ConversationMessageRef? customer = await _store
-                    .FindCustomerMessageAsync(existing, cancellationToken)
-                    .ConfigureAwait(false);
-
-                if (customer is null)
-                {
-                    // Every completed turn names the message that started it.
-                    // Missing it means the rows have been tampered with, and
-                    // answering again would spend money to cover it up.
-                    throw new AiResponseInvalidException();
-                }
-
-                // A missing reply is not damage any more: a turn settled while a
-                // person was handling the conversation has no reply and never
-                // will. Replaying it returns exactly what the first attempt
-                // returned -- the customer's own message, and no answer.
-                return reply is null
-                    ? new WebChatTurnResult(
-                        ToView(customer, MessageSender.Customer),
-                        Reply: null,
-                        nameof(ConversationHandling.Human))
-                    : new WebChatTurnResult(
-                        ToView(customer, MessageSender.Customer),
-                        ToView(reply, MessageSender.AiAgent),
-                        nameof(ConversationHandling.Ai));
-
-            case ConversationTurnStatus.Failed:
-                throw new WebChatTurnAlreadyFailedException();
-
-            default:
-                throw new WebChatTurnInProgressException();
-        }
-    }
+    private static WebChatTurnResult ToTurnResult(CustomerTurnOutcome outcome) =>
+        new(
+            ToView(outcome.CustomerMessage, MessageSender.Customer),
+            outcome.Reply is null ? null : ToView(outcome.Reply, MessageSender.AiAgent),
+            outcome.Handling.ToString());
 
     /// <summary>
     /// The agent this conversation is bound to, if it may still answer.

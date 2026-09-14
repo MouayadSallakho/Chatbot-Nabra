@@ -98,6 +98,25 @@
     <PackageVersion Include="Microsoft.AspNetCore.SignalR.StackExchangeRedis" Version="10.0.11" />
   </ItemGroup>
 
+  <ItemGroup Label="Channels">
+    <!--
+      IHttpClientFactory, for the WhatsApp Cloud API adapter. Infrastructure
+      only: the Application asks for a text to reach a recipient and knows
+      nothing about Graph, bearer tokens or JSON envelopes.
+
+      A factory rather than a hand-built HttpClient because a long-lived client
+      pins DNS and a per-call one exhausts sockets, and because it is the
+      supported place to set a finite timeout and to switch automatic retries
+      off. No WhatsApp SDK is used: the surface this phase needs is one POST and
+      one webhook, and an unofficial wrapper would be a dependency between this
+      platform and Meta's documentation that nobody here controls.
+
+      10.0.11 matches the version every other Microsoft package here is pinned
+      to.
+    -->
+    <PackageVersion Include="Microsoft.Extensions.Http" Version="10.0.11" />
+  </ItemGroup>
+
   <ItemGroup Label="Testing">
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <!--

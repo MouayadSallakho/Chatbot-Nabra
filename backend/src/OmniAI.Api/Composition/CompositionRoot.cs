@@ -49,11 +49,13 @@ using OmniAI.Application.WebChat.ListWebChatEndpoints;
 using OmniAI.Application.WebChat.SetWebChatEndpointStatus;
 using OmniAI.Application.WebChat.UpdateWebChatWidget;
 using OmniAI.Application.WebChat;
+using OmniAI.Application.WhatsApp;
 using OmniAI.Application.Tenants.GetTenantById;
 using OmniAI.Application.Tenants.ListMyTenants;
 using OmniAI.Application.Tenants;
 using OmniAI.Infrastructure.DependencyInjection;
 using OmniAI.Infrastructure.Time;
+using OmniAI.Infrastructure.Security;
 using OmniAI.Infrastructure.WebChat.Protection;
 
 namespace OmniAI.Api.Composition;
@@ -111,6 +113,20 @@ internal static class CompositionRoot
         // Infrastructure decides how persistence is built; the composition root
         // only decides where its configuration comes from.
         services.AddOmniAiPersistence(configuration.GetConnectionString(DatabaseConnectionName));
+
+        // Authenticated encryption for the credentials this platform stores on a
+        // workspace's behalf. The ephemeral key is allowed in Development only:
+        // it makes the feature usable on a laptop without a key ceremony, and it
+        // is worthless for anything else because it is discarded on restart.
+        // Everywhere else a missing key means credentials cannot be stored at
+        // all, which is the safe failure.
+        services.AddOmniAiSecretProtection(
+            configuration,
+            allowEphemeralKey: environment.IsDevelopment());
+
+        // The WhatsApp channel: storage, the Meta transport, webhook security
+        // and the two background workers.
+        services.AddOmniAiWhatsApp(configuration);
 
         // The clock. TimeProvider is the BCL abstraction, so no third-party clock
         // package is involved and nothing in the Domain or Application had to invent
@@ -256,6 +272,24 @@ internal static class CompositionRoot
         services.AddScoped<ConversationHandoffHandler>();
         services.AddScoped<ConversationAssignmentHandler>();
         services.AddScoped<ReplyToConversationHandler>();
+
+        // The one orchestration both channels enter. Website chat and WhatsApp
+        // hand it a customer turn and get back the same outcome; neither has a
+        // copy of the lock, the replay check, retrieval or generation.
+        services.AddScoped<CustomerTurnRunner>();
+
+        // WhatsApp.
+        services.AddScoped<WhatsAppConnectionHandlers>();
+        services.AddScoped<ReceiveWhatsAppWebhookHandler>();
+        services.AddScoped<ProcessInboundWhatsAppHandler>();
+        services.AddScoped<DispatchWhatsAppDeliveryHandler>();
+        services.AddScoped<ReadWhatsAppConversationHandler>();
+
+        // What happens to a reply after it is stored, per channel. Website chat
+        // needs nothing -- the visitor is reading the transcript -- so the only
+        // implementation is the one that queues a WhatsApp delivery, and it is
+        // silent for every conversation that did not come from there.
+        services.AddScoped<IOutboundReplyDispatcher, WhatsAppReplyDispatcher>();
         services.AddScoped<IssueRealtimeTicketHandler>();
 
         // Resource policies. Singletons rather than constants read at each use

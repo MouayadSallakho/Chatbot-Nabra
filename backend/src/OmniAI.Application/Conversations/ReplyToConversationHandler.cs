@@ -59,6 +59,7 @@ public sealed class ReplyToConversationHandler(
     IConversationInboxStore store,
     IConversationLock conversationLock,
     IConversationRealtimeNotifier realtime,
+    IOutboundReplyDispatcher dispatcher,
     TimeProvider clock)
 {
     private readonly TenantAuthorizer _authorizer =
@@ -75,6 +76,9 @@ public sealed class ReplyToConversationHandler(
 
     private readonly IConversationRealtimeNotifier _realtime =
         realtime ?? throw new ArgumentNullException(nameof(realtime));
+
+    private readonly IOutboundReplyDispatcher _dispatcher =
+        dispatcher ?? throw new ArgumentNullException(nameof(dispatcher));
 
     private readonly TimeProvider _clock =
         clock ?? throw new ArgumentNullException(nameof(clock));
@@ -155,6 +159,22 @@ public sealed class ReplyToConversationHandler(
         // already re-read it.
         if (!outcome.WasAlreadyStored)
         {
+            // Arranged before the announcement, so a colleague who sees the reply
+            // appear is looking at something already queued for the customer
+            // rather than at a message the platform has not yet decided to send.
+            //
+            // For website chat this does nothing at all: the visitor's browser is
+            // already reading the transcript. For WhatsApp it queues a delivery
+            // the outbound worker will send.
+            await _dispatcher
+                .DispatchAsync(
+                    tenantId,
+                    conversationId,
+                    MessageId.From(outcome.Message.Id),
+                    outcome.Message.Text,
+                    cancellationToken)
+                .ConfigureAwait(false);
+
             await _realtime
                 .AnnounceQuietlyAsync(tenantId, conversationId, cancellationToken)
                 .ConfigureAwait(false);

@@ -6,6 +6,7 @@ using OmniAI.Api.Composition;
 using OmniAI.Api.Conversations;
 using OmniAI.Api.Knowledge;
 using OmniAI.Api.WebChat;
+using OmniAI.Api.WhatsApp;
 using OmniAI.Api.Security;
 using OmniAI.Api.Team;
 using OmniAI.Api.Tenants;
@@ -129,6 +130,7 @@ app.MapAiAgentEndpoints();
 // use case.
 app.MapKnowledgeEndpoints();
 app.MapWebChatEndpoints();
+app.MapWhatsAppEndpoints();
 
 // Reading the conversations customers have actually had. Read-only in this
 // release: there is no reply, no assignment and no handoff yet.
@@ -142,6 +144,10 @@ app.MapConversationEndpoints();
 app.MapHostedChatEndpoints();
 app.MapEmbeddedChatEndpoints();
 app.MapWidgetLoaderEndpoints();
+
+// Meta's webhook. Anonymous, like the widget routes above it, and authenticated
+// by an HMAC over the exact request body rather than by a session.
+app.MapWhatsAppWebhookEndpoints();
 
 // The realtime hubs.
 //

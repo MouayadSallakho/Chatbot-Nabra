@@ -65,6 +65,16 @@ internal sealed class Harness
 
     public required SendWebChatMessageHandler Send { get; init; }
 
+    /// <summary>
+    /// The one orchestration every channel enters.
+    /// </summary>
+    /// <remarks>
+    /// Exposed so the WhatsApp suite can drive the same instance website chat
+    /// does. Two runners built from two arrangements could agree with each other
+    /// while production disagreed with both.
+    /// </remarks>
+    public required CustomerTurnRunner Runner { get; init; }
+
     public required ListWebChatMessagesHandler List { get; init; }
 
     /// <summary>
@@ -181,6 +191,18 @@ internal sealed class Harness
             embedder,
             retrieval ?? new KnowledgeRetrievalPolicy());
 
+        // Built once and shared, because production builds one: the send handler
+        // and every other channel resolve the same scoped instance.
+        CustomerTurnRunner runner = new(
+            world,
+            world,
+            recorder,
+            gate,
+            announcer,
+            retriever,
+            contextPolicy,
+            time);
+
         return new Harness
         {
             World = world,
@@ -204,18 +226,17 @@ internal sealed class Harness
                 guard,
                 bounds,
                 time),
+            Runner = runner,
             Send = new SendWebChatMessageHandler(
                 access,
                 world,
-                world,
-                world,
                 agents,
-                recorder,
-                gate,
+                // The shared runner, built from exactly the pieces the send
+                // handler used to hold itself. Website chat now enters the same
+                // orchestration WhatsApp does, so these tests exercise the one
+                // path rather than a copy of it.
+                runner,
                 guard,
-                announcer,
-                retriever,
-                contextPolicy,
                 chatPolicy,
                 time),
             List = new ListWebChatMessagesHandler(access, world, world, chatPolicy),

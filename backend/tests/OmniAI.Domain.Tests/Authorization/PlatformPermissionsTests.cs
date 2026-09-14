@@ -129,6 +129,8 @@ public sealed class PlatformPermissionsTests
                 "conversations.assign",
                 "website-chat.view",
                 "website-chat.manage",
+                "whatsapp.view",
+                "whatsapp.manage",
                 "knowledge.view",
                 "knowledge.manage",
             ],

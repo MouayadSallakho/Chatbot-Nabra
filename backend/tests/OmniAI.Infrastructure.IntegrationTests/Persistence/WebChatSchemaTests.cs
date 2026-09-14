@@ -18,8 +18,9 @@ public sealed class WebChatSchemaTests(PostgresTestDatabase database)
     public async Task No_table_stores_a_raw_conversation_secret()
     {
         // The central privacy claim of this phase, asserted against the schema
-        // rather than trusted from the code. The only credential-shaped column in
-        // the whole database is a digest, and it is bytea.
+        // rather than trusted from the code. Every credential-shaped column in the
+        // whole database is bytea, because every one of them holds either a digest
+        // or a ciphertext -- never a value anybody could read.
         object? columns = await database.ExecuteScalarAsync(
             "SELECT string_agg(table_name || '.' || column_name || ':' || data_type, ', ' "
             + "ORDER BY table_name, column_name) FROM information_schema.columns "
@@ -27,8 +28,16 @@ public sealed class WebChatSchemaTests(PostgresTestDatabase database)
             + "AND (column_name LIKE '%token%' OR column_name LIKE '%secret%')");
 
         // tenant_invitations.token_hash is Phase 14's, and is also a digest.
+        //
+        // whatsapp_credentials.protected_token is Phase 20's, and is the one
+        // column here that is not a digest: a WhatsApp access token has to be
+        // used, so it cannot be stored one-way. It is AES-256-GCM ciphertext
+        // bound to the workspace, the connection and the purpose, in its own
+        // table, read by exactly one query. A `text` column of that name would
+        // fail this test, which is the point.
         Assert.Equal(
-            "tenant_invitations.token_hash:bytea, web_chat_sessions.access_token_hash:bytea",
+            "tenant_invitations.token_hash:bytea, web_chat_sessions.access_token_hash:bytea, "
+            + "whatsapp_credentials.protected_token:bytea",
             columns as string);
     }
 

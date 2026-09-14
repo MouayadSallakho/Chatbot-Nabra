@@ -897,6 +897,267 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                     b.ToTable("web_chat_sessions", (string)null);
                 });
 
+            modelBuilder.Entity("OmniAI.Domain.WhatsApp.InboundWhatsAppMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer")
+                        .HasColumnName("attempts");
+
+                    b.Property<Guid>("ConnectionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("whatsapp_connection_id");
+
+                    b.Property<string>("CustomerId")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("customer_id");
+
+                    b.Property<string>("ProviderMessageId")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("provider_message_id");
+
+                    b.Property<DateTimeOffset>("ReceivedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("received_at");
+
+                    b.Property<DateTimeOffset>("SentAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("sent_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<string>("Text")
+                        .HasMaxLength(4096)
+                        .HasColumnType("character varying(4096)")
+                        .HasColumnName("text");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ConnectionId", "ProviderMessageId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_whatsapp_inbound_provider_message");
+
+                    b.HasIndex("Status", "ReceivedAt")
+                        .HasDatabaseName("ix_whatsapp_inbound_status_received");
+
+                    b.ToTable("whatsapp_inbound_messages", (string)null);
+                });
+
+            modelBuilder.Entity("OmniAI.Domain.WhatsApp.WhatsAppConnection", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AiAgentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("ai_agent_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("DisplayPhoneNumber")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("display_phone_number");
+
+                    b.Property<bool>("HasCredential")
+                        .HasColumnType("boolean")
+                        .HasColumnName("has_credential");
+
+                    b.Property<string>("PhoneNumberId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("phone_number_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("WabaId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("waba_id");
+
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AiAgentId")
+                        .HasDatabaseName("ix_whatsapp_connections_agent");
+
+                    b.HasIndex("PhoneNumberId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_whatsapp_connections_phone_number");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_whatsapp_connections_tenant");
+
+                    b.ToTable("whatsapp_connections", (string)null);
+                });
+
+            modelBuilder.Entity("OmniAI.Domain.WhatsApp.WhatsAppContact", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ConnectionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("whatsapp_connection_id");
+
+                    b.Property<Guid>("ConversationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("conversation_id");
+
+                    b.Property<string>("CustomerId")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("customer_id");
+
+                    b.Property<bool>("IsCurrent")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_current");
+
+                    b.Property<DateTimeOffset>("StartedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("started_at");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ConnectionId")
+                        .HasDatabaseName("ix_whatsapp_contacts_connection");
+
+                    b.HasIndex("ConversationId")
+                        .HasDatabaseName("ix_whatsapp_contacts_conversation");
+
+                    b.ToTable("whatsapp_contacts", (string)null);
+                });
+
+            modelBuilder.Entity("OmniAI.Domain.WhatsApp.WhatsAppDelivery", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer")
+                        .HasColumnName("attempts");
+
+                    b.Property<Guid>("ConnectionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("whatsapp_connection_id");
+
+                    b.Property<Guid>("ConversationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("conversation_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("FailureReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("failure_reason");
+
+                    b.Property<Guid>("MessageId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("message_id");
+
+                    b.Property<string>("ProviderMessageId")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("provider_message_id");
+
+                    b.Property<string>("Recipient")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("recipient");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasMaxLength(4096)
+                        .HasColumnType("character varying(4096)")
+                        .HasColumnName("text");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ConnectionId")
+                        .HasDatabaseName("ix_whatsapp_deliveries_connection");
+
+                    b.HasIndex("ConversationId")
+                        .HasDatabaseName("ix_whatsapp_deliveries_conversation");
+
+                    b.HasIndex("MessageId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_whatsapp_deliveries_message");
+
+                    b.HasIndex("ProviderMessageId")
+                        .HasDatabaseName("ix_whatsapp_deliveries_provider_message");
+
+                    b.HasIndex("Status", "CreatedAt")
+                        .HasDatabaseName("ix_whatsapp_deliveries_status_created");
+
+                    b.ToTable("whatsapp_deliveries", (string)null);
+                });
+
             modelBuilder.Entity("OmniAI.Infrastructure.Identity.OmniAiUser", b =>
                 {
                     b.Property<Guid>("Id")
@@ -976,6 +1237,26 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_users_normalized_user_name");
 
                     b.ToTable("users", (string)null);
+                });
+
+            modelBuilder.Entity("OmniAI.Infrastructure.Persistence.WhatsAppCredentialRow", b =>
+                {
+                    b.Property<Guid>("ConnectionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("whatsapp_connection_id");
+
+                    b.Property<byte[]>("ProtectedToken")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("protected_token");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("ConnectionId");
+
+                    b.ToTable("whatsapp_credentials", (string)null);
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserClaim<System.Guid>", b =>
@@ -1238,6 +1519,84 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_web_chat_sessions_endpoint");
+                });
+
+            modelBuilder.Entity("OmniAI.Domain.WhatsApp.InboundWhatsAppMessage", b =>
+                {
+                    b.HasOne("OmniAI.Domain.WhatsApp.WhatsAppConnection", null)
+                        .WithMany()
+                        .HasForeignKey("ConnectionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_whatsapp_inbound_connection");
+                });
+
+            modelBuilder.Entity("OmniAI.Domain.WhatsApp.WhatsAppConnection", b =>
+                {
+                    b.HasOne("OmniAI.Domain.AiAgents.AiAgent", null)
+                        .WithMany()
+                        .HasForeignKey("AiAgentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_whatsapp_connections_agent");
+
+                    b.HasOne("OmniAI.Domain.Tenants.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_whatsapp_connections_tenant");
+                });
+
+            modelBuilder.Entity("OmniAI.Domain.WhatsApp.WhatsAppContact", b =>
+                {
+                    b.HasOne("OmniAI.Domain.WhatsApp.WhatsAppConnection", null)
+                        .WithMany()
+                        .HasForeignKey("ConnectionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_whatsapp_contacts_connection");
+
+                    b.HasOne("OmniAI.Domain.Conversations.Conversation", null)
+                        .WithMany()
+                        .HasForeignKey("ConversationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_whatsapp_contacts_conversation");
+                });
+
+            modelBuilder.Entity("OmniAI.Domain.WhatsApp.WhatsAppDelivery", b =>
+                {
+                    b.HasOne("OmniAI.Domain.WhatsApp.WhatsAppConnection", null)
+                        .WithMany()
+                        .HasForeignKey("ConnectionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_whatsapp_deliveries_connection");
+
+                    b.HasOne("OmniAI.Domain.Conversations.Conversation", null)
+                        .WithMany()
+                        .HasForeignKey("ConversationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_whatsapp_deliveries_conversation");
+
+                    b.HasOne("OmniAI.Domain.Conversations.Message", null)
+                        .WithMany()
+                        .HasForeignKey("MessageId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_whatsapp_deliveries_message");
+                });
+
+            modelBuilder.Entity("OmniAI.Infrastructure.Persistence.WhatsAppCredentialRow", b =>
+                {
+                    b.HasOne("OmniAI.Domain.WhatsApp.WhatsAppConnection", null)
+                        .WithOne()
+                        .HasForeignKey("OmniAI.Infrastructure.Persistence.WhatsAppCredentialRow", "ConnectionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_whatsapp_credentials_connection");
                 });
 
             modelBuilder.Entity("OmniAI.Domain.Authorization.TenantRole", b =>

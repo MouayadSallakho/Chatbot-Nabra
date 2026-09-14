@@ -188,6 +188,26 @@ public static class PlatformPermissions
     public static readonly PermissionCode WebsiteChatManage =
         PermissionCode.Create("website-chat.manage");
 
+    /// <summary>Read how the workspace's WhatsApp channel is configured.</summary>
+    /// <remarks>
+    /// Reading a connection tells somebody which number the workspace answers on
+    /// and which agent answers there. It never tells them the access token: no
+    /// read path in this platform returns one, whatever permission the caller
+    /// holds.
+    /// </remarks>
+    public static readonly PermissionCode WhatsAppView = PermissionCode.Create("whatsapp.view");
+
+    /// <summary>Configure the WhatsApp channel, and replace its credential.</summary>
+    /// <remarks>
+    /// This is what connects a workspace's AI to a phone number the public can
+    /// message, and what disconnects it again — so it is separate from reading,
+    /// for the same reason publishing a chat link is separate from seeing that
+    /// one exists. It also covers replacing the access token, which is a
+    /// write-only operation: the value goes in and is never shown again.
+    /// </remarks>
+    public static readonly PermissionCode WhatsAppManage =
+        PermissionCode.Create("whatsapp.manage");
+
     /// <summary>Read the workspace's knowledge and try retrieval out.</summary>
     public static readonly PermissionCode KnowledgeView = PermissionCode.Create("knowledge.view");
 
@@ -324,6 +344,18 @@ public static class PlatformPermissions
             "Manage website chat",
             "Create website chat links and decide whether the public can use "
             + "them."),
+        new(
+            WhatsAppView,
+            ChannelsGroup,
+            "View WhatsApp",
+            "See how the workspace's WhatsApp channel is set up and whether it is "
+            + "in service. It never reveals the access token."),
+        new(
+            WhatsAppManage,
+            ChannelsGroup,
+            "Manage WhatsApp",
+            "Connect a WhatsApp number to an AI agent, replace its access token, "
+            + "and take the channel in and out of service."),
         new(
             KnowledgeView,
             KnowledgeGroup,

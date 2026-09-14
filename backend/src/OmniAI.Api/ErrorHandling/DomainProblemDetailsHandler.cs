@@ -13,6 +13,7 @@ using OmniAI.Application.Knowledge.ListKnowledgeDocuments;
 using OmniAI.Application.Members;
 using OmniAI.Application.WebChat;
 using OmniAI.Application.WebChat.Protection;
+using OmniAI.Application.WhatsApp;
 using OmniAI.Application.Security;
 using OmniAI.Application.Tenants;
 using OmniAI.Domain;
@@ -438,6 +439,42 @@ internal sealed partial class DomainProblemDetailsHandler(
             StatusCodes.Status409Conflict,
             "Message already attempted",
             alreadyFailed.Message),
+
+        // A WhatsApp connection was not at the version the caller said it was.
+        // 412, like every other stale conditional write: two administrators in
+        // the same settings screen is the normal case, and the second to save is
+        // told rather than silently undoing the first.
+        WhatsAppConnectionVersionMismatchException staleConnection => (
+            StatusCodes.Status412PreconditionFailed,
+            "Precondition failed",
+            staleConnection.Message),
+
+        // Two connections cannot share one phone number id, deployment-wide.
+        // 409: the request is well-formed and permitted, and contradicts the
+        // state of the platform. The message says the number is already
+        // connected and deliberately not by whom -- that would disclose another
+        // workspace's configuration to somebody who guessed a number.
+        WhatsAppPhoneNumberInUseException numberTaken => (
+            StatusCodes.Status409Conflict,
+            "Number already connected",
+            numberTaken.Message),
+
+        // A reply was asked to go to WhatsApp for a conversation that did not
+        // come from there. 409 rather than 404: the conversation exists and the
+        // caller may read it; what is wrong is the assumption about its channel.
+        ConversationNotOnWhatsAppException notWhatsApp => (
+            StatusCodes.Status409Conflict,
+            "Conversation is not on WhatsApp",
+            notWhatsApp.Message),
+
+        // This deployment has no master key, so no credential can be stored
+        // safely. 503 rather than 500: nothing is broken, the platform has
+        // declined to do something it could not do securely, and the message
+        // names the configuration an operator has to supply.
+        SecretProtectionUnavailableException unprotectedSecret => (
+            StatusCodes.Status503ServiceUnavailable,
+            "Credential storage unavailable",
+            unprotectedSecret.Message),
 
         // A public caller asking too often. 429, which is exactly what it means,
         // and paired with a Retry-After above.

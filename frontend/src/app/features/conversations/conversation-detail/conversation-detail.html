@@ -89,6 +89,17 @@
           <p class="text-label text-muted">Assigned to</p>
           <p class="text-body">{{ current.assignedTo?.email ?? 'Nobody' }}</p>
         </div>
+        @if (whatsAppFacts(); as whatsapp) {
+          <div>
+            <p class="text-label text-muted">Customer</p>
+            <!--
+              Masked by the server and never sent in full. Enough to recognise
+              who you are talking to; not a contact list, and not a phone number
+              in a screenshot.
+            -->
+            <p class="text-body">{{ whatsapp.customerReference }}</p>
+          </div>
+        }
       </div>
     </div>
 
@@ -189,8 +200,35 @@
               <p class="message-meta">
                 <span class="message-sender">{{ senderName(message) }}</span>
                 <span class="text-muted">{{ message.sentAt | date: 'medium' }}</span>
+
+                @if (deliveryStatus(message.id); as delivery) {
+                  <!--
+                    A word, not a colour: whether a reply reached the customer is
+                    exactly the kind of thing somebody who cannot rely on hue must
+                    still be able to read.
+                  -->
+                  <span
+                    class="badge badge-sm"
+                    [class.badge-success]="delivery === 'Delivered' || delivery === 'Read'"
+                    [class.badge-danger]="delivery === 'Failed'"
+                    [class.badge-warning]="delivery === 'Unknown'"
+                    [class.badge-neutral]="
+                      delivery !== 'Delivered' &&
+                      delivery !== 'Read' &&
+                      delivery !== 'Failed' &&
+                      delivery !== 'Unknown'
+                    "
+                    >{{ delivery }}</span
+                  >
+                }
               </p>
               <p class="message-text">{{ message.text }}</p>
+
+              @if (deliveryStatus(message.id); as delivery) {
+                @if (deliveryHint(delivery); as hint) {
+                  <p class="text-small text-muted message-delivery">{{ hint }}</p>
+                }
+              }
             </li>
           }
         </ol>

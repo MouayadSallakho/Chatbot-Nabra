@@ -383,6 +383,23 @@ internal sealed class FakeWebChatWorld : IWebChatEndpointRepository, IWebChatRun
 
     // ---- IWebChatRuntimeStore -------------------------------------------
 
+    /// <summary>
+    /// Seeds a conversation with no website-chat session beside it.
+    /// </summary>
+    /// <remarks>
+    /// For channels that have no session at all. A WhatsApp conversation is
+    /// reached through a contact mapping rather than through a browser
+    /// credential, so requiring one here would force a test to invent a session
+    /// the production code never creates.
+    /// </remarks>
+    public void AddConversation(Conversation conversation)
+    {
+        lock (_sync)
+        {
+            _conversations.Add(conversation);
+        }
+    }
+
     public Task StartConversationAsync(
         Conversation conversation,
         WebChatSession session,

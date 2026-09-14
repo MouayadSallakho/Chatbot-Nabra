@@ -78,7 +78,7 @@ public sealed class MigrationSchemaTests(PostgresTestDatabase database)
 
         string[] applied = [.. await context.Database.GetAppliedMigrationsAsync()];
 
-        Assert.Equal(10, applied.Length);
+        Assert.Equal(11, applied.Length);
         Assert.EndsWith("InitialPersistence", applied[0], StringComparison.Ordinal);
         Assert.EndsWith("AddAiAgents", applied[1], StringComparison.Ordinal);
         Assert.EndsWith("AddIdentityAndTenantMemberships", applied[2], StringComparison.Ordinal);
@@ -100,6 +100,29 @@ public sealed class MigrationSchemaTests(PostgresTestDatabase database)
             "AddWebChatWidgetEmbedding",
             applied[8],
             StringComparison.Ordinal);
+        Assert.EndsWith(
+            "AddHumanHandoffAndAssignment",
+            applied[9],
+            StringComparison.Ordinal);
+        Assert.EndsWith(
+            "AddWhatsAppCloudApiChannel",
+            applied[10],
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task The_whatsapp_connections_table_has_no_physical_xmin_column()
+    {
+        // The same hand-edit guard, aimed at the table Phase 20 added. Npgsql's
+        // scaffolder emitted the column again and it was removed again by hand;
+        // this is what notices if a future regeneration puts it back and turns a
+        // working entity tag into a column that shadows PostgreSQL's own.
+        object? columns = await database.ExecuteScalarAsync(
+            "SELECT count(*) FROM information_schema.columns "
+            + "WHERE table_schema = 'public' AND table_name = 'whatsapp_connections' "
+            + "AND column_name = 'xmin'");
+
+        Assert.Equal(0L, columns as long?);
     }
 
     [Fact]

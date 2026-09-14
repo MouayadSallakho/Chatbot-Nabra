@@ -101,4 +101,22 @@ internal static class PersistenceSchema
     /// otherwise repeat a string literal that a rename could silently orphan.
     /// </remarks>
     public const string HumanRepliesTable = "conversation_human_replies";
+
+    /// <summary>The workspaces' connected WhatsApp numbers.</summary>
+    public const string WhatsAppConnectionsTable = "whatsapp_connections";
+
+    /// <summary>
+    /// The protected access tokens, kept apart from the connections they belong
+    /// to so that no ordinary read touches a credential.
+    /// </summary>
+    public const string WhatsAppCredentialsTable = "whatsapp_credentials";
+
+    /// <summary>Which conversation each WhatsApp customer is talking in.</summary>
+    public const string WhatsAppContactsTable = "whatsapp_contacts";
+
+    /// <summary>The durable record of every webhook message accepted.</summary>
+    public const string InboundWhatsAppMessagesTable = "whatsapp_inbound_messages";
+
+    /// <summary>The durable record of every message owed to a customer.</summary>
+    public const string WhatsAppDeliveriesTable = "whatsapp_deliveries";
 }

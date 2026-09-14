@@ -132,3 +132,9 @@
 .composer-hint {
   margin-block-start: var(--space-5);
 }
+
+// Sits under the message it describes, quiet enough not to compete with the
+// customer's own words.
+.message-delivery {
+  margin-block-start: var(--space-2);
+}

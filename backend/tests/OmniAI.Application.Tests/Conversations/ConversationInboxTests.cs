@@ -63,6 +63,10 @@ public sealed class ConversationInboxTests
                 store,
                 gate,
                 announcer,
+                // These conversations are on website chat, where a stored reply
+                // is already in front of the visitor. The dispatcher exists for
+                // channels that need a delivery, and has nothing to do here.
+                new NoOutboundDelivery(),
                 clock));
     }
 

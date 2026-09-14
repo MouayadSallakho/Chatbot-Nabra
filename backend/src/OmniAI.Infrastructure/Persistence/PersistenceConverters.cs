@@ -7,6 +7,7 @@ using OmniAI.Domain.Knowledge;
 using OmniAI.Domain.Tenants;
 using OmniAI.Domain.Users;
 using OmniAI.Domain.WebChat;
+using OmniAI.Domain.WhatsApp;
 
 namespace OmniAI.Infrastructure.Persistence;
 
@@ -15,9 +16,9 @@ namespace OmniAI.Infrastructure.Persistence;
 /// </summary>
 /// <remarks>
 /// Written out by hand rather than produced by a reflection-driven convention:
-/// there are eight of them, each is two lines, and being able to read exactly how
-/// a column is stored is worth more here than saving the repetition. Nothing in
-/// this file is visible to the Domain.
+/// each is two lines, and being able to read exactly how a column is stored is
+/// worth more here than saving the repetition. Nothing in this file is visible to
+/// the Domain.
 /// </remarks>
 internal static class PersistenceConverters
 {
@@ -96,6 +97,39 @@ internal static class PersistenceConverters
 
     public static readonly ValueConverter<ConversationTurnId, Guid> ConversationTurnId =
         new(id => id.Value, value => Domain.Conversations.ConversationTurnId.From(value));
+
+    public static readonly ValueConverter<WhatsAppConnectionId, Guid> WhatsAppConnectionId =
+        new(id => id.Value, value => Domain.WhatsApp.WhatsAppConnectionId.From(value));
+
+    public static readonly ValueConverter<WhatsAppContactId, Guid> WhatsAppContactId =
+        new(id => id.Value, value => Domain.WhatsApp.WhatsAppContactId.From(value));
+
+    public static readonly ValueConverter<InboundWhatsAppMessageId, Guid> InboundWhatsAppMessageId =
+        new(id => id.Value, value => Domain.WhatsApp.InboundWhatsAppMessageId.From(value));
+
+    public static readonly ValueConverter<WhatsAppDeliveryId, Guid> WhatsAppDeliveryId =
+        new(id => id.Value, value => Domain.WhatsApp.WhatsAppDeliveryId.From(value));
+
+    public static readonly ValueConverter<WabaId, string> WabaId =
+        new(id => id.Value, value => Domain.WhatsApp.WabaId.Create(value));
+
+    public static readonly ValueConverter<PhoneNumberId, string> PhoneNumberId =
+        new(id => id.Value, value => Domain.WhatsApp.PhoneNumberId.Create(value));
+
+    public static readonly ValueConverter<WhatsAppCustomerId, string> WhatsAppCustomerId =
+        new(id => id.Value, value => Domain.WhatsApp.WhatsAppCustomerId.Create(value));
+
+    public static readonly ValueConverter<ProviderMessageId, string> ProviderMessageId =
+        new(id => id.Value, value => Domain.WhatsApp.ProviderMessageId.Create(value));
+
+    /// <remarks>
+    /// Nullable, because a delivery has no provider id until the provider has
+    /// accepted it -- and never will if it never did.
+    /// </remarks>
+    public static readonly ValueConverter<ProviderMessageId?, string?> NullableProviderMessageId =
+        new(
+            id => id == null ? null : id.Value.Value,
+            value => value == null ? null : Domain.WhatsApp.ProviderMessageId.Create(value));
 
     public static readonly ValueConverter<HumanReplyId, Guid> HumanReplyId =
         new(id => id.Value, value => Domain.Conversations.HumanReplyId.From(value));

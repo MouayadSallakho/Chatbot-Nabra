@@ -90,14 +90,18 @@ export const NAV_ITEMS: readonly NavItem[] = [
     permissions: ['knowledge.view'],
   },
   {
-    // Website chat is the first real channel. The others are still honestly
-    // labelled as not built rather than shown as empty screens, which is why the
-    // area is entered through a list rather than straight into one channel.
+    // Website chat and WhatsApp are real; Instagram and Messenger are still
+    // honestly labelled as not built rather than shown as empty screens, which
+    // is why the area is entered through a list rather than straight into one
+    // channel.
+    //
+    // Either channel permission opens it: somebody who administers WhatsApp and
+    // not website chat still needs a way in.
     label: 'Channels',
     path: 'channels',
     icon: 'channels',
     implemented: true,
-    permissions: ['website-chat.view'],
+    permissions: ['website-chat.view', 'whatsapp.view'],
   },
   { label: 'Integrations', path: 'integrations', icon: 'integrations', implemented: false },
   { label: 'Analytics', path: 'analytics', icon: 'analytics', implemented: false },

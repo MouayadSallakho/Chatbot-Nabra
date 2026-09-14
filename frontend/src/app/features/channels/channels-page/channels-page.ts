@@ -7,8 +7,8 @@ import { PageHeader } from '@app/shared/page-header/page-header';
 /**
  * The channels a workspace can be reached on.
  *
- * <strong>One is real and the rest say so.</strong> Website chat is built;
- * WhatsApp, Instagram and Messenger are not, and they are listed as not built
+ * <strong>Two are real and the rest say so.</strong> Website chat and WhatsApp
+ * are built; Instagram and Messenger are not, and they are listed as not built
  * rather than shown as empty screens somebody could mistake for a configuration
  * they have not finished. An honest "not yet" is more useful than a page that
  * looks broken.
@@ -23,7 +23,16 @@ import { PageHeader } from '@app/shared/page-header/page-header';
 export class ChannelsPage {
   private readonly permissions = inject(PermissionService);
 
-  protected readonly canView = computed(() => this.permissions.has('website-chat.view'));
+  /**
+   * Whether this page has anything to show.
+   *
+   * Either channel permission is enough to see the list: somebody who
+   * administers WhatsApp and not website chat still needs a way in, and each
+   * channel's own screen decides what they may do once there.
+   */
+  protected readonly canView = computed(
+    () => this.permissions.has('website-chat.view') || this.permissions.has('whatsapp.view'),
+  );
 
   /** The channels, built and unbuilt alike. */
   protected readonly channels = [
@@ -35,9 +44,9 @@ export class ChannelsPage {
     },
     {
       name: 'WhatsApp',
-      description: 'Not built yet.',
-      available: false,
-      path: null,
+      description: 'A number customers can message you on.',
+      available: true,
+      path: '/channels/whatsapp',
     },
     {
       name: 'Instagram',

@@ -17,6 +17,7 @@ import { Versioned } from '@app/core/api/versioned';
 import { PermissionService } from '@app/core/authorization/permission-service';
 import { ConversationRealtime } from '@app/core/realtime/conversation-realtime';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
+import { WhatsAppApi, WhatsAppConversationFacts } from '@app/features/channels/whatsapp-api';
 import { EmptyState } from '@app/shared/empty-state/empty-state';
 import { PageHeader } from '@app/shared/page-header/page-header';
 import {
@@ -64,6 +65,7 @@ export class ConversationDetail implements OnInit {
   private readonly api = inject(ConversationsApi);
   private readonly workspace = inject(WorkspaceContextService);
   private readonly permissions = inject(PermissionService);
+  private readonly whatsapp = inject(WhatsAppApi);
   private readonly realtime = inject(ConversationRealtime);
   private readonly destroyRef = inject(DestroyRef);
 
@@ -137,6 +139,43 @@ export class ConversationDetail implements OnInit {
     }
   }
 
+  /**
+   * The WhatsApp side of this conversation, when it came from there.
+   *
+   * Null for every other channel, and null when the read failed — this is extra
+   * detail beside a transcript that is already on screen, so a failure here
+   * must not take the conversation down with it.
+   */
+  protected readonly whatsAppFacts = signal<WhatsAppConversationFacts | null>(null);
+
+  /** Whether this conversation arrived over WhatsApp. */
+  protected readonly isWhatsApp = computed(() => this.conversation()?.channel === 'WhatsApp');
+
+  /**
+   * How a reply to this customer went, by message id.
+   *
+   * <strong>Only meaningful on a channel with a delivery step.</strong> A website
+   * visitor is reading the transcript, so a reply is delivered by being stored.
+   * On WhatsApp it is a separate attempt that can fail, be refused, or end
+   * unknown, and a colleague needs to be able to see which.
+   */
+  protected deliveryStatus(messageId: string): string | null {
+    return this.whatsAppFacts()?.deliveryStatuses[messageId] ?? null;
+  }
+
+  /** A sentence for a delivery state that needs explaining. */
+  protected deliveryHint(status: string): string | null {
+    if (status === 'Failed') {
+      return 'This reply did not reach the customer.';
+    }
+
+    if (status === 'Unknown') {
+      return 'Whether this reply reached the customer is not known. It was not sent again.';
+    }
+
+    return null;
+  }
+
   protected async load(): Promise<void> {
     const tenantId = this.workspace.tenantId();
 
@@ -199,10 +238,38 @@ export class ConversationDetail implements OnInit {
       this.messages.set(page.items);
       this.cursor.set(page.nextCursor);
 
+      await this.readWhatsApp(tenantId);
+
       return;
     }
 
     this.messages.update((current) => merge(current, page.items));
+
+    await this.readWhatsApp(tenantId);
+  }
+
+  /**
+   * Reads the WhatsApp facts, if this conversation has any.
+   *
+   * Failures are swallowed: the customer reference and the delivery states are
+   * detail beside a transcript that is already rendered, and a screen that
+   * refused to show a conversation because one extra read failed would be worse
+   * than one missing a badge.
+   */
+  private async readWhatsApp(tenantId: string): Promise<void> {
+    if (!this.isWhatsApp()) {
+      this.whatsAppFacts.set(null);
+
+      return;
+    }
+
+    try {
+      this.whatsAppFacts.set(
+        await firstValueFrom(this.whatsapp.conversation(tenantId, this.conversationId())),
+      );
+    } catch {
+      this.whatsAppFacts.set(null);
+    }
   }
 
   /** Appends the next page, keeping what is already on screen. */

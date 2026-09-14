@@ -9,6 +9,7 @@ import { ConversationRealtime } from '@app/core/realtime/conversation-realtime';
 import { LOCAL_STORAGE } from '@app/core/storage/local-storage';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
 import { memoryStorage, permissionApiGranting } from '@app/testing/test-doubles';
+import { WhatsAppApi } from '@app/features/channels/whatsapp-api';
 import { ConversationsApi } from '../conversations-api';
 import { ConversationDetail } from './conversation-detail';
 
@@ -84,6 +85,11 @@ describe('ConversationDetail', () => {
         provideHttpClient(),
         provideHttpClientTesting(),
         ConversationsApi,
+
+        // The real client, over the same testing HTTP backend. These
+        // conversations are on website chat, so it is never called -- and a test
+        // that says so is worth more than a stub that could not.
+        WhatsAppApi,
         { provide: LOCAL_STORAGE, useValue: memoryStorage() },
         { provide: TenantApi, useValue: { get: () => undefined, create: () => undefined } },
         { provide: PermissionApi, useValue: permissionApiGranting(...permissions) },

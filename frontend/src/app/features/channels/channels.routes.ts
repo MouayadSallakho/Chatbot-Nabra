@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 import { AiAgentApi } from '@app/features/ai-agents/ai-agent-api';
 import { WebChatAdminApi } from './website-chat-api';
+import { WhatsAppApi } from './whatsapp-api';
 
 /**
  * The channel administration screens.
@@ -19,7 +20,7 @@ import { WebChatAdminApi } from './website-chat-api';
 export const channelRoutes: Routes = [
   {
     path: '',
-    providers: [WebChatAdminApi, AiAgentApi],
+    providers: [WebChatAdminApi, WhatsAppApi, AiAgentApi],
     children: [
       {
         path: '',
@@ -42,6 +43,19 @@ export const channelRoutes: Routes = [
           import('./website-chat/website-chat-detail/website-chat-detail').then(
             (m) => m.WebsiteChatDetail,
           ),
+      },
+      {
+        path: 'whatsapp',
+        title: 'WhatsApp',
+        loadComponent: () =>
+          import('./whatsapp/whatsapp-page/whatsapp-page').then((m) => m.WhatsAppPage),
+      },
+      {
+        // After the literal segment, so it cannot swallow it.
+        path: 'whatsapp/:connectionId',
+        title: 'WhatsApp number',
+        loadComponent: () =>
+          import('./whatsapp/whatsapp-detail/whatsapp-detail').then((m) => m.WhatsAppDetail),
       },
     ],
   },
