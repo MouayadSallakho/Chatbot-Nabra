@@ -25,6 +25,12 @@ export type ApiErrorKind =
   | 'stale'
   /** A conditional request was required and none was sent. */
   | 'preconditionRequired'
+  /** An uploaded file is past the size this platform accepts. */
+  | 'tooLarge'
+  /** An uploaded file is not one of the formats this platform reads. */
+  | 'unsupportedMedia'
+  /** The request was fine; the file's own content could not be used. */
+  | 'unprocessable'
   /** Something answered upstream and what came back was unusable. */
   | 'invalidResponse'
   /** No AI provider is configured on this deployment. */
@@ -78,6 +84,9 @@ const MESSAGES: Readonly<Record<ApiErrorKind, string>> = {
   gone: 'This invitation is no longer available. Ask whoever invited you for a new one.',
   stale: 'This item was updated somewhere else since you opened it.',
   preconditionRequired: 'This item needs to be reloaded before it can be saved.',
+  tooLarge: 'That file is too large for this platform to accept.',
+  unsupportedMedia: 'That file is not one of the formats this platform can read.',
+  unprocessable: 'No usable text could be read from that file.',
   invalidResponse: 'The AI provider returned a response this platform could not use.',
   // Deliberately not "preview": from Phase 17 this same status also answers a
   // knowledge index, and a sentence naming one capability is simply wrong on
@@ -119,7 +128,16 @@ const MESSAGES: Readonly<Record<ApiErrorKind, string>> = {
  * the copy is written to say so: it is a statement about what this person may
  * do, not about whether the thing exists.
  */
-const DETAIL_IS_USEFUL: ReadonlySet<number> = new Set([400, 401, 404, 409, 410]);
+const DETAIL_IS_USEFUL: ReadonlySet<number> = new Set([
+  400, 401, 404, 409, 410,
+
+  // The file-upload refusals, added in Phase 21. Each one is written for the
+  // person who just chose the file -- which format was expected, what the limit
+  // is, that a scanned PDF needs text rather than pixels -- and the generic copy
+  // below would tell them strictly less. They are safe to show: the backend
+  // composes them itself and never puts a parser's own exception into one.
+  413, 415, 422,
+]);
 
 /**
  * Interprets a failed request.
@@ -212,6 +230,15 @@ function kindOf(status: number): ApiErrorKind {
       return 'stale';
     case 428:
       return 'preconditionRequired';
+    // The upload refusals. Three kinds rather than one, because the repair is
+    // different each time: use a smaller file, use a different format, or use a
+    // file that actually has text in it.
+    case 413:
+      return 'tooLarge';
+    case 415:
+      return 'unsupportedMedia';
+    case 422:
+      return 'unprocessable';
     // Too many requests. Its own kind rather than a conflict, because the advice
     // is unique: nothing is wrong with the request and nothing needs correcting
     // -- the caller simply has to wait. Never retried automatically here; see

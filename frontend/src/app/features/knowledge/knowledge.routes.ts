@@ -26,8 +26,15 @@ export const knowledgeRoutes: Routes = [
           import('./knowledge-create/knowledge-create').then((m) => m.KnowledgeCreate),
       },
       {
+        path: 'upload',
+        title: 'Upload a knowledge file',
+        loadComponent: () =>
+          import('./knowledge-upload/knowledge-upload').then((m) => m.KnowledgeUpload),
+      },
+      {
         // Last, so it cannot swallow 'new'. Route order is the only thing
-        // separating a literal segment from a parameter that would match it.
+        // separating a literal segment from a parameter that would match it, and
+        // 'upload' is now a second literal that would otherwise be read as an id.
         path: ':knowledgeDocumentId',
         title: 'Knowledge document',
         loadComponent: () =>

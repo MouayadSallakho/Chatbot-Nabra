@@ -129,6 +129,7 @@ app.MapAiAgentEndpoints();
 // whether it is switched on. Authenticated, and permission-checked inside every
 // use case.
 app.MapKnowledgeEndpoints();
+app.MapKnowledgeFileEndpoints();
 app.MapWebChatEndpoints();
 app.MapWhatsAppEndpoints();
 

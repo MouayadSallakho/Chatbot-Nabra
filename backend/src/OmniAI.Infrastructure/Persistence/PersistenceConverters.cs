@@ -231,6 +231,27 @@ internal static class PersistenceConverters
     public static readonly ValueConverter<AgentInstructions, string> AgentInstructions =
         new(instructions => instructions.Value, value => Domain.AiAgents.AgentInstructions.Create(value));
 
+    public static readonly ValueConverter<KnowledgeSourceId, Guid> KnowledgeSourceId =
+        new(id => id.Value, value => Domain.Knowledge.KnowledgeSourceId.From(value));
+
+    /// <remarks>
+    /// Display metadata, stored as ordinary text. The value object has already
+    /// stripped path segments and control characters, so what reaches the column
+    /// is one safe name.
+    /// </remarks>
+    public static readonly ValueConverter<SourceFileName, string> SourceFileName =
+        new(name => name.Value, value => Domain.Knowledge.SourceFileName.Create(value));
+
+    /// <remarks>
+    /// The non-nullable form, for a source that always has a digest of the file
+    /// it was read from. The nullable one below is the document's own indexed
+    /// fingerprint, which is absent until something is indexed.
+    /// </remarks>
+    public static readonly ValueConverter<ContentFingerprint, byte[]> ContentFingerprint =
+        new(
+            fingerprint => fingerprint.ToArray(),
+            value => Domain.Knowledge.ContentFingerprint.From(value));
+
     public static readonly ValueConverter<KnowledgeDocumentId, Guid> KnowledgeDocumentId =
         new(id => id.Value, value => Domain.Knowledge.KnowledgeDocumentId.From(value));
 

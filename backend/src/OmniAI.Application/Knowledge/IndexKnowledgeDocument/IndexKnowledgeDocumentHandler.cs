@@ -77,6 +77,7 @@ public sealed record KnowledgeIndexResult(
 /// </remarks>
 public sealed class IndexKnowledgeDocumentHandler(
     IKnowledgeDocumentRepository documents,
+    IKnowledgeSourceRepository sources,
     IKnowledgeIndexStore index,
     ITextEmbeddingGenerator embeddings,
     KnowledgeChunker chunker,
@@ -85,6 +86,9 @@ public sealed class IndexKnowledgeDocumentHandler(
 {
     private readonly IKnowledgeDocumentRepository _documents =
         documents ?? throw new ArgumentNullException(nameof(documents));
+
+    private readonly IKnowledgeSourceRepository _sources =
+        sources ?? throw new ArgumentNullException(nameof(sources));
 
     private readonly IKnowledgeIndexStore _index =
         index ?? throw new ArgumentNullException(nameof(index));
@@ -131,13 +135,19 @@ public sealed class IndexKnowledgeDocumentHandler(
         KnowledgeDocument document = stored.Value;
         EmbeddingProfile profile = _embeddings.Profile;
 
+        // Read before any provider work, so both the nothing-to-do answer and
+        // the indexed answer describe the document the same way.
+        KnowledgeSource? source = await _sources
+            .FindAsync(tenantId, documentId, cancellationToken)
+            .ConfigureAwait(false);
+
         if (document.IsIndexCurrent(profile.Id))
         {
             // Nothing to do, and nothing spent. Reported honestly rather than
             // pretended to be work, so the screen can say so.
             return new Versioned<KnowledgeIndexResult>(
                 new KnowledgeIndexResult(
-                    KnowledgeDocumentView.From(document, profile.Id),
+                    KnowledgeDocumentView.From(document, profile.Id, source),
                     ChunkCount: 0,
                     EmbeddingCalls: 0,
                     AlreadyCurrent: true),
@@ -166,7 +176,7 @@ public sealed class IndexKnowledgeDocumentHandler(
 
         return new Versioned<KnowledgeIndexResult>(
             new KnowledgeIndexResult(
-                KnowledgeDocumentView.From(document, profile.Id),
+                KnowledgeDocumentView.From(document, profile.Id, source),
                 writes.Count,
                 calls,
                 AlreadyCurrent: false),

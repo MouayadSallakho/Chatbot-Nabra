@@ -89,7 +89,11 @@ internal sealed class InMemoryKnowledgeDocumentRepository : IKnowledgeDocumentRe
                     document.Content.Value.Length,
                     document.CreatedAt,
                     document.UpdatedAt,
-                    document.IndexedAt)),
+                    document.IndexedAt,
+                    // Manual documents, in this double. The file-backed case is
+                    // covered against the real repository, which is the only
+                    // place the left join it needs can be exercised.
+                    SourceFileType: null)),
         ];
 
         return Task.FromResult(new KnowledgeDocumentPage(items, page, pageSize, owned.Count));

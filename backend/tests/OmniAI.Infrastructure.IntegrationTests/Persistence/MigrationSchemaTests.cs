@@ -78,7 +78,7 @@ public sealed class MigrationSchemaTests(PostgresTestDatabase database)
 
         string[] applied = [.. await context.Database.GetAppliedMigrationsAsync()];
 
-        Assert.Equal(11, applied.Length);
+        Assert.Equal(12, applied.Length);
         Assert.EndsWith("InitialPersistence", applied[0], StringComparison.Ordinal);
         Assert.EndsWith("AddAiAgents", applied[1], StringComparison.Ordinal);
         Assert.EndsWith("AddIdentityAndTenantMemberships", applied[2], StringComparison.Ordinal);
@@ -108,6 +108,41 @@ public sealed class MigrationSchemaTests(PostgresTestDatabase database)
             "AddWhatsAppCloudApiChannel",
             applied[10],
             StringComparison.Ordinal);
+        Assert.EndsWith(
+            "AddKnowledgeFileSources",
+            applied[11],
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task The_knowledge_sources_table_has_no_physical_xmin_column()
+    {
+        // The same hand-edit guard, aimed at the table Phase 21 added. Npgsql's
+        // scaffolder emitted the column again and it was removed again by hand;
+        // this is what notices if a future regeneration puts it back.
+        object? columns = await database.ExecuteScalarAsync(
+            "SELECT count(*) FROM information_schema.columns "
+            + "WHERE table_schema = 'public' AND table_name = 'knowledge_sources' "
+            + "AND column_name = 'xmin'");
+
+        Assert.Equal(0L, columns as long?);
+    }
+
+    [Fact]
+    public async Task A_knowledge_source_can_only_point_at_a_document_in_its_own_workspace()
+    {
+        // The composite foreign key, asserted to exist rather than trusted from
+        // the migration. Without it a source row could name another workspace's
+        // document, and only application code would stand between that and one
+        // company's file metadata attached to another company's knowledge.
+        object? definition = await database.ExecuteScalarAsync(
+            "SELECT pg_get_constraintdef(oid) FROM pg_constraint "
+            + "WHERE conname = 'fk_knowledge_sources_document'");
+
+        string constraint = definition as string ?? string.Empty;
+
+        Assert.Contains("knowledge_document_id, tenant_id", constraint, StringComparison.Ordinal);
+        Assert.Contains("knowledge_documents(id, tenant_id)", constraint, StringComparison.Ordinal);
     }
 
     [Fact]

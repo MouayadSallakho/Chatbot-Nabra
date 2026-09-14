@@ -123,6 +123,27 @@ export class KnowledgeList {
     await this.load();
   }
 
+  /**
+   * Where a document's text came from, in one word.
+   *
+   * Only the format, never the filename: a filename can itself say something
+   * about a business that a list of two hundred rows is not the place for.
+   */
+  protected origin(fileType: string | null): string {
+    switch (fileType) {
+      case 'Pdf':
+        return 'PDF';
+      case 'Docx':
+        return 'Word';
+      case 'Text':
+        return 'Text file';
+      case 'Csv':
+        return 'CSV';
+      default:
+        return 'Written';
+    }
+  }
+
   /** The words a reader sees for each state. */
   protected label(readiness: string): string {
     switch (readiness) {

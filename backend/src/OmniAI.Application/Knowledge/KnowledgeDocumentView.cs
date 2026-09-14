@@ -1,3 +1,4 @@
+using OmniAI.Application.Knowledge.Files;
 using OmniAI.Domain.Knowledge;
 
 namespace OmniAI.Application.Knowledge;
@@ -20,6 +21,11 @@ namespace OmniAI.Application.Knowledge;
 /// index describes an older draft.
 /// </para>
 /// </remarks>
+/// <param name="Source">
+/// The file this text was read out of, or <see langword="null"/> for a document
+/// somebody typed. Provenance rather than content: the text above is what gets
+/// indexed either way.
+/// </param>
 public sealed record KnowledgeDocumentView(
     Guid Id,
     Guid TenantId,
@@ -29,9 +35,13 @@ public sealed record KnowledgeDocumentView(
     KnowledgeReadiness Readiness,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
-    DateTimeOffset? IndexedAt)
+    DateTimeOffset? IndexedAt,
+    KnowledgeSourceView? Source)
 {
-    internal static KnowledgeDocumentView From(KnowledgeDocument document, EmbeddingProfileId profile)
+    internal static KnowledgeDocumentView From(
+        KnowledgeDocument document,
+        EmbeddingProfileId profile,
+        KnowledgeSource? source = null)
     {
         ArgumentNullException.ThrowIfNull(document);
 
@@ -44,7 +54,8 @@ public sealed record KnowledgeDocumentView(
             document.ReadinessFor(profile),
             document.CreatedAt,
             document.UpdatedAt,
-            document.IndexedAt);
+            document.IndexedAt,
+            source is null ? null : KnowledgeSourceView.From(source));
     }
 }
 
@@ -56,6 +67,11 @@ public sealed record KnowledgeDocumentView(
 /// characters each would otherwise send twenty megabytes to render a list of
 /// titles. The editor reads the one document somebody opened.
 /// </remarks>
+/// <param name="SourceFileType">
+/// The kind of file this document came from, or <see langword="null"/> when it
+/// was written by hand. Enough for a list to say where a document came from
+/// without carrying a whole source record per row.
+/// </param>
 public sealed record KnowledgeDocumentSummary(
     Guid Id,
     Guid TenantId,
@@ -65,11 +81,13 @@ public sealed record KnowledgeDocumentSummary(
     int ContentLength,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
-    DateTimeOffset? IndexedAt)
+    DateTimeOffset? IndexedAt,
+    KnowledgeFileType? SourceFileType)
 {
     internal static KnowledgeDocumentSummary From(
         KnowledgeDocument document,
-        EmbeddingProfileId profile)
+        EmbeddingProfileId profile,
+        KnowledgeSource? source = null)
     {
         ArgumentNullException.ThrowIfNull(document);
 
@@ -82,6 +100,7 @@ public sealed record KnowledgeDocumentSummary(
             document.Content.Value.Length,
             document.CreatedAt,
             document.UpdatedAt,
-            document.IndexedAt);
+            document.IndexedAt,
+            source?.FileType);
     }
 }

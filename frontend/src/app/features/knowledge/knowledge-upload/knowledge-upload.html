@@ -1,0 +1,157 @@
+<div class="page page-narrow">
+  <app-page-header
+    heading="Upload a file"
+    description="Reads the text out of a business file and saves it as a knowledge document. Uploading costs nothing — indexing it, which is what makes it answerable, is a separate step on the next screen."
+  />
+
+  @if (!allowed()) {
+    <div class="page-section">
+      <div class="card">
+        <div class="card-body">
+          <p class="text-body-strong">You cannot add knowledge</p>
+          <p class="text-small text-secondary">
+            Uploading a knowledge file needs a permission your roles do not include. Ask somebody
+            who administers this workspace if you need it.
+          </p>
+          <p><a class="btn btn-secondary btn-sm" routerLink="/knowledge">Back to knowledge</a></p>
+        </div>
+      </div>
+    </div>
+  } @else {
+    <div class="page-section">
+      <form class="card upload-form" [formGroup]="form" (ngSubmit)="upload()" novalidate>
+        <div class="card-body">
+          <div class="field">
+            <label class="field-label field-required" for="knowledge-file">File</label>
+            <!--
+              The browser's own input. It is focusable, labelled and announced
+              without any help, and it is the only path to a chosen file here —
+              there is no second drag-and-drop code path to keep in step with it.
+            -->
+            <input
+              id="knowledge-file"
+              class="input file-input"
+              type="file"
+              [attr.accept]="fileLimits.accept"
+              (change)="choose($event)"
+              [disabled]="uploading()"
+              aria-describedby="knowledge-file-hint"
+              [attr.aria-invalid]="localRefusal() ? 'true' : null"
+              [attr.aria-errormessage]="localRefusal() ? 'knowledge-file-error' : null"
+              data-testid="file-input"
+            />
+            <p class="field-hint" id="knowledge-file-hint">
+              PDF, Word (.docx), plain text or CSV, up to {{ fileLimits.maxMegabytes }} MB.
+            </p>
+
+            @if (chosen(); as file) {
+              <p class="chosen-file text-small text-secondary" role="status">
+                <app-icon name="knowledge" [strokeWidth]="1.75" />
+                <span data-testid="chosen-file">{{ file.name }} — {{ chosenSize() }}</span>
+              </p>
+            }
+
+            @if (localRefusal(); as reason) {
+              <p
+                class="field-error"
+                id="knowledge-file-error"
+                role="alert"
+                data-testid="local-refusal"
+              >
+                <app-icon name="alert" [strokeWidth]="1.75" />
+                <span>{{ reason }}</span>
+              </p>
+            }
+          </div>
+
+          <div class="field">
+            <label class="field-label" for="knowledge-upload-title">Title</label>
+            <input
+              id="knowledge-upload-title"
+              class="input"
+              type="text"
+              formControlName="title"
+              autocomplete="off"
+              [attr.maxlength]="limits.titleMax"
+              aria-describedby="knowledge-upload-title-hint"
+            />
+            <p class="field-hint" id="knowledge-upload-title-hint">
+              Optional. Left blank, the file's own name is used without its extension.
+            </p>
+          </div>
+
+          <!--
+            What uploading does and does not do. Written out rather than implied,
+            because both surprises are expensive: an agent that answers nothing
+            because the document was never indexed, and a file somebody expected
+            this platform to keep.
+          -->
+          <div class="upload-notes">
+            <h2 class="text-body-strong">What happens when you upload</h2>
+            <ul class="text-small text-secondary">
+              <li>
+                The text is read out of the file and saved as a document you can edit like any
+                other.
+              </li>
+              <li>
+                <strong>The file itself is not stored.</strong> It is read once, during the upload,
+                and discarded — there is nothing to download afterwards, so keep your own copy.
+              </li>
+              <li>
+                <strong>Indexing is a separate step.</strong> The document arrives needing an index,
+                and nothing is sent to the AI provider until you ask for it on the next screen.
+              </li>
+              <li>
+                <strong>Scanned PDFs are not supported.</strong> A PDF has to contain real text.
+                Pages that are pictures of text need OCR, which this platform does not do yet.
+              </li>
+              <li>
+                Spreadsheets, presentations, images and archives are not supported. Save a
+                spreadsheet as CSV if you need its contents here.
+              </li>
+            </ul>
+          </div>
+
+          @if (uploading()) {
+            <p class="text-small text-secondary upload-progress" role="status">
+              <span class="spinner" aria-hidden="true"></span>
+              <span>Uploading and reading the text out of this file…</span>
+            </p>
+          }
+
+          @if (failure(); as error) {
+            <div class="alert alert-danger" role="alert" data-testid="upload-error">
+              <app-icon name="alert" [strokeWidth]="1.75" />
+              <div>
+                <span>{{ error.message }}</span>
+                @if (error.kind === 'unprocessable') {
+                  <!--
+                    Said separately from the server sentence because it is about
+                    the workspace rather than the file: a refused upload creates
+                    nothing, so there is no half-made document to go and tidy up.
+                  -->
+                  <p class="text-small">Nothing was saved — no document was created.</p>
+                }
+              </div>
+            </div>
+          }
+        </div>
+
+        <div class="upload-actions">
+          <a class="btn btn-secondary" routerLink="/knowledge">Cancel</a>
+          <button
+            type="submit"
+            class="btn btn-primary"
+            [disabled]="!canUpload()"
+            data-testid="upload-button"
+          >
+            @if (uploading()) {
+              <span class="spinner" aria-hidden="true"></span>
+            }
+            <span class="btn-label">{{ uploading() ? 'Uploading…' : 'Upload file' }}</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  }
+</div>

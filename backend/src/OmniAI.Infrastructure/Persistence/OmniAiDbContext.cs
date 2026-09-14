@@ -124,6 +124,16 @@ public sealed class OmniAiDbContext(DbContextOptions<OmniAiDbContext> options)
     public DbSet<KnowledgeDocument> KnowledgeDocuments => Set<KnowledgeDocument>();
 
     /// <summary>
+    /// Where each file-backed document's text came from.
+    /// </summary>
+    /// <remarks>
+    /// Metadata only. There is no column here holding a file, a path or a storage
+    /// key: an upload is read during the request and discarded, and what survives
+    /// is this row beside the document's text.
+    /// </remarks>
+    public DbSet<KnowledgeSource> KnowledgeSources => Set<KnowledgeSource>();
+
+    /// <summary>
     /// Which agents may draw on which documents.
     /// </summary>
     /// <remarks>

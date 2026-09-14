@@ -22,6 +22,7 @@ using OmniAI.Application.Invitations.ListTenantInvitations;
 using OmniAI.Application.Invitations.RevokeTenantInvitation;
 using OmniAI.Application.Invitations;
 using OmniAI.Application.Knowledge;
+using OmniAI.Application.Knowledge.Files;
 using OmniAI.Application.Knowledge.AgentKnowledge;
 using OmniAI.Application.Knowledge.CreateKnowledgeDocument;
 using OmniAI.Application.Knowledge.GetKnowledgeDocumentById;
@@ -318,6 +319,15 @@ internal static class CompositionRoot
         services.AddScoped<SearchAgentKnowledgeHandler>();
 
         services.AddScoped<KnowledgeRetriever>();
+
+        // Uploading business files into Knowledge.
+        services.AddScoped<UploadKnowledgeFileHandler>();
+        services.AddScoped<ReplaceKnowledgeSourceHandler>();
+
+        // What this platform will accept from an upload and how far it will read.
+        // A singleton like every other policy here, so a deployment can raise a
+        // bound deliberately and a test can drive a tiny one.
+        services.AddSingleton(new KnowledgeFilePolicy());
 
         // Singletons because they are pure policy: no state, no clock, no
         // connection. The chunker in particular is a pure function of its input,

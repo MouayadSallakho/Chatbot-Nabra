@@ -34,6 +34,14 @@
       and the Redis client above, the vendor's transport stops in this project.
     -->
     <PackageReference Include="Microsoft.Extensions.Http" />
+    <!--
+      The file parsers behind Knowledge uploads. Like every other vendor
+      dependency, they stop in this project: the Application asks for text out of
+      bytes and never names a library.
+    -->
+    <PackageReference Include="PdfPig" />
+    <PackageReference Include="DocumentFormat.OpenXml" />
+    <PackageReference Include="CsvHelper" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>

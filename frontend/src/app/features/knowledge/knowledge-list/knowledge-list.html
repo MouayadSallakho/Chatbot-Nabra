@@ -3,6 +3,10 @@
     heading="Knowledge"
     description="Knowledge is written business information your AI agents can draw on — opening hours, a returns policy, how a service works. A document answers questions only once it has been indexed and assigned to an agent."
   >
+    <!-- One block per projected link: see the empty state below for why. -->
+    @if (hasDocuments() && canManage()) {
+      <a pageActions class="btn btn-secondary" routerLink="/knowledge/upload">Upload file</a>
+    }
     @if (hasDocuments() && canManage()) {
       <a pageActions class="btn btn-primary" routerLink="/knowledge/new">New document</a>
     }
@@ -51,11 +55,20 @@
         <app-empty-state
           icon="knowledge"
           heading="No knowledge yet"
-          description="Write down something your agents should know — a returns policy, delivery times, what a plan includes. Index it, assign it to an agent, and the agent can answer from it."
+          description="Write down something your agents should know — a returns policy, delivery times, what a plan includes — or upload it as a PDF, Word document, text file or CSV. Index it, assign it to an agent, and the agent can answer from it."
         >
+          <!--
+            Two blocks rather than one holding both links: content projection
+            only reaches a slot when the block around it has a single root node.
+          -->
           @if (canManage()) {
             <a stateActions class="btn btn-primary btn-sm" routerLink="/knowledge/new">
               Write your first document
+            </a>
+          }
+          @if (canManage()) {
+            <a stateActions class="btn btn-secondary btn-sm" routerLink="/knowledge/upload">
+              Upload a file
             </a>
           }
         </app-empty-state>
@@ -65,6 +78,7 @@
         <div class="knowledge-list-head" aria-hidden="true">
           <span>Title</span>
           <span>State</span>
+          <span>Source</span>
           <span>Last indexed</span>
           <span>Last updated</span>
         </div>
@@ -84,6 +98,11 @@
                   >
                     {{ label(document.readiness) }}
                   </span>
+                </span>
+
+                <span class="knowledge-origin text-small text-muted">
+                  <span class="knowledge-cell-label">Source&nbsp;</span>
+                  <span>{{ origin(document.sourceFileType) }}</span>
                 </span>
 
                 <span class="knowledge-indexed text-small text-muted">

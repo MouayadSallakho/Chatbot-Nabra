@@ -9,6 +9,7 @@ using OmniAI.Application.Conversations;
 using OmniAI.Application.Conversations.Persistence;
 using OmniAI.Application.Invitations.Persistence;
 using OmniAI.Application.Knowledge;
+using OmniAI.Application.Knowledge.Files;
 using OmniAI.Application.Knowledge.Persistence;
 using OmniAI.Application.Invitations;
 using OmniAI.Application.Members.Persistence;
@@ -21,6 +22,7 @@ using OmniAI.Infrastructure.Identity;
 using OmniAI.Infrastructure.Conversations;
 using OmniAI.Infrastructure.Invitations;
 using OmniAI.Infrastructure.Knowledge;
+using OmniAI.Infrastructure.Knowledge.Files;
 using OmniAI.Infrastructure.WebChat;
 using OmniAI.Infrastructure.Ai;
 using OmniAI.Infrastructure.Persistence.Repositories;
@@ -95,6 +97,15 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<IAgentKnowledgeRepository, AgentKnowledgeRepository>();
         services.AddScoped<IKnowledgeIndexStore, KnowledgeIndexStore>();
         services.AddScoped<IKnowledgeSearchStore, KnowledgeSearchStore>();
+        services.AddScoped<IKnowledgeSourceRepository, KnowledgeSourceRepository>();
+
+        // Reading text out of uploaded files. A singleton because it holds only
+        // the limits: every parser call is a pure function of the bytes handed to
+        // it, and nothing is cached between uploads -- the file does not outlive
+        // the request that carried it.
+        services.AddSingleton<IKnowledgeFileExtractor>(
+            provider => new KnowledgeFileExtractor(
+                provider.GetRequiredService<KnowledgeFilePolicy>()));
 
         // The one account fact the product may read. Scoped, because it reads
         // through the request's DbContext.

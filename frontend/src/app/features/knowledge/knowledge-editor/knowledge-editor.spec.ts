@@ -34,6 +34,18 @@ describe('KnowledgeEditor', () => {
     createdAt: '2026-09-01T09:00:00+00:00',
     updatedAt: '2026-09-01T09:00:00+00:00',
     indexedAt: null,
+    source: null,
+  };
+
+  /** The same document, read out of an uploaded file rather than typed. */
+  const fromFile: KnowledgeDocument = {
+    ...needsIndex,
+    source: {
+      fileName: 'returns-policy.pdf',
+      fileType: 'Pdf',
+      byteLength: 48_000,
+      extractedAt: '2026-09-01T09:00:00+00:00',
+    },
   };
 
   const ready: KnowledgeDocument = {
@@ -93,6 +105,37 @@ describe('KnowledgeEditor', () => {
   async function type(element: HTMLTextAreaElement, value: string): Promise<void> {
     element.value = value;
     element.dispatchEvent(new Event('input'));
+    await settle();
+  }
+
+  const replaceButton = (): HTMLButtonElement =>
+    query<HTMLButtonElement>('[data-testid="replace-button"]')!;
+
+  /** A file of the given size, standing in for whatever the reader picked. */
+  function file(name = 'returns-v2.pdf', size = 2_048): File {
+    return new File([new Uint8Array(size)], name, { type: 'application/pdf' });
+  }
+
+  /**
+   * Puts a file into the replace input the way a browser would.
+   *
+   * `HTMLInputElement.files` is read-only, and the test DOM has no
+   * `DataTransfer` to build a real `FileList` with -- so the property is defined
+   * over with the smallest thing the component actually reads.
+   */
+  async function chooseReplacement(chosen: File): Promise<void> {
+    const input = query<HTMLInputElement>('[data-testid="replace-input"]')!;
+
+    Object.defineProperty(input, 'files', {
+      configurable: true,
+      value: {
+        length: 1,
+        item: (index: number) => (index === 0 ? chosen : null),
+      } as unknown as FileList,
+    });
+
+    input.dispatchEvent(new Event('change'));
+
     await settle();
   }
 
@@ -380,6 +423,156 @@ describe('KnowledgeEditor', () => {
 
       expect(contentBox().value).toBe('My unsaved work.');
       expect(host().textContent).toContain('updated elsewhere');
+    });
+  });
+
+  describe('the source file', () => {
+    it('says nothing about a file for a document somebody typed', async () => {
+      await mount();
+
+      expect(host().textContent).not.toContain('Source file');
+      expect(query('[data-testid="replace-input"]')).toBeNull();
+    });
+
+    it('describes the file an uploaded document came from', async () => {
+      await mount(fromFile);
+
+      expect(query('[data-testid="source-name"]')?.textContent).toContain('returns-policy.pdf');
+      expect(query('[data-testid="source-format"]')?.textContent).toContain('PDF');
+      expect(host().textContent).toContain('47 KB');
+    });
+
+    it('says the file itself was not kept', async () => {
+      await mount(fromFile);
+
+      expect(host().textContent).toContain('The file itself was not kept');
+    });
+
+    it('warns that replacing invalidates the current index', async () => {
+      await mount({ ...fromFile, readiness: 'Ready', indexedAt: '2026-09-01T10:00:00+00:00' });
+
+      expect(host().textContent).toContain('the current index stops describing it');
+    });
+
+    it('sends the replacement as multipart with If-Match', async () => {
+      await mount(fromFile);
+
+      await chooseReplacement(file('returns-v2.pdf'));
+
+      replaceButton().click();
+
+      const request = http.expectOne(`${documentUrl}/source`);
+
+      expect(request.request.method).toBe('PUT');
+      expect(request.request.headers.get('If-Match')).toBe('"v1"');
+      expect(request.request.body instanceof FormData).toBe(true);
+      expect(((request.request.body as FormData).get('file') as File).name).toBe('returns-v2.pdf');
+
+      request.flush(
+        {
+          ...fromFile,
+          content: 'Goods may be returned within 14 days.',
+          readiness: 'NeedsIndex',
+          indexedAt: null,
+          source: { ...fromFile.source!, fileName: 'returns-v2.pdf' },
+        },
+        { headers: { ETag: '"v2"' } },
+      );
+
+      await settle();
+
+      expect(contentBox().value).toBe('Goods may be returned within 14 days.');
+      expect(query('[data-testid="source-name"]')?.textContent).toContain('returns-v2.pdf');
+      expect(query('[data-testid="readiness"]')?.textContent).toContain('Needs index');
+    });
+
+    it('refuses to replace over unsaved edits', async () => {
+      await mount(fromFile);
+
+      await type(contentBox(), 'Half-written and not saved.');
+      await chooseReplacement(file());
+
+      replaceButton().click();
+
+      await settle();
+
+      // Nothing was sent, and the half-written text is still there.
+      http.expectNone(`${documentUrl}/source`);
+      expect(contentBox().value).toBe('Half-written and not saved.');
+      expect(query('[data-testid="replace-error"]')?.textContent).toContain(
+        'Save or discard your changes first',
+      );
+    });
+
+    it('keeps the document untouched when the new file cannot be read', async () => {
+      await mount(fromFile);
+
+      await chooseReplacement(file('scan.pdf'));
+
+      replaceButton().click();
+
+      http.expectOne(`${documentUrl}/source`).flush(
+        {
+          title: 'No text could be read',
+          detail: 'No extractable text was found. Scanned documents are not supported yet.',
+        },
+        { status: 422, statusText: 'Unprocessable Content' },
+      );
+
+      await settle();
+
+      expect(contentBox().value).toBe(needsIndex.content);
+      expect(query('[data-testid="replace-error"]')?.textContent).toContain(
+        'No extractable text was found',
+      );
+      expect(query('[data-testid="replace-error"]')?.textContent).toContain(
+        'still holds the text it had before',
+      );
+    });
+
+    it('treats a stale version on replacement as a conflict, changing nothing', async () => {
+      await mount(fromFile);
+
+      await chooseReplacement(file());
+
+      replaceButton().click();
+
+      http
+        .expectOne(`${documentUrl}/source`)
+        .flush({}, { status: 412, statusText: 'Precondition Failed' });
+
+      await settle();
+
+      expect(host().textContent).toContain('updated elsewhere');
+      expect(host().textContent).toContain('file replacement');
+      expect(contentBox().value).toBe(needsIndex.content);
+
+      // The tag is gone, so nothing further can be written with it.
+      expect(replaceButton().disabled).toBe(true);
+    });
+
+    it('refuses an oversized replacement without sending it', async () => {
+      await mount(fromFile);
+
+      await chooseReplacement(file('huge.pdf', 11 * 1024 * 1024));
+
+      expect(query('[data-testid="replacement-refusal"]')?.textContent).toContain(
+        '10 MB or smaller',
+      );
+      expect(replaceButton().disabled).toBe(true);
+
+      http.expectNone(`${documentUrl}/source`);
+    });
+
+    it('renders a filename containing markup as text, never as markup', async () => {
+      // A filename is chosen by whoever uploaded it and is untrusted, exactly
+      // like the document body.
+      const attack = '<img src=x onerror="alert(1)">.pdf';
+
+      await mount({ ...fromFile, source: { ...fromFile.source!, fileName: attack } });
+
+      expect(host().querySelector('img')).toBeNull();
+      expect(query('[data-testid="source-name"]')?.textContent).toBe(attack);
     });
   });
 

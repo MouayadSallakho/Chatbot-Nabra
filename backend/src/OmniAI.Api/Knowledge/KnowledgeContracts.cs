@@ -1,4 +1,5 @@
 using OmniAI.Application.Knowledge;
+using OmniAI.Application.Knowledge.Files;
 using OmniAI.Application.Knowledge.AgentKnowledge;
 using OmniAI.Application.Knowledge.IndexKnowledgeDocument;
 using OmniAI.Application.Knowledge.ListKnowledgeDocuments;
@@ -39,7 +40,8 @@ public sealed record KnowledgeDocumentResponse(
     string Readiness,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
-    DateTimeOffset? IndexedAt)
+    DateTimeOffset? IndexedAt,
+    KnowledgeSourceResponse? Source)
 {
     public static KnowledgeDocumentResponse From(KnowledgeDocumentView document)
     {
@@ -54,7 +56,40 @@ public sealed record KnowledgeDocumentResponse(
             document.Readiness.ToString(),
             document.CreatedAt,
             document.UpdatedAt,
-            document.IndexedAt);
+            document.IndexedAt,
+            document.Source is null ? null : KnowledgeSourceResponse.From(document.Source));
+    }
+}
+
+/// <summary>
+/// The file a document's text was read out of, on the wire.
+/// </summary>
+/// <remarks>
+/// <strong>Metadata only, and there is no way to get the file back.</strong> The
+/// upload was read during its request and discarded: there is no download route,
+/// no storage key and no path — by design, so this platform never becomes a place
+/// a workspace's original documents accumulate.
+/// <para>
+/// The fingerprint is not published either. It is an internal comparison value,
+/// and exposing it would let anybody who can read one document test whether a
+/// file they hold is the same one.
+/// </para>
+/// </remarks>
+public sealed record KnowledgeSourceResponse(
+    string FileName,
+    string FileType,
+    long ByteLength,
+    DateTimeOffset ExtractedAt)
+{
+    public static KnowledgeSourceResponse From(KnowledgeSourceView source)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+
+        return new KnowledgeSourceResponse(
+            source.FileName,
+            source.FileType.ToString(),
+            source.ByteLength,
+            source.ExtractedAt);
     }
 }
 
@@ -68,7 +103,8 @@ public sealed record KnowledgeDocumentSummaryResponse(
     int ContentLength,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
-    DateTimeOffset? IndexedAt);
+    DateTimeOffset? IndexedAt,
+    string? SourceFileType);
 
 /// <summary>One page of knowledge documents.</summary>
 public sealed record KnowledgeDocumentPageResponse(
@@ -92,7 +128,8 @@ public sealed record KnowledgeDocumentPageResponse(
                     item.ContentLength,
                     item.CreatedAt,
                     item.UpdatedAt,
-                    item.IndexedAt)),
+                    item.IndexedAt,
+                    item.SourceFileType?.ToString())),
             ],
             page.Page,
             page.PageSize,

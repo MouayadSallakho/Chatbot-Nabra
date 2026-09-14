@@ -46,14 +46,18 @@ li + li .knowledge-row {
   gap: var(--space-2);
 }
 
-// Wide enough for four columns and a chevron. Below this the row stacks, the
+// Wide enough for five columns and a chevron. Below this the row stacks, the
 // column headings stay hidden, and each cell carries its own inline label -- so
 // a value is never orphaned from what it means.
+//
+// Source sits on a fixed track rather than a fraction: it holds one short word
+// and would otherwise take space from the two dates, which are the widest things
+// in the row.
 @media (min-width: 48rem) {
   .knowledge-list-head,
   .knowledge-row {
     display: grid;
-    grid-template-columns: minmax(0, 2fr) 8rem minmax(0, 1fr) minmax(0, 1fr) 1.5rem;
+    grid-template-columns: minmax(0, 2fr) 8rem 6rem minmax(0, 1fr) minmax(0, 1fr) 1.5rem;
     align-items: center;
     gap: var(--space-4);
   }

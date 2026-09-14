@@ -259,6 +259,7 @@ internal sealed class KnowledgeIndexHarness
             Embeddings = embeddings,
             Handler = new IndexKnowledgeDocumentHandler(
                 documents,
+                new InMemoryKnowledgeSourceRepository(documents),
                 index,
                 embeddings,
                 new KnowledgeChunker(chunking),

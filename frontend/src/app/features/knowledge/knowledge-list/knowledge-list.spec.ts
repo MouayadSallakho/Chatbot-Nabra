@@ -31,6 +31,7 @@ describe('KnowledgeList', () => {
     createdAt: '2026-09-01T09:00:00+00:00',
     updatedAt: '2026-09-01T09:00:00+00:00',
     indexedAt: '2026-09-01T10:00:00+00:00',
+    sourceFileType: null,
   };
 
   const unindexed: KnowledgeDocumentSummary = {
@@ -105,6 +106,30 @@ describe('KnowledgeList', () => {
     expect(host().textContent).toContain('Delivery times');
     expect(host().textContent).toContain('Ready');
     expect(host().textContent).toContain('Needs index');
+  });
+
+  it('tells a written document apart from an uploaded one', async () => {
+    await mount();
+
+    flush([ready, { ...unindexed, sourceFileType: 'Pdf' }]);
+    await settle();
+
+    // Provenance, in one word per row: somebody looking for "the policy we
+    // uploaded" should not have to open every document to find it.
+    expect(host().textContent).toContain('Written');
+    expect(host().textContent).toContain('PDF');
+  });
+
+  it('never puts a source filename in the list', async () => {
+    await mount();
+
+    flush([{ ...unindexed, sourceFileType: 'Docx' }]);
+    await settle();
+
+    // Only the format. A filename can itself say something about a business,
+    // and a list of two hundred rows is not where it needs reading.
+    expect(host().textContent).toContain('Word');
+    expect(host().textContent).not.toContain('.docx');
   });
 
   it('says when a document has never been indexed rather than leaving the cell blank', async () => {

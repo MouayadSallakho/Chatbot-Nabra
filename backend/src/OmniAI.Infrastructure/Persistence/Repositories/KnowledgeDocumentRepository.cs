@@ -80,7 +80,14 @@ internal sealed class KnowledgeDocumentRepository(
                 candidate.CreatedAt,
                 candidate.UpdatedAt,
                 candidate.IndexedAt,
-                EF.Property<byte[]>(candidate, PersistenceSchema.KnowledgeContentFingerprint)))
+                EF.Property<byte[]>(candidate, PersistenceSchema.KnowledgeContentFingerprint),
+                // Left-joined in the same query rather than read per row: a list
+                // says where each document came from, and a query per row would
+                // make that cost one round trip each.
+                _context.KnowledgeSources
+                    .Where(source => source.KnowledgeDocumentId == candidate.Id)
+                    .Select(source => (KnowledgeFileType?)source.FileType)
+                    .FirstOrDefault()))
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 
@@ -218,7 +225,8 @@ internal sealed class KnowledgeDocumentRepository(
         DateTimeOffset CreatedAt,
         DateTimeOffset UpdatedAt,
         DateTimeOffset? IndexedAt,
-        byte[] ContentFingerprint)
+        byte[] ContentFingerprint,
+        KnowledgeFileType? SourceFileType)
     {
         public KnowledgeDocumentSummary ToSummary(EmbeddingProfileId profile) =>
             new(
@@ -230,7 +238,8 @@ internal sealed class KnowledgeDocumentRepository(
                 ContentLength,
                 CreatedAt,
                 UpdatedAt,
-                IndexedAt);
+                IndexedAt,
+                SourceFileType);
 
         private KnowledgeReadiness Readiness(EmbeddingProfileId profile)
         {

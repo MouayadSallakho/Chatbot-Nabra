@@ -88,3 +88,61 @@
   border-block-start: 1px solid var(--border-subtle);
   background-color: var(--surface-inset);
 }
+
+// --------------------------------------------------------------- source file
+
+.source-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+// Four short facts. They wrap onto as many rows as the width allows rather than
+// being forced into a table, which at 390px would scroll sideways.
+.source-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: var(--space-4);
+  margin: 0;
+
+  dt {
+    margin-block-end: var(--space-1);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  dd {
+    margin: 0;
+    // Filenames are reader-supplied and can be long without a space in them.
+    overflow-wrap: anywhere;
+  }
+}
+
+// A file input renders its own button, which no stylesheet can fully reach. The
+// padding is reduced so the native control does not sit crushed against the
+// border it shares with text inputs.
+.file-input {
+  padding-block: var(--space-2);
+  line-height: 1.4;
+}
+
+.chosen-file {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-block-start: var(--space-2);
+
+  span {
+    overflow-wrap: anywhere;
+  }
+}
+
+// The same treatment the unsaved-changes note gets: this is a consequence worth
+// noticing before the button beneath it is pressed.
+.replace-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: 0;
+  color: var(--warning-fg);
+}

@@ -25,12 +25,16 @@ public sealed record UpdateKnowledgeDocumentCommand(
 /// </remarks>
 public sealed class UpdateKnowledgeDocumentHandler(
     IKnowledgeDocumentRepository documents,
+    IKnowledgeSourceRepository sources,
     TenantAuthorizer authorizer,
     ITextEmbeddingGenerator embeddings,
     TimeProvider clock)
 {
     private readonly IKnowledgeDocumentRepository _documents =
         documents ?? throw new ArgumentNullException(nameof(documents));
+
+    private readonly IKnowledgeSourceRepository _sources =
+        sources ?? throw new ArgumentNullException(nameof(sources));
 
     private readonly TenantAuthorizer _authorizer =
         authorizer ?? throw new ArgumentNullException(nameof(authorizer));
@@ -70,6 +74,13 @@ public sealed class UpdateKnowledgeDocumentHandler(
 
         KnowledgeConcurrency.RequireExpectedVersion(stored, command.Expected);
 
+        // Read before the write so the answer describes the same document the
+        // caller will go on holding: editing the text of a file-backed document
+        // does not detach it from the file it came from.
+        KnowledgeSource? source = await _sources
+            .FindAsync(tenantId, documentId, cancellationToken)
+            .ConfigureAwait(false);
+
         stored.Value.Revise(title, content, _clock.GetUtcNow());
 
         ConcurrencyToken version = await _documents
@@ -77,7 +88,7 @@ public sealed class UpdateKnowledgeDocumentHandler(
             .ConfigureAwait(false);
 
         return new Versioned<KnowledgeDocumentView>(
-            KnowledgeDocumentView.From(stored.Value, _embeddings.Profile.Id),
+            KnowledgeDocumentView.From(stored.Value, _embeddings.Profile.Id, source),
             version);
     }
 }

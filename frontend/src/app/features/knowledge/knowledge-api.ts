@@ -13,6 +13,31 @@ import { Versioned, withEntityTag } from '@app/core/api/versioned';
  */
 export type KnowledgeReadiness = 'Ready' | 'NeedsIndex' | 'Disabled';
 
+/**
+ * The formats a file upload accepts, exactly as the backend names them.
+ *
+ * Deliberately not a MIME type and deliberately not a file extension: the
+ * backend decides what a file actually is by looking inside it, and this is the
+ * answer it reached rather than what the name claimed.
+ */
+export type KnowledgeFileType = 'Pdf' | 'Docx' | 'Text' | 'Csv';
+
+/**
+ * Where a document's text came from.
+ *
+ * <strong>There is no file here and there never will be.</strong> The uploaded
+ * bytes are read once, during the request that carried them, and discarded; what
+ * survives is the extracted text and this description of the file it came out
+ * of. Nothing in this platform can hand the original file back, because nothing
+ * in this platform kept it.
+ */
+export interface KnowledgeSource {
+  readonly fileName: string;
+  readonly fileType: KnowledgeFileType;
+  readonly byteLength: number;
+  readonly extractedAt: string;
+}
+
 /** One document, in full. */
 export interface KnowledgeDocument {
   readonly id: string;
@@ -24,6 +49,9 @@ export interface KnowledgeDocument {
   readonly createdAt: string;
   readonly updatedAt: string;
   readonly indexedAt: string | null;
+
+  /** Null for a document somebody typed. */
+  readonly source: KnowledgeSource | null;
 }
 
 /** One document as the list publishes it. No content -- see the backend contract. */
@@ -37,6 +65,14 @@ export interface KnowledgeDocumentSummary {
   readonly createdAt: string;
   readonly updatedAt: string;
   readonly indexedAt: string | null;
+
+  /**
+   * The format the document was read from, or null when it was typed.
+   *
+   * Only the type, not the filename: a filename can itself be sensitive, and a
+   * list of two hundred rows is not where it needs to be read.
+   */
+  readonly sourceFileType: KnowledgeFileType | null;
 }
 
 /** One page of documents. */
@@ -145,6 +181,64 @@ export class KnowledgeApi {
   ): Observable<Versioned<KnowledgeDocument>> {
     return this.http
       .post<KnowledgeDocument>(this.knowledgeUrl(tenantId), request, { observe: 'response' })
+      .pipe(map(withEntityTag));
+  }
+
+  /**
+   * Uploads a file and stores the text read out of it as a new document.
+   *
+   * <strong>Multipart, because the file is sent as a file.</strong> Base64 inside
+   * a JSON body would be a third larger on the wire for no gain. `FormData` also
+   * means the browser sets the boundary itself -- so nothing here sets a
+   * `Content-Type`, which would overwrite it with a header missing the boundary
+   * and produce a body the server cannot parse.
+   *
+   * No `If-Match`: nothing exists yet to be stale. It costs nothing -- extracting
+   * text is not indexing.
+   */
+  uploadFile(
+    tenantId: string,
+    file: File,
+    title?: string,
+  ): Observable<Versioned<KnowledgeDocument>> {
+    const body = new FormData();
+
+    body.append('file', file, file.name);
+
+    if (title && title.trim().length > 0) {
+      body.append('title', title.trim());
+    }
+
+    return this.http
+      .post<KnowledgeDocument>(`${this.knowledgeUrl(tenantId)}/files`, body, {
+        observe: 'response',
+      })
+      .pipe(map(withEntityTag));
+  }
+
+  /**
+   * Replaces the file behind a document, only if it is still at this version.
+   *
+   * A successful replacement changes the text, so the document stops being
+   * indexed and needs indexing again. That is the server's decision and is
+   * visible in the response it returns.
+   */
+  replaceSource(
+    tenantId: string,
+    documentId: string,
+    file: File,
+    etag: string,
+  ): Observable<Versioned<KnowledgeDocument>> {
+    const body = new FormData();
+
+    body.append('file', file, file.name);
+
+    return this.http
+      .request<KnowledgeDocument>('PUT', `${this.documentUrl(tenantId, documentId)}/source`, {
+        body,
+        headers: { 'If-Match': etag },
+        observe: 'response',
+      })
       .pipe(map(withEntityTag));
   }
 

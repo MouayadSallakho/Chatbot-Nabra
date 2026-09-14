@@ -19,11 +19,17 @@ import { WorkspaceContextService } from '@app/core/workspace/workspace-context-s
 import { EmptyState } from '@app/shared/empty-state/empty-state';
 import { Icon } from '@app/shared/icon/icon';
 import { PageHeader } from '@app/shared/page-header/page-header';
-import { CREATED_DOCUMENT_STATE, KNOWLEDGE_LIMITS } from '../knowledge-limits';
-import { KnowledgeApi, KnowledgeDocument } from '../knowledge-api';
+import {
+  CREATED_DOCUMENT_STATE,
+  KNOWLEDGE_FILE_LIMITS,
+  KNOWLEDGE_LIMITS,
+  UPLOADED_DOCUMENT_STATE,
+} from '../knowledge-limits';
+import { KnowledgeApi, KnowledgeDocument, KnowledgeFileType } from '../knowledge-api';
+import { describeBytes } from '../knowledge-upload/knowledge-upload';
 
 /** Which action ran into a version that is no longer current. */
-type ConflictSource = 'content' | 'index' | 'availability';
+type ConflictSource = 'content' | 'index' | 'availability' | 'source';
 
 /**
  * The knowledge editor: the text, its index, whether it is in use, and what it
@@ -45,6 +51,14 @@ type ConflictSource = 'content' | 'index' | 'availability';
  *
  * <strong>Indexing is the only control here that spends money</strong>, and it
  * says so before it is pressed and reports afterwards what it actually cost.
+ *
+ * <strong>Replacing the file is the same conditional write as any other.</strong>
+ * A document that came from a file can be given a new one; the new text replaces
+ * the old, which means the index no longer describes it and the document needs
+ * indexing again. The page says so before the button is pressed rather than
+ * reporting it afterwards. Replacing is offered only where there is a source to
+ * replace: a written document is edited by typing, and uploading over one would
+ * silently discard what somebody wrote.
  */
 @Component({
   selector: 'app-knowledge-editor',
@@ -64,6 +78,7 @@ export class KnowledgeEditor implements OnInit {
   readonly knowledgeDocumentId = input.required<string>();
 
   protected readonly limits = KNOWLEDGE_LIMITS;
+  protected readonly fileLimits = KNOWLEDGE_FILE_LIMITS;
 
   protected readonly loading = signal(true);
   protected readonly loadFailure = signal<ApiError | null>(null);
@@ -83,11 +98,19 @@ export class KnowledgeEditor implements OnInit {
   protected readonly saving = signal(false);
   protected readonly indexing = signal(false);
   protected readonly changingAvailability = signal(false);
+  protected readonly replacing = signal(false);
 
   protected readonly conflict = signal<ConflictSource | null>(null);
   protected readonly saveFailure = signal<ApiError | null>(null);
   protected readonly indexFailure = signal<ApiError | null>(null);
   protected readonly availabilityFailure = signal<ApiError | null>(null);
+  protected readonly replaceFailure = signal<ApiError | null>(null);
+
+  /** The replacement file, once one is chosen. */
+  protected readonly replacement = signal<File | null>(null);
+
+  /** A reason the chosen replacement was refused before it was ever sent. */
+  protected readonly replacementRefusal = signal<string | null>(null);
 
   /** What the last index attempt actually did, for an honest report. */
   protected readonly lastIndex = signal<{ chunks: number; calls: number; current: boolean } | null>(
@@ -147,6 +170,25 @@ export class KnowledgeEditor implements OnInit {
 
   protected readonly tenantId = computed(() => this.workspace.tenantId() ?? '');
 
+  /** Where this text came from, or null when somebody typed it. */
+  protected readonly source = computed(() => this.document()?.source ?? null);
+
+  /** The source file size, in the words a person uses for it. */
+  protected readonly sourceSize = computed(() => {
+    const source = this.source();
+
+    return source ? describeBytes(source.byteLength) : '';
+  });
+
+  /** Whether pressing Replace would do anything. */
+  protected readonly canReplace = computed(
+    () =>
+      this.replacement() !== null &&
+      this.replacementRefusal() === null &&
+      !this.replacing() &&
+      !this.cannotWrite(),
+  );
+
   /** Whether indexing this document now would actually do anything. */
   protected readonly indexWouldWork = computed(
     () => this.document()?.readiness !== 'Ready' || this.contentChanged(),
@@ -158,9 +200,12 @@ export class KnowledgeEditor implements OnInit {
    * Read in the constructor because that is the only moment it is available:
    * `currentNavigation()` is null once the navigation has finished.
    */
-  private readonly handedOver = this.router.currentNavigation()?.extras.state?.[
-    CREATED_DOCUMENT_STATE
-  ] as Versioned<KnowledgeDocument> | undefined;
+  private readonly handedOver = (() => {
+    const state = this.router.currentNavigation()?.extras.state;
+
+    return (state?.[CREATED_DOCUMENT_STATE] ?? state?.[UPLOADED_DOCUMENT_STATE]) as
+      Versioned<KnowledgeDocument> | undefined;
+  })();
 
   constructor() {
     this.form.controls.title.valueChanges.subscribe((value) => this.titleValue.set(value));
@@ -338,6 +383,112 @@ export class KnowledgeEditor implements OnInit {
     }
   }
 
+  // ------------------------------------------------------------------- source
+
+  /** The words a reader sees for each format. */
+  protected formatName(fileType: KnowledgeFileType): string {
+    switch (fileType) {
+      case 'Pdf':
+        return 'PDF';
+      case 'Docx':
+        return 'Word document';
+      case 'Text':
+        return 'Text file';
+      default:
+        return 'CSV';
+    }
+  }
+
+  /**
+   * Takes the replacement file, and says straight away if it is hopeless.
+   *
+   * The same courtesy checks the upload page makes, with the same standing: the
+   * backend decides what a file really is by reading what is inside it.
+   */
+  protected chooseReplacement(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.item(0) ?? null;
+
+    this.replaceFailure.set(null);
+    this.replacementRefusal.set(null);
+    this.replacement.set(file);
+
+    if (!file) {
+      return;
+    }
+
+    if (file.size === 0) {
+      this.replacementRefusal.set('That file is empty. Choose a file with something in it.');
+
+      return;
+    }
+
+    if (file.size > KNOWLEDGE_FILE_LIMITS.maxBytes) {
+      this.replacementRefusal.set(
+        `That file is ${describeBytes(file.size)}, and uploads must be ` +
+          `${KNOWLEDGE_FILE_LIMITS.maxMegabytes} MB or smaller.`,
+      );
+    }
+  }
+
+  /**
+   * Replaces the file this document was read from.
+   *
+   * Unsaved edits are refused rather than silently thrown away: the new text
+   * replaces the whole document, and doing that over somebody half-finished
+   * typing would destroy work they cannot recover.
+   */
+  protected async replaceSource(): Promise<void> {
+    const file = this.replacement();
+
+    if (!file || !this.canReplace()) {
+      return;
+    }
+
+    if (this.dirty()) {
+      this.replaceFailure.set({
+        kind: 'validation',
+        status: 0,
+        message:
+          'Save or discard your changes first — replacing the file replaces the whole document.',
+      });
+
+      return;
+    }
+
+    this.replacing.set(true);
+    this.replaceFailure.set(null);
+    this.conflict.set(null);
+    this.lastIndex.set(null);
+
+    try {
+      const previous = this.document()?.content;
+
+      this.adopt(
+        await firstValueFrom(
+          this.api.replaceSource(
+            this.tenantId(),
+            this.knowledgeDocumentId(),
+            file,
+            this.etag() as string,
+          ),
+        ),
+      );
+
+      this.replacement.set(null);
+
+      this.toasts.success(
+        previous !== this.document()?.content
+          ? 'File replaced. The text changed, so this document needs indexing again.'
+          : 'That file produced exactly the same text, so nothing changed.',
+      );
+    } catch (error) {
+      this.handleFailure(error, 'source');
+    } finally {
+      this.replacing.set(false);
+    }
+  }
+
   // ----------------------------------------------------------------- conflict
 
   /**
@@ -355,6 +506,7 @@ export class KnowledgeEditor implements OnInit {
     this.saveFailure.set(null);
     this.indexFailure.set(null);
     this.availabilityFailure.set(null);
+    this.replaceFailure.set(null);
 
     await this.load();
   }
@@ -389,6 +541,8 @@ export class KnowledgeEditor implements OnInit {
       this.saveFailure.set(error);
     } else if (source === 'index') {
       this.indexFailure.set(error);
+    } else if (source === 'source') {
+      this.replaceFailure.set(error);
     } else {
       this.availabilityFailure.set(error);
     }

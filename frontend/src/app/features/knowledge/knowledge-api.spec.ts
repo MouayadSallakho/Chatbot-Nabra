@@ -29,6 +29,7 @@ describe('KnowledgeApi', () => {
     createdAt: '2026-09-01T09:00:00+00:00',
     updatedAt: '2026-09-01T09:00:00+00:00',
     indexedAt: null,
+    source: null,
   };
 
   let api: KnowledgeApi;
@@ -90,6 +91,55 @@ describe('KnowledgeApi', () => {
     );
 
     expect(request.request.headers.get('If-Match')).toBe('"v1"');
+
+    request.flush(document, { headers: { ETag: '"v2"' } });
+  });
+
+  it('uploads a file as multipart, with no precondition and no Content-Type', () => {
+    api.uploadFile(tenantId, new File([new Uint8Array(8)], 'plans.csv'), 'Plans').subscribe();
+
+    const request = http.expectOne(
+      (candidate) => candidate.url === `${knowledgeUrl}/files` && candidate.method === 'POST',
+    );
+
+    expect(request.request.body instanceof FormData).toBe(true);
+    expect(((request.request.body as FormData).get('file') as File).name).toBe('plans.csv');
+    expect((request.request.body as FormData).get('title')).toBe('Plans');
+
+    // No precondition: nothing exists yet to be stale. And no Content-Type,
+    // because setting one here would replace the boundary the browser writes
+    // and leave the server with a body it cannot parse.
+    expect(request.request.headers.get('If-Match')).toBeNull();
+    expect(request.request.headers.get('Content-Type')).toBeNull();
+
+    request.flush(document, { headers: { ETag: '"v1"' } });
+  });
+
+  it('leaves the title out entirely when none was given', () => {
+    api.uploadFile(tenantId, new File([new Uint8Array(8)], 'plans.csv')).subscribe();
+
+    const request = http.expectOne(
+      (candidate) => candidate.url === `${knowledgeUrl}/files` && candidate.method === 'POST',
+    );
+
+    // Absent rather than empty: an empty title would be a value the server has
+    // to decide how to read, and the server already knows what to do with none.
+    expect((request.request.body as FormData).get('title')).toBeNull();
+
+    request.flush(document, { headers: { ETag: '"v1"' } });
+  });
+
+  it('sends the precondition when it replaces a source file', () => {
+    api
+      .replaceSource(tenantId, documentId, new File([new Uint8Array(8)], 'plans.csv'), '"v1"')
+      .subscribe();
+
+    const request = http.expectOne(
+      (candidate) => candidate.url === `${documentUrl}/source` && candidate.method === 'PUT',
+    );
+
+    expect(request.request.headers.get('If-Match')).toBe('"v1"');
+    expect(request.request.body instanceof FormData).toBe(true);
 
     request.flush(document, { headers: { ETag: '"v2"' } });
   });

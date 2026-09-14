@@ -119,4 +119,15 @@ internal static class PersistenceSchema
 
     /// <summary>The durable record of every message owed to a customer.</summary>
     public const string WhatsAppDeliveriesTable = "whatsapp_deliveries";
+
+    /// <summary>
+    /// Where each file-backed knowledge document's text came from.
+    /// </summary>
+    /// <remarks>
+    /// Named here because two schema tests read it: one asserts the unique index
+    /// that keeps a document to one file, and one asserts the composite foreign
+    /// key that makes a cross-workspace source unrepresentable. Both would
+    /// otherwise repeat a literal a rename could silently orphan.
+    /// </remarks>
+    public const string KnowledgeSourcesTable = "knowledge_sources";
 }

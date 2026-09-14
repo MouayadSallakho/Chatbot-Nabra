@@ -9,6 +9,7 @@ using OmniAI.Application.Conversations.Realtime;
 using OmniAI.Application.Conversations;
 using OmniAI.Application.Invitations;
 using OmniAI.Application.Knowledge;
+using OmniAI.Application.Knowledge.Files;
 using OmniAI.Application.Knowledge.ListKnowledgeDocuments;
 using OmniAI.Application.Members;
 using OmniAI.Application.WebChat;
@@ -112,6 +113,21 @@ internal sealed partial class DomainProblemDetailsHandler(
     /// <c>Reason</c> names the missing setting or the unreachable dependency and
     /// carries no address, credential or customer text.
     /// </remarks>
+    /// <summary>A short title naming what is wrong with an upload.</summary>
+    /// <remarks>
+    /// Separate from the message because a problem-details title is a category
+    /// and the detail is the explanation. Both are safe to show anybody.
+    /// </remarks>
+    private static string TitleFor(KnowledgeFileRejection reason) => reason switch
+    {
+        KnowledgeFileRejection.TooLarge => "That file is too large",
+        KnowledgeFileRejection.UnsupportedType => "That kind of file is not supported",
+        KnowledgeFileRejection.TypeMismatch => "That file is not what it claims to be",
+        KnowledgeFileRejection.NoText => "No text could be read",
+        KnowledgeFileRejection.TooMuchContent => "That file holds too much content",
+        _ => "That file could not be read",
+    };
+
     private static string OperatorReason(Exception exception, string detail) =>
         exception is PublicChatProtectionUnavailableException unprotected
             ? unprotected.Reason
@@ -475,6 +491,36 @@ internal sealed partial class DomainProblemDetailsHandler(
             StatusCodes.Status503ServiceUnavailable,
             "Credential storage unavailable",
             unprotectedSecret.Message),
+
+        // A file this platform will not ingest. The status follows the reason
+        // rather than being one catch-all 400: "too large" and "not a supported
+        // format" are different problems with different fixes, and a client that
+        // has to read the sentence to tell them apart is a client that cannot.
+        //
+        // The message is the exception's own, which is written for the person who
+        // chose the file and never carries parser detail.
+        KnowledgeFileRejectedException rejected => (
+            rejected.Reason switch
+            {
+                KnowledgeFileRejection.TooLarge => StatusCodes.Status413PayloadTooLarge,
+                KnowledgeFileRejection.UnsupportedType =>
+                    StatusCodes.Status415UnsupportedMediaType,
+
+                // 422 for the rest: the request is well-formed and permitted, and
+                // what is wrong is the content of the file itself. A 400 would
+                // suggest the upload was malformed, which it was not.
+                _ => StatusCodes.Status422UnprocessableEntity,
+            },
+            TitleFor(rejected.Reason),
+            rejected.Message),
+
+        // Somebody tried to replace the file behind a document that was typed.
+        // 409: the request is well-formed and permitted, and contradicts what
+        // the document is.
+        KnowledgeDocumentHasNoSourceException noSource => (
+            StatusCodes.Status409Conflict,
+            "This document has no file",
+            noSource.Message),
 
         // A public caller asking too often. 429, which is exactly what it means,
         // and paired with a Retry-After above.

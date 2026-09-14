@@ -10,13 +10,22 @@ namespace OmniAI.Application.Knowledge.GetKnowledgeDocumentById;
 public sealed record GetKnowledgeDocumentByIdQuery(Guid TenantId, Guid KnowledgeDocumentId);
 
 /// <summary>Reads one document, with the version needed to change it.</summary>
+/// <remarks>
+/// A document uploaded as a file carries its provenance with it. A document
+/// somebody typed carries none, and that absence is the answer rather than a
+/// gap: the two are told apart by whether there is a source at all.
+/// </remarks>
 public sealed class GetKnowledgeDocumentByIdHandler(
     IKnowledgeDocumentRepository documents,
+    IKnowledgeSourceRepository sources,
     TenantAuthorizer authorizer,
     ITextEmbeddingGenerator embeddings)
 {
     private readonly IKnowledgeDocumentRepository _documents =
         documents ?? throw new ArgumentNullException(nameof(documents));
+
+    private readonly IKnowledgeSourceRepository _sources =
+        sources ?? throw new ArgumentNullException(nameof(sources));
 
     private readonly TenantAuthorizer _authorizer =
         authorizer ?? throw new ArgumentNullException(nameof(authorizer));
@@ -44,10 +53,20 @@ public sealed class GetKnowledgeDocumentByIdHandler(
             .FindAsync(tenantId, documentId, cancellationToken)
             .ConfigureAwait(false);
 
-        return stored is null
-            ? null
-            : new Versioned<KnowledgeDocumentView>(
-                KnowledgeDocumentView.From(stored.Value, _embeddings.Profile.Id),
-                stored.Version);
+        if (stored is null)
+        {
+            return null;
+        }
+
+        // Where the text came from is part of what this document is, so it is
+        // read here rather than left to a second request the screen would have to
+        // remember to make.
+        KnowledgeSource? source = await _sources
+            .FindAsync(tenantId, documentId, cancellationToken)
+            .ConfigureAwait(false);
+
+        return new Versioned<KnowledgeDocumentView>(
+            KnowledgeDocumentView.From(stored.Value, _embeddings.Profile.Id, source),
+            stored.Version);
     }
 }

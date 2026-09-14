@@ -106,7 +106,13 @@
             <p class="text-small">
               Somebody else changed it since you opened this page, so your
               {{
-                source === 'content' ? 'save' : source === 'index' ? 'indexing request' : 'change'
+                source === 'content'
+                  ? 'save'
+                  : source === 'index'
+                    ? 'indexing request'
+                    : source === 'source'
+                      ? 'file replacement'
+                      : 'change'
               }}
               was refused. Nothing you have typed has been lost or overwritten. Reload to see the
               latest version — you will be asked first if that would replace unsaved changes.
@@ -213,6 +219,150 @@
         }
       </form>
     </div>
+
+    <!--
+      Where this document came from, and how to give it a new file. Present only
+      for a document that was uploaded: a written one has no file to describe and
+      no file to replace.
+    -->
+    @if (source(); as file) {
+      <div class="page-section">
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">Source file</h2>
+            <p class="text-small text-muted">
+              This document was read out of a file. The file itself was not kept — only the text
+              below and this description of where it came from.
+            </p>
+          </div>
+
+          <div class="card-body source-body">
+            <dl class="source-facts">
+              <div>
+                <dt class="text-caption text-muted">File</dt>
+                <!--
+                  The filename is tenant-supplied text. Interpolated, never
+                  rendered as markup, and never used as a path by anything.
+                -->
+                <dd class="text-small" data-testid="source-name">{{ file.fileName }}</dd>
+              </div>
+              <div>
+                <dt class="text-caption text-muted">Format</dt>
+                <dd class="text-small" data-testid="source-format">
+                  {{ formatName(file.fileType) }}
+                </dd>
+              </div>
+              <div>
+                <dt class="text-caption text-muted">Size</dt>
+                <dd class="text-small">{{ sourceSize() }}</dd>
+              </div>
+              <div>
+                <dt class="text-caption text-muted">Text read</dt>
+                <dd class="text-small">
+                  <time [attr.datetime]="file.extractedAt">
+                    {{ file.extractedAt | date: 'medium' }}
+                  </time>
+                </dd>
+              </div>
+            </dl>
+
+            @if (canManage()) {
+              <div class="field replace-field">
+                <label class="field-label" for="knowledge-replacement">Replace file</label>
+                <input
+                  id="knowledge-replacement"
+                  class="input file-input"
+                  type="file"
+                  [attr.accept]="fileLimits.accept"
+                  (change)="chooseReplacement($event)"
+                  [disabled]="replacing() || cannotWrite()"
+                  aria-describedby="knowledge-replacement-hint"
+                  [attr.aria-invalid]="replacementRefusal() ? 'true' : null"
+                  [attr.aria-errormessage]="
+                    replacementRefusal() ? 'knowledge-replacement-error' : null
+                  "
+                  data-testid="replace-input"
+                />
+                <p class="field-hint" id="knowledge-replacement-hint">
+                  PDF, Word (.docx), plain text or CSV, up to {{ fileLimits.maxMegabytes }} MB.
+                  Uploading a new file replaces this whole document.
+                </p>
+
+                @if (replacement(); as chosen) {
+                  <p class="chosen-file text-small text-secondary" role="status">
+                    <app-icon name="knowledge" [strokeWidth]="1.75" />
+                    <span data-testid="replacement-name">{{ chosen.name }}</span>
+                  </p>
+                }
+
+                @if (replacementRefusal(); as reason) {
+                  <p
+                    class="field-error"
+                    id="knowledge-replacement-error"
+                    role="alert"
+                    data-testid="replacement-refusal"
+                  >
+                    <app-icon name="alert" [strokeWidth]="1.75" />
+                    <span>{{ reason }}</span>
+                  </p>
+                }
+              </div>
+
+              <!--
+                Said before the button is pressed, not reported afterwards. The
+                index describes the old text, and replacing the file makes that
+                index wrong.
+              -->
+              <p class="text-small text-secondary replace-warning">
+                <app-icon name="alert" [strokeWidth]="1.75" />
+                <span>
+                  @if (doc.indexedAt) {
+                    Replacing the file replaces this document's text, so the current index stops
+                    describing it and you will need to index it again.
+                  } @else {
+                    Replacing the file replaces this document's text. It still needs indexing
+                    afterwards.
+                  }
+                </span>
+              </p>
+            }
+
+            @if (replaceFailure(); as error) {
+              <div class="alert alert-danger" role="alert" data-testid="replace-error">
+                <app-icon name="alert" [strokeWidth]="1.75" />
+                <div>
+                  <span>{{ error.message }}</span>
+                  @if (error.kind === 'unprocessable') {
+                    <p class="text-small">
+                      Nothing was changed — this document still holds the text it had before.
+                    </p>
+                  }
+                </div>
+              </div>
+            }
+          </div>
+
+          @if (canManage()) {
+            <div class="card-actions">
+              <button
+                type="button"
+                class="btn btn-secondary"
+                (click)="replaceSource()"
+                [disabled]="!canReplace()"
+                data-testid="replace-button"
+              >
+                @if (replacing()) {
+                  <span class="spinner" aria-hidden="true"></span>
+                }
+                <span class="btn-label">{{
+                  replacing() ? 'Reading the new file…' : 'Replace file'
+                }}</span>
+              </button>
+            </div>
+          }
+        </div>
+      </div>
+    }
 
     <!-- Indexing: the one control on this page that costs money. -->
     <div class="page-section">

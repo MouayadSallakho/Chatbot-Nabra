@@ -42,12 +42,16 @@ Phase 18 put that runtime onto other people's websites: a versioned loader scrip
 a cross-origin iframe on the OmniAI origin, a per-endpoint allowlist of exact
 origins, a header-borne conversation credential that needs no third-party cookie,
 and a postMessage channel that carries nothing but how big the rectangle should
-be. No channel-provider architecture has been designed, and the platform is still
+be. Phase 21 gave that knowledge base a second way in: a workspace administrator
+can upload a PDF, Word document, text file or CSV, and the text read out of it
+becomes an ordinary knowledge document that still has to be indexed deliberately.
+The uploaded file itself is never stored. No channel-provider architecture has
+been designed, and the platform is still
 not authorised for production deployment -- email verification and password
 recovery remain ahead of it, and there is no provider usage accounting, billing or
 alerting behind the safety budget or behind embedding spend.
 
-Sixteen areas have their own documents:
+Seventeen areas have their own documents:
 
 - [multi-tenancy-isolation.md](multi-tenancy-isolation.md) - tenant isolation
 - [conversation-domain.md](conversation-domain.md) - conversation and message modelling
@@ -66,6 +70,7 @@ Sixteen areas have their own documents:
 - [public-chat-protection.md](public-chat-protection.md) - distributed rate limiting, client-network identity, cost safety and the public session lifecycle
 - [knowledge-base-rag.md](knowledge-base-rag.md) - knowledge documents, deterministic chunking, pgvector retrieval and the grounding privilege boundary
 - [human-handoff-realtime-inbox.md](human-handoff-realtime-inbox.md) - AI/human handling, conversation assignment, human reply attribution and idempotency, and the SignalR realtime inbox with its short-lived public tickets
+- [knowledge-file-ingestion.md](knowledge-file-ingestion.md) - uploading business files into Knowledge: what a file is allowed to be, how its text is read within bounds, and why the file itself is never kept
 - [embeddable-web-chat-widget.md](embeddable-web-chat-widget.md) - the loader, the cross-origin iframe, origin allowlisting, the wall between the hosted and embedded transports, and the Development opt-in that keeps an inherited `OPENAI_API_KEY` from spending money
 
 ---
