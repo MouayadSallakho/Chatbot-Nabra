@@ -9,7 +9,8 @@ import {
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
 import { ApiError, toApiError } from '@app/core/api/api-error';
-import { ChatMessage, HostedChatApi } from '../hosted-chat-api';
+import { PublicChatRealtime } from '@app/core/realtime/public-chat-realtime';
+import { ChatHandling, ChatMessage, HostedChatApi } from '../hosted-chat-api';
 import { HostedChatSessionStore } from '../hosted-chat-session';
 
 /** The longest message the hosted chat accepts, matching the server's bound. */
@@ -58,12 +59,23 @@ type ChatState = 'opening' | 'unavailable' | 'ready' | 'failed';
 export class HostedChat implements OnInit {
   private readonly api = inject(HostedChatApi);
   private readonly store = inject(HostedChatSessionStore);
+  private readonly realtime = inject(PublicChatRealtime);
 
   protected readonly state = signal<ChatState>('opening');
   protected readonly agentName = signal('');
   protected readonly messages = signal<readonly ChatMessage[]>([]);
   protected readonly sending = signal(false);
   protected readonly sendFailure = signal<ApiError | null>(null);
+
+  /**
+   * Who is answering, as the server last told this page.
+   *
+   * Starts at the ordinary case. It changes when a turn comes back saying a
+   * person has taken over, and it is what the view uses to say so plainly
+   * instead of leaving the visitor waiting for a reply that is not coming from
+   * a machine.
+   */
+  protected readonly handling = signal<ChatHandling>('Ai');
   protected readonly openFailure = signal<ApiError | null>(null);
 
   /** The conversation this page is talking in, once there is one. */
@@ -176,11 +188,33 @@ export class HostedChat implements OnInit {
 
       this.conversation.set(remembered);
       this.messages.set(page.items);
+      this.handling.set(page.handling);
+
+      await this.watch(remembered);
     } catch (error) {
       if (toApiError(error).kind === 'notFound') {
         this.store.clear(publicKey);
       }
     }
+  }
+
+  /**
+   * Starts listening for replies to this conversation.
+   *
+   * <strong>The cookie is not what authorises the socket.</strong> It is spent
+   * on a ticket first, through a route that already checks it — see the API
+   * client. That is what keeps a credential this script cannot even read out of
+   * a URL that every proxy logs.
+   *
+   * Failure is silent. A visitor whose live updates did not start still sends
+   * and receives perfectly; they simply see a reply when they next send or
+   * reload, which is how this page worked before live updates existed.
+   */
+  private async watch(conversationId: string): Promise<void> {
+    await this.realtime.listen(
+      () => this.api.realtimeTicket(conversationId),
+      () => void this.refreshTranscript(),
+    );
   }
 
   /**
@@ -213,9 +247,25 @@ export class HostedChat implements OnInit {
     try {
       const conversationId = await this.ensureConversation(publicKey);
 
+      // Listening starts as soon as there is something to listen to, and before
+      // the turn is attempted. Subscribing only after a successful send would
+      // leave a visitor whose first turn failed with no live updates at all --
+      // which is precisely when a colleague is most likely to step in.
+      await this.watch(conversationId);
+
       const turn = await firstValueFrom(this.api.send(conversationId, clientMessageId, text));
 
-      this.messages.update((current) => [...current, turn.customerMessage, turn.reply]);
+      this.handling.set(turn.handling);
+
+      // A turn with no reply is a success: a person is handling this
+      // conversation and will answer. Appending a placeholder, or showing an
+      // error, would both be telling the visitor something untrue.
+      this.messages.update((current) =>
+        turn.reply === null
+          ? [...current, turn.customerMessage]
+          : [...current, turn.customerMessage, turn.reply],
+      );
+
       this.form.controls.message.setValue('');
     } catch (error) {
       this.sendFailure.set(this.explain(toApiError(error)));
@@ -377,6 +427,10 @@ export class HostedChat implements OnInit {
       const page = await firstValueFrom(this.api.messages(conversationId));
 
       this.messages.set(page.items);
+
+      // The mode comes back with every read, so a takeover reaches the visitor
+      // on the next notification rather than when somebody happens to reply.
+      this.handling.set(page.handling);
     } catch {
       // Leave what is on screen. A failed refresh must not also erase the
       // conversation the visitor can see.

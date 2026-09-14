@@ -4,8 +4,21 @@
     Api is the composition root: hosting, HTTP surface and dependency wiring.
     Business rules must not live here.
   -->
+  <!--
+    The hubs and the realtime notifier are internal: nothing outside this
+    assembly should be able to name a hub type, and making one public to the
+    whole solution would invite exactly that. The API integration suite is the
+    exception, because proving the Redis backplane actually carries an
+    announcement between two instances means constructing both instances.
+  -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="OmniAI.Api.IntegrationTests" />
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <!-- Redis backplane for SignalR, so realtime survives a second instance. -->
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.StackExchangeRedis" />
   </ItemGroup>
 
   <ItemGroup>

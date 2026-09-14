@@ -1,7 +1,7 @@
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
-import { ChatMessagePage, ChatTurn } from '@app/features/chat/hosted-chat-api';
+import { ChatMessagePage, ChatTurn, RealtimeTicket } from '@app/features/chat/hosted-chat-api';
 
 /** The header carrying the website the browser reported the widget is on. */
 const ORIGIN_HEADER = 'X-OmniAI-Embed-Origin';
@@ -104,5 +104,29 @@ export class EmbedChatApi {
     const headers = new HttpHeaders().set(ORIGIN_HEADER, parentOrigin);
 
     return credential ? headers.set(SESSION_HEADER, credential) : headers;
+  }
+
+  /**
+   * Exchanges the embedded credential for a short-lived realtime ticket.
+   *
+   * <strong>The credential is readable by script here, which is exactly why it
+   * must not travel in a URL.</strong> It lives in this iframe's own
+   * `sessionStorage` and goes out in a header on every request; a websocket
+   * address cannot carry a header, so without this exchange it would end up in
+   * a query string the embedding page's network panel shows.
+   *
+   * The website is re-checked against the workspace's allowlist on this
+   * request, so a site removed a second ago mints nothing.
+   */
+  realtimeTicket(
+    conversationId: string,
+    parentOrigin: string,
+    credential: string,
+  ): Observable<RealtimeTicket> {
+    return this.http.post<RealtimeTicket>(
+      `/api/public/embed/conversations/${conversationId}/realtime-ticket`,
+      {},
+      { headers: this.headers(parentOrigin, credential) },
+    );
   }
 }

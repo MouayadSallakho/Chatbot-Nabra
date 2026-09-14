@@ -93,6 +93,7 @@ public sealed class SendWebChatMessageHandler(
     IAiTextGenerator generator,
     IConversationLock conversationLock,
     IPublicChatProtection protection,
+    IConversationRealtimeNotifier realtime,
     KnowledgeRetriever knowledge,
     ConversationContextPolicy context,
     WebChatPolicy policy,
@@ -121,6 +122,9 @@ public sealed class SendWebChatMessageHandler(
 
     private readonly IPublicChatProtection _protection =
         protection ?? throw new ArgumentNullException(nameof(protection));
+
+    private readonly IConversationRealtimeNotifier _realtime =
+        realtime ?? throw new ArgumentNullException(nameof(realtime));
 
     private readonly KnowledgeRetriever _knowledge =
         knowledge ?? throw new ArgumentNullException(nameof(knowledge));
@@ -222,6 +226,17 @@ public sealed class SendWebChatMessageHandler(
             return settled;
         }
 
+        // Who is answering, read inside the lock. Earlier would be reading a
+        // value a takeover is free to change while this request queues, and
+        // acting on it would mean generating a reply for a conversation somebody
+        // has already taken over -- the exact contradiction the lock exists to
+        // rule out.
+        ConversationHandling handling =
+            await _store.ReadHandlingAsync(conversationId, cancellationToken).ConfigureAwait(false)
+            ?? ConversationHandling.Ai;
+
+        bool answeredByAi = handling == ConversationHandling.Ai;
+
         // The expensive budget, consumed here and nowhere else: past both
         // idempotency checks and inside the lock, so this request is the one that
         // is genuinely about to call a provider. A duplicate never reaches this
@@ -230,11 +245,22 @@ public sealed class SendWebChatMessageHandler(
         //
         // Before the customer's message is stored, so a refusal leaves no trace:
         // no message, no turn, and nothing claiming a generation happened.
-        await RequireAllowedAsync(() => _protection.AuthoriseGenerationAsync(
-                session.TenantId,
-                conversationId,
-                cancellationToken))
-            .ConfigureAwait(false);
+        //
+        // Not consumed at all when a person is handling the conversation: the
+        // budget counts generation attempts, and there is not going to be one.
+        // Charging a workspace for turns its own staff answer by hand would make
+        // taking a conversation over cost money. The per-client request limit
+        // still applies -- it was checked above, before any of this -- so human
+        // mode is not a way around the protection, only around the part of it
+        // that meters spending.
+        if (answeredByAi)
+        {
+            await RequireAllowedAsync(() => _protection.AuthoriseGenerationAsync(
+                    session.TenantId,
+                    conversationId,
+                    cancellationToken))
+                .ConfigureAwait(false);
+        }
 
         DateTimeOffset now = _clock.GetUtcNow();
 
@@ -251,8 +277,61 @@ public sealed class SendWebChatMessageHandler(
             throw new WebChatTurnInProgressException();
         }
 
+        if (!answeredByAi)
+        {
+            return await LeaveForHumanAsync(session, turn, text, now, cancellationToken)
+                .ConfigureAwait(false);
+        }
+
         return await AnswerAsync(session, agent, turn, text, now, cancellationToken)
             .ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Closes a turn a person is going to answer, without retrieving or
+    /// generating anything.
+    /// </summary>
+    /// <remarks>
+    /// <strong>This is the whole of human mode on the customer's side.</strong>
+    /// The message is stored -- it was stored before this method was reached --
+    /// the turn is settled so a retry replays rather than restarts, and the
+    /// result says a person is handling it. No embedding is requested, no
+    /// provider is called, and nothing is spent.
+    /// <para>
+    /// <strong>It is a success, not a failure.</strong> Reporting 503 here
+    /// because the AI was deliberately bypassed would tell a visitor their
+    /// message did not arrive, when it did, and would put a non-incident into
+    /// every count of how often the runtime breaks.
+    /// </para>
+    /// <para>
+    /// The workspace is told, so whoever took the conversation over sees the new
+    /// message without doing anything. That announcement carries an identifier
+    /// and no text.
+    /// </para>
+    /// </remarks>
+    private async Task<WebChatTurnResult> LeaveForHumanAsync(
+        WebChatSession session,
+        ConversationTurn turn,
+        string text,
+        DateTimeOffset sentAt,
+        CancellationToken cancellationToken)
+    {
+        await _store
+            .SettleWithoutReplyAsync(turn, _clock.GetUtcNow(), cancellationToken)
+            .ConfigureAwait(false);
+
+        await _realtime
+            .AnnounceQuietlyAsync(session.TenantId, session.ConversationId, cancellationToken)
+            .ConfigureAwait(false);
+
+        return new WebChatTurnResult(
+            new PublicChatMessageView(
+                turn.CustomerMessageId.Value,
+                nameof(MessageSender.Customer),
+                text,
+                sentAt),
+            Reply: null,
+            nameof(ConversationHandling.Human));
     }
 
     /// <summary>
@@ -320,13 +399,20 @@ public sealed class SendWebChatMessageHandler(
             .CompleteTurnAsync(turn, result.Text, _clock.GetUtcNow(), cancellationToken)
             .ConfigureAwait(false);
 
+        // The workspace's own screens are watching this conversation too, and an
+        // AI turn changes it as much as a human one does.
+        await _realtime
+            .AnnounceQuietlyAsync(session.TenantId, session.ConversationId, cancellationToken)
+            .ConfigureAwait(false);
+
         return new WebChatTurnResult(
             new PublicChatMessageView(
                 turn.CustomerMessageId.Value,
                 nameof(MessageSender.Customer),
                 text,
                 sentAt),
-            ToView(reply, MessageSender.AiAgent));
+            ToView(reply, MessageSender.AiAgent),
+            nameof(ConversationHandling.Ai));
     }
 
     /// <summary>
@@ -435,17 +521,27 @@ public sealed class SendWebChatMessageHandler(
                     .FindCustomerMessageAsync(existing, cancellationToken)
                     .ConfigureAwait(false);
 
-                if (reply is null || customer is null)
+                if (customer is null)
                 {
-                    // A completed turn always names both. Missing one means the
-                    // rows have been tampered with, and answering again would
-                    // spend money to cover it up.
+                    // Every completed turn names the message that started it.
+                    // Missing it means the rows have been tampered with, and
+                    // answering again would spend money to cover it up.
                     throw new AiResponseInvalidException();
                 }
 
-                return new WebChatTurnResult(
-                    ToView(customer, MessageSender.Customer),
-                    ToView(reply, MessageSender.AiAgent));
+                // A missing reply is not damage any more: a turn settled while a
+                // person was handling the conversation has no reply and never
+                // will. Replaying it returns exactly what the first attempt
+                // returned -- the customer's own message, and no answer.
+                return reply is null
+                    ? new WebChatTurnResult(
+                        ToView(customer, MessageSender.Customer),
+                        Reply: null,
+                        nameof(ConversationHandling.Human))
+                    : new WebChatTurnResult(
+                        ToView(customer, MessageSender.Customer),
+                        ToView(reply, MessageSender.AiAgent),
+                        nameof(ConversationHandling.Ai));
 
             case ConversationTurnStatus.Failed:
                 throw new WebChatTurnAlreadyFailedException();

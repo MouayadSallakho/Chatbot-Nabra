@@ -1,5 +1,7 @@
 using System.Globalization;
 using OmniAI.Api.Security;
+using OmniAI.Domain.WebChat;
+using OmniAI.Application.Conversations.Realtime;
 using OmniAI.Application.WebChat.Hosted;
 using OmniAI.Application.WebChat.Protection;
 
@@ -89,6 +91,15 @@ internal static class HostedChatEndpoints
         chat.MapPost("/{publicKey}/conversations", StartConversationAsync)
             .AddEndpointFilter<AntiforgeryEndpointFilter>()
             .WithName("StartWebChatConversation");
+
+        // Exchanges the conversation's own credential for a realtime ticket.
+        //
+        // A POST, because it mints something. Antiforgery-protected like every
+        // other hosted write: the credential here is an ambient cookie, so the
+        // same reasoning that puts a token on sending a message puts one here.
+        chat.MapPost("/conversations/{conversationId:guid}/realtime-ticket", IssueTicketAsync)
+            .AddEndpointFilter<AntiforgeryEndpointFilter>()
+            .WithName("IssueHostedRealtimeTicket");
 
         chat.MapGet("/conversations/{conversationId:guid}/messages", ListMessagesAsync)
             .WithName("ListWebChatMessages");
@@ -206,7 +217,8 @@ internal static class HostedChatEndpoints
         return Results.Ok(
             new ChatMessagePageResponse(
                 [.. page.Items.Select(ChatMessageResponse.From)],
-                page.NextCursor));
+                page.NextCursor,
+                page.Handling));
     }
 
     /// <summary><c>POST /api/public/webchat/conversations/{conversationId}/messages</c>.</summary>
@@ -241,7 +253,8 @@ internal static class HostedChatEndpoints
         return Results.Ok(
             new ChatTurnResponse(
                 ChatMessageResponse.From(turn.CustomerMessage),
-                ChatMessageResponse.From(turn.Reply)));
+                ChatMessageResponse.FromOrNull(turn.Reply),
+                turn.Handling));
     }
 
     /// <summary>
@@ -255,6 +268,41 @@ internal static class HostedChatEndpoints
     /// </remarks>
     private static string? ReadCredential(HttpContext http) =>
         http.Request.Cookies.TryGetValue(SessionCookieName, out string? token) ? token : null;
+
+    /// <summary>
+    /// <c>POST /api/public/webchat/conversations/{id}/realtime-ticket</c>.
+    /// </summary>
+    /// <remarks>
+    /// <strong>The cookie is spent here and goes no further.</strong> It stays
+    /// where it is -- <c>HttpOnly</c>, path-scoped, unreadable by script -- and
+    /// what the page receives instead is a ticket it may put in a URL, because a
+    /// ticket in a URL costs nothing. Putting the credential itself in a
+    /// websocket address would undo every one of those properties in a single
+    /// line.
+    /// <para>
+    /// Refusal is the same 404 every other route on this conversation gives, so
+    /// this does not become a way to ask whether a conversation exists.
+    /// </para>
+    /// </remarks>
+    private static async Task<IResult> IssueTicketAsync(
+        Guid conversationId,
+        HttpContext http,
+        IssueRealtimeTicketHandler handler,
+        CancellationToken cancellationToken)
+    {
+        RealtimeTicket? ticket = await handler
+            .HandleAsync(
+                new IssueRealtimeTicketCommand(
+                    conversationId,
+                    ReadCredential(http),
+                    WebChatClientMode.Hosted),
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        return ticket is null
+            ? Results.NotFound()
+            : Results.Ok(new RealtimeTicketResponse(ticket.Value, ticket.ExpiresInSeconds));
+    }
 
     /// <summary>
     /// The path one conversation's credential is scoped to.

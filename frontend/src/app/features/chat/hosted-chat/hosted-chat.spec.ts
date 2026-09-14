@@ -117,6 +117,26 @@ describe('HostedChat', () => {
         text: reply,
         sentAt: '2026-09-07T12:00:01Z',
       },
+      handling: 'Ai',
+    };
+  }
+
+  /**
+   * A turn accepted while a person is handling the conversation.
+   *
+   * No reply, and that is a success rather than a failure: the message was
+   * stored and a colleague will answer it.
+   */
+  function humanTurn(customerText: string) {
+    return {
+      customerMessage: {
+        id: `c-${customerText}`,
+        sender: 'Customer',
+        text: customerText,
+        sentAt: '2026-09-07T12:00:00Z',
+      },
+      reply: null,
+      handling: 'Human',
     };
   }
 
@@ -794,5 +814,67 @@ describe('HostedChat', () => {
     await settle();
 
     expect(host().querySelector('[role="alert"]')).not.toBeNull();
+  });
+
+  // ---- A person takes over ---------------------------------------------
+
+  it('says a person will reply, and shows no fake typing indicator', async () => {
+    // A turn with no reply is not an error. Showing one would tell a visitor
+    // their message did not arrive, when it did — and a typing indicator when
+    // nobody may be at their desk is a promise the platform cannot keep.
+    await open();
+    await sendFirst('Where is my order?');
+
+    http.expectOne(messagesUrl).flush(humanTurn('Where is my order?'));
+    await settle();
+
+    expect(text()).toContain('A support team member will reply here.');
+    expect(text()).not.toContain('is typing');
+    expect(alertText()).toBe('');
+
+    // The visitor's own message is on screen, and no reply was invented.
+    expect(text()).toContain('Where is my order?');
+  });
+
+  it('labels a reply from a person Support, never an employee', async () => {
+    // The disclosure boundary as the visitor sees it. The server sends a role
+    // and no identity, and this asserts the client renders the role.
+    window.sessionStorage.setItem(resumeKey, conversationId);
+
+    openAt(publicKey);
+    await mount();
+
+    http.expectOne(configUrl).flush({ agentName: 'Concierge', available: true });
+    await settle();
+
+    http.expectOne(messagesUrl).flush({
+      items: [
+        { id: 'c1', sender: 'Customer', text: 'Where is it?', sentAt: '2026-09-07T12:00:00Z' },
+        {
+          id: 'h1',
+          sender: 'HumanAgent',
+          text: 'We refunded it this morning.',
+          sentAt: '2026-09-07T12:01:00Z',
+        },
+      ],
+      nextCursor: null,
+
+      // The server sends the mode with every transcript read, which is how a
+      // visitor learns a person has taken over without waiting for them to
+      // reply. A fixture without it would be testing a response shape the API
+      // does not produce.
+      handling: 'Human',
+    });
+    await settle();
+
+    expect(text()).toContain('Support');
+    expect(text()).toContain('We refunded it this morning.');
+
+    // Nothing resembling a colleague's address reached the page.
+    expect(text()).not.toContain('@');
+
+    // A resumed conversation that already has a human reply is known to be in
+    // human mode, so the visitor is told rather than left waiting on an AI.
+    expect(text()).toContain('A support team member will reply here.');
   });
 });

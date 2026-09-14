@@ -71,3 +71,64 @@
   justify-content: center;
   margin-block-start: var(--space-4);
 }
+
+// Handling and assignment, side by side on a wide screen and stacked on a
+// narrow one. Not a grid with fixed columns: the two controls are different
+// widths and a select that has to fit an email address is the wider of them.
+.handling-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-6);
+  align-items: flex-start;
+}
+
+.handling-action {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  flex: 1 1 16rem;
+}
+
+// The word, not the colour, is what says who is answering. The colour agrees
+// with it; it does not carry it alone.
+.handling {
+  font: var(--text-body-strong);
+}
+
+.handling-human {
+  color: var(--color-accent-strong);
+}
+
+// A human reply sits with the agent's, because to the customer they are both
+// the business talking. The left border is what distinguishes them from each
+// other, and the sender label above says which is which.
+.message-human {
+  border-inline-start: 3px solid var(--color-accent-strong);
+  padding-inline-start: var(--space-3);
+}
+
+.composer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-block-start: var(--space-5);
+}
+
+.composer-input {
+  width: 100%;
+  resize: vertical;
+  min-height: 5rem;
+}
+
+.composer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: center;
+  justify-content: space-between;
+}
+
+.composer-hint {
+  margin-block-start: var(--space-5);
+}

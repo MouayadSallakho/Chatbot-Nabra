@@ -74,6 +74,30 @@
     <PackageVersion Include="StackExchange.Redis" Version="3.1.31" />
   </ItemGroup>
 
+  <ItemGroup Label="Realtime">
+    <!--
+      SignalR itself is part of the ASP.NET Core shared framework and needs no
+      package. This one is the Redis backplane, and it is the difference between
+      realtime that works and realtime that works on one instance.
+
+      Without it, a hub only ever reaches the browsers connected to the process
+      that raised the event. With two instances behind a load balancer that is not
+      an error anybody sees. It is an inbox that updates for roughly half the
+      staff, intermittently, depending on which instance their websocket landed
+      on. The failure is silent, load-dependent and absent from every local test,
+      which is exactly the kind this platform refuses to ship.
+
+      It uses the Redis connection the public-chat protection already configures.
+      A second Redis would be a second thing to run, and this needs no isolation
+      from the counters: the key spaces do not overlap, and unlike the counters
+      this traffic is best-effort by design.
+
+      10.0.11 matches the ASP.NET Core version every other Microsoft package here
+      is pinned to.
+    -->
+    <PackageVersion Include="Microsoft.AspNetCore.SignalR.StackExchangeRedis" Version="10.0.11" />
+  </ItemGroup>
+
   <ItemGroup Label="Testing">
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <!--

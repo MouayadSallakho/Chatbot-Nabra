@@ -73,8 +73,8 @@ public sealed class WebChatRuntimeTests
         Assert.NotNull(turn);
         Assert.Equal("Do you deliver on Sundays?", turn.CustomerMessage.Text);
         Assert.Equal("Customer", turn.CustomerMessage.Sender);
-        Assert.Equal("The answer.", turn.Reply.Text);
-        Assert.Equal("AiAgent", turn.Reply.Sender);
+        Assert.Equal("The answer.", turn.Reply!.Text);
+        Assert.Equal("AiAgent", turn.Reply!.Sender);
 
         Assert.Equal(1, harness.Generator.Calls);
 
@@ -173,7 +173,7 @@ public sealed class WebChatRuntimeTests
 
         // The same stored rows, not a fresh pair that happens to read alike.
         Assert.Equal(first.CustomerMessage.Id, repeat.CustomerMessage.Id);
-        Assert.Equal(first.Reply.Id, repeat.Reply.Id);
+        Assert.Equal(first.Reply!.Id, repeat.Reply!.Id);
 
         Assert.Equal(1, harness.Generator.Calls);
         Assert.Single(harness.World.Turns);

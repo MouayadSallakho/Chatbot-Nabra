@@ -73,10 +73,20 @@
             <li
               class="bubble"
               [class.bubble-customer]="message.sender === 'Customer'"
-              [class.bubble-agent]="message.sender === 'AiAgent'"
+              [class.bubble-agent]="message.sender !== 'Customer'"
             >
+              <!--
+                A reply from a person is labelled "Support", never with an
+                employee's name or address. The server does not send one and
+                there is no field here to put one in: who at the business
+                answered is the business's information, not the customer's.
+              -->
               <span class="bubble-sender">{{
-                message.sender === 'Customer' ? 'You' : agentName()
+                message.sender === 'Customer'
+                  ? 'You'
+                  : message.sender === 'HumanAgent'
+                    ? 'Support'
+                    : agentName()
               }}</span>
               <span class="bubble-text">{{ message.text }}</span>
             </li>
@@ -87,9 +97,22 @@
           }
         </ol>
 
-        @if (sending()) {
+        <!--
+          No typing indicator while a person is handling this. "Somebody is
+          typing" when nobody may be at their desk is a promise the platform
+          cannot keep, and a fake one aimed at a waiting customer is worse than
+          silence. What they get instead is the truth: a person has this, and
+          the reply will appear here.
+        -->
+        @if (sending() && handling() === 'Ai') {
           <p class="chat-status text-small text-muted" role="status">
             {{ agentName() }} is typing…
+          </p>
+        }
+
+        @if (handling() === 'Human') {
+          <p class="chat-status chat-handover text-small" role="status">
+            A support team member will reply here.
           </p>
         }
 

@@ -92,7 +92,21 @@
                 </span>
               </span>
 
-              <span class="conversation-agent">{{ conversation.agentName ?? '—' }}</span>
+              <span class="conversation-agent">
+                {{ conversation.agentName ?? '—' }}
+                <!--
+                  Shown only when a person has taken the conversation over. A
+                  badge on every row saying "AI" would be noise on the ordinary
+                  case; what a supervisor scans this list for is the exception.
+                  It is a word, not a colour.
+                -->
+                @if (conversation.handling === 'Human') {
+                  <span class="badge badge-accent">Human</span>
+                }
+                @if (conversation.assignedTo; as member) {
+                  <span class="text-small text-muted assigned">{{ member.email }}</span>
+                }
+              </span>
 
               <span class="conversation-activity">
                 {{ conversation.lastActivityAt | date: 'medium' }}

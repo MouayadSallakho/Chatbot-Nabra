@@ -1,4 +1,5 @@
 using OmniAI.Application.Conversations.Persistence;
+using OmniAI.Application.WebChat.Persistence;
 using OmniAI.Domain.Conversations;
 using OmniAI.Domain.WebChat;
 
@@ -36,10 +37,14 @@ public sealed record ListWebChatMessagesQuery(
 public sealed class ListWebChatMessagesHandler(
     PublicWebChatAccess access,
     IConversationRepository conversations,
+    IWebChatRuntimeStore store,
     WebChatPolicy policy)
 {
     private readonly PublicWebChatAccess _access =
         access ?? throw new ArgumentNullException(nameof(access));
+
+    private readonly IWebChatRuntimeStore _store =
+        store ?? throw new ArgumentNullException(nameof(store));
 
     private readonly IConversationRepository _conversations =
         conversations ?? throw new ArgumentNullException(nameof(conversations));
@@ -77,9 +82,15 @@ public sealed class ListWebChatMessagesHandler(
             .ListMessagesAsync(session.ConversationId, query.AfterSequence, limit, cancellationToken)
             .ConfigureAwait(false);
 
+        ConversationHandling handling = await _store
+            .ReadHandlingAsync(session.ConversationId, cancellationToken)
+            .ConfigureAwait(false)
+            ?? ConversationHandling.Ai;
+
         return new PublicChatMessagePage(
             [.. page.Items.Where(Visible).Select(ToView)],
-            page.NextCursor);
+            page.NextCursor,
+            handling.ToString());
     }
 
     /// <summary>
@@ -87,14 +98,30 @@ public sealed class ListWebChatMessagesHandler(
     /// </summary>
     /// <remarks>
     /// Platform audit notes are not part of the conversation as far as the person
-    /// having it is concerned, and a human agent's messages cannot exist yet.
+    /// having it is concerned. A human agent's messages are: somebody at the
+    /// workspace wrote them to this visitor, and withholding them would mean the
+    /// customer could not read the reply they were waiting for.
     /// Filtering here rather than in the query keeps the cursor meaningful: pages
     /// are still cut on the stored ingestion sequence, so a filtered message does
     /// not shift the boundary between pages.
     /// </remarks>
     private static bool Visible(ConversationMessageRecord message) =>
-        message.Sender is MessageSender.Customer or MessageSender.AiAgent;
+        message.Sender is MessageSender.Customer
+            or MessageSender.AiAgent
+            or MessageSender.HumanAgent;
 
+    /// <summary>
+    /// Narrows a stored message to what its own visitor may see.
+    /// </summary>
+    /// <remarks>
+    /// <strong><c>SentBy</c> is dropped here, and that is the only reason this
+    /// method is worth a comment.</strong> The stored record names the employee
+    /// who wrote a reply, because an administrator looking at their own team
+    /// needs to know. A customer does not, and an email address is a real
+    /// person's contact details: the sender a visitor is told about is the role
+    /// that wrote it, never the individual. The view type has no field for one,
+    /// so this cannot be undone by forgetting.
+    /// </remarks>
     private static PublicChatMessageView ToView(ConversationMessageRecord message) =>
         new(message.Id, message.Sender.ToString(), message.Text, message.SentAt);
 }

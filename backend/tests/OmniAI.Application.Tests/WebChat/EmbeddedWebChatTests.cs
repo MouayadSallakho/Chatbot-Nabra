@@ -429,7 +429,7 @@ public sealed class EmbeddedWebChatTests
 
         Assert.NotNull(turn);
         Assert.Equal("Hello", turn.CustomerMessage.Text);
-        Assert.NotEmpty(turn.Reply.Text);
+        Assert.NotEmpty(turn.Reply!.Text);
 
         // The conversation lock, the idempotency key and the generator are the
         // hosted ones, because this is the hosted runtime.
@@ -456,7 +456,7 @@ public sealed class EmbeddedWebChatTests
 
         Assert.NotNull(first);
         Assert.NotNull(retry);
-        Assert.Equal(first.Reply.Text, retry.Reply.Text);
+        Assert.Equal(first.Reply!.Text, retry.Reply!.Text);
 
         // The workspace paid for one answer, not two.
         Assert.Equal(1, harness.Generator.Calls);

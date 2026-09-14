@@ -1,4 +1,5 @@
 using OmniAI.Application.Authorization;
+using OmniAI.Application.Concurrency;
 using OmniAI.Application.Conversations.Persistence;
 using OmniAI.Domain.Authorization;
 using OmniAI.Domain.Conversations;
@@ -44,10 +45,13 @@ public sealed class ConversationReadPolicy
 /// Reading conversations, for people who administer the workspace.
 /// </summary>
 /// <remarks>
-/// <strong>Read-only, and that is the whole capability.</strong> There is no
-/// reply, no assignment, no note, no close and no delete, because none of those
-/// workflows exists — and a read model is the honest shape for a phase that has
-/// built a runtime rather than an inbox.
+/// <strong>Still read-only, and still the whole capability of this type.</strong>
+/// Replying, taking over and routing now exist, and each is its own use case with
+/// its own permission and its own conditional write. They are deliberately not
+/// methods here: a reader needs <c>conversations.view</c> and nothing else, and
+/// keeping the read path free of every write concern is what makes that easy to
+/// see. There is still no note, no close and no delete, because none of those
+/// workflows exists.
 /// <para>
 /// <strong>Every operation names the tenant, and the predicate carries it.</strong>
 /// A conversation id from another workspace is not a shortcut into it: the lookup
@@ -109,7 +113,7 @@ public sealed class ReadConversationsHandler(
     /// or no such conversation belongs to this workspace. Deliberately the same
     /// answer for both.
     /// </returns>
-    public async Task<ConversationDetail?> GetAsync(
+    public async Task<Versioned<ConversationDetail>?> GetAsync(
         GetConversationQuery query,
         CancellationToken cancellationToken = default)
     {

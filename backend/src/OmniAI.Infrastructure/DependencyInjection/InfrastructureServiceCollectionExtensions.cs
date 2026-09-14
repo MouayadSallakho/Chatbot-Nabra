@@ -109,6 +109,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<IWebChatEndpointRepository, WebChatEndpointRepository>();
         services.AddScoped<IWebChatRuntimeStore, WebChatRuntimeStore>();
         services.AddScoped<IConversationRepository, ConversationRepository>();
+        services.AddScoped<IConversationInboxStore, ConversationInboxStore>();
 
         // Both mint values, neither holds state, and the primitives behind them
         // are static and thread-safe -- so one instance serves every caller. They

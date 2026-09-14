@@ -1,6 +1,8 @@
+using OmniAI.Application.Concurrency;
 using OmniAI.Domain.AiAgents;
 using OmniAI.Domain.Conversations;
 using OmniAI.Domain.Tenants;
+using OmniAI.Domain.Users;
 
 namespace OmniAI.Application.Conversations.Persistence;
 
@@ -17,12 +19,29 @@ namespace OmniAI.Application.Conversations.Persistence;
 /// is also the pagination cursor, because it is the only value that is both
 /// stable and strictly increasing in the order history is read.
 /// </param>
+/// <param name="SentBy">
+/// For a message a person sent, who sent it. <see langword="null"/> for every
+/// other sender, and never read by a public transport: a visitor is told the
+/// business replied, not which employee typed it.
+/// </param>
 public sealed record ConversationMessageRecord(
     Guid Id,
     MessageSender Sender,
     string Text,
     DateTimeOffset SentAt,
-    long IngestionSequence);
+    long IngestionSequence,
+    ConversationMessageAuthor? SentBy = null);
+
+/// <summary>
+/// The person behind a human reply, for the workspace's own screens.
+/// </summary>
+/// <remarks>
+/// Carries the email because an administrator looking at their own team needs to
+/// know who said something, and inside the workspace that is not a disclosure.
+/// It leaves through the admin API and no other: the public transports drop it
+/// before a view is built, and a test asserts they do.
+/// </remarks>
+public sealed record ConversationMessageAuthor(Guid UserId, string Email);
 
 /// <summary>One page of a conversation's history.</summary>
 /// <param name="Items">Messages in ingestion order, oldest first.</param>
@@ -44,12 +63,14 @@ public sealed record ConversationSummary(
     Guid Id,
     ChannelKind Channel,
     ConversationStatus Status,
+    ConversationHandling Handling,
     DateTimeOffset StartedAt,
     DateTimeOffset LastActivityAt,
     string? AiAgentName,
     int MessageCount,
     string? LastMessagePreview,
-    MessageSender? LastMessageSender);
+    MessageSender? LastMessageSender,
+    ConversationMessageAuthor? AssignedTo);
 
 /// <summary>A page of conversations.</summary>
 public sealed record ConversationPage(
@@ -63,10 +84,12 @@ public sealed record ConversationDetail(
     Guid Id,
     ChannelKind Channel,
     ConversationStatus Status,
+    ConversationHandling Handling,
     DateTimeOffset StartedAt,
     DateTimeOffset LastActivityAt,
     string? AiAgentName,
-    int MessageCount);
+    int MessageCount,
+    ConversationMessageAuthor? AssignedTo);
 
 /// <summary>
 /// Reading conversations, for administrators and for the visitors who own them.
@@ -101,7 +124,12 @@ public interface IConversationRepository
     /// Null covers both "no such conversation" and "that conversation belongs to
     /// another workspace", deliberately indistinguishably.
     /// </remarks>
-    Task<ConversationDetail?> FindAsync(
+    /// <remarks>
+    /// Versioned, because the admin screens do not only read a conversation any
+    /// more: taking one over and routing it are conditional writes, and the
+    /// version the reader saw is what they must present back.
+    /// </remarks>
+    Task<Versioned<ConversationDetail>?> FindAsync(
         TenantId tenantId,
         ConversationId conversationId,
         CancellationToken cancellationToken = default);

@@ -18,21 +18,52 @@ export interface StartedConversation {
 /** One message in the visitor's own transcript. */
 export interface ChatMessage {
   readonly id: string;
-  readonly sender: 'Customer' | 'AiAgent';
+  /**
+   * Who wrote it.
+   *
+   * `HumanAgent` says a person at the business replied. It names a role and
+   * never an individual: there is no field here for an employee's name or
+   * address, and the server does not send one.
+   */
+  readonly sender: 'Customer' | 'AiAgent' | 'HumanAgent';
   readonly text: string;
   readonly sentAt: string;
+}
+
+/** Who is answering the conversation right now. */
+export type ChatHandling = 'Ai' | 'Human';
+
+/** Permission to listen to this conversation, briefly. */
+export interface RealtimeTicket {
+  readonly ticket: string;
+  readonly expiresInSeconds: number;
 }
 
 /** A page of the visitor's transcript. */
 export interface ChatMessagePage {
   readonly items: readonly ChatMessage[];
   readonly nextCursor: number | null;
+  /**
+   * Who is answering right now.
+   *
+   * Carried on the transcript read so a visitor learns a person has stepped in
+   * as soon as their client re-reads, rather than only when that person happens
+   * to reply. It is a mode and never an identity.
+   */
+  readonly handling: ChatHandling;
 }
 
 /** What one visitor turn produced. */
 export interface ChatTurn {
   readonly customerMessage: ChatMessage;
-  readonly reply: ChatMessage;
+  /**
+   * The agent's answer, or null when a person is handling this conversation.
+   *
+   * Null is a success, not a failure: the message was stored and a colleague
+   * will answer it. `handling` is what tells the two apart.
+   */
+  readonly reply: ChatMessage | null;
+  readonly handling: ChatHandling;
 }
 
 /**
@@ -88,6 +119,22 @@ export class HostedChatApi {
     return this.http.post<ChatTurn>(
       `/api/public/webchat/conversations/${conversationId}/messages`,
       { clientMessageId, text },
+    );
+  }
+
+  /**
+   * Exchanges the conversation's cookie for a short-lived realtime ticket.
+   *
+   * <strong>This exists so the credential never enters a URL.</strong> A
+   * websocket cannot carry a header, so whatever authorises one ends up in the
+   * query string — in proxy logs, access logs, and the network panel of the page
+   * that opened it. The cookie stays where it is, unreadable by this script, and
+   * what travels instead is a value good for about a minute that reads nothing.
+   */
+  realtimeTicket(conversationId: string): Observable<RealtimeTicket> {
+    return this.http.post<RealtimeTicket>(
+      `/api/public/webchat/conversations/${conversationId}/realtime-ticket`,
+      {},
     );
   }
 }

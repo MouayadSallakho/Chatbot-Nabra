@@ -1,8 +1,10 @@
 using Microsoft.EntityFrameworkCore;
+using OmniAI.Application.Concurrency;
 using OmniAI.Application.Conversations.Persistence;
 using OmniAI.Domain.AiAgents;
 using OmniAI.Domain.Conversations;
 using OmniAI.Domain.Tenants;
+using OmniAI.Domain.Users;
 
 namespace OmniAI.Infrastructure.Persistence.Repositories;
 
@@ -48,6 +50,7 @@ internal sealed class ConversationRepository(OmniAiDbContext context) : IConvers
                 conversation.Id.Value,
                 conversation.Channel,
                 conversation.Status,
+                conversation.Handling,
                 conversation.StartedAt,
                 conversation.LastActivityAt,
                 _context.WebChatSessions
@@ -75,41 +78,76 @@ internal sealed class ConversationRepository(OmniAiDbContext context) : IConvers
                     .OrderByDescending(message =>
                         EF.Property<long>(message, PersistenceSchema.MessageIngestionSequence))
                     .Select(message => (MessageSender?)message.Sender)
-                    .FirstOrDefault()))
+                    .FirstOrDefault(),
+
+                // The id only. Turning it into a name is a second query, for the
+                // reason set out on NameAssigneesAsync.
+                AssignedTo: null))
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 
-        return new ConversationPage(items, page, pageSize, total);
+        return new ConversationPage(
+            await NameAssigneesAsync(items, cancellationToken).ConfigureAwait(false),
+            page,
+            pageSize,
+            total);
     }
 
-    public async Task<ConversationDetail?> FindAsync(
+    public async Task<Versioned<ConversationDetail>?> FindAsync(
         TenantId tenantId,
         ConversationId conversationId,
         CancellationToken cancellationToken = default)
     {
         // The tenant is in the predicate. A conversation id belonging to another
         // workspace finds nothing rather than being found and then rejected.
-        return await _context.Conversations
+        //
+        // The version is projected alongside the detail rather than read from a
+        // tracked entry, because this query is deliberately untracked: a list
+        // screen reading a hundred conversations should not populate a change
+        // tracker it will never save.
+        var row = await _context.Conversations
             .AsNoTracking()
             .Where(conversation =>
                 conversation.Id == conversationId && conversation.TenantId == tenantId)
-            .Select(conversation => new ConversationDetail(
-                conversation.Id.Value,
-                conversation.Channel,
-                conversation.Status,
-                conversation.StartedAt,
-                conversation.LastActivityAt,
-                _context.WebChatSessions
-                    .Where(session => session.ConversationId == conversation.Id)
-                    .Join(
-                        _context.AiAgents,
-                        session => session.AiAgentId,
-                        agent => agent.Id,
-                        (session, agent) => agent.Name.Value)
-                    .FirstOrDefault(),
-                conversation.Messages.Count))
+            .Select(conversation => new
+            {
+                Detail = new ConversationDetail(
+                    conversation.Id.Value,
+                    conversation.Channel,
+                    conversation.Status,
+                    conversation.Handling,
+                    conversation.StartedAt,
+                    conversation.LastActivityAt,
+                    _context.WebChatSessions
+                        .Where(session => session.ConversationId == conversation.Id)
+                        .Join(
+                            _context.AiAgents,
+                            session => session.AiAgentId,
+                            agent => agent.Id,
+                            (session, agent) => agent.Name.Value)
+                        .FirstOrDefault(),
+                    conversation.Messages.Count,
+                    AssignedTo: null),
+                Assigned = conversation.AssignedTo,
+                Version = EF.Property<uint>(
+                    conversation,
+                    PersistenceSchema.XminConcurrencyToken),
+            })
             .FirstOrDefaultAsync(cancellationToken)
             .ConfigureAwait(false);
+
+        if (row is null)
+        {
+            return null;
+        }
+
+        ConversationMessageAuthor? assignee = row.Assigned is null
+            ? null
+            : await FindMemberAsync(row.Assigned.Value, cancellationToken).ConfigureAwait(false);
+
+        return new Versioned<ConversationDetail>(
+            row.Detail with { AssignedTo = assignee },
+            RowVersionTokens.Encode(row.Version));
     }
 
     public Task<bool> BelongsToAsync(
@@ -159,8 +197,163 @@ internal sealed class ConversationRepository(OmniAiDbContext context) : IConvers
         }
 
         return new ConversationMessagePage(
-            rows,
+            await NameAuthorsAsync(rows, cancellationToken).ConfigureAwait(false),
             hasMore && rows.Count > 0 ? rows[^1].IngestionSequence : null);
+    }
+
+    /// <summary>
+    /// Names the colleague each conversation on this page is routed to.
+    /// </summary>
+    /// <remarks>
+    /// <strong>A second query, for the same reason the transcript authors need
+    /// one.</strong> A subquery from the conversation into the users table on a
+    /// nullable value-object id is not translatable: EF Core cannot turn
+    /// <c>AssignedTo.Value.Value</c> inside a projection into SQL, and the
+    /// failure is a 500 on the first administrator who opens the inbox rather
+    /// than a compile error.
+    /// <para>
+    /// A page where nothing is assigned — which is most pages, most of the time
+    /// — makes no second query at all.
+    /// </para>
+    /// </remarks>
+    private async Task<IReadOnlyList<ConversationSummary>> NameAssigneesAsync(
+        List<ConversationSummary> items,
+        CancellationToken cancellationToken)
+    {
+        // Value objects throughout, never their unwrapped Guids. A predicate
+        // that reaches inside one -- Contains(conversation.Id.Value) -- is not
+        // translatable, because the value converter maps the whole object to a
+        // column and EF has nothing to map a member of it to. Comparing the
+        // objects themselves is what every other query here already does.
+        List<ConversationId> onThisPage = [.. items.Select(item => ConversationId.From(item.Id))];
+
+        var assignments = await _context.Conversations
+            .AsNoTracking()
+            .Where(conversation =>
+                onThisPage.Contains(conversation.Id) && conversation.AssignedTo != null)
+            .Select(conversation => new
+            {
+                Conversation = conversation.Id.Value,
+                Member = conversation.AssignedTo!.Value.Value,
+            })
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        if (assignments.Count == 0)
+        {
+            return items;
+        }
+
+        // Users are Identity's table, keyed on a plain Guid, so this one is an
+        // ordinary translatable Contains.
+        List<Guid> members = [.. assignments.Select(assignment => assignment.Member).Distinct()];
+
+        Dictionary<Guid, ConversationMessageAuthor> byMember = await _context.Users
+            .AsNoTracking()
+            .Where(user => members.Contains(user.Id))
+            .ToDictionaryAsync(
+                user => user.Id,
+                user => new ConversationMessageAuthor(user.Id, user.Email!),
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        Dictionary<Guid, ConversationMessageAuthor> byConversation = assignments
+            .Where(assignment => byMember.ContainsKey(assignment.Member))
+            .ToDictionary(
+                assignment => assignment.Conversation,
+                assignment => byMember[assignment.Member]);
+
+        return [.. items.Select(item =>
+            byConversation.TryGetValue(item.Id, out ConversationMessageAuthor? author)
+                ? item with { AssignedTo = author }
+                : item)];
+    }
+
+    /// <summary>One member, named.</summary>
+    private async Task<ConversationMessageAuthor?> FindMemberAsync(
+        UserId member,
+        CancellationToken cancellationToken) =>
+        await _context.Users
+            .AsNoTracking()
+            .Where(user => user.Id == member.Value)
+            .Select(user => new ConversationMessageAuthor(user.Id, user.Email!))
+            .FirstOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+    /// <summary>
+    /// Names the colleague behind each reply a person wrote.
+    /// </summary>
+    /// <remarks>
+    /// <strong>A second query rather than a join, and that is a deliberate
+    /// retreat.</strong> The obvious version — a correlated subquery in the
+    /// projection, joining the reply record to the user — is not translatable:
+    /// EF Core cannot turn a <c>Join</c> inside a <c>Select</c> into SQL, and
+    /// the failure is a runtime exception on the first admin who opens a
+    /// transcript, not a compile error. Expressing it as a left join in the main
+    /// query is translatable but drags a nullable navigation through a
+    /// projection that is otherwise a clean row-to-record mapping.
+    /// <para>
+    /// So the page is read as it always was, and the authors of the human
+    /// replies on it are fetched in one further round trip keyed on the message
+    /// ids already in hand. A page with no human replies — which is every page
+    /// of every conversation the AI is handling — makes no second query at all.
+    /// </para>
+    /// <para>
+    /// The email is published to the workspace's own screens and nowhere else.
+    /// Every public transport builds its own view type, and none of them has a
+    /// field this could be assigned to.
+    /// </para>
+    /// </remarks>
+    private async Task<IReadOnlyList<ConversationMessageRecord>> NameAuthorsAsync(
+        List<ConversationMessageRecord> rows,
+        CancellationToken cancellationToken)
+    {
+        List<MessageId> written = [..
+            rows.Where(row => row.Sender == MessageSender.HumanAgent)
+                .Select(row => MessageId.From(row.Id))];
+
+        if (written.Count == 0)
+        {
+            return rows;
+        }
+
+        // Value objects in the predicate, for the reason given on
+        // NameAssigneesAsync.
+        var replies = await _context.HumanReplies
+            .AsNoTracking()
+            .Where(reply => written.Contains(reply.MessageId))
+            .Select(reply => new
+            {
+                Message = reply.MessageId.Value,
+                Member = reply.Sender.Value,
+            })
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        if (replies.Count == 0)
+        {
+            return rows;
+        }
+
+        List<Guid> members = [.. replies.Select(reply => reply.Member).Distinct()];
+
+        Dictionary<Guid, ConversationMessageAuthor> byMember = await _context.Users
+            .AsNoTracking()
+            .Where(user => members.Contains(user.Id))
+            .ToDictionaryAsync(
+                user => user.Id,
+                user => new ConversationMessageAuthor(user.Id, user.Email!),
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        Dictionary<Guid, ConversationMessageAuthor> byMessage = replies
+            .Where(reply => byMember.ContainsKey(reply.Member))
+            .ToDictionary(reply => reply.Message, reply => byMember[reply.Member]);
+
+        return [.. rows.Select(row =>
+            byMessage.TryGetValue(row.Id, out ConversationMessageAuthor? author)
+                ? row with { SentBy = author }
+                : row)];
     }
 
     public async Task<IReadOnlyList<ConversationMessageRecord>> ListRecentMessagesAsync(

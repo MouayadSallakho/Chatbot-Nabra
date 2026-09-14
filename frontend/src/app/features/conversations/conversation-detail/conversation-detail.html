@@ -73,8 +73,86 @@
           <p class="text-label text-muted">Last activity</p>
           <p class="text-body">{{ current.lastActivityAt | date: 'medium' }}</p>
         </div>
+        <div>
+          <p class="text-label text-muted">Answered by</p>
+          <!--
+            A word, not a colour. Somebody who cannot rely on hue still reads
+            which of two quite different things is happening to this customer.
+          -->
+          <p class="text-body">
+            <span class="handling" [class.handling-human]="isHuman()">
+              {{ isHuman() ? 'A person' : 'The AI' }}
+            </span>
+          </p>
+        </div>
+        <div>
+          <p class="text-label text-muted">Assigned to</p>
+          <p class="text-body">{{ current.assignedTo?.email ?? 'Nobody' }}</p>
+        </div>
       </div>
     </div>
+
+    @if (canHandoff() || canAssign()) {
+      <div class="page-section">
+        <div class="card card-body handling-controls">
+          @if (canHandoff()) {
+            <div class="handling-action">
+              @if (isHuman()) {
+                <button
+                  type="button"
+                  class="btn btn-secondary"
+                  [disabled]="working()"
+                  (click)="returnToAi()"
+                >
+                  {{ working() ? 'Working…' : 'Return to AI' }}
+                </button>
+                <p class="text-small text-muted">
+                  The AI answers new messages again. Anything the customer sent while you were
+                  handling this stays unanswered by it.
+                </p>
+              } @else {
+                <button
+                  type="button"
+                  class="btn btn-primary"
+                  [disabled]="working()"
+                  (click)="takeOver()"
+                >
+                  {{ working() ? 'Working…' : 'Take over' }}
+                </button>
+                <p class="text-small text-muted">
+                  The AI stops answering this conversation until you hand it back.
+                </p>
+              }
+            </div>
+          }
+
+          @if (canAssign()) {
+            <div class="handling-action">
+              <label class="text-label" for="conversation-assignee">Assign to</label>
+              <select
+                id="conversation-assignee"
+                class="input"
+                [disabled]="working()"
+                [value]="current.assignedTo?.userId ?? ''"
+                (change)="onAssignmentChange($event)"
+              >
+                <option value="">Nobody</option>
+                @for (member of assignees(); track member.userId) {
+                  <option [value]="member.userId">{{ member.email }}</option>
+                }
+              </select>
+              <p class="text-small text-muted">
+                Routing only. It gives that colleague no permission they did not already have.
+              </p>
+            </div>
+          }
+        </div>
+
+        @if (actionFailure(); as error) {
+          <p class="form-error" role="alert">{{ error.message }}</p>
+        }
+      </div>
+    }
 
     <div class="page-section">
       <h2 class="text-section-title">Transcript</h2>
@@ -94,12 +172,19 @@
           Sender is carried by a label and by layout, not by colour alone, so the
           distinction survives for anybody who cannot rely on hue.
         -->
-        <ol class="transcript">
+        <!--
+          A polite live region, so a screen-reader user hears a message that
+          arrives while they are reading rather than discovering it later.
+          Polite and not assertive: an incoming message is worth knowing about
+          and is never worth interrupting somebody mid-sentence for.
+        -->
+        <ol class="transcript" aria-live="polite" aria-relevant="additions">
           @for (message of messages(); track message.id) {
             <li
               class="message"
               [class.message-customer]="message.sender === 'Customer'"
               [class.message-agent]="message.sender === 'AiAgent'"
+              [class.message-human]="message.sender === 'HumanAgent'"
             >
               <p class="message-meta">
                 <span class="message-sender">{{ senderName(message) }}</span>
@@ -121,6 +206,50 @@
               {{ loadingMore() ? 'Loading…' : 'Load older messages' }}
             </button>
           </div>
+        }
+      }
+
+      @if (canReply()) {
+        @if (isHuman()) {
+          <!--
+            Not a <form>. Send is an ordinary button and Enter is handled as a
+            keystroke, so nothing here depends on native form submission — which
+            keeps this composer identical in shape to the one inside the
+            sandboxed widget iframe, where submission is not available at all.
+          -->
+          <div class="composer">
+            <label class="visually-hidden" for="conversation-reply">Your reply</label>
+            <textarea
+              id="conversation-reply"
+              class="input composer-input"
+              rows="3"
+              [formControl]="reply"
+              [attr.maxlength]="maxLength"
+              placeholder="Reply to the customer…"
+            ></textarea>
+
+            <div class="composer-actions">
+              <p class="text-small text-muted">
+                The customer sees this as the business replying, not as you.
+              </p>
+              <button
+                type="button"
+                class="btn btn-primary"
+                [disabled]="!canSend() || reply.invalid"
+                (click)="send()"
+              >
+                {{ sending() ? 'Sending…' : 'Send reply' }}
+              </button>
+            </div>
+
+            @if (sendFailure(); as error) {
+              <p class="form-error" role="alert">{{ error.message }}</p>
+            }
+          </div>
+        } @else {
+          <p class="text-small text-muted composer-hint">
+            The AI is answering this conversation. Take it over to reply yourself.
+          </p>
         }
       }
     </div>

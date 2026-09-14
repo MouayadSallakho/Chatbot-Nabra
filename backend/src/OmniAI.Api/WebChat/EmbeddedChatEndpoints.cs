@@ -3,6 +3,7 @@ using OmniAI.Application.WebChat.Embedded;
 using OmniAI.Application.WebChat.Hosted;
 using OmniAI.Application.WebChat.Protection;
 using OmniAI.Domain.WebChat;
+using OmniAI.Application.Conversations.Realtime;
 
 namespace OmniAI.Api.WebChat;
 
@@ -67,6 +68,18 @@ internal static class EmbeddedChatEndpoints
 
         embed.MapPost("/{publicKey}/conversations", StartConversationAsync)
             .WithName("StartEmbeddedWebChatConversation");
+
+        // Exchanges the embedded credential for a realtime ticket.
+        //
+        // No antiforgery filter, exactly like the other embed routes and for the
+        // same reason: the credential is not ambient, and the custom header this
+        // needs forces a preflight the API answers for nobody. There is nothing
+        // for a forged cross-site request to ride on.
+        //
+        // The allowlist is re-checked inside, on this request, so a website
+        // removed while a widget is open cannot mint a ticket a second later.
+        embed.MapPost("/conversations/{conversationId:guid}/realtime-ticket", IssueTicketAsync)
+            .WithName("IssueEmbeddedRealtimeTicket");
 
         embed.MapGet("/conversations/{conversationId:guid}/messages", ListMessagesAsync)
             .WithName("ListEmbeddedWebChatMessages");
@@ -187,7 +200,8 @@ internal static class EmbeddedChatEndpoints
         return Results.Ok(
             new ChatMessagePageResponse(
                 [.. page.Items.Select(ChatMessageResponse.From)],
-                page.NextCursor));
+                page.NextCursor,
+                page.Handling));
     }
 
     /// <summary>
@@ -231,7 +245,8 @@ internal static class EmbeddedChatEndpoints
         return Results.Ok(
             new ChatTurnResponse(
                 ChatMessageResponse.From(turn.CustomerMessage),
-                ChatMessageResponse.From(turn.Reply)));
+                ChatMessageResponse.FromOrNull(turn.Reply),
+                turn.Handling));
     }
 
     /// <summary>The website the iframe says the browser reported.</summary>
@@ -252,6 +267,42 @@ internal static class EmbeddedChatEndpoints
         http.Request.Headers.TryGetValue(SessionHeaderName, out Microsoft.Extensions.Primitives.StringValues value)
             ? value.ToString()
             : null;
+
+    /// <summary>
+    /// <c>POST /api/public/embed/conversations/{id}/realtime-ticket</c>.
+    /// </summary>
+    /// <remarks>
+    /// <strong>The embedded credential is readable by script, and that is
+    /// precisely why it must not travel in a URL.</strong> It lives in the
+    /// iframe's own <c>sessionStorage</c> and goes out in a header on every
+    /// request; a websocket address cannot carry a header, so without this
+    /// exchange the credential would end up in a query string that proxies log
+    /// and the embedding page's own network panel shows.
+    /// <para>
+    /// A hosted ticket cannot be minted here and an embedded ticket cannot be
+    /// minted on the hosted route: the transport is part of what is checked, and
+    /// part of what the ticket records.
+    /// </para>
+    /// </remarks>
+    private static async Task<IResult> IssueTicketAsync(
+        Guid conversationId,
+        HttpContext http,
+        IssueRealtimeTicketHandler handler,
+        CancellationToken cancellationToken)
+    {
+        RealtimeTicket? ticket = await handler
+            .HandleAsync(
+                new IssueRealtimeTicketCommand(
+                    conversationId,
+                    ReadCredential(http),
+                    WebChatClientMode.Embedded),
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        return ticket is null
+            ? NotAvailable()
+            : Results.Ok(new RealtimeTicketResponse(ticket.Value, ticket.ExpiresInSeconds));
+    }
 
     /// <summary>
     /// One answer for every reason a widget may not run here.

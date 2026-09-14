@@ -34,6 +34,10 @@ using OmniAI.Application.Members.GetAssignableRoles;
 using OmniAI.Application.Members.GetTenantMemberById;
 using OmniAI.Application.Members.ListTenantMembers;
 using OmniAI.Application.Members.ReplaceTenantMemberRoles;
+using Microsoft.AspNetCore.SignalR;
+using OmniAI.Api.Realtime;
+using OmniAI.Application.Conversations.Realtime;
+using OmniAI.Infrastructure.Conversations.Realtime;
 using OmniAI.Application.Conversations;
 using OmniAI.Application.Tenants.CreateTenant;
 using OmniAI.Application.WebChat.CreateWebChatEndpoint;
@@ -139,6 +143,35 @@ internal static class CompositionRoot
             configuration,
             allowEphemeralNetworkKeySecret: environment.IsDevelopment());
 
+        // Realtime. Registered here because it shares the protection's Redis, and
+        // for no other reason: the two have nothing to say to each other.
+        //
+        // SignalR itself is part of the framework. The backplane is not, and
+        // adding it is the difference between an inbox that updates and one that
+        // updates for whichever half of the staff happened to land on the
+        // instance that handled the write. That failure is invisible on one
+        // instance, which is exactly where it would be tested.
+        string? realtimeRedis = configuration.GetConnectionString(
+            PublicChatProtectionSetup.RedisConnectionName);
+
+        services.AddOmniAiRealtimeTickets(realtimeRedis);
+
+        ISignalRServerBuilder realtime = services.AddSignalR();
+
+        if (!string.IsNullOrWhiteSpace(realtimeRedis))
+        {
+            realtime.AddStackExchangeRedis(realtimeRedis, options =>
+            {
+                // Namespaced, so a Redis shared with anything else -- including
+                // another deployment of this platform -- cannot deliver one
+                // workspace's events to another's browsers.
+                options.Configuration.ChannelPrefix =
+                    StackExchange.Redis.RedisChannel.Literal("omniai:realtime");
+            });
+        }
+
+        services.AddScoped<IConversationRealtimeNotifier, SignalRConversationNotifier>();
+
         // The AI runtime. Infrastructure decides which implementation that is:
         // the OpenAI adapter when a key is configured in the environment, and an
         // implementation that refuses every request explicitly when it is not.
@@ -220,6 +253,10 @@ internal static class CompositionRoot
 
         // Reading conversations from the admin.
         services.AddScoped<ReadConversationsHandler>();
+        services.AddScoped<ConversationHandoffHandler>();
+        services.AddScoped<ConversationAssignmentHandler>();
+        services.AddScoped<ReplyToConversationHandler>();
+        services.AddScoped<IssueRealtimeTicketHandler>();
 
         // Resource policies. Singletons rather than constants read at each use
         // site, so the limits are configurable and a test can drive a tiny window

@@ -178,6 +178,39 @@ public interface IWebChatRuntimeStore
         DateTimeOffset failedAt,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Who is answering this conversation right now.
+    /// </summary>
+    /// <remarks>
+    /// Read inside the conversation lock, immediately before the runtime decides
+    /// whether to spend anything. Reading it earlier would be reading a value a
+    /// takeover is allowed to change while the request queues for the lock — and
+    /// acting on it would be generating a reply for a conversation somebody has
+    /// already taken over.
+    /// </remarks>
+    /// <returns>
+    /// <see langword="null"/> when there is no such conversation, which the
+    /// caller has already excluded by authorising a session on it.
+    /// </returns>
+    Task<ConversationHandling?> ReadHandlingAsync(
+        ConversationId conversationId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Settles the turn as completed with no reply, because a person is handling
+    /// this conversation.
+    /// </summary>
+    /// <remarks>
+    /// The customer's message stays exactly where <see cref="BeginTurnAsync"/>
+    /// put it. Nothing was retrieved, nothing was generated and nothing was
+    /// spent; the turn is closed so a retry of the same client message id replays
+    /// this same outcome instead of starting again.
+    /// </remarks>
+    Task SettleWithoutReplyAsync(
+        ConversationTurn turn,
+        DateTimeOffset settledAt,
+        CancellationToken cancellationToken = default);
+
     /// <summary>The stored reply of a settled turn, for answering a duplicate.</summary>
     Task<ConversationMessageRef?> FindReplyAsync(
         ConversationTurn turn,

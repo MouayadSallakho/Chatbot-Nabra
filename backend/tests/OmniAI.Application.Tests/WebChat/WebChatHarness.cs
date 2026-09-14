@@ -81,6 +81,12 @@ internal sealed class Harness
 
     public required AiAgent Agent { get; init; }
 
+    /// <summary>
+    /// Every realtime announcement this run made: a tenant and a conversation
+    /// id, which is the whole payload the platform sends.
+    /// </summary>
+    public required RecordingRealtimeNotifier Announcer { get; init; }
+
     public required TenantId Workspace { get; init; }
 
     /// <summary>The clock every handler in this scenario reads.</summary>
@@ -157,6 +163,7 @@ internal sealed class Harness
         TestWebChatTokens tokens = new();
         WebChatPolicy chatPolicy = policy ?? new WebChatPolicy();
         ConversationContextPolicy contextPolicy = context ?? new ConversationContextPolicy();
+        RecordingRealtimeNotifier announcer = new();
         FakePublicChatProtection guard = protection ?? new FakePublicChatProtection();
         PublicChatProtectionOptions bounds = limits ?? new PublicChatProtectionOptions();
         FixedTimeProvider time = clock ?? new FixedTimeProvider(Noon);
@@ -184,6 +191,7 @@ internal sealed class Harness
             Tokens = tokens,
             Endpoint = endpoint,
             Agent = agent,
+            Announcer = announcer,
             Workspace = workspace,
             Clock = time,
             Limits = bounds,
@@ -205,11 +213,12 @@ internal sealed class Harness
                 recorder,
                 gate,
                 guard,
+                announcer,
                 retriever,
                 contextPolicy,
                 chatPolicy,
                 time),
-            List = new ListWebChatMessagesHandler(access, world, chatPolicy),
+            List = new ListWebChatMessagesHandler(access, world, world, chatPolicy),
             Embed = new EmbeddedWebChatHandler(world, world, tokens, guard, bounds, time),
         };
     }

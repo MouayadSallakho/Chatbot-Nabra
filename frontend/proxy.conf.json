@@ -1,4 +1,11 @@
 {
+  "/hubs": {
+    "target": "http://localhost:5027",
+    "secure": false,
+    "changeOrigin": false,
+    "ws": true,
+    "logLevel": "warn"
+  },
   "/widget": {
     "target": "http://localhost:5027",
     "secure": false,

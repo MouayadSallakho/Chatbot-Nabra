@@ -5,6 +5,8 @@ using OmniAI.Application.Ai;
 using OmniAI.Application.AiAgents.ListAiAgents;
 using OmniAI.Application.AiAgents;
 using OmniAI.Application.Authorization;
+using OmniAI.Application.Conversations.Realtime;
+using OmniAI.Application.Conversations;
 using OmniAI.Application.Invitations;
 using OmniAI.Application.Knowledge;
 using OmniAI.Application.Knowledge.ListKnowledgeDocuments;
@@ -372,6 +374,41 @@ internal sealed partial class DomainProblemDetailsHandler(
             StatusCodes.Status403Forbidden,
             "Invitation is for a different account",
             wrongAccount.Message),
+
+        // A conversation was not at the version the caller said it was. 412, like
+        // every other stale conditional write: two people in the same inbox is
+        // the normal case, and the second to press a button is told rather than
+        // silently undoing the first.
+        ConversationVersionMismatchException staleConversation => (
+            StatusCodes.Status412PreconditionFailed,
+            "Precondition failed",
+            staleConversation.Message),
+
+        // Somebody tried to reply to a conversation the AI is still answering.
+        // 409: the request is well-formed and permitted, and contradicts the
+        // state of the conversation. Not 403, which would suggest the person is
+        // not allowed to reply at all -- they are, once they take it over.
+        ConversationNotHandledByHumanException notHuman => (
+            StatusCodes.Status409Conflict,
+            "Conversation is answered by the AI",
+            notHuman.Message),
+
+        // A conversation was routed to somebody who cannot take it. 422 rather
+        // than 400: the request is syntactically fine and names a real person,
+        // and what is wrong is a fact about the workspace -- which is exactly
+        // what the message explains, because an administrator can fix it.
+        ConversationAssigneeIneligibleException ineligible => (
+            StatusCodes.Status422UnprocessableEntity,
+            "Cannot assign this conversation",
+            ineligible.Message),
+
+        // Live updates are not configured on this deployment. 503, like every
+        // other missing dependency: the chat itself is unaffected, and the
+        // client falls back to reading on demand.
+        RealtimeUnavailableException realtime => (
+            StatusCodes.Status503ServiceUnavailable,
+            "Live updates unavailable",
+            realtime.Message),
 
         // A website chat endpoint was not at the version the caller said it was.
         // 412, like every other stale conditional write.

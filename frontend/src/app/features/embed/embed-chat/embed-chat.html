@@ -94,18 +94,38 @@
             <li
               class="embed-bubble"
               [class.embed-bubble-customer]="message.sender === 'Customer'"
-              [class.embed-bubble-agent]="message.sender === 'AiAgent'"
+              [class.embed-bubble-agent]="message.sender !== 'Customer'"
             >
+              <!--
+                A reply from a person is labelled "Support". Never an employee's
+                name or address: the server sends none, and there is no field
+                here that could carry one.
+              -->
               <span class="embed-sender">{{
-                message.sender === 'Customer' ? 'You' : agentName()
+                message.sender === 'Customer'
+                  ? 'You'
+                  : message.sender === 'HumanAgent'
+                    ? 'Support'
+                    : agentName()
               }}</span>
               <span class="embed-text">{{ message.text }}</span>
             </li>
           }
         </ol>
 
-        @if (sending()) {
+        @if (sending() && handling() === 'Ai') {
           <p class="embed-status" role="status">{{ agentName() }} is typing…</p>
+        }
+
+        <!--
+          No fake typing indicator while a person has this conversation. Nobody
+          may be at their desk, and pretending otherwise to a waiting customer
+          is worse than saying nothing. This says what is true instead.
+        -->
+        @if (handling() === 'Human') {
+          <p class="embed-status embed-handover" role="status">
+            A support team member will reply here.
+          </p>
         }
 
         @if (sendFailure(); as error) {

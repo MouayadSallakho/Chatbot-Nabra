@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
 using OmniAI.Domain.Tenants;
+using OmniAI.Domain.Users;
 
 namespace OmniAI.Domain.Conversations;
 
@@ -35,6 +36,7 @@ public sealed class Conversation
         TenantId = tenantId;
         Channel = channel;
         Status = ConversationStatus.Open;
+        Handling = ConversationHandling.Ai;
         StartedAt = startedAt;
         LastActivityAt = startedAt;
         _messagesView = _messages.AsReadOnly();
@@ -57,6 +59,33 @@ public sealed class Conversation
 
     /// <summary>Current lifecycle state.</summary>
     public ConversationStatus Status { get; private set; }
+
+    /// <summary>
+    /// Who answers new customer turns: the AI, or a person.
+    /// </summary>
+    /// <remarks>
+    /// Starts at <see cref="ConversationHandling.Ai"/> because that is what a
+    /// conversation on a chat endpoint is for. Nothing about a conversation
+    /// arriving implies a person should look at it.
+    /// </remarks>
+    public ConversationHandling Handling { get; private set; }
+
+    /// <summary>
+    /// The member this conversation is routed to, or <see langword="null"/>.
+    /// </summary>
+    /// <remarks>
+    /// <strong>Routing, not authority.</strong> Being assigned grants nothing:
+    /// a member who cannot reply still cannot reply, and a member who can reply
+    /// can reply to a conversation assigned to somebody else. It is how a team
+    /// says "this one is mine" so two people do not answer the same customer,
+    /// and it is deliberately optional — taking a conversation over without
+    /// claiming it is a normal thing to do.
+    /// <para>
+    /// It is independent of <see cref="Handling"/>. Assigning does not take a
+    /// conversation over, and taking one over does not assign it.
+    /// </para>
+    /// </remarks>
+    public UserId? AssignedTo { get; private set; }
 
     /// <summary>When the conversation began, in UTC.</summary>
     public DateTimeOffset StartedAt { get; }
@@ -195,6 +224,140 @@ public sealed class Conversation
 
         Status = ConversationStatus.Open;
         RecordActivity(instant);
+    }
+
+    /// <summary>
+    /// Hands the conversation to a person. Idempotent.
+    /// </summary>
+    /// <remarks>
+    /// From here the AI answers nothing. A customer turn arriving after this is
+    /// still recorded — the customer really did say it, and losing it because
+    /// nobody had replied yet would be the worst possible failure — but no
+    /// retrieval runs and no generation is paid for.
+    /// <para>
+    /// Idempotent for the same reason <see cref="Close"/> is: two people pressing
+    /// Take over within a second of each other both meant the same thing, and
+    /// making the second one an error would be reporting a problem that does not
+    /// exist. It returns whether it changed anything, so a caller that wants to
+    /// announce the change can tell.
+    /// </para>
+    /// </remarks>
+    /// <returns><see langword="true"/> if the AI was answering until now.</returns>
+    /// <exception cref="DomainStateException">The conversation is closed.</exception>
+    /// <exception cref="DomainValidationException">The instant is not a real point in time.</exception>
+    public bool TakeOverByHuman(DateTimeOffset takenOverAt)
+    {
+        RequireOpen("take over");
+
+        DateTimeOffset instant = RequireInstant(takenOverAt, "take-over instant");
+
+        if (Handling == ConversationHandling.Human)
+        {
+            return false;
+        }
+
+        Handling = ConversationHandling.Human;
+        RecordActivity(instant);
+
+        return true;
+    }
+
+    /// <summary>
+    /// Gives the conversation back to the AI. Idempotent.
+    /// </summary>
+    /// <remarks>
+    /// <strong>It answers nothing retroactively.</strong> Customer messages that
+    /// arrived while a person was handling this conversation stay unanswered by
+    /// the AI, for ever. Generating replies to them now would be answering
+    /// questions a colleague may already have answered by phone, in a transcript
+    /// the customer is still reading — several minutes late, out of order, and
+    /// paid for. Only a genuinely new customer turn starts the AI again.
+    /// </remarks>
+    /// <returns><see langword="true"/> if a person was handling it until now.</returns>
+    /// <exception cref="DomainStateException">The conversation is closed.</exception>
+    /// <exception cref="DomainValidationException">The instant is not a real point in time.</exception>
+    public bool ReturnToAi(DateTimeOffset returnedAt)
+    {
+        RequireOpen("return to the AI");
+
+        DateTimeOffset instant = RequireInstant(returnedAt, "return instant");
+
+        if (Handling == ConversationHandling.Ai)
+        {
+            return false;
+        }
+
+        Handling = ConversationHandling.Ai;
+        RecordActivity(instant);
+
+        return true;
+    }
+
+    /// <summary>
+    /// Routes the conversation to one member, replacing any previous assignment.
+    /// </summary>
+    /// <remarks>
+    /// The aggregate checks only that an assignment names somebody. That the
+    /// somebody is a member of <em>this</em> tenant, and is allowed to reply, is
+    /// not knowable from here — the conversation has no access to the workspace's
+    /// membership or roles, and giving it one would drag the whole authorisation
+    /// system into an aggregate that exists to own a transcript. Those are
+    /// checked by the use case, and again by a composite foreign key in the
+    /// database that makes a foreign-tenant assignment unrepresentable.
+    /// </remarks>
+    /// <returns><see langword="true"/> if this changed who it is assigned to.</returns>
+    /// <exception cref="DomainStateException">The conversation is closed.</exception>
+    /// <exception cref="DomainValidationException">
+    /// The member is empty, or the instant is not a real point in time.
+    /// </exception>
+    public bool AssignTo(UserId member, DateTimeOffset assignedAt)
+    {
+        RequireOpen("assign");
+
+        if (member.IsEmpty)
+        {
+            throw new DomainValidationException("An assignment must name a member.");
+        }
+
+        DateTimeOffset instant = RequireInstant(assignedAt, "assignment instant");
+
+        if (AssignedTo == member)
+        {
+            return false;
+        }
+
+        AssignedTo = member;
+        RecordActivity(instant);
+
+        return true;
+    }
+
+    /// <summary>
+    /// Removes any assignment, leaving the conversation unclaimed. Idempotent.
+    /// </summary>
+    /// <remarks>
+    /// Does not change <see cref="Handling"/>. A conversation a person took over
+    /// and then released is still being handled by people; it just is not one
+    /// particular person's any more.
+    /// </remarks>
+    /// <returns><see langword="true"/> if it had been assigned.</returns>
+    /// <exception cref="DomainStateException">The conversation is closed.</exception>
+    /// <exception cref="DomainValidationException">The instant is not a real point in time.</exception>
+    public bool Unassign(DateTimeOffset unassignedAt)
+    {
+        RequireOpen("unassign");
+
+        DateTimeOffset instant = RequireInstant(unassignedAt, "assignment instant");
+
+        if (AssignedTo is null)
+        {
+            return false;
+        }
+
+        AssignedTo = null;
+        RecordActivity(instant);
+
+        return true;
     }
 
     private Message Append(

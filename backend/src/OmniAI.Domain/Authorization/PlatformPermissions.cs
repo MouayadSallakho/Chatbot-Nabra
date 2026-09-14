@@ -126,14 +126,52 @@ public static class PlatformPermissions
     /// reading them is its own capability rather than something the workspace
     /// permission or an agent permission carries along.
     /// <para>
-    /// It grants reading only. Replying, assigning, exporting and deleting are
-    /// deliberately absent from the catalogue because none of those operations
-    /// exists yet, and a permission that grants nothing today would be a promise
-    /// this platform has not made.
+    /// It grants reading only, and is required for every other conversation
+    /// capability: a person who may reply but may not read has no way to see
+    /// what they are replying to. Exporting and deleting are still deliberately
+    /// absent, because neither operation exists.
     /// </para>
     /// </remarks>
     public static readonly PermissionCode ConversationsView =
         PermissionCode.Create("conversations.view");
+
+    /// <summary>Sending replies to customers as the workspace.</summary>
+    /// <remarks>
+    /// What this grants is writing to a customer in the workspace's name, which
+    /// the customer will read as the business speaking. That is a different
+    /// responsibility from being allowed to read a transcript, so it is a
+    /// different permission — and holding it does not confer
+    /// <see cref="ConversationsView"/>, because nothing in this platform implies
+    /// anything else.
+    /// <para>
+    /// It is also what makes somebody eligible to have a conversation assigned to
+    /// them. Assigning work to a person who cannot do it is a routing decision
+    /// that can only end in the customer waiting.
+    /// </para>
+    /// </remarks>
+    public static readonly PermissionCode ConversationsReply =
+        PermissionCode.Create("conversations.reply");
+
+    /// <summary>Taking a conversation over from the AI, and giving it back.</summary>
+    /// <remarks>
+    /// Separate from replying because it changes what happens to <em>future</em>
+    /// customer messages rather than adding one of your own: taking over stops
+    /// the AI answering, and returning hands it back. A workspace may reasonably
+    /// want people who can answer a conversation somebody else has already
+    /// escalated, without being able to escalate one themselves.
+    /// </remarks>
+    public static readonly PermissionCode ConversationsHandoff =
+        PermissionCode.Create("conversations.handoff");
+
+    /// <summary>Deciding which member a conversation is routed to.</summary>
+    /// <remarks>
+    /// Routing only. An assignment confers no permission on the member it names —
+    /// it does not let them reply, and it does not stop anybody else replying —
+    /// so this is not delegation and the authority ceiling that governs role
+    /// assignment does not apply to it.
+    /// </remarks>
+    public static readonly PermissionCode ConversationsAssign =
+        PermissionCode.Create("conversations.assign");
 
     /// <summary>Reading how the workspace's website chat is configured.</summary>
     public static readonly PermissionCode WebsiteChatView =
@@ -256,6 +294,24 @@ public static class PlatformPermissions
             "View conversations",
             "Read the conversations customers have had with this workspace, "
             + "including everything they wrote."),
+        new(
+            ConversationsReply,
+            ConversationsGroup,
+            "Reply to conversations",
+            "Write to customers as this workspace. Members who hold it are also "
+            + "the members a conversation can be assigned to."),
+        new(
+            ConversationsHandoff,
+            ConversationsGroup,
+            "Take conversations over from the AI",
+            "Stop the AI answering a conversation so a person can, and hand it "
+            + "back again afterwards."),
+        new(
+            ConversationsAssign,
+            ConversationsGroup,
+            "Assign conversations",
+            "Decide which team member a conversation is routed to. It gives that "
+            + "member no permission they did not already have."),
         new(
             WebsiteChatView,
             ChannelsGroup,

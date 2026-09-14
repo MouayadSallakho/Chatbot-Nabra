@@ -35,6 +35,27 @@ internal sealed class ConversationConfiguration : IEntityTypeConfiguration<Conve
             .HasMaxLength(32)
             .IsRequired();
 
+        builder.Property(conversation => conversation.Handling)
+            .HasColumnName("handling")
+            .HasConversion<string>()
+            .HasMaxLength(16)
+            .IsRequired();
+
+        // Nullable, because unassigned is the ordinary state of a conversation
+        // and not a missing value: most of them are nobody's in particular.
+        //
+        // The composite foreign key that makes a cross-workspace assignment
+        // unrepresentable -- (assigned_to, tenant_id) into the membership table's
+        // own primary key -- is declared in the migration rather than here.
+        // tenant_memberships is keyed on (user_id, tenant_id), and EF cannot
+        // express a composite principal key for a single-column dependent
+        // without modelling membership as a navigation on this aggregate, which
+        // would put the workspace's entire membership graph inside a
+        // conversation. A schema test asserts the constraint exists.
+        builder.Property(conversation => conversation.AssignedTo)
+            .HasColumnName("assigned_to")
+            .HasConversion(PersistenceConverters.NullableUserId);
+
         // timestamptz stores an absolute instant. The Domain has already
         // normalised every value to UTC, so nothing here depends on the server's
         // or the client's time zone.

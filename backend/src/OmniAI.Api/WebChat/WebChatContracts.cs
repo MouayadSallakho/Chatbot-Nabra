@@ -81,14 +81,49 @@ public sealed record ChatMessageResponse(
 
         return new ChatMessageResponse(view.Id, view.Sender, view.Text, view.SentAt);
     }
+
+    /// <summary>The same, for a reply that may legitimately not exist.</summary>
+    /// <remarks>
+    /// Separate from <see cref="From"/> rather than relaxing it, so the one case
+    /// where null is expected is the one place it is allowed. A null reply
+    /// anywhere else is still a bug worth throwing over.
+    /// </remarks>
+    public static ChatMessageResponse? FromOrNull(PublicChatMessageView? view) =>
+        view is null ? null : From(view);
 }
 
 /// <summary>A page of a visitor's own transcript.</summary>
 public sealed record ChatMessagePageResponse(
     IReadOnlyList<ChatMessageResponse> Items,
-    long? NextCursor);
+    long? NextCursor,
+    string Handling);
 
 /// <summary>What one visitor turn produced.</summary>
+/// <param name="Reply">
+/// The agent's answer, or <see langword="null"/> when a person is handling this
+/// conversation and no AI reply was produced.
+/// </param>
+/// <param name="Handling">
+/// <c>"Ai"</c> or <c>"Human"</c>, so the visitor's client can say what is
+/// actually happening instead of inferring it from a missing field. A turn with
+/// no reply and no explanation is indistinguishable from a broken one, and
+/// showing an error for a message that arrived perfectly is the wrong answer.
+/// <para>
+/// It names a mode and never a person: no employee, no assignment, no workspace.
+/// </para>
+/// </param>
 public sealed record ChatTurnResponse(
     ChatMessageResponse CustomerMessage,
-    ChatMessageResponse Reply);
+    ChatMessageResponse? Reply,
+    string Handling);
+
+/// <summary>Permission to listen to one conversation, briefly.</summary>
+/// <param name="Ticket">
+/// Opaque, single-purpose and short-lived. It reads no API and writes nothing;
+/// all it does is admit a listener to one conversation's notifications.
+/// </param>
+/// <param name="ExpiresInSeconds">
+/// So a client can mint a fresh one before reconnecting rather than discovering
+/// the old one died mid-handshake.
+/// </param>
+public sealed record RealtimeTicketResponse(string Ticket, int ExpiresInSeconds);

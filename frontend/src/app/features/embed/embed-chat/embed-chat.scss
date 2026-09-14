@@ -284,3 +284,10 @@
   display: grid;
   align-content: center;
 }
+
+// The human-support notice. Weight and wording carry it, not colour alone: it
+// reads correctly for anybody who cannot rely on hue.
+.embed-handover {
+  font-weight: 600;
+  color: var(--embed-accent, currentColor);
+}

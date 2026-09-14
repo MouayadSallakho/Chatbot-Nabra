@@ -65,6 +65,7 @@ Sixteen areas have their own documents:
 - [conversation-runtime-website-chat.md](conversation-runtime-website-chat.md) - the conversation runtime, hosted website chat, and the anonymous visitor boundary
 - [public-chat-protection.md](public-chat-protection.md) - distributed rate limiting, client-network identity, cost safety and the public session lifecycle
 - [knowledge-base-rag.md](knowledge-base-rag.md) - knowledge documents, deterministic chunking, pgvector retrieval and the grounding privilege boundary
+- [human-handoff-realtime-inbox.md](human-handoff-realtime-inbox.md) - AI/human handling, conversation assignment, human reply attribution and idempotency, and the SignalR realtime inbox with its short-lived public tickets
 - [embeddable-web-chat-widget.md](embeddable-web-chat-widget.md) - the loader, the cross-origin iframe, origin allowlisting, the wall between the hosted and embedded transports, and the Development opt-in that keeps an inherited `OPENAI_API_KEY` from spending money
 
 ---

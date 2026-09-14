@@ -491,6 +491,43 @@ internal sealed class FakeWebChatWorld : IWebChatEndpointRepository, IWebChatRun
         }
     }
 
+    /// <summary>
+    /// Who is answering. Settable, so a test can put the world into human mode
+    /// and assert that a customer turn spends nothing.
+    /// </summary>
+    public ConversationHandling Handling { get; set; } = ConversationHandling.Ai;
+
+    /// <summary>How many turns were settled without a reply.</summary>
+    public int SettledWithoutReply { get; private set; }
+
+    public Task<ConversationHandling?> ReadHandlingAsync(
+        ConversationId conversationId,
+        CancellationToken cancellationToken = default)
+    {
+        lock (_sync)
+        {
+            bool exists = _conversations.Any(conversation => conversation.Id == conversationId);
+
+            return Task.FromResult<ConversationHandling?>(exists ? Handling : null);
+        }
+    }
+
+    public Task SettleWithoutReplyAsync(
+        ConversationTurn turn,
+        DateTimeOffset settledAt,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(turn);
+
+        lock (_sync)
+        {
+            turn.CompleteWithoutReply(settledAt);
+            SettledWithoutReply++;
+        }
+
+        return Task.CompletedTask;
+    }
+
     public Task FailTurnAsync(
         ConversationTurn turn,
         DateTimeOffset failedAt,
@@ -536,11 +573,11 @@ internal sealed class FakeWebChatWorld : IWebChatEndpointRepository, IWebChatRun
         CancellationToken cancellationToken = default) =>
         Task.FromResult(new ConversationPage([], page, pageSize, 0));
 
-    public Task<ConversationDetail?> FindAsync(
+    public Task<Versioned<ConversationDetail>?> FindAsync(
         TenantId tenantId,
         ConversationId conversationId,
         CancellationToken cancellationToken = default) =>
-        Task.FromResult<ConversationDetail?>(null);
+        Task.FromResult<Versioned<ConversationDetail>?>(null);
 
     public Task<bool> BelongsToAsync(
         TenantId tenantId,
@@ -696,5 +733,62 @@ internal sealed class FakePublicChatProtection : IPublicChatProtection
         return Unreachable is null
             ? Task.FromResult(decision)
             : Task.FromException<PublicChatDecision>(Unreachable());
+    }
+}
+
+/// <summary>
+/// A realtime notifier that records instead of connecting to anything.
+/// </summary>
+/// <remarks>
+/// <strong>What it records is the whole payload the platform sends.</strong> A
+/// tenant and a conversation id — no text, no sender, no workspace detail. A
+/// test asserting on this double is therefore asserting the real contract: if
+/// somebody ever added transcript content to the notification, this type would
+/// have to grow a field to hold it, and that change is impossible to make by
+/// accident.
+/// </remarks>
+internal sealed class RecordingRealtimeNotifier : IConversationRealtimeNotifier
+{
+    private readonly List<(TenantId Tenant, ConversationId Conversation)> _announced = [];
+    private readonly Lock _sync = new();
+
+    /// <summary>Every announcement, in the order it was made.</summary>
+    public IReadOnlyList<(TenantId Tenant, ConversationId Conversation)> Announced
+    {
+        get
+        {
+            lock (_sync)
+            {
+                return [.. _announced];
+            }
+        }
+    }
+
+    /// <summary>
+    /// When set, every announcement throws.
+    /// </summary>
+    /// <remarks>
+    /// Realtime is best effort, and a caller must never fail a write because an
+    /// announcement failed. This is how a test proves that: a stored reply with
+    /// a broken notifier is still a stored reply.
+    /// </remarks>
+    public Exception? Failure { get; set; }
+
+    public Task ConversationChangedAsync(
+        TenantId tenantId,
+        ConversationId conversationId,
+        CancellationToken cancellationToken = default)
+    {
+        if (Failure is not null)
+        {
+            throw Failure;
+        }
+
+        lock (_sync)
+        {
+            _announced.Add((tenantId, conversationId));
+        }
+
+        return Task.CompletedTask;
     }
 }

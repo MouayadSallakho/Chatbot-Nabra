@@ -11,7 +11,8 @@ import {
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
 import { ApiError, toApiError } from '@app/core/api/api-error';
-import { ChatMessage } from '@app/features/chat/hosted-chat-api';
+import { PublicChatRealtime } from '@app/core/realtime/public-chat-realtime';
+import { ChatHandling, ChatMessage } from '@app/features/chat/hosted-chat-api';
 import { readableForeground } from '../accent-color';
 import { EmbedBridge } from '../embed-bridge';
 import { EmbedChatApi, EmbeddedChatConfig } from '../embed-chat-api';
@@ -66,6 +67,7 @@ type EmbedState = 'connecting' | 'notEmbedded' | 'unavailable' | 'ready' | 'fail
 export class EmbedChat implements OnInit {
   private readonly api = inject(EmbedChatApi);
   private readonly store = inject(EmbedSessionStore);
+  private readonly realtime = inject(PublicChatRealtime);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
 
   /** Read by a host binding, so it cannot be private. */
@@ -80,6 +82,15 @@ export class EmbedChat implements OnInit {
   protected readonly panelOpen = signal(false);
   protected readonly messages = signal<readonly ChatMessage[]>([]);
   protected readonly sending = signal(false);
+
+  /**
+   * Who is answering, as the server last told this widget.
+   *
+   * Starts at the ordinary case and changes when a turn comes back saying a
+   * person has taken over. It is what lets the panel tell the visitor the truth
+   * rather than leave them waiting on a machine that is no longer answering.
+   */
+  protected readonly handling = signal<ChatHandling>('Ai');
   protected readonly sendFailure = signal<ApiError | null>(null);
 
   /** The website this widget is embedded on, as the browser reported it. */
@@ -244,11 +255,31 @@ export class EmbedChat implements OnInit {
     try {
       const conversation = await this.ensureConversation(publicKey, origin);
 
+      // Listening starts as soon as there is something to listen to, and before
+      // the turn is attempted.
+      //
+      // Doing it after a successful send looks equivalent and is not: a first
+      // turn that fails -- a provider outage, a rate limit, a lost response --
+      // would leave the widget with a conversation and no subscription, so a
+      // colleague taking it over and replying would reach a visitor who never
+      // hears about it. That is exactly the case where live updates matter
+      // most, because the AI just failed to answer.
+      await this.watch(conversation.id, origin, conversation.credential);
+
       const turn = await firstValueFrom(
         this.api.send(conversation.id, origin, conversation.credential, clientMessageId, text),
       );
 
-      this.messages.update((current) => [...current, turn.customerMessage, turn.reply]);
+      this.handling.set(turn.handling);
+
+      // A turn with no reply is a success: a person is handling this and will
+      // answer. A placeholder bubble, or an error, would each say something
+      // untrue to somebody who is waiting.
+      this.messages.update((current) =>
+        turn.reply === null
+          ? [...current, turn.customerMessage]
+          : [...current, turn.customerMessage, turn.reply],
+      );
       this.form.controls.message.setValue('');
     } catch (error) {
       this.sendFailure.set(this.explain(toApiError(error)));
@@ -289,6 +320,25 @@ export class EmbedChat implements OnInit {
    * expired, or the website's approval may have been withdrawn since. Either way
    * the right outcome is a fresh empty widget.
    */
+  /**
+   * Starts listening for replies to this conversation.
+   *
+   * <strong>The credential is spent on a ticket and does not travel.</strong>
+   * It is readable by this script, which is exactly why it must not end up in a
+   * websocket address that the embedding page's own network panel displays and
+   * every proxy logs. The ticket that goes instead is good for about a minute,
+   * names one conversation and reads nothing.
+   *
+   * Failure is silent. A widget without live updates still sends and receives;
+   * the visitor sees a reply when they next send, which is how it worked before.
+   */
+  private async watch(conversationId: string, origin: string, credential: string): Promise<void> {
+    await this.realtime.listen(
+      () => this.api.realtimeTicket(conversationId, origin, credential),
+      () => void this.refreshTranscript(),
+    );
+  }
+
   private async resume(publicKey: string, origin: string): Promise<void> {
     const remembered = this.store.read(publicKey);
 
@@ -306,6 +356,9 @@ export class EmbedChat implements OnInit {
         credential: remembered.credential,
       });
       this.messages.set(page.items);
+      this.handling.set(page.handling);
+
+      await this.watch(remembered.conversationId, origin, remembered.credential);
     } catch (error) {
       if (toApiError(error).kind === 'notFound') {
         this.store.clear(publicKey);
@@ -394,6 +447,10 @@ export class EmbedChat implements OnInit {
       );
 
       this.messages.set(page.items);
+
+      // The mode comes back with every read, so a takeover reaches the visitor
+      // on the next notification rather than when somebody happens to reply.
+      this.handling.set(page.handling);
     } catch {
       // Leave what is on screen. A failed refresh must not also erase the
       // conversation the visitor can see.

@@ -210,6 +210,39 @@ internal sealed class WebChatRuntimeStore(OmniAiDbContext context) : IWebChatRun
                 "The conversation this turn belongs to no longer exists.");
     }
 
+    public async Task<ConversationHandling?> ReadHandlingAsync(
+        ConversationId conversationId,
+        CancellationToken cancellationToken = default)
+    {
+        // Untracked and projected to the one column. The caller is about to load
+        // the same conversation for writing through BeginTurnAsync, and tracking
+        // one row from two queries is how a change tracker ends up with an
+        // opinion nobody intended.
+        ConversationHandling[] found = await _context.Conversations
+            .AsNoTracking()
+            .Where(conversation => conversation.Id == conversationId)
+            .Select(conversation => conversation.Handling)
+            .Take(1)
+            .ToArrayAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        return found.Length == 0 ? null : found[0];
+    }
+
+    public async Task SettleWithoutReplyAsync(
+        ConversationTurn turn,
+        DateTimeOffset settledAt,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(turn);
+
+        turn.CompleteWithoutReply(settledAt);
+
+        _context.ConversationTurns.Update(turn);
+
+        await _context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+    }
+
     /// <summary>
     /// Whether a failed save was the turn uniqueness index refusing a duplicate.
     /// </summary>

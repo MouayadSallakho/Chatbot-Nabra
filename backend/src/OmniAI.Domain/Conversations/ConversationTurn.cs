@@ -147,6 +147,32 @@ public sealed class ConversationTurn
     }
 
     /// <summary>
+    /// Settles a turn that was never going to produce an AI reply, because a
+    /// person is handling this conversation.
+    /// </summary>
+    /// <remarks>
+    /// <strong>Completed, not failed.</strong> Nothing went wrong: the customer's
+    /// message was accepted and stored exactly as asked, and a colleague will
+    /// answer it. Recording it as a failure would make the visitor's client show
+    /// an error for a message that arrived perfectly, and would put a
+    /// non-incident into every count of how often generation breaks.
+    /// <para>
+    /// It leaves <see cref="ReplyMessageId"/> null, which is what makes a replay
+    /// of the same client message id return the customer's own message and no
+    /// reply — the same answer, however many times the browser retries.
+    /// </para>
+    /// </remarks>
+    /// <exception cref="DomainStateException">The turn is already settled.</exception>
+    /// <exception cref="DomainValidationException">The instant is not a real point in time.</exception>
+    public void CompleteWithoutReply(DateTimeOffset completedAt)
+    {
+        RequireUnsettled("complete");
+
+        Status = ConversationTurnStatus.Completed;
+        RecordChange(RequireInstant(completedAt));
+    }
+
+    /// <summary>
     /// Records that no reply was produced.
     /// </summary>
     /// <remarks>

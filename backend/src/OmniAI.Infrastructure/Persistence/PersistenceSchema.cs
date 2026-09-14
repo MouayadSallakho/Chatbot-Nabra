@@ -89,4 +89,16 @@ internal static class PersistenceSchema
 
     /// <summary>The table holding the websites a widget may be embedded on.</summary>
     public const string WebChatAllowedOriginsTable = "web_chat_allowed_origins";
+
+    /// <summary>
+    /// Who sent each human reply, and the key that makes sending it twice
+    /// harmless.
+    /// </summary>
+    /// <remarks>
+    /// Named here because two schema tests read it: one asserts the unique index
+    /// on (conversation_id, client_message_id) exists, and one asserts the
+    /// composite foreign key into the workspace membership exists. Both would
+    /// otherwise repeat a string literal that a rename could silently orphan.
+    /// </remarks>
+    public const string HumanRepliesTable = "conversation_human_replies";
 }

@@ -90,3 +90,18 @@
     font-size: 0.75rem;
   }
 }
+
+// The agent cell now carries up to three things: the agent's name, a badge when
+// a person has taken the conversation over, and who it is assigned to. Stacked,
+// because on a narrow screen they would otherwise push the row sideways.
+.conversation-agent {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: baseline;
+  min-width: 0;
+}
+
+.assigned {
+  overflow-wrap: anywhere;
+}

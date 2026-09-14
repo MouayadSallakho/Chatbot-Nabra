@@ -1,3 +1,4 @@
+using OmniAI.Api.Realtime;
 using OmniAI.Api.AiAgents;
 using OmniAI.Api.Auth;
 using OmniAI.Api.Authorization;
@@ -141,6 +142,15 @@ app.MapConversationEndpoints();
 app.MapHostedChatEndpoints();
 app.MapEmbeddedChatEndpoints();
 app.MapWidgetLoaderEndpoints();
+
+// The realtime hubs.
+//
+// Mapped after authentication and authorisation, so the admin hub sees the
+// signed-in principal the rest of the application sees. The public hub is
+// anonymous and authorises itself from the ticket its connection carries -- the
+// visitor credential never reaches this far, by design.
+app.MapHub<WorkspaceInboxHub>("/hubs/workspace-inbox");
+app.MapHub<PublicChatHub>("/hubs/public-chat");
 
 // TLS is terminated by the reverse proxy in front of this process, so the
 // application deliberately does not perform its own HTTPS redirection -- there is

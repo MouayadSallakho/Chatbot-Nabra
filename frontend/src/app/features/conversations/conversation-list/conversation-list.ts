@@ -2,6 +2,7 @@ import { DatePipe } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
+  DestroyRef,
   OnInit,
   computed,
   inject,
@@ -10,6 +11,7 @@ import {
 import { RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { ApiError, toApiError } from '@app/core/api/api-error';
+import { ConversationRealtime } from '@app/core/realtime/conversation-realtime';
 import { PermissionService } from '@app/core/authorization/permission-service';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
 import { EmptyState } from '@app/shared/empty-state/empty-state';
@@ -40,6 +42,8 @@ export class ConversationList implements OnInit {
   private readonly api = inject(ConversationsApi);
   private readonly workspace = inject(WorkspaceContextService);
   private readonly permissions = inject(PermissionService);
+  private readonly realtime = inject(ConversationRealtime);
+  private readonly destroyRef = inject(DestroyRef);
 
   protected readonly loading = signal(true);
   protected readonly failure = signal<ApiError | null>(null);
@@ -50,8 +54,49 @@ export class ConversationList implements OnInit {
 
   protected readonly skeletonRows = [1, 2, 3];
 
+  /** Whether live updates are arriving. Shown quietly; never an error. */
+  protected readonly live = this.realtime.live;
+
   ngOnInit(): void {
     void this.load();
+
+    const tenantId = this.workspace.tenantId();
+
+    if (tenantId && this.canView()) {
+      // Any conversation changing changes this list: a new message moves a row
+      // to the top and rewrites its preview. So the list re-reads on every
+      // event rather than trying to patch one row, which would be a second,
+      // subtly different projection of the same data.
+      const stop = this.realtime.listen(tenantId, () => void this.refresh());
+
+      this.destroyRef.onDestroy(stop);
+    }
+  }
+
+  /**
+   * Re-reads without flipping the screen back to skeletons.
+   *
+   * A refresh of something already on screen is not a load: tearing the table
+   * down every time a customer typed would make the list unusable precisely
+   * when it is busiest.
+   */
+  private async refresh(): Promise<void> {
+    const tenantId = this.workspace.tenantId();
+
+    if (!tenantId) {
+      return;
+    }
+
+    try {
+      const page = await firstValueFrom(this.api.list(tenantId));
+
+      this.conversations.set(page.items);
+      this.total.set(page.total);
+    } catch {
+      // What is on screen is the last thing the server confirmed. An error
+      // banner over a correct list because one background read lost a race
+      // would be worse than being a few seconds stale.
+    }
   }
 
   protected async load(): Promise<void> {
@@ -80,6 +125,15 @@ export class ConversationList implements OnInit {
 
   /** How a sender is described beside a preview. */
   protected senderLabel(sender: string | null): string {
-    return sender === 'AiAgent' ? 'AI' : sender === 'Customer' ? 'Customer' : '';
+    switch (sender) {
+      case 'AiAgent':
+        return 'AI';
+      case 'Customer':
+        return 'Customer';
+      case 'HumanAgent':
+        return 'Colleague';
+      default:
+        return '';
+    }
   }
 }

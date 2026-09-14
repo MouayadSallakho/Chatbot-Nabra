@@ -51,13 +51,46 @@ public sealed record PublicChatMessageView(
 /// <param name="NextCursor">
 /// Where to continue, or <see langword="null"/> at the end of the conversation.
 /// </param>
+/// <param name="Handling">
+/// Who is answering right now: <c>"Ai"</c> or <c>"Human"</c>.
+/// <para>
+/// <strong>Sent so a visitor can be told the truth after a takeover.</strong>
+/// Without it the widget learns a person has stepped in only when that person
+/// happens to reply, which can be several minutes of a customer watching an AI
+/// that has stopped answering. Re-reading the transcript is what a client does
+/// when it hears the conversation changed, so this is where the mode belongs.
+/// </para>
+/// <para>
+/// It is the mode and nothing else — no employee, no assignment, no workspace.
+/// </para>
+/// </param>
 public sealed record PublicChatMessagePage(
     IReadOnlyList<PublicChatMessageView> Items,
-    long? NextCursor);
+    long? NextCursor,
+    string Handling);
 
 /// <summary>The outcome of one visitor turn.</summary>
 /// <param name="CustomerMessage">What the visitor said, as stored.</param>
-/// <param name="Reply">The agent's answer.</param>
+/// <param name="Reply">
+/// The agent's answer, or <see langword="null"/> when a person is handling this
+/// conversation and no AI reply was produced — or ever will be, for this message.
+/// </param>
+/// <param name="Handling">
+/// Who is answering: <c>"Ai"</c> or <c>"Human"</c>.
+/// <para>
+/// <strong>Sent so the visitor's client can tell the truth rather than guess
+/// it.</strong> Without it, a turn that came back with no reply is
+/// indistinguishable from one that failed, and the widget would have to choose
+/// between showing an error for a message that arrived perfectly and showing
+/// nothing at all. Neither is what happened.
+/// </para>
+/// <para>
+/// It is the enum's name and nothing else. It carries no employee, no
+/// assignment, no workspace and no identity — a visitor is told that a person is
+/// looking after them, never which person.
+/// </para>
+/// </param>
 public sealed record WebChatTurnResult(
     PublicChatMessageView CustomerMessage,
-    PublicChatMessageView Reply);
+    PublicChatMessageView? Reply,
+    string Handling);

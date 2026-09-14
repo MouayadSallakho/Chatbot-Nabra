@@ -166,3 +166,11 @@
   flex: none;
   white-space: nowrap;
 }
+
+// The human-support notice. Distinguished by weight and wording, not by colour
+// alone: it says what is happening in words that stand on their own.
+.chat-handover {
+  font: var(--text-body-strong);
+  font-size: 0.8125rem;
+  color: var(--color-accent-strong);
+}

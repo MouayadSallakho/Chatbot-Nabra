@@ -92,6 +92,16 @@ public sealed class OmniAiDbContext(DbContextOptions<OmniAiDbContext> options)
     /// </remarks>
     public DbSet<ConversationTurn> ConversationTurns => Set<ConversationTurn>();
 
+    /// <summary>
+    /// Who sent each reply written by a person, and the key that de-duplicates it.
+    /// </summary>
+    /// <remarks>
+    /// Its own set for the same reason a turn is: attribution and idempotency are
+    /// operational bookkeeping, and a transcript should not have to carry an
+    /// employee reference into every place a message is read.
+    /// </remarks>
+    public DbSet<HumanReply> HumanReplies => Set<HumanReply>();
+
     /// <summary>Website chat endpoints: where a workspace's AI is reachable from.</summary>
     public DbSet<WebChatEndpoint> WebChatEndpoints => Set<WebChatEndpoint>();
 
