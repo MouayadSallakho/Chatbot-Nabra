@@ -130,4 +130,13 @@ internal static class PersistenceSchema
     /// otherwise repeat a literal a rename could silently orphan.
     /// </remarks>
     public const string KnowledgeSourcesTable = "knowledge_sources";
+
+    /// <summary>
+    /// Real calls to external AI providers, and what they cost.
+    /// </summary>
+    /// <remarks>
+    /// Accounting, not billing: what this platform paid a provider, never what a
+    /// customer is charged. It holds no content of any kind.
+    /// </remarks>
+    public const string AiProviderUsagesTable = "ai_provider_usages";
 }

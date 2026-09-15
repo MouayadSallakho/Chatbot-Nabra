@@ -1,3 +1,5 @@
+using OmniAI.Application.Ai.Usage;
+
 namespace OmniAI.Application.Ai;
 
 /// <summary>
@@ -74,7 +76,14 @@ public interface IAiTextGenerator
     /// <exception cref="OperationCanceledException">
     /// <paramref name="cancellationToken"/> was cancelled.
     /// </exception>
+    /// <param name="usage">
+    /// Whose money this spends and what for. Required, and a parameter rather
+    /// than an ambient value: a new call site cannot compile without saying which
+    /// workspace to attribute the call to, which is the only way attribution
+    /// stays correct once background work exists.
+    /// </param>
     Task<AiTextGenerationResult> GenerateAsync(
         AiTextGenerationRequest request,
+        AiUsageContext usage,
         CancellationToken cancellationToken = default);
 }

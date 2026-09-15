@@ -66,7 +66,7 @@ public sealed class OpenAiFailureTests
         };
 
         await Assert.ThrowsAsync<AiRuntimeTimeoutException>(
-            () => OpenAiTestHarness.Generator(transport).GenerateAsync(OpenAiTestHarness.SimpleRequest()));
+            () => OpenAiTestHarness.Generator(transport).GenerateAsync(OpenAiTestHarness.SimpleRequest(), OpenAiTestHarness.Usage));
     }
 
     [Fact]
@@ -89,7 +89,7 @@ public sealed class OpenAiFailureTests
         CannedOpenAiTransport transport = Failing(HttpStatusCode.InternalServerError);
 
         Exception failure = await Record.ExceptionAsync(
-            () => OpenAiTestHarness.Generator(transport).GenerateAsync(OpenAiTestHarness.SimpleRequest()));
+            () => OpenAiTestHarness.Generator(transport).GenerateAsync(OpenAiTestHarness.SimpleRequest(), OpenAiTestHarness.Usage));
 
         Assert.NotNull(failure);
         Assert.Equal("OmniAI.Application", failure.GetType().Assembly.GetName().Name);
@@ -103,7 +103,7 @@ public sealed class OpenAiFailureTests
     public async Task No_provider_detail_reaches_the_failure_message(HttpStatusCode status)
     {
         Exception failure = await Record.ExceptionAsync(
-            () => OpenAiTestHarness.Generator(Failing(status)).GenerateAsync(OpenAiTestHarness.SimpleRequest()));
+            () => OpenAiTestHarness.Generator(Failing(status)).GenerateAsync(OpenAiTestHarness.SimpleRequest(), OpenAiTestHarness.Usage));
 
         Assert.NotNull(failure);
 
@@ -140,7 +140,7 @@ public sealed class OpenAiFailureTests
         CannedOpenAiTransport transport = Failing(status);
 
         await Record.ExceptionAsync(
-            () => OpenAiTestHarness.Generator(transport).GenerateAsync(OpenAiTestHarness.SimpleRequest()));
+            () => OpenAiTestHarness.Generator(transport).GenerateAsync(OpenAiTestHarness.SimpleRequest(), OpenAiTestHarness.Usage));
 
         Assert.Equal(1, transport.Calls);
     }
@@ -151,7 +151,7 @@ public sealed class OpenAiFailureTests
         CannedOpenAiTransport transport = new() { ResponseBody = OpenAiCannedResponses.NoOutput() };
 
         await Assert.ThrowsAsync<AiResponseInvalidException>(
-            () => OpenAiTestHarness.Generator(transport).GenerateAsync(OpenAiTestHarness.SimpleRequest()));
+            () => OpenAiTestHarness.Generator(transport).GenerateAsync(OpenAiTestHarness.SimpleRequest(), OpenAiTestHarness.Usage));
 
         Assert.Equal(1, transport.Calls);
     }
@@ -167,7 +167,7 @@ public sealed class OpenAiFailureTests
         using CancellationTokenSource source = new();
 
         Task<AiTextGenerationResult> pending = OpenAiTestHarness.Generator(transport)
-            .GenerateAsync(OpenAiTestHarness.SimpleRequest(), source.Token);
+            .GenerateAsync(OpenAiTestHarness.SimpleRequest(), OpenAiTestHarness.Usage, source.Token);
 
         await source.CancelAsync();
 
@@ -188,7 +188,7 @@ public sealed class OpenAiFailureTests
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
             () => OpenAiTestHarness.Generator(transport)
-                .GenerateAsync(OpenAiTestHarness.SimpleRequest(), source.Token));
+                .GenerateAsync(OpenAiTestHarness.SimpleRequest(), OpenAiTestHarness.Usage, source.Token));
 
         Assert.Equal(0, transport.Calls);
     }
@@ -204,5 +204,5 @@ public sealed class OpenAiFailureTests
     };
 
     private static Task<AiTextGenerationResult> FailWith(HttpStatusCode status) =>
-        OpenAiTestHarness.Generator(Failing(status)).GenerateAsync(OpenAiTestHarness.SimpleRequest());
+        OpenAiTestHarness.Generator(Failing(status)).GenerateAsync(OpenAiTestHarness.SimpleRequest(), OpenAiTestHarness.Usage);
 }

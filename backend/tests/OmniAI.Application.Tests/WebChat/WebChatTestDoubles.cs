@@ -11,6 +11,7 @@ using OmniAI.Domain.AiAgents;
 using OmniAI.Domain.Conversations;
 using OmniAI.Domain.Tenants;
 using OmniAI.Domain.WebChat;
+using OmniAI.Application.Ai.Usage;
 
 namespace OmniAI.Application.Tests.WebChat;
 
@@ -62,6 +63,7 @@ internal sealed class RecordingGenerator : IAiTextGenerator
 
     public async Task<AiTextGenerationResult> GenerateAsync(
         AiTextGenerationRequest request,
+        AiUsageContext usage,
         CancellationToken cancellationToken = default)
     {
         Interlocked.Increment(ref _calls);

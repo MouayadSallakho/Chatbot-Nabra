@@ -103,6 +103,100 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                     b.ToTable("user_tokens", (string)null);
                 });
 
+            modelBuilder.Entity("OmniAI.Domain.Ai.AiProviderUsage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<decimal?>("CachedInputRatePerMillion")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("numeric(18,6)")
+                        .HasColumnName("cached_input_rate_per_million");
+
+                    b.Property<DateTimeOffset?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("completed_at");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Currency")
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasColumnName("currency");
+
+                    b.Property<decimal?>("EstimatedCost")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("numeric(18,6)")
+                        .HasColumnName("estimated_cost");
+
+                    b.Property<decimal?>("InputRatePerMillion")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("numeric(18,6)")
+                        .HasColumnName("input_rate_per_million");
+
+                    b.Property<string>("OperationType")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("operation_type");
+
+                    b.Property<decimal?>("OutputRatePerMillion")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("numeric(18,6)")
+                        .HasColumnName("output_rate_per_million");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("provider");
+
+                    b.Property<string>("Purpose")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("purpose");
+
+                    b.Property<DateTimeOffset?>("RatesEffectiveFrom")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("rates_effective_from");
+
+                    b.Property<string>("RequestedModel")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("requested_model");
+
+                    b.Property<string>("ResolvedModel")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("resolved_model");
+
+                    b.Property<DateTimeOffset>("StartedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("started_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "StartedAt")
+                        .HasDatabaseName("ix_ai_provider_usages_tenant_started");
+
+                    b.ToTable("ai_provider_usages", (string)null);
+                });
+
             modelBuilder.Entity("OmniAI.Domain.AiAgents.AiAgent", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1358,6 +1452,51 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_user_tokens_user");
+                });
+
+            modelBuilder.Entity("OmniAI.Domain.Ai.AiProviderUsage", b =>
+                {
+                    b.HasOne("OmniAI.Domain.Tenants.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.OwnsOne("OmniAI.Domain.Ai.ProviderTokenUsage", "Usage", b1 =>
+                        {
+                            b1.Property<Guid>("AiProviderUsageId")
+                                .HasColumnType("uuid");
+
+                            b1.Property<long?>("CachedInputTokens")
+                                .HasColumnType("bigint")
+                                .HasColumnName("cached_input_tokens");
+
+                            b1.Property<long?>("InputTokens")
+                                .HasColumnType("bigint")
+                                .HasColumnName("input_tokens");
+
+                            b1.Property<long?>("OutputTokens")
+                                .HasColumnType("bigint")
+                                .HasColumnName("output_tokens");
+
+                            b1.Property<long?>("ReasoningTokens")
+                                .HasColumnType("bigint")
+                                .HasColumnName("reasoning_tokens");
+
+                            b1.Property<long?>("TotalTokens")
+                                .HasColumnType("bigint")
+                                .HasColumnName("total_tokens");
+
+                            b1.HasKey("AiProviderUsageId");
+
+                            b1.ToTable("ai_provider_usages");
+
+                            b1.WithOwner()
+                                .HasForeignKey("AiProviderUsageId");
+                        });
+
+                    b.Navigation("Usage")
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("OmniAI.Domain.AiAgents.AiAgent", b =>

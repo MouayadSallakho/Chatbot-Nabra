@@ -526,7 +526,10 @@ public sealed class WorkspaceAnalyticsReaderTests(PostgresTestDatabase database)
 
         // A dashboard is a fixed number of statements, whatever the workspace
         // holds. If this ever grows with the data, something became an N+1.
-        Assert.InRange(recorded.Statements.Count, 1, 16);
+        //
+        // Phase 23 added five: the usage buckets, the rated cost per currency,
+        // the unrated count, the model breakdown and its costs. Still a constant.
+        Assert.InRange(recorded.Statements.Count, 1, 21);
     }
 
     // ----------------------------------------------------------------- helpers

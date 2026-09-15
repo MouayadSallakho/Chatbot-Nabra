@@ -1,6 +1,8 @@
 using OmniAI.Application.Knowledge.Persistence;
 using OmniAI.Domain.AiAgents;
 using OmniAI.Domain.Tenants;
+using OmniAI.Domain.Ai;
+using OmniAI.Application.Ai.Usage;
 
 namespace OmniAI.Application.Knowledge;
 
@@ -88,8 +90,14 @@ public sealed class KnowledgeRetriever(
 
         string trimmed = Shorten(query.Trim());
 
+        // Reached only past the eligibility check above: a workspace with
+        // nothing to retrieve from never embeds a question, and therefore never
+        // pays for one.
         IReadOnlyList<EmbeddingVector> vectors = await _embeddings
-            .GenerateAsync([trimmed], cancellationToken)
+            .GenerateAsync(
+                [trimmed],
+                AiUsageContext.For(tenantId, AiUsagePurpose.ConversationRetrievalEmbedding),
+                cancellationToken)
             .ConfigureAwait(false);
 
         if (vectors is null || vectors.Count != 1 || vectors[0] is null)

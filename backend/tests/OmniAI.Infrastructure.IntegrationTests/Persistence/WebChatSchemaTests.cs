@@ -35,8 +35,19 @@ public sealed class WebChatSchemaTests(PostgresTestDatabase database)
         // bound to the workspace, the connection and the purpose, in its own
         // table, read by exactly one query. A `text` column of that name would
         // fail this test, which is the point.
+        //
+        // The ai_provider_usages columns are Phase 23's, and are counts: how many
+        // tokens a provider said it processed. They are caught by the same sweep
+        // because the word is the same, and they are listed rather than filtered
+        // out so that the sweep keeps its teeth -- a `text` column named for a
+        // token still fails here, whatever table it appears in.
         Assert.Equal(
-            "tenant_invitations.token_hash:bytea, web_chat_sessions.access_token_hash:bytea, "
+            "ai_provider_usages.cached_input_tokens:bigint, "
+            + "ai_provider_usages.input_tokens:bigint, "
+            + "ai_provider_usages.output_tokens:bigint, "
+            + "ai_provider_usages.reasoning_tokens:bigint, "
+            + "ai_provider_usages.total_tokens:bigint, "
+            + "tenant_invitations.token_hash:bytea, web_chat_sessions.access_token_hash:bytea, "
             + "whatsapp_credentials.protected_token:bytea",
             columns as string);
     }

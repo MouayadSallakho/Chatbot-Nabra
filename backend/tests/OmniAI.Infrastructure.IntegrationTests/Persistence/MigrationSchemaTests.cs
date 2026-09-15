@@ -79,7 +79,7 @@ public sealed class MigrationSchemaTests(PostgresTestDatabase database)
 
         string[] applied = [.. await context.Database.GetAppliedMigrationsAsync()];
 
-        Assert.Equal(13, applied.Length);
+        Assert.Equal(14, applied.Length);
         Assert.EndsWith("InitialPersistence", applied[0], StringComparison.Ordinal);
         Assert.EndsWith("AddAiAgents", applied[1], StringComparison.Ordinal);
         Assert.EndsWith("AddIdentityAndTenantMemberships", applied[2], StringComparison.Ordinal);
@@ -116,6 +116,10 @@ public sealed class MigrationSchemaTests(PostgresTestDatabase database)
         Assert.EndsWith(
             "AddAnalyticsIndexes",
             applied[12],
+            StringComparison.Ordinal);
+        Assert.EndsWith(
+            "AddAiProviderUsageAccounting",
+            applied[13],
             StringComparison.Ordinal);
     }
 

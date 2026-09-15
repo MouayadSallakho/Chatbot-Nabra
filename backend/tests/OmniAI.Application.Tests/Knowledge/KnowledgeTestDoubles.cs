@@ -4,6 +4,7 @@ using OmniAI.Application.Knowledge.Persistence;
 using OmniAI.Domain.AiAgents;
 using OmniAI.Domain.Knowledge;
 using OmniAI.Domain.Tenants;
+using OmniAI.Application.Ai.Usage;
 
 namespace OmniAI.Application.Tests.Knowledge;
 
@@ -32,6 +33,8 @@ internal sealed class RecordingEmbeddingGenerator : ITextEmbeddingGenerator
 
     private readonly List<IReadOnlyList<string>> _batches = [];
 
+    private readonly List<AiUsageContext> _usages = [];
+
     public RecordingEmbeddingGenerator(EmbeddingProfile? profile = null) =>
         Profile = profile ?? EmbeddingProfile.Create(
             EmbeddingProfileId.Create("test:fake:8"),
@@ -56,9 +59,13 @@ internal sealed class RecordingEmbeddingGenerator : ITextEmbeddingGenerator
     /// <summary>Makes the next call return one vector too few.</summary>
     public bool PretendShortResponse { get; set; }
 
+    /// <summary>The attribution every batch was handed, in order.</summary>
+    public IReadOnlyList<AiUsageContext> Usages => _usages;
+
     public void Reset()
     {
         _batches.Clear();
+        _usages.Clear();
         Calls = 0;
         PretendUnavailable = false;
         PretendShortResponse = false;
@@ -66,12 +73,14 @@ internal sealed class RecordingEmbeddingGenerator : ITextEmbeddingGenerator
 
     public Task<IReadOnlyList<EmbeddingVector>> GenerateAsync(
         IReadOnlyList<string> inputs,
+        AiUsageContext usage,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(inputs);
 
         Calls++;
         _batches.Add([.. inputs]);
+        _usages.Add(usage);
 
         cancellationToken.ThrowIfCancellationRequested();
 

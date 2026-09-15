@@ -134,6 +134,17 @@ public sealed class OmniAiDbContext(DbContextOptions<OmniAiDbContext> options)
     public DbSet<KnowledgeSource> KnowledgeSources => Set<KnowledgeSource>();
 
     /// <summary>
+    /// Real provider calls and their cost.
+    /// </summary>
+    /// <remarks>
+    /// One row is one provider request -- not one chunk, not one logical attempt.
+    /// Written before dispatch and settled afterwards, so spend can never happen
+    /// without a record of it.
+    /// </remarks>
+    public DbSet<Domain.Ai.AiProviderUsage> AiProviderUsages =>
+        Set<Domain.Ai.AiProviderUsage>();
+
+    /// <summary>
     /// Which agents may draw on which documents.
     /// </summary>
     /// <remarks>

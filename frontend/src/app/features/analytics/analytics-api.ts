@@ -79,15 +79,108 @@ export interface AnalyticsAgent {
 /**
  * How AI turns ended.
  *
- * Exact, because the runtime records each turn's outcome. There is deliberately
- * no token count, no duration and no cost: the platform does not hold them, and
- * this is analytics rather than billing.
+ * Exact, because the runtime records each turn's outcome. A turn is not a
+ * provider call: one answer can involve an embedding and a generation, and a
+ * turn that failed before dispatch involves neither. Provider calls are counted
+ * separately, in {@link AnalyticsAiUsage}.
  */
 export interface AnalyticsAiOperations {
   readonly attempts: number;
   readonly completed: number;
   readonly failed: number;
   readonly inProgress: number;
+}
+
+/**
+ * One currency's estimated provider cost.
+ *
+ * <strong>Currencies are never added together.</strong> This platform holds no
+ * exchange rate and must not invent one, so two currencies arrive as two
+ * entries and are shown as two figures.
+ */
+export interface AnalyticsRatedCost {
+  /** ISO 4217, three letters. */
+  readonly currency: string;
+
+  /**
+   * What the calls in this currency are estimated to have cost.
+   *
+   * <strong>An internal estimate, not a bill.</strong> It is what this platform
+   * reckons it paid a provider, computed from rates an operator configured. It
+   * is not an invoice amount, not a customer charge and not an amount due.
+   */
+  readonly estimatedCost: number;
+
+  /** How many calls this figure covers. */
+  readonly calls: number;
+}
+
+/**
+ * Real calls made to AI providers, and what they are estimated to have cost.
+ *
+ * <strong>Provider-reported, never estimated.</strong> Every token figure here
+ * is what the provider itself said it processed. Nothing is derived from the
+ * length of a prompt or an answer, and a call the provider reported no usage for
+ * contributes nothing rather than a zero.
+ *
+ * Null on the dashboard when this workspace has never called a provider: no
+ * calls is not the same as calls that cost nothing.
+ */
+export interface AnalyticsAiUsage {
+  readonly calls: number;
+  readonly generationCalls: number;
+  readonly embeddingCalls: number;
+  readonly succeeded: number;
+  readonly failed: number;
+
+  /**
+   * Calls dispatched whose outcome was never established.
+   *
+   * A timeout, or a process that died between the request and the answer. The
+   * provider may well have been paid for them, so they are reported rather than
+   * counted as failures.
+   */
+  readonly unresolved: number;
+
+  readonly generationInputTokens: number;
+  readonly generationCachedInputTokens: number;
+  readonly generationOutputTokens: number;
+  readonly generationReasoningTokens: number;
+  readonly embeddingInputTokens: number;
+
+  /**
+   * Successful calls this deployment has no configured rate for.
+   *
+   * <strong>Unrated is not free.</strong> These calls happened and cost money;
+   * they are outside the totals below, and saying so is the only honest way to
+   * present a total that does not cover everything.
+   */
+  readonly unratedCalls: number;
+
+  /** One entry per currency. Empty when nothing could be priced. */
+  readonly ratedCost: readonly AnalyticsRatedCost[];
+}
+
+/**
+ * One model's share of the provider calls.
+ *
+ * `model` is the build the provider said it used where it said so, and what was
+ * asked for otherwise. `estimatedCost` is null when a model was billed in more
+ * than one currency, because there is no single figure to give.
+ */
+export interface AnalyticsModelUsage {
+  readonly provider: string;
+  readonly model: string;
+
+  /** `TextGeneration` or `Embedding`. */
+  readonly operationType: string;
+
+  readonly calls: number;
+  readonly inputTokens: number;
+  readonly outputTokens: number;
+  readonly estimatedCost: number | null;
+  readonly currency: string | null;
+  readonly unratedCalls: number;
 }
 
 /** Where outbound WhatsApp messages got to. Null when there are none. */
@@ -116,6 +209,13 @@ export interface AnalyticsDashboard {
   readonly channels: readonly AnalyticsChannel[];
   readonly agents: readonly AnalyticsAgent[];
   readonly aiOperations: AnalyticsAiOperations;
+
+  /** Null when this workspace has never called a provider. */
+  readonly aiUsage: AnalyticsAiUsage | null;
+
+  /** The busiest models, or empty when there were no calls. */
+  readonly models: readonly AnalyticsModelUsage[];
+
   readonly whatsappDelivery: AnalyticsWhatsappDelivery | null;
 }
 

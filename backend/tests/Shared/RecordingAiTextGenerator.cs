@@ -1,4 +1,5 @@
 using OmniAI.Application.Ai;
+using OmniAI.Application.Ai.Usage;
 
 namespace OmniAI.Testing;
 
@@ -32,6 +33,8 @@ namespace OmniAI.Testing;
 internal sealed class RecordingAiTextGenerator : IAiTextGenerator
 {
     private readonly List<AiTextGenerationRequest> _requests = [];
+
+    private readonly List<AiUsageContext> _usages = [];
     private readonly Lock _sync = new();
 
     private int _calls;
@@ -122,18 +125,51 @@ internal sealed class RecordingAiTextGenerator : IAiTextGenerator
         Interlocked.Exchange(ref _calls, 0);
 
         LastCancellationToken = default;
+
+        lock (_sync)
+        {
+            _usages.Clear();
+        }
+
         Reply = "I can certainly help you choose.";
         PretendUnavailable = false;
         PretendNullResult = false;
     }
 
+    /// <summary>
+    /// The attribution every call was handed, in order.
+    /// </summary>
+    /// <remarks>
+    /// Recorded so a flow test can assert whose money was about to be spent and
+    /// what for — the thing a real ledger would write down.
+    /// </remarks>
+    public IReadOnlyList<AiUsageContext> Usages
+    {
+        get
+        {
+            lock (_sync)
+            {
+                return [.. _usages];
+            }
+        }
+    }
+
     public Task<AiTextGenerationResult> GenerateAsync(
         AiTextGenerationRequest request,
+        AiUsageContext usage,
         CancellationToken cancellationToken = default)
     {
         Interlocked.Increment(ref _calls);
 
         LastCancellationToken = cancellationToken;
+
+        if (usage is not null)
+        {
+            lock (_sync)
+            {
+                _usages.Add(usage);
+            }
+        }
 
         if (request is not null)
         {

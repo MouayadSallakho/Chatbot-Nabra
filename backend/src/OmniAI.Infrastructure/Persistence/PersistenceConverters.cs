@@ -231,6 +231,33 @@ internal static class PersistenceConverters
     public static readonly ValueConverter<AgentInstructions, string> AgentInstructions =
         new(instructions => instructions.Value, value => Domain.AiAgents.AgentInstructions.Create(value));
 
+    /// <summary>The identity of one accounted provider operation.</summary>
+    public static readonly ValueConverter<Domain.Ai.AiProviderUsageId, Guid> AiProviderUsageId =
+        new(id => id.Value, value => Domain.Ai.AiProviderUsageId.From(value));
+
+    /// <summary>A model identifier, stored exactly as the provider spells it.</summary>
+    public static readonly ValueConverter<Domain.Ai.ModelName, string> ModelName =
+        new(name => name.Value, value => Domain.Ai.ModelName.Create(value));
+
+    /// <summary>
+    /// The model a provider said it used, which it may not have said.
+    /// </summary>
+    /// <remarks>
+    /// Its own converter because absence is meaningful here: a null means the
+    /// provider did not report a model, which is different from it reporting the
+    /// one we asked for.
+    /// </remarks>
+    public static readonly ValueConverter<Domain.Ai.ModelName?, string?> NullableModelName =
+        new(
+            name => name == null ? null : name.Value.Value,
+            value => Domain.Ai.ModelName.CreateOrNull(value));
+
+    /// <summary>The currency a cost estimate is in. Null when unrated.</summary>
+    public static readonly ValueConverter<Domain.Ai.CurrencyCode?, string?> NullableCurrencyCode =
+        new(
+            code => code == null ? null : code.Value.Value,
+            value => value == null ? null : Domain.Ai.CurrencyCode.Create(value));
+
     public static readonly ValueConverter<KnowledgeSourceId, Guid> KnowledgeSourceId =
         new(id => id.Value, value => Domain.Knowledge.KnowledgeSourceId.From(value));
 

@@ -1,4 +1,5 @@
 using OmniAI.Application.Ai;
+using OmniAI.Application.Ai.Usage;
 
 namespace OmniAI.Infrastructure.Ai;
 
@@ -55,8 +56,14 @@ internal sealed class UnconfiguredAiTextGenerator : IAiTextGenerator
     /// </para>
     /// </remarks>
     /// <exception cref="AiRuntimeUnavailableException">Always.</exception>
+    /// <remarks>
+    /// Refuses before anything is dispatched, so it writes no accounting row.
+    /// A deployment with no provider spends nothing, and a ledger full of
+    /// operations that never left the process would be a lie about that.
+    /// </remarks>
     public Task<AiTextGenerationResult> GenerateAsync(
         AiTextGenerationRequest request,
+        AiUsageContext usage,
         CancellationToken cancellationToken = default) =>
         throw new AiRuntimeUnavailableException();
 }

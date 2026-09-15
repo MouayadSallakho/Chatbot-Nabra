@@ -185,6 +185,7 @@ internal sealed class RecordingEmbeddingProvider : Application.Knowledge.ITextEm
 
     public Task<IReadOnlyList<Application.Knowledge.EmbeddingVector>> GenerateAsync(
         IReadOnlyList<string> inputs,
+        Application.Ai.Usage.AiUsageContext usage,
         CancellationToken cancellationToken = default)
     {
         Calls++;

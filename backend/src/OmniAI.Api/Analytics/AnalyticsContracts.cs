@@ -72,6 +72,56 @@ public sealed record AnalyticsWhatsAppDeliveryResponse(
     long Failed,
     long Unknown);
 
+
+/// <summary>
+/// Rated provider spend in one currency.
+/// </summary>
+/// <remarks>
+/// <strong>An internal estimate, and labelled as one everywhere it is shown.</strong>
+/// It is what this platform reckons it paid a provider, computed from configured
+/// rates. It is not an invoice amount, not a customer charge and not an amount
+/// due.
+/// </remarks>
+public sealed record AnalyticsRatedCostResponse(
+    string Currency,
+    decimal EstimatedCost,
+    long Calls);
+
+/// <summary>
+/// Real calls to AI providers, and what they cost.
+/// </summary>
+/// <remarks>
+/// Counts and the providers' own token figures. No prompt, no completion, no
+/// customer content, no API key and no provider request or response body appears
+/// here — a model name is a published identifier and nothing else travels.
+/// </remarks>
+public sealed record AnalyticsAiUsageResponse(
+    long Calls,
+    long GenerationCalls,
+    long EmbeddingCalls,
+    long Succeeded,
+    long Failed,
+    long Unresolved,
+    long GenerationInputTokens,
+    long GenerationCachedInputTokens,
+    long GenerationOutputTokens,
+    long GenerationReasoningTokens,
+    long EmbeddingInputTokens,
+    long UnratedCalls,
+    IReadOnlyList<AnalyticsRatedCostResponse> RatedCost);
+
+/// <summary>One provider model's share of the spend.</summary>
+public sealed record AnalyticsModelUsageResponse(
+    string Provider,
+    string Model,
+    string OperationType,
+    long Calls,
+    long InputTokens,
+    long OutputTokens,
+    decimal? EstimatedCost,
+    string? Currency,
+    long UnratedCalls);
+
 /// <summary>
 /// One workspace's dashboard.
 /// </summary>
@@ -94,7 +144,12 @@ public sealed record AnalyticsDashboardResponse(
     // Spelt with a small "a" deliberately. The camel-case policy would turn
     // WhatsAppDelivery into "whatsAppDelivery", which reads as a typo on the
     // wire; this name serialises as "whatsappDelivery".
-    AnalyticsWhatsAppDeliveryResponse? WhatsappDelivery)
+    AnalyticsWhatsAppDeliveryResponse? WhatsappDelivery,
+
+    // Null for a workspace that has never called a provider, rather than a block
+    // of zeroes: no spend and spend of nothing read very differently.
+    AnalyticsAiUsageResponse? AiUsage,
+    IReadOnlyList<AnalyticsModelUsageResponse> Models)
 {
     public static AnalyticsDashboardResponse From(WorkspaceAnalytics analytics)
     {
@@ -156,6 +211,40 @@ public sealed record AnalyticsDashboardResponse(
                     analytics.WhatsAppDelivery.Delivered,
                     analytics.WhatsAppDelivery.Read,
                     analytics.WhatsAppDelivery.Failed,
-                    analytics.WhatsAppDelivery.Unknown));
+                    analytics.WhatsAppDelivery.Unknown),
+            analytics.AiUsage.HasAny
+                ? new AnalyticsAiUsageResponse(
+                    analytics.AiUsage.Calls,
+                    analytics.AiUsage.GenerationCalls,
+                    analytics.AiUsage.EmbeddingCalls,
+                    analytics.AiUsage.Succeeded,
+                    analytics.AiUsage.Failed,
+                    analytics.AiUsage.Unresolved,
+                    analytics.AiUsage.GenerationInputTokens,
+                    analytics.AiUsage.GenerationCachedInputTokens,
+                    analytics.AiUsage.GenerationOutputTokens,
+                    analytics.AiUsage.GenerationReasoningTokens,
+                    analytics.AiUsage.EmbeddingInputTokens,
+                    analytics.AiUsage.UnratedCalls,
+                    [
+                        .. analytics.AiUsage.RatedCost.Select(cost =>
+                            new AnalyticsRatedCostResponse(
+                                cost.Currency,
+                                cost.EstimatedCost,
+                                cost.Calls)),
+                    ])
+                : null,
+            [
+                .. analytics.Models.Select(model => new AnalyticsModelUsageResponse(
+                    model.Provider,
+                    model.Model,
+                    model.OperationType.ToString(),
+                    model.Calls,
+                    model.InputTokens,
+                    model.OutputTokens,
+                    model.EstimatedCost,
+                    model.Currency,
+                    model.UnratedCalls)),
+            ]);
     }
 }

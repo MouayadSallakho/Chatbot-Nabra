@@ -1,0 +1,182 @@
+<!--
+  Provider usage. Present only when this workspace has actually called a
+  provider: a panel of noughts would claim the spend had been measured
+  and found to be nothing.
+
+  Internal accounting. Every money figure here is an estimate of what
+  this platform paid a provider, from configured rates. Nothing on this
+  card is a bill, and the wording is part of the contract rather than
+  decoration -- the component's spec sweeps the rendered page for the
+  vocabulary of billing and fails if any of it appears.
+-->
+@if (usage(); as reported) {
+  <div class="card">
+    <div class="card-header">
+      <h2 class="card-title">AI provider usage</h2>
+      <p class="text-small text-muted">
+        Calls this workspace made to AI providers, with the token counts the providers themselves
+        reported. Money figures are internal estimates of what this platform paid its providers,
+        worked out from configured rates.
+      </p>
+    </div>
+    <div class="card-body">
+      <div class="usage-grid" data-testid="ai-usage">
+        <div class="usage-figure">
+          <span class="usage-value">{{ tokens(reported.calls) }}</span>
+          <span class="usage-label">provider calls</span>
+          <span class="text-small text-muted">
+            {{ tokens(reported.generationCalls) }} generation ·
+            {{ tokens(reported.embeddingCalls) }} embedding
+          </span>
+        </div>
+
+        <div class="usage-figure">
+          <span class="usage-value">{{ tokens(reported.succeeded) }}</span>
+          <span class="usage-label">answered</span>
+          <span class="text-small text-muted">
+            {{ tokens(reported.failed) }} failed
+            @if (reported.unresolved > 0) {
+              · {{ tokens(reported.unresolved) }} unresolved
+            }
+          </span>
+        </div>
+
+        <div class="usage-figure">
+          <span class="usage-value">{{ tokens(reported.generationInputTokens) }}</span>
+          <span class="usage-label">generation input tokens</span>
+          @if (reported.generationCachedInputTokens > 0) {
+            <span class="text-small text-muted">
+              {{ tokens(reported.generationCachedInputTokens) }} of them cached
+            </span>
+          }
+        </div>
+
+        <div class="usage-figure">
+          <span class="usage-value">{{ tokens(reported.generationOutputTokens) }}</span>
+          <span class="usage-label">generation output tokens</span>
+          @if (reported.generationReasoningTokens > 0) {
+            <span class="text-small text-muted">
+              {{ tokens(reported.generationReasoningTokens) }} of them reasoning
+            </span>
+          }
+        </div>
+
+        @if (reported.embeddingCalls > 0) {
+          <div class="usage-figure">
+            <span class="usage-value">{{ tokens(reported.embeddingInputTokens) }}</span>
+            <span class="usage-label">embedding input tokens</span>
+          </div>
+        }
+      </div>
+
+      <!--
+        The estimate. One figure per currency and never a sum of them:
+        this platform has no exchange rate and must not invent one.
+      -->
+      <div class="usage-cost" data-testid="ai-usage-cost">
+        <h3 class="usage-cost-title">Estimated provider cost</h3>
+
+        @if (reported.ratedCost.length === 0) {
+          <p class="text-small text-secondary">
+            No configured rate covers these calls, so none of them could be priced. They still cost
+            money — this deployment simply does not know how much.
+          </p>
+        } @else {
+          <ul class="usage-cost-list">
+            @for (rated of reported.ratedCost; track rated.currency) {
+              <li class="usage-cost-row">
+                <span class="usage-value">{{ cost(rated) }}</span>
+                <span class="text-small text-muted">
+                  estimated across {{ tokens(rated.calls) }}
+                  {{ rated.calls === 1 ? 'call' : 'calls' }}
+                </span>
+              </li>
+            }
+          </ul>
+
+          @if (reported.ratedCost.length > 1) {
+            <p class="text-small text-muted">
+              Shown per currency. They are not added together, because this platform holds no
+              exchange rate.
+            </p>
+          }
+        }
+
+        <!--
+          The caveat only claims what is true in each case. When nothing could be
+          priced there is no figure to be outside of, and saying there was would
+          leave a reader looking for a number that is not on the page.
+        -->
+        @if (reported.unratedCalls > 0 && hasRatedCost()) {
+          <p class="text-small usage-warning" data-testid="ai-usage-unrated">
+            {{ tokens(reported.unratedCalls) }}
+            {{ reported.unratedCalls === 1 ? 'call is' : 'calls are' }} not covered by any
+            configured rate and {{ reported.unratedCalls === 1 ? 'is' : 'are' }} outside the figure
+            above. Unrated does not mean free.
+          </p>
+        } @else if (reported.unratedCalls > 0) {
+          <p class="text-small usage-warning" data-testid="ai-usage-unrated">
+            {{ tokens(reported.unratedCalls) }}
+            {{ reported.unratedCalls === 1 ? 'call' : 'calls' }} could not be priced. Unrated does
+            not mean free.
+          </p>
+        }
+      </div>
+    </div>
+  </div>
+}
+
+<!-- The busiest models. Present only alongside real calls. -->
+@if (models().length > 0) {
+  <div class="card">
+    <div class="card-header">
+      <h2 class="card-title">Models used</h2>
+      <p class="text-small text-muted">
+        The ten busiest models in this period. A model billed in more than one currency shows no
+        single cost, because there is no honest one to show.
+      </p>
+    </div>
+    <div class="card-body">
+      <div class="table-scroll">
+        <table class="table" data-testid="ai-models">
+          <caption class="visually-hidden">
+            Provider calls per model, with estimated cost
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">Model</th>
+              <th scope="col">Operation</th>
+              <th scope="col" class="numeric">Calls</th>
+              <th scope="col" class="numeric">Input tokens</th>
+              <th scope="col" class="numeric">Output tokens</th>
+              <th scope="col" class="numeric">Estimated cost</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (model of models(); track model.provider + model.model + model.operationType) {
+              <tr>
+                <!--
+                  Interpolated, never rendered as markup. A model name is
+                  a published identifier, but it arrives over the wire.
+                -->
+                <th scope="row" class="model-name">{{ model.model }}</th>
+                <td>{{ operationName(model.operationType) }}</td>
+                <td class="numeric">{{ tokens(model.calls) }}</td>
+                <td class="numeric">{{ tokens(model.inputTokens) }}</td>
+                <td class="numeric">{{ tokens(model.outputTokens) }}</td>
+                <td class="numeric">
+                  {{ cost(model) }}
+                  @if (model.unratedCalls > 0) {
+                    <span class="text-small text-muted model-unrated">
+                      {{ tokens(model.unratedCalls) }} unrated
+                    </span>
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+}

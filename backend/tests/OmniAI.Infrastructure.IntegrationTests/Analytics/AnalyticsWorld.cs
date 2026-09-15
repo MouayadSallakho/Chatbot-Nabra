@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using OmniAI.Domain.Ai;
 using OmniAI.Domain.AiAgents;
 using OmniAI.Domain.Conversations;
 using OmniAI.Domain.Tenants;
@@ -309,6 +310,84 @@ internal sealed class AnalyticsWorld(PostgresTestDatabase database)
 
         await context.SaveChangesAsync();
     }
+
+    /// <summary>
+    /// A provider operation that has already run its course.
+    /// </summary>
+    /// <remarks>
+    /// Written through the aggregate rather than as a hand-built row, so a test
+    /// cannot store a combination the domain would refuse -- a cost without a
+    /// currency, say, or tokens on an operation nobody began.
+    /// </remarks>
+    public async Task<AiProviderUsage> UsageAsync(
+        DateTimeOffset startedAt,
+        AiOperationType operationType = AiOperationType.TextGeneration,
+        AiUsagePurpose purpose = AiUsagePurpose.ConversationGeneration,
+        string model = "test-model-x",
+        AiOperationStatus status = AiOperationStatus.Succeeded,
+        ProviderTokenUsage? reported = null,
+        AiModelRates? rates = null,
+        string? resolvedModel = null)
+    {
+        AiProviderUsage operation = AiProviderUsage.Begin(
+            Tenant.Id,
+            AiProvider.OpenAi,
+            operationType,
+            purpose,
+            ModelName.Create(model),
+            startedAt);
+
+        switch (status)
+        {
+            case AiOperationStatus.Succeeded:
+                operation.Succeed(
+                    reported ?? ProviderTokenUsage.Unreported,
+                    ModelName.CreateOrNull(resolvedModel),
+                    rates,
+                    startedAt.AddSeconds(2));
+
+                break;
+
+            case AiOperationStatus.Failed:
+                operation.Fail(startedAt.AddSeconds(2));
+
+                break;
+
+            case AiOperationStatus.Unknown:
+                operation.MarkUnknown(startedAt.AddSeconds(2));
+
+                break;
+
+            default:
+                // Started is what Begin produces: a call that never came back.
+                break;
+        }
+
+        await using OmniAiDbContext context = _database.CreateContext();
+
+        context.AiProviderUsages.Add(operation);
+
+        await context.SaveChangesAsync();
+
+        return operation;
+    }
+
+    /// <summary>Rates for a model, in a currency, so a test can price by hand.</summary>
+    public static AiModelRates Rates(
+        string model = "test-model-x",
+        string currency = "USD",
+        AiOperationType operationType = AiOperationType.TextGeneration,
+        decimal inputPerMillion = 2.00m,
+        decimal? outputPerMillion = 8.00m) =>
+        AiModelRates.Create(
+            AiProvider.OpenAi,
+            ModelName.Create(model),
+            operationType,
+            CurrencyCode.Create(currency),
+            new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero),
+            inputPerMillion,
+            cachedInputPerMillion: null,
+            outputPerMillion: outputPerMillion);
 
     private static string Key() => $"{Guid.NewGuid():N}"[..22];
 

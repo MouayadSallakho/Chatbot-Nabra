@@ -48,6 +48,7 @@
       proven end to end without a provider, an API key or a network call.
     -->
     <Compile Include="..\Shared\RecordingAiTextGenerator.cs" Link="RecordingAiTextGenerator.cs" />
+    <Compile Include="..\Shared\RecordingUsageLedger.cs" Link="RecordingUsageLedger.cs" />
   </ItemGroup>
 
   <ItemGroup>

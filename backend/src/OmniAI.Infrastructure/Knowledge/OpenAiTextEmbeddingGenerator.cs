@@ -2,7 +2,10 @@ using System.ClientModel;
 using System.Globalization;
 using Microsoft.Extensions.Logging;
 using OpenAI.Embeddings;
+using OmniAI.Application.Ai.Usage;
 using OmniAI.Application.Knowledge;
+using OmniAI.Domain.Ai;
+using OmniAI.Infrastructure.Ai.OpenAi;
 
 namespace OmniAI.Infrastructure.Knowledge;
 
@@ -33,16 +36,19 @@ internal sealed partial class OpenAiTextEmbeddingGenerator : ITextEmbeddingGener
 {
     private readonly EmbeddingClient _client;
     private readonly EmbeddingOptions _options;
+    private readonly IAiProviderUsageLedger _ledger;
     private readonly ILogger<OpenAiTextEmbeddingGenerator> _logger;
 
     public OpenAiTextEmbeddingGenerator(
         EmbeddingClient client,
         EmbeddingOptions options,
         EmbeddingProfile profile,
+        IAiProviderUsageLedger ledger,
         ILogger<OpenAiTextEmbeddingGenerator> logger)
     {
         _client = client ?? throw new ArgumentNullException(nameof(client));
         _options = options ?? throw new ArgumentNullException(nameof(options));
+        _ledger = ledger ?? throw new ArgumentNullException(nameof(ledger));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
         Profile = profile ?? throw new ArgumentNullException(nameof(profile));
@@ -52,9 +58,11 @@ internal sealed partial class OpenAiTextEmbeddingGenerator : ITextEmbeddingGener
 
     public async Task<IReadOnlyList<EmbeddingVector>> GenerateAsync(
         IReadOnlyList<string> inputs,
+        AiUsageContext usage,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(inputs);
+        ArgumentNullException.ThrowIfNull(usage);
 
         if (inputs.Count == 0)
         {
@@ -104,6 +112,22 @@ internal sealed partial class OpenAiTextEmbeddingGenerator : ITextEmbeddingGener
             Dimensions = EmbeddingOptions.Dimensions,
         };
 
+        // THE COST-SAFETY INVARIANT. See OpenAiTextGenerator: the accounting row
+        // is committed before the request leaves this process, and a ledger that
+        // cannot write stops the call rather than letting it be made unaccounted.
+        //
+        // ONE ROW PER PROVIDER REQUEST. This batch is one HTTP operation however
+        // many inputs it carries, so it is one accounted operation -- not one per
+        // vector. That is what an invoice will show.
+        AiProviderUsageId operation = await _ledger
+            .BeginAsync(
+                usage,
+                AiProvider.OpenAi,
+                AiOperationType.Embedding,
+                ModelName.Create(_options.Model),
+                cancellationToken)
+            .ConfigureAwait(false);
+
         ClientResult<OpenAIEmbeddingCollection> result;
 
         try
@@ -115,11 +139,16 @@ internal sealed partial class OpenAiTextEmbeddingGenerator : ITextEmbeddingGener
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             // The caller gave up. Not a provider failure, and reporting it as one
-            // would turn a closed browser tab into an incident.
+            // would turn a closed browser tab into an incident. Unresolved rather
+            // than failed: it was dispatched and may have been billed.
+            await SettleUnknownAsync(operation).ConfigureAwait(false);
+
             throw;
         }
         catch (TaskCanceledException timeout)
         {
+            await SettleUnknownAsync(operation).ConfigureAwait(false);
+
             LogUnavailable(_logger, "timeout", 0);
 
             throw new EmbeddingTimeoutException(
@@ -127,8 +156,23 @@ internal sealed partial class OpenAiTextEmbeddingGenerator : ITextEmbeddingGener
         }
         catch (ClientResultException failure)
         {
+            // A status the provider chose to send resolves the operation. An
+            // upstream timeout does not: nothing decided anything.
+            if (failure.Status is 408 or 504)
+            {
+                await SettleUnknownAsync(operation).ConfigureAwait(false);
+            }
+            else
+            {
+                await _ledger.FailAsync(operation, CancellationToken.None).ConfigureAwait(false);
+            }
+
             throw Translate(failure);
         }
+
+        // Settled before the vectors are validated: the provider ran and will
+        // bill for it whether or not the collection turns out to be usable.
+        await SucceedAsync(operation, result?.Value).ConfigureAwait(false);
 
         return Read(result?.Value, inputs.Count);
     }
@@ -140,6 +184,46 @@ internal sealed partial class OpenAiTextEmbeddingGenerator : ITextEmbeddingGener
     /// goes: a short response would otherwise attach the wrong text to the wrong
     /// embedding for every item after the gap, and nothing downstream could tell.
     /// </remarks>
+    /// <summary>
+    /// Records the call as successful, with exactly what the provider reported.
+    /// </summary>
+    /// <remarks>
+    /// Impossible usage is discarded rather than stored, and does not fail the
+    /// call: see the text generator for the same reasoning. The vectors are real
+    /// whatever the token block said.
+    /// </remarks>
+    private async Task SucceedAsync(
+        AiProviderUsageId operation,
+        OpenAIEmbeddingCollection? embeddings)
+    {
+        ProviderTokenUsage reported;
+
+        try
+        {
+            reported = OpenAiUsageMapping.Read(embeddings?.Usage);
+        }
+        catch (ProviderUsageInvalidException)
+        {
+            LogUsageUnusable(_logger);
+
+            reported = ProviderTokenUsage.Unreported;
+        }
+
+        await _ledger
+            .SucceedAsync(
+                operation,
+                reported,
+                OpenAiUsageMapping.Resolved(embeddings?.Model),
+
+                // None, not the caller's token: the accounting must be written
+                // even when whoever asked has already given up.
+                CancellationToken.None)
+            .ConfigureAwait(false);
+    }
+
+    private Task SettleUnknownAsync(AiProviderUsageId operation) =>
+        _ledger.MarkUnknownAsync(operation, CancellationToken.None);
+
     private static EmbeddingVector[] Read(OpenAIEmbeddingCollection? embeddings, int expected)
     {
         if (embeddings is null || embeddings.Count != expected)
@@ -207,4 +291,17 @@ internal sealed partial class OpenAiTextEmbeddingGenerator : ITextEmbeddingGener
         Level = LogLevel.Warning,
         Message = "OpenAI embedding failed ({Category}, status {StatusCode}). Nothing was indexed.")]
     private static partial void LogUnavailable(ILogger logger, string category, int statusCode);
+
+    /// <summary>
+    /// Records that a provider reported usage this platform cannot believe.
+    /// </summary>
+    /// <remarks>
+    /// No values: the figures are what is wrong, and writing them here would put
+    /// an unvalidated provider payload into the log.
+    /// </remarks>
+    [LoggerMessage(
+        EventId = 2101,
+        Level = LogLevel.Warning,
+        Message = "OpenAI reported embedding token usage that cannot be true. The call succeeded and its usage was recorded as unavailable rather than stored.")]
+    private static partial void LogUsageUnusable(ILogger logger);
 }

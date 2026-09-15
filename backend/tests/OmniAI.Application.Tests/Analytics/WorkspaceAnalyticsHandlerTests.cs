@@ -188,6 +188,8 @@ internal sealed class RecordingAnalyticsReader : IWorkspaceAnalyticsReader
             [],
             [],
             new AnalyticsAiOperations(0, 0, 0, 0),
-            WhatsAppDelivery: null));
+            WhatsAppDelivery: null,
+            new AnalyticsAiUsage(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, []),
+            []));
     }
 }

@@ -1,6 +1,8 @@
 using System.ClientModel.Primitives;
 using Microsoft.Extensions.Logging.Abstractions;
 using OmniAI.Application.Ai;
+using OmniAI.Application.Ai.Usage;
+using OmniAI.Testing;
 using OmniAI.Infrastructure.Ai.OpenAi;
 
 namespace OmniAI.Infrastructure.IntegrationTests.Ai.OpenAi;
@@ -34,9 +36,13 @@ internal static class OpenAiTestHarness
     /// <summary>
     /// The real adapter, wired to the supplied canned transport.
     /// </summary>
+    /// <summary>A context for calls whose accounting is not what is under test.</summary>
+    internal static AiUsageContext Usage => TestUsage.Context();
+
     internal static IAiTextGenerator Generator(
         CannedOpenAiTransport transport,
-        OpenAiOptions? options = null)
+        OpenAiOptions? options = null,
+        IAiProviderUsageLedger? ledger = null)
     {
         ArgumentNullException.ThrowIfNull(transport);
 
@@ -47,6 +53,7 @@ internal static class OpenAiTestHarness
         return new OpenAiTextGenerator(
             OpenAiClientFactory.Create(DummyApiKey, options, pipeline),
             options,
+            ledger ?? new RecordingUsageLedger(),
             NullLogger<OpenAiTextGenerator>.Instance);
     }
 }

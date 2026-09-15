@@ -1,10 +1,12 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Npgsql;
 using OmniAI.Application.Ai;
 using OmniAI.Application.AiAgents.Persistence;
 using OmniAI.Application.Authorization.Persistence;
+using OmniAI.Application.Ai.Usage;
 using OmniAI.Application.Analytics;
 using OmniAI.Application.Conversations;
 using OmniAI.Application.Conversations.Persistence;
@@ -19,6 +21,7 @@ using OmniAI.Application.Tenants.Persistence;
 using OmniAI.Application.WebChat;
 using OmniAI.Application.WebChat.Persistence;
 using OmniAI.Infrastructure.Ai.OpenAi;
+using OmniAI.Infrastructure.Ai.Usage;
 using OmniAI.Infrastructure.Analytics;
 using OmniAI.Infrastructure.Identity;
 using OmniAI.Infrastructure.Conversations;
@@ -268,12 +271,31 @@ public static class InfrastructureServiceCollectionExtensions
             apiKey = null;
         }
 
+        // Accounting is registered whatever the provider situation is. A
+        // deployment with no key still gets a ledger and a (possibly empty) rate
+        // card, so nothing downstream has to ask whether accounting exists.
+        //
+        // The catalogue is read and validated here, at startup: a misspelled model
+        // or a negative rate should stop a deployment from starting, not appear a
+        // month later as a cost report nobody can explain.
+        services.AddSingleton<IAiProviderPricing>(
+            AiProviderPricingCatalog.Create(ReadPricing(configuration)));
+
+        services.AddSingleton<IAiProviderUsageLedger, AiProviderUsageLedger>();
+
+        // A clock, if the host has not already chosen one. The ledger stamps
+        // every operation, so this assembly now depends on one whether or not it
+        // is composed into the API -- and a host that registered its own keeps it,
+        // because TryAdd yields.
+        services.TryAddSingleton(TimeProvider.System);
+
         // The embedding profile is registered whichever branch is taken. How this
         // deployment is configured to make vectors is a fact about the deployment,
         // not about whether a credential happens to be present -- and without it
         // the knowledge screens could not report readiness at all on a deployment
         // with no key, which is exactly the deployment somebody is most likely to
         // be looking at first.
+
         EmbeddingOptions embeddingOptions = ReadEmbeddingOptions(configuration);
 
         services.AddSingleton(embeddingOptions);
@@ -325,8 +347,35 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddSingleton(OpenAiEmbeddingClientFactory.Create(apiKey, embeddingOptions));
         services.AddSingleton<ITextEmbeddingGenerator, OpenAiTextEmbeddingGenerator>();
 
+
         return services;
     }
+
+    /// <summary>
+    /// Reads the configured provider rate card.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Bound from <c>AiPricing:Rates</c>. It is ordinary configuration, not a
+    /// secret: a published rate card needs no protection, and treating it as
+    /// sensitive would only make it harder to keep current.
+    /// </para>
+    /// <para>
+    /// Absent configuration is a valid deployment. Every operation is then
+    /// unrated, which is reported honestly rather than shown as free.
+    /// </para>
+    /// </remarks>
+    private static List<AiModelRateOptions> ReadPricing(IConfiguration configuration)
+    {
+        List<AiModelRateOptions> rates = [];
+
+        configuration.GetSection(PricingSectionName).Bind(rates);
+
+        return rates;
+    }
+
+    /// <summary>Where the rate card is read from.</summary>
+    private const string PricingSectionName = "AiPricing:Rates";
 
     /// <summary>
     /// Reads the embedding settings, validating them at startup.

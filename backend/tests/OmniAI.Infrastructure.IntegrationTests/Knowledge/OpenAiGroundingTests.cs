@@ -33,7 +33,7 @@ public sealed class OpenAiGroundingTests
         CannedOpenAiTransport transport,
         AiTextGenerationRequest request)
     {
-        await OpenAiTestHarness.Generator(transport).GenerateAsync(request);
+        await OpenAiTestHarness.Generator(transport).GenerateAsync(request, OpenAiTestHarness.Usage);
 
         return JsonDocument.Parse(transport.LastBody).RootElement.Clone();
     }

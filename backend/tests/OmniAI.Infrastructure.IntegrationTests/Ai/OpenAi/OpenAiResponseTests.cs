@@ -20,7 +20,7 @@ public sealed class OpenAiResponseTests
         };
 
         AiTextGenerationResult result = await OpenAiTestHarness.Generator(transport)
-            .GenerateAsync(OpenAiTestHarness.SimpleRequest());
+            .GenerateAsync(OpenAiTestHarness.SimpleRequest(), OpenAiTestHarness.Usage);
 
         Assert.Equal("A student laptop should be light.", result.Text);
     }
@@ -34,7 +34,7 @@ public sealed class OpenAiResponseTests
         };
 
         AiTextGenerationResult result = await OpenAiTestHarness.Generator(transport)
-            .GenerateAsync(OpenAiTestHarness.SimpleRequest());
+            .GenerateAsync(OpenAiTestHarness.SimpleRequest(), OpenAiTestHarness.Usage);
 
         Assert.Equal("Two options:\n\n- A\n- B", result.Text);
     }
@@ -52,7 +52,7 @@ public sealed class OpenAiResponseTests
         };
 
         AiTextGenerationResult result = await OpenAiTestHarness.Generator(transport)
-            .GenerateAsync(OpenAiTestHarness.SimpleRequest());
+            .GenerateAsync(OpenAiTestHarness.SimpleRequest(), OpenAiTestHarness.Usage);
 
         Assert.Contains("First part.", result.Text, StringComparison.Ordinal);
         Assert.Contains("Second part.", result.Text, StringComparison.Ordinal);
@@ -70,7 +70,7 @@ public sealed class OpenAiResponseTests
         CannedOpenAiTransport transport = new() { ResponseBody = OpenAiCannedResponses.NoOutput() };
 
         await Assert.ThrowsAsync<AiResponseInvalidException>(
-            () => OpenAiTestHarness.Generator(transport).GenerateAsync(OpenAiTestHarness.SimpleRequest()));
+            () => OpenAiTestHarness.Generator(transport).GenerateAsync(OpenAiTestHarness.SimpleRequest(), OpenAiTestHarness.Usage));
     }
 
     [Theory]
@@ -85,7 +85,7 @@ public sealed class OpenAiResponseTests
         };
 
         await Assert.ThrowsAsync<AiResponseInvalidException>(
-            () => OpenAiTestHarness.Generator(transport).GenerateAsync(OpenAiTestHarness.SimpleRequest()));
+            () => OpenAiTestHarness.Generator(transport).GenerateAsync(OpenAiTestHarness.SimpleRequest(), OpenAiTestHarness.Usage));
     }
 
     [Fact]
@@ -97,7 +97,7 @@ public sealed class OpenAiResponseTests
         };
 
         AiTextGenerationResult result = await OpenAiTestHarness.Generator(transport)
-            .GenerateAsync(OpenAiTestHarness.SimpleRequest());
+            .GenerateAsync(OpenAiTestHarness.SimpleRequest(), OpenAiTestHarness.Usage);
 
         Assert.Equal("Certainly.", result.Text);
     }
@@ -111,7 +111,7 @@ public sealed class OpenAiResponseTests
         CannedOpenAiTransport transport = new();
 
         AiTextGenerationResult result = await OpenAiTestHarness.Generator(transport)
-            .GenerateAsync(OpenAiTestHarness.SimpleRequest());
+            .GenerateAsync(OpenAiTestHarness.SimpleRequest(), OpenAiTestHarness.Usage);
 
         Assert.Equal("OmniAI.Application", result.GetType().Assembly.GetName().Name);
         Assert.Equal(typeof(AiTextGenerationResult), result.GetType());
@@ -129,7 +129,7 @@ public sealed class OpenAiResponseTests
         };
 
         AiTextGenerationResult result = await OpenAiTestHarness.Generator(transport)
-            .GenerateAsync(OpenAiTestHarness.SimpleRequest());
+            .GenerateAsync(OpenAiTestHarness.SimpleRequest(), OpenAiTestHarness.Usage);
 
         Assert.Equal("Text", Assert.Single(
             result.GetType().GetProperties()

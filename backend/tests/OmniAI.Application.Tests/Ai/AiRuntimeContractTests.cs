@@ -301,6 +301,37 @@ public sealed class AiRuntimeContractTests
             typeof(IAiTextGenerator).GetMethods()[0].GetParameters();
 
         Assert.Equal(typeof(AiTextGenerationRequest), parameters[0].ParameterType);
-        Assert.Equal(typeof(CancellationToken), parameters[1].ParameterType);
+        Assert.Equal(typeof(CancellationToken), parameters[^1].ParameterType);
+    }
+
+    /// <remarks>
+    /// <strong>The attribution parameter is the whole of Phase 23's tenant
+    /// story.</strong> It is required rather than optional and a parameter rather
+    /// than ambient state, so a new call site cannot compile without saying whose
+    /// money it spends. An ambient value read from the current request works right
+    /// up until the first background worker, and then attributes spend to whatever
+    /// happened to be on the stack.
+    /// </remarks>
+    [Fact]
+    public void The_generator_contract_demands_to_know_whose_money_it_is_spending()
+    {
+        System.Reflection.ParameterInfo attribution =
+            typeof(IAiTextGenerator).GetMethods()[0].GetParameters()[1];
+
+        Assert.Equal(typeof(Application.Ai.Usage.AiUsageContext), attribution.ParameterType);
+        Assert.False(attribution.IsOptional);
+    }
+
+    /// <remarks>The embedding contract carries the same requirement.</remarks>
+    [Fact]
+    public void The_embedding_contract_demands_to_know_whose_money_it_is_spending()
+    {
+        System.Reflection.MethodInfo generate = typeof(Application.Knowledge.ITextEmbeddingGenerator)
+            .GetMethod(nameof(Application.Knowledge.ITextEmbeddingGenerator.GenerateAsync))!;
+
+        System.Reflection.ParameterInfo attribution = generate.GetParameters()[1];
+
+        Assert.Equal(typeof(Application.Ai.Usage.AiUsageContext), attribution.ParameterType);
+        Assert.False(attribution.IsOptional);
     }
 }

@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using OmniAI.Application.Analytics;
+using OmniAI.Domain.Ai;
 using OmniAI.Domain.AiAgents;
 using OmniAI.Domain.Conversations;
 using OmniAI.Domain.Tenants;
@@ -44,6 +45,19 @@ internal sealed class WorkspaceAnalyticsReader(OmniAiDbContext context)
     /// </remarks>
     private const int MaxAgents = 10;
 
+    /// <summary>How many provider models a breakdown will name.</summary>
+    private const int MaxModels = 10;
+
+    /// <summary>
+    /// How many raw model groupings to read before merging them down.
+    /// </summary>
+    /// <remarks>
+    /// Comfortably more than <see cref="MaxModels"/>, because one reported model
+    /// can arrive as several stored pairs: an alias, the dated builds it resolved
+    /// to, and the calls that failed before resolving to anything.
+    /// </remarks>
+    private const int MaxModelRows = MaxModels * 6;
+
     private readonly OmniAiDbContext _context =
         context ?? throw new ArgumentNullException(nameof(context));
 
@@ -75,6 +89,9 @@ internal sealed class WorkspaceAnalyticsReader(OmniAiDbContext context)
         AnalyticsWhatsAppDelivery delivery =
             await WhatsAppAsync(tenantId, window, cancellationToken).ConfigureAwait(false);
 
+        (AnalyticsAiUsage usage, IReadOnlyList<AnalyticsModelUsage> models) =
+            await ProviderUsageAsync(tenantId, window, cancellationToken).ConfigureAwait(false);
+
         return new WorkspaceAnalytics(
             new AnalyticsPeriod(
                 window.Label,
@@ -92,7 +109,9 @@ internal sealed class WorkspaceAnalyticsReader(OmniAiDbContext context)
             // Absent rather than a row of zeroes for a workspace that has never
             // used WhatsApp: a delivery panel full of noughts invites somebody to
             // go looking for the outage behind it.
-            delivery.HasAny ? delivery : null);
+            delivery.HasAny ? delivery : null,
+            usage,
+            models);
     }
 
     // ------------------------------------------------------------------ pieces
@@ -466,6 +485,279 @@ internal sealed class WorkspaceAnalyticsReader(OmniAiDbContext context)
             && message.SentAt < window.To
         select message;
 
+
+    /// <summary>
+    /// What was actually spent with providers, and on which models.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <strong>Grouped by the dispatch instant, like everything else on this
+    /// dashboard.</strong> An operation that began before midnight and finished
+    /// after belongs to the day the money was committed. One timestamp, used
+    /// consistently, so a call is counted once.
+    /// </para>
+    /// <para>
+    /// <strong>Nulls are not zeroes, and PostgreSQL agrees.</strong>
+    /// <c>SUM</c> over a nullable column ignores the nulls rather than reading
+    /// them as nought, so a provider that reported nothing contributes nothing —
+    /// which is exactly the arithmetic this feature needs and the reason the
+    /// columns are nullable in the first place.
+    /// </para>
+    /// <para>
+    /// <strong>Currencies are grouped, never added.</strong> There is no exchange
+    /// rate anywhere in this platform, so two currencies produce two totals.
+    /// </para>
+    /// </remarks>
+    private async Task<(AnalyticsAiUsage Usage, IReadOnlyList<AnalyticsModelUsage> Models)>
+        ProviderUsageAsync(
+            TenantId tenantId,
+            AnalyticsWindow window,
+            CancellationToken cancellationToken)
+    {
+        IQueryable<AiProviderUsage> operations = Operations(tenantId, window);
+
+        // One grouped trip for the headline counts and token sums. Everything is
+        // a COUNT or a SUM over one table; nothing is materialised.
+        List<UsageBucket> buckets = await operations
+            .GroupBy(operation => new { operation.OperationType, operation.Status })
+            .Select(group => new UsageBucket(
+                group.Key.OperationType,
+                group.Key.Status,
+                group.Count(),
+                group.Sum(operation => (long?)operation.Usage.InputTokens) ?? 0,
+                group.Sum(operation => (long?)operation.Usage.CachedInputTokens) ?? 0,
+                group.Sum(operation => (long?)operation.Usage.OutputTokens) ?? 0,
+                group.Sum(operation => (long?)operation.Usage.ReasoningTokens) ?? 0))
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        // Rated spend, per currency. Only succeeded operations that carry a cost.
+        // Grouped by the stored currency itself, and unwrapped afterwards. A
+        // value object's own property is not a column, so reaching inside one
+        // here would quietly move the whole aggregation into this process.
+        List<CurrencyRow> costRows = await operations
+            .Where(operation => operation.EstimatedCost != null && operation.Currency != null)
+            .GroupBy(operation => operation.Currency)
+            .Select(group => new CurrencyRow(
+                group.Key,
+                group.Sum(operation => operation.EstimatedCost) ?? 0m,
+                group.Count()))
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        List<CurrencyBucket> costs =
+        [
+            .. costRows
+                .Where(row => row.Currency is not null)
+                .Select(row => new CurrencyBucket(
+                    row.Currency!.Value.Value,
+                    row.EstimatedCost,
+                    row.Calls)),
+        ];
+
+        // Spend that could not be priced. Real calls, real tokens, no configured
+        // rate -- reported so the rated figure is never mistaken for the whole.
+        int unrated = await operations
+            .Where(operation =>
+                operation.Status == AiOperationStatus.Succeeded
+                && operation.EstimatedCost == null)
+            .CountAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        long Calls(Func<UsageBucket, bool> which) =>
+            buckets.Where(which).Sum(bucket => (long)bucket.Calls);
+
+        long Tokens(AiOperationType type, Func<UsageBucket, long> which) =>
+            buckets.Where(bucket => bucket.OperationType == type).Sum(which);
+
+        AnalyticsAiUsage usage = new(
+            Calls(_ => true),
+            Calls(bucket => bucket.OperationType == AiOperationType.TextGeneration),
+            Calls(bucket => bucket.OperationType == AiOperationType.Embedding),
+            Calls(bucket => bucket.Status == AiOperationStatus.Succeeded),
+            Calls(bucket => bucket.Status == AiOperationStatus.Failed),
+
+            // Started and Unknown together: both mean "dispatched, outcome not
+            // established". A row still Started is a process that died mid-flight,
+            // and it is evidence rather than an absence.
+            Calls(bucket => bucket.Status is AiOperationStatus.Started or AiOperationStatus.Unknown),
+            Tokens(AiOperationType.TextGeneration, bucket => bucket.InputTokens),
+            Tokens(AiOperationType.TextGeneration, bucket => bucket.CachedInputTokens),
+            Tokens(AiOperationType.TextGeneration, bucket => bucket.OutputTokens),
+            Tokens(AiOperationType.TextGeneration, bucket => bucket.ReasoningTokens),
+            Tokens(AiOperationType.Embedding, bucket => bucket.InputTokens),
+            unrated,
+            [
+                .. costs
+                    .OrderBy(cost => cost.Currency, StringComparer.Ordinal)
+                    .Select(cost => new AnalyticsRatedCost(
+                        cost.Currency,
+                        cost.EstimatedCost,
+                        cost.Calls)),
+            ]);
+
+        return (usage, await ModelsAsync(operations, cancellationToken).ConfigureAwait(false));
+    }
+
+    /// <remarks>
+    /// <para>
+    /// Bounded to ten, by call volume. The model reported is the one the provider
+    /// said it used where it said, and the one we asked for otherwise — an alias
+    /// resolved to a dated build should appear under the build that was billed.
+    /// </para>
+    /// <para>
+    /// <strong>Two queries, then a merge over at most ten rows each.</strong>
+    /// Counts and tokens group by model; rated cost groups by model <em>and</em>
+    /// currency, because currencies are never added. A model billed in two
+    /// currencies therefore reports no single cost figure — that is the honest
+    /// answer, not a missing one, and its call and token counts stay exact.
+    /// </para>
+    /// </remarks>
+    private static async Task<IReadOnlyList<AnalyticsModelUsage>> ModelsAsync(
+        IQueryable<AiProviderUsage> operations,
+        CancellationToken cancellationToken)
+    {
+        // Grouped on the two model columns as they are stored, because choosing
+        // between them -- a COALESCE, a conditional -- is not something this
+        // provider translates over converted value objects, and a grouping that
+        // fell back to this process would read the whole table.
+        //
+        // The pairs are few: a workspace uses a handful of models, and each has
+        // at most an unresolved form and the builds the provider named. Taking
+        // the busiest of them leaves the merge below working over a few dozen
+        // rows at most.
+        List<ModelRow> rows = await operations
+            .GroupBy(operation => new
+            {
+                operation.Provider,
+                operation.RequestedModel,
+                operation.ResolvedModel,
+                operation.OperationType,
+            })
+            .OrderByDescending(group => group.Count())
+            .Take(MaxModelRows)
+            .Select(group => new ModelRow(
+                group.Key.Provider,
+                group.Key.RequestedModel,
+                group.Key.ResolvedModel,
+                group.Key.OperationType,
+                group.Count(),
+                group.Sum(operation => (long?)operation.Usage.InputTokens) ?? 0,
+                group.Sum(operation => (long?)operation.Usage.OutputTokens) ?? 0,
+                group.Count(operation =>
+                    operation.Status == AiOperationStatus.Succeeded
+                    && operation.EstimatedCost == null)))
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        if (rows.Count == 0)
+        {
+            return [];
+        }
+
+        // The model a call is reported under: what the provider said it used
+        // where it said, and what we asked for otherwise.
+        List<ModelBucket> merged =
+        [
+            .. rows
+                .GroupBy(row => new
+                {
+                    row.Provider,
+                    Model = (row.ResolvedModel ?? row.RequestedModel).Value,
+                    row.OperationType,
+                })
+                .Select(group => new ModelBucket(
+                    group.Key.Provider,
+                    group.Key.Model,
+                    group.Key.OperationType,
+                    group.Sum(row => row.Calls),
+                    group.Sum(row => row.InputTokens),
+                    group.Sum(row => row.OutputTokens),
+                    group.Sum(row => row.UnratedCalls)))
+                .OrderByDescending(bucket => bucket.Calls)
+                .Take(MaxModels),
+        ];
+
+        List<ModelCostRow> costRows = await operations
+            .Where(operation => operation.EstimatedCost != null && operation.Currency != null)
+            .GroupBy(operation => new
+            {
+                operation.Provider,
+                operation.RequestedModel,
+                operation.ResolvedModel,
+                operation.OperationType,
+                operation.Currency,
+            })
+            .OrderByDescending(group => group.Count())
+            .Take(MaxModelRows)
+            .Select(group => new ModelCostRow(
+                group.Key.Provider,
+                group.Key.RequestedModel,
+                group.Key.ResolvedModel,
+                group.Key.OperationType,
+                group.Key.Currency,
+                group.Sum(operation => operation.EstimatedCost) ?? 0m))
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        List<ModelCostBucket> costs =
+        [
+            .. costRows
+                .Where(row => row.Currency is not null)
+                .GroupBy(row => new
+                {
+                    row.Provider,
+                    Model = (row.ResolvedModel ?? row.RequestedModel).Value,
+                    row.OperationType,
+                    Currency = row.Currency!.Value.Value,
+                })
+                .Select(group => new ModelCostBucket(
+                    group.Key.Provider,
+                    group.Key.Model,
+                    group.Key.OperationType,
+                    group.Key.Currency,
+                    group.Sum(row => row.EstimatedCost))),
+        ];
+
+        return
+        [
+            .. merged.Select(row =>
+            {
+                List<ModelCostBucket> rated =
+                [
+                    .. costs.Where(cost =>
+                        cost.Provider == row.Provider
+                        && string.Equals(cost.Model, row.Model, StringComparison.Ordinal)
+                        && cost.OperationType == row.OperationType),
+                ];
+
+                // One currency, one figure. More than one, and there is no figure
+                // to give without inventing an exchange rate.
+                ModelCostBucket? only = rated.Count == 1 ? rated[0] : null;
+
+                return new AnalyticsModelUsage(
+                    row.Provider.ToString(),
+                    row.Model,
+                    row.OperationType,
+                    row.Calls,
+                    row.InputTokens,
+                    row.OutputTokens,
+                    only?.EstimatedCost,
+                    only?.Currency,
+                    row.UnratedCalls);
+            }),
+        ];
+    }
+
+    /// <summary>Provider operations this workspace dispatched inside the window.</summary>
+    private IQueryable<AiProviderUsage> Operations(TenantId tenantId, AnalyticsWindow window) =>
+        _context.AiProviderUsages
+            .AsNoTracking()
+            .Where(operation =>
+                operation.TenantId == tenantId
+                && operation.StartedAt >= window.From
+                && operation.StartedAt < window.To);
+
     // ------------------------------------------------------------------ totals
 
     private static long Count(IEnumerable<SenderCount> rows, MessageSender sender) =>
@@ -517,4 +809,54 @@ internal sealed class WorkspaceAnalyticsReader(OmniAiDbContext context)
     private sealed record TurnCount(ConversationTurnStatus Status, int Count);
 
     private sealed record DeliveryCount(WhatsAppDeliveryStatus Status, int Count);
+
+    private sealed record UsageBucket(
+        AiOperationType OperationType,
+        AiOperationStatus Status,
+        int Calls,
+        long InputTokens,
+        long CachedInputTokens,
+        long OutputTokens,
+        long ReasoningTokens);
+
+    private sealed record CurrencyBucket(string Currency, decimal EstimatedCost, int Calls);
+
+    /// <summary>A grouped row as it comes back, before its value objects are opened.</summary>
+    private sealed record CurrencyRow(CurrencyCode? Currency, decimal EstimatedCost, int Calls);
+
+    /// <inheritdoc cref="CurrencyRow"/>
+    private sealed record ModelRow(
+        AiProvider Provider,
+        ModelName RequestedModel,
+        ModelName? ResolvedModel,
+        AiOperationType OperationType,
+        int Calls,
+        long InputTokens,
+        long OutputTokens,
+        int UnratedCalls);
+
+    /// <inheritdoc cref="CurrencyRow"/>
+    private sealed record ModelCostRow(
+        AiProvider Provider,
+        ModelName RequestedModel,
+        ModelName? ResolvedModel,
+        AiOperationType OperationType,
+        CurrencyCode? Currency,
+        decimal EstimatedCost);
+
+    private sealed record ModelBucket(
+        AiProvider Provider,
+        string Model,
+        AiOperationType OperationType,
+        int Calls,
+        long InputTokens,
+        long OutputTokens,
+        int UnratedCalls);
+
+    private sealed record ModelCostBucket(
+        AiProvider Provider,
+        string Model,
+        AiOperationType OperationType,
+        string Currency,
+        decimal EstimatedCost);
 }

@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using OmniAI.Application.Knowledge;
 using OmniAI.Infrastructure.DependencyInjection;
 using OmniAI.Infrastructure.Knowledge;
+using OmniAI.Infrastructure.IntegrationTests.Ai.OpenAi;
 
 namespace OmniAI.Infrastructure.IntegrationTests.Knowledge;
 
@@ -48,7 +49,7 @@ public sealed class EmbeddingRegistrationTests
         ITextEmbeddingGenerator generator = provider.GetRequiredService<ITextEmbeddingGenerator>();
 
         await Assert.ThrowsAsync<EmbeddingUnavailableException>(
-            () => generator.GenerateAsync(["anything"]));
+            () => generator.GenerateAsync(["anything"], OpenAiTestHarness.Usage));
     }
 
     [Fact]

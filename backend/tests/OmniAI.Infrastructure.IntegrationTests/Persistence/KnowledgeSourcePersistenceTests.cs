@@ -376,6 +376,7 @@ internal sealed class StubEmbeddingGenerator : Application.Knowledge.ITextEmbedd
 
     public Task<IReadOnlyList<Application.Knowledge.EmbeddingVector>> GenerateAsync(
         IReadOnlyList<string> inputs,
+        Application.Ai.Usage.AiUsageContext usage,
         CancellationToken cancellationToken = default) =>
         throw new InvalidOperationException(
             "These tests are about stored rows. Nothing here should reach a provider.");

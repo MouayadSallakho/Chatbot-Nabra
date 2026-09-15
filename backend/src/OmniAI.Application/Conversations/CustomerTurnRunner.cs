@@ -1,4 +1,5 @@
 using OmniAI.Application.Ai;
+using OmniAI.Application.Ai.Usage;
 using OmniAI.Application.Conversations.Persistence;
 using OmniAI.Application.Knowledge;
 using OmniAI.Application.WebChat;
@@ -6,6 +7,7 @@ using OmniAI.Application.WebChat.Persistence;
 using OmniAI.Domain.AiAgents;
 using OmniAI.Domain.Conversations;
 using OmniAI.Domain.Tenants;
+using OmniAI.Domain.Ai;
 
 namespace OmniAI.Application.Conversations;
 
@@ -229,7 +231,14 @@ public sealed class CustomerTurnRunner(
             AiTextGenerationRequest request =
                 await BuildRequestAsync(turn, cancellationToken).ConfigureAwait(false);
 
-            result = await _generator.GenerateAsync(request, cancellationToken)
+            result = await _generator
+                .GenerateAsync(
+                    request,
+
+                    // The workspace comes from the turn being answered, not from
+                    // whatever request happens to be in flight.
+                    AiUsageContext.For(turn.TenantId, AiUsagePurpose.ConversationGeneration),
+                    cancellationToken)
                 .ConfigureAwait(false);
 
             if (result is null)

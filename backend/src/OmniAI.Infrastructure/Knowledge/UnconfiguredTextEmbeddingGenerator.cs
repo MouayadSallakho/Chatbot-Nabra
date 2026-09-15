@@ -1,3 +1,4 @@
+using OmniAI.Application.Ai.Usage;
 using OmniAI.Application.Knowledge;
 
 namespace OmniAI.Infrastructure.Knowledge;
@@ -28,8 +29,13 @@ internal sealed class UnconfiguredTextEmbeddingGenerator(EmbeddingProfile profil
     public EmbeddingProfile Profile { get; } =
         profile ?? throw new ArgumentNullException(nameof(profile));
 
+    /// <remarks>
+    /// Refuses before dispatch and therefore writes no accounting row. See the
+    /// unconfigured text generator.
+    /// </remarks>
     public Task<IReadOnlyList<EmbeddingVector>> GenerateAsync(
         IReadOnlyList<string> inputs,
+        AiUsageContext usage,
         CancellationToken cancellationToken = default) =>
         throw new EmbeddingUnavailableException();
 }

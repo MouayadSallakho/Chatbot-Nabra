@@ -1,3 +1,5 @@
+using OmniAI.Application.Ai.Usage;
+
 namespace OmniAI.Application.Knowledge;
 
 /// <summary>
@@ -45,7 +47,12 @@ public interface ITextEmbeddingGenerator
     /// <exception cref="EmbeddingResponseInvalidException">
     /// The provider answered with something unusable.
     /// </exception>
+    /// <param name="usage">
+    /// Whose money this spends and what for. See the text generator for why this
+    /// is a parameter rather than something read from ambient state.
+    /// </param>
     Task<IReadOnlyList<EmbeddingVector>> GenerateAsync(
         IReadOnlyList<string> inputs,
+        AiUsageContext usage,
         CancellationToken cancellationToken = default);
 }

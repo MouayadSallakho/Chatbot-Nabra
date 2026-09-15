@@ -6,6 +6,8 @@ using OmniAI.Application.Tenants;
 using OmniAI.Domain.AiAgents;
 using OmniAI.Domain.Authorization;
 using OmniAI.Domain.Tenants;
+using OmniAI.Domain.Ai;
+using OmniAI.Application.Ai.Usage;
 
 namespace OmniAI.Application.AiAgents.PreviewAiAgent;
 
@@ -133,7 +135,10 @@ public sealed class PreviewAiAgentHandler(
             [question]);
 
         AiTextGenerationResult result = await _generator
-            .GenerateAsync(request, cancellationToken)
+            .GenerateAsync(
+                request,
+                AiUsageContext.For(tenantId, AiUsagePurpose.AgentPreviewGeneration),
+                cancellationToken)
             .ConfigureAwait(false);
 
         // The result type refuses blank text at construction, so a badly behaved

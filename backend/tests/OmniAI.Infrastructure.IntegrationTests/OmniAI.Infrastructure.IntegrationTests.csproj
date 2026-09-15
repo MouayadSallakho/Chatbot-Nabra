@@ -25,6 +25,7 @@
     <Compile Include="..\Shared\RedisTestServer.cs" Link="RedisTestServer.cs" />
     <!-- Deterministic clock, for the storage-precision clock wrapper tests. -->
     <Compile Include="..\Shared\FixedTimeProvider.cs" Link="FixedTimeProvider.cs" />
+    <Compile Include="..\Shared\RecordingUsageLedger.cs" Link="RecordingUsageLedger.cs" />
   </ItemGroup>
 
   <ItemGroup>

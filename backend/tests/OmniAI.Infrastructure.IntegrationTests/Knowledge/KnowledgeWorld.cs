@@ -10,6 +10,7 @@ using OmniAI.Infrastructure.Knowledge;
 using OmniAI.Infrastructure.Persistence;
 using OmniAI.Infrastructure.Persistence.Repositories;
 using OmniAI.Testing;
+using OmniAI.Application.Ai.Usage;
 
 namespace OmniAI.Infrastructure.IntegrationTests.Knowledge;
 
@@ -248,6 +249,7 @@ internal sealed class KnowledgeWorld(PostgresTestDatabase database)
 
         public Task<IReadOnlyList<EmbeddingVector>> GenerateAsync(
             IReadOnlyList<string> inputs,
+            AiUsageContext usage,
             CancellationToken cancellationToken = default) =>
             throw new EmbeddingUnavailableException(
                 "This fixture chooses its own vectors and never embeds anything.");

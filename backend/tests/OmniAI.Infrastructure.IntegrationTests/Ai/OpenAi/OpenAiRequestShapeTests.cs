@@ -239,7 +239,7 @@ public sealed class OpenAiRequestShapeTests
     {
         CannedOpenAiTransport transport = new();
 
-        await OpenAiTestHarness.Generator(transport).GenerateAsync(OpenAiTestHarness.SimpleRequest());
+        await OpenAiTestHarness.Generator(transport).GenerateAsync(OpenAiTestHarness.SimpleRequest(), OpenAiTestHarness.Usage);
 
         Assert.True(transport.SentAuthorizationHeader, "The request carried no Authorization header.");
 
@@ -261,7 +261,7 @@ public sealed class OpenAiRequestShapeTests
         // to generate text; who it is for is this platform's business.
         CannedOpenAiTransport transport = new();
 
-        await OpenAiTestHarness.Generator(transport).GenerateAsync(OpenAiTestHarness.SimpleRequest());
+        await OpenAiTestHarness.Generator(transport).GenerateAsync(OpenAiTestHarness.SimpleRequest(), OpenAiTestHarness.Usage);
 
         foreach (string forbidden in (string[])
             ["tenant", "agent_id", "aiAgentId", "omniai", "xmin", "postgres"])
@@ -275,7 +275,7 @@ public sealed class OpenAiRequestShapeTests
     {
         CannedOpenAiTransport transport = new();
 
-        await OpenAiTestHarness.Generator(transport).GenerateAsync(OpenAiTestHarness.SimpleRequest());
+        await OpenAiTestHarness.Generator(transport).GenerateAsync(OpenAiTestHarness.SimpleRequest(), OpenAiTestHarness.Usage);
 
         Assert.Equal(1, transport.Calls);
     }
@@ -301,7 +301,7 @@ public sealed class OpenAiRequestShapeTests
     {
         CannedOpenAiTransport transport = new();
 
-        await OpenAiTestHarness.Generator(transport, options).GenerateAsync(request);
+        await OpenAiTestHarness.Generator(transport, options).GenerateAsync(request, OpenAiTestHarness.Usage);
 
         return JsonDocument.Parse(transport.LastBody).RootElement.Clone();
     }

@@ -4,6 +4,8 @@ using System.Text;
 using Microsoft.Extensions.Logging;
 using OpenAI.Responses;
 using OmniAI.Application.Ai;
+using OmniAI.Application.Ai.Usage;
+using OmniAI.Domain.Ai;
 
 // OPENAI001 is the diagnostic the official OpenAI .NET SDK 2.13.0 puts on its
 // entire OpenAI.Responses namespace: every type this file touches --
@@ -54,23 +56,28 @@ internal sealed partial class OpenAiTextGenerator : IAiTextGenerator
 {
     private readonly ResponsesClient _client;
     private readonly OpenAiOptions _options;
+    private readonly IAiProviderUsageLedger _ledger;
     private readonly ILogger<OpenAiTextGenerator> _logger;
 
     public OpenAiTextGenerator(
         ResponsesClient client,
         OpenAiOptions options,
+        IAiProviderUsageLedger ledger,
         ILogger<OpenAiTextGenerator> logger)
     {
         _client = client ?? throw new ArgumentNullException(nameof(client));
         _options = options ?? throw new ArgumentNullException(nameof(options));
+        _ledger = ledger ?? throw new ArgumentNullException(nameof(ledger));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     public async Task<AiTextGenerationResult> GenerateAsync(
         AiTextGenerationRequest request,
+        AiUsageContext usage,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(usage);
 
         // Checked before anything is dispatched. The SDK pipeline does not
         // short-circuit an already-cancelled token -- a test caught it reaching
@@ -79,6 +86,25 @@ internal sealed partial class OpenAiTextGenerator : IAiTextGenerator
         cancellationToken.ThrowIfCancellationRequested();
 
         CreateResponseOptions options = BuildOptions(request);
+
+        // THE COST-SAFETY INVARIANT.
+        //
+        // The accounting row is committed before the request leaves this process.
+        // If this throws, the provider is never called: it is better to refuse to
+        // answer than to spend money the platform cannot account for, because the
+        // second failure is invisible until somebody questions an invoice.
+        //
+        // Deliberately not wrapped in a try/catch that continues. A ledger that
+        // cannot write is a fault, and swallowing it here would quietly restore
+        // exactly the situation this line exists to prevent.
+        AiProviderUsageId operation = await _ledger
+            .BeginAsync(
+                usage,
+                AiProvider.OpenAi,
+                AiOperationType.TextGeneration,
+                ModelName.Create(_options.Model),
+                cancellationToken)
+            .ConfigureAwait(false);
 
         ClientResult<ResponseResult> result;
 
@@ -93,13 +119,20 @@ internal sealed partial class OpenAiTextGenerator : IAiTextGenerator
             // The caller gave up. That is not a provider failure and must not be
             // reported as one: it would turn a closed browser tab into an
             // incident and would poison any latency signal built on these logs.
+            //
+            // The operation is still unresolved rather than failed: it was already
+            // dispatched, and the provider may have executed and billed it.
+            await SettleUnknownAsync(operation).ConfigureAwait(false);
+
             // Rethrown unchanged so the caller sees ordinary cancellation.
             throw;
         }
         catch (TaskCanceledException timeout)
         {
             // Cancellation that did not come from the caller's token is the
-            // transport's own timeout expiring.
+            // transport's own timeout expiring. Ambiguous for the same reason.
+            await SettleUnknownAsync(operation).ConfigureAwait(false);
+
             LogUnavailable(_logger, "timeout", 0);
 
             throw new AiRuntimeTimeoutException(
@@ -107,14 +140,72 @@ internal sealed partial class OpenAiTextGenerator : IAiTextGenerator
         }
         catch (ClientResultException failure)
         {
+            // A status the provider chose to send is a definitive answer: it
+            // decided, so the operation is resolved. An upstream timeout is not --
+            // nothing decided anything, and the work may have happened.
+            if (failure.Status is 408 or 504)
+            {
+                await SettleUnknownAsync(operation).ConfigureAwait(false);
+            }
+            else
+            {
+                await _ledger.FailAsync(operation, CancellationToken.None).ConfigureAwait(false);
+            }
+
             throw Translate(failure);
         }
+
+        // Settled before the text is validated, and on purpose: the provider ran
+        // and will bill for it whether or not the answer turns out to be usable.
+        // Recording the spend only for answers we liked would understate it.
+        await SucceedAsync(operation, result?.Value).ConfigureAwait(false);
 
         // Create refuses null, empty and whitespace-only text, so an unusable
         // answer becomes AiResponseInvalidException here rather than reaching a
         // person as though the agent had chosen to say nothing.
         return AiTextGenerationResult.Create(result?.Value?.GetOutputText());
     }
+
+    /// <summary>
+    /// Records the call as successful, with exactly what the provider reported.
+    /// </summary>
+    /// <remarks>
+    /// <strong>Impossible usage is discarded, not stored and not fatal.</strong>
+    /// A response whose counts contradict themselves means the mapping or the
+    /// provider's contract has changed; the answer itself is still a real answer
+    /// somebody is waiting for. So the figures are dropped, the call is recorded
+    /// as succeeded with usage unavailable, and the anomaly is logged without the
+    /// values -- which is the honest reading and the one that cannot invent spend.
+    /// </remarks>
+    private async Task SucceedAsync(AiProviderUsageId operation, ResponseResult? response)
+    {
+        ProviderTokenUsage reported;
+
+        try
+        {
+            reported = OpenAiUsageMapping.Read(response?.Usage);
+        }
+        catch (ProviderUsageInvalidException)
+        {
+            LogUsageUnusable(_logger);
+
+            reported = ProviderTokenUsage.Unreported;
+        }
+
+        await _ledger
+            .SucceedAsync(
+                operation,
+                reported,
+                OpenAiUsageMapping.Resolved(response?.Model),
+
+                // None, not the caller's token: the caller may already have given
+                // up, and the accounting must still be written.
+                CancellationToken.None)
+            .ConfigureAwait(false);
+    }
+
+    private Task SettleUnknownAsync(AiProviderUsageId operation) =>
+        _ledger.MarkUnknownAsync(operation, CancellationToken.None);
 
     /// <summary>
     /// Translates this platform's request into the provider's request.
@@ -338,6 +429,21 @@ internal sealed partial class OpenAiTextGenerator : IAiTextGenerator
         Level = LogLevel.Warning,
         Message = "OpenAI text generation failed ({Category}, status {StatusCode}). No answer was produced.")]
     private static partial void LogUnavailable(ILogger logger, string category, int statusCode);
+
+    /// <summary>
+    /// Records that a provider reported usage this platform cannot believe.
+    /// </summary>
+    /// <remarks>
+    /// <strong>No values, deliberately.</strong> The figures are the thing that
+    /// is wrong, and writing them here would put an unvalidated provider payload
+    /// into the log. The event says what happened; the response that caused it is
+    /// reproducible from the provider's own side.
+    /// </remarks>
+    [LoggerMessage(
+        EventId = 2001,
+        Level = LogLevel.Warning,
+        Message = "OpenAI reported token usage that cannot be true. The call succeeded and its usage was recorded as unavailable rather than stored.")]
+    private static partial void LogUsageUnusable(ILogger logger);
 }
 
 #pragma warning restore OPENAI001

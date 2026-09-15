@@ -2,6 +2,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using OmniAI.Application.Ai;
 using OmniAI.Infrastructure.DependencyInjection;
+using OmniAI.Infrastructure.IntegrationTests.Ai.OpenAi;
 
 namespace OmniAI.Infrastructure.IntegrationTests.Ai;
 
@@ -38,7 +39,7 @@ public sealed class UnconfiguredAiTextGeneratorTests
         IAiTextGenerator generator = Resolve();
 
         await Assert.ThrowsAsync<AiRuntimeUnavailableException>(
-            () => generator.GenerateAsync(Request));
+            () => generator.GenerateAsync(Request, OpenAiTestHarness.Usage));
     }
 
     [Fact]
@@ -51,7 +52,7 @@ public sealed class UnconfiguredAiTextGeneratorTests
 
         AiRuntimeUnavailableException failure =
             await Assert.ThrowsAsync<AiRuntimeUnavailableException>(
-                () => generator.GenerateAsync(Request));
+                () => generator.GenerateAsync(Request, OpenAiTestHarness.Usage));
 
         Assert.DoesNotContain(
             "Which laptop", failure.Message, StringComparison.OrdinalIgnoreCase);
@@ -64,7 +65,7 @@ public sealed class UnconfiguredAiTextGeneratorTests
 
         AiRuntimeUnavailableException failure =
             await Assert.ThrowsAsync<AiRuntimeUnavailableException>(
-                () => generator.GenerateAsync(Request));
+                () => generator.GenerateAsync(Request, OpenAiTestHarness.Usage));
 
         foreach (string forbidden in (string[])
             ["openai", "anthropic", "azure", "api key", "apikey", "OPENAI_API_KEY",

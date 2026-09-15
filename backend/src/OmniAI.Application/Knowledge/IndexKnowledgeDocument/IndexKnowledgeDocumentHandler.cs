@@ -4,6 +4,8 @@ using OmniAI.Application.Knowledge.Persistence;
 using OmniAI.Domain.Authorization;
 using OmniAI.Domain.Knowledge;
 using OmniAI.Domain.Tenants;
+using OmniAI.Domain.Ai;
+using OmniAI.Application.Ai.Usage;
 
 namespace OmniAI.Application.Knowledge.IndexKnowledgeDocument;
 
@@ -166,7 +168,8 @@ public sealed class IndexKnowledgeDocumentHandler(
         }
 
         (IReadOnlyList<KnowledgeChunkWrite> writes, int calls) =
-            await EmbedAsync(chunks, profile, cancellationToken).ConfigureAwait(false);
+            await EmbedAsync(chunks, profile, tenantId, cancellationToken)
+                .ConfigureAwait(false);
 
         document.MarkIndexed(profile.Id, _clock.GetUtcNow());
 
@@ -193,6 +196,7 @@ public sealed class IndexKnowledgeDocumentHandler(
     private async Task<(IReadOnlyList<KnowledgeChunkWrite> Writes, int Calls)> EmbedAsync(
         IReadOnlyList<KnowledgeChunk> chunks,
         EmbeddingProfile profile,
+        TenantId tenantId,
         CancellationToken cancellationToken)
     {
         List<KnowledgeChunkWrite> writes = new(chunks.Count);
@@ -211,8 +215,13 @@ public sealed class IndexKnowledgeDocumentHandler(
 
             calls++;
 
+            // One batch, one provider request, and therefore one accounted
+            // operation -- not one per chunk.
             IReadOnlyList<EmbeddingVector> vectors = await _embeddings
-                .GenerateAsync(inputs, cancellationToken)
+                .GenerateAsync(
+                    inputs,
+                    AiUsageContext.For(tenantId, AiUsagePurpose.KnowledgeIndexEmbedding),
+                    cancellationToken)
                 .ConfigureAwait(false);
 
             if (vectors is null || vectors.Count != size)

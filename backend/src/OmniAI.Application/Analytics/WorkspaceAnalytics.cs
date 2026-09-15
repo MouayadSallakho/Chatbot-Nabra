@@ -1,3 +1,4 @@
+using OmniAI.Domain.Ai;
 using OmniAI.Domain.Conversations;
 
 namespace OmniAI.Application.Analytics;
@@ -111,6 +112,86 @@ public sealed record AnalyticsWhatsAppDelivery(
         Pending + Sending + Sent + Delivered + Read + Failed + Unknown > 0;
 }
 
+
+/// <summary>
+/// What this workspace's AI providers were actually asked to do, and what it cost.
+/// </summary>
+/// <remarks>
+/// <para>
+/// <strong>These are calls, not attempts.</strong> A turn refused before dispatch
+/// — rate limited, handed to a person, a duplicate replayed from store — spends
+/// nothing and appears here not at all. The AI-operations panel above counts
+/// attempts; this counts money.
+/// </para>
+/// <para>
+/// <strong>Tokens are the providers' own figures.</strong> Nothing here is
+/// derived from text, and a call whose usage a provider did not report contributes
+/// nothing to these sums rather than a zero.
+/// </para>
+/// <para>
+/// <strong>This is accounting, not billing.</strong> An internal estimate of what
+/// the platform spent with a provider: no customer charge, no markup, no plan, no
+/// invoice.
+/// </para>
+/// </remarks>
+/// <param name="Calls">Real provider requests dispatched in the period.</param>
+/// <param name="Unresolved">
+/// Dispatched and never settled, or settled as unknown. The provider may have
+/// executed and billed these; they are neither successes nor zeroes.
+/// </param>
+/// <param name="UnratedCalls">
+/// Succeeded calls this deployment has no configured price for. Real spend that
+/// cannot be costed — never shown as free.
+/// </param>
+public sealed record AnalyticsAiUsage(
+    long Calls,
+    long GenerationCalls,
+    long EmbeddingCalls,
+    long Succeeded,
+    long Failed,
+    long Unresolved,
+    long GenerationInputTokens,
+    long GenerationCachedInputTokens,
+    long GenerationOutputTokens,
+    long GenerationReasoningTokens,
+    long EmbeddingInputTokens,
+    long UnratedCalls,
+    IReadOnlyList<AnalyticsRatedCost> RatedCost)
+{
+    /// <summary>Whether this workspace called a provider at all in the period.</summary>
+    public bool HasAny => Calls > 0;
+}
+
+/// <summary>
+/// Rated spend in one currency.
+/// </summary>
+/// <remarks>
+/// <strong>A list, never a single figure.</strong> Currencies are not added
+/// together and nothing is converted: there is no exchange rate in this platform,
+/// and inventing one would produce a total that is wrong by an amount nobody can
+/// determine. Two currencies means two rows.
+/// </remarks>
+public sealed record AnalyticsRatedCost(string Currency, decimal EstimatedCost, long Calls);
+
+/// <summary>
+/// One provider, model and operation type's share of the spend.
+/// </summary>
+/// <remarks>
+/// Bounded, like the agent breakdown: the tenth busiest model is the last one
+/// worth a row. Carries no key, no prompt and no response body — a model name is
+/// a published identifier.
+/// </remarks>
+public sealed record AnalyticsModelUsage(
+    string Provider,
+    string Model,
+    AiOperationType OperationType,
+    long Calls,
+    long InputTokens,
+    long OutputTokens,
+    decimal? EstimatedCost,
+    string? Currency,
+    long UnratedCalls);
+
 /// <summary>The period a dashboard describes, as the API publishes it.</summary>
 public sealed record AnalyticsPeriod(
     string Range,
@@ -136,4 +217,6 @@ public sealed record WorkspaceAnalytics(
     IReadOnlyList<AnalyticsChannel> Channels,
     IReadOnlyList<AnalyticsAgent> Agents,
     AnalyticsAiOperations AiOperations,
-    AnalyticsWhatsAppDelivery? WhatsAppDelivery);
+    AnalyticsWhatsAppDelivery? WhatsAppDelivery,
+    AnalyticsAiUsage AiUsage,
+    IReadOnlyList<AnalyticsModelUsage> Models);

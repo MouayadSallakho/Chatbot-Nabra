@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using OmniAI.Api.IntegrationTests.Authorization;
 using OmniAI.Api.IntegrationTests.Knowledge;
+using OmniAI.Domain.Ai;
 using OmniAI.Domain.AiAgents;
 using OmniAI.Domain.Conversations;
 using OmniAI.Domain.Tenants;
@@ -91,6 +92,84 @@ public sealed class AnalyticsApiFixture : RoleApiFixture
         context.Conversations.Add(conversation);
         context.WebChatEndpoints.Add(endpoint);
         context.WebChatSessions.Add(session);
+
+        await context.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Writes one accounted provider call, as the ledger would have left it.
+    /// </summary>
+    /// <remarks>
+    /// <strong>Synthetic rows, written locally through the aggregate.</strong>
+    /// Nothing here reaches OpenAI, and nothing needs to: what the API layer has
+    /// to prove is the route, the permission and the shape on the wire, and a row
+    /// the domain accepted is indistinguishable at that level from one a real
+    /// call left behind.
+    /// </remarks>
+    public async Task SeedUsageAsync(
+        Guid tenantId,
+        string model = "test-model-x",
+        AiOperationType operationType = AiOperationType.TextGeneration,
+        AiUsagePurpose purpose = AiUsagePurpose.ConversationGeneration,
+        AiOperationStatus status = AiOperationStatus.Succeeded,
+        long? inputTokens = 1_000,
+        long? outputTokens = 200,
+        decimal? inputPerMillion = 2.00m,
+        string currency = "USD")
+    {
+        DateTimeOffset now = DateTimeOffset.UtcNow.AddMinutes(-5);
+
+        AiProviderUsage operation = AiProviderUsage.Begin(
+            TenantId.From(tenantId),
+            AiProvider.OpenAi,
+            operationType,
+            purpose,
+            ModelName.Create(model),
+            now);
+
+        AiModelRates? rates = inputPerMillion is decimal rate
+            ? AiModelRates.Create(
+                AiProvider.OpenAi,
+                ModelName.Create(model),
+                operationType,
+                CurrencyCode.Create(currency),
+                now.AddYears(-1),
+                rate,
+                cachedInputPerMillion: null,
+                outputPerMillion: 8.00m)
+            : null;
+
+        switch (status)
+        {
+            case AiOperationStatus.Succeeded:
+                operation.Succeed(
+                    ProviderTokenUsage.Create(
+                        inputTokens: inputTokens,
+                        outputTokens: outputTokens),
+                    null,
+                    rates,
+                    now.AddSeconds(2));
+
+                break;
+
+            case AiOperationStatus.Failed:
+                operation.Fail(now.AddSeconds(2));
+
+                break;
+
+            case AiOperationStatus.Unknown:
+                operation.MarkUnknown(now.AddSeconds(2));
+
+                break;
+
+            default:
+                // Started: dispatched, never settled.
+                break;
+        }
+
+        await using OmniAiDbContext context = CreateDbContext();
+
+        context.AiProviderUsages.Add(operation);
 
         await context.SaveChangesAsync();
     }

@@ -7,6 +7,8 @@ using Microsoft.Extensions.Logging.Abstractions;
 using OmniAI.Application.Knowledge;
 using OmniAI.Infrastructure.IntegrationTests.Ai.OpenAi;
 using OmniAI.Infrastructure.Knowledge;
+using OmniAI.Application.Ai.Usage;
+using OmniAI.Testing;
 
 namespace OmniAI.Infrastructure.IntegrationTests.Knowledge;
 
@@ -25,7 +27,8 @@ public sealed class OpenAiEmbeddingTests
 
     private static OpenAiTextEmbeddingGenerator Generator(
         CannedOpenAiTransport transport,
-        EmbeddingOptions? options = null)
+        EmbeddingOptions? options = null,
+        IAiProviderUsageLedger? ledger = null)
     {
         options ??= new EmbeddingOptions();
 
@@ -42,6 +45,7 @@ public sealed class OpenAiEmbeddingTests
                 Dimensions,
                 options.MaxBatchSize,
                 options.MaxInputCharacters),
+            ledger ?? new RecordingUsageLedger(),
             NullLogger<OpenAiTextEmbeddingGenerator>.Instance);
     }
 
@@ -87,7 +91,7 @@ public sealed class OpenAiEmbeddingTests
         CannedOpenAiTransport transport = new() { ResponseBody = Response(3) };
 
         IReadOnlyList<EmbeddingVector> vectors =
-            await Generator(transport).GenerateAsync(["first", "second", "third"]);
+            await Generator(transport).GenerateAsync(["first", "second", "third"], OpenAiTestHarness.Usage);
 
         Assert.Equal(3, vectors.Count);
         Assert.All(vectors, vector => Assert.Equal(Dimensions, vector.Dimensions));
@@ -101,7 +105,7 @@ public sealed class OpenAiEmbeddingTests
         // indexing at the database rather than here.
         CannedOpenAiTransport transport = new() { ResponseBody = Response(1) };
 
-        await Generator(transport).GenerateAsync(["anything"]);
+        await Generator(transport).GenerateAsync(["anything"], OpenAiTestHarness.Usage);
 
         using JsonDocument body = JsonDocument.Parse(transport.LastBody);
 
@@ -113,7 +117,7 @@ public sealed class OpenAiEmbeddingTests
     {
         CannedOpenAiTransport transport = new() { ResponseBody = Response(1) };
 
-        await Generator(transport).GenerateAsync(["anything"]);
+        await Generator(transport).GenerateAsync(["anything"], OpenAiTestHarness.Usage);
 
         using JsonDocument body = JsonDocument.Parse(transport.LastBody);
 
@@ -129,7 +133,7 @@ public sealed class OpenAiEmbeddingTests
         // not it.
         CannedOpenAiTransport transport = new() { ResponseBody = Response(0) };
 
-        Assert.Empty(await Generator(transport).GenerateAsync([]));
+        Assert.Empty(await Generator(transport).GenerateAsync([], OpenAiTestHarness.Usage));
         Assert.Equal(0, transport.Calls);
     }
 
@@ -145,7 +149,7 @@ public sealed class OpenAiEmbeddingTests
         EmbeddingOptions options = new() { MaxBatchSize = 2 };
 
         await Assert.ThrowsAsync<ArgumentException>(
-            () => Generator(transport, options).GenerateAsync(["a", "b", "c"]));
+            () => Generator(transport, options).GenerateAsync(["a", "b", "c"], OpenAiTestHarness.Usage));
 
         Assert.Equal(0, transport.Calls);
     }
@@ -155,7 +159,7 @@ public sealed class OpenAiEmbeddingTests
     {
         CannedOpenAiTransport transport = new() { ResponseBody = Response(4) };
 
-        await Generator(transport).GenerateAsync(["a", "b", "c", "d"]);
+        await Generator(transport).GenerateAsync(["a", "b", "c", "d"], OpenAiTestHarness.Usage);
 
         Assert.Equal(1, transport.Calls);
 
@@ -170,7 +174,7 @@ public sealed class OpenAiEmbeddingTests
         CannedOpenAiTransport transport = new() { ResponseBody = Response(2) };
 
         await Assert.ThrowsAsync<ArgumentException>(
-            () => Generator(transport).GenerateAsync(["fine", "   "]));
+            () => Generator(transport).GenerateAsync(["fine", "   "], OpenAiTestHarness.Usage));
 
         Assert.Equal(0, transport.Calls);
     }
@@ -183,7 +187,7 @@ public sealed class OpenAiEmbeddingTests
         EmbeddingOptions options = new() { MaxInputCharacters = 10 };
 
         await Assert.ThrowsAsync<ArgumentException>(
-            () => Generator(transport, options).GenerateAsync(["far too long for this"]));
+            () => Generator(transport, options).GenerateAsync(["far too long for this"], OpenAiTestHarness.Usage));
 
         Assert.Equal(0, transport.Calls);
     }
@@ -199,7 +203,7 @@ public sealed class OpenAiEmbeddingTests
 
         EmbeddingResponseInvalidException failure =
             await Assert.ThrowsAsync<EmbeddingResponseInvalidException>(
-                () => Generator(transport).GenerateAsync(["a", "b", "c"]));
+                () => Generator(transport).GenerateAsync(["a", "b", "c"], OpenAiTestHarness.Usage));
 
         Assert.Contains("2 vectors for 3 inputs", failure.Message, StringComparison.Ordinal);
     }
@@ -214,7 +218,7 @@ public sealed class OpenAiEmbeddingTests
 
         EmbeddingResponseInvalidException failure =
             await Assert.ThrowsAsync<EmbeddingResponseInvalidException>(
-                () => Generator(transport).GenerateAsync(["anything"]));
+                () => Generator(transport).GenerateAsync(["anything"], OpenAiTestHarness.Usage));
 
         Assert.Contains("8 dimensions", failure.Message, StringComparison.Ordinal);
         Assert.Contains("configured for 1536", failure.Message, StringComparison.Ordinal);
@@ -234,7 +238,7 @@ public sealed class OpenAiEmbeddingTests
         };
 
         await Assert.ThrowsAsync<EmbeddingUnavailableException>(
-            () => Generator(transport).GenerateAsync(["anything"]));
+            () => Generator(transport).GenerateAsync(["anything"], OpenAiTestHarness.Usage));
     }
 
     [Theory]
@@ -249,7 +253,7 @@ public sealed class OpenAiEmbeddingTests
         };
 
         await Assert.ThrowsAsync<EmbeddingTimeoutException>(
-            () => Generator(transport).GenerateAsync(["anything"]));
+            () => Generator(transport).GenerateAsync(["anything"], OpenAiTestHarness.Usage));
     }
 
     [Fact]
@@ -260,7 +264,7 @@ public sealed class OpenAiEmbeddingTests
         EmbeddingOptions options = new() { TimeoutSeconds = 1 };
 
         await Assert.ThrowsAsync<EmbeddingTimeoutException>(
-            () => Generator(transport, options).GenerateAsync(["anything"]));
+            () => Generator(transport, options).GenerateAsync(["anything"], OpenAiTestHarness.Usage));
     }
 
     [Fact]
@@ -273,7 +277,7 @@ public sealed class OpenAiEmbeddingTests
         using CancellationTokenSource cancellation = new();
 
         Task<IReadOnlyList<EmbeddingVector>> pending =
-            Generator(transport).GenerateAsync(["anything"], cancellation.Token);
+            Generator(transport).GenerateAsync(["anything"], OpenAiTestHarness.Usage, cancellation.Token);
 
         await cancellation.CancelAsync();
 
@@ -292,7 +296,7 @@ public sealed class OpenAiEmbeddingTests
         await cancellation.CancelAsync();
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
-            () => Generator(transport).GenerateAsync(["anything"], cancellation.Token));
+            () => Generator(transport).GenerateAsync(["anything"], OpenAiTestHarness.Usage, cancellation.Token));
 
         Assert.Equal(0, transport.Calls);
     }
@@ -310,7 +314,7 @@ public sealed class OpenAiEmbeddingTests
         };
 
         await Assert.ThrowsAsync<EmbeddingUnavailableException>(
-            () => Generator(transport).GenerateAsync(["anything"]));
+            () => Generator(transport).GenerateAsync(["anything"], OpenAiTestHarness.Usage));
 
         Assert.Equal(1, transport.Calls);
     }

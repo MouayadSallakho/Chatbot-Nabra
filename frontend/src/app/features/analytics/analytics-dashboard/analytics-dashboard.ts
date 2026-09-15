@@ -12,6 +12,7 @@ import {
   AnalyticsRange,
   DEFAULT_ANALYTICS_RANGE,
 } from '../analytics-api';
+import { ProviderUsageCard } from '../provider-usage/provider-usage';
 
 /** One bar in the activity chart, already scaled. */
 interface ActivityBar {
@@ -34,10 +35,11 @@ interface ActivityBar {
  * with no activity shows zeroes and says so. A dashboard that invents a plausible
  * line is worse than an empty one, because somebody will make a decision from it.
  *
- * <strong>It is not billing.</strong> No cost, no token count, no plan and no
- * estimate appears here, because the platform does not hold those numbers. When
- * provider usage accounting exists it can be added; inventing "$0" in the
- * meantime would be a lie with a currency symbol on it.
+ * <strong>Provider usage is internal accounting, and lives in its own
+ * component.</strong> It reports what this workspace's calls to AI providers are
+ * estimated to have cost <em>us</em>, from rates an operator configured — not an
+ * invoice, a charge or an amount due. See {@link ProviderUsageCard}, which owns
+ * that vocabulary and the rules that keep it honest.
  *
  * <strong>The chart is drawn with CSS, and it is not the only representation.</strong>
  * No chart library was added. Every bar is also a row in a table below it, which
@@ -51,7 +53,7 @@ interface ActivityBar {
 @Component({
   selector: 'app-analytics-dashboard',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [PageHeader, EmptyState],
+  imports: [PageHeader, EmptyState, ProviderUsageCard],
   templateUrl: './analytics-dashboard.html',
   styleUrl: './analytics-dashboard.scss',
 })

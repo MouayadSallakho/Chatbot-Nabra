@@ -15,8 +15,9 @@ import { AnalyticsDashboardPage, formatDay } from './analytics-dashboard';
  *
  * What matters most here is honesty: a workspace with no activity must say so
  * rather than draw something, the numbers on screen must be the numbers the
- * server sent, and nothing about cost or tokens may appear anywhere — this is
- * analytics, not billing.
+ * server sent, and the provider usage section must read as the internal
+ * accounting it is: an estimate of what this platform paid a provider, never an
+ * invoice, a charge or an amount due. Unknown is shown as unknown.
  */
 describe('AnalyticsDashboardPage', () => {
   const tenantId = '11111111-1111-1111-1111-111111111111';
@@ -57,6 +58,11 @@ describe('AnalyticsDashboardPage', () => {
     channels: [],
     agents: [],
     aiOperations: { attempts: 0, completed: 0, failed: 0, inProgress: 0 },
+
+    // Null, not a shape full of noughts: a workspace that has never called a
+    // provider has nothing to report about spend.
+    aiUsage: null,
+    models: [],
     whatsappDelivery: null,
   };
 
@@ -113,6 +119,45 @@ describe('AnalyticsDashboardPage', () => {
       },
     ],
     aiOperations: { attempts: 33, completed: 31, failed: 2, inProgress: 0 },
+    aiUsage: {
+      calls: 40,
+      generationCalls: 31,
+      embeddingCalls: 9,
+      succeeded: 38,
+      failed: 1,
+      unresolved: 1,
+      generationInputTokens: 120_000,
+      generationCachedInputTokens: 40_000,
+      generationOutputTokens: 18_000,
+      generationReasoningTokens: 3_000,
+      embeddingInputTokens: 52_000,
+      unratedCalls: 0,
+      ratedCost: [{ currency: 'USD', estimatedCost: 0.384, calls: 38 }],
+    },
+    models: [
+      {
+        provider: 'OpenAi',
+        model: 'test-model-x-2026-09-01',
+        operationType: 'TextGeneration',
+        calls: 31,
+        inputTokens: 120_000,
+        outputTokens: 18_000,
+        estimatedCost: 0.384,
+        currency: 'USD',
+        unratedCalls: 0,
+      },
+      {
+        provider: 'OpenAi',
+        model: 'test-embed-a',
+        operationType: 'Embedding',
+        calls: 9,
+        inputTokens: 52_000,
+        outputTokens: 0,
+        estimatedCost: null,
+        currency: null,
+        unratedCalls: 9,
+      },
+    ],
     whatsappDelivery: {
       pending: 1,
       sending: 0,
@@ -331,16 +376,180 @@ describe('AnalyticsDashboardPage', () => {
     });
   });
 
-  describe('this is not billing', () => {
-    it('shows no cost, no tokens and no plan anywhere on the page', async () => {
+  describe('provider usage', () => {
+    it('is absent entirely for a workspace that never called a provider', async () => {
+      await mount();
+      await answer(empty);
+
+      // Not a card of noughts. "No calls" and "calls that cost nothing" are
+      // different facts, and only one of them is true here.
+      expect(query('[data-testid="ai-usage"]')).toBeNull();
+      expect(query('[data-testid="ai-models"]')).toBeNull();
+    });
+
+    it('is reported even when the workspace held no conversations at all', async () => {
+      await mount();
+
+      // Indexing a document and previewing an agent both cost money and produce
+      // no conversation. A workspace like this one is exactly the one whose
+      // owner wants to be told about spend, so it must not sit behind the
+      // conversation-activity empty state.
+      await answer({ ...empty, aiUsage: busy.aiUsage, models: busy.models });
+
+      expect(query('[data-testid="empty"]')).not.toBeNull();
+      expect(query('[data-testid="ai-usage"]')).not.toBeNull();
+      expect(query('[data-testid="ai-models"]')).not.toBeNull();
+    });
+
+    it('reports the calls and the tokens the providers themselves reported', async () => {
+      await mount();
+      await answer(busy);
+
+      const usage = query('[data-testid="ai-usage"]');
+
+      expect(usage).not.toBeNull();
+
+      const text = usage!.textContent ?? '';
+
+      expect(text).toContain('40');
+      expect(text).toContain('31 generation');
+      expect(text).toContain('9 embedding');
+      expect(text).toContain('120,000');
+      expect(text).toContain('40,000');
+    });
+
+    it('calls the figure an estimate and never anything stronger', async () => {
+      await mount();
+      await answer(busy);
+
+      const cost = query('[data-testid="ai-usage-cost"]');
+
+      expect(cost!.textContent).toContain('Estimated provider cost');
+      expect(cost!.textContent).toContain('$0.38');
+    });
+
+    it('shows a fraction of a penny as an amount rather than as nothing', async () => {
+      await mount();
+      await answer({
+        ...busy,
+        aiUsage: {
+          ...busy.aiUsage!,
+          ratedCost: [{ currency: 'USD', estimatedCost: 0.002468, calls: 3 }],
+        },
+      });
+
+      // Rounded to two places this would read "$0.00", which is a lie about a
+      // real amount. It is shown to as many places as it takes.
+      const text = query('[data-testid="ai-usage-cost"]')!.textContent ?? '';
+
+      expect(text).toContain('0.002468');
+      expect(text).not.toContain('$0.00 ');
+    });
+
+    it('says unrated calls are unrated and not free', async () => {
+      await mount();
+      await answer({
+        ...busy,
+        aiUsage: { ...busy.aiUsage!, unratedCalls: 9 },
+      });
+
+      const note = query('[data-testid="ai-usage-unrated"]');
+
+      expect(note).not.toBeNull();
+      expect(note!.textContent).toContain('Unrated does not mean free');
+    });
+
+    it('reports nothing priced rather than a cost of zero when no rate applies', async () => {
+      await mount();
+      await answer({
+        ...busy,
+        aiUsage: { ...busy.aiUsage!, unratedCalls: 40, ratedCost: [] },
+      });
+
+      const text = query('[data-testid="ai-usage-cost"]')!.textContent ?? '';
+
+      expect(text).toContain('could be priced');
+      expect(text).not.toContain('$0.00');
+    });
+
+    it('keeps two currencies apart instead of adding them', async () => {
+      await mount();
+      await answer({
+        ...busy,
+        aiUsage: {
+          ...busy.aiUsage!,
+          ratedCost: [
+            { currency: 'EUR', estimatedCost: 1.25, calls: 10 },
+            { currency: 'USD', estimatedCost: 2.5, calls: 28 },
+          ],
+        },
+      });
+
+      const text = query('[data-testid="ai-usage-cost"]')!.textContent ?? '';
+
+      // Both figures, and an explanation. Never 3.75 of anything.
+      expect(text).toContain('1.25');
+      expect(text).toContain('2.50');
+      expect(text).toContain('not added together');
+      expect(text).not.toContain('3.75');
+    });
+
+    it('lists the models with what each of them did', async () => {
+      await mount();
+      await answer(busy);
+
+      const rows = host().querySelectorAll('[data-testid="ai-models"] tbody tr');
+
+      expect(rows.length).toBe(2);
+
+      const first = rows[0].textContent ?? '';
+
+      expect(first).toContain('test-model-x-2026-09-01');
+      expect(first).toContain('Generation');
+      expect(first).toContain('120,000');
+
+      // The embedding row has no single currency, so it carries no figure.
+      const second = rows[1].textContent ?? '';
+
+      expect(second).toContain('test-embed-a');
+      expect(second).toContain('Not priced');
+      expect(second).toContain('9 unrated');
+    });
+  });
+
+  describe('this is accounting, not billing', () => {
+    it('uses no billing word anywhere on the page', async () => {
+      await mount();
+      await answer(busy);
+
+      const text = (host().textContent ?? '').toLowerCase();
+
+      // Phase 23 is internal accounting. Any of these words would be read as a
+      // promise the platform does not make and a feature it does not have.
+      for (const forbidden of [
+        'invoice',
+        'credit',
+        'wallet',
+        'subscription',
+        'amount due',
+        'balance',
+        'quota',
+        'billing',
+        'payment',
+        'vat',
+      ]) {
+        expect(text).not.toContain(forbidden);
+      }
+    });
+
+    it('labels every money figure as an estimate of what a provider was paid', async () => {
       await mount();
       await answer(busy);
 
       const text = host().textContent ?? '';
 
-      for (const forbidden of ['$', 'cost', 'token', 'credit', 'invoice', 'plan', 'spend']) {
-        expect(text.toLowerCase()).not.toContain(forbidden.toLowerCase());
-      }
+      expect(text).toContain('Estimated provider cost');
+      expect(text).toContain('internal estimates of what this platform paid its providers');
     });
   });
 

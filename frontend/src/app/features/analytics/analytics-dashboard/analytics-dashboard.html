@@ -181,7 +181,7 @@
             <app-empty-state
               icon="analytics"
               heading="No activity in this period"
-              description="Nobody started a conversation and no messages were exchanged in the selected period. Try a longer period, or connect a channel so customers can reach your agents."
+              description="Nobody started a conversation and no messages were exchanged in the selected period. Try a longer period, or connect a channel so customers can reach your agents. Any provider usage is still reported below."
             />
           </div>
         } @else {
@@ -413,6 +413,18 @@
             </div>
           }
         }
+
+        <!--
+          Provider usage. Outside the activity guard on purpose: indexing a
+          document and previewing an agent both cost money and produce no
+          conversation, so a workspace with no messages can still have spent
+          something — and that is exactly the workspace whose owner wants to be
+          told.
+
+          Its own component, because it is a self-contained subject with its own
+          vocabulary: calls, tokens, and an estimate of what a provider was paid.
+        -->
+        <app-provider-usage [usage]="data.aiUsage" [models]="data.models" />
       }
     }
   </div>
