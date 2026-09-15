@@ -85,6 +85,17 @@ internal sealed class ConversationConfiguration : IEntityTypeConfiguration<Conve
         builder.HasIndex(conversation => new { conversation.TenantId, conversation.LastActivityAt })
             .HasDatabaseName("ix_conversations_tenant_last_activity");
 
+        // The analytics entry point, added in Phase 22.
+        //
+        // Every dashboard query begins by narrowing conversations to one
+        // workspace and one window, and a window is on `started_at` -- when the
+        // conversation began -- not on `last_activity_at`, which is when it was
+        // last touched. The index above leads with the wrong second column for
+        // that question, so without this one a dashboard scans every conversation
+        // the deployment holds.
+        builder.HasIndex(conversation => new { conversation.TenantId, conversation.StartedAt })
+            .HasDatabaseName("ix_conversations_tenant_started");
+
         builder.Property<uint>(PersistenceSchema.XminConcurrencyToken)
             .HasColumnName(PersistenceSchema.XminConcurrencyToken)
             .HasColumnType("xid")

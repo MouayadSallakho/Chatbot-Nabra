@@ -1,8 +1,42 @@
 <div class="page">
   <app-page-header
     heading="Platform overview"
-    description="Once this workspace is connected to the platform backend, this page will summarise agent activity, conversation volume and channel health. Nothing below reports live data yet."
+    description="Where this workspace stands, and the way into each part of it. Full numbers live on Analytics."
   />
+
+  <!--
+    Four real numbers from the last seven days, and a way through to the rest.
+    Not a second dashboard: the charts, channel split and agent breakdown are on
+    Analytics, and duplicating them here would be two places to keep in step.
+  -->
+  @if (canSeeNumbers() && recent(); as summary) {
+    <section class="page-section" aria-labelledby="recent-heading">
+      <h2 id="recent-heading" class="text-section-title">Last 7 days</h2>
+
+      <div class="card">
+        <div class="card-body recent-body" data-testid="overview-recent">
+          <p>
+            <span class="recent-value">{{ summary.conversationsStarted }}</span> conversations
+          </p>
+          <p>
+            <span class="recent-value">{{ summary.customerMessages }}</span> customer messages
+          </p>
+          <p>
+            <span class="recent-value">{{ summary.aiMessages }}</span> AI replies
+          </p>
+          <p>
+            <span class="recent-value">{{ summary.humanMessages }}</span> human replies
+          </p>
+        </div>
+        <div class="card-actions">
+          <a class="btn btn-secondary btn-sm" routerLink="/analytics">
+            Open Analytics
+            <app-icon name="arrow-end" [strokeWidth]="1.75" />
+          </a>
+        </div>
+      </div>
+    </section>
+  }
 
   <!--
     The Bootstrap grid, doing the job it is here for: proportional columns that
@@ -30,16 +64,17 @@
             </div>
 
             <!--
-              Still no metrics. The AI Agents area is now real, but no aggregation
-              endpoint exists and none is authorised, so this panel offers a way
-              in rather than a number nobody can substantiate.
+              A way in rather than a number. The workspace's numbers are on
+              Analytics and are summarised above; repeating a per-area count in
+              each panel would be three more places for a figure to disagree with
+              the one beside it.
             -->
             <app-empty-state
-              [heading]="panel.implemented ? 'Ready to configure' : 'No data source connected'"
+              [heading]="panel.implemented ? 'Ready to use' : 'Not built yet'"
               [description]="
                 panel.implemented
-                  ? 'Create and configure the agents that answer on your behalf.'
-                  : 'This panel has nothing to show until the platform API is wired up.'
+                  ? 'Open this area to configure it and see what it is doing.'
+                  : 'This area is part of the planned product and has no screens in this build.'
               "
             >
               <a stateActions class="btn btn-secondary btn-sm" [routerLink]="'/' + panel.path">
@@ -61,7 +96,8 @@
   <section class="page-section" aria-labelledby="areas-heading">
     <h2 id="areas-heading" class="text-section-title">Product areas</h2>
     <p class="section-note text-small text-secondary">
-      What this build of the admin application contains today.
+      What this build of the admin application contains today. Areas marked available are real and
+      report real data.
     </p>
 
     <div class="table-wrap areas-table">

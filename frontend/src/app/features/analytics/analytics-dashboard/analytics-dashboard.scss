@@ -1,0 +1,299 @@
+// Everything here uses semantic tokens. A hard-coded chart colour would look
+// deliberate in light mode and be unreadable in dark, which is exactly the bug
+// a token system exists to make impossible.
+
+.page-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+// ------------------------------------------------------------- period control
+
+.range-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.range-picker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+  margin: 0;
+  padding: var(--space-1);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background-color: var(--surface-inset);
+}
+
+// A real legend, positioned inline rather than hidden: "Period" in front of the
+// three options is what makes them read as one setting.
+.range-legend {
+  float: inline-start;
+  margin-inline-end: var(--space-2);
+  padding-inline: var(--space-2);
+  font: var(--text-caption);
+  color: var(--text-muted);
+  line-height: 2;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.range-option {
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-sm);
+  font: var(--text-small);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background-color var(--motion-fast) var(--ease-standard);
+
+  &:hover {
+    background-color: var(--surface-hover);
+  }
+
+  // The focus ring belongs to the label, because the input itself is visually
+  // hidden. Without this, keyboard users move through an invisible control.
+  &:has(input:focus-visible) {
+    outline: var(--focus-ring-width) solid var(--accent);
+    outline-offset: var(--focus-ring-offset);
+  }
+}
+
+// The selected period is marked by weight and surface as well as colour.
+.range-selected {
+  background-color: var(--surface-raised);
+  color: var(--text-primary);
+  font-weight: 600;
+  box-shadow: var(--shadow-subtle);
+}
+
+.range-note {
+  margin: 0;
+}
+
+// ---------------------------------------------------------------- summary
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: var(--space-4);
+}
+
+.summary-card .card-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.summary-label {
+  margin: 0;
+  font: var(--text-caption);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.summary-value {
+  margin: 0;
+  font-size: 2rem;
+  font-weight: 650;
+  line-height: 1.1;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.snapshot-body,
+.outcome-body {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-6);
+
+  p {
+    margin: 0;
+    color: var(--text-secondary);
+  }
+}
+
+.snapshot-value,
+.outcome-value {
+  font-weight: 650;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+// ------------------------------------------------------------------- chart
+
+// CSS bars, no library. Decorative — the numbers live in the table below, which
+// is why the whole thing is aria-hidden rather than given fake ARIA roles.
+.chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  block-size: 9rem;
+  padding: var(--space-2) 0;
+  border-block-end: 1px solid var(--border-subtle);
+}
+
+.chart-column {
+  display: flex;
+  flex: 1 1 0;
+  align-items: flex-end;
+  justify-content: center;
+  block-size: 100%;
+  min-inline-size: 2px;
+}
+
+.chart-stack {
+  display: flex;
+  flex-direction: column;
+  inline-size: 100%;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  overflow: hidden;
+
+  // A day with nothing on it still shows a hairline, so the axis reads as a run
+  // of days rather than as a gap in the data.
+  min-block-size: 2px;
+  background-color: var(--surface-inset);
+}
+
+.chart-part {
+  display: block;
+  inline-size: 100%;
+  min-block-size: 0;
+}
+
+.chart-customer {
+  background-color: var(--accent);
+}
+
+.chart-ai {
+  background-color: var(--success-fg);
+}
+
+.chart-human {
+  background-color: var(--warning-fg);
+}
+
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  list-style: none;
+
+  li {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+}
+
+.swatch {
+  inline-size: 0.75rem;
+  block-size: 0.75rem;
+  border-radius: 2px;
+}
+
+.swatch-customer {
+  background-color: var(--accent);
+}
+
+.swatch-ai {
+  background-color: var(--success-fg);
+}
+
+.swatch-human {
+  background-color: var(--warning-fg);
+}
+
+.daily-table {
+  margin-block-start: var(--space-4);
+
+  summary {
+    cursor: pointer;
+    color: var(--text-secondary);
+  }
+
+  > div {
+    margin-block-start: var(--space-3);
+  }
+}
+
+// ----------------------------------------------------------------- channels
+
+.channel-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+// Name above, bar and count below at narrow widths; one row when there is room.
+.channel-row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-1) var(--space-4);
+  align-items: center;
+}
+
+.channel-name {
+  font: var(--text-body-strong);
+}
+
+.channel-bar {
+  display: block;
+  block-size: 0.5rem;
+  border-radius: var(--radius-pill);
+  background-color: var(--surface-inset);
+  overflow: hidden;
+}
+
+.channel-fill {
+  display: block;
+  block-size: 100%;
+  background-color: var(--accent);
+}
+
+.channel-count {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+// ------------------------------------------------------------------- tables
+
+// Tables get their own scroller rather than widening the page. A table is one of
+// the few things allowed to scroll sideways; the page never is.
+.table-scroll {
+  overflow-x: auto;
+}
+
+.numeric {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+
+// An agent name is workspace-authored and can be long without a space in it.
+.agent-name {
+  overflow-wrap: anywhere;
+  font-weight: 600;
+}
+
+// ----------------------------------------------------------------- wide only
+
+@media (min-width: 48rem) {
+  .channel-row {
+    grid-template-columns: minmax(8rem, 12rem) minmax(0, 1fr) auto;
+  }
+
+  .chart {
+    block-size: 12rem;
+    gap: 3px;
+  }
+}

@@ -5,6 +5,7 @@ using Npgsql;
 using OmniAI.Application.Ai;
 using OmniAI.Application.AiAgents.Persistence;
 using OmniAI.Application.Authorization.Persistence;
+using OmniAI.Application.Analytics;
 using OmniAI.Application.Conversations;
 using OmniAI.Application.Conversations.Persistence;
 using OmniAI.Application.Invitations.Persistence;
@@ -18,6 +19,7 @@ using OmniAI.Application.Tenants.Persistence;
 using OmniAI.Application.WebChat;
 using OmniAI.Application.WebChat.Persistence;
 using OmniAI.Infrastructure.Ai.OpenAi;
+using OmniAI.Infrastructure.Analytics;
 using OmniAI.Infrastructure.Identity;
 using OmniAI.Infrastructure.Conversations;
 using OmniAI.Infrastructure.Invitations;
@@ -98,6 +100,12 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<IKnowledgeIndexStore, KnowledgeIndexStore>();
         services.AddScoped<IKnowledgeSearchStore, KnowledgeSearchStore>();
         services.AddScoped<IKnowledgeSourceRepository, KnowledgeSourceRepository>();
+
+        // Analytics reads the operational tables directly rather than through the
+        // repositories, because a repository answers "give me this aggregate" and
+        // a dashboard asks "count these rows". Scoped, like every other consumer
+        // of the DbContext.
+        services.AddScoped<IWorkspaceAnalyticsReader, WorkspaceAnalyticsReader>();
 
         // Reading text out of uploaded files. A singleton because it holds only
         // the limits: every parser call is a pure function of the bytes handed to

@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
@@ -78,7 +79,7 @@ public sealed class MigrationSchemaTests(PostgresTestDatabase database)
 
         string[] applied = [.. await context.Database.GetAppliedMigrationsAsync()];
 
-        Assert.Equal(12, applied.Length);
+        Assert.Equal(13, applied.Length);
         Assert.EndsWith("InitialPersistence", applied[0], StringComparison.Ordinal);
         Assert.EndsWith("AddAiAgents", applied[1], StringComparison.Ordinal);
         Assert.EndsWith("AddIdentityAndTenantMemberships", applied[2], StringComparison.Ordinal);
@@ -112,6 +113,55 @@ public sealed class MigrationSchemaTests(PostgresTestDatabase database)
             "AddKnowledgeFileSources",
             applied[11],
             StringComparison.Ordinal);
+        Assert.EndsWith(
+            "AddAnalyticsIndexes",
+            applied[12],
+            StringComparison.Ordinal);
+    }
+
+    /// <remarks>
+    /// Phase 22 added no table and no column. What it added is two indexes, and
+    /// they are asserted here because an index that quietly failed to be created
+    /// would turn a bounded dashboard into a full scan with nothing to show for
+    /// it -- a performance regression no functional test would notice.
+    /// </remarks>
+    [Fact]
+    public async Task The_analytics_indexes_exist_on_the_columns_analytics_filters_by()
+    {
+        object? conversations = await database.ExecuteScalarAsync(
+            "SELECT indexdef FROM pg_indexes "
+            + "WHERE tablename = 'conversations' "
+            + "AND indexname = 'ix_conversations_tenant_started'");
+
+        Assert.NotNull(conversations);
+        Assert.Contains("tenant_id", (string)conversations, StringComparison.Ordinal);
+        Assert.Contains("started_at", (string)conversations, StringComparison.Ordinal);
+
+        object? deliveries = await database.ExecuteScalarAsync(
+            "SELECT indexdef FROM pg_indexes "
+            + "WHERE tablename = 'whatsapp_deliveries' "
+            + "AND indexname = 'ix_whatsapp_deliveries_tenant_created'");
+
+        Assert.NotNull(deliveries);
+        Assert.Contains("tenant_id", (string)deliveries, StringComparison.Ordinal);
+        Assert.Contains("created_at", (string)deliveries, StringComparison.Ordinal);
+    }
+
+    /// <remarks>
+    /// The other half of the Phase 22 index decision: nothing was added to the
+    /// tables that joins already reach by an indexed key. If a later phase adds
+    /// one it should be because a measurement asked for it, and this test failing
+    /// is the prompt to write that measurement down.
+    /// </remarks>
+    [Fact]
+    public async Task Phase_22_added_no_index_to_messages_or_conversation_turns()
+    {
+        object? count = await database.ExecuteScalarAsync(
+            "SELECT count(*) FROM pg_indexes "
+            + "WHERE tablename IN ('messages', 'conversation_turns')");
+
+        // Two apiece: the primary key and the one join key each already had.
+        Assert.Equal(5L, Convert.ToInt64(count, CultureInfo.InvariantCulture));
     }
 
     [Fact]

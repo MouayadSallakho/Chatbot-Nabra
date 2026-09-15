@@ -484,6 +484,16 @@ internal sealed class WhatsAppDeliveryConfiguration : IEntityTypeConfiguration<W
         builder.HasIndex(delivery => new { delivery.Status, delivery.CreatedAt })
             .HasDatabaseName("ix_whatsapp_deliveries_status_created");
 
+        // The analytics predicate, added in Phase 22.
+        //
+        // The dispatcher asks "what is still pending", which leads with status.
+        // A dashboard asks "what did this workspace send in this window", which
+        // leads with the workspace -- and until now this table had no index on
+        // its tenant column at all, so that question read every delivery row in
+        // the deployment to answer for one workspace.
+        builder.HasIndex(delivery => new { delivery.TenantId, delivery.CreatedAt })
+            .HasDatabaseName("ix_whatsapp_deliveries_tenant_created");
+
         builder.HasIndex(delivery => delivery.ConversationId)
             .HasDatabaseName("ix_whatsapp_deliveries_conversation");
 

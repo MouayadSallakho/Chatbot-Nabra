@@ -104,7 +104,16 @@ export const NAV_ITEMS: readonly NavItem[] = [
     permissions: ['website-chat.view', 'whatsapp.view'],
   },
   { label: 'Integrations', path: 'integrations', icon: 'integrations', implemented: false },
-  { label: 'Analytics', path: 'analytics', icon: 'analytics', implemented: false },
+  {
+    // Real from Phase 22: counts drawn from the conversations, messages and
+    // turns the platform already stores. One permission, because there is
+    // nothing here to configure.
+    label: 'Analytics',
+    path: 'analytics',
+    icon: 'analytics',
+    implemented: true,
+    permissions: ['analytics.view'],
+  },
   {
     // This replaces the Phase 10 "Settings" placeholder rather than nesting
     // inside it. There are no other settings yet, so a Settings hub would be a

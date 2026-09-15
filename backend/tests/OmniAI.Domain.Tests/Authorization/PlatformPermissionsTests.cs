@@ -80,10 +80,15 @@ public sealed class PlatformPermissionsTests
         //
         // Knowledge left it in Phase 17, when documents, indexing, agent
         // assignment and retrieval were built. Its two codes cover reading and
-        // administering written documents, and nothing else: file upload, crawling
-        // and external connectors are still absent, and have no permission
-        // advertising them.
-        string[] unimplemented = ["billing", "integrations", "analytics"];
+        // administering written documents and -- from Phase 21 -- the files they
+        // can be read out of; crawling and external connectors are still absent,
+        // and have no permission advertising them.
+        //
+        // Analytics left it in Phase 22, when the dashboard was built over the
+        // operational records. It has exactly one code, because there is nothing
+        // to configure: no analytics.manage exists, and none should until there
+        // is something mutable for it to govern.
+        string[] unimplemented = ["billing", "integrations"];
 
         Assert.All(PlatformPermissions.AllCodes, code =>
             Assert.DoesNotContain(
@@ -133,6 +138,7 @@ public sealed class PlatformPermissionsTests
                 "whatsapp.manage",
                 "knowledge.view",
                 "knowledge.manage",
+                "analytics.view",
             ],
             PlatformPermissions.AllCodes.Select(code => code.Value));
     }

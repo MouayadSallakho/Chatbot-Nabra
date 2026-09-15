@@ -43,3 +43,22 @@
   font: var(--text-body-strong);
   white-space: nowrap;
 }
+
+// The seven-day strip. Four facts on one line where there is room, wrapping to
+// as many lines as a phone needs.
+.recent-body {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-6);
+
+  p {
+    margin: 0;
+    color: var(--text-secondary);
+  }
+}
+
+.recent-value {
+  font-weight: 650;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}

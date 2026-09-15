@@ -4,6 +4,7 @@ using OmniAI.Api.Auth;
 using OmniAI.Api.Authorization;
 using OmniAI.Api.Composition;
 using OmniAI.Api.Conversations;
+using OmniAI.Api.Analytics;
 using OmniAI.Api.Knowledge;
 using OmniAI.Api.WebChat;
 using OmniAI.Api.WhatsApp;
@@ -130,6 +131,10 @@ app.MapAiAgentEndpoints();
 // use case.
 app.MapKnowledgeEndpoints();
 app.MapKnowledgeFileEndpoints();
+
+// The workspace's own numbers. Read-only, permission-gated, and free: it counts
+// rows this platform already holds and calls no provider.
+app.MapAnalyticsEndpoints();
 app.MapWebChatEndpoints();
 app.MapWhatsAppEndpoints();
 

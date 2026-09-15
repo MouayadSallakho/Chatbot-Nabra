@@ -308,6 +308,9 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                     b.HasIndex("TenantId", "LastActivityAt")
                         .HasDatabaseName("ix_conversations_tenant_last_activity");
 
+                    b.HasIndex("TenantId", "StartedAt")
+                        .HasDatabaseName("ix_conversations_tenant_started");
+
                     b.ToTable("conversations", (string)null);
                 });
 
@@ -1219,6 +1222,9 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("Status", "CreatedAt")
                         .HasDatabaseName("ix_whatsapp_deliveries_status_created");
+
+                    b.HasIndex("TenantId", "CreatedAt")
+                        .HasDatabaseName("ix_whatsapp_deliveries_tenant_created");
 
                     b.ToTable("whatsapp_deliveries", (string)null);
                 });

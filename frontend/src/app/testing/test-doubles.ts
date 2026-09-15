@@ -266,4 +266,12 @@ export const EVERY_PERMISSION: readonly PermissionDefinition[] = [
       'Write and edit knowledge documents, index them, switch them on and off, and choose ' +
       'which AI agents may draw on them.',
   },
+  {
+    code: 'analytics.view',
+    group: 'Analytics',
+    label: 'View analytics',
+    description:
+      'See how many conversations the workspace handled, how its channels and AI agents are ' +
+      'being used, and how much activity happened each day.',
+  },
 ];

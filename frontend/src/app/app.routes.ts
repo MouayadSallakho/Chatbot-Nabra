@@ -7,6 +7,7 @@ import { ACCEPT_INVITATION_PATH } from '@app/core/invitations/invitation-handoff
 import { TeamApi } from '@app/features/team/team-api';
 import { HostedChatApi } from '@app/features/chat/hosted-chat-api';
 import { HostedChatSessionStore } from '@app/features/chat/hosted-chat-session';
+import { AnalyticsApi } from '@app/features/analytics/analytics-api';
 
 /**
  * One route per unbuilt product area, generated from the navigation model.
@@ -113,6 +114,12 @@ export const routes: Routes = [
       {
         path: HOME_PATH,
         title: 'Overview',
+
+        // The overview shows a four-number summary from the analytics endpoint,
+        // so it needs that client. Provided here rather than in the root
+        // injector: two small consumers, neither of which should put it in
+        // everybody's initial bundle.
+        providers: [AnalyticsApi],
         loadComponent: () => import('@app/features/overview/overview').then((m) => m.Overview),
       },
       {
@@ -154,6 +161,13 @@ export const routes: Routes = [
         path: 'channels',
         loadChildren: () =>
           import('@app/features/channels/channels.routes').then((m) => m.channelRoutes),
+      },
+      {
+        // Analytics, replacing the Phase 10 placeholder. Lazily loaded like the
+        // other feature areas, so somebody who never opens it never downloads it.
+        path: 'analytics',
+        loadChildren: () =>
+          import('@app/features/analytics/analytics.routes').then((m) => m.analyticsRoutes),
       },
       ...placeholderRoutes,
       // Deliberate, and deliberately not a redirect: bouncing an unknown address

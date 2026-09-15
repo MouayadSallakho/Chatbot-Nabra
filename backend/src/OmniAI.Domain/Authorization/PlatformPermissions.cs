@@ -216,6 +216,16 @@ public static class PlatformPermissions
     public static readonly PermissionCode KnowledgeManage =
         PermissionCode.Create("knowledge.manage");
 
+    /// <summary>
+    /// Read the workspace's own numbers.
+    /// </summary>
+    /// <remarks>
+    /// There is deliberately no matching manage permission. Analytics has nothing
+    /// to configure: it is a read over operational records that other capabilities
+    /// already govern, so a second code would grant authority over nothing.
+    /// </remarks>
+    public static readonly PermissionCode AnalyticsView = PermissionCode.Create("analytics.view");
+
     /// <summary>The workspace group's display name.</summary>
     public const string WorkspaceGroup = "Workspace";
 
@@ -235,6 +245,9 @@ public static class PlatformPermissions
     public const string ChannelsGroup = "Channels";
 
     public const string KnowledgeGroup = "Knowledge";
+
+    /// <summary>The analytics group's display name.</summary>
+    public const string AnalyticsGroup = "Analytics";
 
     /// <summary>
     /// The catalogue, in the order it is published and rendered.
@@ -369,6 +382,13 @@ public static class PlatformPermissions
             "Write and edit knowledge documents, index them, switch them on and "
             + "off, and choose which AI agents may draw on them. Indexing sends "
             + "the document's text to the AI provider and costs money."),
+        new(
+            AnalyticsView,
+            AnalyticsGroup,
+            "View analytics",
+            "See how many conversations the workspace handled, how its channels "
+            + "and AI agents are being used, and how much activity happened each "
+            + "day. Counts only -- never the text of a conversation."),
     ];
 
     /// <summary>

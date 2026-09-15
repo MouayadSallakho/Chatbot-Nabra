@@ -1,5 +1,9 @@
-import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { firstValueFrom } from 'rxjs';
+import { PermissionService } from '@app/core/authorization/permission-service';
+import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
+import { AnalyticsApi, AnalyticsSummary } from '@app/features/analytics/analytics-api';
 import { NAV_ITEMS, NavItem } from '@app/layout/navigation';
 import { EmptyState } from '@app/shared/empty-state/empty-state';
 import { Icon } from '@app/shared/icon/icon';
@@ -44,4 +48,48 @@ export class Overview {
   protected readonly panels: readonly NavItem[] = NAV_ITEMS.filter((item) =>
     ['ai-agents', 'conversations', 'channels'].includes(item.path),
   );
+
+  private readonly analytics = inject(AnalyticsApi);
+  private readonly workspace = inject(WorkspaceContextService);
+  private readonly permissions = inject(PermissionService);
+
+  /**
+   * Whether this reader may see the workspace's numbers at all.
+   *
+   * The strip below is the analytics endpoint, so it is behind the analytics
+   * permission like everything else that reads it. Somebody without it gets an
+   * overview with no numbers rather than an overview with a failed request on it.
+   */
+  protected readonly canSeeNumbers = computed(() => this.permissions.has('analytics.view'));
+
+  /**
+   * The last seven days, or null while loading or when it could not be read.
+   *
+   * <strong>Four numbers and a link, deliberately.</strong> The full picture is
+   * the Analytics screen; repeating its charts here would be two places to keep
+   * in step and two places to be wrong. A failure is simply absent — an overview
+   * is not the place to report that an optional summary did not load.
+   */
+  protected readonly recent = signal<AnalyticsSummary | null>(null);
+
+  constructor() {
+    void this.loadRecent();
+  }
+
+  private async loadRecent(): Promise<void> {
+    const tenantId = this.workspace.tenantId();
+
+    if (!tenantId || !this.canSeeNumbers()) {
+      return;
+    }
+
+    try {
+      const dashboard = await firstValueFrom(this.analytics.dashboard(tenantId, '7d'));
+
+      this.recent.set(dashboard.summary);
+    } catch {
+      // Left absent on purpose. See the field's own note.
+      this.recent.set(null);
+    }
+  }
 }
