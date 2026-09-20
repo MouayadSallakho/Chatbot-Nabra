@@ -817,6 +817,95 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                     b.ToTable("knowledge_sources", (string)null);
                 });
 
+            modelBuilder.Entity("OmniAI.Domain.Plans.Plan", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("code");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("display_name");
+
+                    b.Property<int?>("MaxAiAgentsValue")
+                        .HasColumnType("integer")
+                        .HasColumnName("max_ai_agents");
+
+                    b.Property<int?>("MaxKnowledgeDocumentsValue")
+                        .HasColumnType("integer")
+                        .HasColumnName("max_knowledge_documents");
+
+                    b.Property<int?>("MaxMembersValue")
+                        .HasColumnType("integer")
+                        .HasColumnName("max_members");
+
+                    b.Property<int?>("MaxMonthlyProviderOperationsValue")
+                        .HasColumnType("integer")
+                        .HasColumnName("max_monthly_provider_operations");
+
+                    b.Property<int?>("MaxWebChatEndpointsValue")
+                        .HasColumnType("integer")
+                        .HasColumnName("max_web_chat_endpoints");
+
+                    b.Property<int?>("MaxWhatsAppConnectionsValue")
+                        .HasColumnType("integer")
+                        .HasColumnName("max_whatsapp_connections");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique()
+                        .HasDatabaseName("ux_plans_code");
+
+                    b.ToTable("plans", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_plans_max_ai_agents_not_negative", "\"max_ai_agents\" IS NULL OR \"max_ai_agents\" >= 0");
+
+                            t.HasCheckConstraint("ck_plans_max_knowledge_documents_not_negative", "\"max_knowledge_documents\" IS NULL OR \"max_knowledge_documents\" >= 0");
+
+                            t.HasCheckConstraint("ck_plans_max_members_not_negative", "\"max_members\" IS NULL OR \"max_members\" >= 0");
+
+                            t.HasCheckConstraint("ck_plans_max_monthly_provider_operations_not_negative", "\"max_monthly_provider_operations\" IS NULL OR \"max_monthly_provider_operations\" >= 0");
+
+                            t.HasCheckConstraint("ck_plans_max_web_chat_endpoints_not_negative", "\"max_web_chat_endpoints\" IS NULL OR \"max_web_chat_endpoints\" >= 0");
+
+                            t.HasCheckConstraint("ck_plans_max_whatsapp_connections_not_negative", "\"max_whatsapp_connections\" IS NULL OR \"max_whatsapp_connections\" >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("OmniAI.Domain.Plans.WorkspacePlanAssignment", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTimeOffset>("AssignedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("assigned_at");
+
+                    b.Property<Guid>("PlanId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("plan_id");
+
+                    b.HasKey("TenantId");
+
+                    b.HasIndex("PlanId");
+
+                    b.ToTable("workspace_plan_assignments", (string)null);
+                });
+
             modelBuilder.Entity("OmniAI.Domain.Tenants.Tenant", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1674,6 +1763,21 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_knowledge_sources_tenant");
+                });
+
+            modelBuilder.Entity("OmniAI.Domain.Plans.WorkspacePlanAssignment", b =>
+                {
+                    b.HasOne("OmniAI.Domain.Plans.Plan", null)
+                        .WithMany()
+                        .HasForeignKey("PlanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("OmniAI.Domain.Tenants.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("OmniAI.Domain.Tenants.TenantMembership", b =>

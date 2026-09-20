@@ -4,6 +4,8 @@ using OmniAI.Application.Concurrency;
 using OmniAI.Application.Invitations.Persistence;
 using OmniAI.Application.Security;
 using OmniAI.Application.Tenants.Persistence;
+using OmniAI.Application.Plans;
+using OmniAI.Domain.Plans;
 using OmniAI.Domain.Authorization;
 using OmniAI.Domain.Invitations;
 using OmniAI.Domain.Tenants;
@@ -51,6 +53,7 @@ public sealed record AcceptedInvitation(Guid TenantId, string TenantName, string
 /// </para>
 /// </remarks>
 public sealed class AcceptTenantInvitationHandler(
+    IWorkspaceEntitlementService entitlements,
     ITenantInvitationRepository invitations,
     ITenantRoleRepository roles,
     ITenantMembershipRepository memberships,
@@ -65,6 +68,9 @@ public sealed class AcceptTenantInvitationHandler(
 
     private readonly ITenantRoleRepository _roles =
         roles ?? throw new ArgumentNullException(nameof(roles));
+
+    private readonly IWorkspaceEntitlementService _entitlements =
+        entitlements ?? throw new ArgumentNullException(nameof(entitlements));
 
     private readonly ITenantMembershipRepository _memberships =
         memberships ?? throw new ArgumentNullException(nameof(memberships));
@@ -154,18 +160,30 @@ public sealed class AcceptTenantInvitationHandler(
         TenantMembership membership =
             TenantMembership.Create(acceptorId, invitation.TenantId, now);
 
-        // One transaction: the membership, its roles and the invitation's ending
-        // are a single fact. A second acceptance, or a revocation racing this one,
-        // finds the invitation already concluded and loses here rather than
-        // producing a duplicate membership.
-        bool accepted = await _invitations
-            .AcceptAsync(
-                invitation,
-                membership,
-                invitation.RoleIds,
-                acceptorId,
-                now,
-                cancellationToken)
+        // Acceptance is where a seat is actually taken, so it is where the limit
+        // is actually enforced. Two people holding invitations against one
+        // remaining seat both reach this line; the workspace's seat lock lets one
+        // through and refuses the other, and the refused one creates no
+        // membership.
+        //
+        // The reservation encloses the whole acceptance. One transaction: the
+        // seat count, the membership, its roles and the invitation's ending are a
+        // single fact. A second acceptance of the *same* invitation, or a
+        // revocation racing this one, finds the invitation already concluded and
+        // loses on that instead.
+        bool accepted = await _entitlements.ReserveAsync(
+            invitation.TenantId,
+            EntitlementKind.Members,
+            async token => await _invitations
+                .AcceptAsync(
+                    invitation,
+                    membership,
+                    invitation.RoleIds,
+                    acceptorId,
+                    now,
+                    token)
+                .ConfigureAwait(false),
+            cancellationToken)
             .ConfigureAwait(false);
 
         if (!accepted)

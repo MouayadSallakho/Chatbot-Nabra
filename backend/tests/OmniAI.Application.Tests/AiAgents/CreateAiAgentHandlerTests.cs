@@ -252,7 +252,12 @@ public sealed class CreateAiAgentHandlerTests
     private static CreateAiAgentHandler Handler(
         InMemoryTenantRepository tenants,
         InMemoryAiAgentRepository agents) =>
-        new(tenants, agents, TestAuthority.Anywhere(), new FixedTimeProvider(Now));
+        new(
+            new FakeEntitlements(),
+            tenants,
+            agents,
+            TestAuthority.Anywhere(),
+            new FixedTimeProvider(Now));
 
     private static Tenant SeedTenant(out InMemoryTenantRepository tenants)
     {

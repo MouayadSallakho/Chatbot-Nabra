@@ -4,6 +4,7 @@ using OmniAI.Application.Knowledge;
 using OmniAI.Application.Knowledge.Persistence;
 using OmniAI.Domain.AiAgents;
 using OmniAI.Domain.Knowledge;
+using OmniAI.Domain.Plans;
 using OmniAI.Domain.Tenants;
 using OmniAI.Domain.Users;
 using OmniAI.Infrastructure.Knowledge;
@@ -50,6 +51,7 @@ internal sealed class KnowledgeWorld(PostgresTestDatabase database)
             TenantName.Create(name),
             TenantSlug.Create($"t{Guid.NewGuid():N}"[..20]),
             owner,
+            SeededPlans.Legacy,
             DateTimeOffset.UtcNow);
 
         await using OmniAiDbContext context = Context();

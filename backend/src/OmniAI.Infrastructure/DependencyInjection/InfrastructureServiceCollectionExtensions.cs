@@ -12,6 +12,7 @@ using OmniAI.Application.Conversations;
 using OmniAI.Application.Conversations.Persistence;
 using OmniAI.Application.Invitations.Persistence;
 using OmniAI.Application.Knowledge;
+using OmniAI.Application.Plans;
 using OmniAI.Application.Knowledge.Files;
 using OmniAI.Application.Knowledge.Persistence;
 using OmniAI.Application.Invitations;
@@ -32,6 +33,7 @@ using OmniAI.Infrastructure.WebChat;
 using OmniAI.Infrastructure.Ai;
 using OmniAI.Infrastructure.Persistence.Repositories;
 using OmniAI.Infrastructure.Persistence;
+using OmniAI.Infrastructure.Plans;
 using System.Globalization;
 
 namespace OmniAI.Infrastructure.DependencyInjection;
@@ -109,6 +111,13 @@ public static class InfrastructureServiceCollectionExtensions
         // a dashboard asks "count these rows". Scoped, like every other consumer
         // of the DbContext.
         services.AddScoped<IWorkspaceAnalyticsReader, WorkspaceAnalyticsReader>();
+
+        // Entitlements count the operational tables too, and hold a transaction
+        // across the count and the mutation, so they share the caller's scoped
+        // DbContext deliberately -- that is what makes the two one atomic step.
+        services.AddScoped<IWorkspaceEntitlementService, WorkspaceEntitlementService>();
+        services.AddScoped<IPlanCatalog, PlanCatalog>();
+        services.AddScoped<DefaultPlanResolver>();
 
         // Reading text out of uploaded files. A singleton because it holds only
         // the limits: every parser call is a pure function of the bytes handed to
@@ -282,6 +291,17 @@ public static class InfrastructureServiceCollectionExtensions
             AiProviderPricingCatalog.Create(ReadPricing(configuration)));
 
         services.AddSingleton<IAiProviderUsageLedger, AiProviderUsageLedger>();
+
+        // Which plan a new workspace starts on. Bound but deliberately not
+        // validated here: an empty value is a perfectly startable deployment that
+        // simply cannot create workspaces, and failing at startup would take down
+        // a running system over a setting only onboarding needs.
+        services.AddSingleton(new DefaultPlanOptions
+        {
+            DefaultPlanCode =
+                configuration[$"{DefaultPlanOptions.Section}:{nameof(DefaultPlanOptions.DefaultPlanCode)}"]
+                ?? string.Empty,
+        });
 
         // A clock, if the host has not already chosen one. The ledger stamps
         // every operation, so this assembly now depends on one whether or not it

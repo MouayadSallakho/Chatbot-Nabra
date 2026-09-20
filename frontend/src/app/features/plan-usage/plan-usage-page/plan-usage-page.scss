@@ -1,0 +1,120 @@
+// Every value is a semantic token. A hard-coded bar colour would look
+// deliberate in light mode and be unreadable in dark, which is the bug a token
+// system exists to make impossible.
+
+.page-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+// ------------------------------------------------------------------- the plan
+
+.plan-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.plan-name {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 650;
+  line-height: 1.2;
+  color: var(--text-primary);
+}
+
+// ------------------------------------------------------------------ the rows
+
+.usage-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.usage-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-inline-size: 0;
+}
+
+// The label and the figure sit on one line when there is room and stack when
+// there is not, so a narrow screen never truncates either.
+.usage-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-1) var(--space-4);
+}
+
+.usage-label {
+  margin: 0;
+  font: var(--text-card-title);
+  color: var(--text-primary);
+}
+
+.usage-figure {
+  margin: 0;
+  font-weight: 650;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.usage-figure-large {
+  font-size: 1.75rem;
+  line-height: 1.2;
+}
+
+.usage-description,
+.usage-unlimited {
+  margin: 0;
+}
+
+// --------------------------------------------------------------------- bars
+
+// Decorative. The same fact is in the figure above it and in the percentage
+// below, so the bar is hidden from assistive technology rather than given a
+// role it would then have to label.
+.usage-bar {
+  display: block;
+  block-size: 0.5rem;
+  border-radius: var(--radius-sm);
+  background-color: var(--surface-inset);
+  overflow: hidden;
+}
+
+.usage-fill {
+  display: block;
+  block-size: 100%;
+  background-color: var(--accent);
+  transition: inline-size var(--motion-fast) var(--ease-standard);
+}
+
+// Colour is never the only signal: each of these has a word beside it.
+.usage-fill-warning {
+  background-color: var(--warning-fg);
+}
+
+.usage-fill-critical,
+.usage-fill-exhausted {
+  background-color: var(--danger-fg);
+}
+
+.usage-note {
+  color: var(--warning-fg);
+}
+
+.usage-note-critical {
+  color: var(--danger-fg);
+}
+
+@media (min-width: 48rem) {
+  .usage-list {
+    gap: var(--space-6);
+  }
+}

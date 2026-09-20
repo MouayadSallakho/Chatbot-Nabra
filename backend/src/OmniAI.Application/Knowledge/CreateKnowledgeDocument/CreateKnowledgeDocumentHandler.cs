@@ -6,6 +6,8 @@ using OmniAI.Domain.Authorization;
 using OmniAI.Domain.Knowledge;
 using OmniAI.Domain.Tenants;
 
+using OmniAI.Application.Plans;
+using OmniAI.Domain.Plans;
 namespace OmniAI.Application.Knowledge.CreateKnowledgeDocument;
 
 public sealed record CreateKnowledgeDocumentCommand(Guid TenantId, string? Title, string? Content);
@@ -21,11 +23,15 @@ public sealed record CreateKnowledgeDocumentCommand(Guid TenantId, string? Title
 /// of embeddings.
 /// </remarks>
 public sealed class CreateKnowledgeDocumentHandler(
+    IWorkspaceEntitlementService entitlements,
     IKnowledgeDocumentRepository documents,
     TenantAuthorizer authorizer,
     ITextEmbeddingGenerator embeddings,
     TimeProvider clock)
 {
+    private readonly IWorkspaceEntitlementService _entitlements =
+        entitlements ?? throw new ArgumentNullException(nameof(entitlements));
+
     private readonly IKnowledgeDocumentRepository _documents =
         documents ?? throw new ArgumentNullException(nameof(documents));
 
@@ -61,12 +67,30 @@ public sealed class CreateKnowledgeDocumentHandler(
         KnowledgeDocument document =
             KnowledgeDocument.Create(tenantId, title, content, _clock.GetUtcNow());
 
-        ConcurrencyToken version = await _documents
-            .AddAsync(document, cancellationToken)
-            .ConfigureAwait(false);
+        // Permission said this person may create one; the plan says whether the
+        // workspace may hold another. Two questions, asked in that order, and
+        // neither answers the other. The count and the insert happen together
+        // under a workspace-scoped database lock, so two requests arriving at the
+        // last free slot cannot both pass the count.
+        //
+        // A manual document and a file-backed one are the same row in the same
+        // table, so they consume the same slot -- which is the intended rule
+        // rather than an accident of storage. Replacing an existing document's
+        // file edits that row and consumes nothing further.
+        return await _entitlements.ReserveAsync(
+            tenantId,
+            EntitlementKind.KnowledgeDocuments,
+            async token =>
+            {
+                ConcurrencyToken version = await _documents
+                    .AddAsync(document, token)
+                    .ConfigureAwait(false);
 
-        return new Versioned<KnowledgeDocumentView>(
-            KnowledgeDocumentView.From(document, _embeddings.Profile.Id),
-            version);
+                return new Versioned<KnowledgeDocumentView>(
+                    KnowledgeDocumentView.From(document, _embeddings.Profile.Id),
+                    version);
+            },
+            cancellationToken)
+            .ConfigureAwait(false);
     }
 }

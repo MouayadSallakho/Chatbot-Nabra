@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using OmniAI.Application.Tenants;
+using OmniAI.Domain.Plans;
 using OmniAI.Domain.Tenants;
 using OmniAI.Domain.Users;
 using OmniAI.Infrastructure.Persistence;
@@ -232,11 +233,7 @@ public sealed class TenantRepositoryTests(PostgresTestDatabase database)
     /// </para>
     /// </remarks>
     private async Task<NewWorkspace> NewWorkspaceAsync(string name, string slug) =>
-        NewWorkspace.Create(
-            TenantName.Create(name),
-            TenantSlug.Create(slug),
-            await TestIdentity.SeedUserAsync(database),
-            DateTimeOffset.UtcNow);
+        NewWorkspace.Create(TenantName.Create(name), TenantSlug.Create(slug), await TestIdentity.SeedUserAsync(database), SeededPlans.Legacy, DateTimeOffset.UtcNow);
 
     /// <summary>Stores a workspace with a fresh owner, on its own context.</summary>
     private async Task StoreAsync(string name, string slug)

@@ -169,6 +169,14 @@ export const routes: Routes = [
         loadChildren: () =>
           import('@app/features/analytics/analytics.routes').then((m) => m.analyticsRoutes),
       },
+      {
+        // Plan and usage. Beside Analytics rather than inside it: it answers a
+        // different question -- what this workspace may hold, rather than what it
+        // did -- and it is read by people who never open a dashboard.
+        path: 'plan-usage',
+        loadChildren: () =>
+          import('@app/features/plan-usage/plan-usage.routes').then((m) => m.planUsageRoutes),
+      },
       ...placeholderRoutes,
       // Deliberate, and deliberately not a redirect: bouncing an unknown address
       // to the overview leaves the reader unsure whether their link was wrong or

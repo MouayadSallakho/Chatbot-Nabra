@@ -96,6 +96,7 @@ public sealed class AiAgentPermissionTests
         InMemoryTenantRepository tenants = SeededTenants();
 
         CreateAiAgentHandler allowed = new(
+            new FakeEntitlements(),
             tenants,
             agents,
             With(PlatformPermissions.AiAgentsCreate),
@@ -108,6 +109,7 @@ public sealed class AiAgentPermissionTests
         // a workspace may reasonably let staff refine agents without letting them
         // proliferate.
         CreateAiAgentHandler refused = new(
+            new FakeEntitlements(),
             tenants,
             agents,
             With(PlatformPermissions.AiAgentsEdit),

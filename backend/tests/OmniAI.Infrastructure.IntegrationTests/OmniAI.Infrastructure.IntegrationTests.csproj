@@ -26,6 +26,7 @@
     <!-- Deterministic clock, for the storage-precision clock wrapper tests. -->
     <Compile Include="..\Shared\FixedTimeProvider.cs" Link="FixedTimeProvider.cs" />
     <Compile Include="..\Shared\RecordingUsageLedger.cs" Link="RecordingUsageLedger.cs" />
+    <Compile Include="..\Shared\FakeEntitlements.cs" Link="FakeEntitlements.cs" />
   </ItemGroup>
 
   <ItemGroup>

@@ -43,7 +43,18 @@ public sealed record NewWorkspace(
     Tenant Tenant,
     TenantMembership Membership,
     TenantRole OwnerRole,
-    TenantRoleAssignment OwnerAssignment)
+    TenantRoleAssignment OwnerAssignment,
+
+    /// <summary>
+    /// The plan the workspace starts on.
+    /// </summary>
+    /// <remarks>
+    /// Part of the same description as the workspace itself, so it is written in
+    /// the same transaction. A workspace that existed for even a moment without a
+    /// plan would be a workspace with no entitlements, and every entitlement check
+    /// against it would have to decide what that meant.
+    /// </remarks>
+    Plans.WorkspacePlanAssignment PlanAssignment)
 {
     /// <summary>
     /// Builds a workspace and everything that makes it usable by its creator.
@@ -51,6 +62,10 @@ public sealed record NewWorkspace(
     /// <param name="name">The workspace's display name.</param>
     /// <param name="slug">Its human-readable identifier.</param>
     /// <param name="creator">The person creating it, who becomes its Owner.</param>
+    /// <param name="planId">
+    /// The plan it starts on, resolved from this deployment's configuration by the
+    /// caller. Never chosen by the person creating the workspace.
+    /// </param>
     /// <param name="now">The instant, from the caller's injected clock.</param>
     /// <remarks>
     /// The creator becomes an Owner rather than a member with a chosen set of
@@ -64,6 +79,7 @@ public sealed record NewWorkspace(
         TenantName name,
         TenantSlug slug,
         UserId creator,
+        Plans.PlanId planId,
         DateTimeOffset now)
     {
         Tenant tenant = Tenant.Create(name, slug);
@@ -73,6 +89,7 @@ public sealed record NewWorkspace(
             tenant,
             TenantMembership.Create(creator, tenant.Id, now),
             owner,
-            TenantRoleAssignment.ForRole(creator, owner, now));
+            TenantRoleAssignment.ForRole(creator, owner, now),
+            Plans.WorkspacePlanAssignment.Create(tenant.Id, planId, now));
     }
 }

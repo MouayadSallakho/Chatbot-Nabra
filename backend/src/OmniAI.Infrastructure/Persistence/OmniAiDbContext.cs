@@ -141,6 +141,20 @@ public sealed class OmniAiDbContext(DbContextOptions<OmniAiDbContext> options)
     /// Written before dispatch and settled afterwards, so spend can never happen
     /// without a record of it.
     /// </remarks>
+    /// <summary>
+    /// What each plan allows. Platform configuration, shared by every workspace.
+    /// </summary>
+    public DbSet<Domain.Plans.Plan> Plans => Set<Domain.Plans.Plan>();
+
+    /// <summary>
+    /// The plan each workspace is on.
+    /// </summary>
+    /// <remarks>
+    /// Keyed by workspace, so the question "which plan" has exactly one answer.
+    /// </remarks>
+    public DbSet<Domain.Plans.WorkspacePlanAssignment> WorkspacePlanAssignments =>
+        Set<Domain.Plans.WorkspacePlanAssignment>();
+
     public DbSet<Domain.Ai.AiProviderUsage> AiProviderUsages =>
         Set<Domain.Ai.AiProviderUsage>();
 

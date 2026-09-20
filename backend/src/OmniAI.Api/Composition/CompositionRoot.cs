@@ -23,6 +23,7 @@ using OmniAI.Application.Invitations.RevokeTenantInvitation;
 using OmniAI.Application.Invitations;
 using OmniAI.Application.Knowledge;
 using OmniAI.Application.Analytics;
+using OmniAI.Application.Plans;
 using OmniAI.Application.Knowledge.Files;
 using OmniAI.Application.Knowledge.AgentKnowledge;
 using OmniAI.Application.Knowledge.CreateKnowledgeDocument;
@@ -323,6 +324,7 @@ internal static class CompositionRoot
 
         // Uploading business files into Knowledge.
         services.AddScoped<GetWorkspaceAnalyticsHandler>();
+        services.AddScoped<GetWorkspacePlanUsageHandler>();
 
         services.AddScoped<UploadKnowledgeFileHandler>();
         services.AddScoped<ReplaceKnowledgeSourceHandler>();

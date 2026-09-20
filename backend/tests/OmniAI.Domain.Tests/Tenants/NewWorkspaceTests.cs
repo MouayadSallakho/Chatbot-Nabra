@@ -1,5 +1,6 @@
 using OmniAI.Domain;
 using OmniAI.Domain.Authorization;
+using OmniAI.Domain.Plans;
 using OmniAI.Domain.Tenants;
 using OmniAI.Domain.Users;
 
@@ -92,11 +93,7 @@ public sealed class NewWorkspaceTests
     [Fact]
     public void The_tenant_starts_active_with_the_name_and_slug_it_was_given()
     {
-        NewWorkspace workspace = NewWorkspace.Create(
-            TenantName.Create("Acme Corporation"),
-            TenantSlug.Create("acme"),
-            UserId.New(),
-            Created);
+        NewWorkspace workspace = NewWorkspace.Create(TenantName.Create("Acme Corporation"), TenantSlug.Create("acme"), UserId.New(), PlanId.New(), Created);
 
         Assert.Equal("Acme Corporation", workspace.Tenant.Name.Value);
         Assert.Equal("acme", workspace.Tenant.Slug.Value);
@@ -116,32 +113,16 @@ public sealed class NewWorkspaceTests
     [Fact]
     public void A_creator_without_an_identity_is_rejected()
     {
-        Assert.Throws<DomainValidationException>(() => NewWorkspace.Create(
-            TenantName.Create("Acme Corporation"),
-            TenantSlug.Create("acme"),
-            default,
-            Created));
+        Assert.Throws<DomainValidationException>(() => NewWorkspace.Create(TenantName.Create("Acme Corporation"), TenantSlug.Create("acme"), default, PlanId.New(), Created));
     }
 
     [Fact]
     public void A_missing_name_or_slug_is_a_programming_error()
     {
-        Assert.Throws<ArgumentNullException>(() => NewWorkspace.Create(
-            null!,
-            TenantSlug.Create("acme"),
-            UserId.New(),
-            Created));
+        Assert.Throws<ArgumentNullException>(() => NewWorkspace.Create(null!, TenantSlug.Create("acme"), UserId.New(), PlanId.New(), Created));
 
-        Assert.Throws<ArgumentNullException>(() => NewWorkspace.Create(
-            TenantName.Create("Acme Corporation"),
-            null!,
-            UserId.New(),
-            Created));
+        Assert.Throws<ArgumentNullException>(() => NewWorkspace.Create(TenantName.Create("Acme Corporation"), null!, UserId.New(), PlanId.New(), Created));
     }
 
-    private static NewWorkspace Provision(UserId creator) => NewWorkspace.Create(
-        TenantName.Create("Acme Corporation"),
-        TenantSlug.Create("acme"),
-        creator,
-        Created);
+    private static NewWorkspace Provision(UserId creator) => NewWorkspace.Create(TenantName.Create("Acme Corporation"), TenantSlug.Create("acme"), creator, PlanId.New(), Created);
 }

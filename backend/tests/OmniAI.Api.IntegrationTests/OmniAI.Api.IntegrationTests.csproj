@@ -49,6 +49,7 @@
     -->
     <Compile Include="..\Shared\RecordingAiTextGenerator.cs" Link="RecordingAiTextGenerator.cs" />
     <Compile Include="..\Shared\RecordingUsageLedger.cs" Link="RecordingUsageLedger.cs" />
+    <Compile Include="..\Shared\FakeEntitlements.cs" Link="FakeEntitlements.cs" />
   </ItemGroup>
 
   <ItemGroup>

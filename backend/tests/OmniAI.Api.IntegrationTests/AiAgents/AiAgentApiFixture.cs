@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using OmniAI.Domain.Plans;
 using OmniAI.Domain.Tenants;
 using OmniAI.Domain.Users;
 using OmniAI.Infrastructure.Persistence;
@@ -66,6 +67,9 @@ public class AiAgentApiFixture : IAsyncLifetime
     /// <summary>
     /// The protection store this host counts in, for the assertions that read it.
     /// </summary>
+    /// <summary>Where the default plan for new workspaces is configured.</summary>
+    private const string DefaultPlanSetting = "Plans:DefaultPlanCode";
+
     public RedisTestServer Redis => _redis;
 
     public async Task InitializeAsync()
@@ -102,6 +106,12 @@ public class AiAgentApiFixture : IAsyncLifetime
                 // environment, and a non-secret policy section. Nothing here
                 // replaces a service, so what the suite exercises is the real
                 // Redis-backed limiter and the real HMAC key derivation.
+                // Which plan a workspace created through the API starts on. Named
+                // explicitly, as a real deployment must: there is no fallback, so
+                // a suite that forgot this would fail to create a workspace rather
+                // than quietly create an unlimited one.
+                builder.UseSetting(DefaultPlanSetting, SeededPlans.DevelopmentCode);
+
                 builder.UseSetting(RedisConnectionSetting, _redis.ConnectionString);
                 builder.UseSetting(NetworkKeySecretSetting, _redis.NetworkKeySecret);
                 builder.UseSetting(KeyPrefixSetting, _redis.KeyPrefix);
@@ -276,6 +286,7 @@ public class AiAgentApiFixture : IAsyncLifetime
             TenantName.Create(name),
             TenantSlug.Create($"t{Guid.NewGuid():N}"[..20]),
             UserId.From(ownerUserId),
+            SeededPlans.Legacy,
             DateTimeOffset.UtcNow);
 
         await using OmniAiDbContext context = CreateDbContext();

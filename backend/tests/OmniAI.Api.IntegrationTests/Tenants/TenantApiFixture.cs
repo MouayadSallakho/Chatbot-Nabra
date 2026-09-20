@@ -50,7 +50,15 @@ public sealed class TenantApiFixture : IAsyncLifetime
 
         _application = new WebApplicationFactory<Program>()
             .WithWebHostBuilder(builder =>
-                builder.UseSetting(ConnectionStringSetting, _database.ConnectionString));
+            {
+                builder.UseSetting(ConnectionStringSetting, _database.ConnectionString);
+
+                // Which plan a workspace created through the API starts on. Named
+                // explicitly, as a real deployment must: there is no fallback, so a
+                // suite that forgot this could not create a workspace at all rather
+                // than quietly creating an unlimited one.
+                builder.UseSetting("Plans:DefaultPlanCode", "development");
+            });
     }
 
     public async Task DisposeAsync()

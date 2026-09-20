@@ -4,6 +4,8 @@ using OmniAI.Application.Ai.Usage;
 using OmniAI.Domain.Ai;
 using OmniAI.Domain.Tenants;
 using OmniAI.Infrastructure.Ai.Usage;
+using OmniAI.Application.Plans;
+using OmniAI.Infrastructure.Plans;
 using OmniAI.Infrastructure.Persistence;
 using OmniAI.Testing;
 
@@ -251,7 +253,19 @@ public sealed class AiProviderUsageLedgerTests(PostgresTestDatabase database)
         ServiceCollection services = new();
 
         services.AddDbContext<OmniAiDbContext>(options =>
-            options.UseNpgsql(database.ConnectionString));
+        {
+            options.UseNpgsql(database.ConnectionString);
+
+            // Same interceptor the rest of the suite uses, so a workspace written
+            // through this container has a plan just as onboarding would give it
+            // one.
+            options.AddInterceptors(new AssignsLegacyPlanInterceptor());
+        });
+
+        // The real entitlement service, because the monthly quota is enforced
+        // inside Begin and a double would prove nothing about that.
+        services.AddScoped<IWorkspaceEntitlementService, WorkspaceEntitlementService>();
+        services.AddSingleton<TimeProvider>(new FixedTimeProvider(Noon));
 
         ServiceProvider provider = services.BuildServiceProvider();
 

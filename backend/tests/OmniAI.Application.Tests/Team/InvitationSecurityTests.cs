@@ -199,6 +199,7 @@ public sealed class InvitationSecurityTests
 
         await Assert.ThrowsAsync<TenantNotFoundException>(() =>
             new CreateTenantInvitationHandler(
+            new FakeEntitlements(),
                 world.Invitations,
                 world.Roles,
                 TestAuthority.Outsider(Inviter),
@@ -546,6 +547,7 @@ public sealed class InvitationSecurityTests
 
         public CreateTenantInvitationHandler Creator(params PermissionCode[] held) =>
             new(
+                new FakeEntitlements(),
                 Invitations,
                 Roles,
                 TestAuthority.With(Inviter, Workspace, held),
@@ -562,6 +564,7 @@ public sealed class InvitationSecurityTests
             Tenants.Seed(WorkspaceTenant);
 
             return new AcceptTenantInvitationHandler(
+            new FakeEntitlements(),
                 Invitations,
                 Roles,
                 Memberships,

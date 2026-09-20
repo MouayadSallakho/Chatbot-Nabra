@@ -4,6 +4,8 @@ using OmniAI.Application.Concurrency;
 using OmniAI.Application.Security;
 using OmniAI.Application.WhatsApp.Persistence;
 using OmniAI.Domain;
+using OmniAI.Application.Plans;
+using OmniAI.Domain.Plans;
 using OmniAI.Domain.AiAgents;
 using OmniAI.Domain.Authorization;
 using OmniAI.Domain.Tenants;
@@ -87,6 +89,7 @@ public sealed record WhatsAppConnectionView(
 /// has to remember on every new endpoint.
 /// </remarks>
 public sealed class WhatsAppConnectionHandlers(
+    IWorkspaceEntitlementService entitlements,
     TenantAuthorizer authorizer,
     IWhatsAppConnectionRepository connections,
     IAiAgentRepository agents,
@@ -102,6 +105,9 @@ public sealed class WhatsAppConnectionHandlers(
     /// file is refused rather than encrypted.
     /// </remarks>
     public const int MaxAccessTokenLength = 4096;
+
+    private readonly IWorkspaceEntitlementService _entitlements =
+        entitlements ?? throw new ArgumentNullException(nameof(entitlements));
 
     private readonly TenantAuthorizer _authorizer =
         authorizer ?? throw new ArgumentNullException(nameof(authorizer));
@@ -189,15 +195,30 @@ public sealed class WhatsAppConnectionHandlers(
             command.DisplayPhoneNumber,
             _clock.GetUtcNow());
 
-        ConcurrencyToken version = await _connections
-            .AddAsync(connection, cancellationToken)
+
+        // Permission said this person may create one; the plan says whether the
+        // workspace may hold another. Two questions, asked in that order, and
+        // neither answers the other. The count and the insert happen together
+        // under a workspace-scoped database lock, so two requests arriving at the
+        // last free slot cannot both pass the count.
+        //
+        // Every connection counts, whatever its status. A disabled connection is
+        // still a configured channel, so turning one off does not free a slot.
+        Versioned<WhatsAppConnection> stored = await _entitlements.ReserveAsync(
+            tenantId,
+            EntitlementKind.WhatsAppConnections,
+            async token =>
+            {
+                ConcurrencyToken version = await _connections
+                    .AddAsync(connection, token)
+                    .ConfigureAwait(false);
+
+                return new Versioned<WhatsAppConnection>(connection, version);
+            },
+            cancellationToken)
             .ConfigureAwait(false);
 
-        return await PublishAsync(
-                tenantId,
-                new Versioned<WhatsAppConnection>(connection, version),
-                cancellationToken)
-            .ConfigureAwait(false);
+        return await PublishAsync(tenantId, stored, cancellationToken).ConfigureAwait(false);
     }
 
     /// <returns>The changed connection, or <see langword="null"/>.</returns>

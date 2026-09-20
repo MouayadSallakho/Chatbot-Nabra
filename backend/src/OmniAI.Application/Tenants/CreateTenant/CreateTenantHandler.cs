@@ -1,5 +1,7 @@
 using OmniAI.Application.Security;
 using OmniAI.Application.Tenants.Persistence;
+using OmniAI.Application.Plans;
+using OmniAI.Domain.Plans;
 using OmniAI.Domain.Tenants;
 using OmniAI.Domain.Users;
 
@@ -38,11 +40,15 @@ namespace OmniAI.Application.Tenants.CreateTenant;
 /// </remarks>
 public sealed class CreateTenantHandler(
     ITenantRepository tenants,
+    DefaultPlanResolver defaultPlan,
     TenantAccessGuard access,
     TimeProvider clock)
 {
     private readonly ITenantRepository _tenants =
         tenants ?? throw new ArgumentNullException(nameof(tenants));
+
+    private readonly DefaultPlanResolver _defaultPlan =
+        defaultPlan ?? throw new ArgumentNullException(nameof(defaultPlan));
 
     private readonly TenantAccessGuard _access =
         access ?? throw new ArgumentNullException(nameof(access));
@@ -60,6 +66,9 @@ public sealed class CreateTenantHandler(
     /// re-implemented here.
     /// </exception>
     /// <exception cref="TenantSlugAlreadyExistsException">The slug is taken.</exception>
+    /// <exception cref="Plans.DefaultPlanUnavailableException">
+    /// This deployment cannot say which plan a new workspace belongs on.
+    /// </exception>
     public async Task<TenantView> HandleAsync(
         CreateTenantCommand command,
         CancellationToken cancellationToken = default)
@@ -87,16 +96,24 @@ public sealed class CreateTenantHandler(
             throw TenantSlugAlreadyExistsException.ForSlug(slug.Value);
         }
 
-        // The workspace and the three rows that make it usable, built together
+        // Which plan the workspace starts on comes from this deployment's
+        // configuration, never from the request. Resolved before anything is
+        // written, and it throws rather than falling back: a deployment that has
+        // not said which plan to use must not quietly create workspaces with no
+        // limits, because nobody would notice until a provider bill arrived.
+        Plan plan = await _defaultPlan.ResolveAsync(cancellationToken).ConfigureAwait(false);
+
+        // The workspace and the four rows that make it usable, built together
         // from one reading of the clock. Two calls to the clock would put
         // different timestamps on what is a single act.
         //
         // Identity and initial status come from the aggregate, and the Owner
         // role's identity, its fixed name and its system kind are equally not the
         // use case's to choose. NewWorkspace is the only way to obtain a
-        // consistent set of the four, so this call site cannot pair a membership
-        // for one person with an assignment for another.
-        NewWorkspace workspace = NewWorkspace.Create(name, slug, userId, _clock.GetUtcNow());
+        // consistent set of them, so this call site cannot pair a membership for
+        // one person with an assignment for another.
+        NewWorkspace workspace =
+            NewWorkspace.Create(name, slug, userId, plan.Id, _clock.GetUtcNow());
 
         await _tenants.AddAsync(workspace, cancellationToken).ConfigureAwait(false);
 

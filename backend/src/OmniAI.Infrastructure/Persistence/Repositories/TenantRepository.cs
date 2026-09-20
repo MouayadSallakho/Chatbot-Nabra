@@ -101,6 +101,11 @@ internal sealed class TenantRepository(OmniAiDbContext context) : ITenantReposit
         _context.TenantRoles.Add(workspace.OwnerRole);
         _context.TenantRoleAssignments.Add(workspace.OwnerAssignment);
 
+        // The plan assignment joins the same transaction. A workspace is never
+        // committed without one, so no entitlement check ever has to decide what
+        // an unassigned workspace is allowed to do.
+        _context.WorkspacePlanAssignments.Add(workspace.PlanAssignment);
+
         // The Owner role stores no permission grants, so there is no normalised
         // name to set from a grants collection -- but its name column pair still
         // needs both halves. See TenantRoleConfiguration for why the normalised
@@ -126,6 +131,7 @@ internal sealed class TenantRepository(OmniAiDbContext context) : ITenantReposit
             _context.Entry(workspace.Membership).State = EntityState.Detached;
             _context.Entry(workspace.OwnerRole).State = EntityState.Detached;
             _context.Entry(workspace.OwnerAssignment).State = EntityState.Detached;
+            _context.Entry(workspace.PlanAssignment).State = EntityState.Detached;
 
             throw TenantSlugAlreadyExistsException.ForSlug(workspace.Tenant.Slug.Value, failure);
         }

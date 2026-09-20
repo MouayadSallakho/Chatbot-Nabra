@@ -135,9 +135,17 @@ internal sealed class TenantInvitationRepository(OmniAiDbContext context)
         ArgumentNullException.ThrowIfNull(membership);
         ArgumentNullException.ThrowIfNull(roleIds);
 
-        await using IDbContextTransaction transaction = await _context.Database
-            .BeginTransactionAsync(cancellationToken)
-            .ConfigureAwait(false);
+        // The seat reservation already opened a transaction when this is called
+        // from acceptance, and the two belong in the same one: the seat count, the
+        // invitation's ending and the membership are a single fact. Joining it
+        // rather than nesting keeps them that way -- and when nobody opened one,
+        // this owns its own exactly as before.
+        IDbContextTransaction? ambient = _context.Database.CurrentTransaction;
+
+        IDbContextTransaction? transaction = ambient is null
+            ? await _context.Database.BeginTransactionAsync(cancellationToken)
+                .ConfigureAwait(false)
+            : null;
 
         // The invitation is concluded first, with the pending state as part of the
         // predicate. Whichever transaction gets there first moves it out of
@@ -160,7 +168,15 @@ internal sealed class TenantInvitationRepository(OmniAiDbContext context)
 
         if (concluded == 0)
         {
-            await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
+            // Nothing was written, so there is nothing to undo. When this owns the
+            // transaction it ends here; when it joined one, the caller decides --
+            // and the caller is the seat reservation, which will not commit a
+            // membership it never created.
+            if (transaction is not null)
+            {
+                await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
+                await transaction.DisposeAsync().ConfigureAwait(false);
+            }
 
             return false;
         }
@@ -186,13 +202,23 @@ internal sealed class TenantInvitationRepository(OmniAiDbContext context)
             // The membership or an assignment could not be written -- a duplicate
             // membership, or a role that has gone. Nothing is left behind: the
             // acceptance rolls back with it, so the invitation stays usable rather
-            // than being marked used by somebody who never got in.
-            await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
+            // than being marked used by somebody who never got in. An ambient
+            // transaction is rolled back by whoever owns it, which is what the
+            // rethrow triggers.
+            if (transaction is not null)
+            {
+                await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
+                await transaction.DisposeAsync().ConfigureAwait(false);
+            }
 
             throw;
         }
 
-        await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+        if (transaction is not null)
+        {
+            await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+            await transaction.DisposeAsync().ConfigureAwait(false);
+        }
 
         return true;
     }

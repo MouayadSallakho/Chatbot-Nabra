@@ -4,6 +4,8 @@ using OmniAI.Application.Concurrency;
 using OmniAI.Application.Invitations.Persistence;
 using OmniAI.Application.Tenants;
 using OmniAI.Domain;
+using OmniAI.Application.Plans;
+using OmniAI.Domain.Plans;
 using OmniAI.Domain.Authorization;
 using OmniAI.Domain.Invitations;
 using OmniAI.Domain.Tenants;
@@ -54,6 +56,7 @@ public sealed record IssuedInvitation(
 /// </para>
 /// </remarks>
 public sealed class CreateTenantInvitationHandler(
+    IWorkspaceEntitlementService entitlements,
     ITenantInvitationRepository invitations,
     ITenantRoleRepository roles,
     TenantAuthorizer authorizer,
@@ -61,6 +64,9 @@ public sealed class CreateTenantInvitationHandler(
     InvitationPolicy policy,
     TimeProvider clock)
 {
+    private readonly IWorkspaceEntitlementService _entitlements =
+        entitlements ?? throw new ArgumentNullException(nameof(entitlements));
+
     private readonly ITenantInvitationRepository _invitations =
         invitations ?? throw new ArgumentNullException(nameof(invitations));
 
@@ -148,6 +154,30 @@ public sealed class CreateTenantInvitationHandler(
         if (beyond is not null)
         {
             throw PermissionDeniedException.ForPermission(beyond.Value);
+        }
+
+        // A courtesy, not the guard. Sending an invitation to a workspace that is
+        // already full produces something nobody can use, so it is refused here --
+        // but the seat is not taken until somebody accepts, and acceptance is
+        // where the limit is actually enforced. Several invitations may therefore
+        // be outstanding against one free seat, and only the first acceptance
+        // gets it.
+        //
+        // A pending invitation deliberately does not consume a seat. If it did, an
+        // administrator could lock their own team out by inviting people who never
+        // arrive, and revoking would be the only way back.
+        WorkspaceEntitlements plan = await _entitlements
+            .DescribeAsync(tenantId, cancellationToken)
+            .ConfigureAwait(false);
+
+        WorkspaceEntitlementView? seats = plan.Find(EntitlementKind.Members);
+
+        if (seats is not null && seats.State == EntitlementState.Exhausted)
+        {
+            throw EntitlementExceededException.For(
+                EntitlementKind.Members,
+                seats.Used,
+                seats.Limit ?? 0);
         }
 
         DateTimeOffset now = _clock.GetUtcNow();

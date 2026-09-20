@@ -62,6 +62,16 @@ export interface ApiError {
   readonly retryAfterSeconds?: number;
 
   /**
+   * The server's stable, machine-readable code for this refusal.
+   *
+   * Present only where the backend publishes one — a plan limit sends
+   * `entitlement.<kind>.exhausted`. A screen branches on this rather than on the
+   * sentence, which is free to be reworded or translated without breaking
+   * anything.
+   */
+  readonly code?: string;
+
+  /**
    * A sentence safe to show a reader.
    *
    * For the kinds where the backend authors genuine guidance -- a rejected
@@ -160,6 +170,7 @@ export function toApiError(failure: unknown): ApiError {
 
   return {
     kind,
+    code: problemCode(failure),
     status: failure.status,
     retryAfterSeconds: readRetryAfter(failure),
     message: readableMessage(failure, kind),
@@ -280,4 +291,23 @@ function readableMessage(failure: HttpErrorResponse, kind: ApiErrorKind): string
   }
 
   return MESSAGES[kind];
+}
+
+/**
+ * The stable code from a Problem Details body, when the server sent one.
+ *
+ * Only a string `code` at the top level is read. Anything else is ignored, so a
+ * malformed or hostile body cannot put arbitrary values into a screen's control
+ * flow.
+ */
+function problemCode(failure: HttpErrorResponse): string | undefined {
+  const body: unknown = failure.error;
+
+  if (typeof body !== 'object' || body === null || !('code' in body)) {
+    return undefined;
+  }
+
+  const code = (body as { code?: unknown }).code;
+
+  return typeof code === 'string' && code.length > 0 ? code : undefined;
 }

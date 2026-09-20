@@ -79,6 +79,7 @@ Eighteen areas have their own documents:
 - [knowledge-file-ingestion.md](knowledge-file-ingestion.md) - uploading business files into Knowledge: what a file is allowed to be, how its text is read within bounds, and why the file itself is never kept
 - [embeddable-web-chat-widget.md](embeddable-web-chat-widget.md) - the loader, the cross-origin iframe, origin allowlisting, the wall between the hosted and embedded transports, and the Development opt-in that keeps an inherited `OPENAI_API_KEY` from spending money
 - [provider-usage-cost-accounting.md](provider-usage-cost-accounting.md) - what a call to an AI provider cost: provider-reported usage only, explicit tenant attribution, durable records written before the money is spent, decimal costs from configured rates, and why none of it is billing
+- [workspace-plans-entitlements-quotas.md](workspace-plans-entitlements-quotas.md) - what a workspace may hold and consume: why a permission is not an entitlement, plans as platform configuration, unlimited as an absence rather than a sentinel, race-safe reservation in PostgreSQL, the monthly provider-operation quota, and why none of it is billing
 
 ---
 

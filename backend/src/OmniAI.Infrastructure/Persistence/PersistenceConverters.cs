@@ -231,6 +231,18 @@ internal static class PersistenceConverters
     public static readonly ValueConverter<AgentInstructions, string> AgentInstructions =
         new(instructions => instructions.Value, value => Domain.AiAgents.AgentInstructions.Create(value));
 
+    /// <summary>The identity of one platform plan.</summary>
+    public static readonly ValueConverter<Domain.Plans.PlanId, Guid> PlanId =
+        new(id => id.Value, value => Domain.Plans.PlanId.From(value));
+
+    /// <summary>A plan's stable code.</summary>
+    public static readonly ValueConverter<Domain.Plans.PlanCode, string> PlanCode =
+        new(code => code.Value, value => Domain.Plans.PlanCode.Create(value));
+
+    /// <summary>A plan's display name.</summary>
+    public static readonly ValueConverter<Domain.Plans.PlanDisplayName, string> PlanDisplayName =
+        new(name => name.Value, value => Domain.Plans.PlanDisplayName.Create(value));
+
     /// <summary>The identity of one accounted provider operation.</summary>
     public static readonly ValueConverter<Domain.Ai.AiProviderUsageId, Guid> AiProviderUsageId =
         new(id => id.Value, value => Domain.Ai.AiProviderUsageId.From(value));

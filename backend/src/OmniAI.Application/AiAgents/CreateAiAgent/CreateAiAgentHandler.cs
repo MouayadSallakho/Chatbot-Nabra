@@ -3,6 +3,8 @@ using OmniAI.Application.Authorization;
 using OmniAI.Application.Concurrency;
 using OmniAI.Application.Tenants.Persistence;
 using OmniAI.Application.Tenants;
+using OmniAI.Application.Plans;
+using OmniAI.Domain.Plans;
 using OmniAI.Domain.AiAgents;
 using OmniAI.Domain.Authorization;
 using OmniAI.Domain.Tenants;
@@ -20,11 +22,15 @@ namespace OmniAI.Application.AiAgents.CreateAiAgent;
 /// readable in one hop.
 /// </remarks>
 public sealed class CreateAiAgentHandler(
+    IWorkspaceEntitlementService entitlements,
     ITenantRepository tenants,
     IAiAgentRepository agents,
     TenantAuthorizer authorizer,
     TimeProvider clock)
 {
+    private readonly IWorkspaceEntitlementService _entitlements =
+        entitlements ?? throw new ArgumentNullException(nameof(entitlements));
+
     private readonly ITenantRepository _tenants =
         tenants ?? throw new ArgumentNullException(nameof(tenants));
 
@@ -91,17 +97,37 @@ public sealed class CreateAiAgentHandler(
             throw TenantNotFoundException.ForId(tenantId.Value);
         }
 
-        // Identity, initial status and the update mark come from the aggregate.
-        // The use case supplies only the instant, and does not read the clock
-        // itself: TimeProvider is injected so the same code is deterministic
-        // under test and correct in production.
-        AiAgent agent = AiAgent.Create(tenantId, name, instructions, _clock.GetUtcNow());
 
-        // The version the stored agent now has. Returned so the caller can make a
-        // conditional write immediately, without reading the agent back first.
-        ConcurrencyToken version =
-            await _agents.AddAsync(agent, cancellationToken).ConfigureAwait(false);
+        // Permission said this person may create one; the plan says whether the
+        // workspace may hold another. Two different questions, asked in that
+        // order, and neither answers the other -- a member with the permission is
+        // still refused when the workspace is full, and no amount of role editing
+        // changes that.
+        //
+        // The count and the insert happen together under a workspace-scoped
+        // database lock, so two requests arriving at the last free slot cannot
+        // both pass the count.
+        return await _entitlements.ReserveAsync(
+            tenantId,
+            EntitlementKind.AiAgents,
+            async token =>
+            {
+                // Identity, initial status and the update mark come from the
+                // aggregate. The use case supplies only the instant, and does not
+                // read the clock itself: TimeProvider is injected so the same code
+                // is deterministic under test and correct in production.
+                AiAgent agent =
+                    AiAgent.Create(tenantId, name, instructions, _clock.GetUtcNow());
 
-        return new Versioned<AiAgentView>(AiAgentView.From(agent), version);
+                // The version the stored agent now has. Returned so the caller can
+                // make a conditional write immediately, without reading the agent
+                // back first.
+                ConcurrencyToken version =
+                    await _agents.AddAsync(agent, token).ConfigureAwait(false);
+
+                return new Versioned<AiAgentView>(AiAgentView.From(agent), version);
+            },
+            cancellationToken)
+            .ConfigureAwait(false);
     }
 }

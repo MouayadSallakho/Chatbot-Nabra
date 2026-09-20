@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Npgsql;
+using OmniAI.Domain.Plans;
+using OmniAI.Domain.Tenants;
 using OmniAI.Infrastructure.Persistence;
 
 namespace OmniAI.Testing;
@@ -93,6 +95,9 @@ public sealed class PostgresTestDatabase : IAsyncLifetime
             new DbContextOptionsBuilder<OmniAiDbContext>()
                 .UseNpgsql(ConnectionString);
 
+        // Every workspace gets a plan, exactly as onboarding gives it one.
+        builder.AddInterceptors(new AssignsLegacyPlanInterceptor());
+
         if (interceptors.Length > 0)
         {
             builder.AddInterceptors(interceptors);
@@ -118,5 +123,91 @@ public sealed class PostgresTestDatabase : IAsyncLifetime
 
         await using NpgsqlCommand command = new(sql, connection);
         await command.ExecuteNonQueryAsync();
+    }
+}
+
+/// <summary>
+/// Gives every workspace a plan the moment one is inserted.
+/// </summary>
+/// <remarks>
+/// <para>
+/// <strong>This makes fixtures match production, not diverge from it.</strong> In
+/// the running application a workspace cannot exist without a plan: onboarding
+/// writes the assignment in the same transaction as the tenant, and the migration
+/// backfilled every workspace that predates plans. Fixtures that insert a
+/// <c>Tenant</c> aggregate directly bypass onboarding, so without this they would
+/// produce something the application never produces — a workspace with no
+/// entitlements at all.
+/// </para>
+/// <para>
+/// <strong>It does not soften any rule under test.</strong> The plan assigned is
+/// the unlimited legacy one, so entitlements are not what these suites are
+/// measuring; the suites that <em>do</em> measure entitlements assign their own
+/// finite plan explicitly and overwrite this one. And the service's refusal to
+/// treat a missing assignment as unlimited stays fully exercised — its own tests
+/// delete the assignment and assert the refusal.
+/// </para>
+/// </remarks>
+public sealed class AssignsLegacyPlanInterceptor : SaveChangesInterceptor
+{
+    public override ValueTask<InterceptionResult<int>> SavingChangesAsync(
+        DbContextEventData eventData,
+        InterceptionResult<int> result,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(eventData);
+
+        Assign(eventData.Context);
+
+        return base.SavingChangesAsync(eventData, result, cancellationToken);
+    }
+
+    public override InterceptionResult<int> SavingChanges(
+        DbContextEventData eventData,
+        InterceptionResult<int> result)
+    {
+        ArgumentNullException.ThrowIfNull(eventData);
+
+        Assign(eventData.Context);
+
+        return base.SavingChanges(eventData, result);
+    }
+
+    private static void Assign(DbContext? context)
+    {
+        if (context is not OmniAiDbContext database)
+        {
+            return;
+        }
+
+        List<Tenant> added =
+        [
+            .. database.ChangeTracker
+                .Entries<Tenant>()
+                .Where(entry => entry.State == EntityState.Added)
+                .Select(entry => entry.Entity),
+        ];
+
+        if (added.Count == 0)
+        {
+            return;
+        }
+
+        // A fixture that assigned its own plan in the same unit of work keeps it.
+        HashSet<TenantId> alreadyAssigned =
+        [
+            .. database.ChangeTracker
+                .Entries<WorkspacePlanAssignment>()
+                .Select(entry => entry.Entity.TenantId),
+        ];
+
+        foreach (Tenant tenant in added.Where(tenant => !alreadyAssigned.Contains(tenant.Id)))
+        {
+            database.WorkspacePlanAssignments.Add(
+                WorkspacePlanAssignment.Create(
+                    tenant.Id,
+                    SeededPlans.Legacy,
+                    DateTimeOffset.UtcNow));
+        }
     }
 }

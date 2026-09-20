@@ -1,7 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using OmniAI.Application.Ai.Usage;
+using OmniAI.Application.Plans;
 using OmniAI.Domain.Ai;
+using OmniAI.Domain.Plans;
 using OmniAI.Infrastructure.Persistence;
 
 namespace OmniAI.Infrastructure.Ai.Usage;
@@ -16,6 +18,14 @@ namespace OmniAI.Infrastructure.Ai.Usage;
 /// independently of it: an accounting record that rolled back with a failed
 /// conversation write would leave spend unrecorded, which is the situation this
 /// whole design exists to prevent.
+/// </para>
+/// <para>
+/// <strong>Begin is also where the monthly provider quota is enforced.</strong>
+/// The count and the insert share one transaction and one workspace lock, so the
+/// last remaining operation in a month cannot be taken twice. An exhausted quota
+/// writes no row at all, which keeps the ledger's own meaning intact: a row here
+/// is evidence that a request reached the paid-dispatch boundary, and a refused
+/// request never did.
 /// </para>
 /// <para>
 /// <strong>Every settle is idempotent, and the aggregate is what makes it so.</strong>
@@ -78,12 +88,34 @@ internal sealed class AiProviderUsageLedger(
 
         OmniAiDbContext database = scope.ServiceProvider.GetRequiredService<OmniAiDbContext>();
 
-        database.AiProviderUsages.Add(operation);
+        IWorkspaceEntitlementService entitlements =
+            scope.ServiceProvider.GetRequiredService<IWorkspaceEntitlementService>();
 
-        // Committed here, before the caller dispatches. If this throws, the
-        // caller must not call the provider -- and it does not, because it lets
-        // the exception through.
-        await database.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        // The monthly quota is checked and the Started row is written inside one
+        // transaction, under the workspace's provider-operation lock. That
+        // ordering is the whole point: counting, releasing, and inserting later
+        // would let two requests at the last remaining operation both pass the
+        // count and both reach the provider.
+        //
+        // Phase 23's rule is unchanged and now has a sibling. If the row cannot be
+        // committed, the caller must not call the provider -- and if the quota is
+        // exhausted, no row is written and the caller must not call the provider
+        // either. Both failures leave this method by throwing, and the adapters
+        // let the exception through without dispatching.
+        await entitlements
+            .ReserveAsync(
+                context.TenantId,
+                EntitlementKind.MonthlyProviderOperations,
+                async token =>
+                {
+                    database.AiProviderUsages.Add(operation);
+
+                    await database.SaveChangesAsync(token).ConfigureAwait(false);
+
+                    return operation.Id;
+                },
+                cancellationToken)
+            .ConfigureAwait(false);
 
         return operation.Id;
     }

@@ -3,6 +3,7 @@ using OmniAI.Application.Authorization;
 using OmniAI.Application.Concurrency;
 using OmniAI.Domain;
 using OmniAI.Domain.Authorization;
+using OmniAI.Domain.Plans;
 using OmniAI.Domain.Tenants;
 using OmniAI.Domain.Users;
 using OmniAI.Infrastructure.Persistence;
@@ -432,6 +433,7 @@ public sealed class TenantRoleRepositoryTests(PostgresTestDatabase database)
             TenantName.Create("Acme Corporation"),
             TenantSlug.Create($"t{Guid.NewGuid():N}"[..20]),
             await TestIdentity.SeedUserAsync(database),
+            SeededPlans.Legacy,
             Created);
 
         await using OmniAiDbContext context = database.CreateContext();

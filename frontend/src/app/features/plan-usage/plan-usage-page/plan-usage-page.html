@@ -1,0 +1,206 @@
+<div class="page">
+  <app-page-header
+    heading="Plan &amp; usage"
+    description="What this workspace's plan allows, and how much of it is in use. Every figure is counted from what the workspace actually holds."
+  >
+    @if (canView()) {
+      <button
+        pageActions
+        type="button"
+        class="btn btn-secondary"
+        (click)="refresh()"
+        [disabled]="refreshing()"
+        data-testid="refresh"
+      >
+        @if (refreshing()) {
+          <span class="spinner" aria-hidden="true"></span>
+        }
+        <span class="btn-label">{{ refreshing() ? 'Refreshing…' : 'Refresh' }}</span>
+      </button>
+    }
+  </app-page-header>
+
+  <div class="page-section">
+    @if (!canView()) {
+      <!--
+        The same permission as the rest of analytics, and the same honest
+        refusal: what is true and what to do, with no status code and no
+        permission name.
+      -->
+      <div class="card">
+        <app-empty-state
+          icon="analytics"
+          heading="You do not have access to plan and usage"
+          description="Seeing what this workspace's plan allows needs a permission your roles do not include. Ask somebody who administers this workspace if you need it."
+        />
+      </div>
+    } @else if (loading()) {
+      <div class="card" aria-busy="true">
+        <p class="text-small text-secondary">Loading plan and usage…</p>
+      </div>
+    } @else if (failure(); as error) {
+      <div class="card">
+        <app-empty-state
+          icon="analytics"
+          heading="Plan and usage could not be loaded"
+          [description]="error.message"
+        >
+          <button stateActions type="button" class="btn btn-secondary" (click)="refresh()">
+            Try again
+          </button>
+        </app-empty-state>
+      </div>
+    } @else if (usage(); as plan) {
+      <!--
+        The plan itself. Its name, and nothing else about it: there is no price
+        in this platform, and a field implying one would be read as a promise.
+      -->
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">Current plan</h2>
+        </div>
+        <div class="card-body plan-header" data-testid="current-plan">
+          <p class="plan-name">{{ plan.planName }}</p>
+
+          <!--
+            Truthful, and deliberately not an Upgrade button. Nothing in this
+            platform can change a workspace's plan yet, and a button that opened
+            nothing would be worse than a sentence that says so.
+          -->
+          <p class="text-small text-muted" data-testid="no-plan-change">
+            Plan changes are not available from this workspace yet.
+          </p>
+        </div>
+      </div>
+
+      <!-- Resource usage. -->
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">Resource usage</h2>
+          <p class="text-small text-muted">
+            Counted from what this workspace holds right now. Disabling something does not free it —
+            only deleting it does.
+          </p>
+        </div>
+        <div class="card-body">
+          <ul class="usage-list" data-testid="resource-usage">
+            @for (row of resources(); track row.entitlement) {
+              <li class="usage-row" [attr.data-testid]="'usage-' + row.entitlement">
+                <div class="usage-heading">
+                  <h3 class="usage-label">{{ row.label }}</h3>
+
+                  <!--
+                    The numbers as words. A screen reader gets this; the bar
+                    below is decorative and hidden from it.
+                  -->
+                  <p class="usage-figure" [attr.data-testid]="'figure-' + row.entitlement">
+                    {{ row.figure }}
+                  </p>
+                </div>
+
+                @if (row.unlimited) {
+                  <!--
+                    No bar at all. A bar needs something to be a proportion of,
+                    and drawing one against nothing implies a limit off to the
+                    right that does not exist.
+                  -->
+                  <p class="text-small text-muted usage-unlimited">
+                    This plan does not limit {{ row.label.toLowerCase() }}.
+                  </p>
+                } @else {
+                  <span class="usage-bar" aria-hidden="true">
+                    <span
+                      class="usage-fill"
+                      [class.usage-fill-warning]="row.state === 'Warning'"
+                      [class.usage-fill-critical]="row.state === 'Critical'"
+                      [class.usage-fill-exhausted]="row.state === 'Exhausted'"
+                      [style.width.%]="row.percentUsed ?? 0"
+                    ></span>
+                  </span>
+
+                  <p class="text-small text-muted">
+                    {{ row.percentUsed }}% used.
+                    <!--
+                      The state in words beside the colour, never colour alone.
+                    -->
+                    @if (row.note) {
+                      <strong
+                        class="usage-note"
+                        [class.usage-note-critical]="row.state !== 'Warning'"
+                        [attr.data-testid]="'note-' + row.entitlement"
+                        >{{ row.note }}.</strong
+                      >
+                    }
+                  </p>
+                }
+
+                <p class="text-small text-secondary usage-description">{{ row.description }}</p>
+              </li>
+            }
+          </ul>
+        </div>
+      </div>
+
+      <!-- The monthly AI allowance, which is the only one measured over a period. -->
+      @if (monthly(); as ai) {
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">AI provider operations</h2>
+            <p class="text-small text-muted">
+              One operation is one call this workspace made to an AI provider. Measured over UTC
+              calendar months, not a rolling window.
+            </p>
+          </div>
+          <div class="card-body" data-testid="monthly-usage">
+            <p class="usage-figure usage-figure-large" data-testid="figure-monthly">
+              {{ ai.figure }}
+            </p>
+
+            @if (ai.period) {
+              <p class="text-small text-muted" data-testid="monthly-period">
+                {{ monthLabel(ai.period) }}
+              </p>
+            }
+
+            @if (ai.unlimited) {
+              <p class="text-small text-muted">This plan does not limit AI provider operations.</p>
+            } @else {
+              <span class="usage-bar" aria-hidden="true">
+                <span
+                  class="usage-fill"
+                  [class.usage-fill-warning]="ai.state === 'Warning'"
+                  [class.usage-fill-critical]="ai.state === 'Critical'"
+                  [class.usage-fill-exhausted]="ai.state === 'Exhausted'"
+                  [style.width.%]="ai.percentUsed ?? 0"
+                ></span>
+              </span>
+
+              <p class="text-small text-muted">
+                {{ ai.percentUsed }}% used.
+                @if (ai.note) {
+                  <strong
+                    class="usage-note"
+                    [class.usage-note-critical]="ai.state !== 'Warning'"
+                    data-testid="note-monthly"
+                    >{{ ai.note }}.</strong
+                  >
+                }
+              </p>
+
+              @if (ai.state === 'Exhausted') {
+                <p
+                  class="text-small usage-note usage-note-critical"
+                  data-testid="monthly-exhausted"
+                >
+                  This workspace has reached its monthly AI operation limit. AI replies, knowledge
+                  indexing and agent previews will not run until the next UTC month. Conversations
+                  handled by a person are unaffected.
+                </p>
+              }
+            }
+          </div>
+        </div>
+      }
+    }
+  </div>
+</div>

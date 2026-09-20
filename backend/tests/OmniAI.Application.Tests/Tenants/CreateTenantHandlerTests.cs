@@ -195,13 +195,20 @@ public sealed class CreateTenantHandlerTests
     public void The_handler_requires_its_dependencies()
     {
         Assert.Throws<ArgumentNullException>(
-            () => new CreateTenantHandler(null!, Access(), TimeProvider.System));
+            () => new CreateTenantHandler(
+                null!, TestPlans.Resolver(), Access(), TimeProvider.System));
 
         Assert.Throws<ArgumentNullException>(
-            () => new CreateTenantHandler(new InMemoryTenantRepository(), null!, TimeProvider.System));
+            () => new CreateTenantHandler(
+                new InMemoryTenantRepository(), null!, Access(), TimeProvider.System));
 
         Assert.Throws<ArgumentNullException>(
-            () => new CreateTenantHandler(new InMemoryTenantRepository(), Access(), null!));
+            () => new CreateTenantHandler(
+                new InMemoryTenantRepository(), TestPlans.Resolver(), null!, TimeProvider.System));
+
+        Assert.Throws<ArgumentNullException>(
+            () => new CreateTenantHandler(
+                new InMemoryTenantRepository(), TestPlans.Resolver(), Access(), null!));
     }
 
     [Fact]
@@ -233,7 +240,7 @@ public sealed class CreateTenantHandlerTests
         InMemoryTenantRepository tenants = new();
 
         CreateTenantHandler handler =
-            new(tenants, Access(), new FixedTimeProvider(moment));
+            new(tenants, TestPlans.Resolver(), Access(), new FixedTimeProvider(moment));
 
         await handler.HandleAsync(new CreateTenantCommand("Acme", "acme"));
 
@@ -248,7 +255,7 @@ public sealed class CreateTenantHandlerTests
         InMemoryTenantRepository tenants = new();
 
         CreateTenantHandler handler =
-            new(tenants, TestAccess.Anonymous(), TimeProvider.System);
+            new(tenants, TestPlans.Resolver(), TestAccess.Anonymous(), TimeProvider.System);
 
         await Assert.ThrowsAsync<NotAuthenticatedException>(
             () => handler.HandleAsync(new CreateTenantCommand("Acme", "acme")));
@@ -265,6 +272,7 @@ public sealed class CreateTenantHandlerTests
         // signed in probe this platform's validation rules.
         CreateTenantHandler handler = new(
             new InMemoryTenantRepository(),
+            TestPlans.Resolver(),
             TestAccess.Anonymous(),
             TimeProvider.System);
 
@@ -315,7 +323,7 @@ public sealed class CreateTenantHandlerTests
 
     /// <summary>A handler for the signed-in creator, on the real system clock.</summary>
     private static CreateTenantHandler NewHandler(ITenantRepository tenants) =>
-        new(tenants, Access(), TimeProvider.System);
+        new(tenants, TestPlans.Resolver(), Access(), TimeProvider.System);
 
     /// <summary>A repository that respects the token it is handed.</summary>
     private sealed class CancellationObservingTenantRepository : ITenantRepository

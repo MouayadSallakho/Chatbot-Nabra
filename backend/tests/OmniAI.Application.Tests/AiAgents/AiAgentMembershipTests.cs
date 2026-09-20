@@ -101,6 +101,7 @@ public sealed class AiAgentMembershipTests
         Tenant tenant = Tenant.Create(TenantName.Create("Rival"), TenantSlug.Create("rival"));
 
         CreateAiAgentHandler handler = new(
+            new FakeEntitlements(),
             new InMemoryTenantRepository().Seed(tenant),
             new InMemoryAiAgentRepository(),
             Outsider(),
@@ -118,6 +119,7 @@ public sealed class AiAgentMembershipTests
         InMemoryAiAgentRepository agents = new();
 
         CreateAiAgentHandler handler = new(
+            new FakeEntitlements(),
             new InMemoryTenantRepository().Seed(tenant),
             agents,
             Outsider(),
@@ -247,6 +249,7 @@ public sealed class AiAgentMembershipTests
                 .HandleAsync(new ListAiAgentsQuery(tenantId.Value)),
 
             () => new CreateAiAgentHandler(
+            new FakeEntitlements(),
                     new InMemoryTenantRepository(), agents, anonymous, Clock())
                 .HandleAsync(new CreateAiAgentCommand(tenantId.Value, "Nobody", "Nothing.")),
 

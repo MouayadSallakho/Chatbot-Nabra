@@ -1,6 +1,8 @@
 using System.Globalization;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
+using OmniAI.Api.Plans;
+using OmniAI.Application.Plans;
 using OmniAI.Application.Ai;
 using OmniAI.Application.AiAgents.ListAiAgents;
 using OmniAI.Application.AiAgents;
@@ -89,17 +91,58 @@ internal sealed partial class DomainProblemDetailsHandler(
                 .ToString(CultureInfo.InvariantCulture);
         }
 
+        ProblemDetails problem = new()
+        {
+            Status = status,
+            Title = title,
+            Detail = detail,
+        };
+
+        Describe(problem, exception);
+
         return await problemDetails.TryWriteAsync(new ProblemDetailsContext
         {
             HttpContext = httpContext,
             Exception = exception,
-            ProblemDetails = new ProblemDetails
-            {
-                Status = status,
-                Title = title,
-                Detail = detail,
-            },
+            ProblemDetails = problem,
         }).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Adds the machine-readable half of a refusal.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <strong>A client must not have to read English to know what happened.</strong>
+    /// The detail sentence is for a person; <c>code</c> is for the browser, and it
+    /// is stable across wording changes and translations. A frontend that matched
+    /// on "has reached its plan limit" would break the first time somebody
+    /// improved the sentence.
+    /// </para>
+    /// <para>
+    /// <strong>Only safe fields.</strong> The entitlement, the count, the cap and
+    /// — where it applies — the month. No price, no plan to upgrade to, no payment
+    /// link and no secret, because none of those exist and a field implying they
+    /// do would be read as a promise.
+    /// </para>
+    /// </remarks>
+    private static void Describe(ProblemDetails problem, Exception exception)
+    {
+        if (exception is not EntitlementExceededException entitlement)
+        {
+            return;
+        }
+
+        problem.Extensions["code"] = entitlement.Code;
+        problem.Extensions["entitlement"] = PlanUsageResponse.Name(entitlement.Kind);
+        problem.Extensions["current"] = entitlement.Current;
+        problem.Extensions["limit"] = entitlement.Limit;
+
+        if (entitlement.Period is not null)
+        {
+            problem.Extensions["periodFrom"] = entitlement.Period.From;
+            problem.Extensions["periodTo"] = entitlement.Period.To;
+        }
     }
 
     /// <summary>
@@ -235,6 +278,37 @@ internal sealed partial class DomainProblemDetailsHandler(
             StatusCodes.Status409Conflict,
             "Operation not allowed in the current state",
             state.Message),
+
+        // The workspace is already holding as many of something as its plan
+        // allows. 409, and deliberately none of the alternatives: it is not 401
+        // or 403, because the caller is authenticated and permitted; not 429,
+        // because slowing down and retrying will not help; and not 402, because
+        // nothing in this platform takes payment and telling somebody otherwise
+        // would send them looking for a screen that does not exist.
+        //
+        // The machine-readable half travels in the extensions; see Describe.
+        EntitlementExceededException entitlement => (
+            StatusCodes.Status409Conflict,
+            "Plan limit reached",
+            entitlement.Message),
+
+        // A workspace with no plan at all. Onboarding assigns one atomically and
+        // the migration backfilled the rest, so this means a bug rather than a
+        // choice -- and it is refused rather than guessed at, because the
+        // convenient guess ("unlimited") is the one nobody would ever notice.
+        WorkspacePlanMissingException => (
+            StatusCodes.Status500InternalServerError,
+            "This workspace is not fully set up",
+            "This workspace has no plan assigned. Nothing was changed."),
+
+        // The deployment cannot say which plan a new workspace belongs on. A
+        // configuration fault, not the caller's: they are told plainly that
+        // workspace creation is unavailable rather than being handed a workspace
+        // with no limits.
+        DefaultPlanUnavailableException => (
+            StatusCodes.Status503ServiceUnavailable,
+            "Workspaces cannot be created right now",
+            "This deployment is not configured with a plan for new workspaces."),
 
         // A route naming a tenant that does not exist.
         TenantNotFoundException missingTenant => (

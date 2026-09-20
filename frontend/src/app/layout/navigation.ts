@@ -115,6 +115,16 @@ export const NAV_ITEMS: readonly NavItem[] = [
     permissions: ['analytics.view'],
   },
   {
+    // Beside Analytics, behind the same permission. It answers a different
+    // question -- what this workspace may hold, rather than what it did -- and
+    // there is nothing to configure here, so one read permission is enough.
+    label: 'Plan & usage',
+    path: 'plan-usage',
+    icon: 'analytics',
+    implemented: true,
+    permissions: ['analytics.view'],
+  },
+  {
     // This replaces the Phase 10 "Settings" placeholder rather than nesting
     // inside it. There are no other settings yet, so a Settings hub would be a
     // page with one link on it -- a dead step that exists only to be completed.

@@ -7,6 +7,8 @@ using OmniAI.Domain.Authorization;
 using OmniAI.Domain.Tenants;
 using OmniAI.Domain.WebChat;
 
+using OmniAI.Application.Plans;
+using OmniAI.Domain.Plans;
 namespace OmniAI.Application.WebChat.CreateWebChatEndpoint;
 
 /// <summary>Publish a chat link for one of the workspace's agents.</summary>
@@ -24,12 +26,16 @@ public sealed record CreateWebChatEndpointCommand(Guid TenantId, Guid AiAgentId)
 /// operation with its own permission check and its own precondition.
 /// </remarks>
 public sealed class CreateWebChatEndpointHandler(
+    IWorkspaceEntitlementService entitlements,
     IWebChatEndpointRepository endpoints,
     IAiAgentRepository agents,
     IWebChatPublicKeys publicKeys,
     TenantAuthorizer authorizer,
     TimeProvider clock)
 {
+    private readonly IWorkspaceEntitlementService _entitlements =
+        entitlements ?? throw new ArgumentNullException(nameof(entitlements));
+
     private readonly IWebChatEndpointRepository _endpoints =
         endpoints ?? throw new ArgumentNullException(nameof(endpoints));
 
@@ -98,12 +104,30 @@ public sealed class CreateWebChatEndpointHandler(
             _publicKeys.Create(),
             _clock.GetUtcNow());
 
-        ConcurrencyToken version = await _endpoints
-            .AddAsync(endpoint, cancellationToken)
-            .ConfigureAwait(false);
+        // Permission said this person may create one; the plan says whether the
+        // workspace may hold another. Two questions, asked in that order, and
+        // neither answers the other. The count and the insert happen together
+        // under a workspace-scoped database lock, so two requests arriving at the
+        // last free slot cannot both pass the count.
+        //
+        // Every endpoint counts, whatever its status. A disabled endpoint is
+        // still a configured channel the workspace owns, and treating Disabled as
+        // a free slot would let a workspace hold any number of them by turning
+        // them off.
+        return await _entitlements.ReserveAsync(
+            tenantId,
+            EntitlementKind.WebChatEndpoints,
+            async token =>
+            {
+                ConcurrencyToken version = await _endpoints
+                    .AddAsync(endpoint, token)
+                    .ConfigureAwait(false);
 
-        return new Versioned<WebChatEndpointView>(
-            WebChatEndpointView.From(endpoint, agent.Value.Name.Value, agent.Value.Status),
-            version);
+                return new Versioned<WebChatEndpointView>(
+                    WebChatEndpointView.From(endpoint, agent.Value.Name.Value, agent.Value.Status),
+                    version);
+            },
+            cancellationToken)
+            .ConfigureAwait(false);
     }
 }

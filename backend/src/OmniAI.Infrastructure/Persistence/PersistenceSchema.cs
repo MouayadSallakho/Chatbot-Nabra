@@ -138,5 +138,11 @@ internal static class PersistenceSchema
     /// Accounting, not billing: what this platform paid a provider, never what a
     /// customer is charged. It holds no content of any kind.
     /// </remarks>
+    /// <summary>The platform's plans. Not tenant-scoped.</summary>
+    public const string PlansTable = "plans";
+
+    /// <summary>Which plan each workspace is on. One row per workspace.</summary>
+    public const string WorkspacePlanAssignmentsTable = "workspace_plan_assignments";
+
     public const string AiProviderUsagesTable = "ai_provider_usages";
 }
