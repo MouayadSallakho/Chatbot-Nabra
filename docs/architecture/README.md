@@ -82,6 +82,10 @@ Eighteen areas have their own documents:
 - [workspace-plans-entitlements-quotas.md](workspace-plans-entitlements-quotas.md) - what a workspace may hold and consume: why a permission is not an entitlement, plans as platform configuration, unlimited as an absence rather than a sentinel, race-safe reservation in PostgreSQL, the monthly provider-operation quota, and why none of it is billing
 - [saas-subscription-billing.md](saas-subscription-billing.md) - what a workspace pays and what that grants: why Stripe is not the entitlement engine, plan versus offer versus subscription, money as minor units, hosted checkout with no card ever reaching this platform, raw-body webhook verification into a payload-free durable inbox, snapshot-driven state so ordering cannot matter, a finite fallback plan, and non-destructive downgrade
 
+Operational procedures live in [../operations/](../operations/):
+
+- [meta-whatsapp-real-validation-runbook.md](../operations/meta-whatsapp-real-validation-runbook.md) - preparing for, running and cleaning up after a real Meta / WhatsApp validation: the actual configuration names, the single webhook callback route, the Development live-Meta safeguard, the temporary-tunnel rules, the credential-handling rules, the local preflight, and the Phase 26B sequence that has not been run
+
 ---
 
 ## 1. Clean Architecture with an enforced inward dependency direction

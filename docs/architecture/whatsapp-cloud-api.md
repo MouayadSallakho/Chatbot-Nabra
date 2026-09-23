@@ -235,6 +235,46 @@ while messages are arriving would reroute a conversation mid-sentence.
 | `WhatsApp:GraphApiVersion` | setting | default `v26.0` |
 | `WhatsApp:Timeout` | setting | default 30s, finite |
 | `WhatsApp:Workers:*` | setting | poll interval, batch size, attempts, claim timeout |
+| `OMNIAI_LIVE_META` | Development opt-in, env | added in Phase 26A; see below |
+
+There is no default for any of the three secrets. A deployment missing the app
+secret or the verify token composes an authenticator that refuses every webhook
+request, and one missing either half of the pair is treated as unconfigured
+rather than as partly working.
+
+## The Development live-Meta safeguard
+
+Added in Phase 26A, after the channel was built and before it was ever pointed at
+Meta.
+
+**Decision.** In **Development**, a `WhatsApp:GraphBaseAddress` that is not on
+loopback does not on its own compose the Meta transport. `OMNIAI_LIVE_META` must
+also be exactly `1`. Without it the container composes a sender that refuses
+every message in-process: no HTTP request, no credential on a socket, and a
+delivery that settles as failed with a sentence naming the variable.
+
+**Why.** The OpenAI guard exists because a key was inherited from a shell once
+and spent money. The same accident on this channel puts words into a real
+person's WhatsApp, which cannot be unsent.
+
+**Loopback is the test, not the hostname.** Asking "is this Meta?" would leave
+every typo, regional alias and proxy on the permitted side. Asking "is this on my
+machine?" is the safe way round, at the cost of one deliberate inconvenience: a
+non-loopback stub needs the opt-in too.
+
+**Refused, not unknown.** A send that never left the process definitively did not
+arrive. Calling it ambiguous would leave a durable row nobody can settle, and the
+guard must not make stored state less truthful than a real refusal would.
+
+**Forbids.** Requiring the opt-in outside Development — a deployment that has
+deliberately configured the channel must not go silent because somebody forgot a
+flag. Relaxing webhook signature verification for any reason: that is a security
+control, and this is not.
+
+**Related.** The operator procedure for a real Meta validation, including the
+configuration contract, the callback URL, the tunnel rules and the credential
+handling, is in
+[operations/meta-whatsapp-real-validation-runbook.md](../operations/meta-whatsapp-real-validation-runbook.md).
 
 ## Out of scope for this phase
 

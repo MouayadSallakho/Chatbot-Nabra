@@ -130,7 +130,16 @@ internal static class CompositionRoot
 
         // The WhatsApp channel: storage, the Meta transport, webhook security
         // and the two background workers.
-        services.AddOmniAiWhatsApp(configuration);
+        //
+        // Development is passed for the same reason it is passed to the AI
+        // runtime below: a machine that has been pointed at a real provider once
+        // keeps that setting, and the accident here is worse than a bill -- it is
+        // a message in a real person's WhatsApp. Nothing outside Development
+        // requires the opt-in, so a configured deployment cannot be silenced by a
+        // forgotten flag.
+        services.AddOmniAiWhatsApp(
+            configuration,
+            requireLiveProviderOptIn: environment.IsDevelopment());
 
         // Subscriptions. Registered on every deployment, including one with no
         // provider keys: the billing screen must be able to say that nothing is

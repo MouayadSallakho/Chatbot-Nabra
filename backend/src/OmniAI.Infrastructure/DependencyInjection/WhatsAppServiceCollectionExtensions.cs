@@ -47,9 +47,27 @@ public static class WhatsAppServiceCollectionExtensions
     /// <param name="configuration">
     /// Where the non-secret settings and the two secret variables are read from.
     /// </param>
+    /// <param name="requireLiveProviderOptIn">
+    /// <para>
+    /// When <see langword="true"/>, a configuration pointing at a real provider
+    /// host does not on its own compose the Meta transport:
+    /// <see cref="WhatsAppTransportOptions.LiveProviderOptInVariable"/> must also
+    /// be exactly <see cref="WhatsAppTransportOptions.LiveProviderOptInValue"/>.
+    /// Without it, every send is refused in-process and no request is made.
+    /// </para>
+    /// <para>
+    /// <strong>The composition root passes Development here and nothing
+    /// else.</strong> A production deployment that has deliberately configured
+    /// the channel must not go silent because somebody forgot a second flag —
+    /// this is a guard for developer machines, not a security control for
+    /// deployments. Its security counterpart, the webhook authenticator, is
+    /// required everywhere and is not affected by this at all.
+    /// </para>
+    /// </param>
     public static IServiceCollection AddOmniAiWhatsApp(
         this IServiceCollection services,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        bool requireLiveProviderOptIn = false)
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configuration);
@@ -63,7 +81,14 @@ public static class WhatsAppServiceCollectionExtensions
         // the clock: the window is computed from the transcript on every call.
         services.AddSingleton<CustomerServiceWindow>();
 
-        AddTransport(services, configuration);
+        // The operator preflight. Registered rather than newed up at a call site
+        // so that it is composed from the same graph the running application has
+        // -- a readiness answer assembled from hand-built parts would be a
+        // readiness answer about something other than this deployment. It has no
+        // HTTP surface: see the type for why.
+        services.AddScoped<WhatsAppRealValidationPreflight>();
+
+        AddTransport(services, configuration, requireLiveProviderOptIn);
         AddWebhookSecurity(services, configuration);
         AddWorkers(services, configuration);
 
@@ -71,7 +96,10 @@ public static class WhatsAppServiceCollectionExtensions
     }
 
     /// <summary>The HTTP adapter, and the client it sends on.</summary>
-    private static void AddTransport(IServiceCollection services, IConfiguration configuration)
+    private static void AddTransport(
+        IServiceCollection services,
+        IConfiguration configuration,
+        bool requireLiveProviderOptIn)
     {
         WhatsAppTransportOptions options = new();
 
@@ -110,7 +138,30 @@ public static class WhatsAppServiceCollectionExtensions
         // turn one ambiguous send into several, and the customer would read the
         // same reply twice. Whether to try again is a decision that needs the
         // durable delivery row, and it is made by the caller.
-        services.AddScoped<IWhatsAppMessageSender, MetaWhatsAppMessageSender>();
+        //
+        // The client above is registered either way. Building it costs nothing at
+        // rest, and leaving it out of the guarded branch would mean the guarded
+        // and unguarded deployments differ in more than one place -- which is how
+        // a configuration error hides until the flag is finally set.
+        bool withheld = IsLiveSendingWithheld(configuration, options, requireLiveProviderOptIn);
+
+        if (withheld)
+        {
+            // Pointed at a real provider, in Development, with nobody having said
+            // so. Every send is refused in-process: no request, no credential on
+            // a wire, nothing arriving in a stranger's WhatsApp.
+            services.AddScoped<IWhatsAppMessageSender, LiveMetaDisabledMessageSender>();
+        }
+        else
+        {
+            services.AddScoped<IWhatsAppMessageSender, MetaWhatsAppMessageSender>();
+        }
+
+        // The preflight asks this rather than recomputing the rule, so that
+        // "sending is permitted" cannot drift away from what was actually
+        // composed a few lines above.
+        services.AddSingleton<IWhatsAppProviderReadiness>(
+            new MetaTransportReadiness(options, liveSendingAllowed: !withheld));
 
         // Reading the provider's envelope belongs on the same side of the
         // boundary as writing it. A singleton because it holds nothing: it is a
@@ -157,6 +208,40 @@ public static class WhatsAppServiceCollectionExtensions
 
         services.AddHostedService<InboundWhatsAppWorker>();
         services.AddHostedService<WhatsAppDeliveryWorker>();
+    }
+
+    /// <summary>
+    /// Whether this deployment may put a real request on the wire.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Three facts, and all three must hold before sending is withheld: the host
+    /// is guarded (Development), the address is not on this machine, and nobody
+    /// opted in. A loopback stub is unaffected, so the whole of local
+    /// verification -- signed webhooks, the inbox, handoff, delivery receipts --
+    /// keeps working without anybody setting anything.
+    /// </para>
+    /// <para>
+    /// The opt-in is read through <see cref="IConfiguration"/> rather than
+    /// <c>Environment.GetEnvironmentVariable</c>, exactly as the OpenAI one is, so
+    /// a test can prove every combination without mutating process-wide state
+    /// shared with every other test running in parallel.
+    /// </para>
+    /// </remarks>
+    private static bool IsLiveSendingWithheld(
+        IConfiguration configuration,
+        WhatsAppTransportOptions options,
+        bool requireLiveProviderOptIn)
+    {
+        if (!requireLiveProviderOptIn || !options.TargetsLiveProvider)
+        {
+            return false;
+        }
+
+        return !string.Equals(
+            configuration[WhatsAppTransportOptions.LiveProviderOptInVariable],
+            WhatsAppTransportOptions.LiveProviderOptInValue,
+            StringComparison.Ordinal);
     }
 
     /// <summary>
