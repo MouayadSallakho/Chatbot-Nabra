@@ -23,7 +23,7 @@ public sealed class RoleEndpointsTests(RoleApiFixture api) : IClassFixture<RoleA
     /// constant array allocated afresh on every call, and naming the set
     /// also says what the case is actually about.
     /// </remarks>
-    private static readonly string[] BillingManage = ["billing.manage"];
+    private static readonly string[] IntegrationsManage = ["integrations.manage"];
 
     /// <summary>A permission set these cases pass to the API.</summary>
     /// <remarks>
@@ -31,7 +31,7 @@ public sealed class RoleEndpointsTests(RoleApiFixture api) : IClassFixture<RoleA
     /// constant array allocated afresh on every call, and naming the set
     /// also says what the case is actually about.
     /// </remarks>
-    private static readonly string[] AiAgentsViewAndBillingManage = ["ai-agents.view", "billing.manage"];
+    private static readonly string[] AiAgentsViewAndIntegrationsManage = ["ai-agents.view", "integrations.manage"];
 
     /// <summary>A permission set these cases pass to the API.</summary>
     /// <remarks>
@@ -147,7 +147,7 @@ public sealed class RoleEndpointsTests(RoleApiFixture api) : IClassFixture<RoleA
 
         using HttpResponseMessage refused = await owner.PostAsJsonAsync(
             $"/api/tenants/{tenantId}/roles",
-            new { name = "Invented", permissions = BillingManage });
+            new { name = "Invented", permissions = IntegrationsManage });
 
         Assert.Equal(HttpStatusCode.BadRequest, refused.StatusCode);
     }
@@ -159,7 +159,7 @@ public sealed class RoleEndpointsTests(RoleApiFixture api) : IClassFixture<RoleA
 
         using HttpResponseMessage refused = await owner.PostAsJsonAsync(
             $"/api/tenants/{tenantId}/roles",
-            new { name = "Invented", permissions = AiAgentsViewAndBillingManage });
+            new { name = "Invented", permissions = AiAgentsViewAndIntegrationsManage });
 
         Assert.Equal(HttpStatusCode.BadRequest, refused.StatusCode);
 

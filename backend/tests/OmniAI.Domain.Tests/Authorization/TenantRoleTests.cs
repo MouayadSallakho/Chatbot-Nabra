@@ -145,7 +145,7 @@ public sealed class TenantRoleTests
         Assert.Throws<DomainValidationException>(() => TenantRole.CreateCustom(
             Workspace,
             TenantRoleName.Create("Invented"),
-            [PermissionCode.Create("billing.manage")],
+            [PermissionCode.Create("integrations.manage")],
             Created));
     }
 
@@ -181,7 +181,7 @@ public sealed class TenantRoleTests
             Created);
 
         Assert.Throws<DomainValidationException>(() => role.ReplacePermissions(
-            [PlatformPermissions.RolesView, PermissionCode.Create("billing.manage")],
+            [PlatformPermissions.RolesView, PermissionCode.Create("integrations.manage")],
             Later));
 
         Assert.Equal([PlatformPermissions.AiAgentsView], role.EffectivePermissions);

@@ -16,6 +16,16 @@ public interface IPlanCatalog
 {
     /// <summary>The plan with this code, or null when no such plan exists.</summary>
     Task<Plan?> FindByCodeAsync(PlanCode code, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// The plan with this identity, or null when no such plan exists.
+    /// </summary>
+    /// <remarks>
+    /// Needed wherever something already holds a plan id and wants its name — a
+    /// commercial offer, a subscription — rather than round-tripping through the
+    /// code a human would type.
+    /// </remarks>
+    Task<Plan?> FindByIdAsync(PlanId planId, CancellationToken cancellationToken = default);
 }
 
 /// <summary>

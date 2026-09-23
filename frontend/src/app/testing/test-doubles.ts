@@ -274,4 +274,18 @@ export const EVERY_PERMISSION: readonly PermissionDefinition[] = [
       'See how many conversations the workspace handled, how its channels and AI agents are ' +
       'being used, and how much activity happened each day.',
   },
+  {
+    code: 'billing.view',
+    group: 'Billing',
+    label: 'View billing',
+    description: "See what this workspace's subscription is, what it costs and when it renews.",
+  },
+  {
+    code: 'billing.manage',
+    group: 'Billing',
+    label: 'Manage billing',
+    description:
+      "Start a subscription and open the payment provider's portal to change payment " +
+      'details or cancel. Viewing billing does not grant this.',
+  },
 ];

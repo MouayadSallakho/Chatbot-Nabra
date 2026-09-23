@@ -5,6 +5,12 @@
     <!-- In-memory configuration, for proving both AI runtime registration branches. -->
     <PackageReference Include="Microsoft.Extensions.Configuration" />
     <PackageReference Include="xunit" />
+
+    <!--
+      Stripe's own library, used only to GENERATE the signatures these tests
+      verify. Nothing in this suite contacts Stripe.
+    -->
+    <PackageReference Include="Stripe.net" />
     <PackageReference Include="xunit.runner.visualstudio" />
     <PackageReference Include="coverlet.collector" />
   </ItemGroup>
@@ -27,6 +33,13 @@
     <Compile Include="..\Shared\FixedTimeProvider.cs" Link="FixedTimeProvider.cs" />
     <Compile Include="..\Shared\RecordingUsageLedger.cs" Link="RecordingUsageLedger.cs" />
     <Compile Include="..\Shared\FakeEntitlements.cs" Link="FakeEntitlements.cs" />
+
+    <!--
+      A payment provider that answers from memory, so that not one test in this
+      repository opens a socket to a payment company, holds a real key, or has a
+      card entered into it.
+    -->
+    <Compile Include="..\Shared\FakeBillingProvider.cs" Link="FakeBillingProvider.cs" />
   </ItemGroup>
 
   <ItemGroup>

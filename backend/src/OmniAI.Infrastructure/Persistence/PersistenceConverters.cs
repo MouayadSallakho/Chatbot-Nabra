@@ -313,4 +313,42 @@ internal static class PersistenceConverters
         new(
             profile => profile == null ? null : profile.Value,
             value => value == null ? null : Domain.Knowledge.EmbeddingProfileId.Create(value));
+
+    public static readonly ValueConverter<Domain.Billing.BillingOfferId, Guid> BillingOfferId =
+        new(id => id.Value, value => Domain.Billing.BillingOfferId.From(value));
+
+    public static readonly ValueConverter<Domain.Billing.WorkspaceSubscriptionId, Guid>
+        WorkspaceSubscriptionId =
+            new(id => id.Value, value => Domain.Billing.WorkspaceSubscriptionId.From(value));
+
+    public static readonly ValueConverter<Domain.Billing.BillingCheckoutIntentId, Guid>
+        BillingCheckoutIntentId =
+            new(id => id.Value, value => Domain.Billing.BillingCheckoutIntentId.From(value));
+
+    public static readonly ValueConverter<Domain.Billing.BillingEventId, Guid> BillingEventId =
+        new(id => id.Value, value => Domain.Billing.BillingEventId.From(value));
+
+    public static readonly ValueConverter<Domain.Billing.OfferCode, string> OfferCode =
+        new(code => code.Value, value => Domain.Billing.OfferCode.Create(value));
+
+    public static readonly ValueConverter<Domain.Billing.BillingCurrency, string> BillingCurrency =
+        new(currency => currency.Value, value => Domain.Billing.BillingCurrency.Create(value));
+
+    // Opaque on purpose. Whatever a provider calls its own records is its
+    // business; this platform stores the string it was handed and never parses
+    // meaning out of it.
+    public static readonly ValueConverter<Domain.Billing.ProviderReference, string>
+        ProviderReference =
+            new(
+                reference => reference.Value,
+                value => Domain.Billing.ProviderReference.Create(value));
+
+    // Null means "the provider has not told us yet" -- a subscription created
+    // before checkout completes has no provider id, and that is different from
+    // one whose id is blank.
+    public static readonly ValueConverter<Domain.Billing.ProviderReference?, string?>
+        NullableProviderReference =
+            new(
+                reference => reference == null ? null : reference.Value.Value,
+                value => Domain.Billing.ProviderReference.CreateOrNull(value));
 }

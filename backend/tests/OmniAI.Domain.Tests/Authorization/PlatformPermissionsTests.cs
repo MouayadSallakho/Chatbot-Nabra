@@ -60,7 +60,8 @@ public sealed class PlatformPermissionsTests
     {
         // Well-formed and plausible, and still refused. This is what stops a
         // caller inventing authority over a capability that does not exist.
-        Assert.False(PlatformPermissions.IsRecognised(PermissionCode.Create("billing.manage")));
+        Assert.False(
+            PlatformPermissions.IsRecognised(PermissionCode.Create("integrations.manage")));
         Assert.False(PlatformPermissions.IsRecognised(PermissionCode.Create("ai-agents.delete")));
     }
 
@@ -88,7 +89,13 @@ public sealed class PlatformPermissionsTests
         // operational records. It has exactly one code, because there is nothing
         // to configure: no analytics.manage exists, and none should until there
         // is something mutable for it to govern.
-        string[] unimplemented = ["billing", "integrations"];
+        //
+        // Billing left it in Phase 25, when subscriptions were built. Its two
+        // codes are its own rather than borrowed from analytics: what a workspace
+        // spends is a different kind of fact from how many conversations it
+        // handled, and the people trusted with one are not automatically the
+        // people trusted with the other.
+        string[] unimplemented = ["integrations"];
 
         Assert.All(PlatformPermissions.AllCodes, code =>
             Assert.DoesNotContain(
@@ -139,6 +146,8 @@ public sealed class PlatformPermissionsTests
                 "knowledge.view",
                 "knowledge.manage",
                 "analytics.view",
+                "billing.view",
+                "billing.manage",
             ],
             PlatformPermissions.AllCodes.Select(code => code.Value));
     }
@@ -174,6 +183,6 @@ public sealed class PlatformPermissionsTests
     [Fact]
     public void An_unrecognised_code_finds_nothing()
     {
-        Assert.Null(PlatformPermissions.Find(PermissionCode.Create("billing.manage")));
+        Assert.Null(PlatformPermissions.Find(PermissionCode.Create("integrations.manage")));
     }
 }

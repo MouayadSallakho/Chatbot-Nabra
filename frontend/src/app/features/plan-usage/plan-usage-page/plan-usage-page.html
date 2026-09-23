@@ -63,12 +63,18 @@
           <p class="plan-name">{{ plan.planName }}</p>
 
           <!--
-            Truthful, and deliberately not an Upgrade button. Nothing in this
-            platform can change a workspace's plan yet, and a button that opened
-            nothing would be worse than a sentence that says so.
+            Truthful again from Phase 25. A plan now changes by subscribing, so
+            this points at Billing rather than claiming nothing can change it --
+            a sentence that was true before billing existed and became a lie the
+            moment it did.
+
+            Still not an Upgrade button: this screen reports usage, and the
+            commercial decision belongs on the screen behind billing.view, which
+            not every reader of this page holds.
           -->
           <p class="text-small text-muted" data-testid="no-plan-change">
-            Plan changes are not available from this workspace yet.
+            A workspace's plan is set by its subscription. See Billing to change it, if you have
+            access to it.
           </p>
         </div>
       </div>

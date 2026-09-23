@@ -226,6 +226,21 @@ public static class PlatformPermissions
     /// </remarks>
     public static readonly PermissionCode AnalyticsView = PermissionCode.Create("analytics.view");
 
+    /// <summary>Read the workspace's subscription and what it could buy.</summary>
+    public static readonly PermissionCode BillingView = PermissionCode.Create("billing.view");
+
+    /// <summary>
+    /// Start a subscription and open the provider's billing portal.
+    /// </summary>
+    /// <remarks>
+    /// <strong>Commercial authority, and nothing more.</strong> It buys, it opens
+    /// the portal, and it widens nothing else: somebody holding it is still bound
+    /// by the delegation ceiling, still cannot grant themselves permissions, and
+    /// still meets every Phase 24 entitlement limit like anybody else. Spending
+    /// money is not administration.
+    /// </remarks>
+    public static readonly PermissionCode BillingManage = PermissionCode.Create("billing.manage");
+
     /// <summary>The workspace group's display name.</summary>
     public const string WorkspaceGroup = "Workspace";
 
@@ -248,6 +263,9 @@ public static class PlatformPermissions
 
     /// <summary>The analytics group's display name.</summary>
     public const string AnalyticsGroup = "Analytics";
+
+    /// <summary>Subscription and payment. Deliberately not part of Analytics.</summary>
+    public const string BillingGroup = "Billing";
 
     /// <summary>
     /// The catalogue, in the order it is published and rendered.
@@ -389,6 +407,20 @@ public static class PlatformPermissions
             "See how many conversations the workspace handled, how its channels "
             + "and AI agents are being used, and how much activity happened each "
             + "day. Counts only -- never the text of a conversation."),
+        new(
+            BillingView,
+            BillingGroup,
+            "View billing",
+            "See the workspace's subscription, what it is paying for and what "
+            + "else it could buy. Never a card number: payment details live with "
+            + "the payment provider and never reach this platform."),
+        new(
+            BillingManage,
+            BillingGroup,
+            "Manage billing",
+            "Start a subscription and open the payment provider's own billing "
+            + "portal, where payment methods, invoices and cancellation are "
+            + "handled. This is authority to spend the workspace's money."),
     ];
 
     /// <summary>

@@ -54,7 +54,7 @@ public sealed class RoleDelegationApiTests(RoleApiFixture api) : IClassFixture<R
     private static readonly string[] AgentsEditAndLifecycle =
         ["ai-agents.edit", "ai-agents.lifecycle"];
 
-    private static readonly string[] Invented = ["billing.manage"];
+    private static readonly string[] Invented = ["integrations.manage"];
 
     // ------------------------------------------- the self-assigned-role case
 

@@ -147,6 +147,54 @@ public sealed class OmniAiDbContext(DbContextOptions<OmniAiDbContext> options)
     public DbSet<Domain.Plans.Plan> Plans => Set<Domain.Plans.Plan>();
 
     /// <summary>
+    /// How each plan is sold.
+    /// </summary>
+    /// <remarks>
+    /// Separate from the plan on purpose: a plan says what may be consumed, an
+    /// offer says what somebody pays to get it. The same plan is sold monthly and
+    /// annually without either of them changing.
+    /// </remarks>
+    public DbSet<Domain.Billing.BillingPlanOffer> BillingPlanOffers =>
+        Set<Domain.Billing.BillingPlanOffer>();
+
+    /// <summary>
+    /// What each provider calls an offer's price.
+    /// </summary>
+    /// <remarks>
+    /// The reason a browser never sends a provider price: it sends an internal
+    /// offer, and this is where that becomes something Stripe understands.
+    /// </remarks>
+    public DbSet<Domain.Billing.BillingProviderPriceMapping> BillingProviderPriceMappings =>
+        Set<Domain.Billing.BillingProviderPriceMapping>();
+
+    /// <summary>Each workspace's customer record with a provider. Opaque references only.</summary>
+    public DbSet<Domain.Billing.WorkspaceBillingCustomer> WorkspaceBillingCustomers =>
+        Set<Domain.Billing.WorkspaceBillingCustomer>();
+
+    /// <summary>
+    /// Each workspace's commercial subscription.
+    /// </summary>
+    /// <remarks>
+    /// Not the entitlement source. It decides which plan a workspace should be
+    /// assigned; Phase 24's assignment remains what every entitlement check reads.
+    /// </remarks>
+    public DbSet<Domain.Billing.WorkspaceSubscription> WorkspaceSubscriptions =>
+        Set<Domain.Billing.WorkspaceSubscription>();
+
+    /// <summary>Checkout attempts, claimed before the provider is called.</summary>
+    public DbSet<Domain.Billing.BillingCheckoutIntent> BillingCheckoutIntents =>
+        Set<Domain.Billing.BillingCheckoutIntent>();
+
+    /// <summary>
+    /// Verified provider events waiting to be applied.
+    /// </summary>
+    /// <remarks>
+    /// Normalised fields only. No raw payload, no card data, no invoice JSON --
+    /// none of which this platform needs and all of which it would then own.
+    /// </remarks>
+    public DbSet<Domain.Billing.BillingEvent> BillingEvents => Set<Domain.Billing.BillingEvent>();
+
+    /// <summary>
     /// The plan each workspace is on.
     /// </summary>
     /// <remarks>

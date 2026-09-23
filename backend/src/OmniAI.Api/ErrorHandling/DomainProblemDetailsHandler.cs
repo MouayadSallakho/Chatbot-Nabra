@@ -7,6 +7,7 @@ using OmniAI.Application.Ai;
 using OmniAI.Application.AiAgents.ListAiAgents;
 using OmniAI.Application.AiAgents;
 using OmniAI.Application.Authorization;
+using OmniAI.Application.Billing;
 using OmniAI.Application.Conversations.Realtime;
 using OmniAI.Application.Conversations;
 using OmniAI.Application.Invitations;
@@ -128,6 +129,25 @@ internal sealed partial class DomainProblemDetailsHandler(
     /// </remarks>
     private static void Describe(ProblemDetails problem, Exception exception)
     {
+        // Refusals carry a stable code so the browser can branch without reading
+        // English. None of them carries a price, a provider identifier or a
+        // payment link.
+        switch (exception)
+        {
+            case BillingCheckoutRefusedException refusal:
+                problem.Extensions["code"] = refusal.Code;
+
+                return;
+
+            case BillingCustomerMissingException:
+                problem.Extensions["code"] = BillingCustomerMissingException.Code;
+
+                return;
+
+            default:
+                break;
+        }
+
         if (exception is not EntitlementExceededException entitlement)
         {
             return;
@@ -291,6 +311,44 @@ internal sealed partial class DomainProblemDetailsHandler(
             StatusCodes.Status409Conflict,
             "Plan limit reached",
             entitlement.Message),
+
+        // A purchase this platform refuses: an offer that does not exist, is
+        // withdrawn, cannot be bought here, or a workspace that already has a
+        // subscription. 409 for every one of them, and deliberately not 402:
+        // nothing about these is "payment required", and sending 402 for an
+        // unknown offer would have a client showing a payment prompt for a
+        // request that no payment could satisfy.
+        //
+        // The stable code travels in the extensions; see Describe.
+        BillingCheckoutRefusedException refusal => (
+            StatusCodes.Status409Conflict,
+            "This purchase cannot be started",
+            refusal.Message),
+
+        // A workspace with nothing for the provider's portal to manage, because
+        // it has never bought anything. 409 rather than 404: the route exists and
+        // the workspace exists; what is missing is a billing relationship.
+        BillingCustomerMissingException missingCustomer => (
+            StatusCodes.Status409Conflict,
+            "There is nothing to manage yet",
+            missingCustomer.Message),
+
+        // This deployment has no billing configuration -- no provider key, no
+        // fallback plan, no return address. A configuration fault rather than the
+        // caller's, and one that must never be reported as a payment problem.
+        BillingNotConfiguredException => (
+            StatusCodes.Status503ServiceUnavailable,
+            "Billing is unavailable",
+            "This deployment is not configured to take subscriptions."),
+
+        // The provider did not answer, or answered with something unusable.
+        // Nothing has been charged and nothing has changed here; the caller may
+        // try again. The provider's own message is never forwarded -- it can name
+        // internal identifiers and occasionally quotes the request back.
+        BillingProviderUnavailableException => (
+            StatusCodes.Status502BadGateway,
+            "The payment provider did not respond",
+            "The payment provider could not be reached. Nothing was charged."),
 
         // A workspace with no plan at all. Onboarding assigns one atomically and
         // the migration backfilled the rest, so this means a bug rather than a

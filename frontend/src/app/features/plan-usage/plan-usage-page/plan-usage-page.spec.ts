@@ -169,13 +169,17 @@ describe('PlanUsagePage', () => {
       expect(query('[data-testid="current-plan"]')!.textContent).toContain('Starter');
     });
 
-    it('says plainly that the plan cannot be changed here', async () => {
+    it('points at Billing rather than claiming the plan cannot change', async () => {
+      // True before Phase 25 and false the moment billing shipped: a plan now
+      // changes by subscribing. This screen still does not offer the change --
+      // that belongs behind billing.view -- but it must not deny it either.
       await mount();
       await answer(starter);
 
       const note = query('[data-testid="no-plan-change"]');
 
-      expect(note!.textContent).toContain('not available from this workspace yet');
+      expect(note!.textContent).toContain('set by its subscription');
+      expect(note!.textContent).not.toContain('not available from this workspace yet');
     });
   });
 
@@ -303,16 +307,19 @@ describe('PlanUsagePage', () => {
 
       const page = text().toLowerCase();
 
+      // From Phase 25 the page may name the Billing screen, because a plan now
+      // does change by subscribing and denying that would be the untruthful
+      // option. What must still never appear here is the commerce itself: no
+      // amount, no currency, no purchase prompt, no payment vocabulary.
       for (const forbidden of [
         'upgrade',
         'buy',
-        'subscribe',
+        'subscribe now',
         'downgrade',
         'price',
         'invoice',
         'payment',
         'card',
-        'billing',
         'checkout',
         '$',
         '€',

@@ -80,6 +80,7 @@ Eighteen areas have their own documents:
 - [embeddable-web-chat-widget.md](embeddable-web-chat-widget.md) - the loader, the cross-origin iframe, origin allowlisting, the wall between the hosted and embedded transports, and the Development opt-in that keeps an inherited `OPENAI_API_KEY` from spending money
 - [provider-usage-cost-accounting.md](provider-usage-cost-accounting.md) - what a call to an AI provider cost: provider-reported usage only, explicit tenant attribution, durable records written before the money is spent, decimal costs from configured rates, and why none of it is billing
 - [workspace-plans-entitlements-quotas.md](workspace-plans-entitlements-quotas.md) - what a workspace may hold and consume: why a permission is not an entitlement, plans as platform configuration, unlimited as an absence rather than a sentinel, race-safe reservation in PostgreSQL, the monthly provider-operation quota, and why none of it is billing
+- [saas-subscription-billing.md](saas-subscription-billing.md) - what a workspace pays and what that grants: why Stripe is not the entitlement engine, plan versus offer versus subscription, money as minor units, hosted checkout with no card ever reaching this platform, raw-body webhook verification into a payload-free durable inbox, snapshot-driven state so ordering cannot matter, a finite fallback plan, and non-destructive downgrade
 
 ---
 

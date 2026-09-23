@@ -20,6 +20,13 @@
     <!-- Design-time only: required by `dotnet ef migrations`. Not shipped at runtime. -->
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.11" />
     <!--
+      The official Stripe .NET library. Pinned exactly, like everything else here:
+      the SDK version determines which Stripe API version the integration talks
+      to (52.4.2 targets 2026-08-26.dahlia), so "latest" would mean the contract
+      moving under a running deployment.
+    -->
+    <PackageVersion Include="Stripe.net" Version="52.4.2" />
+    <!--
       Pinned so every project sees one EF Core version. The provider and the
       design-time package resolve different patches on their own, which made the
       Infrastructure assembly compile against a newer EF Core than its own test

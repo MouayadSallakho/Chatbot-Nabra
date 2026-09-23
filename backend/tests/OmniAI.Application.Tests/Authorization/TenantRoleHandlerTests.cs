@@ -112,7 +112,7 @@ public sealed class TenantRoleHandlerTests
         RecordingRoleRepository roles = new();
 
         await Assert.ThrowsAsync<DomainValidationException>(() => Creator(roles).HandleAsync(
-            new CreateTenantRoleCommand(Workspace, "Invented", ["billing.manage"])));
+            new CreateTenantRoleCommand(Workspace, "Invented", ["integrations.manage"])));
 
         Assert.Empty(roles.Added);
     }
@@ -199,7 +199,7 @@ public sealed class TenantRoleHandlerTests
             new FixedTimeProvider(Now));
 
         await Assert.ThrowsAsync<PermissionDeniedException>(() => handler.HandleAsync(
-            new CreateTenantRoleCommand(Workspace, "", ["billing.manage"])));
+            new CreateTenantRoleCommand(Workspace, "", ["integrations.manage"])));
     }
 
     [Fact]
@@ -362,7 +362,7 @@ public sealed class TenantRoleHandlerTests
             () => Replacer(roles).HandleAsync(new ReplaceTenantRolePermissionsCommand(
                 Workspace,
                 role.Id.Value,
-                ["roles.view", "billing.manage"],
+                ["roles.view", "integrations.manage"],
                 roles.Version)));
 
         Assert.Equal([PlatformPermissions.AiAgentsView], role.EffectivePermissions);

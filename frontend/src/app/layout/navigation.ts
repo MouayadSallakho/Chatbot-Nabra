@@ -125,6 +125,17 @@ export const NAV_ITEMS: readonly NavItem[] = [
     permissions: ['analytics.view'],
   },
   {
+    // Beside Plan & usage rather than inside it. The two are read by different
+    // people: one wants to know what the workspace may hold, the other what it
+    // costs -- and billing.view is deliberately not analytics.view, because
+    // being trusted with conversation counts is not being trusted with money.
+    label: 'Billing',
+    path: 'billing',
+    icon: 'settings',
+    implemented: true,
+    permissions: ['billing.view'],
+  },
+  {
     // This replaces the Phase 10 "Settings" placeholder rather than nesting
     // inside it. There are no other settings yet, so a Settings hub would be a
     // page with one link on it -- a dead step that exists only to be completed.

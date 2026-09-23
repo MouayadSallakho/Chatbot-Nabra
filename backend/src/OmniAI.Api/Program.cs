@@ -5,6 +5,7 @@ using OmniAI.Api.Authorization;
 using OmniAI.Api.Composition;
 using OmniAI.Api.Conversations;
 using OmniAI.Api.Analytics;
+using OmniAI.Api.Billing;
 using OmniAI.Api.Plans;
 using OmniAI.Api.Knowledge;
 using OmniAI.Api.WebChat;
@@ -137,6 +138,7 @@ app.MapKnowledgeFileEndpoints();
 // rows this platform already holds and calls no provider.
 app.MapAnalyticsEndpoints();
 app.MapPlanUsageEndpoints();
+app.MapBillingEndpoints();
 app.MapWebChatEndpoints();
 app.MapWhatsAppEndpoints();
 
@@ -156,6 +158,12 @@ app.MapWidgetLoaderEndpoints();
 // Meta's webhook. Anonymous, like the widget routes above it, and authenticated
 // by an HMAC over the exact request body rather than by a session.
 app.MapWhatsAppWebhookEndpoints();
+
+// The payment provider's webhook. Anonymous for the same reason, and
+// authenticated by a signature over the exact request body. It is the only
+// billing route without an antiforgery check, because there is no browser
+// session here to defend.
+app.MapBillingWebhookEndpoints();
 
 // The realtime hubs.
 //

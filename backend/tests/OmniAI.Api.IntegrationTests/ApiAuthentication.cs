@@ -42,6 +42,16 @@ internal static class ApiAuthentication
     private const string XsrfCookie = "XSRF-TOKEN";
 
     /// <summary>The header the server expects it echoed in.</summary>
+    /// <summary>
+    /// The header a browser sends its antiforgery token in.
+    /// </summary>
+    /// <remarks>
+    /// Public so that a suite can remove it and prove a write is refused without
+    /// it. Nothing else about the client changes: the session cookie is still
+    /// there, which is exactly the situation a cross-site form post creates.
+    /// </remarks>
+    public const string AntiforgeryHeader = XsrfHeader;
+
     private const string XsrfHeader = "X-XSRF-TOKEN";
 
     /// <summary>

@@ -39,7 +39,9 @@ export type PermissionCode =
   | 'whatsapp.manage'
   | 'knowledge.view'
   | 'knowledge.manage'
-  | 'analytics.view';
+  | 'analytics.view'
+  | 'billing.view'
+  | 'billing.manage';
 
 /**
  * One capability, as the catalogue endpoint publishes it.

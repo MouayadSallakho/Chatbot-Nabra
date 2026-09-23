@@ -271,7 +271,7 @@ public sealed class PermissionEscalationApiTests(RoleApiFixture api)
         (HttpClient owner, Guid tenantId, _) = await api.CreateOwnerAsync();
 
         foreach (string forged in
-            (string[])["tenant.admin", "roles.*", "billing.manage", "ai-agents.delete", "*"])
+            (string[])["tenant.admin", "roles.*", "integrations.manage", "ai-agents.delete", "*"])
         {
             using HttpResponseMessage refused = await owner.PostAsJsonAsync(
                 $"/api/tenants/{tenantId}/roles",

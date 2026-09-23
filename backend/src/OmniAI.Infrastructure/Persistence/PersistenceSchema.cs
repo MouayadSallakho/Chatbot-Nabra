@@ -138,6 +138,24 @@ internal static class PersistenceSchema
     /// Accounting, not billing: what this platform paid a provider, never what a
     /// customer is charged. It holds no content of any kind.
     /// </remarks>
+    /// <summary>What each plan is sold for. Platform-owned, like the plans.</summary>
+    public const string BillingPlanOffersTable = "billing_plan_offers";
+
+    /// <summary>Which provider price corresponds to which offer.</summary>
+    public const string BillingProviderPriceMappingsTable = "billing_provider_price_mappings";
+
+    /// <summary>A workspace's customer record with a payment provider.</summary>
+    public const string WorkspaceBillingCustomersTable = "workspace_billing_customers";
+
+    /// <summary>A workspace's commercial subscription.</summary>
+    public const string WorkspaceSubscriptionsTable = "workspace_subscriptions";
+
+    /// <summary>One attempt to buy a subscription.</summary>
+    public const string BillingCheckoutIntentsTable = "billing_checkout_intents";
+
+    /// <summary>Verified provider events, stored before they are acted on.</summary>
+    public const string BillingEventsTable = "billing_events";
+
     /// <summary>The platform's plans. Not tenant-scoped.</summary>
     public const string PlansTable = "plans";
 

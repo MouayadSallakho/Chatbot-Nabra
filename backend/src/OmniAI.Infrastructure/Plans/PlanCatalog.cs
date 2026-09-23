@@ -25,4 +25,12 @@ internal sealed class PlanCatalog(OmniAiDbContext context) : IPlanCatalog
             .AsNoTracking()
             .FirstOrDefaultAsync(plan => plan.Code == code, cancellationToken)
             .ConfigureAwait(false);
+
+    public async Task<Plan?> FindByIdAsync(
+        PlanId planId,
+        CancellationToken cancellationToken = default) =>
+        await _context.Plans
+            .AsNoTracking()
+            .FirstOrDefaultAsync(plan => plan.Id == planId, cancellationToken)
+            .ConfigureAwait(false);
 }

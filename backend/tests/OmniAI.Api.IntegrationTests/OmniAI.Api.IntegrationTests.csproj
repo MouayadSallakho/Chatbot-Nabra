@@ -14,6 +14,13 @@
     <PackageReference Include="coverlet.collector" />
     <!-- Hosts the real API in memory so HTTP behaviour is exercised end to end. -->
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+
+    <!--
+      Stripe's own library, used only to GENERATE the signatures these tests send.
+      Verifying with one implementation and signing with another would test the
+      test's idea of the scheme rather than the scheme. Nothing here calls Stripe.
+    -->
+    <PackageReference Include="Stripe.net" />
   </ItemGroup>
 
   <ItemGroup>
@@ -50,6 +57,13 @@
     <Compile Include="..\Shared\RecordingAiTextGenerator.cs" Link="RecordingAiTextGenerator.cs" />
     <Compile Include="..\Shared\RecordingUsageLedger.cs" Link="RecordingUsageLedger.cs" />
     <Compile Include="..\Shared\FakeEntitlements.cs" Link="FakeEntitlements.cs" />
+
+    <!--
+      A payment provider that answers from memory, so that not one test in this
+      repository opens a socket to a payment company, holds a real key, or has a
+      card entered into it.
+    -->
+    <Compile Include="..\Shared\FakeBillingProvider.cs" Link="FakeBillingProvider.cs" />
   </ItemGroup>
 
   <ItemGroup>

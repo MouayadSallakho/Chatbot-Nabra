@@ -177,6 +177,14 @@ export const routes: Routes = [
         loadChildren: () =>
           import('@app/features/plan-usage/plan-usage.routes').then((m) => m.planUsageRoutes),
       },
+      {
+        // Billing. Separate from Plan & usage on purpose: that screen answers
+        // what this workspace may hold, this one answers what is being paid for
+        // it. Different questions, different readers, different permissions.
+        path: 'billing',
+        loadChildren: () =>
+          import('@app/features/billing/billing.routes').then((m) => m.billingRoutes),
+      },
       ...placeholderRoutes,
       // Deliberate, and deliberately not a redirect: bouncing an unknown address
       // to the overview leaves the reader unsure whether their link was wrong or

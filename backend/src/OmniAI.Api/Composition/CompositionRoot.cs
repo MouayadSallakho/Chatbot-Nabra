@@ -23,6 +23,7 @@ using OmniAI.Application.Invitations.RevokeTenantInvitation;
 using OmniAI.Application.Invitations;
 using OmniAI.Application.Knowledge;
 using OmniAI.Application.Analytics;
+using OmniAI.Application.Billing;
 using OmniAI.Application.Plans;
 using OmniAI.Application.Knowledge.Files;
 using OmniAI.Application.Knowledge.AgentKnowledge;
@@ -130,6 +131,11 @@ internal static class CompositionRoot
         // The WhatsApp channel: storage, the Meta transport, webhook security
         // and the two background workers.
         services.AddOmniAiWhatsApp(configuration);
+
+        // Subscriptions. Registered on every deployment, including one with no
+        // provider keys: the billing screen must be able to say that nothing is
+        // for sale rather than fail to load.
+        services.AddOmniAiBilling(configuration);
 
         // The clock. TimeProvider is the BCL abstraction, so no third-party clock
         // package is involved and nothing in the Domain or Application had to invent
@@ -325,6 +331,14 @@ internal static class CompositionRoot
         // Uploading business files into Knowledge.
         services.AddScoped<GetWorkspaceAnalyticsHandler>();
         services.AddScoped<GetWorkspacePlanUsageHandler>();
+
+        // Billing. Reading what a workspace pays, starting a hosted checkout,
+        // opening the provider's portal, and applying what the provider reports.
+        services.AddScoped<GetWorkspaceBillingHandler>();
+        services.AddScoped<StartBillingCheckoutHandler>();
+        services.AddScoped<CreateBillingPortalSessionHandler>();
+        services.AddScoped<ReceiveBillingWebhookHandler>();
+        services.AddScoped<ApplyProviderBillingEvent>();
 
         services.AddScoped<UploadKnowledgeFileHandler>();
         services.AddScoped<ReplaceKnowledgeSourceHandler>();

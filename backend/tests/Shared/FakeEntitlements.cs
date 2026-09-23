@@ -160,6 +160,11 @@ public sealed class FakePlanCatalog : IPlanCatalog
         PlanCode code,
         CancellationToken cancellationToken = default) =>
         Task.FromResult(_plans.GetValueOrDefault(code.Value));
+
+    public Task<Plan?> FindByIdAsync(
+        PlanId planId,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(_plans.Values.FirstOrDefault(plan => plan.Id == planId));
 }
 
 /// <summary>Builders for the default-plan resolver under test.</summary>

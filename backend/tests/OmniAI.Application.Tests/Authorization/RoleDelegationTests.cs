@@ -292,7 +292,7 @@ public sealed class RoleDelegationTests
             Creator(roles).HandleAsync(new CreateTenantRoleCommand(
                 Workspace,
                 "Invented",
-                ["billing.manage"])));
+                ["integrations.manage"])));
     }
 
     // ------------------------------------------------------------- arranging
