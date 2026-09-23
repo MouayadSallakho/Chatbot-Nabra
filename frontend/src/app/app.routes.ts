@@ -150,6 +150,14 @@ export const routes: Routes = [
           ),
       },
       {
+        // Who the workspace talks to. Its own area rather than a tab inside
+        // Conversations, because a customer belongs to no single channel and the
+        // directory is read by people who may not read transcripts at all.
+        path: 'customers',
+        loadChildren: () =>
+          import('@app/features/customers/customers.routes').then((m) => m.customersRoutes),
+      },
+      {
         // Knowledge: the documents agents draw on. Lazily loaded like the other
         // feature areas, so somebody who never opens it never downloads it.
         path: 'knowledge',

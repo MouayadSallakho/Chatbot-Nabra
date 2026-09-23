@@ -234,6 +234,20 @@ public sealed class OmniAiDbContext(DbContextOptions<OmniAiDbContext> options)
     public DbSet<WhatsAppContact> WhatsAppContacts => Set<WhatsAppContact>();
 
     /// <summary>
+    /// The canonical people a workspace talks to.
+    /// </summary>
+    /// <remarks>
+    /// Includes records that have been merged away. They are tombstones rather
+    /// than deletions, so an old link still resolves, and every read that shows a
+    /// directory filters them out explicitly.
+    /// </remarks>
+    public DbSet<Domain.Customers.Customer> Customers => Set<Domain.Customers.Customer>();
+
+    /// <summary>Which WhatsApp number is which canonical customer.</summary>
+    public DbSet<WhatsAppCustomerIdentity> WhatsAppCustomerIdentities =>
+        Set<WhatsAppCustomerIdentity>();
+
+    /// <summary>
     /// The protected WhatsApp access tokens.
     /// </summary>
     /// <remarks>

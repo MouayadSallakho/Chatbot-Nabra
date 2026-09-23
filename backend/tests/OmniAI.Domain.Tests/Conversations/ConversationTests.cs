@@ -1,4 +1,5 @@
 using OmniAI.Domain.Conversations;
+using OmniAI.Domain.Customers;
 using OmniAI.Domain.Tenants;
 
 namespace OmniAI.Domain.Tests.Conversations;
@@ -13,7 +14,7 @@ public sealed class ConversationTests
     private static readonly DateTimeOffset ThreeMinutesLater = Start.AddMinutes(3);
 
     private static Conversation StartConversation(ChannelKind channel = ChannelKind.WebChat) =>
-        Conversation.Start(TenantId.New(), channel, Start);
+        Conversation.Start(TenantId.New(), CustomerId.New(), channel, Start);
 
     // ---------------------------------------------------------------- creation
 
@@ -22,7 +23,7 @@ public sealed class ConversationTests
     {
         TenantId tenantId = TenantId.New();
 
-        Conversation conversation = Conversation.Start(tenantId, ChannelKind.WhatsApp, Start);
+        Conversation conversation = Conversation.Start(tenantId, CustomerId.New(), ChannelKind.WhatsApp, Start);
 
         Assert.Equal(tenantId, conversation.TenantId);
     }
@@ -70,21 +71,21 @@ public sealed class ConversationTests
     public void Start_rejects_an_uninitialised_tenant_id()
     {
         Assert.Throws<DomainValidationException>(
-            () => Conversation.Start(default, ChannelKind.WebChat, Start));
+            () => Conversation.Start(default, CustomerId.New(), ChannelKind.WebChat, Start));
     }
 
     [Fact]
     public void Start_rejects_an_unrecognised_channel()
     {
         Assert.Throws<DomainValidationException>(
-            () => Conversation.Start(TenantId.New(), (ChannelKind)99, Start));
+            () => Conversation.Start(TenantId.New(), CustomerId.New(), (ChannelKind)99, Start));
     }
 
     [Fact]
     public void Start_rejects_the_uninitialised_default_channel()
     {
         Assert.Throws<DomainValidationException>(
-            () => Conversation.Start(TenantId.New(), default, Start));
+            () => Conversation.Start(TenantId.New(), CustomerId.New(), default, Start));
     }
 
     // -------------------------------------------------------------------- time
@@ -93,7 +94,7 @@ public sealed class ConversationTests
     public void Start_rejects_an_unset_instant()
     {
         Assert.Throws<DomainValidationException>(
-            () => Conversation.Start(TenantId.New(), ChannelKind.WebChat, default));
+            () => Conversation.Start(TenantId.New(), CustomerId.New(), ChannelKind.WebChat, default));
     }
 
     [Fact]
@@ -101,7 +102,7 @@ public sealed class ConversationTests
     {
         DateTimeOffset withOffset = new(2026, 1, 1, 15, 0, 0, TimeSpan.FromHours(3));
 
-        Conversation conversation = Conversation.Start(TenantId.New(), ChannelKind.WebChat, withOffset);
+        Conversation conversation = Conversation.Start(TenantId.New(), CustomerId.New(), ChannelKind.WebChat, withOffset);
 
         Assert.Equal(TimeSpan.Zero, conversation.StartedAt.Offset);
         Assert.Equal(withOffset.UtcDateTime, conversation.StartedAt.UtcDateTime);
@@ -297,7 +298,7 @@ public sealed class ConversationTests
     public void Lifecycle_changes_leave_identity_tenant_and_channel_untouched()
     {
         TenantId tenantId = TenantId.New();
-        Conversation conversation = Conversation.Start(tenantId, ChannelKind.Messenger, Start);
+        Conversation conversation = Conversation.Start(tenantId, CustomerId.New(), ChannelKind.Messenger, Start);
         ConversationId originalId = conversation.Id;
 
         conversation.Close(OneMinuteLater);

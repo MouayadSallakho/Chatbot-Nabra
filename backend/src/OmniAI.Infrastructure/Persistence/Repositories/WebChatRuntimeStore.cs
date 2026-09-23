@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using OmniAI.Application.WebChat.Persistence;
 using OmniAI.Domain.Conversations;
+using OmniAI.Domain.Customers;
 using OmniAI.Domain.WebChat;
 
 namespace OmniAI.Infrastructure.Persistence.Repositories;
@@ -25,14 +26,20 @@ internal sealed class WebChatRuntimeStore(OmniAiDbContext context) : IWebChatRun
 
     public async Task StartConversationAsync(
         Conversation conversation,
+        Customer customer,
         WebChatSession session,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(conversation);
+        ArgumentNullException.ThrowIfNull(customer);
         ArgumentNullException.ThrowIfNull(session);
 
         // One SaveChanges, therefore one transaction. A conversation without its
-        // session would be unreachable by the visitor who just started it.
+        // session would be unreachable by the visitor who just started it, and a
+        // conversation without its customer would not be insertable at all -- the
+        // foreign key is what makes "every conversation belongs to somebody" a
+        // fact about the database rather than a habit of the code.
+        _context.Customers.Add(customer);
         _context.Conversations.Add(conversation);
         _context.WebChatSessions.Add(session);
 

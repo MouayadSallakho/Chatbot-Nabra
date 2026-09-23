@@ -727,6 +727,10 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(32)")
                         .HasColumnName("channel");
 
+                    b.Property<Guid>("CustomerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("customer_id");
+
                     b.Property<string>("Handling")
                         .IsRequired()
                         .HasMaxLength(16)
@@ -764,6 +768,9 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("TenantId", "StartedAt")
                         .HasDatabaseName("ix_conversations_tenant_started");
+
+                    b.HasIndex("TenantId", "CustomerId", "LastActivityAt")
+                        .HasDatabaseName("ix_conversations_tenant_customer_activity");
 
                     b.ToTable("conversations", (string)null);
                 });
@@ -912,6 +919,57 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_messages_conversation_ingestion");
 
                     b.ToTable("messages", (string)null);
+                });
+
+            modelBuilder.Entity("OmniAI.Domain.Customers.Customer", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("DisplayName")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("display_name");
+
+                    b.Property<DateTimeOffset?>("MergedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("merged_at");
+
+                    b.Property<Guid?>("MergedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("merged_by");
+
+                    b.Property<Guid?>("MergedIntoCustomerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("merged_into_customer_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MergedIntoCustomerId");
+
+                    b.HasIndex("TenantId", "CreatedAt")
+                        .HasDatabaseName("ix_customers_tenant_created");
+
+                    b.ToTable("customers", (string)null);
                 });
 
             modelBuilder.Entity("OmniAI.Domain.Invitations.InvitationRoleGrant", b =>
@@ -1686,6 +1744,33 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                     b.ToTable("whatsapp_contacts", (string)null);
                 });
 
+            modelBuilder.Entity("OmniAI.Domain.WhatsApp.WhatsAppCustomerIdentity", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<string>("WhatsAppCustomerId")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("whatsapp_customer_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("CustomerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("customer_id");
+
+                    b.HasKey("TenantId", "WhatsAppCustomerId");
+
+                    b.HasIndex("TenantId", "CustomerId")
+                        .HasDatabaseName("ix_whatsapp_customer_identities_customer");
+
+                    b.ToTable("whatsapp_customer_identities", (string)null);
+                });
+
             modelBuilder.Entity("OmniAI.Domain.WhatsApp.WhatsAppDelivery", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2055,6 +2140,14 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_conversations_tenant");
+
+                    b.HasOne("OmniAI.Domain.Customers.Customer", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "CustomerId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_conversations_customer");
                 });
 
             modelBuilder.Entity("OmniAI.Domain.Conversations.ConversationTurn", b =>
@@ -2106,6 +2199,22 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_messages_conversation");
+                });
+
+            modelBuilder.Entity("OmniAI.Domain.Customers.Customer", b =>
+                {
+                    b.HasOne("OmniAI.Domain.Customers.Customer", null)
+                        .WithMany()
+                        .HasForeignKey("MergedIntoCustomerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_customers_merged_into");
+
+                    b.HasOne("OmniAI.Domain.Tenants.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_customers_tenant");
                 });
 
             modelBuilder.Entity("OmniAI.Domain.Invitations.InvitationRoleGrant", b =>
@@ -2298,6 +2407,24 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_whatsapp_contacts_conversation");
+                });
+
+            modelBuilder.Entity("OmniAI.Domain.WhatsApp.WhatsAppCustomerIdentity", b =>
+                {
+                    b.HasOne("OmniAI.Domain.Tenants.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_whatsapp_customer_identities_tenant");
+
+                    b.HasOne("OmniAI.Domain.Customers.Customer", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "CustomerId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_whatsapp_customer_identities_customer");
                 });
 
             modelBuilder.Entity("OmniAI.Domain.WhatsApp.WhatsAppDelivery", b =>

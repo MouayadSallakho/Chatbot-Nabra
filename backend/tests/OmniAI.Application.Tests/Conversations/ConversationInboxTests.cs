@@ -4,6 +4,7 @@ using OmniAI.Application.Conversations;
 using OmniAI.Application.Conversations.Persistence;
 using OmniAI.Application.Tests.Security;
 using OmniAI.Application.Tests.WebChat;
+using OmniAI.Domain.Customers;
 using OmniAI.Domain;
 using OmniAI.Domain.Authorization;
 using OmniAI.Domain.Conversations;
@@ -42,6 +43,7 @@ public sealed class ConversationInboxTests
 
         Conversation conversation = Conversation.Start(
             TenantId.From(Workspace),
+            CustomerId.New(),
             ChannelKind.WebChat,
             Now);
 

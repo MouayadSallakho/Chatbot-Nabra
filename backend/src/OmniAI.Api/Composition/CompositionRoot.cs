@@ -285,6 +285,11 @@ internal static class CompositionRoot
         services.AddScoped<SendWebChatMessageHandler>();
         services.AddScoped<ListWebChatMessagesHandler>();
 
+        // Who the workspace talks to. Registered beside conversations rather than
+        // inside a channel, because a customer belongs to none of them. Its
+        // repository is composed by Infrastructure, which owns the type.
+        services.AddScoped<OmniAI.Application.Customers.CustomerHandlers>();
+
         // Reading conversations from the admin.
         services.AddScoped<ReadConversationsHandler>();
         services.AddScoped<ConversationHandoffHandler>();

@@ -9,6 +9,7 @@ using OmniAI.Application.WebChat.Persistence;
 using OmniAI.Application.WebChat.Protection;
 using OmniAI.Domain.AiAgents;
 using OmniAI.Domain.Conversations;
+using OmniAI.Domain.Customers;
 using OmniAI.Domain.Tenants;
 using OmniAI.Domain.WebChat;
 using OmniAI.Application.Ai.Usage;
@@ -190,6 +191,7 @@ internal sealed class FakeWebChatWorld : IWebChatEndpointRepository, IWebChatRun
     private readonly Dictionary<Guid, string> _agentNames = [];
     private readonly Dictionary<Guid, AiAgentStatus> _agentStatuses = [];
     private readonly List<Conversation> _conversations = [];
+    private readonly List<Customer> _customers = [];
     private readonly List<WebChatSession> _sessions = [];
     private readonly List<ConversationTurn> _turns = [];
     private readonly List<StoredMessage> _messages = [];
@@ -404,16 +406,35 @@ internal sealed class FakeWebChatWorld : IWebChatEndpointRepository, IWebChatRun
 
     public Task StartConversationAsync(
         Conversation conversation,
+        Customer customer,
         WebChatSession session,
         CancellationToken cancellationToken = default)
     {
         lock (_sync)
         {
+            _customers.Add(customer);
             _conversations.Add(conversation);
             _sessions.Add(session);
         }
 
         return Task.CompletedTask;
+    }
+
+    /// <summary>Every customer a conversation start created here.</summary>
+    /// <remarks>
+    /// Exposed so a test can assert the count directly: "opening the widget
+    /// creates nobody" is a claim about this list being empty, and it is the
+    /// claim most easily broken by accident.
+    /// </remarks>
+    public IReadOnlyList<Customer> Customers
+    {
+        get
+        {
+            lock (_sync)
+            {
+                return [.. _customers];
+            }
+        }
     }
 
     public Task<WebChatSession?> FindSessionAsync(

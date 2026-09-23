@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using OmniAI.Domain.Conversations;
+using OmniAI.Domain.Customers;
 using OmniAI.Domain.Tenants;
 
 namespace OmniAI.Infrastructure.Persistence.Configurations;
@@ -21,6 +22,11 @@ internal sealed class ConversationConfiguration : IEntityTypeConfiguration<Conve
         builder.Property(conversation => conversation.TenantId)
             .HasColumnName("tenant_id")
             .HasConversion(PersistenceConverters.TenantId)
+            .IsRequired();
+
+        builder.Property(conversation => conversation.CustomerId)
+            .HasColumnName("customer_id")
+            .HasConversion(PersistenceConverters.CustomerId)
             .IsRequired();
 
         builder.Property(conversation => conversation.Channel)
@@ -79,6 +85,33 @@ internal sealed class ConversationConfiguration : IEntityTypeConfiguration<Conve
             .HasConstraintName("fk_conversations_tenant")
             .OnDelete(DeleteBehavior.Restrict)
             .IsRequired();
+
+        // The composite key is the point: the customer a conversation belongs to
+        // must be a customer of the same workspace. Expressed as a constraint
+        // rather than as an application check, because an application check is
+        // one forgotten call site away from a workspace reading another
+        // workspace's conversation through its own customer directory.
+        //
+        // Restrict, for the same reason the tenant relationship is: a customer
+        // with conversations is not something to remove by accident, and Phase 30
+        // deliberately has no customer deletion at all.
+        builder.HasOne<Customer>()
+            .WithMany()
+            .HasForeignKey(conversation => new { conversation.TenantId, conversation.CustomerId })
+            .HasPrincipalKey(customer => new { customer.TenantId, customer.Id })
+            .HasConstraintName("fk_conversations_customer")
+            .OnDelete(DeleteBehavior.Restrict)
+            .IsRequired();
+
+        // One customer's history, newest first -- the customer detail page's only
+        // query, and the ordering the merge has to preserve.
+        builder.HasIndex(conversation => new
+            {
+                conversation.TenantId,
+                conversation.CustomerId,
+                conversation.LastActivityAt,
+            })
+            .HasDatabaseName("ix_conversations_tenant_customer_activity");
 
         // Every realistic query is tenant-scoped, and this is also the index that
         // makes a tenant-scoped listing cheap.

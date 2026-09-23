@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using OmniAI.Domain.Conversations;
+using OmniAI.Domain.Customers;
 using OmniAI.Domain.Tenants;
 using OmniAI.Infrastructure.Persistence;
 using OmniAI.Testing;
@@ -15,7 +16,7 @@ public sealed class ConversationPersistenceTests(PostgresTestDatabase database)
     public async Task A_conversation_round_trips_with_every_field_intact()
     {
         Tenant tenant = await NewTenantAsync();
-        Conversation conversation = Conversation.Start(tenant.Id, ChannelKind.Instagram, Start);
+        Conversation conversation = Conversation.Start(tenant.Id, CustomerId.New(), ChannelKind.Instagram, Start);
         ConversationId originalId = conversation.Id;
 
         await AddAsync(conversation);
@@ -37,7 +38,7 @@ public sealed class ConversationPersistenceTests(PostgresTestDatabase database)
         Tenant owner = await NewTenantAsync();
         Tenant other = await NewTenantAsync();
 
-        Conversation conversation = Conversation.Start(owner.Id, ChannelKind.WebChat, Start);
+        Conversation conversation = Conversation.Start(owner.Id, CustomerId.New(), ChannelKind.WebChat, Start);
         await AddAsync(conversation);
 
         await using OmniAiDbContext read = database.CreateContext();
@@ -55,7 +56,7 @@ public sealed class ConversationPersistenceTests(PostgresTestDatabase database)
     public async Task Every_channel_kind_round_trips_and_is_stored_by_name(ChannelKind channel)
     {
         Tenant tenant = await NewTenantAsync();
-        Conversation conversation = Conversation.Start(tenant.Id, channel, Start);
+        Conversation conversation = Conversation.Start(tenant.Id, CustomerId.New(), channel, Start);
         await AddAsync(conversation);
 
         object? stored = await database.ExecuteScalarAsync(
@@ -73,7 +74,7 @@ public sealed class ConversationPersistenceTests(PostgresTestDatabase database)
     public async Task A_closed_conversation_round_trips_as_closed_with_its_activity_instant()
     {
         Tenant tenant = await NewTenantAsync();
-        Conversation conversation = Conversation.Start(tenant.Id, ChannelKind.WebChat, Start);
+        Conversation conversation = Conversation.Start(tenant.Id, CustomerId.New(), ChannelKind.WebChat, Start);
         conversation.Close(Start.AddHours(2));
 
         await AddAsync(conversation);
@@ -99,7 +100,7 @@ public sealed class ConversationPersistenceTests(PostgresTestDatabase database)
         // A non-UTC offset on the way in; the Domain normalises it, and the
         // column stores the instant.
         DateTimeOffset withOffset = new(2026, 3, 15, 12, 30, 0, TimeSpan.FromHours(3));
-        Conversation conversation = Conversation.Start(tenant.Id, ChannelKind.WhatsApp, withOffset);
+        Conversation conversation = Conversation.Start(tenant.Id, CustomerId.New(), ChannelKind.WhatsApp, withOffset);
         await AddAsync(conversation);
 
         object? columnType = await database.ExecuteScalarAsync(
@@ -120,7 +121,13 @@ public sealed class ConversationPersistenceTests(PostgresTestDatabase database)
     {
         // The tenant foreign key is what makes an orphaned conversation
         // impossible, whatever the calling code believes.
-        Conversation orphan = Conversation.Start(TenantId.New(), ChannelKind.WebChat, Start);
+        //
+        // No owner row is written here on purpose. From Phase 30 a conversation
+        // also needs a customer, and that key belongs to the same workspace that
+        // does not exist -- so writing one would only move the failure. Either
+        // constraint refusing is the property this test is about: a conversation
+        // whose workspace is fictional does not reach the table.
+        Conversation orphan = Conversation.Start(TenantId.New(), CustomerId.New(), ChannelKind.WebChat, Start);
 
         await using OmniAiDbContext context = database.CreateContext();
         context.Conversations.Add(orphan);
@@ -128,7 +135,10 @@ public sealed class ConversationPersistenceTests(PostgresTestDatabase database)
         DbUpdateException failure = await Assert.ThrowsAsync<DbUpdateException>(
             () => context.SaveChangesAsync());
 
-        Assert.Contains("fk_conversations_tenant", failure.InnerException?.Message, StringComparison.Ordinal);
+        Assert.Contains(
+            "fk_conversations_",
+            failure.InnerException?.Message,
+            StringComparison.Ordinal);
     }
 
     [Fact]
@@ -137,7 +147,7 @@ public sealed class ConversationPersistenceTests(PostgresTestDatabase database)
         // Restrict, not Cascade: losing a tenant's whole history to a stray
         // delete is exactly the accident this constraint exists to prevent.
         Tenant tenant = await NewTenantAsync();
-        await AddAsync(Conversation.Start(tenant.Id, ChannelKind.WebChat, Start));
+        await AddAsync(Conversation.Start(tenant.Id, CustomerId.New(), ChannelKind.WebChat, Start));
 
         await using OmniAiDbContext context = database.CreateContext();
         Tenant loaded = await context.Tenants.SingleAsync(t => t.Id == tenant.Id);
@@ -165,6 +175,7 @@ public sealed class ConversationPersistenceTests(PostgresTestDatabase database)
     private async Task AddAsync(Conversation conversation)
     {
         await using OmniAiDbContext context = database.CreateContext();
+        context.AddOwner(conversation);
         context.Conversations.Add(conversation);
         await context.SaveChangesAsync();
     }

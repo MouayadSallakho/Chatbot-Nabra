@@ -114,6 +114,18 @@ internal static class PersistenceSchema
     /// <summary>Which conversation each WhatsApp customer is talking in.</summary>
     public const string WhatsAppContactsTable = "whatsapp_contacts";
 
+    /// <summary>The canonical customer directory.</summary>
+    public const string CustomersTable = "customers";
+
+    /// <summary>
+    /// Which WhatsApp number belongs to which canonical customer.
+    /// </summary>
+    /// <remarks>
+    /// One row per number per workspace, unlike <see cref="WhatsAppContactsTable"/>
+    /// which holds one row per conversation.
+    /// </remarks>
+    public const string WhatsAppCustomerIdentitiesTable = "whatsapp_customer_identities";
+
     /// <summary>The durable record of every webhook message accepted.</summary>
     public const string InboundWhatsAppMessagesTable = "whatsapp_inbound_messages";
 

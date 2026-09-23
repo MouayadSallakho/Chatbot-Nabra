@@ -1,3 +1,4 @@
+using OmniAI.Domain.Customers;
 using System.Reflection;
 using OmniAI.Domain.Conversations;
 using OmniAI.Domain.Tenants;
@@ -36,7 +37,7 @@ public sealed class MessageTests
     [Fact]
     public void A_message_keeps_the_values_it_was_created_with()
     {
-        Conversation conversation = Conversation.Start(TenantId.New(), ChannelKind.WhatsApp, Start);
+        Conversation conversation = Conversation.Start(TenantId.New(), CustomerId.New(), ChannelKind.WhatsApp, Start);
 
         Message message = conversation.AddTextMessage(
             MessageSender.Customer,
@@ -57,7 +58,7 @@ public sealed class MessageTests
     [Fact]
     public void A_message_records_its_instant_in_utc()
     {
-        Conversation conversation = Conversation.Start(TenantId.New(), ChannelKind.WebChat, Start);
+        Conversation conversation = Conversation.Start(TenantId.New(), CustomerId.New(), ChannelKind.WebChat, Start);
         DateTimeOffset withOffset = new(2026, 1, 1, 15, 30, 0, TimeSpan.FromHours(3));
 
         Message message = conversation.AddTextMessage(MessageSender.Customer, "Hello", withOffset);

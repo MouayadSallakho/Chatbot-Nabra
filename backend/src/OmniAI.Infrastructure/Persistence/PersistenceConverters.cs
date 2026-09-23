@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using OmniAI.Domain.AiAgents;
 using OmniAI.Domain.Authorization;
 using OmniAI.Domain.Conversations;
+using OmniAI.Domain.Customers;
 using OmniAI.Domain.Invitations;
 using OmniAI.Domain.Knowledge;
 using OmniAI.Domain.Tenants;
@@ -88,6 +89,34 @@ internal static class PersistenceConverters
 
     public static readonly ValueConverter<ConversationId, Guid> ConversationId =
         new(id => id.Value, value => Domain.Conversations.ConversationId.From(value));
+
+    public static readonly ValueConverter<CustomerId, Guid> CustomerId =
+        new(id => id.Value, value => Domain.Customers.CustomerId.From(value));
+
+    /// <summary>
+    /// The merge pointer, which is absent for every canonical customer.
+    /// </summary>
+    /// <remarks>
+    /// Null is the ordinary case here, not an error case: most customers have
+    /// never been merged into anything.
+    /// </remarks>
+    public static readonly ValueConverter<CustomerId?, Guid?> NullableCustomerId =
+        new(
+            id => id == null ? null : id.Value.Value,
+            value => value == null ? null : Domain.Customers.CustomerId.From(value.Value));
+
+    /// <summary>
+    /// The optional customer label.
+    /// </summary>
+    /// <remarks>
+    /// Blank and absent are the same thing, so a row written with an empty string
+    /// by some future path still reads back as "no label" rather than as a label
+    /// nobody can see.
+    /// </remarks>
+    public static readonly ValueConverter<CustomerDisplayName?, string?> NullableCustomerDisplayName =
+        new(
+            name => name == null ? null : name.Value,
+            value => Domain.Customers.CustomerDisplayName.CreateOrNull(value));
 
     public static readonly ValueConverter<MessageId, Guid> MessageId =
         new(id => id.Value, value => Domain.Conversations.MessageId.From(value));

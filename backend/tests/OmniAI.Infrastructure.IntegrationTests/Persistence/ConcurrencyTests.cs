@@ -1,3 +1,4 @@
+using OmniAI.Domain.Customers;
 using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using OmniAI.Domain.Conversations;
@@ -53,7 +54,7 @@ public sealed class ConcurrencyTests(PostgresTestDatabase database)
     public async Task A_stale_conversation_status_change_is_rejected()
     {
         Tenant tenant = Tenant.Create(TenantName.Create("Acme"), TenantSlug.Create(NewSlug()));
-        Conversation conversation = Conversation.Start(tenant.Id, ChannelKind.WhatsApp, Start);
+        Conversation conversation = Conversation.Start(tenant.Id, CustomerId.New(), ChannelKind.WhatsApp, Start);
         await SaveAsync(tenant, conversation);
 
         await using OmniAiDbContext first = database.CreateContext();
@@ -86,7 +87,7 @@ public sealed class ConcurrencyTests(PostgresTestDatabase database)
         // The realistic version of this race: one worker closes a conversation
         // while another, holding a stale copy, is still appending to it.
         Tenant tenant = Tenant.Create(TenantName.Create("Acme"), TenantSlug.Create(NewSlug()));
-        Conversation conversation = Conversation.Start(tenant.Id, ChannelKind.WebChat, Start);
+        Conversation conversation = Conversation.Start(tenant.Id, CustomerId.New(), ChannelKind.WebChat, Start);
         await SaveAsync(tenant, conversation);
 
         await using OmniAiDbContext closer = database.CreateContext();
@@ -147,7 +148,8 @@ public sealed class ConcurrencyTests(PostgresTestDatabase database)
 
         if (conversation is not null)
         {
-            context.Conversations.Add(conversation);
+            context.AddOwner(conversation);
+        context.Conversations.Add(conversation);
         }
 
         await context.SaveChangesAsync();

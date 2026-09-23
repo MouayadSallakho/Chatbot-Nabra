@@ -140,6 +140,12 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<IWebChatEndpointRepository, WebChatEndpointRepository>();
         services.AddScoped<IWebChatRuntimeStore, WebChatRuntimeStore>();
         services.AddScoped<IConversationRepository, ConversationRepository>();
+
+        // The canonical customer directory. Scoped like every other repository:
+        // it holds the request's DbContext and nothing else.
+        services.AddScoped<
+            OmniAI.Application.Customers.Persistence.ICustomerRepository,
+            CustomerRepository>();
         services.AddScoped<IConversationInboxStore, ConversationInboxStore>();
 
         // Both mint values, neither holds state, and the primitives behind them

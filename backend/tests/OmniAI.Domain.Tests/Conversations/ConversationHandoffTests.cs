@@ -1,4 +1,5 @@
 using OmniAI.Domain.Conversations;
+using OmniAI.Domain.Customers;
 using OmniAI.Domain.Tenants;
 using OmniAI.Domain.Users;
 
@@ -13,7 +14,7 @@ public sealed class ConversationHandoffTests
         new(2026, 9, 14, 9, 0, 0, TimeSpan.Zero);
 
     private static Conversation Start() =>
-        Conversation.Start(TenantId.New(), ChannelKind.WebChat, Now);
+        Conversation.Start(TenantId.New(), CustomerId.New(), ChannelKind.WebChat, Now);
 
     [Fact]
     public void A_new_conversation_is_answered_by_the_ai()

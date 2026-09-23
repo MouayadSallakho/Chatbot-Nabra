@@ -1,6 +1,7 @@
 using OmniAI.Application.Tests.WebChat;
 using OmniAI.Application.WhatsApp;
 using OmniAI.Domain.Conversations;
+using OmniAI.Domain.Customers;
 using OmniAI.Domain.WhatsApp;
 using OmniAI.Testing;
 
@@ -116,6 +117,7 @@ public sealed class WhatsAppReplyDispatcherTests
 
             Conversation conversation = Conversation.Start(
                 harness.Workspace,
+                CustomerId.New(),
                 onWhatsApp ? ChannelKind.WhatsApp : ChannelKind.WebChat,
                 Noon);
 

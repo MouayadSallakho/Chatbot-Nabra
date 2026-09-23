@@ -173,6 +173,45 @@ public static class PlatformPermissions
     public static readonly PermissionCode ConversationsAssign =
         PermissionCode.Create("conversations.assign");
 
+    /// <summary>Reading the workspace's customer directory.</summary>
+    /// <remarks>
+    /// <para>
+    /// Who the workspace talks to, which channels each person reaches it on, and
+    /// how much they have talked — not a word of what was said. A customer record
+    /// is personal data in its own right: a list of everybody a business serves
+    /// is worth having even without the transcripts, which is why reading it is
+    /// its own capability rather than something a channel or conversation
+    /// permission carries along.
+    /// </para>
+    /// <para>
+    /// <strong>It does not grant transcript access.</strong> A customer's
+    /// conversation history appears on their page only for somebody who also
+    /// holds <see cref="ConversationsView"/>, so the directory cannot become a
+    /// way around the permission that guards what customers actually said.
+    /// </para>
+    /// </remarks>
+    public static readonly PermissionCode CustomersView =
+        PermissionCode.Create("customers.view");
+
+    /// <summary>Naming a customer, and combining two records into one.</summary>
+    /// <remarks>
+    /// <para>
+    /// Two capabilities of very different weight sharing one permission, because
+    /// both are the same kind of claim: this is who that person is. A label is
+    /// easily corrected; a merge combines two people's channel identities and
+    /// conversation history and cannot be undone in this phase, which is why the
+    /// interface makes somebody confirm it in words.
+    /// </para>
+    /// <para>
+    /// <strong>It is not authority over customers in general.</strong> There is
+    /// deliberately no <c>customers.delete</c>: nothing in this platform removes
+    /// a customer or their history, and a permission implying otherwise would be
+    /// a promise the product does not keep.
+    /// </para>
+    /// </remarks>
+    public static readonly PermissionCode CustomersManage =
+        PermissionCode.Create("customers.manage");
+
     /// <summary>Reading how the workspace's website chat is configured.</summary>
     public static readonly PermissionCode WebsiteChatView =
         PermissionCode.Create("website-chat.view");
@@ -255,6 +294,16 @@ public static class PlatformPermissions
 
     /// <summary>The conversations group's display name.</summary>
     public const string ConversationsGroup = "Conversations";
+
+    /// <summary>
+    /// Who the workspace talks to. Deliberately not part of Conversations.
+    /// </summary>
+    /// <remarks>
+    /// A separate group because the two answer different questions and are
+    /// granted to different people: a directory is an administrative view of the
+    /// customer base, and a transcript is what somebody said in confidence.
+    /// </remarks>
+    public const string CustomersGroup = "Customers";
 
     /// <summary>The channel administration group's display name.</summary>
     public const string ChannelsGroup = "Channels";
@@ -363,6 +412,18 @@ public static class PlatformPermissions
             "Assign conversations",
             "Decide which team member a conversation is routed to. It gives that "
             + "member no permission they did not already have."),
+        new(
+            CustomersView,
+            CustomersGroup,
+            "View customers",
+            "See who this workspace talks to, which channels they use and how "
+            + "much they have talked. It does not grant access to what they said."),
+        new(
+            CustomersManage,
+            CustomersGroup,
+            "Manage customers",
+            "Name a customer, and combine two records that turn out to be the "
+            + "same person. Combining cannot be undone."),
         new(
             WebsiteChatView,
             ChannelsGroup,

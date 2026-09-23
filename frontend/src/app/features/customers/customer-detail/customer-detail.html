@@ -1,0 +1,340 @@
+<div class="page">
+  <app-page-header
+    [heading]="customer()?.label ?? 'Customer'"
+    description="Who this is to your workspace, how they reach you, and what they have talked about."
+  >
+    <a pageActions class="btn btn-secondary" routerLink="..">Back to customers</a>
+  </app-page-header>
+
+  <div class="page-section">
+    @if (!canView()) {
+      <div class="card">
+        <app-empty-state
+          icon="team"
+          heading="You do not have access to customers"
+          description="Seeing who this workspace talks to needs a permission your roles do not include. Ask somebody who administers this workspace if you need it."
+        />
+      </div>
+    } @else if (loading()) {
+      <div class="card" aria-busy="true">
+        <p class="text-small text-secondary">Loading customer…</p>
+      </div>
+    } @else if (failure(); as error) {
+      <div class="card">
+        <app-empty-state
+          icon="team"
+          heading="This customer could not be loaded"
+          [description]="error.message"
+        >
+          <button stateActions type="button" class="btn btn-secondary" (click)="reload()">
+            Try again
+          </button>
+        </app-empty-state>
+      </div>
+    } @else if (customer(); as person) {
+      @if (merged(); as canonical) {
+        <!--
+          A tombstone still resolves, and says where the history went. A 404 here
+          would look like data loss to somebody following an old link.
+        -->
+        <div class="card card-notice" role="status" data-testid="merged-notice">
+          <p class="text-small">
+            This record was combined with another customer, which now holds their channels and their
+            conversations.
+          </p>
+          <a class="btn btn-secondary" [routerLink]="['..', canonical]">Open that customer</a>
+        </div>
+      }
+
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">Identity</h2>
+        </div>
+
+        <div class="card-body customer-identity">
+          <dl class="customer-facts">
+            <div>
+              <dt class="text-small text-muted">Name</dt>
+              <dd class="text-small" data-testid="label">{{ person.label }}</dd>
+            </div>
+            <div>
+              <dt class="text-small text-muted">First seen</dt>
+              <dd class="text-small">{{ date(person.createdAt) }}</dd>
+            </div>
+            <div>
+              <dt class="text-small text-muted">Conversations</dt>
+              <dd class="text-small" data-testid="conversation-count">
+                {{ conversations(person.conversationCount) }}
+              </dd>
+            </div>
+            <div>
+              <dt class="text-small text-muted">Last activity</dt>
+              <dd class="text-small">
+                {{ person.lastActivityAt ? date(person.lastActivityAt) : 'No activity yet' }}
+              </dd>
+            </div>
+          </dl>
+
+          <div>
+            <h3 class="customer-subheading">Channels</h3>
+            <!--
+              Masked, and masked on the server. What is shown is enough for a
+              colleague to recognise who they are talking to and not enough for a
+              screenshot to identify a stranger.
+            -->
+            <ul class="identity-list" data-testid="identities">
+              @for (identity of person.identities; track identity.channel + identity.reference) {
+                <li class="identity">
+                  <span
+                    class="channel-badge"
+                    [class]="'channel-' + identity.channel.toLowerCase()"
+                    >{{ channelLabel(identity.channel) }}</span
+                  >
+                  <span class="text-small">
+                    <span class="visually-hidden">Masked identifier, </span>{{ identity.reference }}
+                  </span>
+                </li>
+              }
+              @for (channel of person.channels; track channel) {
+                @if (channel === 'WebChat') {
+                  <li class="identity">
+                    <span class="channel-badge channel-webchat">Website</span>
+                    <span class="text-small text-muted">
+                      No lasting identifier. A website visitor is anonymous, and this platform does
+                      not try to recognise them across visits.
+                    </span>
+                  </li>
+                }
+              }
+              @if (person.identities.length === 0 && person.channels.length === 0) {
+                <li class="text-small text-muted">No channel yet.</li>
+              }
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- The name. -->
+      @if (canManage() && !merged()) {
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">Name</h2>
+            <p class="text-small text-muted">
+              A label for your colleagues. It is never used to match one customer to another — two
+              people with the same name stay two customers.
+            </p>
+          </div>
+          <div class="card-body customer-name-form">
+            <label class="field">
+              <span class="field-label">Customer name</span>
+              <input
+                class="input"
+                type="text"
+                maxlength="120"
+                [ngModel]="draft()"
+                (ngModelChange)="draft.set($event)"
+                name="displayName"
+                data-testid="name-input"
+              />
+              <span class="field-hint text-small text-muted">
+                Leave it empty to remove the name.
+              </span>
+            </label>
+
+            @if (saveFailure(); as problem) {
+              <p class="text-small form-problem" role="alert" data-testid="save-failure">
+                {{ problem }}
+              </p>
+            }
+
+            @if (saved()) {
+              <p class="text-small text-secondary" role="status" data-testid="saved">Saved.</p>
+            }
+
+            <div class="customer-name-actions">
+              <button
+                type="button"
+                class="btn btn-primary"
+                (click)="save()"
+                [disabled]="saving() || !dirty()"
+                data-testid="save-name"
+              >
+                @if (saving()) {
+                  <span class="spinner" aria-hidden="true"></span>
+                }
+                <span class="btn-label">{{ saving() ? 'Saving…' : 'Save name' }}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- Combining two records. -->
+      @if (canManage() && !merged()) {
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">Combine with another customer</h2>
+            <p class="text-small text-muted">
+              If this record and another one are the same person, you can combine them. This cannot
+              be undone.
+            </p>
+          </div>
+          <div class="card-body customer-merge">
+            @if (!merging()) {
+              <button
+                type="button"
+                class="btn btn-secondary"
+                (click)="openMerge()"
+                data-testid="open-merge"
+              >
+                Choose a customer to combine with
+              </button>
+            } @else {
+              <!--
+                A list the reader pages through, never a ranked suggestion. The
+                platform has no basis for guessing who is the same person, and a
+                guess presented as a recommendation is one people accept.
+              -->
+              <fieldset class="merge-picker">
+                <legend class="customer-subheading">Keep which customer?</legend>
+
+                <ul class="candidate-list" data-testid="candidates">
+                  @for (candidate of candidates(); track candidate.id) {
+                    <li>
+                      <label class="candidate">
+                        <input
+                          type="radio"
+                          name="mergeTarget"
+                          [checked]="target()?.id === candidate.id"
+                          (change)="choose(candidate)"
+                          [attr.data-testid]="'candidate-' + candidate.id"
+                        />
+                        <span class="candidate-details">
+                          <span class="candidate-name">{{ candidate.label }}</span>
+                          <!--
+                            Two unnamed website visitors both read "Anonymous
+                            visitor", so the label alone cannot tell them apart -
+                            and this is the one operation that cannot be undone.
+                            What the platform honestly knows about each is which
+                            channels they used and when it first heard from them,
+                            so that is what distinguishes them here.
+                          -->
+                          <span class="text-small text-muted">{{ distinguish(candidate) }}</span>
+                        </span>
+                        <span class="text-small text-muted">{{
+                          conversations(candidate.conversationCount)
+                        }}</span>
+                      </label>
+                    </li>
+                  }
+                  @if (candidates().length === 0) {
+                    <li class="text-small text-muted">
+                      There is nobody else in this workspace to combine with.
+                    </li>
+                  }
+                </ul>
+              </fieldset>
+
+              @if (target(); as chosen) {
+                <!--
+                  Both records named, and what happens said outright. The wording
+                  deliberately does not claim the platform knows they are the same
+                  person: the reader is the one asserting that.
+                -->
+                <div class="merge-confirmation" role="alert" data-testid="merge-confirmation">
+                  <p class="text-small">
+                    <strong>{{ person.label }}</strong>
+                    <span class="text-small">({{ distinguishThis(person) }})</span> will be combined
+                    into <strong>{{ chosen.label }}</strong>
+                    <span class="text-small">({{ distinguish(chosen) }})</span>.
+                  </p>
+                  <p class="text-small">
+                    This combines their channel identities and conversation history. Confirm that
+                    these records belong to the same customer. It cannot be undone.
+                  </p>
+                </div>
+              }
+
+              @if (mergeFailure(); as problem) {
+                <p class="text-small form-problem" role="alert" data-testid="merge-failure">
+                  {{ problem }}
+                </p>
+              }
+
+              <div class="customer-merge-actions">
+                <button
+                  type="button"
+                  class="btn btn-danger"
+                  (click)="confirmMerge()"
+                  [disabled]="target() === null || mergeRunning()"
+                  data-testid="confirm-merge"
+                >
+                  @if (mergeRunning()) {
+                    <span class="spinner" aria-hidden="true"></span>
+                  }
+                  <span class="btn-label">
+                    {{ mergeRunning() ? 'Combining…' : 'Combine these customers' }}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-secondary"
+                  (click)="closeMerge()"
+                  data-testid="cancel-merge"
+                >
+                  Cancel
+                </button>
+              </div>
+            }
+          </div>
+        </div>
+      }
+
+      <!-- The history. -->
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">Conversations</h2>
+        </div>
+        <div class="card-body">
+          @if (!person.canReadConversations) {
+            <!--
+              The directory is not a way around the permission that guards
+              transcripts, and the page says so rather than showing an empty list
+              that reads as "this customer has never written".
+            -->
+            <p class="text-small text-muted" data-testid="conversations-denied">
+              Seeing what a customer said needs a permission your roles do not include. This
+              customer has {{ conversations(person.conversationCount) }}.
+            </p>
+          } @else if (person.conversations.length === 0) {
+            <p class="text-small text-muted" data-testid="no-conversations">
+              This customer has no conversations.
+            </p>
+          } @else {
+            <ul class="history-list" data-testid="conversations">
+              @for (conversation of person.conversations; track conversation.id) {
+                <li>
+                  <a
+                    class="history"
+                    [routerLink]="['/conversations', conversation.id]"
+                    [attr.data-testid]="'conversation-' + conversation.id"
+                  >
+                    <span
+                      class="channel-badge"
+                      [class]="'channel-' + conversation.channel.toLowerCase()"
+                      >{{ channelLabel(conversation.channel) }}</span
+                    >
+                    <span class="text-small">{{ conversation.status }}</span>
+                    <span class="text-small text-muted">{{
+                      date(conversation.lastActivityAt)
+                    }}</span>
+                  </a>
+                </li>
+              }
+            </ul>
+          }
+        </div>
+      </div>
+    }
+  </div>
+</div>

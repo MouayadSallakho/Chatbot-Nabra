@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
+using OmniAI.Domain.Customers;
 using OmniAI.Domain.Tenants;
 using OmniAI.Domain.Users;
 
@@ -29,11 +30,13 @@ public sealed class Conversation
     private Conversation(
         ConversationId id,
         TenantId tenantId,
+        CustomerId customerId,
         ChannelKind channel,
         DateTimeOffset startedAt)
     {
         Id = id;
         TenantId = tenantId;
+        CustomerId = customerId;
         Channel = channel;
         Status = ConversationStatus.Open;
         Handling = ConversationHandling.Ai;
@@ -53,6 +56,27 @@ public sealed class Conversation
     /// class of cross-tenant leak.
     /// </summary>
     public TenantId TenantId { get; }
+
+    /// <summary>
+    /// Who the workspace is talking to.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <strong>Required, so that "every conversation belongs to somebody" is an
+    /// invariant rather than a hope.</strong> It is supplied at the transport
+    /// boundary that already knows the relationship — the web chat session being
+    /// opened, the WhatsApp number being routed — and written in the same
+    /// transaction as the conversation itself, so there is no window in which a
+    /// conversation exists without an owner.
+    /// </para>
+    /// <para>
+    /// It has a private setter for exactly one operation: an administrator
+    /// merging two customers, which moves this conversation to the canonical
+    /// record. Nothing else may move a conversation between people, and nothing
+    /// automatic may do it at all.
+    /// </para>
+    /// </remarks>
+    public CustomerId CustomerId { get; private set; }
 
     /// <summary>The channel this conversation takes place on. Fixed at creation.</summary>
     public ChannelKind Channel { get; }
@@ -125,17 +149,31 @@ public sealed class Conversation
     /// Starts a conversation. It begins <see cref="ConversationStatus.Open"/>.
     /// </summary>
     /// <param name="tenantId">The owning tenant.</param>
+    /// <param name="customerId">
+    /// Who the workspace is talking to. Resolved by the transport boundary before
+    /// this is called, because only that boundary knows whether this is somebody
+    /// already known or somebody new.
+    /// </param>
     /// <param name="channel">The channel it takes place on.</param>
     /// <param name="startedAt">The effective start instant, supplied by the caller.</param>
     /// <exception cref="DomainValidationException">
-    /// The tenant id is empty, the channel is not a recognised value, or the
-    /// instant is not a real point in time.
+    /// The tenant id is empty, the customer id is empty, the channel is not a
+    /// recognised value, or the instant is not a real point in time.
     /// </exception>
-    public static Conversation Start(TenantId tenantId, ChannelKind channel, DateTimeOffset startedAt)
+    public static Conversation Start(
+        TenantId tenantId,
+        CustomerId customerId,
+        ChannelKind channel,
+        DateTimeOffset startedAt)
     {
         if (tenantId.IsEmpty)
         {
             throw new DomainValidationException("A conversation must belong to a tenant.");
+        }
+
+        if (customerId.IsEmpty)
+        {
+            throw new DomainValidationException("A conversation must belong to a customer.");
         }
 
         RequireDefined(channel, "channel");
@@ -143,8 +181,31 @@ public sealed class Conversation
         return new Conversation(
             ConversationId.New(),
             tenantId,
+            customerId,
             channel,
             RequireInstant(startedAt, "start instant"));
+    }
+
+    /// <summary>
+    /// Moves this conversation to the customer a merge made canonical.
+    /// </summary>
+    /// <remarks>
+    /// <strong>The only way a conversation changes hands, and it is not a
+    /// re-attribution.</strong> A merge is an administrator stating that two
+    /// records were one person all along, so this does not say the conversation
+    /// happened with somebody else — it says the platform now knows their real
+    /// name for that person. Nothing about the transcript, its ordering, its
+    /// timestamps or its activity high-water mark is touched.
+    /// </remarks>
+    /// <exception cref="DomainValidationException">The customer id is empty.</exception>
+    public void MoveToCustomer(CustomerId customerId)
+    {
+        if (customerId.IsEmpty)
+        {
+            throw new DomainValidationException("A conversation must belong to a customer.");
+        }
+
+        CustomerId = customerId;
     }
 
     /// <summary>

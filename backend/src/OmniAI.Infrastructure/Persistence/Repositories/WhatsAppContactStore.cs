@@ -1,8 +1,11 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Storage;
 using Npgsql;
 using OmniAI.Application.WhatsApp.Persistence;
 using OmniAI.Domain.Conversations;
+using OmniAI.Domain.Customers;
+using OmniAI.Domain.Tenants;
 using OmniAI.Domain.WhatsApp;
 
 namespace OmniAI.Infrastructure.Persistence.Repositories;
@@ -36,6 +39,17 @@ internal sealed class WhatsAppContactStore(OmniAiDbContext context) : IWhatsAppC
     private const string CurrentContactIndex = "ux_whatsapp_contacts_current";
 
     /// <summary>
+    /// The primary key on (workspace, sender) that makes one person one customer.
+    /// </summary>
+    /// <remarks>
+    /// Two first messages from the same number racing each other both try to
+    /// insert the identity. One wins; the other reads what the winner wrote, which
+    /// is why there is no application lock here and why a second instance of the
+    /// worker changes nothing.
+    /// </remarks>
+    private const string CustomerIdentityKey = "PK_whatsapp_customer_identities";
+
+    /// <summary>
     /// How many times a lost race is re-run before giving up.
     /// </summary>
     /// <remarks>
@@ -55,6 +69,18 @@ internal sealed class WhatsAppContactStore(OmniAiDbContext context) : IWhatsAppC
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(route);
+
+        // Who this is, decided before and outside the conversation transaction.
+        // Identity is durable and independent of whether this particular
+        // conversation starts, and resolving it inside that transaction would mean
+        // a lost identity race aborted the conversation's transaction too --
+        // PostgreSQL gives up on a transaction the moment a statement in it fails.
+        CustomerId customer = await ResolveCustomerAsync(
+                route.TenantId,
+                customerId,
+                now,
+                cancellationToken)
+            .ConfigureAwait(false);
 
         for (int attempt = 1; ; attempt++)
         {
@@ -81,7 +107,13 @@ internal sealed class WhatsAppContactStore(OmniAiDbContext context) : IWhatsAppC
 
             try
             {
-                return await StartAsync(route, customerId, current, now, cancellationToken)
+                return await StartAsync(
+                        route,
+                        customerId,
+                        customer,
+                        current,
+                        now,
+                        cancellationToken)
                     .ConfigureAwait(false);
             }
             catch (DbUpdateException failure)
@@ -128,6 +160,7 @@ internal sealed class WhatsAppContactStore(OmniAiDbContext context) : IWhatsAppC
     private async Task<ConversationId> StartAsync(
         WhatsAppRoute route,
         WhatsAppCustomerId customerId,
+        CustomerId customer,
         WhatsAppContact? superseded,
         DateTimeOffset now,
         CancellationToken cancellationToken)
@@ -140,7 +173,11 @@ internal sealed class WhatsAppContactStore(OmniAiDbContext context) : IWhatsAppC
         // index allows only one current mapping and the new row is about to be it.
         superseded?.Supersede();
 
-        Conversation conversation = Conversation.Start(route.TenantId, ChannelKind.WhatsApp, now);
+        Conversation conversation = Conversation.Start(
+            route.TenantId,
+            customer,
+            ChannelKind.WhatsApp,
+            now);
 
         _context.Conversations.Add(conversation);
 
@@ -166,6 +203,116 @@ internal sealed class WhatsAppContactStore(OmniAiDbContext context) : IWhatsAppC
 
         return conversation.Id;
     }
+
+    /// <summary>
+    /// The canonical customer behind one WhatsApp number, creating one the first
+    /// time that number is seen.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <strong>This is the only automatic identity claim the platform makes, and
+    /// it is a transport fact rather than a guess.</strong> Meta reports the
+    /// sender; the same sender in the same workspace is the same person. Nothing
+    /// here compares names, compares numbers for similarity, or reasons about
+    /// devices — if the transport cannot prove it, two identities stay two people
+    /// until an administrator says otherwise.
+    /// </para>
+    /// <para>
+    /// Keyed on the workspace rather than on the connection, so somebody who
+    /// messages two of a workspace's numbers is one customer. That is still the
+    /// same transport fact: it is the sender Meta names, not two strings that
+    /// happen to look alike.
+    /// </para>
+    /// <para>
+    /// The insert races with itself and settles in the database. The primary key
+    /// admits one row; the loser reads the winner's and uses it, which is what
+    /// makes two simultaneous first messages produce one customer without any
+    /// process-local lock.
+    /// </para>
+    /// </remarks>
+    private async Task<CustomerId> ResolveCustomerAsync(
+        TenantId tenantId,
+        WhatsAppCustomerId customerId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        CustomerId? existing = await FindCustomerAsync(tenantId, customerId, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (existing is CustomerId known)
+        {
+            return known;
+        }
+
+        // No label. A number is not a name, and inventing one from the provider's
+        // profile would put an unverified claim about a real person on screen as
+        // though somebody had checked it.
+        Customer customer = Customer.Create(tenantId, displayName: null, now);
+
+        _context.Customers.Add(customer);
+
+        _context.WhatsAppCustomerIdentities.Add(WhatsAppCustomerIdentity.Create(
+            tenantId,
+            customerId,
+            customer.Id,
+            now));
+
+        try
+        {
+            await _context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+
+            return customer.Id;
+        }
+        catch (DbUpdateException failure) when (IsIdentityRace(failure))
+        {
+            // Somebody else recorded this person first. Theirs is the identity,
+            // and the one built here is discarded rather than retried: two
+            // customers for one number is the exact failure this guards.
+            _context.Entry(customer).State = EntityState.Detached;
+
+            foreach (EntityEntry entry in _context.ChangeTracker
+                .Entries<WhatsAppCustomerIdentity>()
+                .Where(tracked => tracked.State == EntityState.Added)
+                .ToList())
+            {
+                entry.State = EntityState.Detached;
+            }
+
+            CustomerId? winner = await FindCustomerAsync(tenantId, customerId, cancellationToken)
+                .ConfigureAwait(false);
+
+            // No winner means the violation was not the one this catch claims to
+            // handle, so the original failure is the honest answer.
+            if (winner is null)
+            {
+                throw;
+            }
+
+            return winner.Value;
+        }
+    }
+
+    private async Task<CustomerId?> FindCustomerAsync(
+        TenantId tenantId,
+        WhatsAppCustomerId customerId,
+        CancellationToken cancellationToken)
+    {
+        List<CustomerId> found = await _context.WhatsAppCustomerIdentities
+            .AsNoTracking()
+            .Where(identity =>
+                identity.TenantId == tenantId && identity.WhatsAppCustomerId == customerId)
+            .Select(identity => identity.CustomerId)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        return found.Count == 0 ? null : found[0];
+    }
+
+    /// <summary>Whether the save lost the race for this person's identity.</summary>
+    private static bool IsIdentityRace(DbUpdateException failure) =>
+        failure.InnerException is PostgresException postgres
+        && postgres.SqlState == UniqueViolation
+        && postgres.ConstraintName == CustomerIdentityKey;
 
     private Task<WhatsAppContact?> CurrentAsync(
         WhatsAppConnectionId connectionId,

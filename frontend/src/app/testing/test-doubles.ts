@@ -239,6 +239,22 @@ export const EVERY_PERMISSION: readonly PermissionDefinition[] = [
     description: 'Read the conversations customers have had with this workspace.',
   },
   {
+    code: 'customers.view',
+    group: 'Customers',
+    label: 'View customers',
+    description:
+      'See who this workspace talks to, which channels they use and how much they have ' +
+      'talked. It does not grant access to what they said.',
+  },
+  {
+    code: 'customers.manage',
+    group: 'Customers',
+    label: 'Manage customers',
+    description:
+      'Name a customer, and combine two records that turn out to be the same person. ' +
+      'Combining cannot be undone.',
+  },
+  {
     code: 'website-chat.view',
     group: 'Channels',
     label: 'View website chat',

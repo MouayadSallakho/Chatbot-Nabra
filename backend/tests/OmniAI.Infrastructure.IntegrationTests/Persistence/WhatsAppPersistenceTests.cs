@@ -1,3 +1,4 @@
+using OmniAI.Domain.Customers;
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
@@ -655,10 +656,11 @@ public sealed class WhatsAppPersistenceTests(PostgresTestDatabase database)
 
     private async Task<Conversation> NewConversationAsync(Tenant tenant)
     {
-        Conversation conversation = Conversation.Start(tenant.Id, ChannelKind.WhatsApp, Noon);
+        Conversation conversation = Conversation.Start(tenant.Id, CustomerId.New(), ChannelKind.WhatsApp, Noon);
 
         await using OmniAiDbContext context = database.CreateContext();
 
+        context.AddOwner(conversation);
         context.Conversations.Add(conversation);
 
         await context.SaveChangesAsync();

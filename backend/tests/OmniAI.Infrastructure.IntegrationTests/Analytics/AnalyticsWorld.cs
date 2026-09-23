@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using OmniAI.Domain.Ai;
 using OmniAI.Domain.AiAgents;
 using OmniAI.Domain.Conversations;
+using OmniAI.Domain.Customers;
 using OmniAI.Domain.Tenants;
 using OmniAI.Domain.WebChat;
 using OmniAI.Domain.WhatsApp;
@@ -76,7 +77,7 @@ internal sealed class AnalyticsWorld(PostgresTestDatabase database)
     {
         ArgumentNullException.ThrowIfNull(agent);
 
-        Conversation conversation = Conversation.Start(Tenant.Id, ChannelKind.WebChat, startedAt);
+        Conversation conversation = Conversation.Start(Tenant.Id, CustomerId.New(), ChannelKind.WebChat, startedAt);
 
         await using OmniAiDbContext context = _database.CreateContext();
 
@@ -103,6 +104,7 @@ internal sealed class AnalyticsWorld(PostgresTestDatabase database)
             startedAt,
             startedAt.AddHours(4));
 
+        context.AddOwner(conversation);
         context.Conversations.Add(conversation);
         context.WebChatSessions.Add(session);
 
@@ -142,7 +144,7 @@ internal sealed class AnalyticsWorld(PostgresTestDatabase database)
     {
         ArgumentNullException.ThrowIfNull(connection);
 
-        Conversation conversation = Conversation.Start(Tenant.Id, ChannelKind.WhatsApp, startedAt);
+        Conversation conversation = Conversation.Start(Tenant.Id, CustomerId.New(), ChannelKind.WhatsApp, startedAt);
 
         WhatsAppContact contact = WhatsAppContact.Start(
             connection.Id,
@@ -153,6 +155,7 @@ internal sealed class AnalyticsWorld(PostgresTestDatabase database)
 
         await using OmniAiDbContext context = _database.CreateContext();
 
+        context.AddOwner(conversation);
         context.Conversations.Add(conversation);
         context.WhatsAppContacts.Add(contact);
 

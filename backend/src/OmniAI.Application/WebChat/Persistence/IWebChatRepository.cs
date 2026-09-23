@@ -1,6 +1,7 @@
 using OmniAI.Application.Concurrency;
 using OmniAI.Domain.AiAgents;
 using OmniAI.Domain.Conversations;
+using OmniAI.Domain.Customers;
 using OmniAI.Domain.Tenants;
 using OmniAI.Domain.WebChat;
 
@@ -116,15 +117,27 @@ public interface IWebChatEndpointRepository
 public interface IWebChatRuntimeStore
 {
     /// <summary>
-    /// Starts a conversation and the anonymous claim on it, together.
+    /// Starts a conversation, the customer it belongs to and the anonymous claim
+    /// on it, together.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// One transaction. A conversation without its session would be a conversation
-    /// its own visitor could never reach again, and a session without its
-    /// conversation would admit somebody to nothing.
+    /// its own visitor could never reach again, a session without its conversation
+    /// would admit somebody to nothing, and a conversation without its customer
+    /// could not be written at all — the database requires one.
+    /// </para>
+    /// <para>
+    /// The customer is created here rather than looked up, because a public web
+    /// visitor arrives with no identity this platform has ever seen. That is the
+    /// honest answer and not a gap to be filled: there is no durable web identity
+    /// to key on, and inventing one from a browser, a network address or a stored
+    /// marker would be identity resolution by fingerprint.
+    /// </para>
     /// </remarks>
     Task StartConversationAsync(
         Conversation conversation,
+        Customer customer,
         WebChatSession session,
         CancellationToken cancellationToken = default);
 

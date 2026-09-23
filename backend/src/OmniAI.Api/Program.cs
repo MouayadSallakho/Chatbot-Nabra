@@ -4,6 +4,7 @@ using OmniAI.Api.Auth;
 using OmniAI.Api.Authorization;
 using OmniAI.Api.Composition;
 using OmniAI.Api.Conversations;
+using OmniAI.Api.Customers;
 using OmniAI.Api.Analytics;
 using OmniAI.Api.Billing;
 using OmniAI.Api.Plans;
@@ -141,6 +142,12 @@ app.MapPlanUsageEndpoints();
 app.MapBillingEndpoints();
 app.MapWebChatEndpoints();
 app.MapWhatsAppEndpoints();
+
+// Who the workspace talks to, across every channel. Its own surface because a
+// customer belongs to no single channel, and guarded by its own permission
+// because a directory of everybody a business serves is worth protecting even
+// without the transcripts.
+app.MapCustomerEndpoints();
 
 // Reading the conversations customers have actually had. Read-only in this
 // release: there is no reply, no assignment and no handoff yet.

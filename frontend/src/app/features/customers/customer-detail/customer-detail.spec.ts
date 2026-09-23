@@ -1,0 +1,481 @@
+import { provideHttpClient } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
+import { TenantApi } from '@app/core/api/tenant-api';
+import { PermissionApi } from '@app/core/authorization/permission-api';
+import { LOCAL_STORAGE } from '@app/core/storage/local-storage';
+import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
+import { memoryStorage, permissionApiGranting } from '@app/testing/test-doubles';
+import { Customer, CustomersApi } from '../customers-api';
+import { CustomerDetail } from './customer-detail';
+
+/**
+ * One customer's page.
+ *
+ * What matters here is that combining two records is never one click, that a
+ * label is rendered as text, that a lost race keeps what somebody typed, and
+ * that the conversation history is behind its own permission.
+ */
+describe('CustomerDetail', () => {
+  const tenantId = '11111111-1111-1111-1111-111111111111';
+  const customerId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+  const otherId = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
+
+  const url = `/api/tenants/${tenantId}/customers/${customerId}`;
+  const directoryUrl = `/api/tenants/${tenantId}/customers`;
+
+  const customer: Customer = {
+    id: customerId,
+    displayName: null,
+    label: 'WhatsApp customer',
+    identities: [{ channel: 'WhatsApp', reference: '••••0123' }],
+    channels: ['WhatsApp'],
+    conversationCount: 2,
+    lastActivityAt: '2026-09-22T10:00:00+00:00',
+    createdAt: '2026-08-01T10:00:00+00:00',
+    updatedAt: '2026-08-01T10:00:00+00:00',
+    mergedIntoCustomerId: null,
+    mergedAt: null,
+    conversations: [
+      {
+        id: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
+        channel: 'WhatsApp',
+        status: 'Open',
+        handling: 'Ai',
+        startedAt: '2026-09-22T09:00:00+00:00',
+        lastActivityAt: '2026-09-22T10:00:00+00:00',
+      },
+    ],
+    canReadConversations: true,
+  };
+
+  let fixture: ComponentFixture<CustomerDetail>;
+  let http: HttpTestingController;
+
+  async function mount(...permissions: readonly string[]): Promise<void> {
+    TestBed.configureTestingModule({
+      imports: [CustomerDetail],
+      providers: [
+        {
+          provide: PermissionApi,
+          useValue: permissionApiGranting(...(permissions.length ? permissions : ['*'])),
+        },
+        provideRouter([]),
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        CustomersApi,
+        { provide: LOCAL_STORAGE, useValue: memoryStorage() },
+        { provide: TenantApi, useValue: { get: () => undefined, create: () => undefined } },
+      ],
+    });
+
+    await TestBed.inject(WorkspaceContextService).adopt({
+      id: tenantId,
+      name: 'Acme Trading',
+      slug: 'acme',
+      status: 'Active',
+    });
+
+    http = TestBed.inject(HttpTestingController);
+
+    fixture = TestBed.createComponent(CustomerDetail);
+    fixture.componentRef.setInput('customerId', customerId);
+
+    await settle();
+  }
+
+  async function settle(): Promise<void> {
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+  }
+
+  const host = (): HTMLElement => fixture.nativeElement as HTMLElement;
+  const text = (): string => host().textContent ?? '';
+  const query = <T extends HTMLElement>(selector: string): T | null =>
+    host().querySelector<T>(selector);
+
+  async function answer(body: Customer = customer, etag = '"1"'): Promise<void> {
+    http
+      .expectOne((request) => request.url === url && request.method === 'GET')
+      .flush(body, { headers: { ETag: etag } });
+
+    await settle();
+  }
+
+  afterEach(() => http.verify());
+
+  describe('authorization', () => {
+    it('asks for nothing without customers.view', async () => {
+      await mount('conversations.view');
+
+      http.expectNone((request) => request.url === url);
+
+      expect(text()).toContain('do not have access to customers');
+    });
+
+    it('reads it with customers.view and offers nothing to change', async () => {
+      await mount('customers.view');
+      await answer();
+
+      expect(text()).toContain('WhatsApp customer');
+
+      // Viewing is not naming, and it is certainly not combining.
+      expect(query('[data-testid="save-name"]')).toBeNull();
+      expect(query('[data-testid="open-merge"]')).toBeNull();
+    });
+
+    it('offers both operations with customers.manage', async () => {
+      await mount('customers.view', 'customers.manage');
+      await answer();
+
+      expect(query('[data-testid="save-name"]')).not.toBeNull();
+      expect(query('[data-testid="open-merge"]')).not.toBeNull();
+    });
+  });
+
+  describe('what it shows', () => {
+    it('shows a masked identifier and says what it is', async () => {
+      await mount('customers.view');
+      await answer();
+
+      expect(text()).toContain('••••0123');
+
+      // Not a bare string of dots beside a badge: a reader using a screen reader
+      // is told what the value is.
+      expect(host().querySelector('.visually-hidden')?.textContent).toContain('Masked identifier');
+    });
+
+    it('says a website visitor has no lasting identifier rather than leaving a gap', async () => {
+      await mount('customers.view');
+
+      await answer({
+        ...customer,
+        identities: [],
+        channels: ['WebChat'],
+        label: 'Anonymous visitor',
+      });
+
+      expect(text()).toContain('No lasting identifier');
+      expect(text()).toContain('does not try to recognise them across visits');
+    });
+
+    it('withholds the history without conversations.view and says why', async () => {
+      await mount('customers.view');
+
+      await answer({ ...customer, conversations: [], canReadConversations: false });
+
+      // Not an empty list, which would read as "this customer has never
+      // written". The count is still shown, because knowing there are two is not
+      // being able to read them.
+      expect(query('[data-testid="conversations-denied"]')).not.toBeNull();
+      expect(text()).toContain('2 conversations');
+    });
+
+    it('lists the history with conversations.view', async () => {
+      await mount('customers.view', 'conversations.view');
+      await answer();
+
+      expect(host().querySelectorAll('[data-testid="conversations"] a').length).toBe(1);
+    });
+
+    it('renders a hostile label as text and never as markup', async () => {
+      await mount('customers.view');
+
+      await answer({
+        ...customer,
+        displayName: '<script>alert(1)</script>',
+        label: '<script>alert(1)</script>',
+      });
+
+      expect(text()).toContain('<script>alert(1)</script>');
+      expect(host().querySelector('script')).toBeNull();
+    });
+
+    it('tells somebody following an old link where the history went', async () => {
+      await mount('customers.view');
+
+      await answer({
+        ...customer,
+        mergedIntoCustomerId: otherId,
+        mergedAt: '2026-09-23T10:00:00+00:00',
+      });
+
+      expect(query('[data-testid="merged-notice"]')).not.toBeNull();
+      expect(text()).toContain('combined with another customer');
+
+      // And nothing is offered on a tombstone.
+      expect(query('[data-testid="save-name"]')).toBeNull();
+      expect(query('[data-testid="open-merge"]')).toBeNull();
+    });
+  });
+
+  describe('naming', () => {
+    it('sends the version it read and keeps the new one', async () => {
+      await mount('customers.view', 'customers.manage');
+      await answer(customer, '"7"');
+
+      const input = query<HTMLInputElement>('[data-testid="name-input"]')!;
+
+      input.value = 'Dana Okafor';
+      input.dispatchEvent(new Event('input'));
+
+      await settle();
+
+      query<HTMLButtonElement>('[data-testid="save-name"]')!.click();
+
+      const request = http.expectOne(
+        (candidate) => candidate.url === `${url}/display-name` && candidate.method === 'PUT',
+      );
+
+      expect(request.request.headers.get('If-Match')).toBe('"7"');
+      expect(request.request.body).toEqual({ displayName: 'Dana Okafor' });
+
+      request.flush(
+        { ...customer, displayName: 'Dana Okafor', label: 'Dana Okafor' },
+        {
+          headers: { ETag: '"8"' },
+        },
+      );
+
+      await settle();
+
+      expect(text()).toContain('Saved.');
+    });
+
+    it('keeps what somebody typed when they lose a race, and never retries', async () => {
+      await mount('customers.view', 'customers.manage');
+      await answer();
+
+      const input = query<HTMLInputElement>('[data-testid="name-input"]')!;
+
+      input.value = 'Dana Okafor';
+      input.dispatchEvent(new Event('input'));
+
+      await settle();
+
+      query<HTMLButtonElement>('[data-testid="save-name"]')!.click();
+
+      http
+        .expectOne((candidate) => candidate.url === `${url}/display-name`)
+        .flush(
+          { title: 'This customer changed' },
+          { status: 412, statusText: 'Precondition Failed' },
+        );
+
+      await settle();
+
+      // Said plainly, with the next step.
+      expect(text()).toContain('Somebody else changed this customer');
+      expect(text()).toContain('nothing you typed has been lost');
+
+      // And it is still in the box: retyping it would be the application's
+      // mistake, not the reader's.
+      expect(query<HTMLInputElement>('[data-testid="name-input"]')!.value).toBe('Dana Okafor');
+
+      // No automatic retry. The next request is only the one a person asks for.
+      http.expectNone((candidate) => candidate.url === `${url}/display-name`);
+    });
+
+    it('clears a name by sending null rather than an empty string', async () => {
+      await mount('customers.view', 'customers.manage');
+
+      await answer({ ...customer, displayName: 'Dana Okafor', label: 'Dana Okafor' });
+
+      const input = query<HTMLInputElement>('[data-testid="name-input"]')!;
+
+      input.value = '   ';
+      input.dispatchEvent(new Event('input'));
+
+      await settle();
+
+      query<HTMLButtonElement>('[data-testid="save-name"]')!.click();
+
+      const request = http.expectOne((candidate) => candidate.url === `${url}/display-name`);
+
+      expect(request.request.body).toEqual({ displayName: null });
+
+      request.flush(customer, { headers: { ETag: '"2"' } });
+
+      await settle();
+    });
+  });
+
+  describe('combining two customers', () => {
+    it('is never one click', async () => {
+      await mount('customers.view', 'customers.manage');
+      await answer();
+
+      // Opening the step is not performing it, and nothing is aimed anywhere yet.
+      query<HTMLButtonElement>('[data-testid="open-merge"]')!.click();
+
+      http
+        .expectOne((candidate) => candidate.url === directoryUrl)
+        .flush({
+          items: [
+            {
+              id: otherId,
+              displayName: null,
+              label: 'Anonymous visitor',
+              channels: ['WebChat'],
+              conversationCount: 1,
+              lastActivityAt: null,
+              createdAt: '2026-09-01T10:00:00+00:00',
+            },
+          ],
+          page: 1,
+          pageSize: 20,
+          totalCount: 1,
+        });
+
+      await settle();
+
+      const confirm = query<HTMLButtonElement>('[data-testid="confirm-merge"]')!;
+
+      expect(confirm.disabled).toBe(true);
+      expect(query('[data-testid="merge-confirmation"]')).toBeNull();
+    });
+
+    it('names both records and says what it does before it will run', async () => {
+      await mount('customers.view', 'customers.manage');
+      await answer();
+
+      query<HTMLButtonElement>('[data-testid="open-merge"]')!.click();
+
+      http
+        .expectOne((candidate) => candidate.url === directoryUrl)
+        .flush({
+          items: [
+            {
+              id: otherId,
+              displayName: null,
+              label: 'Anonymous visitor',
+              channels: ['WebChat'],
+              conversationCount: 1,
+              lastActivityAt: null,
+              createdAt: '2026-09-01T10:00:00+00:00',
+            },
+          ],
+          page: 1,
+          pageSize: 20,
+          totalCount: 1,
+        });
+
+      await settle();
+
+      query<HTMLInputElement>(`[data-testid="candidate-${otherId}"]`)!.click();
+
+      await settle();
+
+      expect(text()).toContain('WhatsApp customer');
+      expect(text()).toContain('Anonymous visitor');
+      expect(text()).toContain('combines their channel identities and conversation history');
+
+      // It asks the reader to assert it, rather than asserting it for them.
+      expect(text()).toContain('Confirm that these records belong to the same customer');
+      expect(text()).toContain('cannot be undone');
+
+      expect(query<HTMLButtonElement>('[data-testid="confirm-merge"]')!.disabled).toBe(false);
+    });
+
+    it('tells two unnamed customers apart, because the label cannot', async () => {
+      // Found in the browser: two website visitors both render as "Anonymous
+      // visitor", so the picker offered a choice between two identical rows for
+      // an operation that cannot be undone.
+      await mount('customers.view', 'customers.manage');
+
+      await answer({ ...customer, channels: ['WebChat'], label: 'Anonymous visitor' });
+
+      query<HTMLButtonElement>('[data-testid="open-merge"]')!.click();
+
+      http
+        .expectOne((candidate) => candidate.url === directoryUrl)
+        .flush({
+          items: [
+            {
+              id: otherId,
+              displayName: null,
+              label: 'Anonymous visitor',
+              channels: ['WebChat'],
+              conversationCount: 1,
+              lastActivityAt: null,
+              createdAt: '2026-09-01T10:00:00+00:00',
+            },
+          ],
+          page: 1,
+          pageSize: 20,
+          totalCount: 1,
+        });
+
+      await settle();
+
+      // Each row says which channel and when the workspace first heard from
+      // them -- the only distinguishing facts the platform actually holds.
+      expect(text()).toContain('Website · first seen');
+
+      query<HTMLInputElement>(`[data-testid="candidate-${otherId}"]`)!.click();
+
+      await settle();
+
+      const confirmation = query('[data-testid="merge-confirmation"]')!.textContent ?? '';
+
+      // Both sides of the confirmation are distinguishable, so somebody cannot
+      // combine the wrong pair by reading two identical names. The dates are
+      // formatted for the reader's locale, so they are compared as the component
+      // would render them rather than as a hard-coded English string.
+      const on = (iso: string): string =>
+        new Date(iso).toLocaleDateString(undefined, { dateStyle: 'medium' });
+
+      expect(confirmation).toContain(`first seen ${on('2026-08-01T10:00:00+00:00')}`);
+      expect(confirmation).toContain(`first seen ${on('2026-09-01T10:00:00+00:00')}`);
+      expect(on('2026-08-01T10:00:00+00:00')).not.toEqual(on('2026-09-01T10:00:00+00:00'));
+    });
+
+    it('never offers this customer as its own target', async () => {
+      await mount('customers.view', 'customers.manage');
+      await answer();
+
+      query<HTMLButtonElement>('[data-testid="open-merge"]')!.click();
+
+      http
+        .expectOne((candidate) => candidate.url === directoryUrl)
+        .flush({
+          items: [
+            {
+              id: customerId,
+              displayName: null,
+              label: 'WhatsApp customer',
+              channels: ['WhatsApp'],
+              conversationCount: 2,
+              lastActivityAt: null,
+              createdAt: '2026-08-01T10:00:00+00:00',
+            },
+          ],
+          page: 1,
+          pageSize: 20,
+          totalCount: 1,
+        });
+
+      await settle();
+
+      expect(query(`[data-testid="candidate-${customerId}"]`)).toBeNull();
+      expect(text()).toContain('nobody else in this workspace to combine with');
+    });
+
+    it('asks for a bounded list of candidates, never for everybody', async () => {
+      await mount('customers.view', 'customers.manage');
+      await answer();
+
+      query<HTMLButtonElement>('[data-testid="open-merge"]')!.click();
+
+      const request = http.expectOne((candidate) => candidate.url === directoryUrl);
+
+      expect(request.request.params.get('pageSize')).toBe('20');
+
+      request.flush({ items: [], page: 1, pageSize: 20, totalCount: 0 });
+
+      await settle();
+    });
+  });
+});

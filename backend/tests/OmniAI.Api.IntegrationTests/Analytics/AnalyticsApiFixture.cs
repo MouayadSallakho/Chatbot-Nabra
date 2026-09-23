@@ -5,9 +5,11 @@ using OmniAI.Api.IntegrationTests.Knowledge;
 using OmniAI.Domain.Ai;
 using OmniAI.Domain.AiAgents;
 using OmniAI.Domain.Conversations;
+using OmniAI.Domain.Customers;
 using OmniAI.Domain.Tenants;
 using OmniAI.Domain.WebChat;
 using OmniAI.Infrastructure.Persistence;
+using OmniAI.Testing;
 
 namespace OmniAI.Api.IntegrationTests.Analytics;
 
@@ -59,7 +61,7 @@ public sealed class AnalyticsApiFixture : RoleApiFixture
             AgentInstructions.Create("Be helpful."),
             now);
 
-        Conversation conversation = Conversation.Start(workspace, ChannelKind.WebChat, now);
+        Conversation conversation = Conversation.Start(workspace, CustomerId.New(), ChannelKind.WebChat, now);
 
         WebChatEndpoint endpoint = WebChatEndpoint.Create(
             workspace,
@@ -89,6 +91,7 @@ public sealed class AnalyticsApiFixture : RoleApiFixture
         await using OmniAiDbContext context = CreateDbContext();
 
         context.AiAgents.Add(agent);
+        context.AddOwner(conversation);
         context.Conversations.Add(conversation);
         context.WebChatEndpoints.Add(endpoint);
         context.WebChatSessions.Add(session);

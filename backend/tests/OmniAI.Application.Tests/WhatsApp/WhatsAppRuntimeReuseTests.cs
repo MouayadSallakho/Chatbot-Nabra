@@ -2,6 +2,7 @@ using OmniAI.Application.Tests.WebChat;
 using OmniAI.Application.WhatsApp;
 using OmniAI.Application.WhatsApp.Persistence;
 using OmniAI.Domain.Conversations;
+using OmniAI.Domain.Customers;
 using OmniAI.Domain.WhatsApp;
 using OmniAI.Testing;
 
@@ -128,6 +129,7 @@ public sealed class WhatsAppRuntimeReuseTests
             // WhatsApp mapping hands out its id, and the runtime can find it.
             Conversation conversation = Conversation.Start(
                 harness.Workspace,
+                CustomerId.New(),
                 ChannelKind.WhatsApp,
                 Noon);
 

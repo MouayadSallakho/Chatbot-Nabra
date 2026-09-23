@@ -1,3 +1,4 @@
+using OmniAI.Domain.Customers;
 using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
@@ -457,7 +458,7 @@ public sealed class MessagePersistenceTests(PostgresTestDatabase database)
         context.Tenants.Add(tenant);
         await context.SaveChangesAsync();
 
-        return Conversation.Start(tenant.Id, ChannelKind.WhatsApp, T1);
+        return Conversation.Start(tenant.Id, CustomerId.New(), ChannelKind.WhatsApp, T1);
     }
 
     private async Task SaveAsync(Conversation conversation)
@@ -469,6 +470,7 @@ public sealed class MessagePersistenceTests(PostgresTestDatabase database)
             return;
         }
 
+        context.AddOwner(conversation);
         context.Conversations.Add(conversation);
         await context.SaveChangesAsync();
     }

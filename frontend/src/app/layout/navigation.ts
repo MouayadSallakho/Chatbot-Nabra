@@ -80,6 +80,20 @@ export const NAV_ITEMS: readonly NavItem[] = [
     permissions: ['conversations.view'],
   },
   {
+    // Real from Phase 30: who the workspace talks to, across every channel.
+    //
+    // Beside Conversations rather than inside it, because the two answer
+    // different questions and are read by different people: a directory is an
+    // administrative view of the customer base, and a transcript is what
+    // somebody said in confidence. customers.view is deliberately not
+    // conversations.view.
+    label: 'Customers',
+    path: 'customers',
+    icon: 'team',
+    implemented: true,
+    permissions: ['customers.view'],
+  },
+  {
     // Real from Phase 17: written documents an agent can actually answer from,
     // not a placeholder. File upload, crawling and connectors are still absent,
     // and the screens say so rather than showing controls that would fail.

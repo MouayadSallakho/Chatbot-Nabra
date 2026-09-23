@@ -3,6 +3,7 @@ using OmniAI.Application.Tests.WebChat;
 using OmniAI.Application.WhatsApp;
 using OmniAI.Application.WhatsApp.Persistence;
 using OmniAI.Domain.Conversations;
+using OmniAI.Domain.Customers;
 using OmniAI.Domain.Tenants;
 using OmniAI.Domain.WhatsApp;
 using OmniAI.Testing;
@@ -158,6 +159,7 @@ public sealed class WhatsAppOutboundTests
 
             Conversation conversation = Conversation.Start(
                 harness.Workspace,
+                CustomerId.New(),
                 ChannelKind.WhatsApp,
                 Noon);
 

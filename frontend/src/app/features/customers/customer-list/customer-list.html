@@ -1,0 +1,131 @@
+<div class="page">
+  <app-page-header
+    heading="Customers"
+    description="Everybody this workspace has talked to, however they got in touch. One person can reach you on more than one channel."
+  >
+    @if (canView()) {
+      <button
+        pageActions
+        type="button"
+        class="btn btn-secondary"
+        (click)="refresh()"
+        [disabled]="refreshing()"
+        data-testid="refresh"
+      >
+        @if (refreshing()) {
+          <span class="spinner" aria-hidden="true"></span>
+        }
+        <span class="btn-label">{{ refreshing() ? 'Refreshing…' : 'Refresh' }}</span>
+      </button>
+    }
+  </app-page-header>
+
+  <div class="page-section">
+    @if (!canView()) {
+      <!--
+        Its own permission, and the same honest refusal used everywhere else:
+        what is true and what to do, with no status code and no permission name.
+      -->
+      <div class="card">
+        <app-empty-state
+          icon="team"
+          heading="You do not have access to customers"
+          description="Seeing who this workspace talks to needs a permission your roles do not include. Ask somebody who administers this workspace if you need it."
+        />
+      </div>
+    } @else if (loading()) {
+      <div class="card" aria-busy="true">
+        <p class="text-small text-secondary">Loading customers…</p>
+      </div>
+    } @else if (failure(); as error) {
+      <div class="card">
+        <app-empty-state
+          icon="team"
+          heading="Customers could not be loaded"
+          [description]="error.message"
+        >
+          <button stateActions type="button" class="btn btn-secondary" (click)="refresh()">
+            Try again
+          </button>
+        </app-empty-state>
+      </div>
+    } @else if (rows().length === 0) {
+      <div class="card">
+        <app-empty-state
+          icon="team"
+          heading="Nobody has been in touch yet"
+          description="A customer appears here the first time somebody writes to this workspace, on any channel. Nothing is created by a page view."
+          data-testid="no-customers"
+        />
+      </div>
+    } @else {
+      <!--
+        Cards rather than a table. Every row carries four unrelated facts, two of
+        which are lists, and a table of those at 390px is a table with a
+        horizontal scrollbar. Each card is a link, so the whole row is the target
+        rather than a small chevron at the end of it.
+      -->
+      <ul class="customer-list" data-testid="customers">
+        @for (customer of rows(); track customer.id) {
+          <li>
+            <a
+              class="customer"
+              [routerLink]="[customer.id]"
+              [attr.data-testid]="'customer-' + customer.id"
+            >
+              <span class="customer-name">{{ customer.label }}</span>
+
+              <span class="customer-channels">
+                <!--
+                  A word, never a colour alone. Somebody who cannot tell the
+                  badges apart still reads which channels this person uses.
+                -->
+                @for (channel of customer.channels; track channel) {
+                  <span class="channel-badge" [class]="'channel-' + channel.toLowerCase()">{{
+                    channel === 'WebChat' ? 'Website' : channel
+                  }}</span>
+                }
+                @if (customer.channels.length === 0) {
+                  <span class="text-small text-muted">No channel yet</span>
+                }
+              </span>
+
+              <span class="text-small text-secondary customer-count">{{
+                conversations(customer.conversationCount)
+              }}</span>
+
+              <span class="text-small text-muted customer-activity">{{
+                activity(customer.lastActivityAt)
+              }}</span>
+            </a>
+          </li>
+        }
+      </ul>
+
+      <div class="customer-paging">
+        <p class="text-small text-muted" data-testid="summary">{{ summary() }}</p>
+
+        <div class="customer-paging-buttons">
+          <button
+            type="button"
+            class="btn btn-secondary"
+            (click)="go(pageNumber() - 1)"
+            [disabled]="!hasPrevious() || refreshing()"
+            data-testid="previous"
+          >
+            Previous
+          </button>
+          <button
+            type="button"
+            class="btn btn-secondary"
+            (click)="go(pageNumber() + 1)"
+            [disabled]="!hasNext() || refreshing()"
+            data-testid="next"
+          >
+            Next
+          </button>
+        </div>
+      </div>
+    }
+  </div>
+</div>

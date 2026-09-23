@@ -3,6 +3,7 @@ using OmniAI.Application.WebChat.Persistence;
 using OmniAI.Application.WebChat.Protection;
 using OmniAI.Domain.AiAgents;
 using OmniAI.Domain.Conversations;
+using OmniAI.Domain.Customers;
 using OmniAI.Domain.WebChat;
 
 namespace OmniAI.Application.WebChat.Hosted;
@@ -159,8 +160,21 @@ public sealed class StartWebChatConversationHandler(
 
         // The channel is decided here, not by the caller. A visitor cannot claim
         // to be arriving over WhatsApp.
+        // A public visitor arrives with no identity this platform has ever seen,
+        // so a new conversation is a new customer. That is the honest answer: the
+        // web transport has no durable identity to key on, and manufacturing one
+        // from a browser marker, a network address or a device signature would be
+        // exactly the fingerprint-based identity resolution this platform refuses
+        // to do. Two visits by the same person become one customer only when an
+        // administrator says so.
+        Customer customer = Customer.Create(
+            endpoint.TenantId,
+            displayName: null,
+            now);
+
         Conversation conversation = Conversation.Start(
             endpoint.TenantId,
+            customer.Id,
             ChannelKind.WebChat,
             now);
 
@@ -184,7 +198,7 @@ public sealed class StartWebChatConversationHandler(
             now + _limits.SessionLifetime);
 
         await _store
-            .StartConversationAsync(conversation, session, cancellationToken)
+            .StartConversationAsync(conversation, customer, session, cancellationToken)
             .ConfigureAwait(false);
 
         return new StartedWebChatSession(

@@ -40,6 +40,12 @@
       card entered into it.
     -->
     <Compile Include="..\Shared\FakeBillingProvider.cs" Link="FakeBillingProvider.cs" />
+    <!--
+      From Phase 30 a conversation carries a customer and the database enforces
+      it, so a test whose subject is something else still needs an owner row.
+      Shared rather than copied, for the same reason the PostgreSQL harness is.
+    -->
+    <Compile Include="..\Shared\TestCustomers.cs" Link="TestCustomers.cs" />
   </ItemGroup>
 
   <ItemGroup>

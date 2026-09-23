@@ -1,0 +1,206 @@
+// Every value is a semantic token, so the page is readable in both themes
+// without a second stylesheet.
+
+.page-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.card-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-color: var(--info-border);
+  background: var(--info-bg);
+  color: var(--info-fg);
+}
+
+.customer-identity {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.customer-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-5);
+  margin: 0;
+
+  div {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    min-width: 0;
+  }
+
+  dt,
+  dd {
+    margin: 0;
+  }
+
+  dd {
+    color: var(--text-primary);
+    font-weight: 600;
+
+    // A customer's label is whatever somebody typed, including one very long
+    // word. Breaking it is better than pushing the page sideways.
+    overflow-wrap: anywhere;
+  }
+}
+
+.customer-subheading {
+  margin: 0 0 var(--space-3);
+  font-size: 0.8125rem;
+  font-weight: 650;
+  letter-spacing: var(--letter-spacing-caps);
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.identity-list,
+.history-list,
+.candidate-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.identity {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+// The badge carries the channel's name. Colour is an addition to the word,
+// never a replacement for it.
+.channel-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-pill);
+  background: var(--surface-inset);
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.channel-whatsapp {
+  border-color: var(--success-border);
+  background: var(--success-bg);
+  color: var(--success-fg);
+}
+
+.channel-webchat {
+  border-color: var(--accent-subtle-border);
+  background: var(--accent-subtle);
+  color: var(--accent);
+}
+
+.customer-name-form,
+.customer-merge {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  align-items: flex-start;
+}
+
+.customer-name-form .field {
+  width: 100%;
+  max-width: 28rem;
+}
+
+.form-problem {
+  color: var(--danger-fg);
+}
+
+.customer-name-actions,
+.customer-merge-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.merge-picker {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.candidate {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  cursor: pointer;
+
+  &:hover {
+    border-color: var(--border-default);
+  }
+}
+
+.candidate-details {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.candidate-name {
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+// Warning colours, because this is the one operation on the page that cannot be
+// undone. The words say so too: colour is never the only signal.
+.merge-confirmation {
+  width: 100%;
+  padding: var(--space-4);
+  border: 1px solid var(--warning-border);
+  border-radius: var(--radius-lg);
+  background: var(--warning-bg);
+  color: var(--warning-fg);
+
+  p {
+    margin: 0 0 var(--space-2);
+
+    &:last-child {
+      margin-bottom: 0;
+    }
+  }
+}
+
+.history {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  color: inherit;
+  text-decoration: none;
+
+  &:hover {
+    border-color: var(--border-default);
+    background: var(--surface-muted);
+  }
+}
