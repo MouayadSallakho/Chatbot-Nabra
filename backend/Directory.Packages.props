@@ -156,6 +156,35 @@
     <PackageVersion Include="CsvHelper" Version="33.1.0" />
   </ItemGroup>
 
+  <ItemGroup Label="Reports">
+    <!--
+      PDF reports with real Unicode text. PdfPig's writer places one glyph per
+      character and has no shaping engine, so Arabic would print as disconnected
+      letters in logical order whatever font was embedded.
+
+      SkiaSharp (MIT, .NET Foundation) writes the PDF through Skia's own PDF
+      backend and embeds the bundled font as a subset. SkiaSharp.HarfBuzz and
+      HarfBuzzSharp (MIT) shape each run with HarfBuzz: Arabic joining, the
+      lam-alef ligature, marks and kerning come from the font's OpenType tables,
+      not from code in this repository. Unicode.Bidi (MIT) is a port of the Rust
+      unicode-bidi crate (UAX #9, Unicode 16) and splits a line into visual runs
+      with their embedding levels; nothing reverses strings by hand.
+
+      QuestPDF was rejected: its Community licence is free only below a revenue
+      threshold, which is an open commercial obligation for a SaaS. iText is
+      AGPL. PDFsharp has no complex-script shaping.
+
+      The Linux native assets are the NoDependencies build: fonts are loaded from
+      the bundled files, never from fontconfig or the host.
+    -->
+    <PackageVersion Include="SkiaSharp" Version="4.152.1" />
+    <PackageVersion Include="SkiaSharp.HarfBuzz" Version="4.152.1" />
+    <PackageVersion Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="4.152.1" />
+    <PackageVersion Include="HarfBuzzSharp" Version="14.2.1.201" />
+    <PackageVersion Include="HarfBuzzSharp.NativeAssets.Linux" Version="14.2.1.201" />
+    <PackageVersion Include="Unicode.Bidi" Version="0.3.18" />
+  </ItemGroup>
+
   <ItemGroup Label="Testing">
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <!--

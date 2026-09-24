@@ -167,6 +167,7 @@ internal sealed class RecordingAnalyticsReader : IWorkspaceAnalyticsReader
     public Task<WorkspaceAnalytics> ReadAsync(
         TenantId tenantId,
         AnalyticsWindow window,
+        AnalyticsBreakdown breakdown,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(window);
@@ -180,7 +181,7 @@ internal sealed class RecordingAnalyticsReader : IWorkspaceAnalyticsReader
                 window.Label,
                 window.From,
                 window.To,
-                window.Range.Days(),
+                window.DayCount,
                 AnalyticsWindow.TimeZone),
             new AnalyticsSummary(0, 0, 0, 0, 0),
             new AnalyticsSnapshot(0, 0, 0),

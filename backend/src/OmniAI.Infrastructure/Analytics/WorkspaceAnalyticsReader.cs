@@ -37,36 +37,33 @@ namespace OmniAI.Infrastructure.Analytics;
 internal sealed class WorkspaceAnalyticsReader(OmniAiDbContext context)
     : IWorkspaceAnalyticsReader
 {
-    /// <summary>How many agents a breakdown will name.</summary>
-    /// <remarks>
-    /// Ten. A bounded list is the point: an unbounded "every agent" would grow a
-    /// response with the workspace, and the eleventh agent by volume is not what
-    /// somebody opens a dashboard to find.
-    /// </remarks>
-    private const int MaxAgents = 10;
-
-    /// <summary>How many provider models a breakdown will name.</summary>
-    private const int MaxModels = 10;
-
     /// <summary>
-    /// How many raw model groupings to read before merging them down.
+    /// How many raw model groupings to read per model a breakdown may name.
     /// </summary>
     /// <remarks>
-    /// Comfortably more than <see cref="MaxModels"/>, because one reported model
-    /// can arrive as several stored pairs: an alias, the dated builds it resolved
-    /// to, and the calls that failed before resolving to anything.
+    /// Comfortably more than one, because one reported model can arrive as
+    /// several stored pairs: an alias, the dated builds it resolved to, and the
+    /// calls that failed before resolving to anything.
     /// </remarks>
-    private const int MaxModelRows = MaxModels * 6;
+    private const int ModelRowsPerModel = 6;
 
     private readonly OmniAiDbContext _context =
         context ?? throw new ArgumentNullException(nameof(context));
 
+    /// <remarks>
+    /// The breakdown limits are the only thing a dashboard and a report pass
+    /// differently. A bounded list is the point on the dashboard: the eleventh
+    /// agent by volume is not what somebody opens it to find. A report lists
+    /// every row up to its own export bound.
+    /// </remarks>
     public async Task<WorkspaceAnalytics> ReadAsync(
         TenantId tenantId,
         AnalyticsWindow window,
+        AnalyticsBreakdown breakdown,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(window);
+        ArgumentNullException.ThrowIfNull(breakdown);
 
         AnalyticsSummary summary =
             await SummaryAsync(tenantId, window, cancellationToken).ConfigureAwait(false);
@@ -81,7 +78,7 @@ internal sealed class WorkspaceAnalyticsReader(OmniAiDbContext context)
             await ChannelsAsync(tenantId, window, cancellationToken).ConfigureAwait(false);
 
         IReadOnlyList<AnalyticsAgent> agents =
-            await AgentsAsync(tenantId, window, cancellationToken).ConfigureAwait(false);
+            await AgentsAsync(tenantId, window, breakdown.MaxAgents, cancellationToken).ConfigureAwait(false);
 
         AnalyticsAiOperations operations =
             await AiOperationsAsync(tenantId, window, cancellationToken).ConfigureAwait(false);
@@ -90,14 +87,14 @@ internal sealed class WorkspaceAnalyticsReader(OmniAiDbContext context)
             await WhatsAppAsync(tenantId, window, cancellationToken).ConfigureAwait(false);
 
         (AnalyticsAiUsage usage, IReadOnlyList<AnalyticsModelUsage> models) =
-            await ProviderUsageAsync(tenantId, window, cancellationToken).ConfigureAwait(false);
+            await ProviderUsageAsync(tenantId, window, breakdown.MaxModels, cancellationToken).ConfigureAwait(false);
 
         return new WorkspaceAnalytics(
             new AnalyticsPeriod(
                 window.Label,
                 window.From,
                 window.To,
-                window.Range.Days(),
+                window.DayCount,
                 AnalyticsWindow.TimeZone),
             summary,
             current,
@@ -286,6 +283,7 @@ internal sealed class WorkspaceAnalyticsReader(OmniAiDbContext context)
     private async Task<IReadOnlyList<AnalyticsAgent>> AgentsAsync(
         TenantId tenantId,
         AnalyticsWindow window,
+        int maxAgents,
         CancellationToken cancellationToken)
     {
         List<AgentCount> webConversations = await
@@ -386,7 +384,8 @@ internal sealed class WorkspaceAnalyticsReader(OmniAiDbContext context)
                 .OrderByDescending(agent => agent.ConversationsStarted)
                 .ThenByDescending(agent => agent.CustomerMessages)
                 .ThenBy(agent => agent.Name, StringComparer.Ordinal)
-                .Take(MaxAgents),
+                .ThenBy(agent => agent.AiAgentId)
+                .Take(maxAgents),
         ];
     }
 
@@ -457,33 +456,11 @@ internal sealed class WorkspaceAnalyticsReader(OmniAiDbContext context)
 
     // ------------------------------------------------------------------- bases
 
-    /// <summary>Conversations this workspace started inside the window.</summary>
     private IQueryable<Conversation> Conversations(TenantId tenantId, AnalyticsWindow window) =>
-        _context.Conversations
-            .AsNoTracking()
-            .Where(conversation =>
-                conversation.TenantId == tenantId
-                && conversation.StartedAt >= window.From
-                && conversation.StartedAt < window.To);
+        AnalyticsQueries.ConversationsStarted(_context, tenantId, window);
 
-    /// <summary>
-    /// Messages sent inside the window, in this workspace's conversations.
-    /// </summary>
-    /// <remarks>
-    /// <strong>The message's own instant, not its conversation's.</strong> A
-    /// conversation opened in March and still running in June contributes its June
-    /// messages to June. Note that this is the <em>analytics</em> reading of time
-    /// and has nothing to do with transcript order, which is and remains the
-    /// ingestion sequence.
-    /// </remarks>
     private IQueryable<Message> Messages(TenantId tenantId, AnalyticsWindow window) =>
-        from message in _context.Set<Message>().AsNoTracking()
-        join conversation in _context.Conversations.AsNoTracking()
-            on message.ConversationId equals conversation.Id
-        where conversation.TenantId == tenantId
-            && message.SentAt >= window.From
-            && message.SentAt < window.To
-        select message;
+        AnalyticsQueries.MessagesSent(_context, tenantId, window);
 
 
     /// <summary>
@@ -512,6 +489,7 @@ internal sealed class WorkspaceAnalyticsReader(OmniAiDbContext context)
         ProviderUsageAsync(
             TenantId tenantId,
             AnalyticsWindow window,
+            int maxModels,
             CancellationToken cancellationToken)
     {
         IQueryable<AiProviderUsage> operations = Operations(tenantId, window);
@@ -596,7 +574,7 @@ internal sealed class WorkspaceAnalyticsReader(OmniAiDbContext context)
                         cost.Calls)),
             ]);
 
-        return (usage, await ModelsAsync(operations, cancellationToken).ConfigureAwait(false));
+        return (usage, await ModelsAsync(operations, maxModels, cancellationToken).ConfigureAwait(false));
     }
 
     /// <remarks>
@@ -615,8 +593,11 @@ internal sealed class WorkspaceAnalyticsReader(OmniAiDbContext context)
     /// </remarks>
     private static async Task<IReadOnlyList<AnalyticsModelUsage>> ModelsAsync(
         IQueryable<AiProviderUsage> operations,
+        int maxModels,
         CancellationToken cancellationToken)
     {
+        int maxModelRows = checked(maxModels * ModelRowsPerModel);
+
         // Grouped on the two model columns as they are stored, because choosing
         // between them -- a COALESCE, a conditional -- is not something this
         // provider translates over converted value objects, and a grouping that
@@ -635,7 +616,7 @@ internal sealed class WorkspaceAnalyticsReader(OmniAiDbContext context)
                 operation.OperationType,
             })
             .OrderByDescending(group => group.Count())
-            .Take(MaxModelRows)
+            .Take(maxModelRows)
             .Select(group => new ModelRow(
                 group.Key.Provider,
                 group.Key.RequestedModel,
@@ -675,7 +656,10 @@ internal sealed class WorkspaceAnalyticsReader(OmniAiDbContext context)
                     group.Sum(row => row.OutputTokens),
                     group.Sum(row => row.UnratedCalls)))
                 .OrderByDescending(bucket => bucket.Calls)
-                .Take(MaxModels),
+                .ThenBy(bucket => bucket.Provider)
+                .ThenBy(bucket => bucket.Model, StringComparer.Ordinal)
+                .ThenBy(bucket => bucket.OperationType)
+                .Take(maxModels),
         ];
 
         List<ModelCostRow> costRows = await operations
@@ -689,7 +673,7 @@ internal sealed class WorkspaceAnalyticsReader(OmniAiDbContext context)
                 operation.Currency,
             })
             .OrderByDescending(group => group.Count())
-            .Take(MaxModelRows)
+            .Take(maxModelRows)
             .Select(group => new ModelCostRow(
                 group.Key.Provider,
                 group.Key.RequestedModel,

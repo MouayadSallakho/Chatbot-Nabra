@@ -21,7 +21,9 @@ namespace OmniAI.Api.IntegrationTests.Analytics;
 /// must cost nothing, and the cheapest way to prove it is a generator that throws
 /// the moment anybody reaches for it.
 /// </remarks>
-public sealed class AnalyticsApiFixture : RoleApiFixture
+// Unsealed in Phase 31 so the reports fixture can inherit its seeding helpers
+// and its embedding tripwire rather than copying them.
+public class AnalyticsApiFixture : RoleApiFixture
 {
     private readonly RecordingEmbeddingProvider _embeddings = new();
 

@@ -58,6 +58,8 @@ public sealed class GetWorkspaceAnalyticsHandler(
 
         AnalyticsWindow window = query.Range.Window(_clock.GetUtcNow());
 
-        return await _reader.ReadAsync(tenantId, window, cancellationToken).ConfigureAwait(false);
+        return await _reader
+            .ReadAsync(tenantId, window, AnalyticsBreakdown.Dashboard, cancellationToken)
+            .ConfigureAwait(false);
     }
 }

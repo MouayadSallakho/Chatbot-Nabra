@@ -1,0 +1,121 @@
+// Every value is a semantic token, so light and dark need no separate rules.
+
+.page-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.generate,
+.generated {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.generate-form {
+  display: grid;
+  gap: var(--space-4);
+  max-inline-size: 44rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-inline-size: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.field-row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-4);
+}
+
+.format-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.format-option {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+
+  &:has(input:checked) {
+    border-color: var(--accent);
+    background: var(--accent-subtle);
+  }
+
+  &:has(input:focus-visible) {
+    outline: var(--focus-ring-width) solid var(--accent);
+    outline-offset: var(--focus-ring-offset);
+  }
+}
+
+.form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.form-error {
+  margin: 0;
+  color: var(--danger-fg);
+}
+
+.report-name {
+  font-weight: 600;
+  min-inline-size: 10rem;
+}
+
+.format {
+  display: block;
+  font-weight: 400;
+}
+
+// A schedule's name is whatever somebody typed; it wraps rather than widening
+// the table past its container.
+.requester {
+  min-inline-size: 10rem;
+  max-inline-size: 18rem;
+  overflow-wrap: anywhere;
+}
+
+.nowrap {
+  white-space: nowrap;
+}
+
+.failure {
+  margin: var(--space-1) 0 0;
+  min-inline-size: 11rem;
+  max-inline-size: 18rem;
+}
+
+.paging {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.paging-buttons {
+  display: flex;
+  gap: var(--space-2);
+}
+
+@media (min-width: 720px) {
+  .field-row {
+    grid-template-columns: 1fr 1fr;
+  }
+}

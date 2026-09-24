@@ -206,6 +206,14 @@ public sealed class OmniAiDbContext(DbContextOptions<OmniAiDbContext> options)
     public DbSet<Domain.Ai.AiProviderUsage> AiProviderUsages =>
         Set<Domain.Ai.AiProviderUsage>();
 
+    /// <summary>Report requests, manual and scheduled, and where each got to.</summary>
+    public DbSet<Domain.Reports.ReportExecution> ReportExecutions => Set<Domain.Reports.ReportExecution>();
+
+    /// <summary>Metadata for generated report files. The bytes live in the artifact store.</summary>
+    public DbSet<Domain.Reports.ReportArtifact> ReportArtifacts => Set<Domain.Reports.ReportArtifact>();
+
+    public DbSet<Domain.Reports.ReportSchedule> ReportSchedules => Set<Domain.Reports.ReportSchedule>();
+
     /// <summary>
     /// Which agents may draw on which documents.
     /// </summary>

@@ -42,6 +42,9 @@ export type PermissionCode =
   | 'knowledge.view'
   | 'knowledge.manage'
   | 'analytics.view'
+  | 'reports.view'
+  | 'reports.generate'
+  | 'reports.schedule'
   | 'billing.view'
   | 'billing.manage';
 

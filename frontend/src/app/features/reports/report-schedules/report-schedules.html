@@ -1,0 +1,259 @@
+<div class="page">
+  <app-page-header
+    heading="Reports"
+    description="Weekly and monthly reports, generated automatically for each completed period."
+  >
+    @if (canView() && canSchedule() && schedulable().length > 0 && !formOpen()) {
+      <button
+        pageActions
+        type="button"
+        class="btn btn-primary"
+        (click)="startCreate()"
+        data-testid="new-schedule"
+      >
+        New schedule
+      </button>
+    }
+  </app-page-header>
+
+  <app-reports-nav />
+
+  <p class="visually-hidden" aria-live="polite" data-testid="announcement">{{ announcement() }}</p>
+
+  <div class="page-section">
+    @if (!canView()) {
+      <div class="card">
+        <app-empty-state
+          icon="analytics"
+          heading="You do not have access to reports"
+          description="Seeing report schedules needs a permission your roles do not include. Ask somebody who administers this workspace if you need it."
+        />
+      </div>
+    } @else if (loading()) {
+      <div class="card card-body" aria-busy="true">
+        <p class="text-small text-secondary">Loading schedules…</p>
+      </div>
+    } @else {
+      <!-- What a schedule does, stated once and plainly. -->
+      <p class="alert alert-info delivery-note" data-testid="delivery-note">
+        Generated reports are available in Reports. Nothing is emailed or sent anywhere else. Weekly
+        schedules run every Monday for the previous seven days; monthly schedules run on the first
+        of the month for the previous calendar month. All times are UTC.
+      </p>
+
+      @if (failure(); as error) {
+        <p class="alert alert-danger" role="alert">{{ error.message }}</p>
+      }
+
+      @if (formOpen()) {
+        <section class="card card-body" aria-labelledby="schedule-form-heading">
+          <h2 id="schedule-form-heading" class="text-section-title">
+            {{ editing() === null ? 'New schedule' : 'Edit schedule' }}
+          </h2>
+
+          <form class="schedule-form" [formGroup]="form" (ngSubmit)="save()" novalidate>
+            <div class="field">
+              <label class="field-label" for="schedule-name">Name</label>
+              <input
+                id="schedule-name"
+                class="input"
+                type="text"
+                formControlName="name"
+                maxlength="100"
+                autocomplete="off"
+                [attr.aria-invalid]="nameError()"
+                [attr.aria-describedby]="nameError() ? 'schedule-name-error' : null"
+              />
+              @if (nameError()) {
+                <p id="schedule-name-error" class="form-error" role="alert">
+                  Give the schedule a name of up to 100 characters.
+                </p>
+              }
+            </div>
+
+            <div class="field">
+              <label class="field-label" for="schedule-type">Report</label>
+              <select id="schedule-type" class="select" formControlName="type">
+                @for (entry of schedulable(); track entry.type) {
+                  <option [value]="entry.type">{{ entry.title }}</option>
+                }
+              </select>
+            </div>
+
+            <div class="field">
+              <label class="field-label" for="schedule-format">Format</label>
+              <select id="schedule-format" class="select" formControlName="format">
+                @for (format of formatsFor(form.controls.type.value); track format) {
+                  <option [value]="format">{{ formatLabel(format) }}</option>
+                }
+              </select>
+            </div>
+
+            <fieldset class="field">
+              <legend class="field-label">How often</legend>
+              <div class="frequency-options">
+                <label class="frequency-option">
+                  <input
+                    type="radio"
+                    class="form-check-input"
+                    formControlName="frequency"
+                    value="Weekly"
+                  />
+                  <span
+                    >Weekly <span class="text-small text-muted">— the previous 7 days</span></span
+                  >
+                </label>
+                <label class="frequency-option">
+                  <input
+                    type="radio"
+                    class="form-check-input"
+                    formControlName="frequency"
+                    value="Monthly"
+                  />
+                  <span
+                    >Monthly
+                    <span class="text-small text-muted">— the previous calendar month</span></span
+                  >
+                </label>
+              </div>
+            </fieldset>
+
+            @if (saveFailure(); as error) {
+              <div class="alert alert-danger" role="alert" data-testid="save-error">
+                <p class="alert-text">
+                  @if (error.kind === 'stale') {
+                    This schedule was changed somewhere else since you opened it. Your edit was not
+                    saved.
+                  } @else {
+                    {{ error.message }}
+                  }
+                </p>
+                @if (error.kind === 'stale') {
+                  <button
+                    type="button"
+                    class="btn btn-secondary btn-sm"
+                    (click)="reloadEditing()"
+                    data-testid="reload"
+                  >
+                    Reload the schedule
+                  </button>
+                }
+              </div>
+            }
+
+            <div class="form-actions">
+              <button
+                type="submit"
+                class="btn btn-primary"
+                [disabled]="saving()"
+                data-testid="save"
+              >
+                {{ saving() ? 'Saving…' : 'Save schedule' }}
+              </button>
+              <button type="button" class="btn btn-ghost" (click)="cancel()">Cancel</button>
+            </div>
+          </form>
+        </section>
+      }
+
+      @if (schedules().length === 0) {
+        <div class="card">
+          <app-empty-state
+            icon="analytics"
+            heading="No schedules yet"
+            [description]="
+              canSchedule()
+                ? 'Create one to have a report generated every week or every month.'
+                : 'Creating schedules needs a permission your roles do not include.'
+            "
+            data-testid="no-schedules"
+          />
+        </div>
+      } @else {
+        <div class="table-wrap">
+          <table class="table" data-testid="schedules">
+            <caption class="visually-hidden">
+              Report schedules
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col">Name</th>
+                <th scope="col">Report</th>
+                <th scope="col">Frequency</th>
+                <th scope="col">Status</th>
+                <th scope="col">Next run (UTC)</th>
+                <th scope="col">Last report</th>
+                <th scope="col"><span class="visually-hidden">Actions</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (schedule of schedules(); track schedule.id) {
+                <tr [attr.data-testid]="'schedule-' + schedule.id">
+                  <td class="schedule-name">{{ schedule.name }}</td>
+                  <td>
+                    {{ schedule.title }}
+                    <span class="text-small text-muted format">{{
+                      formatLabel(schedule.format)
+                    }}</span>
+                  </td>
+                  <td class="frequency">{{ frequencyLabel(schedule) }}</td>
+                  <td>
+                    <span
+                      class="badge"
+                      [class]="schedule.enabled ? 'badge badge-success' : 'badge badge-neutral'"
+                    >
+                      {{ schedule.enabled ? 'On' : 'Off' }}
+                    </span>
+                    @if (disabledReason(schedule); as reason) {
+                      <p class="text-small text-secondary reason">{{ reason }}</p>
+                    }
+                  </td>
+                  <td class="nowrap">{{ schedule.enabled ? when(schedule.nextRunAt) : '—' }}</td>
+                  <td class="last">{{ lastLabel(schedule) }}</td>
+                  <td>
+                    @if (schedule.canEdit && canSchedule()) {
+                      <div class="row-actions">
+                        <button
+                          type="button"
+                          class="btn btn-secondary btn-sm"
+                          (click)="startEdit(schedule)"
+                          [attr.aria-label]="'Edit schedule ' + schedule.name"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          class="btn btn-secondary btn-sm"
+                          (click)="toggle(schedule)"
+                          [disabled]="busy() === schedule.id"
+                          [attr.aria-label]="
+                            (schedule.enabled ? 'Turn off schedule ' : 'Turn on schedule ') +
+                            schedule.name
+                          "
+                          data-testid="toggle"
+                        >
+                          {{ schedule.enabled ? 'Turn off' : 'Turn on' }}
+                        </button>
+                      </div>
+                    }
+                    @if (rowFailure(); as failed) {
+                      @if (failed.id === schedule.id) {
+                        <p class="text-small form-error" role="alert">
+                          {{
+                            failed.error.kind === 'stale'
+                              ? 'Changed elsewhere — refresh and try again.'
+                              : failed.error.message
+                          }}
+                        </p>
+                      }
+                    }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    }
+  </div>
+</div>

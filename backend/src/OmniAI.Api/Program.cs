@@ -8,6 +8,7 @@ using OmniAI.Api.Customers;
 using OmniAI.Api.Analytics;
 using OmniAI.Api.Billing;
 using OmniAI.Api.Plans;
+using OmniAI.Api.Reports;
 using OmniAI.Api.Knowledge;
 using OmniAI.Api.WebChat;
 using OmniAI.Api.WhatsApp;
@@ -138,6 +139,10 @@ app.MapKnowledgeFileEndpoints();
 // The workspace's own numbers. Read-only, permission-gated, and free: it counts
 // rows this platform already holds and calls no provider.
 app.MapAnalyticsEndpoints();
+
+// Reports: the same numbers, exported. Generation is queued and done by a
+// worker; downloads stream through here, re-checking permissions every time.
+app.MapReportEndpoints();
 app.MapPlanUsageEndpoints();
 app.MapBillingEndpoints();
 app.MapWebChatEndpoints();

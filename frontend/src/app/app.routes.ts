@@ -178,6 +178,13 @@ export const routes: Routes = [
           import('@app/features/analytics/analytics.routes').then((m) => m.analyticsRoutes),
       },
       {
+        // Reports: exports and schedules. Lazily loaded like the other feature
+        // areas, so somebody who never opens it never downloads it.
+        path: 'reports',
+        loadChildren: () =>
+          import('@app/features/reports/reports.routes').then((m) => m.reportsRoutes),
+      },
+      {
         // Plan and usage. Beside Analytics rather than inside it: it answers a
         // different question -- what this workspace may hold, rather than what it
         // did -- and it is read by people who never open a dashboard.

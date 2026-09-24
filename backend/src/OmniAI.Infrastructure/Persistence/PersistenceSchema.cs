@@ -175,4 +175,13 @@ internal static class PersistenceSchema
     public const string WorkspacePlanAssignmentsTable = "workspace_plan_assignments";
 
     public const string AiProviderUsagesTable = "ai_provider_usages";
+
+    /// <summary>Report requests and what became of them.</summary>
+    public const string ReportExecutionsTable = "report_executions";
+
+    /// <summary>What is known about each generated report file. Never the file.</summary>
+    public const string ReportArtifactsTable = "report_artifacts";
+
+    /// <summary>Weekly and monthly report schedules.</summary>
+    public const string ReportSchedulesTable = "report_schedules";
 }

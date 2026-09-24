@@ -291,6 +291,24 @@ export const EVERY_PERMISSION: readonly PermissionDefinition[] = [
       'being used, and how much activity happened each day.',
   },
   {
+    code: 'reports.view',
+    group: 'Reports',
+    label: 'View reports',
+    description: 'See which reports exist and download generated ones.',
+  },
+  {
+    code: 'reports.generate',
+    group: 'Reports',
+    label: 'Generate reports',
+    description: 'Export the workspace numbers as CSV, Excel or PDF files.',
+  },
+  {
+    code: 'reports.schedule',
+    group: 'Reports',
+    label: 'Schedule reports',
+    description: 'Create weekly and monthly reports generated automatically.',
+  },
+  {
     code: 'billing.view',
     group: 'Billing',
     label: 'View billing',

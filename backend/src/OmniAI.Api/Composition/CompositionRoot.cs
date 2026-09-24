@@ -146,6 +146,11 @@ internal static class CompositionRoot
         // for sale rather than fail to load.
         services.AddOmniAiBilling(configuration);
 
+        // Reports: exports and schedules over the same reads the dashboard uses.
+        // Storage comes from configuration and is refused if it points inside the
+        // application; absent, reports simply cannot be generated here.
+        services.AddOmniAiReports(configuration, environment.ContentRootPath);
+
         // The clock. TimeProvider is the BCL abstraction, so no third-party clock
         // package is involved and nothing in the Domain or Application had to invent
         // one. Tests substitute a deterministic instance, which is why no handler

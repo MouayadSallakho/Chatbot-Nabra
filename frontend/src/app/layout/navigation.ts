@@ -129,6 +129,16 @@ export const NAV_ITEMS: readonly NavItem[] = [
     permissions: ['analytics.view'],
   },
   {
+    // Real from Phase 31: the same numbers as Analytics, exported as files and
+    // generated on a schedule. Its own permission, because being trusted to read
+    // a dashboard is not being trusted to write the workspace's data to a file.
+    label: 'Reports',
+    path: 'reports',
+    icon: 'analytics',
+    implemented: true,
+    permissions: ['reports.view'],
+  },
+  {
     // Beside Analytics, behind the same permission. It answers a different
     // question -- what this workspace may hold, rather than what it did -- and
     // there is nothing to configure here, so one read permission is enough.

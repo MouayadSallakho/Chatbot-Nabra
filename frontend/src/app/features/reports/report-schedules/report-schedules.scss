@@ -1,0 +1,87 @@
+.page-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.delivery-note {
+  margin: 0;
+}
+
+.schedule-form {
+  display: grid;
+  gap: var(--space-4);
+  max-inline-size: 36rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-inline-size: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.frequency-options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.frequency-option {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  cursor: pointer;
+}
+
+.form-actions,
+.row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.form-error {
+  margin: 0;
+  color: var(--danger-fg);
+}
+
+.alert-text {
+  margin: 0 0 var(--space-2);
+}
+
+// Whatever somebody typed as a name wraps rather than widening the table.
+.schedule-name {
+  font-weight: 600;
+  min-inline-size: 12rem;
+  max-inline-size: 22rem;
+  overflow-wrap: anywhere;
+}
+
+.frequency,
+.last {
+  min-inline-size: 7rem;
+}
+
+// A sentence, so it gets a sentence's width rather than a single word's.
+.reason {
+  margin: var(--space-1) 0 0;
+  min-inline-size: 11rem;
+  max-inline-size: 18rem;
+}
+
+.row-actions {
+  flex-wrap: nowrap;
+}
+
+.nowrap {
+  white-space: nowrap;
+}
+
+.format {
+  display: block;
+}

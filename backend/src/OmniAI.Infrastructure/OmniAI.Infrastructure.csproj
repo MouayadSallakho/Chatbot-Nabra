@@ -42,6 +42,12 @@
     <PackageReference Include="PdfPig" />
     <PackageReference Include="DocumentFormat.OpenXml" />
     <PackageReference Include="CsvHelper" />
+    <PackageReference Include="SkiaSharp" />
+    <PackageReference Include="SkiaSharp.HarfBuzz" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" />
+    <PackageReference Include="HarfBuzzSharp" />
+    <PackageReference Include="HarfBuzzSharp.NativeAssets.Linux" />
+    <PackageReference Include="Unicode.Bidi" />
     <PackageReference Include="Stripe.net" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
       <PrivateAssets>all</PrivateAssets>
@@ -69,6 +75,18 @@
   <ItemGroup>
     <ProjectReference Include="..\OmniAI.Application\OmniAI.Application.csproj" />
     <ProjectReference Include="..\OmniAI.Domain\OmniAI.Domain.csproj" />
+  </ItemGroup>
+
+  <ItemGroup Label="Report fonts">
+    <!--
+      DejaVu Sans, bundled so a PDF renders identically on every host: nothing
+      is read from the operating system's fonts and nothing is fetched. Embedded
+      in the assembly rather than copied beside it, so no file path is involved
+      at run time. The licence travels with the fonts, as it requires.
+    -->
+    <EmbeddedResource Include="Reports\Rendering\Fonts\DejaVuSans.ttf" LogicalName="OmniAI.Reports.Fonts.DejaVuSans.ttf" />
+    <EmbeddedResource Include="Reports\Rendering\Fonts\DejaVuSans-Bold.ttf" LogicalName="OmniAI.Reports.Fonts.DejaVuSans-Bold.ttf" />
+    <None Include="Reports\Rendering\Fonts\LICENSE-DejaVu.txt" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

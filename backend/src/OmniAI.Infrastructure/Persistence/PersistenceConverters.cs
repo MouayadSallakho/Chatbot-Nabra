@@ -380,4 +380,19 @@ internal static class PersistenceConverters
             new(
                 reference => reference == null ? null : reference.Value.Value,
                 value => Domain.Billing.ProviderReference.CreateOrNull(value));
+
+    public static readonly ValueConverter<Domain.Reports.ReportExecutionId, Guid> ReportExecutionId =
+        new(id => id.Value, value => Domain.Reports.ReportExecutionId.From(value));
+
+    public static readonly ValueConverter<Domain.Reports.ReportArtifactId, Guid> ReportArtifactId =
+        new(id => id.Value, value => Domain.Reports.ReportArtifactId.From(value));
+
+    public static readonly ValueConverter<Domain.Reports.ReportScheduleId, Guid> ReportScheduleId =
+        new(id => id.Value, value => Domain.Reports.ReportScheduleId.From(value));
+
+    /// <summary>The schedule an execution belongs to; absent for a report somebody asked for.</summary>
+    public static readonly ValueConverter<Domain.Reports.ReportScheduleId?, Guid?> NullableReportScheduleId =
+        new(
+            id => id == null ? null : id.Value.Value,
+            value => value == null ? null : Domain.Reports.ReportScheduleId.From(value.Value));
 }

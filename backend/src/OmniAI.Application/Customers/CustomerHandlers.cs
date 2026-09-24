@@ -89,7 +89,7 @@ public sealed class CustomerHandlers(
             [.. rows.Select(row => new CustomerRow(
                 row.Id.Value,
                 row.DisplayName?.Value,
-                Label(row.DisplayName, row.Channels),
+                CustomerLabels.For(row.DisplayName, row.Channels),
                 row.Channels,
                 row.ConversationCount,
                 row.LastActivityAt,
@@ -184,7 +184,7 @@ public sealed class CustomerHandlers(
             new CustomerView(
                 customer.Id.Value,
                 customer.DisplayName?.Value,
-                Label(customer.DisplayName, channels),
+                CustomerLabels.For(customer.DisplayName, channels),
                 identities,
                 channels,
                 summary?.ConversationCount ?? 0,
@@ -324,43 +324,6 @@ public sealed class CustomerHandlers(
             counts.Conversations,
             counts.Identities,
             alreadyMerged);
-    }
-
-    /// <summary>
-    /// What to call a customer who has no label.
-    /// </summary>
-    /// <remarks>
-    /// <para>
-    /// <strong>Built from how they reach this workspace, never from what they
-    /// said.</strong> Taking a name out of a message, a provider profile or an
-    /// email-looking string would be the platform asserting a fact about a real
-    /// person that nobody checked, and it would then be shown as though somebody
-    /// had.
-    /// </para>
-    /// <para>
-    /// The masked number is deliberately not used here even for a WhatsApp
-    /// customer: it belongs on the detail page beside its channel, where it is
-    /// clear what it is, rather than as a heading in a list where it reads like a
-    /// name. A channel word is the honest label for somebody nobody has named.
-    /// </para>
-    /// </remarks>
-    private static string Label(
-        CustomerDisplayName? displayName,
-        IReadOnlyList<ChannelKind> channels)
-    {
-        if (displayName is not null)
-        {
-            return displayName.Value;
-        }
-
-        if (channels.Count > 1)
-        {
-            return "Unnamed customer";
-        }
-
-        return channels.Count == 1 && channels[0] == ChannelKind.WhatsApp
-            ? "WhatsApp customer"
-            : "Anonymous visitor";
     }
 
     private Task<bool> ViewAsync(TenantId tenantId, CancellationToken cancellationToken) =>

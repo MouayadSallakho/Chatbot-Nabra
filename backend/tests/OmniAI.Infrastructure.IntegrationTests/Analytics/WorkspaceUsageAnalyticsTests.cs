@@ -481,7 +481,8 @@ public sealed class WorkspaceUsageAnalyticsTests(PostgresTestDatabase database)
         {
             await new WorkspaceAnalyticsReader(context).ReadAsync(
                 world.Tenant.Id,
-                AnalyticsRange.ThirtyDays.Window(Now));
+                AnalyticsRange.ThirtyDays.Window(Now),
+                AnalyticsBreakdown.Dashboard);
         }
 
         List<string> overUsage =
@@ -508,6 +509,6 @@ public sealed class WorkspaceUsageAnalyticsTests(PostgresTestDatabase database)
         await using OmniAiDbContext context = database.CreateContext();
 
         return await new WorkspaceAnalyticsReader(context)
-            .ReadAsync(world.Tenant.Id, range.Window(Now));
+            .ReadAsync(world.Tenant.Id, range.Window(Now), AnalyticsBreakdown.Dashboard);
     }
 }

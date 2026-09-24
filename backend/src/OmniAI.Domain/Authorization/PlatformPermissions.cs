@@ -280,6 +280,28 @@ public static class PlatformPermissions
     /// </remarks>
     public static readonly PermissionCode BillingManage = PermissionCode.Create("billing.manage");
 
+    /// <summary>See the report catalogue, generated reports, and schedules.</summary>
+    /// <remarks>
+    /// Downloading a report additionally needs whatever that report's data needs
+    /// -- <c>customers.view</c> for customer activity, <c>analytics.view</c> for
+    /// the rest -- so this permission never becomes a way around those.
+    /// </remarks>
+    public static readonly PermissionCode ReportsView = PermissionCode.Create("reports.view");
+
+    /// <summary>Generate and export a report.</summary>
+    /// <remarks>
+    /// Never implied by <see cref="ReportsView"/>: reading a list of reports is not
+    /// deciding that the workspace's data should be written to a file.
+    /// </remarks>
+    public static readonly PermissionCode ReportsGenerate = PermissionCode.Create("reports.generate");
+
+    /// <summary>Create, change and switch off report schedules.</summary>
+    /// <remarks>
+    /// A schedule generates under its owner's authority, and that authority is
+    /// checked again at every occurrence.
+    /// </remarks>
+    public static readonly PermissionCode ReportsSchedule = PermissionCode.Create("reports.schedule");
+
     /// <summary>The workspace group's display name.</summary>
     public const string WorkspaceGroup = "Workspace";
 
@@ -315,6 +337,9 @@ public static class PlatformPermissions
 
     /// <summary>Subscription and payment. Deliberately not part of Analytics.</summary>
     public const string BillingGroup = "Billing";
+
+    /// <summary>Exports and scheduled reports. Separate from Analytics.</summary>
+    public const string ReportsGroup = "Reports";
 
     /// <summary>
     /// The catalogue, in the order it is published and rendered.
@@ -468,6 +493,24 @@ public static class PlatformPermissions
             "See how many conversations the workspace handled, how its channels "
             + "and AI agents are being used, and how much activity happened each "
             + "day. Counts only -- never the text of a conversation."),
+        new(
+            ReportsView,
+            ReportsGroup,
+            "View reports",
+            "See which reports exist and download generated ones. Each download also "
+            + "needs the permission that report's data needs."),
+        new(
+            ReportsGenerate,
+            ReportsGroup,
+            "Generate reports",
+            "Export the workspace's numbers as CSV, Excel or PDF files. Counts and "
+            + "safe labels only -- never the text of a conversation."),
+        new(
+            ReportsSchedule,
+            ReportsGroup,
+            "Schedule reports",
+            "Create weekly and monthly reports that are generated automatically "
+            + "under your own permissions."),
         new(
             BillingView,
             BillingGroup,

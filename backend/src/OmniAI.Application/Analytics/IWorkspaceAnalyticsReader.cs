@@ -35,8 +35,14 @@ public interface IWorkspaceAnalyticsReader
     /// underneath filters on it, and a reader that could be called without one
     /// would be a cross-tenant leak waiting for a careless call site.
     /// </remarks>
+    /// <param name="breakdown">
+    /// How many agents and models the breakdowns may name. The dashboard passes
+    /// <see cref="AnalyticsBreakdown.Dashboard"/>; a report passes its export
+    /// bound. Nothing else about the read changes.
+    /// </param>
     Task<WorkspaceAnalytics> ReadAsync(
         TenantId tenantId,
         AnalyticsWindow window,
+        AnalyticsBreakdown breakdown,
         CancellationToken cancellationToken = default);
 }

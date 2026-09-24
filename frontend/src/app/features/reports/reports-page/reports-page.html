@@ -1,0 +1,254 @@
+<div class="page">
+  <app-page-header
+    heading="Reports"
+    description="Export this workspace's numbers as CSV, Excel or PDF. Counts and safe labels only — never the text of a conversation."
+  >
+    @if (canView()) {
+      <button
+        pageActions
+        type="button"
+        class="btn btn-secondary"
+        (click)="refresh()"
+        [disabled]="refreshing()"
+        data-testid="refresh"
+      >
+        @if (refreshing()) {
+          <span class="spinner" aria-hidden="true"></span>
+        }
+        <span class="btn-label">{{ refreshing() ? 'Refreshing…' : 'Refresh' }}</span>
+      </button>
+    }
+  </app-page-header>
+
+  <app-reports-nav />
+
+  <!-- Status changes are spoken, not only shown. -->
+  <p class="visually-hidden" aria-live="polite" data-testid="announcement">{{ announcement() }}</p>
+
+  <div class="page-section">
+    @if (!canView()) {
+      <div class="card">
+        <app-empty-state
+          icon="analytics"
+          heading="You do not have access to reports"
+          description="Seeing and downloading reports needs a permission your roles do not include. Ask somebody who administers this workspace if you need it."
+        />
+      </div>
+    } @else if (loading()) {
+      <div class="card card-body" aria-busy="true">
+        <p class="text-small text-secondary">Loading reports…</p>
+      </div>
+    } @else {
+      @if (failure(); as error) {
+        <p class="alert alert-danger" role="alert">{{ error.message }}</p>
+      }
+
+      <section class="card card-body generate" aria-labelledby="generate-heading">
+        <h2 id="generate-heading" class="text-section-title">Generate a report</h2>
+
+        @if (!canGenerate()) {
+          <p class="text-small text-secondary" data-testid="no-generate">
+            You can download reports that have already been generated, but creating new ones needs a
+            permission your roles do not include.
+          </p>
+        } @else if (catalog()?.storageConfigured === false) {
+          <p class="alert alert-warning" role="status" data-testid="no-storage">
+            Reports cannot be generated on this deployment because report storage is not configured.
+          </p>
+        } @else if (reports().length === 0) {
+          <p class="text-small text-secondary" data-testid="no-reports">
+            None of the reports is available to you. Each report also needs permission to read the
+            data it contains, such as analytics or customers.
+          </p>
+        } @else {
+          <form class="generate-form" [formGroup]="form" (ngSubmit)="submit()" novalidate>
+            <div class="field">
+              <label class="field-label" for="report-type">Report</label>
+              <select
+                id="report-type"
+                class="select"
+                formControlName="type"
+                aria-describedby="report-type-hint"
+              >
+                @for (entry of reports(); track entry.type) {
+                  <option [value]="entry.type">{{ entry.title }}</option>
+                }
+              </select>
+              <p id="report-type-hint" class="text-small text-muted">
+                {{ selected()?.description }}
+              </p>
+            </div>
+
+            <div class="field">
+              <label class="field-label" for="report-range">Period</label>
+              <select
+                id="report-range"
+                class="select"
+                formControlName="range"
+                aria-describedby="report-range-hint"
+              >
+                <option value="7d">Last 7 days</option>
+                <option value="30d">Last 30 days</option>
+                <option value="90d">Last 90 days</option>
+                <option value="custom">Choose dates</option>
+              </select>
+              <p id="report-range-hint" class="text-small text-muted">
+                Whole days in UTC, including today. At most {{ catalog()?.maxRangeDays }} days.
+              </p>
+            </div>
+
+            @if (selectedRange() === 'custom') {
+              <div class="field-row">
+                <div class="field">
+                  <label class="field-label" for="report-from">From</label>
+                  <input id="report-from" class="input" type="date" formControlName="from" />
+                </div>
+                <div class="field">
+                  <label class="field-label" for="report-through">Through</label>
+                  <input id="report-through" class="input" type="date" formControlName="through" />
+                </div>
+              </div>
+            }
+
+            <fieldset class="field formats">
+              <legend class="field-label">Format</legend>
+              <div class="format-options">
+                @for (format of formats(); track format) {
+                  <label class="format-option">
+                    <input
+                      type="radio"
+                      class="form-check-input"
+                      formControlName="format"
+                      [value]="format"
+                    />
+                    <span>{{ formatLabel(format) }}</span>
+                  </label>
+                }
+              </div>
+            </fieldset>
+
+            @if (formError(); as problem) {
+              <p class="form-error" role="alert" data-testid="form-error">{{ problem }}</p>
+            }
+
+            @if (submitFailure(); as error) {
+              <p class="alert alert-danger" role="alert" data-testid="submit-error">
+                {{ error.message }}
+              </p>
+            }
+
+            <div class="form-actions">
+              <button
+                type="submit"
+                class="btn btn-primary"
+                [disabled]="submitting()"
+                data-testid="generate"
+              >
+                {{ submitting() ? 'Requesting…' : 'Generate report' }}
+              </button>
+              <p class="text-small text-muted">
+                Reports are generated in the background and appear below. Nothing is emailed.
+              </p>
+            </div>
+          </form>
+        }
+      </section>
+
+      <section class="generated" aria-labelledby="generated-heading">
+        <h2 id="generated-heading" class="text-section-title">Generated reports</h2>
+
+        @if (rows().length === 0) {
+          <div class="card">
+            <app-empty-state
+              icon="analytics"
+              heading="No reports yet"
+              description="Reports you and your colleagues generate, and those schedules produce, appear here."
+              data-testid="no-executions"
+            />
+          </div>
+        } @else {
+          <div class="table-wrap">
+            <table class="table" data-testid="executions">
+              <caption class="visually-hidden">
+                Generated reports, newest first
+              </caption>
+              <thead>
+                <tr>
+                  <th scope="col">Report</th>
+                  <th scope="col">Period (UTC)</th>
+                  <th scope="col">Requested by</th>
+                  <th scope="col">Requested</th>
+                  <th scope="col">Status</th>
+                  <th scope="col">Size</th>
+                  <th scope="col"><span class="visually-hidden">Download</span></th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (execution of rows(); track execution.id) {
+                  <tr [attr.data-testid]="'execution-' + execution.id">
+                    <td class="report-name">
+                      {{ execution.title }}
+                      <span class="text-small text-muted format">{{
+                        formatLabel(execution.format)
+                      }}</span>
+                    </td>
+                    <td class="nowrap">{{ period(execution) }}</td>
+                    <td class="requester">{{ requester(execution) }}</td>
+                    <td class="nowrap">{{ when(execution.requestedAt) }}</td>
+                    <td>
+                      <!-- The word is the status; the colour only repeats it. -->
+                      <span class="badge" [class]="'badge ' + statusTone(execution)">{{
+                        statusLabel(execution)
+                      }}</span>
+                      @if (execution.failureReason; as reason) {
+                        <p class="text-small text-secondary failure">{{ reason }}</p>
+                      }
+                    </td>
+                    <td class="nowrap">{{ sizeLabel(execution.byteLength) }}</td>
+                    <td>
+                      @if (execution.canDownload) {
+                        <a
+                          class="btn btn-secondary btn-sm"
+                          [href]="downloadUrl(execution)"
+                          [attr.aria-label]="downloadName(execution)"
+                          data-testid="download"
+                          >Download</a
+                        >
+                      } @else if (execution.status === 'Completed') {
+                        <span class="text-small text-muted">Needs more access</span>
+                      }
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+
+          <div class="paging">
+            <p class="text-small text-muted">
+              {{ totalCount() === 1 ? '1 report' : totalCount() + ' reports' }} · kept for 30 days
+            </p>
+            <div class="paging-buttons">
+              <button
+                type="button"
+                class="btn btn-secondary"
+                (click)="go(pageNumber() - 1)"
+                [disabled]="!hasPrevious() || refreshing()"
+              >
+                Previous
+              </button>
+              <button
+                type="button"
+                class="btn btn-secondary"
+                (click)="go(pageNumber() + 1)"
+                [disabled]="!hasNext() || refreshing()"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        }
+      </section>
+    }
+  </div>
+</div>
