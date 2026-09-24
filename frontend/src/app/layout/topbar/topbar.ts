@@ -8,25 +8,24 @@ import {
 } from '@angular/core';
 import { Icon } from '@app/shared/icon/icon';
 import { ThemeToggle } from '@app/layout/theme-toggle/theme-toggle';
+import { NotificationBell } from '@app/layout/notification-bell/notification-bell';
 
 /**
  * The top bar.
  *
  * Deliberately close to empty. It carries the drawer trigger, the name of the
- * current page, and the theme control -- and nothing else, because nothing else
- * exists yet.
+ * current page, the theme control and the notification bell -- and nothing else.
  *
- * NOTHING HERE IS A PLACEHOLDER FOR LIVE DATA. No avatar, no notification bell,
- * no tenant switcher, no account menu. Those all imply systems this product does
- * not have -- authentication, notifications, tenant membership -- and a control
- * that looks functional and is not is worse than an empty space: it invites
- * somebody to click it, and it makes the product look finished in a review while
- * teaching the reader that its controls do not work.
+ * NOTHING HERE IS A PLACEHOLDER FOR LIVE DATA. The bell arrived with Phase 32's
+ * operational notifications, and is backed by them end to end. There is still no
+ * avatar, tenant switcher or account menu in this bar: the workspace and account
+ * controls live in the sidebar, and a control that looks functional and is not
+ * is worse than an empty space.
  */
 @Component({
   selector: 'app-topbar',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Icon, ThemeToggle],
+  imports: [Icon, ThemeToggle, NotificationBell],
   templateUrl: './topbar.html',
   styleUrl: './topbar.scss',
 })

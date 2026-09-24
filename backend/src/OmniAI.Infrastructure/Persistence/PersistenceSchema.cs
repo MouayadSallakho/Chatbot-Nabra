@@ -184,4 +184,16 @@ internal static class PersistenceSchema
 
     /// <summary>Weekly and monthly report schedules.</summary>
     public const string ReportSchedulesTable = "report_schedules";
+
+    /// <summary>Authoritative transitions waiting to become notifications.</summary>
+    public const string NotificationOccurrencesTable = "notification_occurrences";
+
+    /// <summary>One member being told about one occurrence.</summary>
+    public const string NotificationsTable = "notifications";
+
+    /// <summary>Each member's operational-email choices, per workspace.</summary>
+    public const string NotificationPreferencesTable = "notification_preferences";
+
+    /// <summary>Queued operational emails and where each got to.</summary>
+    public const string NotificationEmailsTable = "notification_emails";
 }

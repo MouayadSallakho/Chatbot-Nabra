@@ -274,6 +274,75 @@ public sealed class BillingSubscriptionServiceTests(PostgresTestDatabase databas
         Assert.Equal(0, await after.AiProviderUsages.CountAsync());
     }
 
+    // ------------------------------------------------- Phase 32 notifications
+
+    /// <remarks>
+    /// Every alert comes from the reconciled lifecycle, in the same transaction as
+    /// the subscription write. A replayed snapshot moves nothing and so records
+    /// nothing; a genuine second PastDue after a recovery is a second occurrence.
+    /// </remarks>
+    [Fact]
+    public async Task Each_real_billing_transition_records_one_occurrence_and_a_replay_records_none()
+    {
+        Fixture fixture = await ArrangeAsync("notify-transitions");
+
+        await ApplyAsync(fixture, SubscriptionStatus.Active, "active", mayBegin: true);
+        Assert.Empty(await OccurrenceKindsAsync(fixture.TenantId));
+
+        await ApplyAsync(fixture, SubscriptionStatus.PastDue, "past_due");
+        await ApplyAsync(fixture, SubscriptionStatus.PastDue, "past_due");
+
+        Assert.Equal([Domain.Notifications.NotificationKind.BillingPastDue], await OccurrenceKindsAsync(fixture.TenantId));
+
+        _clock.Advance(TimeSpan.FromDays(1));
+        await ApplyAsync(fixture, SubscriptionStatus.Active, "active");
+        await ApplyAsync(fixture, SubscriptionStatus.Active, "active");
+
+        _clock.Advance(TimeSpan.FromDays(1));
+        await ApplyAsync(fixture, SubscriptionStatus.PastDue, "past_due");
+
+        _clock.Advance(Grace + TimeSpan.FromDays(1));
+        Assert.True(await SuspendAsync(fixture.TenantId));
+        Assert.False(await SuspendAsync(fixture.TenantId));
+
+        _clock.Advance(TimeSpan.FromHours(1));
+        await ApplyAsync(fixture, SubscriptionStatus.Canceled, "canceled");
+
+        Assert.Equal(
+            [
+                Domain.Notifications.NotificationKind.BillingPastDue,
+                Domain.Notifications.NotificationKind.BillingRecovered,
+                Domain.Notifications.NotificationKind.BillingPastDue,
+                Domain.Notifications.NotificationKind.BillingSuspended,
+                Domain.Notifications.NotificationKind.BillingCanceled,
+            ],
+            await OccurrenceKindsAsync(fixture.TenantId));
+    }
+
+    [Fact]
+    public async Task A_transition_whose_write_is_refused_records_no_occurrence()
+    {
+        Fixture fixture = await ArrangeAsync("notify-nothing");
+
+        // No subscription and not allowed to begin one: nothing moves, nothing is recorded.
+        Assert.Equal(
+            BillingApplyOutcome.NoSubscription,
+            await ApplyAsync(fixture, SubscriptionStatus.PastDue, "past_due", mayBegin: false));
+
+        Assert.Empty(await OccurrenceKindsAsync(fixture.TenantId));
+    }
+
+    private async Task<List<Domain.Notifications.NotificationKind>> OccurrenceKindsAsync(TenantId tenantId)
+    {
+        await using OmniAiDbContext context = database.CreateContext();
+
+        return await context.NotificationOccurrences
+            .Where(occurrence => occurrence.TenantId == tenantId)
+            .OrderBy(occurrence => occurrence.OccurredAt)
+            .Select(occurrence => occurrence.Kind)
+            .ToListAsync();
+    }
+
     private async Task<BillingApplyOutcome> ApplyAsync(
         Fixture fixture,
         SubscriptionStatus status,

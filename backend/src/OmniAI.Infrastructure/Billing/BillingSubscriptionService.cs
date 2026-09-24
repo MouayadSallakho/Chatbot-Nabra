@@ -6,8 +6,10 @@ using Microsoft.EntityFrameworkCore.Storage;
 using OmniAI.Application.Billing;
 using OmniAI.Application.Plans;
 using OmniAI.Domain.Billing;
+using OmniAI.Domain.Notifications;
 using OmniAI.Domain.Plans;
 using OmniAI.Domain.Tenants;
+using OmniAI.Infrastructure.Notifications;
 using OmniAI.Infrastructure.Persistence;
 
 namespace OmniAI.Infrastructure.Billing;
@@ -125,6 +127,10 @@ internal sealed class BillingSubscriptionService(
             subscription.MoveTo(offer.Id, offer.PlanId, offer.Interval, _clock.GetUtcNow());
         }
 
+        SubscriptionStatus? previous = _context.Entry(subscription).State == EntityState.Added
+            ? null
+            : subscription.Status;
+
         subscription.Apply(
             snapshot.Status,
             snapshot.RawStatus,
@@ -138,6 +144,8 @@ internal sealed class BillingSubscriptionService(
             _clock.GetUtcNow());
 
         await AssignAsync(tenantId, subscription, cancellationToken).ConfigureAwait(false);
+
+        await RecordTransitionAsync(subscription, previous, cancellationToken).ConfigureAwait(false);
 
         await _context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
@@ -176,10 +184,70 @@ internal sealed class BillingSubscriptionService(
 
         await AssignAsync(tenantId, subscription, cancellationToken).ConfigureAwait(false);
 
+        await RecordTransitionAsync(subscription, SubscriptionStatus.PastDue, cancellationToken).ConfigureAwait(false);
+
         await _context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
 
         return true;
+    }
+
+    /// <summary>
+    /// Records the notification occurrence a lifecycle transition deserves, if any.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <strong>Only from reconciled state.</strong> This runs after the provider's
+    /// own snapshot has been applied under the workspace's billing lock — never
+    /// from a checkout redirect, a success URL or an event's contents.
+    /// </para>
+    /// <para>
+    /// <strong>One occurrence per real transition.</strong> The key is the
+    /// subscription, the state it entered and the instant it entered it. The same
+    /// snapshot applied twice moves nothing and records nothing; PastDue, then
+    /// Active, then PastDue again is two PastDue occurrences, because it is two
+    /// transitions.
+    /// </para>
+    /// <para>
+    /// In the same transaction as the subscription write, so the transition and
+    /// its occurrence commit together or not at all.
+    /// </para>
+    /// </remarks>
+    private async Task RecordTransitionAsync(
+        WorkspaceSubscription subscription,
+        SubscriptionStatus? previous,
+        CancellationToken cancellationToken)
+    {
+        if (subscription.Status == previous)
+        {
+            return;
+        }
+
+        NotificationKind? kind = subscription.Status switch
+        {
+            SubscriptionStatus.PastDue => NotificationKind.BillingPastDue,
+            SubscriptionStatus.Suspended => NotificationKind.BillingSuspended,
+            SubscriptionStatus.Canceled => NotificationKind.BillingCanceled,
+            SubscriptionStatus.Active when previous is SubscriptionStatus.PastDue or SubscriptionStatus.Suspended =>
+                NotificationKind.BillingRecovered,
+            _ => null,
+        };
+
+        if (kind is not NotificationKind notify)
+        {
+            return;
+        }
+
+        string key = string.Create(
+            CultureInfo.InvariantCulture,
+            $"{subscription.Id.Value:D}:{subscription.Status}:{subscription.UpdatedAt.ToUnixTimeMilliseconds()}");
+
+        await NotificationOccurrenceSql
+            .RecordAsync(
+                _context,
+                NotificationOccurrence.Record(subscription.TenantId, notify, key, subscription.Id.Value, _clock.GetUtcNow()),
+                cancellationToken)
+            .ConfigureAwait(false);
     }
 
     /// <summary>

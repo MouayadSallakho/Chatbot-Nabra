@@ -46,12 +46,18 @@ public sealed class WebChatSchemaTests(PostgresTestDatabase database)
         // a random value a report worker stamps on the row it claims, so that
         // only that worker can settle it. It grants nothing to anybody, never
         // leaves the server, and is cleared the moment the execution settles.
+        //
+        // notification_emails.claim_token and notification_occurrences.claim_token
+        // are Phase 32's, and are the same kind of worker lease token: random,
+        // server-only, cleared on settlement, granting nothing.
         Assert.Equal(
             "ai_provider_usages.cached_input_tokens:bigint, "
             + "ai_provider_usages.input_tokens:bigint, "
             + "ai_provider_usages.output_tokens:bigint, "
             + "ai_provider_usages.reasoning_tokens:bigint, "
             + "ai_provider_usages.total_tokens:bigint, "
+            + "notification_emails.claim_token:uuid, "
+            + "notification_occurrences.claim_token:uuid, "
             + "report_executions.claim_token:uuid, "
             + "tenant_invitations.token_hash:bytea, web_chat_sessions.access_token_hash:bytea, "
             + "whatsapp_credentials.protected_token:bytea",

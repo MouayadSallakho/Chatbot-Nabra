@@ -201,4 +201,15 @@
     <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.11" />
   </ItemGroup>
 
+  <ItemGroup Label="Operational email">
+    <!--
+      SMTP for Phase 32's transactional operational email, replacing the obsolete
+      System.Net.Mail SmtpClient. MIT-licensed. MailKit stops in Infrastructure: the
+      Application asks an IOperationalEmailSender to send and never names a library.
+      MimeKit is pinned beside it because the adapter builds MimeMessage directly.
+    -->
+    <PackageVersion Include="MailKit" Version="4.18.0" />
+    <PackageVersion Include="MimeKit" Version="4.18.1" />
+  </ItemGroup>
+
 </Project>

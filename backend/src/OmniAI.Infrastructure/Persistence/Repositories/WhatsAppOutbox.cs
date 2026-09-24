@@ -232,22 +232,31 @@ internal sealed class WhatsAppOutbox(OmniAiDbContext context) : IWhatsAppOutbox
         DateTimeOffset claimedBefore,
         CancellationToken cancellationToken = default)
     {
+        // Every delivery given up on here becomes Unknown, and each is an
+        // operational alert — recorded in the same statement, so the state and
+        // its notification cannot part company.
         await using NpgsqlCommand command = await CommandAsync(
                 """
-                UPDATE whatsapp_deliveries
-                   SET status = 'Unknown',
-                       failure_reason = @reason,
-                       updated_at = @cutoff
-                 WHERE status = 'Sending'
-                   AND updated_at < @cutoff
+                WITH moved AS (
+                    UPDATE whatsapp_deliveries
+                       SET status = 'Unknown',
+                           failure_reason = @reason,
+                           updated_at = @cutoff
+                     WHERE status = 'Sending'
+                       AND updated_at < @cutoff
+                    RETURNING id, tenant_id
+                )
+                """ + RecordUnknown + """
+                SELECT count(*) FROM moved
                 """,
                 cancellationToken)
             .ConfigureAwait(false);
 
         command.Parameters.AddWithValue("reason", AbandonedReason);
         command.Parameters.AddWithValue("cutoff", claimedBefore.ToUniversalTime());
+        command.Parameters.AddWithValue("now", claimedBefore.ToUniversalTime());
 
-        return await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        return (int)(long)(await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) ?? 0L);
     }
 
     public async Task<IReadOnlyDictionary<Guid, WhatsAppDeliveryStatus>> ListStatusesAsync(
@@ -296,6 +305,36 @@ internal sealed class WhatsAppOutbox(OmniAiDbContext context) : IWhatsAppOutbox
         return found is Guid id ? id : null;
     }
 
+    /// <summary>
+    /// Records a WhatsApp-delivery-Unknown occurrence for every row of a
+    /// <c>moved</c> CTE. Keyed by delivery: a delivery becomes Unknown once.
+    /// </summary>
+    private const string RecordUnknown = """
+        ,
+        recorded AS (
+            INSERT INTO notification_occurrences
+                (id, tenant_id, kind, occurrence_key, source_id, occurred_at, attempts)
+            SELECT gen_random_uuid(), tenant_id, 'WhatsAppDeliveryUnknown', id::text, id, @now, 0
+              FROM moved
+            ON CONFLICT (tenant_id, kind, occurrence_key) DO NOTHING
+        )
+
+        """;
+
+    /// <summary>The same, only for rows the settlement actually made Unknown.</summary>
+    private const string RecordUnknownSettled = """
+        ,
+        recorded AS (
+            INSERT INTO notification_occurrences
+                (id, tenant_id, kind, occurrence_key, source_id, occurred_at, attempts)
+            SELECT gen_random_uuid(), tenant_id, 'WhatsAppDeliveryUnknown', id::text, id, @now, 0
+              FROM moved
+             WHERE status = 'Unknown'
+            ON CONFLICT (tenant_id, kind, occurrence_key) DO NOTHING
+        )
+
+        """;
+
     /// <summary>Settles a delivery a worker is holding.</summary>
     /// <remarks>
     /// Conditional on the row still being in flight, so a worker the sweeper has
@@ -308,14 +347,21 @@ internal sealed class WhatsAppOutbox(OmniAiDbContext context) : IWhatsAppOutbox
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
+        // Settling as Unknown records its operational alert in the same
+        // statement; any other outcome records nothing.
         await using NpgsqlCommand command = await CommandAsync(
                 """
-                UPDATE whatsapp_deliveries
-                   SET status = @status,
-                       failure_reason = @reason,
-                       updated_at = @now
-                 WHERE id = @id
-                   AND status IN ('Pending', 'Sending')
+                WITH moved AS (
+                    UPDATE whatsapp_deliveries
+                       SET status = @status,
+                           failure_reason = @reason,
+                           updated_at = @now
+                     WHERE id = @id
+                       AND status IN ('Pending', 'Sending')
+                    RETURNING id, tenant_id, status
+                )
+                """ + RecordUnknownSettled + """
+                SELECT count(*) FROM moved
                 """,
                 cancellationToken)
             .ConfigureAwait(false);

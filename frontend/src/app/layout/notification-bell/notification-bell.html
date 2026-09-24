@@ -1,0 +1,81 @@
+<button
+  #bell
+  type="button"
+  class="btn btn-ghost btn-icon bell"
+  [attr.aria-expanded]="open()"
+  aria-controls="notification-panel"
+  [attr.aria-label]="name()"
+  data-testid="notification-bell"
+  (click)="toggle()"
+>
+  <app-icon name="bell" [strokeWidth]="1.75" />
+  @if (center.unread() > 0) {
+    <!-- The number is already in the button's name; the badge is for the eye. -->
+    <span class="bell-badge" aria-hidden="true" data-testid="notification-badge">{{
+      badge()
+    }}</span>
+  }
+</button>
+
+<!--
+  A polite, visually hidden echo of the count, so a realtime change is heard
+  without anything moving on screen or stealing focus.
+-->
+<p class="visually-hidden" aria-live="polite" data-testid="notification-live">
+  {{ center.unreadLabel() }}
+</p>
+
+@if (open()) {
+  <section
+    id="notification-panel"
+    class="panel"
+    aria-labelledby="notification-panel-heading"
+    data-testid="notification-panel"
+  >
+    <header class="panel-header">
+      <h2 id="notification-panel-heading" class="panel-title">Notifications</h2>
+      @if (center.unread() > 0) {
+        <button
+          type="button"
+          class="btn btn-ghost btn-sm"
+          (click)="markAllRead()"
+          data-testid="mark-all-read"
+        >
+          Mark all as read
+        </button>
+      }
+    </header>
+
+    <div class="panel-body">
+      @if (center.failure(); as error) {
+        <p class="alert alert-danger panel-alert" role="alert">
+          Notifications could not be loaded. {{ error.message }}
+        </p>
+      } @else if (center.loading() && center.recent().length === 0) {
+        <p class="panel-empty text-small text-secondary" aria-busy="true">Loading notifications…</p>
+      } @else if (center.recent().length === 0) {
+        <p class="panel-empty text-small text-secondary" data-testid="notifications-empty">
+          You have no notifications. Operational alerts — reports, usage, billing, knowledge and
+          WhatsApp delivery — will appear here.
+        </p>
+      } @else {
+        <ul class="panel-list" aria-label="Recent notifications">
+          @for (notification of center.recent(); track notification.id) {
+            <li>
+              <app-notification-item
+                [notification]="notification"
+                (opened)="followed($event)"
+                (markedRead)="markRead($event)"
+              />
+            </li>
+          }
+        </ul>
+      }
+    </div>
+
+    <footer class="panel-footer">
+      <a routerLink="/notifications" data-testid="view-all">View all notifications</a>
+      <a routerLink="/notifications/preferences">Email preferences</a>
+    </footer>
+  </section>
+}

@@ -8,6 +8,7 @@ using OmniAI.Api.Customers;
 using OmniAI.Api.Analytics;
 using OmniAI.Api.Billing;
 using OmniAI.Api.Plans;
+using OmniAI.Api.Notifications;
 using OmniAI.Api.Reports;
 using OmniAI.Api.Knowledge;
 using OmniAI.Api.WebChat;
@@ -143,6 +144,10 @@ app.MapAnalyticsEndpoints();
 // Reports: the same numbers, exported. Generation is queued and done by a
 // worker; downloads stream through here, re-checking permissions every time.
 app.MapReportEndpoints();
+
+// The signed-in member's own notifications and email preferences. Every route is
+// "mine": none names another member, so none can reach another member's rows.
+app.MapNotificationEndpoints();
 app.MapPlanUsageEndpoints();
 app.MapBillingEndpoints();
 app.MapWebChatEndpoints();

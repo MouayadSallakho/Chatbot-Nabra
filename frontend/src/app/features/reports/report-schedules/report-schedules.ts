@@ -23,7 +23,8 @@ import { ReportsNav } from '../reports-nav/reports-nav';
  *
  * <strong>Delivery is into Reports, and nowhere else.</strong> A schedule
  * produces a report that appears in the generated list. There is no recipient
- * field because nothing is emailed; the page says so rather than implying it.
+ * field: the schedule's owner is notified (Phase 32), by email only if they chose
+ * it, and the file itself is never attached to anything.
  *
  * <strong>Every change presents the version it was made against.</strong> A
  * schedule edited in another tab since this one loaded is refused, and the page

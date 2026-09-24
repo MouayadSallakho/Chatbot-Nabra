@@ -1,0 +1,97 @@
+<div class="page">
+  <app-page-header
+    heading="Notifications"
+    description="Choose which operational alerts are also emailed to you. These choices are yours alone."
+  />
+
+  <app-notifications-nav />
+
+  <p class="visually-hidden" aria-live="polite" data-testid="announcement">{{ announcement() }}</p>
+
+  <div class="page-section">
+    <p class="alert alert-info" data-testid="in-app-note">
+      In-app notifications are always on. Email is off unless you turn a category on here, and it is
+      only ever sent to your own account's address. Emails never contain report files — they link to
+      OmniAI, where you sign in as usual.
+    </p>
+
+    @if (!emailConfigured()) {
+      <p class="alert alert-warning" data-testid="email-unavailable">
+        Email is not set up on this deployment, so nothing will be emailed yet. Your choices are
+        saved and take effect once it is.
+      </p>
+    }
+
+    @if (loading()) {
+      <div class="card card-body" aria-busy="true">
+        <p class="text-small text-secondary">Loading preferences…</p>
+      </div>
+    } @else if (failure(); as error) {
+      <p class="alert alert-danger" role="alert">
+        Preferences could not be loaded. {{ error.message }}
+      </p>
+    } @else {
+      <form class="card card-body preferences" [formGroup]="form" (ngSubmit)="save()">
+        <fieldset class="categories">
+          <legend class="text-section-title">Email me about</legend>
+
+          @for (category of categories; track category.key) {
+            <div class="category">
+              <input
+                type="checkbox"
+                role="switch"
+                class="form-check-input category-switch"
+                [id]="'email-' + category.key"
+                [formControlName]="category.key"
+                [attr.aria-describedby]="'email-' + category.key + '-description'"
+                [attr.data-testid]="'email-' + category.key"
+              />
+              <div class="category-text">
+                <label class="category-label" [for]="'email-' + category.key">{{
+                  category.label
+                }}</label>
+                <p class="category-description" [id]="'email-' + category.key + '-description'">
+                  {{ category.description }}
+                </p>
+              </div>
+            </div>
+          }
+        </fieldset>
+
+        @if (saveFailure(); as error) {
+          <div class="alert alert-danger" role="alert" data-testid="save-error">
+            <p class="alert-text">
+              @if (error.kind === 'stale') {
+                Your preferences were changed somewhere else since you opened this page. Nothing was
+                saved.
+              } @else {
+                {{ error.message }}
+              }
+            </p>
+            @if (error.kind === 'stale') {
+              <button
+                type="button"
+                class="btn btn-secondary btn-sm"
+                (click)="reload()"
+                data-testid="reload"
+              >
+                Reload preferences
+              </button>
+            }
+          </div>
+        }
+
+        <div class="form-actions">
+          <button
+            type="submit"
+            class="btn btn-primary"
+            [disabled]="saving() || form.pristine"
+            data-testid="save"
+          >
+            {{ saving() ? 'Saving…' : 'Save preferences' }}
+          </button>
+        </div>
+      </form>
+    }
+  </div>
+</div>

@@ -5,8 +5,10 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using OmniAI.Application.Plans;
 using OmniAI.Domain.Ai;
+using OmniAI.Domain.Notifications;
 using OmniAI.Domain.Plans;
 using OmniAI.Domain.Tenants;
+using OmniAI.Infrastructure.Notifications;
 using OmniAI.Infrastructure.Persistence;
 
 namespace OmniAI.Infrastructure.Plans;
@@ -128,6 +130,9 @@ internal sealed class WorkspaceEntitlementService(
 
             T result = await mutate(cancellationToken).ConfigureAwait(false);
 
+            await RecordThresholdAsync(tenantId, kind, limit, current, period, cancellationToken)
+                .ConfigureAwait(false);
+
             if (owned is not null)
             {
                 await owned.CommitAsync(cancellationToken).ConfigureAwait(false);
@@ -160,6 +165,66 @@ internal sealed class WorkspaceEntitlementService(
                 await owned.DisposeAsync().ConfigureAwait(false);
             }
         }
+    }
+
+    /// <summary>
+    /// Records a usage-threshold occurrence when this reservation crossed one.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <strong>Phase 24's thresholds, not a second model.</strong> The state before
+    /// and after this one operation are both computed by
+    /// <see cref="EntitlementUsage"/> — Warning at 70%, Critical at 90%, Exhausted
+    /// at the limit — and an occurrence is recorded only when the state moved up.
+    /// Operations at 92% move nothing and record nothing.
+    /// </para>
+    /// <para>
+    /// <strong>Exactly once per threshold per month.</strong> The crossing is
+    /// decided under the reservation's advisory lock, so concurrent operations see
+    /// each other's counts; and the occurrence key is the threshold and the UTC
+    /// month, so even a repeat would be refused by the unique index. The ledger
+    /// row and the occurrence commit in the same transaction.
+    /// </para>
+    /// </remarks>
+    private async Task RecordThresholdAsync(
+        TenantId tenantId,
+        EntitlementKind kind,
+        PlanLimit limit,
+        long before,
+        EntitlementPeriod? period,
+        CancellationToken cancellationToken)
+    {
+        if (kind != EntitlementKind.MonthlyProviderOperations || limit.IsUnlimited || period is null)
+        {
+            return;
+        }
+
+        EntitlementState was = EntitlementUsage.Create(kind, before, limit).State;
+        EntitlementState now = EntitlementUsage.Create(kind, before + 1, limit).State;
+
+        NotificationKind? crossed = now > was
+            ? now switch
+            {
+                EntitlementState.Warning => NotificationKind.UsageWarning,
+                EntitlementState.Critical => NotificationKind.UsageCritical,
+                EntitlementState.Exhausted => NotificationKind.UsageExhausted,
+                _ => null,
+            }
+            : null;
+
+        if (crossed is not NotificationKind notify)
+        {
+            return;
+        }
+
+        string month = period.From.UtcDateTime.ToString("yyyy-MM", CultureInfo.InvariantCulture);
+
+        await NotificationOccurrenceSql
+            .RecordAsync(
+                _context,
+                NotificationOccurrence.Record(tenantId, notify, month, sourceId: null, _clock.GetUtcNow()),
+                cancellationToken)
+            .ConfigureAwait(false);
     }
 
     /// <summary>

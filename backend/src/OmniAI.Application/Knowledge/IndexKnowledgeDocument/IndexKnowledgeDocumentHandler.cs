@@ -1,3 +1,4 @@
+using System.Globalization;
 using OmniAI.Application.Authorization;
 using OmniAI.Application.Concurrency;
 using OmniAI.Application.Knowledge.Persistence;
@@ -6,6 +7,8 @@ using OmniAI.Domain.Knowledge;
 using OmniAI.Domain.Tenants;
 using OmniAI.Domain.Ai;
 using OmniAI.Application.Ai.Usage;
+using OmniAI.Application.Notifications;
+using OmniAI.Domain.Notifications;
 
 namespace OmniAI.Application.Knowledge.IndexKnowledgeDocument;
 
@@ -84,7 +87,8 @@ public sealed class IndexKnowledgeDocumentHandler(
     ITextEmbeddingGenerator embeddings,
     KnowledgeChunker chunker,
     TenantAuthorizer authorizer,
-    TimeProvider clock)
+    TimeProvider clock,
+    INotificationOccurrenceRecorder? notifications = null)
 {
     private readonly IKnowledgeDocumentRepository _documents =
         documents ?? throw new ArgumentNullException(nameof(documents));
@@ -106,6 +110,8 @@ public sealed class IndexKnowledgeDocumentHandler(
 
     private readonly TimeProvider _clock =
         clock ?? throw new ArgumentNullException(nameof(clock));
+
+    private readonly INotificationOccurrenceRecorder? _notifications = notifications;
 
     public async Task<Versioned<KnowledgeIndexResult>?> HandleAsync(
         IndexKnowledgeDocumentCommand command,
@@ -167,9 +173,25 @@ public sealed class IndexKnowledgeDocumentHandler(
                 "This document produced no text to index. Nothing was written.");
         }
 
-        (IReadOnlyList<KnowledgeChunkWrite> writes, int calls) =
-            await EmbedAsync(chunks, profile, tenantId, cancellationToken)
+        IReadOnlyList<KnowledgeChunkWrite> writes;
+        int calls;
+
+        try
+        {
+            (writes, calls) = await EmbedAsync(chunks, profile, tenantId, cancellationToken)
                 .ConfigureAwait(false);
+        }
+        catch (Exception failure) when (failure is EmbeddingUnavailableException
+            or EmbeddingTimeoutException
+            or EmbeddingResponseInvalidException)
+        {
+            // A real indexing failure: nothing was written and the document is
+            // exactly as it was. The member who asked sees the error in their own
+            // response; the workspace's other knowledge managers are told too.
+            await RecordFailureAsync(tenantId, documentId).ConfigureAwait(false);
+
+            throw;
+        }
 
         document.MarkIndexed(profile.Id, _clock.GetUtcNow());
 
@@ -193,6 +215,42 @@ public sealed class IndexKnowledgeDocumentHandler(
     /// batches, and the first thing that happens when a quota is exceeded is that
     /// somebody else's live conversation stops being answered.
     /// </remarks>
+    /// <summary>
+    /// Records that one indexing attempt failed.
+    /// </summary>
+    /// <remarks>
+    /// Its own occurrence per attempt, so a second failure later is a second
+    /// notification rather than a duplicate of the first. Recording is best
+    /// effort and never replaces the failure being reported: a notification that
+    /// could not be written must not turn a provider error into a database error.
+    /// </remarks>
+    private async Task RecordFailureAsync(TenantId tenantId, KnowledgeDocumentId documentId)
+    {
+        if (_notifications is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await _notifications
+                .RecordAsync(
+                    NotificationOccurrence.Record(
+                        tenantId,
+                        NotificationKind.KnowledgeIndexingFailed,
+                        string.Create(CultureInfo.InvariantCulture, $"{documentId.Value:D}:{Guid.CreateVersion7():D}"),
+                        documentId.Value,
+                        _clock.GetUtcNow()),
+                    CancellationToken.None)
+                .ConfigureAwait(false);
+        }
+#pragma warning disable CA1031 // The indexing failure is what the caller must see, not this one.
+        catch (Exception)
+#pragma warning restore CA1031
+        {
+        }
+    }
+
     private async Task<(IReadOnlyList<KnowledgeChunkWrite> Writes, int Calls)> EmbedAsync(
         IReadOnlyList<KnowledgeChunk> chunks,
         EmbeddingProfile profile,

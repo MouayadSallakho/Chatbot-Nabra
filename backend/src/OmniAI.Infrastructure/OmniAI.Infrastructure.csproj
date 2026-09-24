@@ -49,6 +49,8 @@
     <PackageReference Include="HarfBuzzSharp.NativeAssets.Linux" />
     <PackageReference Include="Unicode.Bidi" />
     <PackageReference Include="Stripe.net" />
+    <PackageReference Include="MailKit" />
+    <PackageReference Include="MimeKit" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>

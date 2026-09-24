@@ -31,6 +31,32 @@ internal sealed class ReportExecutionStore(OmniAiDbContext context) : IReportExe
 {
     private const string ClientRequestIndex = "ux_report_executions_client_request";
 
+    /// <summary>
+    /// Records a notification occurrence for every row of a <c>failed</c> CTE.
+    /// </summary>
+    /// <remarks>
+    /// Keyed by execution and outcome, so the same failure recorded twice is one
+    /// occurrence. Appended as a second CTE, so the statement still reports how
+    /// many executions it failed rather than how many occurrences it wrote.
+    /// </remarks>
+    private const string RecordFailed = """
+        ,
+        recorded AS (
+            INSERT INTO notification_occurrences
+                (id, tenant_id, kind, occurrence_key, source_id, occurred_at, attempts)
+            SELECT gen_random_uuid(),
+                   tenant_id,
+                   CASE WHEN schedule_id IS NULL THEN 'ReportFailed' ELSE 'ScheduledReportFailed' END,
+                   id::text || ':Failed',
+                   id,
+                   @now,
+                   0
+              FROM failed
+            ON CONFLICT (tenant_id, kind, occurrence_key) DO NOTHING
+        )
+
+        """;
+
     private readonly OmniAiDbContext _context =
         context ?? throw new ArgumentNullException(nameof(context));
 
@@ -142,14 +168,19 @@ internal sealed class ReportExecutionStore(OmniAiDbContext context) : IReportExe
         // claim again. It is failed here, honestly, rather than left Running.
         await using (NpgsqlCommand exhausted = await CommandAsync(
                 """
-                UPDATE report_executions
-                   SET status = 'Failed',
-                       failure_code = @code,
-                       failed_at = @now,
-                       claim_token = NULL
-                 WHERE status = 'Running'
-                   AND claimed_at < @stale
-                   AND attempts >= @max_attempts
+                WITH failed AS (
+                    UPDATE report_executions
+                       SET status = 'Failed',
+                           failure_code = @code,
+                           failed_at = @now,
+                           claim_token = NULL
+                     WHERE status = 'Running'
+                       AND claimed_at < @stale
+                       AND attempts >= @max_attempts
+                    RETURNING id, tenant_id, schedule_id
+                )
+                """ + RecordFailed + """
+                SELECT count(*) FROM failed
                 """,
                 cancellationToken)
             .ConfigureAwait(false))
@@ -228,17 +259,37 @@ internal sealed class ReportExecutionStore(OmniAiDbContext context) : IReportExe
             .BeginTransactionAsync(cancellationToken)
             .ConfigureAwait(false);
 
-        int completed;
+        long completed;
 
+        // The completion and its notification occurrence are one statement, in
+        // the same transaction as the artifact row: a report cannot become
+        // downloadable without its requester being told, nor the other way round.
         await using (NpgsqlCommand command = await CommandAsync(
                 """
-                UPDATE report_executions
-                   SET status = 'Completed',
-                       completed_at = @now,
-                       claim_token = NULL
-                 WHERE id = @id
-                   AND status = 'Running'
-                   AND claim_token = @token
+                WITH completed AS (
+                    UPDATE report_executions
+                       SET status = 'Completed',
+                           completed_at = @now,
+                           claim_token = NULL
+                     WHERE id = @id
+                       AND status = 'Running'
+                       AND claim_token = @token
+                    RETURNING id, tenant_id, schedule_id
+                ),
+                recorded AS (
+                    INSERT INTO notification_occurrences
+                        (id, tenant_id, kind, occurrence_key, source_id, occurred_at, attempts)
+                    SELECT gen_random_uuid(),
+                           tenant_id,
+                           CASE WHEN schedule_id IS NULL THEN 'ReportCompleted' ELSE 'ScheduledReportCompleted' END,
+                           id::text || ':Completed',
+                           id,
+                           @now,
+                           0
+                      FROM completed
+                    ON CONFLICT (tenant_id, kind, occurrence_key) DO NOTHING
+                )
+                SELECT count(*) FROM completed
                 """,
                 cancellationToken)
             .ConfigureAwait(false))
@@ -247,7 +298,7 @@ internal sealed class ReportExecutionStore(OmniAiDbContext context) : IReportExe
             command.Parameters.AddWithValue("id", id.Value);
             command.Parameters.AddWithValue("token", claimToken);
 
-            completed = await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+            completed = (long)(await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) ?? 0L);
         }
 
         if (completed != 1)
@@ -272,16 +323,22 @@ internal sealed class ReportExecutionStore(OmniAiDbContext context) : IReportExe
         DateTimeOffset now,
         CancellationToken cancellationToken = default)
     {
+        // The failure and its notification occurrence, in one statement.
         await using NpgsqlCommand command = await CommandAsync(
                 """
-                UPDATE report_executions
-                   SET status = 'Failed',
-                       failure_code = @code,
-                       failed_at = @now,
-                       claim_token = NULL
-                 WHERE id = @id
-                   AND status = 'Running'
-                   AND claim_token = @token
+                WITH failed AS (
+                    UPDATE report_executions
+                       SET status = 'Failed',
+                           failure_code = @code,
+                           failed_at = @now,
+                           claim_token = NULL
+                     WHERE id = @id
+                       AND status = 'Running'
+                       AND claim_token = @token
+                    RETURNING id, tenant_id, schedule_id
+                )
+                """ + RecordFailed + """
+                SELECT count(*) FROM failed
                 """,
                 cancellationToken)
             .ConfigureAwait(false);
@@ -291,7 +348,7 @@ internal sealed class ReportExecutionStore(OmniAiDbContext context) : IReportExe
         command.Parameters.AddWithValue("id", id.Value);
         command.Parameters.AddWithValue("token", claimToken);
 
-        return await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false) == 1;
+        return (long)(await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) ?? 0L) == 1;
     }
 
     public async Task<bool> ReleaseAsync(

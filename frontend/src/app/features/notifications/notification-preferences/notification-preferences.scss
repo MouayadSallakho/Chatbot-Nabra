@@ -1,0 +1,102 @@
+// Every value is a semantic token, so light and dark need no separate rules.
+
+.page-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-inline-size: 48rem;
+}
+
+.preferences {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.categories {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  border: 0;
+
+  legend {
+    margin-block-end: var(--space-2);
+  }
+}
+
+.category {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-3);
+}
+
+// A switch drawn from the native checkbox, so keyboard use, the checked state and
+// the accessible role all stay the browser's.
+.category-switch {
+  appearance: none;
+  position: relative;
+  flex: none;
+  inline-size: 40px;
+  block-size: 22px;
+  margin: 2px 0 0;
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius-pill);
+  background: var(--surface-inset);
+  cursor: pointer;
+  transition: background-color var(--motion-fast) var(--ease-standard);
+
+  &::after {
+    content: '';
+    position: absolute;
+    inset-block-start: 2px;
+    inset-inline-start: 2px;
+    inline-size: 16px;
+    block-size: 16px;
+    border-radius: var(--radius-pill);
+    background: var(--text-secondary);
+    transition: transform var(--motion-fast) var(--ease-standard);
+  }
+
+  &:checked {
+    border-color: var(--accent);
+    background: var(--accent);
+
+    &::after {
+      background: var(--accent-contrast);
+      transform: translateX(calc(18px * var(--direction-flip, 1)));
+    }
+  }
+
+  &:focus-visible {
+    outline: var(--focus-ring-width) solid var(--accent);
+    outline-offset: var(--focus-ring-offset);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+
+    &::after {
+      transition: none;
+    }
+  }
+}
+
+.category-label {
+  font: var(--text-body-strong);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.category-description {
+  margin: var(--space-1) 0 0;
+  font: var(--text-small);
+  color: var(--text-secondary);
+}
+
+.form-actions {
+  display: flex;
+  gap: var(--space-3);
+}

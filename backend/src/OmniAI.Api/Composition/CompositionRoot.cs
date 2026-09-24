@@ -40,6 +40,7 @@ using OmniAI.Application.Members.ListTenantMembers;
 using OmniAI.Application.Members.ReplaceTenantMemberRoles;
 using Microsoft.AspNetCore.SignalR;
 using OmniAI.Api.Realtime;
+using OmniAI.Application.Notifications;
 using OmniAI.Application.Conversations.Realtime;
 using OmniAI.Infrastructure.Conversations.Realtime;
 using OmniAI.Application.Conversations;
@@ -151,6 +152,10 @@ internal static class CompositionRoot
         // application; absent, reports simply cannot be generated here.
         services.AddOmniAiReports(configuration, environment.ContentRootPath);
 
+        services.AddOmniAiNotifications(
+            configuration,
+            requireLiveEmailOptIn: environment.IsDevelopment());
+
         // The clock. TimeProvider is the BCL abstraction, so no third-party clock
         // package is involved and nothing in the Domain or Application had to invent
         // one. Tests substitute a deterministic instance, which is why no handler
@@ -210,6 +215,7 @@ internal static class CompositionRoot
         }
 
         services.AddScoped<IConversationRealtimeNotifier, SignalRConversationNotifier>();
+        services.AddScoped<INotificationRealtime, SignalRNotificationRealtime>();
 
         // The AI runtime. Infrastructure decides which implementation that is:
         // the OpenAI adapter when a key is configured in the environment, and an

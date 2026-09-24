@@ -1,7 +1,7 @@
 /**
  * The product's icon set.
  *
- * WHY THIS IS NOT A PACKAGE. The application needs nineteen glyphs. Every icon
+ * WHY THIS IS NOT A PACKAGE. The application needs two dozen glyphs. Every icon
  * library worth using ships hundreds, and pulling one in for this would add a
  * dependency to audit and upgrade in exchange for shipping mostly dead weight.
  * Authoring the set instead makes the stroke language a fact of the codebase
@@ -112,8 +112,21 @@ export const ICON_PATHS = {
     'M6.2 4.5h11.6a2 2 0 0 1 1.9 1.4L22 13v5a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-5l2.3-7.1a2 2 0 0 1 1.9-1.4z',
   ],
 
-  /** Something went wrong. */
+  /** Something went wrong. Also the Warning severity of a notification. */
   alert: ['M12 4L2.5 20h19z', 'M12 10v4', 'M12 17h.01'],
+
+  /** Critical severity: a stop sign, distinct from the warning triangle by shape. */
+  critical: ['M8.3 3h7.4L21 8.3v7.4L15.7 21H8.3L3 15.7V8.3z', 'M12 8v5', 'M12 16.5h.01'],
+
+  /** Information severity: a circled i. */
+  info: ['M21 12a9 9 0 1 0-18 0 9 9 0 0 0 18 0z', 'M12 11v5', 'M12 7.5h.01'],
+
+  /** Done: mark as read. */
+  check: ['M5 12.5l4.5 4.5L19 7.5'],
+
+  // --- Notifications --------------------------------------------------------
+  /** The notification centre. */
+  bell: ['M18 16V11a6 6 0 1 0-12 0v5l-2 2h16z', 'M10 20.5a2 2 0 0 0 4 0'],
 
   /** Continue, in the reading direction. */
   'arrow-end': ['M5 12h14', 'M13 6l6 6-6 6'],

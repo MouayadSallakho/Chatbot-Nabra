@@ -395,4 +395,13 @@ internal static class PersistenceConverters
         new(
             id => id == null ? null : id.Value.Value,
             value => value == null ? null : Domain.Reports.ReportScheduleId.From(value.Value));
+
+    public static readonly ValueConverter<Domain.Notifications.NotificationId, Guid> NotificationId =
+        new(id => id.Value, value => Domain.Notifications.NotificationId.From(value));
+
+    public static readonly ValueConverter<Domain.Notifications.NotificationOccurrenceId, Guid> NotificationOccurrenceId =
+        new(id => id.Value, value => Domain.Notifications.NotificationOccurrenceId.From(value));
+
+    public static readonly ValueConverter<Domain.Notifications.NotificationEmailId, Guid> NotificationEmailId =
+        new(id => id.Value, value => Domain.Notifications.NotificationEmailId.From(value));
 }

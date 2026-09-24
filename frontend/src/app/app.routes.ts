@@ -200,6 +200,16 @@ export const routes: Routes = [
         loadChildren: () =>
           import('@app/features/billing/billing.routes').then((m) => m.billingRoutes),
       },
+      {
+        // The member's own notifications and email preferences. Reached from the
+        // bell rather than the sidebar: every member has one, whatever they are
+        // allowed to do, so there is no permission to gate it on here.
+        path: 'notifications',
+        loadChildren: () =>
+          import('@app/features/notifications/notifications.routes').then(
+            (m) => m.notificationRoutes,
+          ),
+      },
       ...placeholderRoutes,
       // Deliberate, and deliberately not a redirect: bouncing an unknown address
       // to the overview leaves the reader unsure whether their link was wrong or

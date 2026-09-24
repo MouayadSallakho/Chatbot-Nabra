@@ -1,0 +1,86 @@
+<div class="page">
+  <app-page-header
+    heading="Notifications"
+    description="Operational alerts about this workspace, addressed to you. Only you can see these."
+  >
+    @if (unreadCount() > 0) {
+      <button
+        pageActions
+        type="button"
+        class="btn btn-secondary"
+        (click)="markAllRead()"
+        data-testid="page-mark-all-read"
+      >
+        Mark all as read
+      </button>
+    }
+  </app-page-header>
+
+  <app-notifications-nav />
+
+  <p class="visually-hidden" aria-live="polite" data-testid="announcement">{{ announcement() }}</p>
+
+  <div class="page-section">
+    @if (loading()) {
+      <div class="card card-body" aria-busy="true">
+        <p class="text-small text-secondary">Loading notifications…</p>
+      </div>
+    } @else if (failure(); as error) {
+      <p class="alert alert-danger" role="alert">
+        Notifications could not be loaded. {{ error.message }}
+      </p>
+    } @else if (items().length === 0) {
+      <div class="card">
+        <app-empty-state
+          icon="inbox"
+          heading="No notifications yet"
+          description="When a report finishes, usage nears its limit, billing needs attention, knowledge indexing fails or a WhatsApp delivery cannot be confirmed, you will be told here."
+        />
+      </div>
+    } @else {
+      <section class="card" aria-labelledby="history-heading">
+        <h2 id="history-heading" class="visually-hidden">Notification history</h2>
+        <p class="history-summary text-small text-secondary" data-testid="summary">
+          {{ unreadCount() }} unread of {{ totalCount() }}. Notifications are kept for 90 days.
+        </p>
+        <ul class="history-list">
+          @for (notification of items(); track notification.id) {
+            <li>
+              <app-notification-item
+                [notification]="notification"
+                (opened)="opened($event)"
+                (markedRead)="markRead($event)"
+              />
+            </li>
+          }
+        </ul>
+      </section>
+
+      @if (pageCount() > 1) {
+        <nav class="pager" aria-label="Notification pages">
+          <button
+            type="button"
+            class="btn btn-secondary btn-sm"
+            [disabled]="page() === 1"
+            (click)="previous()"
+            data-testid="previous"
+          >
+            Previous
+          </button>
+          <span class="text-small text-secondary" aria-live="polite"
+            >Page {{ page() }} of {{ pageCount() }}</span
+          >
+          <button
+            type="button"
+            class="btn btn-secondary btn-sm"
+            [disabled]="page() === pageCount()"
+            (click)="next()"
+            data-testid="next"
+          >
+            Next
+          </button>
+        </nav>
+      }
+    }
+  </div>
+</div>

@@ -75,6 +75,44 @@ internal sealed class WorkspaceInboxHub(TenantAuthorizer authorizer) : Hub
     /// Needs no authorisation: leaving a group you are not in does nothing, and
     /// leaving one you are in is always something you are allowed to do.
     /// </remarks>
+    /// <summary>
+    /// Listens for changes to the caller's own notifications in one workspace.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <strong>Membership is the only requirement.</strong> Every member has
+    /// notifications, whatever their roles, so this deliberately does not ask for
+    /// <c>conversations.view</c> the way the inbox subscription does. A non-member
+    /// is refused exactly as there.
+    /// </para>
+    /// <para>
+    /// The group is the caller's own — workspace and member — taken from the
+    /// signed-in session, never from an argument, so nobody can listen to a
+    /// colleague's signals. What arrives on it is a workspace id and nothing more.
+    /// </para>
+    /// </remarks>
+    public async Task SubscribeNotifications(Guid tenantId)
+    {
+        TenantId tenant = TenantId.From(tenantId);
+
+        if (await _authorizer.EffectivePermissionsAsync(tenant, Context.ConnectionAborted).ConfigureAwait(false) is null)
+        {
+            throw new HubException("No such workspace.");
+        }
+
+        Guid me = _authorizer.RequireCurrentUser().Value;
+
+        await Groups
+            .AddToGroupAsync(Context.ConnectionId, RealtimeGroups.ForMember(tenantId, me), Context.ConnectionAborted)
+            .ConfigureAwait(false);
+    }
+
+    public Task UnsubscribeNotifications(Guid tenantId) =>
+        Groups.RemoveFromGroupAsync(
+            Context.ConnectionId,
+            RealtimeGroups.ForMember(tenantId, _authorizer.RequireCurrentUser().Value),
+            Context.ConnectionAborted);
+
     public Task Unsubscribe(Guid tenantId) =>
         Groups.RemoveFromGroupAsync(
             Context.ConnectionId,

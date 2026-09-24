@@ -27,6 +27,16 @@ internal static class RealtimeGroups
     /// <summary>The visitor having one conversation.</summary>
     internal static string ForConversation(Guid conversationId) =>
         string.Create(CultureInfo.InvariantCulture, $"conversation:{conversationId:D}");
+
+    /// <summary>
+    /// One member's own notifications, in one workspace.
+    /// </summary>
+    /// <remarks>
+    /// Keyed by workspace and member, so a signal for one member in one workspace
+    /// reaches none of their colleagues and none of their other workspaces.
+    /// </remarks>
+    internal static string ForMember(Guid tenantId, Guid userId) =>
+        string.Create(CultureInfo.InvariantCulture, $"notifications:{tenantId:D}:{userId:D}");
 }
 
 /// <summary>
@@ -48,4 +58,7 @@ internal static class RealtimeEvents
     /// rather than an optimisation that was never made.
     /// </remarks>
     internal const string ConversationChanged = "conversationChanged";
+
+    /// <summary>Structural only: the payload is the workspace id, and the client re-reads.</summary>
+    internal const string NotificationsChanged = "notificationsChanged";
 }

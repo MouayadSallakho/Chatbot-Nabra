@@ -214,6 +214,19 @@ public sealed class OmniAiDbContext(DbContextOptions<OmniAiDbContext> options)
 
     public DbSet<Domain.Reports.ReportSchedule> ReportSchedules => Set<Domain.Reports.ReportSchedule>();
 
+    /// <summary>Transitions members are to be told about, written with the transition itself.</summary>
+    public DbSet<Domain.Notifications.NotificationOccurrence> NotificationOccurrences =>
+        Set<Domain.Notifications.NotificationOccurrence>();
+
+    /// <summary>Per-member notifications. Never the source of truth for what they describe.</summary>
+    public DbSet<Domain.Notifications.Notification> Notifications => Set<Domain.Notifications.Notification>();
+
+    public DbSet<Domain.Notifications.NotificationPreferences> NotificationPreferences =>
+        Set<Domain.Notifications.NotificationPreferences>();
+
+    public DbSet<Domain.Notifications.NotificationEmail> NotificationEmails =>
+        Set<Domain.Notifications.NotificationEmail>();
+
     /// <summary>
     /// Which agents may draw on which documents.
     /// </summary>

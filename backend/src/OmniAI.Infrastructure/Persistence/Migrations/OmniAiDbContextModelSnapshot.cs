@@ -1235,6 +1235,290 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                     b.ToTable("knowledge_sources", (string)null);
                 });
 
+            modelBuilder.Entity("OmniAI.Domain.Notifications.Notification", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("ActionPath")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("action_path");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasMaxLength(400)
+                        .HasColumnType("character varying(400)")
+                        .HasColumnName("body");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("category");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("DeduplicationKey")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("deduplication_key");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("kind");
+
+                    b.Property<Guid>("OccurrenceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("occurrence_id");
+
+                    b.Property<DateTimeOffset?>("ReadAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("read_at");
+
+                    b.Property<Guid>("RecipientUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("recipient_user_id");
+
+                    b.Property<string>("Severity")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("severity");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("title");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExpiresAt")
+                        .HasDatabaseName("ix_notifications_expires");
+
+                    b.HasIndex("TenantId", "RecipientUserId")
+                        .HasDatabaseName("ix_notifications_recipient_unread")
+                        .HasFilter("read_at IS NULL");
+
+                    b.HasIndex("TenantId", "RecipientUserId", "DeduplicationKey")
+                        .IsUnique()
+                        .HasDatabaseName("ux_notifications_recipient_dedup");
+
+                    b.HasIndex("TenantId", "RecipientUserId", "CreatedAt", "Id")
+                        .IsDescending(false, false, true, true)
+                        .HasDatabaseName("ix_notifications_recipient_created");
+
+                    b.ToTable("notifications", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_notifications_action_path", "action_path IS NULL OR action_path ~ '^/([a-z0-9-]+(/[a-z0-9-]+)*)?$'");
+
+                            t.HasCheckConstraint("ck_notifications_expiry", "expires_at > created_at");
+                        });
+                });
+
+            modelBuilder.Entity("OmniAI.Domain.Notifications.NotificationEmail", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer")
+                        .HasColumnName("attempts");
+
+                    b.Property<DateTimeOffset>("AvailableAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("available_at");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("category");
+
+                    b.Property<Guid?>("ClaimToken")
+                        .HasColumnType("uuid")
+                        .HasColumnName("claim_token");
+
+                    b.Property<DateTimeOffset?>("ClaimedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("claimed_at");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("FailureCode")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("failure_code");
+
+                    b.Property<Guid>("NotificationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("notification_id");
+
+                    b.Property<Guid>("RecipientUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("recipient_user_id");
+
+                    b.Property<DateTimeOffset?>("SentAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("sent_at");
+
+                    b.Property<DateTimeOffset?>("SettledAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("settled_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("NotificationId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_notification_emails_notification");
+
+                    b.HasIndex("Status", "AvailableAt")
+                        .HasDatabaseName("ix_notification_emails_claimable")
+                        .HasFilter("status IN ('Pending', 'Sending')");
+
+                    b.HasIndex("TenantId", "NotificationId");
+
+                    b.ToTable("notification_emails", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_notification_emails_attempts", "attempts >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("OmniAI.Domain.Notifications.NotificationOccurrence", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer")
+                        .HasColumnName("attempts");
+
+                    b.Property<Guid?>("ClaimToken")
+                        .HasColumnType("uuid")
+                        .HasColumnName("claim_token");
+
+                    b.Property<DateTimeOffset?>("ClaimedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("claimed_at");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("kind");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at");
+
+                    b.Property<string>("OccurrenceKey")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)")
+                        .HasColumnName("occurrence_key");
+
+                    b.Property<DateTimeOffset?>("ProcessedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("processed_at");
+
+                    b.Property<Guid?>("SourceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("source_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OccurredAt")
+                        .HasDatabaseName("ix_notification_occurrences_pending")
+                        .HasFilter("processed_at IS NULL");
+
+                    b.HasIndex("TenantId", "Kind", "OccurrenceKey")
+                        .IsUnique()
+                        .HasDatabaseName("ux_notification_occurrences_key");
+
+                    b.ToTable("notification_occurrences", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_notification_occurrences_attempts", "attempts >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("OmniAI.Domain.Notifications.NotificationPreferences", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<bool>("EmailBilling")
+                        .HasColumnType("boolean")
+                        .HasColumnName("email_billing");
+
+                    b.Property<bool>("EmailChannelHealth")
+                        .HasColumnType("boolean")
+                        .HasColumnName("email_channel_health");
+
+                    b.Property<bool>("EmailKnowledge")
+                        .HasColumnType("boolean")
+                        .HasColumnName("email_knowledge");
+
+                    b.Property<bool>("EmailReports")
+                        .HasColumnType("boolean")
+                        .HasColumnName("email_reports");
+
+                    b.Property<bool>("EmailUsage")
+                        .HasColumnType("boolean")
+                        .HasColumnName("email_usage");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("TenantId", "UserId");
+
+                    b.ToTable("notification_preferences", (string)null);
+                });
+
             modelBuilder.Entity("OmniAI.Domain.Plans.Plan", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2553,6 +2837,47 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_knowledge_sources_tenant");
+                });
+
+            modelBuilder.Entity("OmniAI.Domain.Notifications.Notification", b =>
+                {
+                    b.HasOne("OmniAI.Domain.Tenants.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_notifications_tenant");
+                });
+
+            modelBuilder.Entity("OmniAI.Domain.Notifications.NotificationEmail", b =>
+                {
+                    b.HasOne("OmniAI.Domain.Notifications.Notification", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "NotificationId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_notification_emails_notification");
+                });
+
+            modelBuilder.Entity("OmniAI.Domain.Notifications.NotificationOccurrence", b =>
+                {
+                    b.HasOne("OmniAI.Domain.Tenants.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_notification_occurrences_tenant");
+                });
+
+            modelBuilder.Entity("OmniAI.Domain.Notifications.NotificationPreferences", b =>
+                {
+                    b.HasOne("OmniAI.Domain.Tenants.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_notification_preferences_tenant");
                 });
 
             modelBuilder.Entity("OmniAI.Domain.Plans.WorkspacePlanAssignment", b =>

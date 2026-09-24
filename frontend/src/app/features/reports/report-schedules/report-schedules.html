@@ -36,9 +36,10 @@
     } @else {
       <!-- What a schedule does, stated once and plainly. -->
       <p class="alert alert-info delivery-note" data-testid="delivery-note">
-        Generated reports are available in Reports. Nothing is emailed or sent anywhere else. Weekly
-        schedules run every Monday for the previous seven days; monthly schedules run on the first
-        of the month for the previous calendar month. All times are UTC.
+        Generated reports are available in Reports. The file is never emailed or sent anywhere else;
+        if you turn on Reports in your notification preferences, you get an email that links here.
+        Weekly schedules run every Monday for the previous seven days; monthly schedules run on the
+        first of the month for the previous calendar month. All times are UTC.
       </p>
 
       @if (failure(); as error) {
