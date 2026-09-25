@@ -214,6 +214,12 @@ public sealed class OmniAiDbContext(DbContextOptions<OmniAiDbContext> options)
 
     public DbSet<Domain.Reports.ReportSchedule> ReportSchedules => Set<Domain.Reports.ReportSchedule>();
 
+    /// <summary>The Data Protection key ring, shared by every instance and every restart.</summary>
+    public DbSet<DataProtectionKeyRow> DataProtectionKeys => Set<DataProtectionKeyRow>();
+
+    /// <summary>Real Knowledge indexing attempts: the crash-recovery anchor for indexing.</summary>
+    public DbSet<KnowledgeIndexAttempt> KnowledgeIndexAttempts => Set<KnowledgeIndexAttempt>();
+
     /// <summary>Transitions members are to be told about, written with the transition itself.</summary>
     public DbSet<Domain.Notifications.NotificationOccurrence> NotificationOccurrences =>
         Set<Domain.Notifications.NotificationOccurrence>();

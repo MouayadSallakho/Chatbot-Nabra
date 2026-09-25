@@ -352,4 +352,104 @@ public sealed class ReportRetention(
 
         return expired.Count;
     }
+
+    /// <summary>
+    /// Removes finished files no artifact row references, once they are old
+    /// enough that no worker can still be committing them.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <strong>The crash window this closes.</strong> A file is finalized, then its
+    /// row is written; a process that dies in between leaves bytes nothing points
+    /// at. Only files older than <see cref="OrphanGrace"/> are considered — far
+    /// longer than the seconds between finalizing a file and committing its row —
+    /// and only if no artifact row references the key at the moment of deciding.
+    /// </para>
+    /// <para>
+    /// <strong>Only the store's own keys.</strong> Candidates come from the
+    /// artifact store, which returns only names of its own key shape inside its own
+    /// root; unfinished writes are a separate directory the store sweeps on its
+    /// own schedule. Deleting a missing file is a no-op, so two instances sweeping
+    /// at once is harmless.
+    /// </para>
+    /// </remarks>
+    /// <returns>How many orphaned files were removed, and the key to continue after.</returns>
+    public async Task<(int Removed, string? NextAfter)> SweepOrphansAsync(
+        string? afterKey,
+        int batchSize,
+        CancellationToken cancellationToken = default)
+    {
+        if (!_artifacts.IsConfigured)
+        {
+            return (0, null);
+        }
+
+        IReadOnlyList<string> keys = await _artifacts
+            .ListFinalizedAsync(_clock.GetUtcNow() - OrphanGrace, afterKey, batchSize, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (keys.Count == 0)
+        {
+            return (0, null);
+        }
+
+        IReadOnlySet<string> referenced = await _executions
+            .ReferencedKeysAsync(keys, cancellationToken)
+            .ConfigureAwait(false);
+
+        int removed = 0;
+
+        foreach (string key in keys.Where(key => !referenced.Contains(key)))
+        {
+            await _artifacts.DeleteAsync(key, cancellationToken).ConfigureAwait(false);
+            removed++;
+        }
+
+        return (removed, keys.Count < batchSize ? null : keys[^1]);
+    }
+
+    /// <summary>
+    /// Makes artifacts whose file has disappeared truthfully non-downloadable.
+    /// </summary>
+    /// <remarks>
+    /// Storage lost or replaced outside the platform leaves rows that advertise a
+    /// Download that can only fail. Each row whose file is gone has its execution
+    /// marked Expired — the existing Phase 31 state for "the file is no longer
+    /// available" — and the row removed. Nothing is regenerated.
+    /// </remarks>
+    /// <returns>How many were reconciled, and the id to continue after.</returns>
+    public async Task<(int Reconciled, Guid? NextAfter)> ReconcileMissingAsync(
+        Guid? afterId,
+        int batchSize,
+        CancellationToken cancellationToken = default)
+    {
+        if (!_artifacts.IsConfigured)
+        {
+            return (0, null);
+        }
+
+        IReadOnlyList<ReportArtifact> artifacts = await _executions
+            .ListArtifactsAsync(afterId, batchSize, cancellationToken)
+            .ConfigureAwait(false);
+
+        int reconciled = 0;
+        DateTimeOffset now = _clock.GetUtcNow();
+
+        foreach (ReportArtifact artifact in artifacts)
+        {
+            // A file younger than the grace may belong to a row committed a moment
+            // ago on another instance; its bytes were written first, so a missing
+            // file here is genuinely missing.
+            if (!await _artifacts.ExistsAsync(artifact.StorageKey, cancellationToken).ConfigureAwait(false))
+            {
+                await _executions.MarkExpiredAsync(artifact, now, cancellationToken).ConfigureAwait(false);
+                reconciled++;
+            }
+        }
+
+        return (reconciled, artifacts.Count < batchSize ? null : artifacts[^1].Id.Value);
+    }
+
+    /// <summary>How old an unreferenced finished file must be before it counts as an orphan.</summary>
+    public static readonly TimeSpan OrphanGrace = TimeSpan.FromHours(6);
 }

@@ -8,6 +8,7 @@ using OmniAI.Application.Billing.Persistence;
 using OmniAI.Domain.Billing;
 using OmniAI.Domain.Tenants;
 using OmniAI.Infrastructure.Persistence;
+using OmniAI.Infrastructure.Reliability;
 
 namespace OmniAI.Infrastructure.Billing;
 
@@ -152,6 +153,8 @@ internal sealed partial class BillingEventWorker(
 
         foreach (BillingEvent stored in claimed)
         {
+            using System.Diagnostics.Activity work = OmniAiTracing.StartWork("billing-event");
+
             // A scope each, because applying one event opens a transaction and
             // takes a workspace lock. Sharing a context across the batch would
             // make one workspace's contention everybody else's problem.
@@ -329,6 +332,8 @@ internal sealed partial class PastDueGraceWorker(
 
         foreach (TenantId tenantId in expired)
         {
+            using System.Diagnostics.Activity work = OmniAiTracing.StartWork("past-due-grace");
+
             await using AsyncServiceScope inner = _scopes.CreateAsyncScope();
 
             // Re-checked under the lock inside the service. This selection was

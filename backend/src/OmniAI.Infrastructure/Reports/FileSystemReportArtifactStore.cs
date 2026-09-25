@@ -248,6 +248,48 @@ internal sealed partial class FileSystemReportArtifactStore : IReportArtifactSto
         return Task.FromResult(removed);
     }
 
+    public Task<IReadOnlyList<string>> ListFinalizedAsync(
+        DateTimeOffset finalizedBefore,
+        string? afterKey,
+        int limit,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(limit);
+
+        if (_final is null)
+        {
+            return Task.FromResult<IReadOnlyList<string>>([]);
+        }
+
+        List<string> keys = [];
+
+        foreach (string path in Directory.EnumerateFiles(_final))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            string name = Path.GetFileName(path);
+
+            // The store's own key shape only, and never a symbolic link: nothing
+            // else in this directory was written by this store.
+            if (!IsKey(name)
+                || (afterKey is not null && string.CompareOrdinal(name, afterKey) <= 0)
+                || new FileInfo(path).LinkTarget is not null
+                || File.GetLastWriteTimeUtc(path) >= finalizedBefore.UtcDateTime)
+            {
+                continue;
+            }
+
+            keys.Add(name);
+        }
+
+        keys.Sort(StringComparer.Ordinal);
+
+        return Task.FromResult<IReadOnlyList<string>>([.. keys.Take(limit)]);
+    }
+
+    public Task<bool> ExistsAsync(string storageKey, CancellationToken cancellationToken = default) =>
+        Task.FromResult(_final is not null && IsKey(storageKey) && File.Exists(PathFor(storageKey)));
+
     private string PathFor(string key)
     {
         string path = Path.GetFullPath(Path.Combine(_final!, key));

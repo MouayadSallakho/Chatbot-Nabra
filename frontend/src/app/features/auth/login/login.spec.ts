@@ -77,6 +77,12 @@ describe('Login', () => {
   const passwordBox = () => host().querySelector<HTMLInputElement>('#password')!;
   const submit = () => host().querySelector<HTMLButtonElement>('button[type="submit"]')!;
 
+  /** Answers the antiforgery renewal the service makes before submitting. */
+  async function answerToken(): Promise<void> {
+    http.expectOne('/api/auth/csrf').flush(null, { status: 204, statusText: 'No Content' });
+    await settle();
+  }
+
   async function fill(email: string, secret: string): Promise<void> {
     emailBox().value = email;
     emailBox().dispatchEvent(new Event('input'));
@@ -126,6 +132,8 @@ describe('Login', () => {
     submit().click();
     await settle();
 
+    await answerToken();
+
     const request = http.expectOne('/api/auth/login');
 
     expect(request.request.method).toBe('POST');
@@ -155,6 +163,8 @@ describe('Login', () => {
     submit().click();
     await settle();
 
+    await answerToken();
+
     http.expectOne('/api/auth/login').flush(account);
     await settle();
 
@@ -173,6 +183,8 @@ describe('Login', () => {
     submit().click();
     await settle();
 
+    await answerToken();
+
     http
       .expectOne('/api/auth/login')
       .flush(
@@ -190,6 +202,8 @@ describe('Login', () => {
 
     submit().click();
     await settle();
+
+    await answerToken();
 
     http
       .expectOne('/api/auth/login')
@@ -228,6 +242,8 @@ describe('Login', () => {
     submit().click();
     await settle();
 
+    await answerToken();
+
     http.expectOne('/api/auth/login').flush(null, { status: 401, statusText: 'Unauthorized' });
     await settle();
 
@@ -241,6 +257,8 @@ describe('Login', () => {
 
     submit().click();
     await settle();
+
+    await answerToken();
 
     http.expectOne('/api/auth/login').flush(account);
     await settle();
@@ -259,6 +277,8 @@ describe('Login', () => {
 
     submit().click();
     await settle();
+
+    await answerToken();
 
     http.expectOne('/api/auth/login').error(new ProgressEvent('error'), { status: 0 });
     await settle();

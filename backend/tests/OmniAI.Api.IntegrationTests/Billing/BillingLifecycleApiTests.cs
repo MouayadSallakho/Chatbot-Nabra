@@ -48,6 +48,19 @@ public sealed class BillingLifecycleApiTests(BillingApiFixture api) : IClassFixt
 
         await WaitForStatusAsync(tenantId, SubscriptionStatus.Active);
 
+        // The intent is settled by the save after the subscription's, so the
+        // subscription turning Active is not yet proof the intent has. Waited for
+        // rather than read at once: reading between the two saves is a race in
+        // the test (seen once in Phase 33), not a defect in the application.
+        await BillingApiFixture.WaitAsync(async () =>
+        {
+            await using OmniAiDbContext settling = api.CreateDbContext();
+
+            return await settling.BillingCheckoutIntents.AnyAsync(candidate =>
+                candidate.TenantId == TenantId.From(tenantId)
+                && candidate.Status == CheckoutIntentStatus.Completed);
+        });
+
         await using OmniAiDbContext context = api.CreateDbContext();
 
         WorkspaceSubscription subscription = await context.WorkspaceSubscriptions

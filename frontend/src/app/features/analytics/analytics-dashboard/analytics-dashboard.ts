@@ -13,6 +13,7 @@ import {
   DEFAULT_ANALYTICS_RANGE,
 } from '../analytics-api';
 import { ProviderUsageCard } from '../provider-usage/provider-usage';
+import { ScrollRegion } from '@app/shared/scroll-region/scroll-region';
 
 /** One bar in the activity chart, already scaled. */
 interface ActivityBar {
@@ -53,7 +54,7 @@ interface ActivityBar {
 @Component({
   selector: 'app-analytics-dashboard',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [PageHeader, EmptyState, ProviderUsageCard],
+  imports: [PageHeader, EmptyState, ProviderUsageCard, ScrollRegion],
   templateUrl: './analytics-dashboard.html',
   styleUrl: './analytics-dashboard.scss',
 })

@@ -59,6 +59,9 @@ internal sealed class RecordingEmbeddingGenerator : ITextEmbeddingGenerator
     /// <summary>Makes the next call return one vector too few.</summary>
     public bool PretendShortResponse { get; set; }
 
+    /// <summary>Runs inside every call, before any vector is produced.</summary>
+    public Action? BeforeCall { get; set; }
+
     /// <summary>The attribution every batch was handed, in order.</summary>
     public IReadOnlyList<AiUsageContext> Usages => _usages;
 
@@ -69,6 +72,7 @@ internal sealed class RecordingEmbeddingGenerator : ITextEmbeddingGenerator
         Calls = 0;
         PretendUnavailable = false;
         PretendShortResponse = false;
+        BeforeCall = null;
     }
 
     public Task<IReadOnlyList<EmbeddingVector>> GenerateAsync(
@@ -83,6 +87,8 @@ internal sealed class RecordingEmbeddingGenerator : ITextEmbeddingGenerator
         _usages.Add(usage);
 
         cancellationToken.ThrowIfCancellationRequested();
+
+        BeforeCall?.Invoke();
 
         if (PretendUnavailable)
         {

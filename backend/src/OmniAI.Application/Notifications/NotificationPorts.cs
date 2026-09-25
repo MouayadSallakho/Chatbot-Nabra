@@ -114,20 +114,6 @@ public interface INotificationStore
         CancellationToken cancellationToken = default);
 }
 
-/// <summary>
-/// Records an occurrence outside a store's own transaction.
-/// </summary>
-/// <remarks>
-/// For the one transition that has no transaction to join: a synchronous
-/// indexing attempt that failed, and therefore wrote nothing. Every other
-/// integration records its occurrence inside the transaction of the change itself.
-/// Recording the same key twice is not an error.
-/// </remarks>
-public interface INotificationOccurrenceRecorder
-{
-    Task RecordAsync(NotificationOccurrence occurrence, CancellationToken cancellationToken = default);
-}
-
 /// <summary>An occurrence a worker has claimed, with the token that proves it.</summary>
 public sealed record ClaimedOccurrence(
     NotificationOccurrenceId Id,

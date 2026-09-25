@@ -103,6 +103,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<IKnowledgeDocumentRepository, KnowledgeDocumentRepository>();
         services.AddScoped<IAgentKnowledgeRepository, AgentKnowledgeRepository>();
         services.AddScoped<IKnowledgeIndexStore, KnowledgeIndexStore>();
+        services.AddScoped<IKnowledgeIndexAttemptStore, KnowledgeIndexAttemptStore>();
         services.AddScoped<IKnowledgeSearchStore, KnowledgeSearchStore>();
         services.AddScoped<IKnowledgeSourceRepository, KnowledgeSourceRepository>();
 

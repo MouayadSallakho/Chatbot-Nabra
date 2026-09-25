@@ -126,7 +126,8 @@ export class ConversationDetail implements OnInit {
 
     if (tenantId && this.canView()) {
       const stop = this.realtime.listen(tenantId, (changed) => {
-        if (changed === this.conversationId()) {
+        // null: the connection came back, and this one may have changed too.
+        if (changed === null || changed === this.conversationId()) {
           void this.refresh();
         }
       });

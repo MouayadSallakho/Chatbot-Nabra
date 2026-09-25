@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using OmniAI.Application.WhatsApp;
 using OmniAI.Application.WhatsApp.Persistence;
+using OmniAI.Infrastructure.Reliability;
 
 namespace OmniAI.Infrastructure.WhatsApp;
 
@@ -110,6 +111,8 @@ internal sealed partial class InboundWhatsAppWorker(
 
         foreach (ClaimedInboundMessage message in claimed)
         {
+            using System.Diagnostics.Activity work = OmniAiTracing.StartWork("whatsapp-inbound");
+
             // A scope per message, not per batch. Each one runs its own unit of
             // work against its own database context, so a failure part-way
             // through a batch cannot leave the next message's context holding

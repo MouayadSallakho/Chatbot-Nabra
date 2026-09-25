@@ -71,6 +71,12 @@ describe('Register', () => {
   const passwordBox = () => host().querySelector<HTMLInputElement>('#password')!;
   const submit = () => host().querySelector<HTMLButtonElement>('button[type="submit"]')!;
 
+  /** Answers the antiforgery renewal the service makes before submitting. */
+  async function answerToken(): Promise<void> {
+    http.expectOne('/api/auth/csrf').flush(null, { status: 204, statusText: 'No Content' });
+    await settle();
+  }
+
   async function fill(email: string, secret: string): Promise<void> {
     emailBox().value = email;
     emailBox().dispatchEvent(new Event('input'));
@@ -116,6 +122,8 @@ describe('Register', () => {
     submit().click();
     await settle();
 
+    await answerToken();
+
     const request = http.expectOne('/api/auth/register');
 
     expect(request.request.body).toEqual({ email: account.email, password: 'abcdefghijkl' });
@@ -133,6 +141,8 @@ describe('Register', () => {
     submit().click();
     await settle();
 
+    await answerToken();
+
     http.expectOne('/api/auth/register').flush(account, { status: 201, statusText: 'Created' });
     await settle();
 
@@ -147,6 +157,8 @@ describe('Register', () => {
 
     submit().click();
     await settle();
+
+    await answerToken();
 
     http
       .expectOne('/api/auth/register')
@@ -166,6 +178,8 @@ describe('Register', () => {
     submit().click();
     await settle();
 
+    await answerToken();
+
     http.expectOne('/api/auth/register').flush(null, { status: 400, statusText: 'Bad Request' });
     await settle();
 
@@ -177,6 +191,8 @@ describe('Register', () => {
 
     submit().click();
     await settle();
+
+    await answerToken();
 
     http.expectOne('/api/auth/register').flush(account, { status: 201, statusText: 'Created' });
     await settle();

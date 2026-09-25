@@ -5,6 +5,7 @@ import {
   HubConnectionState,
   LogLevel,
 } from '@microsoft/signalr';
+import { ADMIN_RECONNECT_POLICY } from './reconnect-policy';
 
 /** The one event the platform pushes. Its payload is a conversation id. */
 const CONVERSATION_CHANGED = 'conversationChanged';
@@ -12,8 +13,11 @@ const CONVERSATION_CHANGED = 'conversationChanged';
 /** Where the workspace hub lives. */
 const WORKSPACE_HUB = '/hubs/workspace-inbox';
 
-/** What a listener is told. */
-export type ConversationChanged = (conversationId: string) => void;
+/**
+ * What a listener is told: the conversation that changed, or `null` when the
+ * connection has just come back and anything may have changed while it was down.
+ */
+export type ConversationChanged = (conversationId: string | null) => void;
 
 /**
  * Live notice that a conversation in this workspace has changed.
@@ -89,7 +93,7 @@ export class ConversationRealtime {
     try {
       connection = new HubConnectionBuilder()
         .withUrl(WORKSPACE_HUB)
-        .withAutomaticReconnect()
+        .withAutomaticReconnect(ADMIN_RECONNECT_POLICY)
         .configureLogging(LogLevel.Warning)
         .build();
     } catch {
@@ -112,7 +116,15 @@ export class ConversationRealtime {
 
     connection.onreconnected(() => {
       void this.subscribe(connection, tenantId);
-      this.zone.run(() => this.live.set(true));
+      this.zone.run(() => {
+        this.live.set(true);
+
+        // Pushes sent while the socket was down are gone. Every listener is
+        // told to re-read, through the ordinary authorised API.
+        for (const listener of this.listeners) {
+          listener(null);
+        }
+      });
     });
 
     connection.onreconnecting(() => this.zone.run(() => this.live.set(false)));

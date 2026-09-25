@@ -56,6 +56,91 @@ public sealed class IndexKnowledgeDocumentTests
         Assert.Equal(1, harness.Index.Replacements);
     }
 
+    // ---- Phase 33: the durable attempt record -------------------------------
+
+    [Fact]
+    public async Task A_real_index_is_anchored_by_an_attempt_committed_before_the_provider_call()
+    {
+        KnowledgeIndexHarness harness = KnowledgeIndexHarness.Build();
+
+        harness.Embeddings.BeforeCall = () => Assert.Single(harness.Attempts.Started);
+
+        await harness.IndexAsync();
+
+        RecordingAttemptStore.Settlement settled = Assert.Single(harness.Attempts.Settled);
+        Assert.Equal(KnowledgeIndexAttemptStatus.Succeeded, settled.Status);
+        Assert.Null(settled.Code);
+        Assert.False(settled.Alert);
+    }
+
+    [Fact]
+    public async Task Re_indexing_unchanged_content_records_no_attempt_at_all()
+    {
+        // The zero-cost path stays zero-cost: no provider call and no row.
+        KnowledgeIndexHarness harness = KnowledgeIndexHarness.Build();
+
+        await harness.IndexAsync();
+        harness.Attempts.Started.Clear();
+
+        await harness.IndexAsync();
+
+        Assert.Empty(harness.Attempts.Started);
+    }
+
+    [Fact]
+    public async Task A_provider_failure_is_recorded_failed_with_its_code_and_an_alert()
+    {
+        KnowledgeIndexHarness harness = KnowledgeIndexHarness.Build();
+
+        harness.Embeddings.PretendUnavailable = true;
+
+        await Assert.ThrowsAsync<EmbeddingUnavailableException>(() => harness.IndexAsync());
+
+        RecordingAttemptStore.Settlement settled = Assert.Single(harness.Attempts.Settled);
+        Assert.Equal(KnowledgeIndexAttemptStatus.Failed, settled.Status);
+        Assert.Equal(KnowledgeIndexAttemptFailures.ProviderUnavailable, settled.Code);
+        Assert.True(settled.Alert);
+    }
+
+    [Fact]
+    public async Task A_refusal_before_any_provider_call_records_no_attempt()
+    {
+        KnowledgeIndexHarness harness = KnowledgeIndexHarness.Build();
+
+        await Assert.ThrowsAsync<KnowledgeDocumentVersionMismatchException>(
+            () => harness.IndexAsync(ConcurrencyToken.From("a-stale-tag")));
+
+        Assert.Empty(harness.Attempts.Started);
+    }
+
+    [Fact]
+    public async Task An_unexpected_failure_stores_only_a_fixed_code_never_the_exception_text()
+    {
+        KnowledgeIndexHarness harness = KnowledgeIndexHarness.Build();
+
+        harness.Embeddings.BeforeCall = () =>
+            throw new InvalidOperationException("secret sk-live-canary at /srv/omniai/file.txt");
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => harness.IndexAsync());
+
+        RecordingAttemptStore.Settlement settled = Assert.Single(harness.Attempts.Settled);
+        Assert.Equal(KnowledgeIndexAttemptFailures.IndexingError, settled.Code);
+        Assert.DoesNotContain("canary", settled.Code, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_failure_to_record_the_outcome_never_hides_the_real_error()
+    {
+        // The row stays Started and the stale reconciler settles it later; the
+        // caller still sees why indexing failed.
+        KnowledgeIndexHarness harness = KnowledgeIndexHarness.Build();
+
+        harness.Embeddings.PretendUnavailable = true;
+        harness.Attempts.FailSettling = true;
+
+        await Assert.ThrowsAsync<EmbeddingUnavailableException>(() => harness.IndexAsync());
+    }
+
     [Fact]
     public async Task Editing_the_content_makes_the_next_index_do_real_work()
     {
@@ -234,6 +319,8 @@ internal sealed class KnowledgeIndexHarness
 
     public required IndexKnowledgeDocumentHandler Handler { get; init; }
 
+    public required RecordingAttemptStore Attempts { get; init; }
+
     public EmbeddingProfileId Profile => Embeddings.Profile.Id;
 
     public static KnowledgeIndexHarness Build(
@@ -249,9 +336,11 @@ internal sealed class KnowledgeIndexHarness
 
         RecordingKnowledgeIndexStore index = new(documents);
         RecordingEmbeddingGenerator embeddings = new();
+        RecordingAttemptStore attempts = new();
 
         return new KnowledgeIndexHarness
         {
+            Attempts = attempts,
             Workspace = workspace,
             Document = document,
             Documents = documents,
@@ -264,7 +353,8 @@ internal sealed class KnowledgeIndexHarness
                 embeddings,
                 new KnowledgeChunker(chunking),
                 Owner(workspace),
-                new FixedTimeProvider(Noon)),
+                new FixedTimeProvider(Noon),
+                attempts),
         };
     }
 
@@ -284,4 +374,48 @@ internal sealed class KnowledgeIndexHarness
             (workspace ?? Workspace).Value,
             Document.Id.Value,
             expected ?? Documents.VersionOf(Document)));
+}
+
+/// <summary>Records attempt transitions; nothing is persisted.</summary>
+internal sealed class RecordingAttemptStore : IKnowledgeIndexAttemptStore
+{
+    public sealed record Settlement(Guid Id, KnowledgeIndexAttemptStatus Status, string? Code, bool Alert);
+
+    public List<KnowledgeIndexAttempt> Started { get; } = [];
+
+    public List<Settlement> Settled { get; } = [];
+
+    public bool FailSettling { get; set; }
+
+    public Task StartAsync(KnowledgeIndexAttempt attempt, CancellationToken cancellationToken = default)
+    {
+        Started.Add(attempt);
+
+        return Task.CompletedTask;
+    }
+
+    public Task<bool> SucceedAsync(Guid attemptId, DateTimeOffset now, CancellationToken cancellationToken = default)
+    {
+        Settled.Add(new Settlement(attemptId, KnowledgeIndexAttemptStatus.Succeeded, null, false));
+
+        return Task.FromResult(true);
+    }
+
+    public Task<bool> SettleAsync(
+        Guid attemptId,
+        KnowledgeIndexAttemptStatus status,
+        string failureCode,
+        bool alert,
+        DateTimeOffset now,
+        CancellationToken cancellationToken = default)
+    {
+        if (FailSettling)
+        {
+            throw new InvalidOperationException("The database is unavailable.");
+        }
+
+        Settled.Add(new Settlement(attemptId, status, failureCode, alert));
+
+        return Task.FromResult(true);
+    }
 }

@@ -185,6 +185,12 @@ internal static class PersistenceSchema
     /// <summary>Weekly and monthly report schedules.</summary>
     public const string ReportSchedulesTable = "report_schedules";
 
+    /// <summary>Real Knowledge indexing attempts and how each ended.</summary>
+    public const string KnowledgeIndexAttemptsTable = "knowledge_index_attempts";
+
+    /// <summary>The ASP.NET Core Data Protection key ring, shared by every instance.</summary>
+    public const string DataProtectionKeysTable = "data_protection_keys";
+
     /// <summary>Authoritative transitions waiting to become notifications.</summary>
     public const string NotificationOccurrencesTable = "notification_occurrences";
 

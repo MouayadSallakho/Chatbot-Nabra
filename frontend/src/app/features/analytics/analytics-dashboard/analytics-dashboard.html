@@ -233,7 +233,7 @@
 
               <details class="daily-table">
                 <summary class="text-small">Daily numbers</summary>
-                <div class="table-scroll">
+                <div class="table-scroll" appScrollRegion="Daily activity table">
                   <table class="table" data-testid="daily-table">
                     <caption class="visually-hidden">
                       Activity per day, in UTC
@@ -314,7 +314,7 @@
                   No conversations were attributed to an agent in this period.
                 </p>
               } @else {
-                <div class="table-scroll">
+                <div class="table-scroll" appScrollRegion="AI agents table">
                   <table class="table" data-testid="agents">
                     <caption class="visually-hidden">
                       Activity per AI agent

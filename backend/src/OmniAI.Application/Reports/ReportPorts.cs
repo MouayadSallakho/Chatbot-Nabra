@@ -108,6 +108,23 @@ public interface IReportArtifactStore
 
     /// <summary>Removes unfinished writes a crashed process left behind.</summary>
     Task<int> SweepAbandonedWritesAsync(DateTimeOffset olderThan, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Keys of finished files last written before <paramref name="finalizedBefore"/>,
+    /// in key order after <paramref name="afterKey"/>, at most <paramref name="limit"/>.
+    /// </summary>
+    /// <remarks>
+    /// Only names of the store's own key shape are ever returned: nothing else in
+    /// the storage root is a report, and nothing else is ever a deletion candidate.
+    /// </remarks>
+    Task<IReadOnlyList<string>> ListFinalizedAsync(
+        DateTimeOffset finalizedBefore,
+        string? afterKey,
+        int limit,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Whether a finished file exists under the key.</summary>
+    Task<bool> ExistsAsync(string storageKey, CancellationToken cancellationToken = default);
 }
 
 /// <summary>Writes a report document as one file format.</summary>
@@ -241,6 +258,17 @@ public interface IReportExecutionStore
     /// <summary>Artifacts whose retention has ended.</summary>
     Task<IReadOnlyList<ReportArtifact>> ListExpiredArtifactsAsync(
         DateTimeOffset now,
+        int batchSize,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Which of these storage keys an artifact row still references.</summary>
+    Task<IReadOnlySet<string>> ReferencedKeysAsync(
+        IReadOnlyCollection<string> storageKeys,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Artifact rows in id order after <paramref name="afterId"/>, for verifying their files exist.</summary>
+    Task<IReadOnlyList<ReportArtifact>> ListArtifactsAsync(
+        Guid? afterId,
         int batchSize,
         CancellationToken cancellationToken = default);
 

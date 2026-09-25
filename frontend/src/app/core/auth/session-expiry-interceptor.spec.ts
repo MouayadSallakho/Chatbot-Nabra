@@ -128,4 +128,72 @@ describe('sessionExpiryInterceptor', () => {
     // authenticated requests, so nothing can bounce back.
     expect(new Set(navigatedTo.map((url) => url.join('/'))).size).toBe(1);
   });
+
+  describe('a rejected antiforgery token', () => {
+    const refusal = {
+      status: 400,
+      code: 'antiforgery.invalid',
+      title: 'Antiforgery validation failed',
+    };
+
+    /** Posts, and answers with the antiforgery refusal. */
+    async function rejectedPost(url: string): Promise<unknown> {
+      const pending = firstValueFrom(client.post(url, { name: 'x' })).catch(
+        (error: unknown) => error,
+      );
+
+      http.expectOne(url).flush(refusal, { status: 400, statusText: 'Bad Request' });
+
+      return pending;
+    }
+
+    it('fetches a fresh token and does not replay the rejected request', async () => {
+      const failure = await rejectedPost('/api/tenants/abc/ai-agents');
+
+      // Exactly one renewal, and no second POST: resending an unsafe request is
+      // the reader's decision, not this interceptor's. verify() in afterEach
+      // fails on any request left unanswered, so a replay would be caught.
+      http.expectOne('/api/auth/csrf').flush(null, { status: 204, statusText: 'No Content' });
+      http.expectNone('/api/tenants/abc/ai-agents');
+
+      expect(failure).toBeTruthy();
+    });
+
+    it('keeps the status meaning what it means: nobody is signed out', async () => {
+      await rejectedPost('/api/tenants/abc/ai-agents');
+
+      http.expectOne('/api/auth/csrf').flush(null, { status: 204, statusText: 'No Content' });
+
+      expect(navigatedTo).toEqual([]);
+      expect(storage.getItem(WORKSPACE_STORAGE_KEY)).toBe('a-workspace-id');
+    });
+
+    it('renews once when several requests are refused together', async () => {
+      const first = firstValueFrom(client.post('/api/one', {})).catch(() => null);
+      const second = firstValueFrom(client.post('/api/two', {})).catch(() => null);
+
+      http.expectOne('/api/one').flush(refusal, { status: 400, statusText: 'Bad Request' });
+      http.expectOne('/api/two').flush(refusal, { status: 400, statusText: 'Bad Request' });
+      await Promise.all([first, second]);
+
+      // expectOne fails if two renewals were issued.
+      http.expectOne('/api/auth/csrf').flush(null, { status: 204, statusText: 'No Content' });
+    });
+
+    it('does nothing for an ordinary validation error', async () => {
+      const pending = firstValueFrom(client.post('/api/tenants/abc/ai-agents', {})).catch(
+        () => null,
+      );
+
+      http
+        .expectOne('/api/tenants/abc/ai-agents')
+        .flush(
+          { status: 400, errors: { name: ['Required'] } },
+          { status: 400, statusText: 'Bad Request' },
+        );
+      await pending;
+
+      http.expectNone('/api/auth/csrf');
+    });
+  });
 });

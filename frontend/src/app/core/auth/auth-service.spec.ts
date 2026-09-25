@@ -50,6 +50,16 @@ describe('AuthService', () => {
     }
   }
 
+  /**
+   * Answers the antiforgery renewal that precedes every sign-in and registration,
+   * then lets the continuation issue the request that follows it.
+   */
+  async function answerToken(): Promise<void> {
+    http.expectOne('/api/auth/csrf').flush(null, { status: 204, statusText: 'No Content' });
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+
   describe('before anything is resolved', () => {
     it('does not guess', () => {
       // 'unknown' is a real state. A client that assumed anonymous would flash
@@ -119,6 +129,8 @@ describe('AuthService', () => {
     it('sends the credentials once and adopts the session', async () => {
       const signingIn = auth.login({ email: account.email, password });
 
+      await answerToken();
+
       const request = http.expectOne('/api/auth/login');
 
       expect(request.request.method).toBe('POST');
@@ -132,6 +144,8 @@ describe('AuthService', () => {
 
     it('reports a refusal without becoming half signed in', async () => {
       const signingIn = auth.login({ email: account.email, password: 'wrong' });
+
+      await answerToken();
 
       http
         .expectOne('/api/auth/login')
@@ -151,6 +165,8 @@ describe('AuthService', () => {
     it('keeps no copy of the password anywhere it can be read back', async () => {
       const signingIn = auth.login({ email: account.email, password });
 
+      await answerToken();
+
       http.expectOne('/api/auth/login').flush(account);
       await signingIn;
 
@@ -162,9 +178,54 @@ describe('AuthService', () => {
     });
   });
 
+  describe('renewing the antiforgery token', () => {
+    it('asks for a fresh token before signing in, so a stale one cannot refuse the attempt', async () => {
+      // The token from startup may have been issued by a server that has since
+      // restarted, or bound to a session that has since expired.
+      const signingIn = auth.login({ email: account.email, password });
+
+      http.expectNone('/api/auth/login');
+
+      await answerToken();
+
+      http.expectOne('/api/auth/login').flush(account);
+
+      expect(await signingIn).toEqual(account);
+    });
+
+    it('still signs in when the renewal itself fails', async () => {
+      const signingIn = auth.login({ email: account.email, password });
+
+      http.expectOne('/api/auth/csrf').flush(null, { status: 0, statusText: 'Unknown Error' });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      http.expectOne('/api/auth/login').flush(account);
+
+      expect(await signingIn).toEqual(account);
+    });
+
+    it('shares one request between concurrent callers', async () => {
+      const first = auth.renewAntiforgery();
+      const second = auth.renewAntiforgery();
+
+      http.expectOne('/api/auth/csrf').flush(null, { status: 204, statusText: 'No Content' });
+
+      await Promise.all([first, second]);
+
+      // A later renewal is a new request, not the settled one.
+      const third = auth.renewAntiforgery();
+
+      http.expectOne('/api/auth/csrf').flush(null, { status: 204, statusText: 'No Content' });
+
+      await third;
+    });
+  });
+
   describe('registering', () => {
     it('creates the account and adopts the session it returns', async () => {
       const registering = auth.register({ email: account.email, password });
+
+      await answerToken();
 
       const request = http.expectOne('/api/auth/register');
 
@@ -180,6 +241,8 @@ describe('AuthService', () => {
     it('asks for no workspace, role or privilege', async () => {
       const registering = auth.register({ email: account.email, password });
 
+      await answerToken();
+
       const request = http.expectOne('/api/auth/register');
       const body = request.request.body as Record<string, unknown>;
 
@@ -191,6 +254,8 @@ describe('AuthService', () => {
 
     it('reports the backend words for a taken address', async () => {
       const registering = auth.register({ email: account.email, password });
+
+      await answerToken();
 
       http
         .expectOne('/api/auth/register')
@@ -209,6 +274,8 @@ describe('AuthService', () => {
   describe('signing out', () => {
     async function signedIn(): Promise<void> {
       const signingIn = auth.login({ email: account.email, password });
+
+      await answerToken();
 
       http.expectOne('/api/auth/login').flush(account);
       await signingIn;
@@ -244,6 +311,8 @@ describe('AuthService', () => {
   describe('an expired session', () => {
     it('can be recorded without calling the server', async () => {
       const signingIn = auth.login({ email: account.email, password });
+
+      await answerToken();
 
       http.expectOne('/api/auth/login').flush(account);
       await signingIn;

@@ -259,6 +259,118 @@ public sealed class ReportGenerationTests(PostgresTestDatabase database)
         Assert.False(File.Exists(Path.Combine(_root, "artifacts", key)));
     }
 
+    // ------------------------------------------------ Phase 33 reconciliation
+
+    [Fact]
+    public async Task Only_an_old_unreferenced_file_of_the_store_s_own_shape_is_removed_as_an_orphan()
+    {
+        ReportWorld world = await ReportWorld.CreateAsync(database);
+        await world.SeedActivityAsync();
+
+        ReportExecution execution = await world.PendingAsync(ReportType.ChannelUsage, ReportFormat.Csv);
+        await GenerateAsync(execution);
+
+        FileSystemReportArtifactStore files = new(_root);
+        string artifacts = Path.Combine(_root, "artifacts");
+
+        // A file finalized and then abandoned before its row was committed.
+        StoredReportFile orphan = await files.WriteAsync((stream, token) => stream.WriteAsync(new byte[] { 1, 2, 3 }, token).AsTask(), 1024);
+
+        // The same, but recent: another instance may be committing its row now.
+        StoredReportFile young = await files.WriteAsync((stream, token) => stream.WriteAsync(new byte[] { 4 }, token).AsTask(), 1024);
+
+        // Not the store's key shape: never a candidate, however old.
+        string stranger = Path.Combine(artifacts, "operator-notes.txt");
+        await File.WriteAllTextAsync(stranger, "kept");
+
+        // An unfinished write in progress.
+        string incoming = Path.Combine(_root, "incoming", $"{Guid.NewGuid():N}.partial");
+        await File.WriteAllTextAsync(incoming, "in progress");
+
+        string referenced;
+        await using (OmniAiDbContext context = database.CreateContext())
+        {
+            referenced = (await new ReportExecutionStore(context).FindArtifactAsync(world.Tenant, execution.Id))!.StorageKey;
+        }
+
+        DateTime old = DateTime.UtcNow.AddHours(-7);
+        foreach (string path in new[] { Path.Combine(artifacts, orphan.StorageKey), Path.Combine(artifacts, referenced), stranger, incoming })
+        {
+            File.SetLastWriteTimeUtc(path, old);
+        }
+
+        (int removed, _) = await SweepAllOrphansAsync(files);
+
+        Assert.Equal(1, removed);
+        Assert.False(File.Exists(Path.Combine(artifacts, orphan.StorageKey)));
+        Assert.True(File.Exists(Path.Combine(artifacts, young.StorageKey)));
+        Assert.True(File.Exists(Path.Combine(artifacts, referenced)));
+        Assert.True(File.Exists(stranger));
+        Assert.True(File.Exists(incoming));
+
+        // Idempotent: a second sweep, or a second instance, removes nothing more.
+        Assert.Equal(0, (await SweepAllOrphansAsync(files)).Removed);
+    }
+
+    [Fact]
+    public async Task An_artifact_whose_file_vanished_is_made_truthfully_non_downloadable()
+    {
+        ReportWorld world = await ReportWorld.CreateAsync(database);
+        await world.SeedActivityAsync();
+
+        ReportExecution execution = await world.PendingAsync(ReportType.ChannelUsage, ReportFormat.Csv);
+        await GenerateAsync(execution);
+
+        FileSystemReportArtifactStore files = new(_root);
+
+        await using (OmniAiDbContext context = database.CreateContext())
+        {
+            string key = (await new ReportExecutionStore(context).FindArtifactAsync(world.Tenant, execution.Id))!.StorageKey;
+
+            // Storage lost or replaced outside the platform.
+            File.Delete(Path.Combine(_root, "artifacts", key));
+        }
+
+        int reconciled = 0;
+        Guid? after = null;
+        do
+        {
+            await using OmniAiDbContext context = database.CreateContext();
+            (int count, Guid? next) = await new ReportRetention(new ReportExecutionStore(context), files, TimeProvider.System)
+                .ReconcileMissingAsync(after, 100);
+            reconciled += count;
+            after = next;
+        }
+        while (after is not null);
+
+        Assert.True(reconciled >= 1);
+
+        await using OmniAiDbContext check = database.CreateContext();
+        ReportExecutionRecord record = (await new ReportExecutionStore(check).FindAsync(world.Tenant, execution.Id))!;
+
+        // Expired: the existing "no longer available" state. Nothing regenerated.
+        Assert.Equal(ReportExecutionStatus.Expired, record.Execution.Status);
+        Assert.Null(await new ReportExecutionStore(check).FindArtifactAsync(world.Tenant, execution.Id));
+    }
+
+    private async Task<(int Removed, string? Last)> SweepAllOrphansAsync(FileSystemReportArtifactStore files)
+    {
+        int removed = 0;
+        string? after = null;
+
+        do
+        {
+            await using OmniAiDbContext context = database.CreateContext();
+            (int count, string? next) = await new ReportRetention(new ReportExecutionStore(context), files, TimeProvider.System)
+                .SweepOrphansAsync(after, 2);
+            removed += count;
+            after = next;
+        }
+        while (after is not null);
+
+        return (removed, after);
+    }
+
     // ---------------------------------------------------------------- helpers
 
     private async Task<ReportGenerationResult> GenerateAsync(ReportExecution execution, ReportOptions? options = null)

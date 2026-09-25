@@ -36,6 +36,9 @@ export class AuthService {
   private readonly state = signal<AuthStatus>('unknown');
   private readonly account = signal<AuthenticatedUser | null>(null);
 
+  /** The antiforgery renewal in flight, shared by everybody who asks meanwhile. */
+  private renewing: Promise<void> | null = null;
+
   /** How far resolution has got. */
   readonly status = this.state.asReadonly();
 
@@ -88,12 +91,46 @@ export class AuthService {
    * and a password that is too short need different words.
    */
   async register(credentials: Credentials): Promise<AuthenticatedUser> {
+    await this.renewAntiforgery();
+
     return this.adopt(() => firstValueFrom(this.api.register(credentials)));
   }
 
-  /** Signs in and adopts the session. Throws the interpreted API error. */
+  /**
+   * Signs in and adopts the session. Throws the interpreted API error.
+   *
+   * <strong>A fresh antiforgery token first, every time.</strong> The one this
+   * page obtained at startup may no longer validate: the API may have restarted
+   * with a different key ring, or the session it was bound to may have expired
+   * while the tab stayed open. Either would reject the first sign-in with a 400
+   * the reader can do nothing about. Asking for a token is a safe GET, so doing
+   * it unconditionally costs one round trip and replays nothing.
+   */
   async login(credentials: Credentials): Promise<AuthenticatedUser> {
+    await this.renewAntiforgery();
+
     return this.adopt(() => firstValueFrom(this.api.login(credentials)));
+  }
+
+  /**
+   * Obtains a fresh antiforgery token pair. Never throws.
+   *
+   * Concurrent callers share one request: several mutations rejected together
+   * produce one renewal, not one each. A failure is swallowed because the next
+   * unsafe request reports it in terms a screen can use -- offline, or the
+   * antiforgery refusal again.
+   */
+  renewAntiforgery(): Promise<void> {
+    this.renewing ??= firstValueFrom(this.api.csrf())
+      .then(
+        () => undefined,
+        () => undefined,
+      )
+      .finally(() => {
+        this.renewing = null;
+      });
+
+    return this.renewing;
   }
 
   /**

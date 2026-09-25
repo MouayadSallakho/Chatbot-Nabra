@@ -17,6 +17,7 @@ import {
   formatLabel,
 } from '../reports-api';
 import { ReportsNav } from '../reports-nav/reports-nav';
+import { ScrollRegion } from '@app/shared/scroll-region/scroll-region';
 
 /**
  * Weekly and monthly reports, generated automatically.
@@ -33,7 +34,7 @@ import { ReportsNav } from '../reports-nav/reports-nav';
 @Component({
   selector: 'app-report-schedules',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, PageHeader, EmptyState, ReportsNav],
+  imports: [ReactiveFormsModule, PageHeader, EmptyState, ReportsNav, ScrollRegion],
   templateUrl: './report-schedules.html',
   styleUrl: './report-schedules.scss',
 })

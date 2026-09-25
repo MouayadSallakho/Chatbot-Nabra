@@ -47,7 +47,6 @@ public static class NotificationsServiceCollectionExtensions
 
         services.AddScoped<NotificationOccurrenceStore>();
         services.AddScoped<INotificationOccurrenceStore>(provider => provider.GetRequiredService<NotificationOccurrenceStore>());
-        services.AddScoped<INotificationOccurrenceRecorder>(provider => provider.GetRequiredService<NotificationOccurrenceStore>());
 
         services.AddScoped<NotificationDirectory>();
         services.AddScoped<INotificationRecipientDirectory>(provider => provider.GetRequiredService<NotificationDirectory>());

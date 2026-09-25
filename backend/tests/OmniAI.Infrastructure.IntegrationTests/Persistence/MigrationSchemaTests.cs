@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Migrations;
+using Microsoft.EntityFrameworkCore.Migrations.Operations;
 using OmniAI.Infrastructure.Persistence;
 using OmniAI.Testing;
 
@@ -12,9 +13,12 @@ namespace OmniAI.Infrastructure.IntegrationTests.Persistence;
 /// Guards on the migration itself, rather than on the behaviour it enables.
 /// </summary>
 /// <remarks>
-/// The migration is generated code that has to be edited by hand, so it can
-/// regress silently the next time it is regenerated. These tests make that
-/// regression a failing test instead of a broken deployment.
+/// Migrations are generated from the model and must not need hand edits (from
+/// Phase 33 on; several earlier migrations were edited, and the notes below
+/// record why). The schema a migration produces can still regress silently when
+/// the model changes, so these tests make that regression a failing test instead
+/// of a broken deployment — and the xmin tests check the model itself, not a
+/// migration file.
 /// </remarks>
 public sealed class MigrationSchemaTests(PostgresTestDatabase database)
     : IClassFixture<PostgresTestDatabase>
@@ -79,7 +83,7 @@ public sealed class MigrationSchemaTests(PostgresTestDatabase database)
 
         string[] applied = [.. await context.Database.GetAppliedMigrationsAsync()];
 
-        Assert.Equal(19, applied.Length);
+        Assert.Equal(20, applied.Length);
         Assert.EndsWith("InitialPersistence", applied[0], StringComparison.Ordinal);
         Assert.EndsWith("AddAiAgents", applied[1], StringComparison.Ordinal);
         Assert.EndsWith("AddIdentityAndTenantMemberships", applied[2], StringComparison.Ordinal);
@@ -136,6 +140,10 @@ public sealed class MigrationSchemaTests(PostgresTestDatabase database)
         Assert.EndsWith(
             "AddOperationalNotifications",
             applied[18],
+            StringComparison.Ordinal);
+        Assert.EndsWith(
+            "AddReliabilityHardening",
+            applied[19],
             StringComparison.Ordinal);
 
         Assert.EndsWith(
@@ -281,6 +289,122 @@ public sealed class MigrationSchemaTests(PostgresTestDatabase database)
             "WHERE table_name = 'messages' AND column_name = 'ingestion_sequence'");
 
         Assert.Equal("bigint/NO", description as string);
+    }
+
+    /// <remarks>
+    /// <para>
+    /// <strong>Tests the model, not a migration file.</strong> The full schema a
+    /// fresh Initial migration would create is derived here from the current EF
+    /// model, through EF's own model differ and Npgsql's own migrations SQL
+    /// generator — the pipeline <c>dotnet ef migrations add</c> followed by
+    /// <c>database update</c> runs. No migration in the repository is read.
+    /// </para>
+    /// <para>
+    /// The differ is provider-agnostic, so it does emit a column operation for
+    /// every <c>xmin</c> token; that is asserted too, because it proves the tokens
+    /// are really mapped. What must never appear is <c>xmin</c> DDL: Npgsql knows
+    /// it is a PostgreSQL system column and generates nothing for it. If a future
+    /// mapping ever named it differently, typed it differently or took it off the
+    /// system-column path, this fails.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void A_schema_derived_from_the_model_alone_creates_no_xmin_column()
+    {
+        using OmniAiDbContext context = database.CreateContext();
+
+        IModel model = context.GetService<IDesignTimeModel>().Model;
+
+        IReadOnlyList<MigrationOperation> operations = context
+            .GetService<IMigrationsModelDiffer>()
+            .GetDifferences(null, model.GetRelationalModel());
+
+        int tokenEntities = model.GetEntityTypes()
+            .Count(entity => entity.FindProperty(PersistenceSchemaNames.Xmin) is not null);
+
+        int xminColumnOperations = operations.OfType<CreateTableOperation>()
+            .SelectMany(table => table.Columns)
+            .Count(column => column.Name == PersistenceSchemaNames.Xmin);
+
+        Assert.True(tokenEntities >= 13, $"Expected every concurrency-guarded aggregate to map xmin; found {tokenEntities}.");
+        Assert.Equal(tokenEntities, xminColumnOperations);
+
+        string ddl = string.Join(
+            "\n",
+            context.GetService<IMigrationsSqlGenerator>()
+                .Generate(operations, model)
+                .Select(command => command.CommandText));
+
+        Assert.Contains("CREATE TABLE ai_provider_usages", ddl, StringComparison.Ordinal);
+        Assert.Contains("CREATE TABLE knowledge_index_attempts", ddl, StringComparison.Ordinal);
+        Assert.Contains("CREATE TABLE data_protection_keys", ddl, StringComparison.Ordinal);
+        Assert.DoesNotMatch(@"\bxmin\b", ddl);
+    }
+
+    [Fact]
+    public async Task Every_xmin_token_is_the_postgres_system_column_and_no_table_owns_one()
+    {
+        using OmniAiDbContext context = database.CreateContext();
+
+        IProperty[] tokens =
+        [
+            .. context.Model.GetEntityTypes()
+                .Select(entity => entity.FindProperty(PersistenceSchemaNames.Xmin))
+                .OfType<IProperty>(),
+        ];
+
+        Assert.NotEmpty(tokens);
+        Assert.All(tokens, token =>
+        {
+            Assert.True(token.IsConcurrencyToken, $"{token.DeclaringType.DisplayName()}.xmin is not a concurrency token.");
+            Assert.Equal(ValueGenerated.OnAddOrUpdate, token.ValueGenerated);
+            Assert.Equal(typeof(uint), token.ClrType);
+            Assert.Equal("xid", token.GetColumnType());
+            Assert.Equal(PersistenceSchemaNames.Xmin, token.GetColumnName());
+        });
+
+        // No application table in the migrated database has a column of its own
+        // by that name, and on a guarded table the name resolves to the system
+        // attribute (negative attnum), which PostgreSQL maintains itself.
+        object? physical = await database.ExecuteScalarAsync(
+            "SELECT count(*) FROM information_schema.columns "
+            + "WHERE table_schema = 'public' AND column_name = 'xmin'");
+
+        Assert.Equal(0L, physical as long?);
+
+        object? systemAttribute = await database.ExecuteScalarAsync(
+            "SELECT attnum FROM pg_attribute "
+            + "WHERE attrelid = 'public.ai_provider_usages'::regclass AND attname = 'xmin'");
+
+        Assert.True(Convert.ToInt32(systemAttribute, CultureInfo.InvariantCulture) < 0);
+    }
+
+    [Fact]
+    public async Task The_phase_33_reliability_schema_exists_with_its_guards()
+    {
+        object? started = await database.ExecuteScalarAsync(
+            "SELECT indexdef FROM pg_indexes WHERE indexname = 'ix_ai_provider_usages_open'");
+        Assert.Contains("WHERE", started as string ?? string.Empty, StringComparison.Ordinal);
+        Assert.Contains("'Started'", started as string ?? string.Empty, StringComparison.Ordinal);
+
+        object? attempts = await database.ExecuteScalarAsync(
+            "SELECT indexdef FROM pg_indexes WHERE indexname = 'ix_knowledge_index_attempts_started'");
+        Assert.Contains("'Started'", attempts as string ?? string.Empty, StringComparison.Ordinal);
+
+        object? foreignKey = await database.ExecuteScalarAsync(
+            "SELECT pg_get_constraintdef(oid) FROM pg_constraint "
+            + "WHERE conname = 'fk_knowledge_index_attempts_document'");
+        Assert.Contains("knowledge_documents(id, tenant_id)", foreignKey as string ?? string.Empty, StringComparison.Ordinal);
+
+        object? settled = await database.ExecuteScalarAsync(
+            "SELECT count(*) FROM pg_constraint WHERE conname IN "
+            + "('ck_knowledge_index_attempts_status', 'ck_knowledge_index_attempts_settled')");
+        Assert.Equal(2L, settled as long?);
+
+        object? keys = await database.ExecuteScalarAsync(
+            "SELECT count(*) FROM information_schema.tables "
+            + "WHERE table_schema = 'public' AND table_name = 'data_protection_keys'");
+        Assert.Equal(1L, keys as long?);
     }
 
     /// <summary>

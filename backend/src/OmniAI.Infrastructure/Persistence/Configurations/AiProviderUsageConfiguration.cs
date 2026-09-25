@@ -148,6 +148,21 @@ internal sealed class AiProviderUsageConfiguration : IEntityTypeConfiguration<Ai
         builder.HasIndex(usage => new { usage.TenantId, usage.StartedAt })
             .HasDatabaseName("ix_ai_provider_usages_tenant_started");
 
+        // The stale-Started reconciler's only query: the few rows still Started.
+        builder.HasIndex(usage => usage.StartedAt)
+            .HasDatabaseName("ix_ai_provider_usages_open")
+            .HasFilter("status = 'Started'");
+
+        // PostgreSQL's own xmin, not a column of ours: Npgsql's documented mapping
+        // (a uint row version) binds it to the system column, and its migrations
+        // SQL generator emits no DDL for a system column. A settlement that lost
+        // a race — to the reconciler, or to a duplicate finaliser — fails its
+        // update instead of overwriting an outcome already recorded, so a settled
+        // operation never changes state again.
+        builder.Property<uint>(PersistenceSchema.XminConcurrencyToken)
+            .HasColumnName(PersistenceSchema.XminConcurrencyToken)
+            .IsRowVersion();
+
         // Restrict rather than cascade. Provider spend is financial evidence:
         // deleting a workspace must not silently erase the record of money this
         // platform actually paid out.

@@ -14,6 +14,7 @@ using OmniAI.Api.Knowledge;
 using OmniAI.Api.WebChat;
 using OmniAI.Api.WhatsApp;
 using OmniAI.Api.Security;
+using OmniAI.Api.Health;
 using OmniAI.Api.Team;
 using OmniAI.Api.Tenants;
 
@@ -27,6 +28,17 @@ builder.Services.AddProblemDetails();
 
 // Persistence, authentication, use cases and error translation. See CompositionRoot.
 builder.Services.AddOmniAi(builder.Configuration, builder.Environment);
+
+// Liveness and readiness probes. Readiness checks PostgreSQL and, when it is
+// configured, Redis -- never a third-party provider. See HealthSetup.
+builder.Services.AddOmniAiHealth();
+
+// Every log line carries the TraceId of the request or background work item that
+// wrote it -- the same id a ProblemDetails body returns as traceId -- so one
+// failure can be followed end to end. Stated explicitly rather than left to the
+// host default, because correlation is a Phase 33 guarantee.
+builder.Logging.Configure(options => options.ActivityTrackingOptions =
+    ActivityTrackingOptions.TraceId | ActivityTrackingOptions.SpanId | ActivityTrackingOptions.ParentId);
 
 WebApplication app = builder.Build();
 
@@ -63,6 +75,12 @@ app.UseForwardedHeaders(forwarded.ClientAddress);
 // issue a cookie.
 app.UseOmniAiSecureTransport();
 
+// Baseline response headers, route-aware so the public widget and embed surface
+// is not given a framing policy meant for the admin API; HSTS outside
+// Development. Early, so error responses carry them too. See
+// SecurityHeadersMiddleware.
+app.UseOmniAiSecurityHeaders();
+
 app.UseExceptionHandler();
 
 // Fills in a Problem Details body for error responses produced by the pipeline
@@ -83,8 +101,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 // Liveness probe. Intentionally dependency-free: it answers "is the process up",
-// not "are downstream services healthy". Readiness checks arrive with the
-// components they check.
+// not "are downstream services healthy"; that is /health/ready's job.
 //
 // Anonymous, deliberately. A liveness probe that requires a session cannot be
 // called by the thing that needs it, and it discloses nothing but that the
@@ -92,6 +109,10 @@ app.UseAuthorization();
 app.MapGet("/health", () => Results.Ok(new { status = "healthy" }))
    .WithName("GetHealth")
    .AllowAnonymous();
+
+// /health/live beside it (the same promise, under the conventional name) and
+// /health/ready, which is the probe that consults dependencies.
+app.MapOmniAiHealth();
 
 // Registration, sign-in, sign-out, the current account and the antiforgery
 // bootstrap. Three of these are necessarily anonymous; each says so at its own

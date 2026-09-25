@@ -3,6 +3,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using OmniAI.Application.Reports;
+using OmniAI.Infrastructure.Reliability;
 
 namespace OmniAI.Infrastructure.Reports;
 
@@ -142,13 +143,22 @@ internal sealed partial class ReportGenerationWorker(
 
         foreach (ClaimedReportExecution execution in claimed)
         {
+            using System.Diagnostics.Activity work = OmniAiTracing.StartWork("report-generation");
+
             // A scope each: one report's queries and transaction are nobody else's.
             await using AsyncServiceScope scope = scopes.CreateAsyncScope();
+
+            long started = System.Diagnostics.Stopwatch.GetTimestamp();
 
             ReportGenerationResult result = await scope.ServiceProvider
                 .GetRequiredService<ReportGenerator>()
                 .GenerateAsync(execution, _options.MaxAttempts, cancellationToken)
                 .ConfigureAwait(false);
+
+            OmniAiMetrics.ReportGenerated(
+                result.Outcome.ToString(),
+                System.Diagnostics.Stopwatch.GetElapsedTime(started));
+            OmniAiMetrics.WorkItem("report-generation", result.Outcome.ToString());
 
             if (result.Fault is not null)
             {
@@ -233,6 +243,11 @@ internal sealed partial class ReportRetentionWorker(
 
     private readonly ReportWorkerOptions _options = options.Value;
 
+    // Where the orphan and missing-file scans resume. Held for the life of the
+    // process only: losing them on restart just starts the scan from the top.
+    private string? _orphanCursor;
+    private Guid? _missingCursor;
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         while (!stoppingToken.IsCancellationRequested)
@@ -243,14 +258,28 @@ internal sealed partial class ReportRetentionWorker(
             {
                 await using AsyncServiceScope scope = scopes.CreateAsyncScope();
 
-                removed = await scope.ServiceProvider
-                    .GetRequiredService<ReportRetention>()
-                    .SweepAsync(BatchSize, stoppingToken)
-                    .ConfigureAwait(false);
+                ReportRetention retention = scope.ServiceProvider.GetRequiredService<ReportRetention>();
+
+                removed = await retention.SweepAsync(BatchSize, stoppingToken).ConfigureAwait(false);
 
                 if (removed > 0)
                 {
                     LogRemoved(logger, removed);
+                }
+
+                (int orphans, _orphanCursor) = await retention
+                    .SweepOrphansAsync(_orphanCursor, BatchSize, stoppingToken)
+                    .ConfigureAwait(false);
+
+                (int missing, _missingCursor) = await retention
+                    .ReconcileMissingAsync(_missingCursor, BatchSize, stoppingToken)
+                    .ConfigureAwait(false);
+
+                if (orphans > 0 || missing > 0)
+                {
+                    LogReconciled(logger, orphans, missing);
+                    OmniAiMetrics.Reconciled(ReconciledKinds.ReportOrphan, orphans);
+                    OmniAiMetrics.Reconciled(ReconciledKinds.ReportMissingFile, missing);
                 }
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
@@ -271,6 +300,9 @@ internal sealed partial class ReportRetentionWorker(
             }
         }
     }
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Report storage reconciled: {Orphans} orphaned files removed, {Missing} artifacts with missing files expired.")]
+    private static partial void LogReconciled(ILogger logger, int orphans, int missing);
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Removed {Count} expired report files.")]
     private static partial void LogRemoved(ILogger logger, int count);

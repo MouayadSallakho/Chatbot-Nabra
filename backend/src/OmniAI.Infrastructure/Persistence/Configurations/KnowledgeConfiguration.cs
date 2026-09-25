@@ -181,3 +181,78 @@ internal sealed class AgentKnowledgeAssignmentConfiguration
             .IsRequired();
     }
 }
+
+/// <summary>
+/// Real indexing attempts: the durable anchor that lets a crashed attempt be
+/// settled and alerted on exactly once.
+/// </summary>
+/// <remarks>
+/// A composite foreign key to the document, so an attempt can only ever belong to
+/// a document of its own workspace, and it goes with the document. The status is
+/// bounded by a check constraint, and a partial index serves the reconciler's only
+/// query: the few rows still Started.
+/// </remarks>
+internal sealed class KnowledgeIndexAttemptConfiguration : IEntityTypeConfiguration<KnowledgeIndexAttempt>
+{
+    public void Configure(EntityTypeBuilder<KnowledgeIndexAttempt> builder)
+    {
+        builder.ToTable(PersistenceSchema.KnowledgeIndexAttemptsTable, table =>
+        {
+            table.HasCheckConstraint(
+                "ck_knowledge_index_attempts_status",
+                "status IN ('Started', 'Succeeded', 'Failed', 'Unknown')");
+            table.HasCheckConstraint(
+                "ck_knowledge_index_attempts_settled",
+                "(status = 'Started') = (completed_at IS NULL)");
+        });
+
+        builder.HasKey(attempt => attempt.Id);
+
+        builder.Property(attempt => attempt.Id).HasColumnName("id").ValueGeneratedNever();
+
+        builder.Property(attempt => attempt.TenantId)
+            .HasColumnName("tenant_id")
+            .HasConversion(PersistenceConverters.TenantId)
+            .IsRequired();
+
+        builder.Property(attempt => attempt.DocumentId)
+            .HasColumnName("document_id")
+            .HasConversion(PersistenceConverters.KnowledgeDocumentId)
+            .IsRequired();
+
+        builder.Property(attempt => attempt.Status)
+            .HasColumnName("status")
+            .HasConversion<string>()
+            .HasMaxLength(16)
+            .IsRequired();
+
+        builder.Property(attempt => attempt.FailureCode)
+            .HasColumnName("failure_code")
+            .HasMaxLength(KnowledgeIndexAttemptFailures.MaxLength);
+
+        builder.Property(attempt => attempt.StartedAt)
+            .HasColumnName("started_at")
+            .HasColumnType("timestamp with time zone")
+            .IsRequired();
+
+        builder.Property(attempt => attempt.CompletedAt)
+            .HasColumnName("completed_at")
+            .HasColumnType("timestamp with time zone");
+
+        builder.HasOne<KnowledgeDocument>()
+            .WithMany()
+            .HasForeignKey(attempt => new { attempt.DocumentId, attempt.TenantId })
+            .HasPrincipalKey(document => new { document.Id, document.TenantId })
+            .HasConstraintName("fk_knowledge_index_attempts_document")
+            .OnDelete(DeleteBehavior.Cascade)
+            .IsRequired();
+
+        builder.HasIndex(attempt => attempt.StartedAt)
+            .HasDatabaseName("ix_knowledge_index_attempts_started")
+            .HasFilter("status = 'Started'");
+
+        // Leads with the document so it also serves the composite foreign key.
+        builder.HasIndex(attempt => new { attempt.DocumentId, attempt.TenantId })
+            .HasDatabaseName("ix_knowledge_index_attempts_document");
+    }
+}

@@ -44,6 +44,26 @@ describe('toApiError', () => {
   });
 
   describe('what reaches the reader', () => {
+    it('explains a stale antiforgery token as nothing the reader did wrong', () => {
+      const error = toApiError(
+        new HttpErrorResponse({
+          status: 400,
+          error: {
+            status: 400,
+            code: 'antiforgery.invalid',
+            detail: 'Reload the page and try again.',
+          },
+        }),
+      );
+
+      // The status keeps its meaning; only the sentence changes, and it does not
+      // send the reader to check fields that are fine.
+      expect(error.kind).toBe('validation');
+      expect(error.code).toBe('antiforgery.invalid');
+      expect(error.message).toContain('Nothing was changed');
+      expect(error.message).not.toContain('highlighted fields');
+    });
+
     it('uses the backend wording where it is written for a reader', () => {
       const error = toApiError(problem(400, 'Name must be 120 characters or fewer.'));
 

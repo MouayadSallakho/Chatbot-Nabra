@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using OmniAI.Application.Notifications;
 using OmniAI.Domain.Notifications;
+using OmniAI.Infrastructure.Reliability;
 using OmniAI.Infrastructure.Reports;
 
 namespace OmniAI.Infrastructure.Notifications;
@@ -120,12 +121,16 @@ internal sealed partial class NotificationDispatchWorker(
 
         foreach (ClaimedOccurrence occurrence in claimed)
         {
+            using System.Diagnostics.Activity work = OmniAiTracing.StartWork("notification-dispatch");
+
             await using AsyncServiceScope scope = scopes.CreateAsyncScope();
 
             NotificationWorkResult result = await scope.ServiceProvider
                 .GetRequiredService<NotificationDispatcher>()
                 .DispatchAsync(occurrence, cancellationToken)
                 .ConfigureAwait(false);
+
+            OmniAiMetrics.WorkItem("notification-dispatch", result.Outcome.ToString());
 
             if (result.Fault is not null)
             {
@@ -214,12 +219,16 @@ internal sealed partial class OperationalEmailWorker(
 
         foreach (ClaimedEmail email in claimed)
         {
+            using System.Diagnostics.Activity work = OmniAiTracing.StartWork("operational-email");
+
             await using AsyncServiceScope scope = scopes.CreateAsyncScope();
 
             NotificationEmailStatus? status = await scope.ServiceProvider
                 .GetRequiredService<OperationalEmailDispatcher>()
                 .SendAsync(email, _options.EmailMaxAttempts, cancellationToken)
                 .ConfigureAwait(false);
+
+            OmniAiMetrics.Email(status?.ToString() ?? "Superseded");
 
             if (status is NotificationEmailStatus.Failed or NotificationEmailStatus.Unknown)
             {

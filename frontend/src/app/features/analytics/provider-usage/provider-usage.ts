@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 import { AnalyticsAiUsage, AnalyticsModelUsage, AnalyticsRatedCost } from '../analytics-api';
+import { ScrollRegion } from '@app/shared/scroll-region/scroll-region';
 
 /**
  * What this workspace's calls to AI providers are estimated to have cost.
@@ -27,6 +28,7 @@ import { AnalyticsAiUsage, AnalyticsModelUsage, AnalyticsRatedCost } from '../an
 @Component({
   selector: 'app-provider-usage',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [ScrollRegion],
   templateUrl: './provider-usage.html',
   styleUrl: './provider-usage.scss',
 })

@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using OmniAI.Application.WhatsApp;
 using OmniAI.Application.WhatsApp.Persistence;
+using OmniAI.Infrastructure.Reliability;
 
 namespace OmniAI.Infrastructure.WhatsApp;
 
@@ -98,6 +99,8 @@ internal sealed partial class WhatsAppDeliveryWorker(
 
         foreach (ClaimedDelivery delivery in claimed)
         {
+            using System.Diagnostics.Activity work = OmniAiTracing.StartWork("whatsapp-delivery");
+
             await using AsyncServiceScope inner = _scopes.CreateAsyncScope();
 
             await HandleAsync(inner.ServiceProvider, delivery, cancellationToken)

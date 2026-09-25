@@ -27,10 +27,11 @@ namespace OmniAI.Infrastructure.Notifications;
 /// </para>
 /// </remarks>
 internal sealed class NotificationOccurrenceStore(OmniAiDbContext context)
-    : INotificationOccurrenceStore, INotificationOccurrenceRecorder
+    : INotificationOccurrenceStore
 {
     private readonly OmniAiDbContext _context = context ?? throw new ArgumentNullException(nameof(context));
 
+    /// <summary>Records an occurrence outside a transition (fixtures and reconciliation).</summary>
     public Task RecordAsync(NotificationOccurrence occurrence, CancellationToken cancellationToken = default) =>
         NotificationOccurrenceSql.RecordAsync(_context, occurrence, cancellationToken);
 

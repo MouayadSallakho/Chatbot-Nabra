@@ -47,8 +47,9 @@ export class AuthApi {
    * returned, because nothing needs to be held in JavaScript.
    *
    * Must be called again whenever the signed-in identity changes — the token is
-   * bound to it. The register, login and logout endpoints reissue it themselves,
-   * so in practice this is only needed at startup.
+   * bound to it. The register, login and logout endpoints reissue it themselves;
+   * the client also asks again at startup, immediately before signing in or
+   * registering, and after the server rejects a token (`antiforgery.invalid`).
    */
   csrf(): Observable<void> {
     return this.http.get<void>('/api/auth/csrf');

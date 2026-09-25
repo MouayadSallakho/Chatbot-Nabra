@@ -21,6 +21,24 @@ const OWN_401_IS_MEANINGFUL: readonly string[] = [
   '/api/auth/csrf',
 ];
 
+/** The stable code the backend puts on a rejected antiforgery token. */
+export const ANTIFORGERY_INVALID_CODE = 'antiforgery.invalid';
+
+/** Whether a failure is the server refusing this page's antiforgery token. */
+function isAntiforgeryRefusal(failure: unknown): boolean {
+  if (!(failure instanceof HttpErrorResponse) || failure.status !== 400) {
+    return false;
+  }
+
+  const body: unknown = failure.error;
+
+  return (
+    typeof body === 'object' &&
+    body !== null &&
+    (body as { code?: unknown }).code === ANTIFORGERY_INVALID_CODE
+  );
+}
+
 /**
  * Turns an expired session into the sign-in screen, once.
  *
@@ -37,6 +55,12 @@ const OWN_401_IS_MEANINGFUL: readonly string[] = [
  * so several requests failing together produce one state change and one
  * navigation rather than a redirect per response.
  *
+ * <strong>It also renews a rejected antiforgery token</strong> -- a 400 carrying
+ * `antiforgery.invalid` -- without replaying the request that was rejected, and
+ * without touching the session: the status keeps its meaning, and the screen
+ * still shows the refusal. The renewal is a safe GET, which can never itself be
+ * refused this way, so this cannot loop either.
+ *
  * <strong>It rethrows.</strong> The calling screen still sees the failure and
  * still stops its own spinner; this adds a reaction rather than swallowing one.
  */
@@ -47,6 +71,17 @@ export const sessionExpiryInterceptor: HttpInterceptorFn = (request, next) => {
 
   return next(request).pipe(
     catchError((failure: unknown) => {
+      if (isAntiforgeryRefusal(failure)) {
+        // The token this page holds no longer validates -- an API restart, or a
+        // session that ended while the tab stayed open. A fresh one is fetched so
+        // the reader's next attempt succeeds. The rejected request is NOT
+        // replayed: it was an unsafe one, and whether to send it again is the
+        // reader's decision, not this interceptor's.
+        void auth.renewAntiforgery();
+
+        return throwError(() => failure);
+      }
+
       if (
         failure instanceof HttpErrorResponse &&
         failure.status === 401 &&

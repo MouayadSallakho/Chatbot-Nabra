@@ -41,7 +41,10 @@
     </p>
 
     <div class="card card-body install">
-      <pre class="snippet"><code>{{ current.installSnippet }}</code></pre>
+      <pre
+        class="snippet"
+        appScrollRegion="Installation snippet"
+      ><code>{{ current.installSnippet }}</code></pre>
 
       <div class="install-actions">
         <button type="button" class="btn btn-secondary btn-sm" (click)="copy('snippet')">

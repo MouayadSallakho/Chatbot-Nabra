@@ -18,6 +18,7 @@ import {
   WebChatWidgetConfiguration,
 } from '@app/features/channels/website-chat-api';
 import { checkOrigin } from '../allowed-origin';
+import { ScrollRegion } from '@app/shared/scroll-region/scroll-region';
 
 /** The server's bound on a greeting, so the box can say so before sending. */
 const MAX_GREETING_LENGTH = 300;
@@ -48,7 +49,7 @@ const ACCENT_PATTERN = /^#[0-9a-fA-F]{6}$/;
 @Component({
   selector: 'app-website-chat-widget',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule],
+  imports: [ReactiveFormsModule, ScrollRegion],
   templateUrl: './website-chat-widget.html',
   styleUrl: './website-chat-widget.scss',
 })

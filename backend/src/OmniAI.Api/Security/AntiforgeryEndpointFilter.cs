@@ -34,6 +34,9 @@ internal sealed partial class AntiforgeryEndpointFilter(
     IAntiforgery antiforgery,
     ILogger<AntiforgeryEndpointFilter> logger) : IEndpointFilter
 {
+    /// <summary>The stable, machine-readable code on every antiforgery refusal.</summary>
+    public const string InvalidCode = "antiforgery.invalid";
+
     private readonly IAntiforgery _antiforgery =
         antiforgery ?? throw new ArgumentNullException(nameof(antiforgery));
 
@@ -68,11 +71,16 @@ internal sealed partial class AntiforgeryEndpointFilter(
             // useful in a log and is a hint worth withholding from an attacker.
             LogRejected(_logger, failure.Message);
 
+            // The stable code is what lets a client tell this refusal from a
+            // validation error and fetch a fresh token -- without replaying the
+            // request, and without the server relaxing anything. Only the code is
+            // published; the reason stays in the log.
             return Results.Problem(
                 title: "Antiforgery validation failed",
                 detail: "This request did not carry a valid antiforgery token. "
                     + "Reload the page and try again.",
-                statusCode: StatusCodes.Status400BadRequest);
+                statusCode: StatusCodes.Status400BadRequest,
+                extensions: new Dictionary<string, object?> { ["code"] = InvalidCode });
         }
 
         return await next(context).ConfigureAwait(false);

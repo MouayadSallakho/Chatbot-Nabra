@@ -8,6 +8,7 @@ import { NAV_ITEMS, NavItem } from '@app/layout/navigation';
 import { EmptyState } from '@app/shared/empty-state/empty-state';
 import { Icon } from '@app/shared/icon/icon';
 import { PageHeader } from '@app/shared/page-header/page-header';
+import { ScrollRegion } from '@app/shared/scroll-region/scroll-region';
 
 /**
  * The landing page.
@@ -30,7 +31,7 @@ import { PageHeader } from '@app/shared/page-header/page-header';
 @Component({
   selector: 'app-overview',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, PageHeader, EmptyState, Icon],
+  imports: [RouterLink, PageHeader, EmptyState, Icon, ScrollRegion],
   templateUrl: './overview.html',
   styleUrl: './overview.scss',
 })

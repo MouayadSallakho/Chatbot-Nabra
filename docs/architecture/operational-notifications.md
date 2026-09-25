@@ -114,7 +114,7 @@ in the same statement or transaction as the state change, with
 | Usage threshold | `WorkspaceEntitlementService.ReserveAsync`, after the ledger insert, under the per-workspace advisory lock, same transaction | `{yyyy-MM}` per kind |
 | Billing | `BillingSubscriptionService.ApplyAsync` / `SuspendAsync`, same transaction and lock as the subscription write | `{subscriptionId}:{status}:{updatedAtMs}` |
 | WhatsApp Unknown | `WhatsAppOutbox` settle (only when the new status is Unknown) and `AbandonStaleSendsAsync` — CTE with the update | `{deliveryId}` |
-| Knowledge failure | `IndexKnowledgeDocumentHandler`, when embedding throws Unavailable / Timeout / ResponseInvalid; nothing was written, so there is no transaction to join — recorded best-effort through `INotificationOccurrenceRecorder` | `{documentId}:{attemptGuid}` |
+| Knowledge failure | Since Phase 33: the durable `knowledge_index_attempts` row. Settling an attempt Failed (explicit provider or unexpected failure) or, by the stale-attempt reconciler, Unknown/`interrupted` inserts the occurrence in the same SQL statement as the settlement. See [security-reliability-observability.md](security-reliability-observability.md) §4 | `{documentId}:{attemptId}` |
 
 A replayed statement is one occurrence. A genuine recurrence has a new key:
 PastDue → Active → PastDue is two PastDue occurrences (verified locally); a new
@@ -280,9 +280,10 @@ client lazily, so it stays out of the initial bundle.
 
 ## 13. Limitations
 
-- Knowledge failures are recorded best-effort outside a transaction (the failed
-  attempt wrote nothing to join); a crash between the provider error and the
-  occurrence insert loses that one alert.
+- ~~Knowledge failures are recorded best-effort outside a transaction.~~ Closed
+  in Phase 33: the attempt is a durable row created before any embedding
+  request, and the alert is written in the same statement that settles it; an
+  abandoned attempt is settled and alerted exactly once by the reconciler.
 - A PastDue that moves directly to Suspended in the same reconciliation is one
   Suspended occurrence; grace-expiry suspension is the Phase 25 sweeper's.
 - No member-removal flow exists in the product yet; removal semantics are enforced

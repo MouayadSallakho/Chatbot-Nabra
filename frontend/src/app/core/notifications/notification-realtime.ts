@@ -1,5 +1,6 @@
 import { DestroyRef, Injectable, NgZone, inject, signal } from '@angular/core';
 import type { HubConnection } from '@microsoft/signalr';
+import { ADMIN_RECONNECT_POLICY } from '@app/core/realtime/reconnect-policy';
 
 /** The one notification event the platform pushes. Its payload is a workspace id. */
 const NOTIFICATIONS_CHANGED = 'notificationsChanged';
@@ -86,7 +87,7 @@ export class NotificationRealtime {
 
       connection = new signalr.HubConnectionBuilder()
         .withUrl(WORKSPACE_HUB)
-        .withAutomaticReconnect()
+        .withAutomaticReconnect(ADMIN_RECONNECT_POLICY)
         .configureLogging(signalr.LogLevel.Warning)
         .build();
     } catch {

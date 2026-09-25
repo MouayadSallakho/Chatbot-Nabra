@@ -155,7 +155,7 @@ internal sealed class AiProviderUsageLedger(
             return;
         }
 
-        await database.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        await SaveSettlementAsync(database, nameof(AiOperationStatus.Succeeded), cancellationToken).ConfigureAwait(false);
     }
 
     public Task FailAsync(AiProviderUsageId id, CancellationToken cancellationToken = default) =>
@@ -183,7 +183,30 @@ internal sealed class AiProviderUsageLedger(
             return;
         }
 
-        await database.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        await SaveSettlementAsync(database, operation.Status.ToString(), cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Writes a settlement, unless the row was settled by somebody else first.
+    /// </summary>
+    /// <remarks>
+    /// The stale-Started reconciler may already have recorded Unknown for an
+    /// operation whose process was presumed dead. That outcome stands: the
+    /// concurrency token makes this update match nothing, and the loser writes
+    /// nothing rather than overwriting it.
+    /// </remarks>
+    private static async Task SaveSettlementAsync(OmniAiDbContext database, string status, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await database.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+
+            Reliability.OmniAiMetrics.ProviderOperation(status);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            // Already settled elsewhere. Monotonic: nothing changes back.
+        }
     }
 
     private static async Task<AiProviderUsage?> FindAsync(

@@ -315,8 +315,17 @@ public sealed class ReportHandlers(
 
         Stream? content = await _artifacts
             .OpenReadAsync(artifact.StorageKey, cancellationToken)
-            .ConfigureAwait(false)
-            ?? throw ReportNotDownloadableException.Missing();
+            .ConfigureAwait(false);
+
+        if (content is null)
+        {
+            // The record says the file exists and storage does not have it. Made
+            // truthful now — the execution becomes Expired and its artifact row
+            // goes — so the list stops offering a Download that cannot work.
+            await _executions.MarkExpiredAsync(artifact, _clock.GetUtcNow(), CancellationToken.None).ConfigureAwait(false);
+
+            throw ReportNotDownloadableException.Missing();
+        }
 
         return new ReportDownload(
             content,

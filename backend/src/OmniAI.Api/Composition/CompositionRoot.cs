@@ -129,6 +129,9 @@ internal static class CompositionRoot
             configuration,
             allowEphemeralKey: environment.IsDevelopment());
 
+        // After secret protection: the key ring is encrypted with the same master key.
+        services.AddOmniAiDataProtection(configuration);
+
         // The WhatsApp channel: storage, the Meta transport, webhook security
         // and the two background workers.
         //
@@ -155,6 +158,8 @@ internal static class CompositionRoot
         services.AddOmniAiNotifications(
             configuration,
             requireLiveEmailOptIn: environment.IsDevelopment());
+
+        services.AddOmniAiReliability(configuration);
 
         // The clock. TimeProvider is the BCL abstraction, so no third-party clock
         // package is involved and nothing in the Domain or Application had to invent

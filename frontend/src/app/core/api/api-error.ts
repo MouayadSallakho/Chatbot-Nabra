@@ -168,14 +168,24 @@ export function toApiError(failure: unknown): ApiError {
   // advice is completely different from any server-side failure.
   const kind: ApiErrorKind = failure.status === 0 ? 'offline' : kindOf(failure.status);
 
+  const code = problemCode(failure);
+
   return {
     kind,
-    code: problemCode(failure),
+    code,
     status: failure.status,
     retryAfterSeconds: readRetryAfter(failure),
-    message: readableMessage(failure, kind),
+    // A rejected antiforgery token is not the reader's input being wrong, and
+    // the interceptor has already fetched a fresh one: the honest advice is to
+    // try again, not to check fields that are fine.
+    message: code === 'antiforgery.invalid' ? ANTIFORGERY_MESSAGE : readableMessage(failure, kind),
   };
 }
+
+/** What a reader is told when the page's antiforgery token was out of date. */
+const ANTIFORGERY_MESSAGE =
+  'This page had been open since before the server last restarted or your session ended, ' +
+  'so its security check was out of date. Nothing was changed. Try again.';
 
 /**
  * The largest `Retry-After` this client will repeat to a reader.

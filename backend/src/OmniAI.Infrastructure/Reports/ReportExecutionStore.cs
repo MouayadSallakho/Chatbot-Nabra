@@ -388,6 +388,40 @@ internal sealed class ReportExecutionStore(OmniAiDbContext context) : IReportExe
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 
+    public async Task<IReadOnlySet<string>> ReferencedKeysAsync(
+        IReadOnlyCollection<string> storageKeys,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(storageKeys);
+
+        List<string> keys = [.. storageKeys];
+
+        List<string> referenced = await _context.ReportArtifacts
+            .AsNoTracking()
+            .Where(artifact => keys.Contains(artifact.StorageKey))
+            .Select(artifact => artifact.StorageKey)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        return referenced.ToHashSet(StringComparer.Ordinal);
+    }
+
+    public async Task<IReadOnlyList<ReportArtifact>> ListArtifactsAsync(
+        Guid? afterId,
+        int batchSize,
+        CancellationToken cancellationToken = default)
+    {
+        // Keyset over the raw uuid: the id is a value object in the model, and a
+        // range over it is simplest said in SQL.
+        Guid after = afterId ?? Guid.Empty;
+
+        return await _context.ReportArtifacts
+            .FromSqlInterpolated($"SELECT * FROM report_artifacts WHERE id > {after} ORDER BY id LIMIT {batchSize}")
+            .AsNoTracking()
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
     public async Task MarkExpiredAsync(
         ReportArtifact artifact,
         DateTimeOffset now,

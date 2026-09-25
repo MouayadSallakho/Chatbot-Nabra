@@ -29,6 +29,7 @@ import {
   sizeLabel,
 } from '../reports-api';
 import { ReportsNav } from '../reports-nav/reports-nav';
+import { ScrollRegion } from '@app/shared/scroll-region/scroll-region';
 
 /**
  * Generate a report, and download the ones already generated.
@@ -50,7 +51,7 @@ import { ReportsNav } from '../reports-nav/reports-nav';
 @Component({
   selector: 'app-reports-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, PageHeader, EmptyState, ReportsNav],
+  imports: [ReactiveFormsModule, PageHeader, EmptyState, ReportsNav, ScrollRegion],
   templateUrl: './reports-page.html',
   styleUrl: './reports-page.scss',
 })

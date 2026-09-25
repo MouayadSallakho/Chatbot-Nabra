@@ -189,7 +189,17 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("tenant_id");
 
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("StartedAt")
+                        .HasDatabaseName("ix_ai_provider_usages_open")
+                        .HasFilter("status = 'Started'");
 
                     b.HasIndex("TenantId", "StartedAt")
                         .HasDatabaseName("ix_ai_provider_usages_tenant_started");
@@ -1168,6 +1178,56 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_knowledge_documents_tenant");
 
                     b.ToTable("knowledge_documents", (string)null);
+                });
+
+            modelBuilder.Entity("OmniAI.Domain.Knowledge.KnowledgeIndexAttempt", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("completed_at");
+
+                    b.Property<Guid>("DocumentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("document_id");
+
+                    b.Property<string>("FailureCode")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("failure_code");
+
+                    b.Property<DateTimeOffset>("StartedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("started_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StartedAt")
+                        .HasDatabaseName("ix_knowledge_index_attempts_started")
+                        .HasFilter("status = 'Started'");
+
+                    b.HasIndex("DocumentId", "TenantId")
+                        .HasDatabaseName("ix_knowledge_index_attempts_document");
+
+                    b.ToTable("knowledge_index_attempts", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_knowledge_index_attempts_settled", "(status = 'Started') = (completed_at IS NULL)");
+
+                            t.HasCheckConstraint("ck_knowledge_index_attempts_status", "status IN ('Started', 'Succeeded', 'Failed', 'Unknown')");
+                        });
                 });
 
             modelBuilder.Entity("OmniAI.Domain.Knowledge.KnowledgeSource", b =>
@@ -2492,6 +2552,30 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                     b.ToTable("users", (string)null);
                 });
 
+            modelBuilder.Entity("OmniAI.Infrastructure.Persistence.DataProtectionKeyRow", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("FriendlyName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("friendly_name");
+
+                    b.Property<string>("Xml")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("xml");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("data_protection_keys", (string)null);
+                });
+
             modelBuilder.Entity("OmniAI.Infrastructure.Persistence.WhatsAppCredentialRow", b =>
                 {
                     b.Property<Guid>("ConnectionId")
@@ -2827,6 +2911,17 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_knowledge_documents_tenant");
+                });
+
+            modelBuilder.Entity("OmniAI.Domain.Knowledge.KnowledgeIndexAttempt", b =>
+                {
+                    b.HasOne("OmniAI.Domain.Knowledge.KnowledgeDocument", null)
+                        .WithMany()
+                        .HasForeignKey("DocumentId", "TenantId")
+                        .HasPrincipalKey("Id", "TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_knowledge_index_attempts_document");
                 });
 
             modelBuilder.Entity("OmniAI.Domain.Knowledge.KnowledgeSource", b =>
