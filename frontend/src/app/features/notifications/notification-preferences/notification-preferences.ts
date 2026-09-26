@@ -1,4 +1,12 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  ElementRef,
+  Injector,
+  afterNextRender,
+  inject,
+  signal,
+} from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
 import { ApiError, toApiError } from '@app/core/api/api-error';
@@ -35,6 +43,8 @@ interface Category {
 export class NotificationPreferencesPage {
   private readonly api = inject(NotificationApi);
   private readonly workspace = inject(WorkspaceContextService);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly injector = inject(Injector);
 
   protected readonly categories: readonly Category[] = [
     {
@@ -102,6 +112,13 @@ export class NotificationPreferencesPage {
       this.etag = saved.etag;
       this.form.reset(saved.value.email);
       this.announcement.set('Email preferences saved.');
+      // Save is disabled while saving and again once nothing has changed, so the
+      // browser has already dropped focus on the body. Back to the start of the
+      // choices, so the reader is still in the form they were using.
+      afterNextRender(
+        () => this.host.nativeElement.querySelector<HTMLElement>('.category-switch')?.focus(),
+        { injector: this.injector },
+      );
     } catch (error: unknown) {
       this.saveFailure.set(toApiError(error));
     } finally {

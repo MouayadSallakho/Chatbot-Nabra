@@ -409,6 +409,53 @@ describe('ConversationDetail', () => {
     );
   });
 
+  it('keeps keyboard focus with the reader through a handover and a reply', async () => {
+    await mount('conversations.view', 'conversations.handoff', 'conversations.reply');
+    document.body.append(host());
+
+    http.expectOne(detailUrl).flush(detail, tagged(detail, '"v1"'));
+    await settle();
+    http.expectOne(messagesUrl).flush({ items: [], nextCursor: null });
+    await settle();
+
+    button('Take over')!.click();
+    await settle();
+    http.expectOne(`${detailUrl}/take-over`).flush(humanDetail, tagged(humanDetail, '"v2"'));
+    await settle();
+    await settle();
+
+    // Take over was replaced by Return to AI; the composer is what comes next.
+    const box = (): HTMLTextAreaElement => host().querySelector('textarea')!;
+    expect(document.activeElement).toBe(box());
+
+    box().value = 'Checking that for you now.';
+    box().dispatchEvent(new Event('input'));
+    // Enter adds a line; it never sends. verify() in afterEach proves no request.
+    box().dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    await settle();
+
+    button('Send reply')!.click();
+    await settle();
+    http
+      .expectOne(`${detailUrl}/messages`)
+      .flush(message('m1', 'HumanAgent', 'Checking that for you now.', 1));
+    await settle();
+    await settle();
+
+    expect(box().value).toBe('');
+    expect(document.activeElement).toBe(box());
+
+    button('Return to AI')!.click();
+    await settle();
+    http.expectOne(`${detailUrl}/return-to-ai`).flush(detail, tagged(detail, '"v3"'));
+    await settle();
+    await settle();
+
+    expect(document.activeElement).toBe(host().querySelector('[data-testid="take-over"]'));
+
+    host().remove();
+  });
+
   it('re-reads when told the conversation changed, without tearing the screen down', async () => {
     await mount('conversations.view');
 

@@ -22,9 +22,15 @@ import { WorkspaceContextService } from '@app/core/workspace/workspace-context-s
 import { WORKSPACE_SETUP_PATH } from '@app/core/workspace/workspace-guard';
 import { Sidebar } from '@app/layout/sidebar/sidebar';
 import { Topbar } from '@app/layout/topbar/topbar';
+import { NavigationHistory } from '@app/core/navigation/navigation-history';
 
-/** Where the desktop collapse preference is kept. */
-const COLLAPSED_STORAGE_KEY = 'omniai.sidebar-collapsed';
+/**
+ * Where the desktop pin preference is kept.
+ *
+ * A layout preference of this browser and nothing more: it is not sent
+ * anywhere, and it is not keyed to the account.
+ */
+export const PINNED_STORAGE_KEY = 'omniai.sidebar-pinned';
 
 /**
  * The application shell: sidebar, top bar, and the routed outlet.
@@ -35,8 +41,10 @@ const COLLAPSED_STORAGE_KEY = 'omniai.sidebar-collapsed';
  * the place the application actually lives.
  *
  * The two pieces of state it does own are genuinely shared: whether the sidebar
- * is collapsed and whether the drawer is open are both needed by the sidebar and
- * the top bar at once, so they belong to the thing that contains both.
+ * is pinned (which decides the grid) and whether the drawer is open (which the
+ * top bar's trigger reports) are needed by more than one child, so they belong
+ * to the thing that contains them all. Whether the rail is peeking changes no
+ * layout, and is the sidebar's own.
  */
 @Component({
   selector: 'app-shell',
@@ -74,11 +82,14 @@ export class AppShell {
    */
   protected readonly drawer = computed(() => !this.isDesktop());
 
-  private readonly collapsePreference = signal(this.readStoredCollapsed());
+  private readonly pinPreference = signal(readStored(this.storage, PINNED_STORAGE_KEY) === 'true');
   private readonly drawerOpen = signal(false);
 
-  /** Collapse is a desktop-only mode; in drawer mode the sidebar is full width. */
-  protected readonly collapsed = computed(() => !this.drawer() && this.collapsePreference());
+  /**
+   * Pinning is a desktop mode. Unpinned -- the default -- the sidebar is a rail
+   * that expands over the page on demand; in drawer mode it is an overlay.
+   */
+  protected readonly pinned = computed(() => !this.drawer() && this.pinPreference());
 
   protected readonly navOpen = computed(() => this.drawer() && this.drawerOpen());
 
@@ -113,19 +124,11 @@ export class AppShell {
     { initialValue: null },
   );
 
-  /**
-   * The name of the current page.
-   *
-   * Read from the route's own `title`, so the top bar, the browser tab and the
-   * route definition cannot disagree.
-   */
-  protected readonly pageTitle = computed(() => {
-    this.navigation();
-
-    return this.activeTitle();
-  });
-
   constructor() {
+    // Started with the shell, before the first detail page can ask it where the
+    // reader came from.
+    inject(NavigationHistory);
+
     // A new page starts at the top. The scrolling region is the shell's main
     // element rather than the document, which is also why Angular's own scroll
     // restoration is not configured -- it acts on the window and would silently
@@ -148,11 +151,11 @@ export class AppShell {
     });
   }
 
-  protected toggleCollapsed(): void {
-    const next = !this.collapsePreference();
+  protected togglePinned(): void {
+    const next = !this.pinPreference();
 
-    this.collapsePreference.set(next);
-    writeStored(this.storage, COLLAPSED_STORAGE_KEY, String(next));
+    this.pinPreference.set(next);
+    writeStored(this.storage, PINNED_STORAGE_KEY, String(next));
   }
 
   protected toggleNav(): void {
@@ -240,20 +243,5 @@ export class AppShell {
   protected skipToContent(event: Event): void {
     event.preventDefault();
     this.mainRegion().nativeElement.focus();
-  }
-
-  /** The deepest activated route's title. */
-  private activeTitle(): string {
-    let route = this.router.routerState.snapshot.root;
-
-    while (route.firstChild) {
-      route = route.firstChild;
-    }
-
-    return route.title ?? '';
-  }
-
-  private readStoredCollapsed(): boolean {
-    return readStored(this.storage, COLLAPSED_STORAGE_KEY) === 'true';
   }
 }

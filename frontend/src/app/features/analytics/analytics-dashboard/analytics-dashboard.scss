@@ -89,19 +89,18 @@
   gap: var(--space-1);
 }
 
+// The same label and figure the overview's metrics use, so one kind of number
+// looks the same wherever it appears.
 .summary-label {
   margin: 0;
-  font: var(--text-caption);
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  font: var(--text-label);
+  color: var(--text-secondary);
 }
 
 .summary-value {
   margin: 0;
-  font-size: 2rem;
-  font-weight: 650;
-  line-height: 1.1;
+  font: 600 1.75rem / 1.2 var(--font-sans);
+  letter-spacing: var(--letter-spacing-tight);
   color: var(--text-primary);
   font-variant-numeric: tabular-nums;
 }

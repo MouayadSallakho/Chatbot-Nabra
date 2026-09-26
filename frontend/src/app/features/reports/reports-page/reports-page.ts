@@ -14,6 +14,8 @@ import { PermissionService } from '@app/core/authorization/permission-service';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
 import { EmptyState } from '@app/shared/empty-state/empty-state';
 import { PageHeader } from '@app/shared/page-header/page-header';
+import { Pagination } from '@app/shared/pagination/pagination';
+import { initialPage, pageRecorder } from '@app/shared/pagination/page-query';
 import {
   ReportCatalog,
   ReportCatalogEntry,
@@ -51,7 +53,7 @@ import { ScrollRegion } from '@app/shared/scroll-region/scroll-region';
 @Component({
   selector: 'app-reports-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, PageHeader, EmptyState, ReportsNav, ScrollRegion],
+  imports: [ReactiveFormsModule, PageHeader, EmptyState, ReportsNav, ScrollRegion, Pagination],
   templateUrl: './reports-page.html',
   styleUrl: './reports-page.scss',
 })
@@ -75,7 +77,12 @@ export class ReportsPage {
   protected readonly failure = signal<ApiError | null>(null);
   protected readonly catalog = signal<ReportCatalog | null>(null);
   protected readonly page = signal<ReportExecutionPage | null>(null);
-  protected readonly pageNumber = signal(1);
+  /** 1-based, mirrored in `?page=`. */
+  protected readonly pageNumber = signal(initialPage());
+
+  protected readonly pageSize = ReportsPage.PageSize;
+
+  private readonly recordPage = pageRecorder();
 
   protected readonly submitting = signal(false);
   protected readonly submitFailure = signal<ApiError | null>(null);
@@ -85,10 +92,6 @@ export class ReportsPage {
   protected readonly reports = computed(() => this.catalog()?.reports ?? []);
   protected readonly rows = computed(() => this.page()?.items ?? []);
   protected readonly totalCount = computed(() => this.page()?.totalCount ?? 0);
-  protected readonly hasPrevious = computed(() => this.pageNumber() > 1);
-  protected readonly hasNext = computed(
-    () => this.pageNumber() * ReportsPage.PageSize < this.totalCount(),
-  );
 
   protected readonly form = new FormGroup({
     type: new FormControl<ReportType | ''>('', { nonNullable: true }),
@@ -154,6 +157,7 @@ export class ReportsPage {
 
   protected async go(page: number): Promise<void> {
     this.pageNumber.set(page);
+    this.recordPage(page);
 
     await this.refresh();
   }

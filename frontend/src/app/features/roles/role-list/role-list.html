@@ -18,16 +18,16 @@
       -->
       <div class="card">
         <app-empty-state
-          icon="settings"
+          icon="roles"
           heading="You do not have access to roles"
           description="Viewing and managing this workspace's roles needs a permission your roles do not include. Ask somebody who administers this workspace if you need it."
         />
       </div>
     } @else if (loading()) {
-      <div class="role-list" aria-busy="true">
+      <div class="data-list role-list" aria-busy="true">
         <p class="visually-hidden" role="status">Loading roles…</p>
         @for (row of skeletonRows; track row) {
-          <div class="role-row role-row-skeleton" aria-hidden="true">
+          <div class="data-row data-row-skeleton" aria-hidden="true">
             <span class="skeleton skeleton-title"></span>
             <span class="skeleton skeleton-text"></span>
             <span class="skeleton skeleton-text"></span>
@@ -48,8 +48,8 @@
         </app-empty-state>
       </div>
     } @else {
-      <div class="role-list">
-        <div class="role-list-head" aria-hidden="true">
+      <div class="data-list role-list">
+        <div class="data-list-head" aria-hidden="true">
           <span>Role</span>
           <span>Permissions</span>
           <span>Last updated</span>
@@ -63,8 +63,8 @@
                 separate "open" button would give a keyboard reader two stops for
                 one destination.
               -->
-              <a class="role-row" [routerLink]="['/roles', role.id]">
-                <span class="role-name">
+              <a class="data-row" [routerLink]="['/roles', role.id]">
+                <span class="data-row-title">
                   <span>{{ role.name }}</span>
 
                   @if (role.isSystem) {
@@ -77,7 +77,7 @@
                   }
                 </span>
 
-                <span class="role-permissions text-small text-secondary">
+                <span class="data-row-meta">
                   @if (role.isSystem) {
                     All {{ role.permissionCount }} permissions
                   } @else if (role.permissionCount === 0) {
@@ -89,14 +89,14 @@
                   }
                 </span>
 
-                <span class="role-updated text-small text-muted">
-                  <span class="role-updated-label">Updated&nbsp;</span>
+                <span class="data-row-meta">
+                  <span class="data-cell-label">Updated&nbsp;</span>
                   <time [attr.datetime]="role.updatedAt">{{
-                    role.updatedAt | date: 'medium'
+                    role.updatedAt | date: 'MMM d, y, h:mm a'
                   }}</time>
                 </span>
 
-                <app-icon class="role-chevron" name="chevron-end" [strokeWidth]="1.75" />
+                <app-icon class="data-row-chevron" name="chevron-end" [strokeWidth]="1.75" />
               </a>
             </li>
           }

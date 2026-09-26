@@ -7,10 +7,12 @@ import {
   inject,
   input,
   signal,
+  viewChild,
 } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
+import { HasUnsavedChanges, protectUnsavedChanges } from '@app/core/navigation/unsaved-changes';
 import { ApiError, toApiError } from '@app/core/api/api-error';
 import { ToastService } from '@app/core/feedback/toast-service';
 import { PermissionService } from '@app/core/authorization/permission-service';
@@ -19,6 +21,7 @@ import { WorkspaceContextService } from '@app/core/workspace/workspace-context-s
 import { EmptyState } from '@app/shared/empty-state/empty-state';
 import { Icon } from '@app/shared/icon/icon';
 import { PageHeader } from '@app/shared/page-header/page-header';
+import { ConfirmDialog } from '@app/core/feedback/confirm-dialog';
 import {
   CREATED_DOCUMENT_STATE,
   KNOWLEDGE_FILE_LIMITS,
@@ -63,11 +66,13 @@ type ConflictSource = 'content' | 'index' | 'availability' | 'source';
 @Component({
   selector: 'app-knowledge-editor',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, RouterLink, DatePipe, PageHeader, EmptyState, Icon],
+  imports: [ReactiveFormsModule, RouterLink, DatePipe, PageHeader, EmptyState, Icon, ConfirmDialog],
   templateUrl: './knowledge-editor.html',
   styleUrl: './knowledge-editor.scss',
 })
-export class KnowledgeEditor implements OnInit {
+export class KnowledgeEditor implements OnInit, HasUnsavedChanges {
+  private readonly disableDialog = viewChild.required<ConfirmDialog>('disableDialog');
+
   private readonly api = inject(KnowledgeApi);
   private readonly workspace = inject(WorkspaceContextService);
   private readonly permissions = inject(PermissionService);
@@ -145,6 +150,11 @@ export class KnowledgeEditor implements OnInit {
   /** Any unsaved edit at all, for the reload warning. */
   protected readonly dirty = computed(() => this.titleChanged() || this.contentChanged());
 
+  /** Whether leaving now would lose edits; asked by the route guard. */
+  hasUnsavedChanges(): boolean {
+    return this.dirty();
+  }
+
   protected readonly contentRemaining = computed(
     () => KNOWLEDGE_LIMITS.contentMax - this.contentValue().length,
   );
@@ -208,6 +218,9 @@ export class KnowledgeEditor implements OnInit {
   })();
 
   constructor() {
+    // The tab being closed or reloaded is the other way unsaved edits are lost.
+    protectUnsavedChanges(() => this.dirty());
+
     this.form.controls.title.valueChanges.subscribe((value) => this.titleValue.set(value));
     this.form.controls.content.valueChanges.subscribe((value) => this.contentValue.set(value));
   }
@@ -352,6 +365,12 @@ export class KnowledgeEditor implements OnInit {
   // ------------------------------------------------------------- availability
 
   protected async setAvailability(enabled: boolean): Promise<void> {
+    // Switching it off affects customers at once, so it is confirmed first;
+    // switching it back on is not.
+    if (!enabled && !(await this.disableDialog().ask())) {
+      return;
+    }
+
     if (this.changingAvailability() || this.cannotWrite()) {
       return;
     }

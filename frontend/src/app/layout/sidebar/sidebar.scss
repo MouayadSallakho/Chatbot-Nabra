@@ -3,13 +3,63 @@
   block-size: 100%;
 }
 
+// -----------------------------------------------------------------------------
+// Panel
+// -----------------------------------------------------------------------------
+// Always the full expanded width. As a rail it is clipped to the rail's width,
+// and peeking animates only the clip -- no width, no layout, nothing behind it
+// reflows. The clip also clips hit-testing, so the hidden part cannot be
+// clicked by accident.
 .sidebar {
+  --rail-clip: calc(var(--sidebar-width) - var(--sidebar-width-collapsed));
+
   display: flex;
   flex-direction: column;
+  inline-size: var(--sidebar-width);
   block-size: 100%;
   background-color: var(--surface-default);
-  // Logical, so the divider moves to the other edge under RTL without a rule.
   border-inline-end: 1px solid var(--border-default);
+}
+
+.sidebar.is-rail {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  z-index: var(--z-sidebar);
+  clip-path: inset(0 var(--rail-clip) 0 0);
+  // Closing is a little slower than opening, on purpose: it reads as the panel
+  // settling back rather than being snatched away.
+  transition:
+    clip-path var(--motion-slow) var(--ease-standard),
+    box-shadow var(--motion-slow) var(--ease-standard);
+}
+
+.sidebar.is-rail.is-expanded {
+  // Negative on the open edge so the overlay's shadow is not clipped away.
+  clip-path: inset(0 -3rem 0 0);
+  box-shadow: var(--shadow-overlay);
+  transition-duration: var(--motion-normal);
+}
+
+[dir='rtl'] .sidebar.is-rail {
+  clip-path: inset(0 0 0 var(--rail-clip));
+}
+
+[dir='rtl'] .sidebar.is-rail.is-expanded {
+  clip-path: inset(0 0 0 -3rem);
+}
+
+// Labels fade rather than jump. They never leave the DOM, so every link keeps
+// its accessible name in every state.
+.fades {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: opacity var(--motion-normal) var(--ease-standard);
+}
+
+.sidebar:not(.is-expanded) .fades {
+  opacity: 0;
 }
 
 // -----------------------------------------------------------------------------
@@ -19,25 +69,24 @@
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  min-block-size: var(--topbar-height);
-  padding-inline: var(--space-4);
-  border-block-end: 1px solid var(--border-subtle);
   flex: none;
+  min-block-size: var(--topbar-height);
+  padding-inline: 1.125rem;
+  border-block-end: 1px solid var(--border-subtle);
 }
 
 .brand-mark {
   inline-size: 1.75rem;
   block-size: 1.75rem;
-  color: var(--accent); // the rect fills with currentColor
   flex: none;
+  color: var(--accent);
 }
 
 .brand-name {
-  font: var(--text-section-title);
+  font: var(--text-card-title);
+  font-size: 1rem;
   letter-spacing: var(--letter-spacing-tight);
   color: var(--text-primary);
-  white-space: nowrap;
-  overflow: hidden;
 }
 
 .sidebar-dismiss {
@@ -49,28 +98,71 @@
 // -----------------------------------------------------------------------------
 .sidebar-nav {
   flex: 1;
-  min-block-size: 0; // lets the list scroll instead of pushing the footer away
+  min-block-size: 0; // the list scrolls on its own; the footer stays put
   overflow-y: auto;
-  padding: var(--space-3);
+  overscroll-behavior: contain;
+  padding: var(--space-1) var(--space-3) var(--space-3);
+  // A thin, quiet scrollbar: present when the list is long, never a slab.
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
 
-  ul {
-    display: flex;
-    flex-direction: column;
-    gap: 0.125rem;
+.nav-group + .nav-group {
+  margin-block-start: var(--space-1);
+}
+
+// The section heading keeps its height in every state, so expanding the rail
+// moves nothing vertically. Collapsed, a short rule stands in for the words.
+.nav-group-label {
+  position: relative;
+  display: flex;
+  align-items: center;
+  block-size: 1.5rem;
+  margin-block-start: var(--space-1);
+  padding-inline: 0.625rem;
+  color: var(--text-muted);
+  font: var(--text-caption);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-caps);
+
+  &::before {
+    content: '';
+    position: absolute;
+    inset-inline-start: 0.625rem;
+    inline-size: 1.25rem;
+    border-block-start: 1px solid var(--border-default);
+    opacity: 0;
+    transition: opacity var(--motion-normal) var(--ease-standard);
   }
 }
 
+.sidebar:not(.is-expanded) .nav-group + .nav-group .nav-group-label::before {
+  opacity: 1;
+}
+
+.nav-group ul {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+// A nav item: the icon sits on the rail's centre line in every state, so the
+// icons never move when the panel expands or collapses.
 .nav-item {
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  padding-inline: var(--space-3);
-  padding-block: var(--space-2);
+  inline-size: 100%;
+  min-block-size: 2.125rem;
+  padding-inline: 0.625rem;
+  border: 0;
   border-radius: var(--radius-md);
+  background: none;
   color: var(--text-secondary);
   font: var(--text-nav);
-  white-space: nowrap;
-  overflow: hidden;
+  text-align: start;
+  text-decoration: none;
+  cursor: pointer;
   transition:
     background-color var(--motion-fast) var(--ease-standard),
     color var(--motion-fast) var(--ease-standard);
@@ -78,24 +170,49 @@
   &:hover {
     background-color: var(--surface-hover);
     color: var(--text-primary);
-    text-decoration: none; // links underline by default; nav items are buttons in spirit
+    text-decoration: none;
+  }
+
+  // Inside the panel, so neither the clip nor the scroller can cut it off.
+  &:focus-visible {
+    outline-offset: -2px;
   }
 
   .icon {
-    inline-size: 1.125rem;
-    block-size: 1.125rem;
+    inline-size: var(--icon-size-nav);
+    block-size: var(--icon-size-nav);
+    flex: none;
   }
 }
 
-// The current page.
-//
-// Three signals, not one: a tinted background, the accent colour, and a solid
-// marker on the inline-start edge. Colour alone would fail anyone who cannot
-// separate the accent from the secondary text, and the marker is what still
-// reads in greyscale or at a glance.
-//
-// `aria-current="page"` is applied by routerLinkActive alongside this class, so
-// the state is announced as well as drawn.
+// Collapsed, an item is exactly its icon's square, so its hover and active
+// fills sit inside the rail instead of running off under the clip. The width
+// snaps back only after the collapse has finished, so it never shows.
+.sidebar.is-rail .nav-item {
+  transition:
+    background-color var(--motion-fast) var(--ease-standard),
+    color var(--motion-fast) var(--ease-standard),
+    inline-size 0s linear var(--motion-slow);
+}
+
+.sidebar.is-rail:not(.is-expanded) .nav-item {
+  inline-size: 2.5rem;
+}
+
+.sidebar.is-rail.is-expanded .nav-item {
+  transition-delay: 0s;
+}
+
+// Touch targets in the drawer, where a finger rather than a pointer chooses.
+@media (pointer: coarse) {
+  .nav-item {
+    min-block-size: 2.75rem;
+  }
+}
+
+// The current page. Three signals, not one: a tinted fill, the accent colour,
+// and a solid marker on the start edge -- the marker is what still reads in
+// greyscale and on the collapsed rail. `aria-current="page"` announces it.
 .nav-item.is-active {
   background-color: var(--surface-selected);
   color: var(--accent);
@@ -112,129 +229,24 @@
 // -----------------------------------------------------------------------------
 .sidebar-footer {
   flex: none;
-  padding: var(--space-3);
+  padding: var(--space-2) var(--space-3);
   border-block-start: 1px solid var(--border-subtle);
 }
 
-.collapse-toggle {
-  inline-size: 100%;
-  justify-content: flex-start;
-  gap: var(--space-3);
+.pin-toggle {
   color: var(--text-muted);
-}
-
-// -----------------------------------------------------------------------------
-// Collapsed
-// -----------------------------------------------------------------------------
-// Labels are hidden visually and kept in the accessibility tree, so every
-// control still has its name. `title` supplies the sighted equivalent, which is
-// what stops a column of unexplained glyphs.
-.sidebar.is-collapsed {
-  .brand-name,
-  .nav-label {
-    position: absolute;
-    inline-size: 1px;
-    block-size: 1px;
-    padding: 0;
-    margin: -1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
-  }
-
-  .sidebar-brand {
-    justify-content: center;
-    padding-inline: 0;
-  }
-
-  .nav-item,
-  .collapse-toggle {
-    justify-content: center;
-    padding-inline: var(--space-2);
-  }
-
-  // The edge marker is the only thing left distinguishing the current page once
-  // the label is gone, so it stays.
-  .nav-item.is-active {
-    box-shadow: inset 3px 0 0 0 var(--accent);
-  }
 }
 
 // -----------------------------------------------------------------------------
 // Drawer
 // -----------------------------------------------------------------------------
-// In drawer mode the sidebar floats above the page rather than sitting beside
-// it, so it carries a shadow and no trailing border.
+// Floating above the page rather than beside it: a shadow, no trailing border.
+// The shadow is only cast while open; off screen it would bleed onto the page.
 .sidebar.is-drawer {
+  inline-size: 100%;
   border-inline-end: none;
+}
+
+.sidebar.is-drawer.is-open {
   box-shadow: var(--shadow-overlay);
-}
-
-// -----------------------------------------------------------------------------
-// Workspace
-// -----------------------------------------------------------------------------
-// The one place the workspace is named, and it names only what the backend owns.
-// Deliberately quiet: it is context, not a control panel, and it is explicitly
-// labelled as a development concept so nobody mistakes it for an account.
-.sidebar-workspace {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  flex: none;
-  padding: var(--space-3) var(--space-4);
-  border-block-start: 1px solid var(--border-subtle);
-  overflow: hidden;
-}
-
-.workspace-label {
-  font: var(--text-label);
-  font-size: 0.6875rem;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: var(--letter-spacing-caps);
-  white-space: nowrap;
-}
-
-.workspace-name {
-  font: var(--text-body-strong);
-  color: var(--text-primary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.workspace-action {
-  align-self: flex-start;
-  padding-inline: 0;
-  color: var(--text-muted);
-  text-decoration: underline;
-}
-
-// The account block, matching the workspace block above it. Both are context
-// rather than navigation, so both are quiet.
-.sidebar-account {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  flex: none;
-  padding: var(--space-3) var(--space-4);
-  border-block-start: 1px solid var(--border-subtle);
-  overflow: hidden;
-}
-
-// The address can be long and must not push the sidebar wider or wrap into
-// three lines; it is truncated with the full value in a title attribute.
-.account-email {
-  font: var(--text-small);
-  color: var(--text-secondary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-// Collapsed to icons, neither block has anything legible to show, so both step
-// aside entirely rather than becoming unexplained stripes.
-.sidebar.is-collapsed .sidebar-workspace,
-.sidebar.is-collapsed .sidebar-account {
-  display: none;
 }

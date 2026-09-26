@@ -1,4 +1,5 @@
 import { Routes } from '@angular/router';
+import { unsavedChangesGuard } from '@app/core/navigation/unsaved-changes';
 import { TeamApi } from './team-api';
 
 /**
@@ -33,6 +34,7 @@ export const teamRoutes: Routes = [
         // Last, so it cannot swallow 'invite'. Route order is the only thing
         // separating a literal segment from a parameter that would match it.
         path: ':userId',
+        canDeactivate: [unsavedChangesGuard],
         title: 'Team member',
         loadComponent: () => import('./member-detail/member-detail').then((m) => m.MemberDetail),
       },

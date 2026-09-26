@@ -7,7 +7,7 @@
   align-items: stretch;
   justify-content: center;
   padding: 0;
-  background-color: var(--surface-sunken, var(--surface-muted));
+  background-color: var(--surface-inset);
 
   // On anything wider than a phone the chat becomes a panel with room around it;
   // on a phone it fills the screen, because a floating card with margins wastes
@@ -48,7 +48,7 @@
 .brand-mark {
   inline-size: 1.75rem;
   block-size: 1.75rem;
-  color: var(--accent-default);
+  color: var(--accent);
   flex: none;
 }
 
@@ -172,5 +172,5 @@
 .chat-handover {
   font: var(--text-body-strong);
   font-size: 0.8125rem;
-  color: var(--color-accent-strong);
+  color: var(--accent);
 }

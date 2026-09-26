@@ -1,8 +1,9 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ApiError } from '@app/core/api/api-error';
 import { AuthService } from '@app/core/auth/auth-service';
+import { SESSION_ENDED } from '@app/core/auth/session-expiry-interceptor';
 import { REGISTER_PATH } from '@app/core/auth/auth-guard';
 import {
   ACCEPT_INVITATION_PATH,
@@ -40,6 +41,13 @@ export class Login {
   private readonly workspace = inject(WorkspaceContextService);
   private readonly invitations = inject(InvitationHandoff);
   private readonly router = inject(Router);
+
+  /**
+   * Whether the reader arrived here because their session ended mid-task, as
+   * opposed to opening the sign-in screen themselves.
+   */
+  protected readonly sessionEnded =
+    inject(ActivatedRoute).snapshot.queryParamMap.get('reason') === SESSION_ENDED;
 
   protected readonly registerPath = REGISTER_PATH;
 

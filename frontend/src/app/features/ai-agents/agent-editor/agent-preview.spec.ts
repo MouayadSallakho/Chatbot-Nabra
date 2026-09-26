@@ -154,7 +154,7 @@ describe('AgentPreview', () => {
     it('explains an unusable provider answer (502) without naming the provider', async () => {
       await fail(502, { detail: 'OpenAI returned an empty completion.' });
 
-      expect(host().textContent).toContain('could not use');
+      expect(host().textContent).toContain('could not be used');
       expect(host().textContent).not.toContain('OpenAI');
     });
 
@@ -196,7 +196,7 @@ describe('AgentPreview', () => {
       http.expectOne(previewUrl).error(new ProgressEvent('error'), { status: 0 });
       await settle();
 
-      expect(host().textContent).toContain('Could not reach');
+      expect(host().textContent).toContain('could not be reached');
     });
   });
 

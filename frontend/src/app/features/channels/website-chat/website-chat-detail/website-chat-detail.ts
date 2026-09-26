@@ -16,6 +16,7 @@ import { PermissionService } from '@app/core/authorization/permission-service';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
 import { EmptyState } from '@app/shared/empty-state/empty-state';
 import { PageHeader } from '@app/shared/page-header/page-header';
+import { ConfirmDialog } from '@app/core/feedback/confirm-dialog';
 import { WebChatAdminApi, WebChatEndpoint, hostedChatUrl } from '../../website-chat-api';
 import { WebsiteChatWidget } from '../website-chat-widget/website-chat-widget';
 
@@ -31,11 +32,21 @@ import { WebsiteChatWidget } from '../website-chat-widget/website-chat-widget';
 @Component({
   selector: 'app-website-chat-detail',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DatePipe, LowerCasePipe, RouterLink, PageHeader, EmptyState, WebsiteChatWidget],
+  imports: [
+    DatePipe,
+    LowerCasePipe,
+    RouterLink,
+    PageHeader,
+    EmptyState,
+    WebsiteChatWidget,
+    ConfirmDialog,
+  ],
   templateUrl: './website-chat-detail.html',
   styleUrl: './website-chat-detail.scss',
 })
 export class WebsiteChatDetail implements OnInit {
+  private readonly disableDialog = viewChild.required<ConfirmDialog>('disableDialog');
+
   private readonly api = inject(WebChatAdminApi);
   private readonly workspace = inject(WorkspaceContextService);
   private readonly permissions = inject(PermissionService);
@@ -122,6 +133,12 @@ export class WebsiteChatDetail implements OnInit {
   }
 
   protected async setStatus(activate: boolean): Promise<void> {
+    // Switching it off affects customers at once, so it is confirmed first;
+    // switching it back on is not.
+    if (!activate && !(await this.disableDialog().ask())) {
+      return;
+    }
+
     const tenantId = this.workspace.tenantId();
     const expected = this.version();
 

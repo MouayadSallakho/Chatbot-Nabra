@@ -1,0 +1,52 @@
+<app-menu [label]="label()" triggerClass="avatar-trigger" placement="end">
+  <span menuTrigger class="avatar" aria-hidden="true">{{ initials() }}</span>
+
+  <div class="identity" role="presentation">
+    <span class="identity-email" [title]="email()">{{ email() }}</span>
+    @if (workspaceName()) {
+      <span class="identity-workspace" [title]="workspaceName()">{{ workspaceName() }}</span>
+    }
+  </div>
+
+  <hr class="menu-separator" role="separator" />
+
+  <div role="group" aria-labelledby="profile-theme-label">
+    <p id="profile-theme-label" class="menu-label" role="presentation">Theme</p>
+    @for (option of themes; track option.value) {
+      <button
+        type="button"
+        class="menu-item"
+        role="menuitemradio"
+        [attr.aria-checked]="preference() === option.value"
+        (click)="selectTheme(option.value)"
+      >
+        <app-icon [name]="option.icon" [strokeWidth]="1.75" />
+        <span>{{ option.label }}</span>
+        @if (preference() === option.value) {
+          <app-icon class="menu-check" name="check" [strokeWidth]="2" />
+        }
+      </button>
+    }
+  </div>
+
+  <hr class="menu-separator" role="separator" />
+
+  <a class="menu-item" role="menuitem" routerLink="/notifications/preferences">
+    <app-icon name="bell" [strokeWidth]="1.75" />
+    <span>Notification preferences</span>
+  </a>
+
+  @if (canSwitchWorkspace()) {
+    <button type="button" class="menu-item" role="menuitem" (click)="workspaceSwitched.emit()">
+      <app-icon name="switch" [strokeWidth]="1.75" />
+      <span>Switch workspace</span>
+    </button>
+  }
+
+  <hr class="menu-separator" role="separator" />
+
+  <button type="button" class="menu-item" role="menuitem" (click)="signedOut.emit()">
+    <app-icon name="sign-out" [strokeWidth]="1.75" />
+    <span>Sign out</span>
+  </button>
+</app-menu>

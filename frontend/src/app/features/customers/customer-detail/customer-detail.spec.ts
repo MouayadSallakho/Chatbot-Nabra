@@ -144,7 +144,9 @@ describe('CustomerDetail', () => {
 
       // Not a bare string of dots beside a badge: a reader using a screen reader
       // is told what the value is.
-      expect(host().querySelector('.visually-hidden')?.textContent).toContain('Masked identifier');
+      expect(
+        host().querySelector('[data-testid="identities"] .visually-hidden')?.textContent,
+      ).toContain('Masked identifier');
     });
 
     it('says a website visitor has no lasting identifier rather than leaving a gap', async () => {
@@ -412,7 +414,7 @@ describe('CustomerDetail', () => {
 
       // Each row says which channel and when the workspace first heard from
       // them -- the only distinguishing facts the platform actually holds.
-      expect(text()).toContain('Website · first seen');
+      expect(text()).toContain('Website chat · first seen');
 
       query<HTMLInputElement>(`[data-testid="candidate-${otherId}"]`)!.click();
 
@@ -425,11 +427,149 @@ describe('CustomerDetail', () => {
       // formatted for the reader's locale, so they are compared as the component
       // would render them rather than as a hard-coded English string.
       const on = (iso: string): string =>
-        new Date(iso).toLocaleDateString(undefined, { dateStyle: 'medium' });
+        new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 
       expect(confirmation).toContain(`first seen ${on('2026-08-01T10:00:00+00:00')}`);
       expect(confirmation).toContain(`first seen ${on('2026-09-01T10:00:00+00:00')}`);
       expect(on('2026-08-01T10:00:00+00:00')).not.toEqual(on('2026-09-01T10:00:00+00:00'));
+    });
+
+    it('tells apart two visitors first seen in the same minute', async () => {
+      // Found in Phase 33.5: seeded visitors who arrived together still read
+      // identically by channel and date. The reference from each record's own
+      // identifier is the one fact guaranteed to differ.
+      const sameMoment = '2026-08-01T10:00:00+00:00';
+
+      await mount('customers.view', 'customers.manage');
+      await answer({
+        ...customer,
+        channels: ['WebChat'],
+        label: 'Anonymous visitor',
+        createdAt: sameMoment,
+      });
+
+      query<HTMLButtonElement>('[data-testid="open-merge"]')!.click();
+
+      http
+        .expectOne((candidate) => candidate.url === directoryUrl)
+        .flush({
+          items: [
+            {
+              id: otherId,
+              displayName: null,
+              label: 'Anonymous visitor',
+              channels: ['WebChat'],
+              conversationCount: 1,
+              lastActivityAt: null,
+              createdAt: sameMoment,
+            },
+          ],
+          page: 1,
+          pageSize: 20,
+          totalCount: 1,
+        });
+
+      await settle();
+
+      query<HTMLInputElement>(`[data-testid="candidate-${otherId}"]`)!.click();
+      await settle();
+
+      const confirmation = query('[data-testid="merge-confirmation"]')!.textContent ?? '';
+
+      expect(customerId.slice(-6)).not.toEqual(otherId.slice(-6));
+      expect(confirmation).toContain(`ref. ${customerId.slice(-6)}`);
+      expect(confirmation).toContain(`ref. ${otherId.slice(-6)}`);
+    });
+
+    async function pickOther(): Promise<void> {
+      query<HTMLButtonElement>('[data-testid="open-merge"]')!.click();
+
+      http
+        .expectOne((candidate) => candidate.url === directoryUrl)
+        .flush({
+          items: [
+            {
+              id: otherId,
+              displayName: null,
+              label: 'Anonymous visitor',
+              channels: ['WebChat'],
+              conversationCount: 1,
+              lastActivityAt: null,
+              createdAt: '2026-09-01T10:00:00+00:00',
+            },
+          ],
+          page: 1,
+          pageSize: 20,
+          totalCount: 1,
+        });
+      await settle();
+      await new Promise((resolve) => setTimeout(resolve));
+      await settle();
+    }
+
+    it('keeps focus with the reader through a merge', async () => {
+      await mount('customers.view', 'customers.manage');
+      await answer();
+      document.body.append(host());
+
+      await pickOther();
+
+      // The opening button was replaced by the picker.
+      expect(document.activeElement).toBe(query(`[data-testid="candidate-${otherId}"]`));
+
+      query<HTMLInputElement>(`[data-testid="candidate-${otherId}"]`)!.click();
+      await settle();
+      query<HTMLButtonElement>('[data-testid="confirm-merge"]')!.click();
+      await settle();
+
+      http
+        .expectOne((request) => request.url === `${url}/merge` && request.method === 'POST')
+        .flush({ sourceCustomerId: customerId, targetCustomerId: otherId });
+      await settle();
+      await new Promise((resolve) => setTimeout(resolve));
+      await answer({
+        ...customer,
+        channels: [],
+        identities: [],
+        conversations: [],
+        conversationCount: 0,
+        mergedIntoCustomerId: otherId,
+        mergedAt: '2026-09-26T10:00:00+00:00',
+      });
+      await new Promise((resolve) => setTimeout(resolve));
+      await settle();
+
+      // This page is now the tombstone, and focus is on what it says.
+      expect(document.activeElement).toBe(query('[data-testid="merged-notice"]'));
+
+      host().remove();
+    });
+
+    it('puts focus on a refused merge, which changes nothing', async () => {
+      await mount('customers.view', 'customers.manage');
+      await answer();
+      document.body.append(host());
+
+      await pickOther();
+      query<HTMLInputElement>(`[data-testid="candidate-${otherId}"]`)!.click();
+      await settle();
+      query<HTMLButtonElement>('[data-testid="confirm-merge"]')!.click();
+      await settle();
+
+      http
+        .expectOne((request) => request.url === `${url}/merge` && request.method === 'POST')
+        .flush(
+          { title: 'Precondition failed', status: 412 },
+          { status: 412, statusText: 'Precondition Failed' },
+        );
+      await settle();
+      await new Promise((resolve) => setTimeout(resolve));
+      await settle();
+
+      expect(query('[data-testid="merged-notice"]')).toBeNull();
+      expect(document.activeElement).toBe(query('[data-testid="merge-failure"]'));
+
+      host().remove();
     });
 
     it('never offers this customer as its own target', async () => {

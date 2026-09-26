@@ -1,6 +1,6 @@
 <div class="page">
   @if (!canView()) {
-    <app-page-header heading="WhatsApp number" />
+    <app-page-header backLink="/channels/whatsapp" backLabel="WhatsApp" heading="WhatsApp number" />
 
     <div class="page-section">
       <div class="card">
@@ -12,7 +12,7 @@
       </div>
     </div>
   } @else if (loading()) {
-    <app-page-header heading="WhatsApp number" />
+    <app-page-header backLink="/channels/whatsapp" backLabel="WhatsApp" heading="WhatsApp number" />
 
     <div class="page-section" aria-busy="true">
       <p class="visually-hidden" role="status">Loading this connection…</p>
@@ -22,7 +22,7 @@
       </div>
     </div>
   } @else if (failure(); as error) {
-    <app-page-header heading="WhatsApp number" />
+    <app-page-header backLink="/channels/whatsapp" backLabel="WhatsApp" heading="WhatsApp number" />
 
     <div class="page-section">
       <div class="card">
@@ -40,10 +40,11 @@
     </div>
   } @else if (connection(); as current) {
     <app-page-header
+      backLink="/channels/whatsapp"
+      backLabel="WhatsApp"
       [heading]="current.displayPhoneNumber || current.phoneNumberId"
       description="One WhatsApp number, one AI agent. Conversations on it appear in the shared inbox."
     >
-      <a pageActions class="btn btn-secondary" routerLink="/channels/whatsapp">Back to WhatsApp</a>
     </app-page-header>
 
     <div class="page-section">
@@ -203,7 +204,12 @@
             [value]="wabaId()"
             [disabled]="!canManage() || isActive()"
             (input)="wabaId.set($any($event.target).value)"
+            [attr.aria-invalid]="idProblem(wabaId()) !== null"
+            [attr.aria-describedby]="idProblem(wabaId()) ? 'detail-waba-error' : null"
           />
+          @if (idProblem(wabaId()); as problem) {
+            <span id="detail-waba-error" class="form-error">{{ problem }}</span>
+          }
         </label>
 
         <label class="field">
@@ -216,7 +222,12 @@
             [value]="phoneNumberId()"
             [disabled]="!canManage() || isActive()"
             (input)="phoneNumberId.set($any($event.target).value)"
+            [attr.aria-invalid]="idProblem(phoneNumberId()) !== null"
+            [attr.aria-describedby]="idProblem(phoneNumberId()) ? 'detail-phone-id-error' : null"
           />
+          @if (idProblem(phoneNumberId()); as problem) {
+            <span id="detail-phone-id-error" class="form-error">{{ problem }}</span>
+          }
         </label>
 
         <label class="field">
@@ -266,4 +277,13 @@
       </div>
     </div>
   }
+
+  <app-confirm-dialog
+    #disableDialog
+    heading="Take this WhatsApp number out of service?"
+    body="Messages sent to this number stop being answered by its AI agent until it is put back into service. Nothing is deleted."
+    confirmLabel="Take out of service"
+    cancelLabel="Keep in service"
+    tone="danger"
+  />
 </div>

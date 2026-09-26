@@ -6,7 +6,12 @@ import { TenantApi } from '@app/core/api/tenant-api';
 import { PermissionApi } from '@app/core/authorization/permission-api';
 import { LOCAL_STORAGE } from '@app/core/storage/local-storage';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
-import { memoryStorage, permissionApiGranting } from '@app/testing/test-doubles';
+import {
+  answerConfirmation,
+  memoryStorage,
+  permissionApiGranting,
+  stubDialogs,
+} from '@app/testing/test-doubles';
 import { WebChatAdminApi } from '../../website-chat-api';
 import { WebsiteChatDetail } from './website-chat-detail';
 
@@ -138,8 +143,14 @@ describe('WebsiteChatDetail', () => {
 
     expect(text()).toContain('Disable chat');
 
-    // The new tag is the one the next change presents.
+    // The new tag is the one the next change presents. Disabling a live chat
+    // is confirmed first; nothing is sent until the reader says yes.
+    stubDialogs(host());
     button('Disable chat')!.click();
+    await settle();
+    http.expectNone(`${url}/disable`);
+
+    answerConfirmation(host());
     await settle();
 
     const disable = http.expectOne(`${url}/disable`);

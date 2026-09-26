@@ -82,31 +82,6 @@
 
 // The badge carries the channel's name. Colour is an addition to the word,
 // never a replacement for it.
-.channel-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: var(--space-1) var(--space-3);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-pill);
-  background: var(--surface-inset);
-  color: var(--text-secondary);
-  font-size: 0.75rem;
-  font-weight: 600;
-  line-height: 1.4;
-  white-space: nowrap;
-}
-
-.channel-whatsapp {
-  border-color: var(--success-border);
-  background: var(--success-bg);
-  color: var(--success-fg);
-}
-
-.channel-webchat {
-  border-color: var(--accent-subtle-border);
-  background: var(--accent-subtle);
-  color: var(--accent);
-}
 
 .customer-name-form,
 .customer-merge {

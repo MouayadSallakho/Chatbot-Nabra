@@ -29,8 +29,12 @@
       </div>
     </div>
   } @else if (document(); as doc) {
-    <app-page-header [heading]="doc.title" description="">
-      <a pageActions class="btn btn-secondary" routerLink="/knowledge">Back to knowledge</a>
+    <app-page-header
+      backLink="/knowledge"
+      backLabel="Knowledge"
+      [heading]="doc.title"
+      description=""
+    >
     </app-page-header>
 
     <!--
@@ -77,12 +81,14 @@
           <p class="text-small text-muted state-times">
             <span>
               Updated
-              <time [attr.datetime]="doc.updatedAt">{{ doc.updatedAt | date: 'medium' }}</time>
+              <time [attr.datetime]="doc.updatedAt">{{
+                doc.updatedAt | date: 'MMM d, y, h:mm a'
+              }}</time>
             </span>
             <span>
               @if (doc.indexedAt; as indexed) {
                 Indexed
-                <time [attr.datetime]="indexed">{{ indexed | date: 'medium' }}</time>
+                <time [attr.datetime]="indexed">{{ indexed | date: 'MMM d, y, h:mm a' }}</time>
               } @else {
                 Never indexed
               }
@@ -260,7 +266,7 @@
                 <dt class="text-caption text-muted">Text read</dt>
                 <dd class="text-small">
                   <time [attr.datetime]="file.extractedAt">
-                    {{ file.extractedAt | date: 'medium' }}
+                    {{ file.extractedAt | date: 'MMM d, y, h:mm a' }}
                   </time>
                 </dd>
               </div>
@@ -473,4 +479,13 @@
       </div>
     </div>
   }
+
+  <app-confirm-dialog
+    #disableDialog
+    heading="Take this document out of use?"
+    body="AI agents stop drawing on it in their answers until it is put back in use. The document and its content are kept."
+    confirmLabel="Take out of use"
+    cancelLabel="Keep in use"
+    tone="danger"
+  />
 </div>

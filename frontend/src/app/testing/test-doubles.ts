@@ -323,3 +323,42 @@ export const EVERY_PERMISSION: readonly PermissionDefinition[] = [
       'details or cancel. Viewing billing does not grant this.',
   },
 ];
+
+/**
+ * Gives every `<dialog>` under `root` the modal behaviour jsdom lacks.
+ *
+ * jsdom implements neither `showModal` nor `close`, so a confirmation would
+ * throw before it could ask anything. These stand-ins do what the browser does
+ * that the product relies on: mark the dialog open, and fire `close` when it
+ * shuts.
+ */
+export function stubDialogs(root: HTMLElement): void {
+  for (const dialog of root.querySelectorAll<HTMLDialogElement>('dialog')) {
+    dialog.showModal = () => {
+      dialog.setAttribute('open', '');
+    };
+    dialog.close = () => {
+      dialog.removeAttribute('open');
+      dialog.dispatchEvent(new Event('close'));
+    };
+  }
+}
+
+/**
+ * Answers the confirmation dialog that is currently open under `root`.
+ *
+ * Presses the dialog's own buttons, so what is proven is the path a reader
+ * takes, not a method call behind their back.
+ */
+export function answerConfirmation(root: HTMLElement, accept = true): void {
+  const dialog = root.querySelector<HTMLDialogElement>('dialog[open]');
+
+  if (!dialog) {
+    throw new Error('No confirmation dialog is open.');
+  }
+
+  const buttons = [...dialog.querySelectorAll<HTMLButtonElement>('.confirm-actions button')];
+
+  // Cancel is first in the markup, the confirming action last.
+  (accept ? buttons[buttons.length - 1] : buttons[0]).click();
+}

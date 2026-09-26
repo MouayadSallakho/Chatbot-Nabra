@@ -14,6 +14,8 @@ import { NotificationItem } from '@app/core/notifications/notification-item';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
 import { EmptyState } from '@app/shared/empty-state/empty-state';
 import { PageHeader } from '@app/shared/page-header/page-header';
+import { Pagination } from '@app/shared/pagination/pagination';
+import { initialPage, pageRecorder } from '@app/shared/pagination/page-query';
 import { NotificationsNav } from '../notifications-nav';
 
 /** Rows per page. The server allows up to 50; the page asks for fewer. */
@@ -31,7 +33,7 @@ const PAGE_SIZE = 20;
 @Component({
   selector: 'app-notifications-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [PageHeader, EmptyState, NotificationItem, NotificationsNav],
+  imports: [PageHeader, EmptyState, NotificationItem, NotificationsNav, Pagination],
   templateUrl: './notifications-page.html',
   styleUrl: './notifications-page.scss',
 })
@@ -43,7 +45,12 @@ export class NotificationsPage {
   protected readonly loading = signal(true);
   protected readonly failure = signal<ApiError | null>(null);
   protected readonly items = signal<readonly AppNotification[]>([]);
-  protected readonly page = signal(1);
+  /** 1-based, mirrored in `?page=`. */
+  protected readonly page = signal(initialPage());
+
+  protected readonly pageSize = PAGE_SIZE;
+
+  private readonly recordPage = pageRecorder();
   protected readonly totalCount = signal(0);
   protected readonly unreadCount = signal(0);
   protected readonly announcement = signal('');
@@ -61,15 +68,11 @@ export class NotificationsPage {
     });
   }
 
-  protected async previous(): Promise<void> {
-    if (this.page() > 1) {
-      this.page.set(this.page() - 1);
-    }
-  }
-
-  protected async next(): Promise<void> {
-    if (this.page() < this.pageCount()) {
-      this.page.set(this.page() + 1);
+  /** The effect above reloads when the page changes; this only moves it. */
+  protected goTo(page: number): void {
+    if (page >= 1 && page <= this.pageCount() && page !== this.page()) {
+      this.page.set(page);
+      this.recordPage(page);
     }
   }
 

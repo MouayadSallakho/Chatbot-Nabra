@@ -10,6 +10,7 @@ import {
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
+import { HasUnsavedChanges, protectUnsavedChanges } from '@app/core/navigation/unsaved-changes';
 import { ApiError, toApiError } from '@app/core/api/api-error';
 import { Versioned } from '@app/core/api/versioned';
 import { PermissionApi } from '@app/core/authorization/permission-api';
@@ -50,7 +51,7 @@ import { ROLE_NAME_MAX } from '../role-limits';
   templateUrl: './role-editor.html',
   styleUrl: './role-editor.scss',
 })
-export class RoleEditor implements OnInit {
+export class RoleEditor implements OnInit, HasUnsavedChanges {
   private readonly api = inject(RoleApi);
   private readonly permissionApi = inject(PermissionApi);
   private readonly workspace = inject(WorkspaceContextService);
@@ -116,6 +117,9 @@ export class RoleEditor implements OnInit {
   private readonly nameValue = signal('');
 
   constructor() {
+    // The tab being closed or reloaded is the other way unsaved edits are lost.
+    protectUnsavedChanges(() => this.dirty());
+
     this.name.valueChanges.subscribe((value) => this.nameValue.set(value));
   }
 
@@ -227,6 +231,11 @@ export class RoleEditor implements OnInit {
 
   /** Whether anything is unsaved, for the leave-page warning and the buttons. */
   protected readonly dirty = computed(() => this.nameDirty() || this.permissionsDirty());
+
+  /** Whether leaving now would lose edits; asked by the route guard. */
+  hasUnsavedChanges(): boolean {
+    return this.dirty();
+  }
 
   /**
    * Loads the role and the catalogue.

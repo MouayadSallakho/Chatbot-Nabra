@@ -17,6 +17,7 @@ import { NAV_ITEMS } from '@app/layout/navigation';
 import { FakeMediaMatcher, memoryStorage, permissionApiGranting } from '@app/testing/test-doubles';
 import { PermissionApi } from '@app/core/authorization/permission-api';
 import { routes } from '@app/app.routes';
+import { PINNED_STORAGE_KEY } from '@app/layout/app-shell/app-shell';
 
 /** A workspace that already exists, so the guard lets the shell render. */
 const TENANT = {
@@ -172,19 +173,19 @@ describe('AppShell', () => {
     it('renders the overview page', async () => {
       await render('/overview');
 
-      expect(query('h1')?.textContent).toContain('Platform overview');
+      expect(query('h1')?.textContent?.trim()).toBe('Overview');
     });
 
-    it('renders a placeholder for an area that is not built, naming the area', async () => {
-      // Integrations rather than Knowledge: Knowledge stopped being a
-      // placeholder in Phase 17, and a test pinned to a particular unbuilt area
-      // has to move as areas get built. That is the point of it -- it proves the
-      // placeholder mechanism still works for whatever is left.
+    it('offers no unbuilt area in the primary navigation', async () => {
+      // Integrations was the last placeholder and left the navigation in Phase
+      // 33.5: a dead destination is not something the sidebar should advertise.
+      // Its address is now simply unknown, answered like any other.
+      expect(NAV_ITEMS.every((item) => item.implemented)).toBe(true);
+
       await render('/integrations');
 
-      expect(query('h1')?.textContent).toContain('Integrations');
-      // The point of the page: it says plainly that nothing is there.
-      expect(host().textContent).toContain('Not implemented yet');
+      expect(query('h1')?.textContent).toContain('Page not found');
+      expect(host().textContent).not.toContain('Not implemented yet');
     });
 
     it('renders the real feature for an area that is built', async () => {
@@ -227,10 +228,24 @@ describe('AppShell', () => {
       expect(current[0].textContent?.trim()).toBe('Conversations');
     });
 
-    it('shows the page name in the top bar', async () => {
+    it('names the workspace in the top bar, as global context', async () => {
       await render('/knowledge');
 
-      expect(query('.topbar-context')?.textContent?.trim()).toBe('Knowledge');
+      // The page names itself in its own <h1>; the bar carries what every page
+      // shares -- which workspace it is about.
+      expect(query('.topbar-context')?.textContent?.trim()).toBe('Workspace: Acme Trading');
+      expect(query('h1')?.textContent).toContain('Knowledge');
+    });
+
+    it('groups the navigation under labelled sections', async () => {
+      await render('/overview');
+
+      const lists = [...host().querySelectorAll<HTMLUListElement>('.sidebar-nav ul')];
+      const names = lists.map((list) =>
+        document.getElementById(list.getAttribute('aria-labelledby') ?? '')?.textContent?.trim(),
+      );
+
+      expect(names).toEqual(['Work', 'AI', 'Channels', 'Insights', 'Workspace']);
     });
   });
 
@@ -247,27 +262,35 @@ describe('AppShell', () => {
       expect(sidebarHost()?.hasAttribute('inert')).toBe(false);
     });
 
-    it('reports the collapsed state on the collapse control', async () => {
+    it('starts as an unpinned rail, and pinning makes the layout room for it', async () => {
       await render('/overview', { desktop: true });
 
-      const toggle = query<HTMLButtonElement>('.collapse-toggle');
+      const toggle = () => query<HTMLButtonElement>('.pin-toggle');
 
-      expect(toggle?.getAttribute('aria-expanded')).toBe('true');
+      expect(query('.shell')?.classList.contains('is-pinned')).toBe(false);
+      expect(toggle()?.textContent?.trim()).toBe('Pin sidebar');
 
-      toggle?.click();
+      toggle()?.click();
       await settle();
 
-      expect(query('.collapse-toggle')?.getAttribute('aria-expanded')).toBe('false');
+      expect(query('.shell')?.classList.contains('is-pinned')).toBe(true);
+      expect(toggle()?.textContent?.trim()).toBe('Unpin sidebar');
     });
 
-    it('keeps navigation labels available to assistive technology when collapsed', async () => {
+    it('remembers the pin preference in this browser', async () => {
       await render('/overview', { desktop: true });
 
-      query<HTMLButtonElement>('.collapse-toggle')?.click();
+      query<HTMLButtonElement>('.pin-toggle')?.click();
       await settle();
 
-      // Hidden visually, still in the accessibility tree: a collapsed sidebar
-      // must not become a column of unnamed glyphs.
+      expect(TestBed.inject(LOCAL_STORAGE)?.getItem(PINNED_STORAGE_KEY)).toBe('true');
+    });
+
+    it('keeps navigation labels available to assistive technology as a rail', async () => {
+      await render('/overview', { desktop: true });
+
+      // Clipped and transparent, still in the accessibility tree: the rail must
+      // not become a column of unnamed glyphs.
       const labels = [...host().querySelectorAll('.sidebar-nav .nav-label')].map((label) =>
         label.textContent?.trim(),
       );
@@ -355,10 +378,10 @@ describe('AppShell', () => {
       expect(menuButton()?.getAttribute('aria-expanded')).toBe('false');
     });
 
-    it('offers no collapse control, which would mean nothing for an overlay', async () => {
+    it('offers no pin control, which would mean nothing for an overlay', async () => {
       await render('/overview', { desktop: false });
 
-      expect(query('.collapse-toggle')).toBeNull();
+      expect(query('.pin-toggle')).toBeNull();
     });
   });
 

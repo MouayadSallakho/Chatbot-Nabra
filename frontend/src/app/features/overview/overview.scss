@@ -1,64 +1,215 @@
-// Spacing comes from the product's own scale rather than from Bootstrap's
-// utility classes. Bootstrap is here for grid structure -- rows, columns and
-// their breakpoints -- and adopting its spacers as well would put two spacing
-// systems in the same template, which is how a design system stops being one.
-
-.area-panels {
-  margin-block-start: var(--space-4);
+// -----------------------------------------------------------------------------
+// Needs attention
+// -----------------------------------------------------------------------------
+.attention-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
-// `.row` stretches its columns to equal height by default, so a card filling its
-// column makes every panel in the row line up without a sizing utility.
-.panel {
-  block-size: 100%;
-  display: flex;
-  flex-direction: column;
+.attention-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-4) var(--space-5);
+
+  & + & {
+    border-block-start: 1px solid var(--border-subtle);
+  }
 }
 
-.card-heading {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-inline-size: 0;
+.attention-action {
+  grid-column: 2;
+  justify-self: start;
+}
+
+@media (min-width: 40rem) {
+  .attention-item {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+  }
+
+  .attention-action {
+    grid-column: auto;
+  }
+}
+
+.attention-icon {
+  display: inline-grid;
+  place-items: center;
+  inline-size: 2rem;
+  block-size: 2rem;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background-color: var(--surface-muted);
   color: var(--text-secondary);
 
   .icon {
-    inline-size: 1.125rem;
-    block-size: 1.125rem;
+    inline-size: var(--icon-size);
+    block-size: var(--icon-size);
   }
 }
 
-.section-note {
-  margin-block-start: var(--space-2);
-  max-inline-size: 68ch;
+.tone-critical {
+  border-color: var(--danger-border);
+  background-color: var(--danger-bg);
+  color: var(--danger-fg);
 }
 
-.areas-table {
-  margin-block-start: var(--space-4);
+.tone-warning {
+  border-color: var(--warning-border);
+  background-color: var(--warning-bg);
+  color: var(--warning-fg);
 }
 
-// Row headers are cells, so they inherit the header weight; the link inside
-// carries the emphasis instead.
-.area-cell {
+.tone-info {
+  border-color: var(--info-border);
+  background-color: var(--info-bg);
+  color: var(--info-fg);
+}
+
+.tone-clear {
+  border-color: var(--success-border);
+  background-color: var(--success-bg);
+  color: var(--success-fg);
+}
+
+.attention-title {
   font: var(--text-body-strong);
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
-// The seven-day strip. Four facts on one line where there is room, wrapping to
-// as many lines as a phone needs.
-.recent-body {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2) var(--space-6);
+.attention-detail {
+  font: var(--text-small);
+  color: var(--text-secondary);
+}
 
-  p {
-    margin: 0;
+.attention-empty {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-block-size: 4rem;
+  padding: var(--space-4) var(--space-5);
+  color: var(--text-secondary);
+}
+
+.attention-skeleton {
+  inline-size: 18rem;
+  max-inline-size: 60%;
+}
+
+// -----------------------------------------------------------------------------
+// Metrics
+// -----------------------------------------------------------------------------
+// One bordered strip divided into cells rather than a wall of floating cards:
+// the numbers are read together, so they sit together.
+.section-link {
+  font: var(--text-label);
+}
+
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 0;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background-color: var(--surface-default);
+  overflow: hidden;
+}
+
+.metric {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-4) var(--space-5);
+  // Dividers from the grid gap would need a background trick; a border on
+  // every cell, clipped by the frame, is simpler and exact at every width.
+  box-shadow:
+    1px 0 0 var(--border-subtle),
+    0 1px 0 var(--border-subtle);
+
+  dt {
+    font: var(--text-label);
     color: var(--text-secondary);
   }
+
+  dd {
+    margin: 0;
+  }
 }
 
-.recent-value {
-  font-weight: 650;
+.metric-value {
+  font: 600 1.75rem / 1.2 var(--font-sans);
+  letter-spacing: var(--letter-spacing-tight);
   color: var(--text-primary);
   font-variant-numeric: tabular-nums;
+}
+
+.metric-skeleton {
+  display: inline-block;
+  inline-size: 4rem;
+  block-size: 1.5rem;
+  vertical-align: middle;
+}
+
+@media (min-width: 48rem) {
+  .metrics-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .metrics-4 {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Shortcuts
+// -----------------------------------------------------------------------------
+.shortcuts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+
+  // Tiles in a row share one height, even when a label wraps.
+  li {
+    display: flex;
+  }
+}
+
+.shortcut {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-block-size: 3rem;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background-color: var(--surface-default);
+  color: var(--text-primary);
+  font: var(--text-body-strong);
+  text-decoration: none;
+  transition:
+    border-color var(--motion-fast) var(--ease-standard),
+    background-color var(--motion-fast) var(--ease-standard);
+
+  .icon {
+    inline-size: var(--icon-size);
+    block-size: var(--icon-size);
+    color: var(--text-secondary);
+  }
+
+  &:hover {
+    border-color: var(--border-strong);
+    background-color: var(--surface-hover);
+    text-decoration: none;
+  }
+}
+
+.shortcut-arrow {
+  margin-inline-start: auto;
 }

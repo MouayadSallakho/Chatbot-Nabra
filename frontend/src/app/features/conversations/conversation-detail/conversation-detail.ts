@@ -3,7 +3,10 @@ import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
+  ElementRef,
+  Injector,
   OnInit,
+  afterNextRender,
   computed,
   inject,
   signal,
@@ -68,6 +71,8 @@ export class ConversationDetail implements OnInit {
   private readonly whatsapp = inject(WhatsAppApi);
   private readonly realtime = inject(ConversationRealtime);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly injector = inject(Injector);
 
   /** From the route, through `withComponentInputBinding`. */
   readonly conversationId = input.required<string>();
@@ -297,22 +302,32 @@ export class ConversationDetail implements OnInit {
   }
 
   /** Stops the AI answering, so a person can. */
-  protected takeOver(): Promise<void> {
-    return this.change((tenantId, version) =>
+  protected async takeOver(): Promise<void> {
+    const changed = await this.change((tenantId, version) =>
       firstValueFrom(this.api.takeOver(tenantId, this.conversationId(), version)),
     );
+
+    // The button just pressed has been replaced by Return to AI. Replying is why
+    // somebody takes over, so the composer that has just appeared is next.
+    if (changed) {
+      this.focusAfterRender('#conversation-reply');
+    }
   }
 
   /** Hands it back. Nothing already said is answered retroactively. */
-  protected returnToAi(): Promise<void> {
-    return this.change((tenantId, version) =>
+  protected async returnToAi(): Promise<void> {
+    const changed = await this.change((tenantId, version) =>
       firstValueFrom(this.api.returnToAi(tenantId, this.conversationId(), version)),
     );
+
+    if (changed) {
+      this.focusAfterRender('[data-testid="take-over"]');
+    }
   }
 
   /** Routes it to a colleague, or to nobody. */
-  protected assign(member: string | null): Promise<void> {
-    return this.change((tenantId, version) =>
+  protected async assign(member: string | null): Promise<void> {
+    await this.change((tenantId, version) =>
       firstValueFrom(this.api.assign(tenantId, this.conversationId(), member, version)),
     );
   }
@@ -353,6 +368,9 @@ export class ConversationDetail implements OnInit {
 
       this.messages.update((current) => merge(current, [stored]));
       this.reply.setValue('');
+      // Send is disabled while sending and again by the empty composer, so focus
+      // has been dropped; back where the next reply is written.
+      this.focusAfterRender('#conversation-reply');
     } catch (error) {
       // The draft is left exactly as typed. Clearing a composer whose send
       // failed is how somebody loses a paragraph they will have to write again.
@@ -395,14 +413,15 @@ export class ConversationDetail implements OnInit {
    * intention formed against a state that no longer exists. The reader is told,
    * and the screen keeps what they were looking at.
    */
+  /** Whether the change was made. */
   private async change(
     write: (tenantId: string, version: string) => Promise<Versioned<Conversation>>,
-  ): Promise<void> {
+  ): Promise<boolean> {
     const tenantId = this.workspace.tenantId();
     const version = this.version();
 
     if (!tenantId || version === null || this.working()) {
-      return;
+      return false;
     }
 
     this.working.set(true);
@@ -413,11 +432,21 @@ export class ConversationDetail implements OnInit {
 
       this.conversation.set(updated.value);
       this.version.set(updated.etag);
+
+      return true;
     } catch (error) {
       this.actionFailure.set(toApiError(error));
+
+      return false;
     } finally {
       this.working.set(false);
     }
+  }
+
+  private focusAfterRender(selector: string): void {
+    afterNextRender(() => this.host.nativeElement.querySelector<HTMLElement>(selector)?.focus(), {
+      injector: this.injector,
+    });
   }
 }
 

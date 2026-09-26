@@ -127,7 +127,9 @@ describe('NotificationsPage', () => {
 
     expect(host().textContent).toContain('Page 1 of 3');
 
-    host().querySelector<HTMLButtonElement>('[data-testid="next"]')!.click();
+    [...host().querySelectorAll<HTMLButtonElement>('.pager button')]
+      .find((button) => button.textContent?.includes('Next'))!
+      .click();
     await settle();
 
     const second = http.expectOne(

@@ -283,7 +283,7 @@ describe('Login', () => {
     http.expectOne('/api/auth/login').error(new ProgressEvent('error'), { status: 0 });
     await settle();
 
-    expect(host().textContent).toContain('Could not reach');
+    expect(host().textContent).toContain('could not be reached');
   });
 
   it('says plainly that password reset does not exist', async () => {

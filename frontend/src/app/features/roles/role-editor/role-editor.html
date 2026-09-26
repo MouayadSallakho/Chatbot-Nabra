@@ -1,28 +1,28 @@
 <div class="page">
   @if (!canView()) {
-    <app-page-header heading="Role" />
+    <app-page-header backLink="/roles" backLabel="Roles & permissions" heading="Role" />
 
     <div class="page-section">
       <div class="card">
         <app-empty-state
-          icon="settings"
+          icon="roles"
           heading="You do not have access to roles"
           description="Viewing this workspace's roles needs a permission your roles do not include. Ask somebody who administers this workspace if you need it."
         />
       </div>
     </div>
   } @else if (loading()) {
-    <app-page-header heading="Role" />
+    <app-page-header backLink="/roles" backLabel="Roles & permissions" heading="Role" />
 
     <div class="page-section" aria-busy="true">
       <p class="visually-hidden" role="status">Loading role…</p>
-      <div class="card">
+      <div class="card card-body">
         <span class="skeleton skeleton-title"></span>
         <span class="skeleton skeleton-text"></span>
       </div>
     </div>
   } @else if (failure(); as error) {
-    <app-page-header heading="Role" />
+    <app-page-header backLink="/roles" backLabel="Roles & permissions" heading="Role" />
 
     <div class="page-section">
       <div class="card">
@@ -38,6 +38,8 @@
     </div>
   } @else if (role(); as current) {
     <app-page-header
+      backLink="/roles"
+      backLabel="Roles & permissions"
       [heading]="current.name"
       [description]="
         current.isSystem
@@ -45,7 +47,6 @@
           : 'A role this workspace defines.'
       "
     >
-      <a pageActions class="btn btn-secondary" routerLink="/roles">Back to roles</a>
     </app-page-header>
 
     <!--
@@ -56,7 +57,7 @@
     -->
     @if (stale()) {
       <div class="page-section">
-        <div class="card conflict" role="alert">
+        <div class="stale-notice" role="alert">
           <p class="conflict-title">This role was updated elsewhere.</p>
           <p class="text-small text-secondary">
             Your changes have not been saved and are still on screen. Reload to see the current
@@ -78,7 +79,7 @@
         reads as a fault rather than a rule.
       -->
       <div class="page-section">
-        <div class="card">
+        <div class="card card-body">
           <h2 class="text-section-title">Protected system role</h2>
           <p class="text-small text-secondary">
             Owner always has every permission this platform defines, including any added in future
@@ -92,7 +93,7 @@
         <h2 class="text-section-title">Permissions</h2>
 
         @for (group of allGroups(); track group.name) {
-          <div class="card permission-group">
+          <div class="card card-body permission-group">
             <h3 class="text-label permission-group-name">{{ group.name }}</h3>
             <ul class="permission-readout">
               @for (permission of group.permissions; track permission.code) {
@@ -115,7 +116,7 @@
         the very capabilities that put this role out of their reach.
       -->
       <div class="page-section">
-        <div class="card">
+        <div class="card card-body">
           <h2 class="text-section-title">
             {{ readOnlyReason() === 'outranked' ? 'You cannot change this role' : 'Read-only' }}
           </h2>
@@ -135,13 +136,13 @@
         <h2 class="text-section-title">Permissions</h2>
 
         @if (roleGroups().length === 0) {
-          <div class="card">
+          <div class="card card-body">
             <p class="text-small text-muted">This role grants nothing.</p>
           </div>
         }
 
         @for (group of roleGroups(); track group.name) {
-          <div class="card permission-group">
+          <div class="card card-body permission-group">
             <h3 class="text-label permission-group-name">{{ group.name }}</h3>
             <ul class="permission-readout">
               @for (permission of group.permissions; track permission.code) {
@@ -158,7 +159,12 @@
       <div class="page-section">
         <h2 class="text-section-title">Name</h2>
 
-        <form class="card role-form" [formGroup]="nameForm" (ngSubmit)="saveName()" novalidate>
+        <form
+          class="card card-body role-form"
+          [formGroup]="nameForm"
+          (ngSubmit)="saveName()"
+          novalidate
+        >
           <div class="field">
             <label class="form-label" for="role-name">Role name</label>
             <input
@@ -194,7 +200,7 @@
         </p>
 
         @for (group of groups(); track group.name) {
-          <fieldset class="card permission-group">
+          <fieldset class="card card-body permission-group">
             <legend class="text-label permission-group-name">{{ group.name }}</legend>
 
             @for (permission of group.permissions; track permission.code) {

@@ -194,8 +194,12 @@ describe('CustomerList', () => {
     await mount('customers.view');
     await answer(page);
 
-    const next = host().querySelector<HTMLButtonElement>('[data-testid="next"]');
+    // A single page shows no page controls at all; with more, Next is disabled
+    // on the last one. Either way there is nothing to press.
+    const next = [...host().querySelectorAll<HTMLButtonElement>('.pager button')].find((button) =>
+      button.textContent?.includes('Next'),
+    );
 
-    expect(next?.disabled).toBe(true);
+    expect(next === undefined || next.disabled).toBe(true);
   });
 });

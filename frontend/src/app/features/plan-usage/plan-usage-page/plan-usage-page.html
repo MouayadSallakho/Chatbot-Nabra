@@ -29,20 +29,20 @@
       -->
       <div class="card">
         <app-empty-state
-          icon="analytics"
+          icon="usage"
           heading="You do not have access to plan and usage"
           description="Seeing what this workspace's plan allows needs a permission your roles do not include. Ask somebody who administers this workspace if you need it."
         />
       </div>
     } @else if (loading()) {
-      <div class="card" aria-busy="true">
+      <div class="card card-body" aria-busy="true">
         <p class="text-small text-secondary">Loading plan and usage…</p>
       </div>
     } @else if (failure(); as error) {
       <div class="card">
         <app-empty-state
-          icon="analytics"
-          heading="Plan and usage could not be loaded"
+          icon="usage"
+          heading="Could not load plan and usage"
           [description]="error.message"
         >
           <button stateActions type="button" class="btn btn-secondary" (click)="refresh()">
@@ -110,9 +110,7 @@
                     and drawing one against nothing implies a limit off to the
                     right that does not exist.
                   -->
-                  <p class="text-small text-muted usage-unlimited">
-                    This plan does not limit {{ row.label.toLowerCase() }}.
-                  </p>
+                  <p class="text-small text-muted usage-unlimited">No limit on this plan.</p>
                 } @else {
                   <span class="usage-bar" aria-hidden="true">
                     <span

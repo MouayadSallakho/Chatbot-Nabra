@@ -11,22 +11,34 @@
       <app-icon name="menu" [strokeWidth]="1.75" />
       <!--
         The button's accessible name. It stays "Navigation" in both states: the
-        open/closed distinction is what aria-expanded is for, and putting it in
-        the name as well would have a screen reader announce the state twice.
+        open/closed distinction is what aria-expanded is for.
       -->
       <span class="visually-hidden">Navigation</span>
     </button>
   }
 
   <!--
-    Context, not a heading. The page's own <h1> lives in the page header; making
-    this one too would give every screen two level-one headings and break the
-    document outline that heading navigation depends on.
+    Global context: which workspace every screen is about. Context, not a
+    heading -- the page's own <h1> lives in its page header.
   -->
-  <p class="topbar-context">{{ pageTitle() }}</p>
+  <p class="topbar-context">
+    <span class="visually-hidden">Workspace: </span>
+    @if (workspaceName()) {
+      <span class="topbar-workspace" [title]="workspaceName()">{{ workspaceName() }}</span>
+    } @else {
+      <!-- Holds the bar's height while the workspace loads, so nothing shifts. -->
+      <span class="skeleton topbar-workspace-skeleton" aria-hidden="true"></span>
+    }
+  </p>
 
   <div class="topbar-actions">
-    <app-theme-toggle />
     <app-notification-bell />
+    <app-profile-menu
+      [email]="userEmail()"
+      [workspaceName]="workspaceName()"
+      [canSwitchWorkspace]="canSwitchWorkspace()"
+      (workspaceSwitched)="workspaceSwitched.emit()"
+      (signedOut)="signedOut.emit()"
+    />
   </div>
 </div>

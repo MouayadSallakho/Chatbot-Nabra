@@ -1,5 +1,17 @@
 import { DatePipe } from '@angular/common';
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  ElementRef,
+  Injector,
+  afterNextRender,
+  computed,
+  inject,
+  signal,
+  viewChild,
+} from '@angular/core';
+import { ConfirmDialog } from '@app/core/feedback/confirm-dialog';
+import { ToastService } from '@app/core/feedback/toast-service';
 import { RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { ApiError, toApiError } from '@app/core/api/api-error';
@@ -26,7 +38,7 @@ import { Invitation, MemberSummary, TeamApi } from '../team-api';
 @Component({
   selector: 'app-team-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DatePipe, RouterLink, PageHeader, EmptyState, Icon],
+  imports: [DatePipe, RouterLink, PageHeader, EmptyState, Icon, ConfirmDialog],
   templateUrl: './team-page.html',
   styleUrl: './team-page.scss',
 })
@@ -34,6 +46,9 @@ export class TeamPage {
   private readonly api = inject(TeamApi);
   private readonly workspace = inject(WorkspaceContextService);
   private readonly permissions = inject(PermissionService);
+  private readonly toasts = inject(ToastService);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly injector = inject(Injector);
 
   protected readonly loading = signal(true);
   protected readonly failure = signal<ApiError | null>(null);
@@ -41,6 +56,11 @@ export class TeamPage {
   protected readonly invitations = signal<readonly Invitation[]>([]);
   protected readonly revoking = signal<string | null>(null);
   protected readonly revokeFailure = signal<ApiError | null>(null);
+
+  /** The invitation the confirmation dialog is asking about. */
+  protected readonly revokeTarget = signal<Invitation | null>(null);
+
+  private readonly revokeDialog = viewChild.required<ConfirmDialog>('revokeDialog');
 
   protected readonly skeletonRows = [0, 1, 2];
 
@@ -118,12 +138,9 @@ export class TeamPage {
       return;
     }
 
-    const confirmed = window.confirm(
-      `Revoke the invitation for ${invitation.email}? Their invitation link will stop working ` +
-        'immediately, and cannot be reinstated.',
-    );
+    this.revokeTarget.set(invitation);
 
-    if (!confirmed) {
+    if (!(await this.revokeDialog().ask())) {
       return;
     }
 
@@ -136,6 +153,14 @@ export class TeamPage {
       // Re-read rather than removing the row locally. The server decides what
       // the list is now, and something else may have changed since it loaded.
       await this.load();
+
+      this.toasts.success(`Invitation for ${invitation.email} revoked.`);
+      // The row that held focus is gone; the section it was in is the nearest
+      // place that still exists.
+      afterNextRender(
+        () => this.host.nativeElement.querySelector<HTMLElement>('#pending-invitations')?.focus(),
+        { injector: this.injector },
+      );
     } catch (error) {
       this.revokeFailure.set(toApiError(error));
     } finally {

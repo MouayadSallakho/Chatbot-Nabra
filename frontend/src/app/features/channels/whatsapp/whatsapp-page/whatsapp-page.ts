@@ -1,7 +1,10 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  ElementRef,
+  Injector,
   OnInit,
+  afterNextRender,
   computed,
   inject,
   signal,
@@ -9,6 +12,7 @@ import {
 import { RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { ApiError, toApiError } from '@app/core/api/api-error';
+import { ToastService } from '@app/core/feedback/toast-service';
 import { PermissionService } from '@app/core/authorization/permission-service';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
 import { AiAgentApi, AiAgentSummary } from '@app/features/ai-agents/ai-agent-api';
@@ -37,6 +41,9 @@ export class WhatsAppPage implements OnInit {
   private readonly agents = inject(AiAgentApi);
   private readonly workspace = inject(WorkspaceContextService);
   private readonly permissions = inject(PermissionService);
+  private readonly toasts = inject(ToastService);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly injector = inject(Injector);
 
   protected readonly loading = signal(true);
   protected readonly failure = signal<ApiError | null>(null);
@@ -119,6 +126,16 @@ export class WhatsAppPage implements OnInit {
       this.displayPhoneNumber.set('');
 
       await this.load();
+
+      this.toasts.success(
+        'Number connected. It stays switched off until you add its access token.',
+      );
+      // The button that held focus is disabled again by the cleared form; the
+      // list the new number joined is where the reader's attention belongs.
+      afterNextRender(
+        () => this.host.nativeElement.querySelector<HTMLElement>('#connected-numbers')?.focus(),
+        { injector: this.injector },
+      );
     } catch (error) {
       this.createFailure.set(toApiError(error));
     } finally {
@@ -136,5 +153,14 @@ export class WhatsAppPage implements OnInit {
     const trimmed = value.trim();
 
     return trimmed.length > 0 && /^[0-9]+$/.test(trimmed);
+  }
+
+  /**
+   * Something has been typed and it is not digits: the case the reader is told
+   * about beside the field. An empty field is not an error yet -- the disabled
+   * button already says the form is incomplete.
+   */
+  protected notDigits(value: string): boolean {
+    return value.trim().length > 0 && !this.digits(value);
   }
 }

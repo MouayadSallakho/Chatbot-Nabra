@@ -6,6 +6,9 @@ import { PermissionService } from '@app/core/authorization/permission-service';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
 import { EmptyState } from '@app/shared/empty-state/empty-state';
 import { PageHeader } from '@app/shared/page-header/page-header';
+import { Icon } from '@app/shared/icon/icon';
+import { Pagination } from '@app/shared/pagination/pagination';
+import { initialPage, pageRecorder } from '@app/shared/pagination/page-query';
 import { CustomerPage, CustomersApi } from '../customers-api';
 
 /**
@@ -28,7 +31,7 @@ import { CustomerPage, CustomersApi } from '../customers-api';
 @Component({
   selector: 'app-customer-list',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [PageHeader, EmptyState, RouterLink],
+  imports: [PageHeader, EmptyState, RouterLink, Icon, Pagination],
   templateUrl: './customer-list.html',
   styleUrl: './customer-list.scss',
 })
@@ -59,31 +62,18 @@ export class CustomerList {
   protected readonly refreshing = signal(false);
   protected readonly failure = signal<ApiError | null>(null);
   protected readonly page = signal<CustomerPage | null>(null);
-  protected readonly pageNumber = signal(1);
+  /** 1-based, mirrored in `?page=` so Back from a customer returns here. */
+  protected readonly pageNumber = signal(initialPage());
+
+  protected readonly pageSize = CustomerList.PageSize;
+
+  protected readonly skeletonRows = [0, 1, 2, 3];
+
+  private readonly recordPage = pageRecorder();
 
   protected readonly rows = computed(() => this.page()?.items ?? []);
 
   protected readonly totalCount = computed(() => this.page()?.totalCount ?? 0);
-
-  protected readonly hasPrevious = computed(() => this.pageNumber() > 1);
-
-  protected readonly hasNext = computed(
-    () => this.pageNumber() * CustomerList.PageSize < this.totalCount(),
-  );
-
-  /** A sentence about how much of the directory is on screen. */
-  protected readonly summary = computed(() => {
-    const total = this.totalCount();
-
-    if (total === 0) {
-      return '';
-    }
-
-    const first = (this.pageNumber() - 1) * CustomerList.PageSize + 1;
-    const last = Math.min(first + this.rows().length - 1, total);
-
-    return total === 1 ? '1 customer' : `${first}–${last} of ${total} customers`;
-  });
 
   constructor() {
     void this.load();
@@ -99,6 +89,7 @@ export class CustomerList {
 
   protected async go(page: number): Promise<void> {
     this.pageNumber.set(page);
+    this.recordPage(page);
 
     await this.refresh();
   }

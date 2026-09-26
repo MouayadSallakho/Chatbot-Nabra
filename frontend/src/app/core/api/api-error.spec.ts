@@ -2,11 +2,15 @@ import { HttpErrorResponse, HttpHeaders } from '@angular/common/http';
 import { ApiErrorKind, toApiError } from './api-error';
 
 /** Builds a Problem Details failure the way the backend sends one. */
-function problem(status: number, detail?: string): HttpErrorResponse {
+function problem(
+  status: number,
+  detail?: string,
+  url = '/api/tenants/x/ai-agents',
+): HttpErrorResponse {
   return new HttpErrorResponse({
     status,
     statusText: 'error',
-    url: '/api/tenants/x/ai-agents',
+    url,
     error: detail === undefined ? null : { type: 'about:blank', title: 'A title', detail },
   });
 }
@@ -36,7 +40,7 @@ describe('toApiError', () => {
     const error = toApiError(problem(0));
 
     expect(error.kind).toBe('offline');
-    expect(error.message).toContain('backend');
+    expect(error.message).toContain('could not be reached');
   });
 
   it('keeps the status for logging and for assertions', () => {
@@ -87,13 +91,23 @@ describe('toApiError', () => {
     });
 
     it('never shows provider internals for an upstream failure', () => {
-      const error = toApiError(problem(503, 'OpenAI key rejected for org-1234'));
+      const error = toApiError(
+        problem(503, 'OpenAI key rejected for org-1234', '/api/tenants/x/ai-agents/y/preview'),
+      );
 
       expect(error.message).not.toContain('OpenAI');
       expect(error.message).not.toContain('org-1234');
       // The reader still learns the useful part -- that this deployment has no
       // provider -- without a word of what the provider said.
       expect(error.message).toContain('none is configured on this deployment');
+    });
+
+    it('does not blame an AI provider for a 503 on an ordinary read', () => {
+      const error = toApiError(problem(503, undefined, '/api/tenants/x/knowledge?page=1'));
+
+      expect(error.kind).toBe('providerUnavailable');
+      expect(error.message).toContain('temporarily unavailable');
+      expect(error.message).not.toContain('AI provider');
     });
 
     it('explains a timeout without inviting an automatic retry', () => {

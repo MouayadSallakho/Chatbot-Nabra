@@ -1,142 +1,199 @@
 <div class="page">
   <app-page-header
-    heading="Platform overview"
-    description="Where this workspace stands, and the way into each part of it. Full numbers live on Analytics."
+    heading="Overview"
+    [description]="
+      workspaceName()
+        ? 'What needs attention in ' + workspaceName() + ', and what is happening now.'
+        : 'What needs attention, and what is happening now.'
+    "
   />
 
-  <!--
-    Four real numbers from the last seven days, and a way through to the rest.
-    Not a second dashboard: the charts, channel split and agent breakdown are on
-    Analytics, and duplicating them here would be two places to keep in step.
-  -->
-  @if (canSeeNumbers() && recent(); as summary) {
-    <section class="page-section" aria-labelledby="recent-heading">
-      <h2 id="recent-heading" class="text-section-title">Last 7 days</h2>
+  <!-- 1. What needs attention -->
+  <section class="page-section" aria-labelledby="attention-heading">
+    <div class="section-header">
+      <h2 id="attention-heading" class="text-section-title">Needs attention</h2>
+    </div>
 
-      <div class="card">
-        <div class="card-body recent-body" data-testid="overview-recent">
-          <p>
-            <span class="recent-value">{{ summary.conversationsStarted }}</span> conversations
-          </p>
-          <p>
-            <span class="recent-value">{{ summary.customerMessages }}</span> customer messages
-          </p>
-          <p>
-            <span class="recent-value">{{ summary.aiMessages }}</span> AI replies
-          </p>
-          <p>
-            <span class="recent-value">{{ summary.humanMessages }}</span> human replies
-          </p>
-        </div>
-        <div class="card-actions">
-          <a class="btn btn-secondary btn-sm" routerLink="/analytics">
-            Open Analytics
-            <app-icon name="arrow-end" [strokeWidth]="1.75" />
-          </a>
+    @if (loading()) {
+      <div class="card attention-empty" aria-busy="true">
+        <span class="skeleton skeleton-text attention-skeleton" aria-hidden="true"></span>
+        <p class="visually-hidden" role="status">Checking what needs attention…</p>
+      </div>
+    } @else if (attention().length === 0) {
+      <div class="card attention-empty" data-testid="attention-clear">
+        <span class="attention-icon tone-clear" aria-hidden="true">
+          <app-icon name="check" [strokeWidth]="2" />
+        </span>
+        <p>Nothing needs attention right now.</p>
+      </div>
+    } @else {
+      <ul class="card attention-list" data-testid="attention">
+        @for (item of attention(); track item.id) {
+          <li class="attention-item">
+            <!--
+              Severity is carried by the icon's shape and by the words in the
+              title as well as by colour: a stop sign, a triangle, a circled i.
+            -->
+            <span
+              class="attention-icon"
+              [class]="'attention-icon tone-' + item.tone"
+              aria-hidden="true"
+            >
+              <app-icon
+                [name]="
+                  item.tone === 'critical' ? 'critical' : item.tone === 'warning' ? 'alert' : 'info'
+                "
+                [strokeWidth]="1.75"
+              />
+            </span>
+            <div class="attention-text">
+              <p class="attention-title">
+                <span class="visually-hidden">{{
+                  item.tone === 'critical'
+                    ? 'Critical: '
+                    : item.tone === 'warning'
+                      ? 'Warning: '
+                      : ''
+                }}</span
+                >{{ item.title }}
+              </p>
+              <p class="attention-detail">{{ item.detail }}</p>
+            </div>
+            <a class="btn btn-secondary btn-sm attention-action" [routerLink]="item.link">
+              {{ item.action }}
+            </a>
+          </li>
+        }
+      </ul>
+    }
+  </section>
+
+  @if (canSeeNumbers()) {
+    @if (dashboardFailed()) {
+      <div class="page-section">
+        <div class="alert alert-danger" role="alert">
+          <app-icon name="alert" [strokeWidth]="1.75" />
+          <span
+            >Activity numbers could not be loaded. Everything else on this page is current.</span
+          >
+          <button type="button" class="btn btn-secondary btn-sm" (click)="load()">Try again</button>
         </div>
       </div>
-    </section>
+    } @else {
+      <!-- 2. What is happening now -->
+      <section class="page-section" aria-labelledby="now-heading">
+        <div class="section-header">
+          <h2 id="now-heading" class="text-section-title">Right now</h2>
+          @if (canSeeConversations()) {
+            <a class="section-link" routerLink="/conversations">Open conversations</a>
+          }
+        </div>
+
+        <dl class="metrics metrics-3" [attr.aria-busy]="loading()">
+          <div class="metric">
+            <dt>Open conversations</dt>
+            <dd class="metric-value">
+              @if (dashboard(); as d) {
+                {{ d.current.openConversations | number }}
+              } @else {
+                <span class="skeleton metric-skeleton" aria-hidden="true"></span>
+              }
+            </dd>
+          </div>
+          <div class="metric">
+            <dt>Handled by AI</dt>
+            <dd class="metric-value">
+              @if (dashboard(); as d) {
+                {{ d.current.openHandledByAi | number }}
+              } @else {
+                <span class="skeleton metric-skeleton" aria-hidden="true"></span>
+              }
+            </dd>
+          </div>
+          <div class="metric">
+            <dt>Handled by a person</dt>
+            <dd class="metric-value">
+              @if (dashboard(); as d) {
+                {{ d.current.openHandledByHuman | number }}
+              } @else {
+                <span class="skeleton metric-skeleton" aria-hidden="true"></span>
+              }
+            </dd>
+          </div>
+        </dl>
+      </section>
+
+      <!-- 3. What changed -->
+      <section class="page-section" aria-labelledby="week-heading">
+        <div class="section-header">
+          <h2 id="week-heading" class="text-section-title">Last 7 days</h2>
+          <a class="section-link" routerLink="/analytics">View analytics</a>
+        </div>
+
+        <dl class="metrics metrics-4" [attr.aria-busy]="loading()">
+          <div class="metric">
+            <dt>Conversations started</dt>
+            <dd class="metric-value">
+              @if (dashboard(); as d) {
+                {{ d.summary.conversationsStarted | number }}
+              } @else {
+                <span class="skeleton metric-skeleton" aria-hidden="true"></span>
+              }
+            </dd>
+          </div>
+          <div class="metric">
+            <dt>Customer messages</dt>
+            <dd class="metric-value">
+              @if (dashboard(); as d) {
+                {{ d.summary.customerMessages | number }}
+              } @else {
+                <span class="skeleton metric-skeleton" aria-hidden="true"></span>
+              }
+            </dd>
+          </div>
+          <div class="metric">
+            <dt>AI replies</dt>
+            <dd class="metric-value">
+              @if (dashboard(); as d) {
+                {{ d.summary.aiMessages | number }}
+              } @else {
+                <span class="skeleton metric-skeleton" aria-hidden="true"></span>
+              }
+            </dd>
+          </div>
+          <div class="metric">
+            <dt>Replies from people</dt>
+            <dd class="metric-value">
+              @if (dashboard(); as d) {
+                {{ d.summary.humanMessages | number }}
+              } @else {
+                <span class="skeleton metric-skeleton" aria-hidden="true"></span>
+              }
+            </dd>
+          </div>
+        </dl>
+      </section>
+    }
   }
 
-  <!--
-    The Bootstrap grid, doing the job it is here for: proportional columns that
-    reflow at defined breakpoints. One panel per row on a phone, two side by side
-    from the medium breakpoint, three from extra-large -- so the panels stay wide
-    enough to read rather than being squeezed into thirds of a laptop screen.
-  -->
-  <section class="page-section" aria-labelledby="operations-heading">
-    <h2 id="operations-heading" class="text-section-title">Operations</h2>
+  <!-- 4. Where next -->
+  @if (shortcuts().length > 0) {
+    <section class="page-section" aria-labelledby="shortcuts-heading">
+      <div class="section-header">
+        <h2 id="shortcuts-heading" class="text-section-title">Shortcuts</h2>
+      </div>
 
-    <div class="row area-panels">
-      @for (panel of panels; track panel.path) {
-        <div class="col-12 col-md-6 col-xl-4">
-          <article class="card panel">
-            <div class="card-header">
-              <span class="card-heading">
-                <app-icon [name]="panel.icon" [strokeWidth]="1.6" />
-                <span class="text-card-title">{{ panel.label }}</span>
-              </span>
-              @if (panel.implemented) {
-                <span class="badge badge-success">Available</span>
-              } @else {
-                <span class="badge badge-neutral">Not implemented</span>
-              }
-            </div>
-
-            <!--
-              A way in rather than a number. The workspace's numbers are on
-              Analytics and are summarised above; repeating a per-area count in
-              each panel would be three more places for a figure to disagree with
-              the one beside it.
-            -->
-            <app-empty-state
-              [heading]="panel.implemented ? 'Ready to use' : 'Not built yet'"
-              [description]="
-                panel.implemented
-                  ? 'Open this area to configure it and see what it is doing.'
-                  : 'This area is part of the planned product and has no screens in this build.'
-              "
-            >
-              <a stateActions class="btn btn-secondary btn-sm" [routerLink]="'/' + panel.path">
-                Open {{ panel.label }}
-                <app-icon name="arrow-end" [strokeWidth]="1.75" />
-              </a>
-            </app-empty-state>
-          </article>
-        </div>
-      }
-    </div>
-  </section>
-
-  <!--
-    The one table in the product so far, and the only genuinely factual content
-    on this page: it is rendered from the navigation model, so it cannot claim an
-    area is built when it is not.
-  -->
-  <section class="page-section" aria-labelledby="areas-heading">
-    <h2 id="areas-heading" class="text-section-title">Product areas</h2>
-    <p class="section-note text-small text-secondary">
-      What this build of the admin application contains today. Areas marked available are real and
-      report real data.
-    </p>
-
-    <div class="table-wrap areas-table" appScrollRegion="Product areas table">
-      <table class="table">
-        <caption class="visually-hidden">
-          Product areas and whether each is implemented in this build
-        </caption>
-        <thead>
-          <tr>
-            <th scope="col">Area</th>
-            <th scope="col">Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          @for (area of areas; track area.path) {
-            <tr>
-              <!--
-                `scope="row"` makes this cell the row's header, so a screen
-                reader announces "AI Agents, Status, Not implemented" instead of
-                reading a status with nothing attached to it.
-              -->
-              <th scope="row" class="area-cell">
-                <a [routerLink]="'/' + area.path">{{ area.label }}</a>
-              </th>
-              <td>
-                <!--
-                  The badge carries a dot and a word, not just a colour, so the
-                  status survives greyscale and colour vision deficiency.
-                -->
-                @if (area.implemented) {
-                  <span class="badge badge-success">Available</span>
-                } @else {
-                  <span class="badge badge-neutral">Not implemented</span>
-                }
-              </td>
-            </tr>
-          }
-        </tbody>
-      </table>
-    </div>
-  </section>
+      <ul class="shortcuts">
+        @for (shortcut of shortcuts(); track shortcut.link) {
+          <li>
+            <a class="shortcut" [routerLink]="shortcut.link">
+              <app-icon [name]="shortcut.icon" [strokeWidth]="1.6" />
+              <span>{{ shortcut.label }}</span>
+              <app-icon class="shortcut-arrow" name="chevron-end" [strokeWidth]="1.75" />
+            </a>
+          </li>
+        }
+      </ul>
+    </section>
+  }
 </div>

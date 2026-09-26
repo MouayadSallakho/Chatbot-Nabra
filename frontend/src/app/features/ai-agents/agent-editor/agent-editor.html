@@ -17,20 +17,19 @@
     </div>
   } @else if (agent(); as current) {
     <app-page-header
+      backLink="/ai-agents"
+      backLabel="AI agents"
       [heading]="current.name"
       description="Configure how this agent replies, then test it before putting it in service."
     >
-      <div pageActions class="header-actions">
-        <span
-          class="badge"
-          [class.badge-success]="current.status === 'Active'"
-          [class.badge-neutral]="current.status === 'Draft'"
-          [class.badge-warning]="current.status === 'Disabled'"
-        >
-          {{ current.status }}
-        </span>
-        <a class="btn btn-secondary btn-sm" routerLink="/ai-agents">All agents</a>
-      </div>
+      <span
+        pageStatus
+        class="badge"
+        [class.badge-success]="current.status === 'Active'"
+        [class.badge-neutral]="current.status !== 'Active'"
+      >
+        {{ current.status }}
+      </span>
     </app-page-header>
 
     @if (conflict(); as source) {
@@ -40,7 +39,7 @@
         no automatic retry and no automatic merge -- both would decide something
         only the reader can decide.
       -->
-      <div class="alert alert-danger conflict" role="alert">
+      <div class="stale-notice" role="alert">
         <app-icon name="alert" [strokeWidth]="1.75" />
         <div class="conflict-body">
           <p class="conflict-title">This agent was updated somewhere else.</p>

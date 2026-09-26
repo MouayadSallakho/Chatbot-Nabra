@@ -1,4 +1,13 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  ElementRef,
+  Injector,
+  afterNextRender,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
 import { ApiError, toApiError } from '@app/core/api/api-error';
@@ -42,6 +51,8 @@ export class ReportSchedules {
   private readonly api = inject(ReportsApi);
   private readonly workspace = inject(WorkspaceContextService);
   private readonly permissions = inject(PermissionService);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly injector = inject(Injector);
 
   protected readonly canView = computed(() => this.permissions.has('reports.view'));
   protected readonly canSchedule = computed(
@@ -62,6 +73,13 @@ export class ReportSchedules {
   protected readonly rowFailure = signal<{ id: string; error: ApiError } | null>(null);
   protected readonly announcement = signal('');
   private readonly submitted = signal(false);
+
+  /**
+   * Where focus goes back to when the form closes: the schedule whose Edit
+   * opened it, or null for New schedule. Opening the form removes the New
+   * schedule button, so without this a keyboard reader is dropped on the body.
+   */
+  private returnFocusTo: string | null = null;
 
   protected readonly form = new FormGroup({
     name: new FormControl('', {
@@ -94,7 +112,7 @@ export class ReportSchedules {
       format: 'Csv',
       frequency: 'Weekly',
     });
-    this.formOpen.set(true);
+    this.openForm(null);
   }
 
   protected async startEdit(schedule: ReportSchedule): Promise<void> {
@@ -118,7 +136,7 @@ export class ReportSchedules {
         format: versioned.value.format,
         frequency: versioned.value.frequency,
       });
-      this.formOpen.set(true);
+      this.openForm(schedule.id);
     } catch (error: unknown) {
       this.rowFailure.set({ id: schedule.id, error: toApiError(error) });
     }
@@ -128,6 +146,7 @@ export class ReportSchedules {
     this.formOpen.set(false);
     this.editing.set(null);
     this.saveFailure.set(null);
+    this.restoreFocus();
   }
 
   protected async save(): Promise<void> {
@@ -135,7 +154,13 @@ export class ReportSchedules {
 
     this.submitted.set(true);
 
-    if (tenantId === null || this.form.invalid || this.saving()) {
+    if (this.form.invalid) {
+      // The error is announced; focus goes to the field it is about.
+      this.focusAfterRender('#schedule-name');
+      return;
+    }
+
+    if (tenantId === null || this.saving()) {
       return;
     }
 
@@ -176,6 +201,7 @@ export class ReportSchedules {
       this.editing.set(null);
 
       await this.reload();
+      this.restoreFocus();
     } catch (error: unknown) {
       this.saveFailure.set(toApiError(error));
     } finally {
@@ -194,6 +220,27 @@ export class ReportSchedules {
     if (fresh !== undefined) {
       await this.startEdit(fresh);
     }
+  }
+
+  private openForm(returnFocusTo: string | null): void {
+    this.returnFocusTo = returnFocusTo;
+    this.formOpen.set(true);
+    this.focusAfterRender('#schedule-name');
+  }
+
+  /** Back to the control that opened the form, which may only now exist again. */
+  private restoreFocus(): void {
+    const id = this.returnFocusTo;
+
+    this.focusAfterRender(
+      id === null ? '[data-testid="new-schedule"]' : `[data-edit-schedule="${id}"]`,
+    );
+  }
+
+  private focusAfterRender(selector: string): void {
+    afterNextRender(() => this.host.nativeElement.querySelector<HTMLElement>(selector)?.focus(), {
+      injector: this.injector,
+    });
   }
 
   protected async toggle(schedule: ReportSchedule): Promise<void> {

@@ -222,7 +222,7 @@ describe('WorkspaceSetup', () => {
       http.expectOne('/api/tenants').error(new ProgressEvent('error'), { status: 0 });
       await settle();
 
-      expect(host().textContent).toContain('Could not reach');
+      expect(host().textContent).toContain('could not be reached');
     });
   });
 
@@ -296,7 +296,7 @@ describe('WorkspaceSetup', () => {
     });
 
     it('reports a connection problem rather than an empty account', () => {
-      expect(host().textContent).toContain('Cannot reach the backend');
+      expect(host().textContent).toContain('OmniAI is not responding');
       expect(host().textContent).toContain('Nothing has been changed');
     });
 

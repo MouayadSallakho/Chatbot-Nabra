@@ -1,6 +1,6 @@
 <div class="page">
   @if (!canView()) {
-    <app-page-header heading="Conversation" />
+    <app-page-header backLink="/conversations" backLabel="Conversations" heading="Conversation" />
 
     <div class="page-section">
       <div class="card">
@@ -12,7 +12,7 @@
       </div>
     </div>
   } @else if (loading()) {
-    <app-page-header heading="Conversation" />
+    <app-page-header backLink="/conversations" backLabel="Conversations" heading="Conversation" />
 
     <div class="page-section" aria-busy="true">
       <p class="visually-hidden" role="status">Loading conversation…</p>
@@ -22,7 +22,7 @@
       </div>
     </div>
   } @else if (failure(); as error) {
-    <app-page-header heading="Conversation" />
+    <app-page-header backLink="/conversations" backLabel="Conversations" heading="Conversation" />
 
     <div class="page-section">
       <div class="card">
@@ -42,6 +42,8 @@
     </div>
   } @else if (conversation(); as current) {
     <app-page-header
+      backLink="/conversations"
+      backLabel="Conversations"
       heading="Conversation"
       [description]="
         current.channel === 'WebChat'
@@ -50,7 +52,6 @@
       "
     >
       <button pageActions type="button" class="btn btn-secondary" (click)="load()">Refresh</button>
-      <a pageActions class="btn btn-secondary" routerLink="/conversations">Back to conversations</a>
     </app-page-header>
 
     <div class="page-section">
@@ -62,16 +63,16 @@
           </p>
         </div>
         <div>
-          <p class="text-label text-muted">Agent</p>
+          <p class="text-label text-muted">AI agent</p>
           <p class="text-body">{{ current.agentName ?? '—' }}</p>
         </div>
         <div>
           <p class="text-label text-muted">Started</p>
-          <p class="text-body">{{ current.startedAt | date: 'medium' }}</p>
+          <p class="text-body">{{ current.startedAt | date: 'MMM d, y, h:mm a' }}</p>
         </div>
         <div>
           <p class="text-label text-muted">Last activity</p>
-          <p class="text-body">{{ current.lastActivityAt | date: 'medium' }}</p>
+          <p class="text-body">{{ current.lastActivityAt | date: 'MMM d, y, h:mm a' }}</p>
         </div>
         <div>
           <p class="text-label text-muted">Answered by</p>
@@ -127,6 +128,7 @@
                   class="btn btn-primary"
                   [disabled]="working()"
                   (click)="takeOver()"
+                  data-testid="take-over"
                 >
                   {{ working() ? 'Working…' : 'Take over' }}
                 </button>
@@ -199,7 +201,7 @@
             >
               <p class="message-meta">
                 <span class="message-sender">{{ senderName(message) }}</span>
-                <span class="text-muted">{{ message.sentAt | date: 'medium' }}</span>
+                <span class="text-muted">{{ message.sentAt | date: 'MMM d, y, h:mm a' }}</span>
 
                 @if (deliveryStatus(message.id); as delivery) {
                   <!--
@@ -250,10 +252,11 @@
       @if (canReply()) {
         @if (isHuman()) {
           <!--
-            Not a <form>. Send is an ordinary button and Enter is handled as a
-            keystroke, so nothing here depends on native form submission — which
-            keeps this composer identical in shape to the one inside the
-            sandboxed widget iframe, where submission is not available at all.
+            Not a <form>. Send is an ordinary button, so nothing here depends on
+            native form submission — which keeps this composer identical in shape
+            to the one inside the sandboxed widget iframe, where submission is not
+            available at all. Enter adds a new line and never sends: a reply to a
+            customer is not something a stray keystroke should post.
           -->
           <div class="composer">
             <label class="visually-hidden" for="conversation-reply">Your reply</label>

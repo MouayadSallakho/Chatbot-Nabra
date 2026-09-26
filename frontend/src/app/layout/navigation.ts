@@ -35,7 +35,21 @@ export interface NavItem {
    * not advertise dead ends.
    */
   readonly permissions?: readonly PermissionCode[];
+
+  /** The sidebar section this destination belongs to. */
+  readonly group: NavGroup;
 }
+
+/**
+ * The sidebar's sections, in the order they appear.
+ *
+ * Shallow on purpose: five short headings, frequent operational work first and
+ * workspace administration last, so the destinations somebody uses every day are
+ * never below the ones they open once a quarter.
+ */
+export const NAV_GROUPS = ['Work', 'AI', 'Channels', 'Insights', 'Workspace'] as const;
+
+export type NavGroup = (typeof NAV_GROUPS)[number];
 
 /**
  * The primary navigation.
@@ -45,15 +59,44 @@ export interface NavItem {
  * from this array, which is what makes a dead navigation link structurally
  * impossible rather than merely unlikely.
  *
- * The order groups by how the product is used, not alphabetically: what is
- * happening now (Overview, AI Agents, Conversations), what the agents draw on
- * (Knowledge), how they reach people (Channels, Integrations), then review and
- * configuration (Analytics, Settings).
+ * Ordered by group, in NAV_GROUPS order, and within a group by how often it is
+ * used: the daily work (Overview, Conversations, Customers), the AI and what it
+ * draws on, how it reaches people, what happened, and finally the workspace's
+ * own administration. Entries of one group are contiguous, which is what lets
+ * the sidebar render them under one heading without re-sorting.
  */
 export const NAV_ITEMS: readonly NavItem[] = [
-  { label: 'Overview', path: 'overview', icon: 'overview', implemented: true },
+  { label: 'Overview', path: 'overview', icon: 'overview', implemented: true, group: 'Work' },
+  {
+    // Real from Phase 15: these are the conversations customers have actually
+    // had, not a placeholder. Read-only -- replying, assigning and handing off do
+    // not exist yet, and the screen says so rather than showing controls that
+    // would fail.
+    label: 'Conversations',
+    group: 'Work',
+    path: 'conversations',
+    icon: 'conversations',
+    implemented: true,
+    permissions: ['conversations.view'],
+  },
+  {
+    // Real from Phase 30: who the workspace talks to, across every channel.
+    //
+    // Beside Conversations rather than inside it, because the two answer
+    // different questions and are read by different people: a directory is an
+    // administrative view of the customer base, and a transcript is what
+    // somebody said in confidence. customers.view is deliberately not
+    // conversations.view.
+    label: 'Customers',
+    group: 'Work',
+    path: 'customers',
+    icon: 'customers',
+    implemented: true,
+    permissions: ['customers.view'],
+  },
   {
     label: 'AI Agents',
+    group: 'AI',
     path: 'ai-agents',
     icon: 'agents',
     implemented: true,
@@ -69,35 +112,11 @@ export const NAV_ITEMS: readonly NavItem[] = [
     ],
   },
   {
-    // Real from Phase 15: these are the conversations customers have actually
-    // had, not a placeholder. Read-only -- replying, assigning and handing off do
-    // not exist yet, and the screen says so rather than showing controls that
-    // would fail.
-    label: 'Conversations',
-    path: 'conversations',
-    icon: 'conversations',
-    implemented: true,
-    permissions: ['conversations.view'],
-  },
-  {
-    // Real from Phase 30: who the workspace talks to, across every channel.
-    //
-    // Beside Conversations rather than inside it, because the two answer
-    // different questions and are read by different people: a directory is an
-    // administrative view of the customer base, and a transcript is what
-    // somebody said in confidence. customers.view is deliberately not
-    // conversations.view.
-    label: 'Customers',
-    path: 'customers',
-    icon: 'team',
-    implemented: true,
-    permissions: ['customers.view'],
-  },
-  {
     // Real from Phase 17: written documents an agent can actually answer from,
     // not a placeholder. File upload, crawling and connectors are still absent,
     // and the screens say so rather than showing controls that would fail.
     label: 'Knowledge',
+    group: 'AI',
     path: 'knowledge',
     icon: 'knowledge',
     implemented: true,
@@ -112,17 +131,23 @@ export const NAV_ITEMS: readonly NavItem[] = [
     // Either channel permission opens it: somebody who administers WhatsApp and
     // not website chat still needs a way in.
     label: 'Channels',
+    group: 'Channels',
     path: 'channels',
     icon: 'channels',
     implemented: true,
     permissions: ['website-chat.view', 'whatsapp.view'],
   },
-  { label: 'Integrations', path: 'integrations', icon: 'integrations', implemented: false },
+  // Integrations is deliberately absent. It was a placeholder with no screens,
+  // and a primary navigation that offers a destination where nothing can be done
+  // wastes the reader's time. It returns here, as an implemented entry, when the
+  // area is built; until then an unbuilt entry can still be listed with
+  // `implemented: false` and gets the generated placeholder route.
   {
     // Real from Phase 22: counts drawn from the conversations, messages and
     // turns the platform already stores. One permission, because there is
     // nothing here to configure.
     label: 'Analytics',
+    group: 'Insights',
     path: 'analytics',
     icon: 'analytics',
     implemented: true,
@@ -133,18 +158,46 @@ export const NAV_ITEMS: readonly NavItem[] = [
     // generated on a schedule. Its own permission, because being trusted to read
     // a dashboard is not being trusted to write the workspace's data to a file.
     label: 'Reports',
+    group: 'Insights',
     path: 'reports',
-    icon: 'analytics',
+    icon: 'reports',
     implemented: true,
     permissions: ['reports.view'],
+  },
+  {
+    // Beside Roles rather than inside it: a role is a definition of what may be
+    // done, and a team is the people who may do it. They are administered by
+    // different permissions and, in a real workspace, often by different people.
+    label: 'Team',
+    group: 'Workspace',
+    path: 'team',
+    icon: 'team',
+    implemented: true,
+    // Only members.view. Inviting and assigning are things done from inside this
+    // area, and somebody who can invite but not see the team would arrive at a
+    // page that could show them nothing.
+    permissions: ['members.view'],
+  },
+  {
+    // This replaces the Phase 10 "Settings" placeholder rather than nesting
+    // inside it. There are no other settings yet, so a Settings hub would be a
+    // page with one link on it -- a dead step that exists only to be completed.
+    // When a second settings area arrives, this becomes a child of one.
+    label: 'Roles & permissions',
+    group: 'Workspace',
+    path: 'roles',
+    icon: 'roles',
+    implemented: true,
+    permissions: ['roles.view'],
   },
   {
     // Beside Analytics, behind the same permission. It answers a different
     // question -- what this workspace may hold, rather than what it did -- and
     // there is nothing to configure here, so one read permission is enough.
     label: 'Plan & usage',
+    group: 'Workspace',
     path: 'plan-usage',
-    icon: 'analytics',
+    icon: 'usage',
     implemented: true,
     permissions: ['analytics.view'],
   },
@@ -154,34 +207,11 @@ export const NAV_ITEMS: readonly NavItem[] = [
     // costs -- and billing.view is deliberately not analytics.view, because
     // being trusted with conversation counts is not being trusted with money.
     label: 'Billing',
+    group: 'Workspace',
     path: 'billing',
-    icon: 'settings',
+    icon: 'billing',
     implemented: true,
     permissions: ['billing.view'],
-  },
-  {
-    // This replaces the Phase 10 "Settings" placeholder rather than nesting
-    // inside it. There are no other settings yet, so a Settings hub would be a
-    // page with one link on it -- a dead step that exists only to be completed.
-    // When a second settings area arrives, this becomes a child of one.
-    label: 'Roles & permissions',
-    path: 'roles',
-    icon: 'settings',
-    implemented: true,
-    permissions: ['roles.view'],
-  },
-  {
-    // Beside Roles rather than inside it: a role is a definition of what may be
-    // done, and a team is the people who may do it. They are administered by
-    // different permissions and, in a real workspace, often by different people.
-    label: 'Team',
-    path: 'team',
-    icon: 'team',
-    implemented: true,
-    // Only members.view. Inviting and assigning are things done from inside this
-    // area, and somebody who can invite but not see the team would arrive at a
-    // page that could show them nothing.
-    permissions: ['members.view'],
   },
 ];
 

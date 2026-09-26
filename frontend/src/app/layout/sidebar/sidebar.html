@@ -1,4 +1,15 @@
-<div class="sidebar" [class.is-collapsed]="collapsed()" [class.is-drawer]="drawer()">
+<div
+  class="sidebar"
+  [class.is-rail]="rail()"
+  [class.is-expanded]="expanded()"
+  [class.is-drawer]="drawer()"
+  [class.is-open]="drawer() && open()"
+  (pointerenter)="onPointerEnter($event)"
+  (pointerleave)="onPointerLeave($event)"
+  (focusin)="onFocusIn()"
+  (focusout)="onFocusOut($event)"
+  (keydown.escape)="onEscape($event)"
+>
   <div class="sidebar-brand">
     <!--
       The product mark. Two dots, the larger leading the smaller: a customer and
@@ -6,11 +17,11 @@
       -- the wordmark beside it already carries the name.
     -->
     <svg class="brand-mark" viewBox="0 0 28 28" aria-hidden="true" focusable="false">
-      <rect width="28" height="28" rx="8" fill="currentColor" />
+      <rect width="28" height="28" rx="7" fill="currentColor" />
       <circle cx="11" cy="11.5" r="3.25" fill="var(--accent-contrast)" />
       <circle cx="18" cy="17" r="2.25" fill="var(--accent-contrast)" fill-opacity="0.7" />
     </svg>
-    <span class="brand-name">OmniAI</span>
+    <span class="brand-name fades">OmniAI</span>
 
     @if (drawer()) {
       <button
@@ -26,95 +37,48 @@
   </div>
 
   <!--
-    `aria-label` distinguishes this from any other navigation landmark the page
-    grows later. A screen reader user listing landmarks gets "Primary
-    navigation" rather than two identical "navigation" entries.
+    `aria-label` distinguishes this from any other navigation landmark. Each
+    section's list is labelled by its heading, so a screen reader announces
+    "Work, list, 3 items" rather than one undifferentiated run of links.
   -->
   <nav class="sidebar-nav" aria-label="Primary">
-    <ul>
-      @for (item of items(); track item.path) {
-        <li>
-          <a
-            class="nav-item"
-            [routerLink]="item.path"
-            routerLinkActive="is-active"
-            ariaCurrentWhenActive="page"
-            [title]="item.label"
-            (click)="navigated.emit()"
-          >
-            <app-icon [name]="item.icon" [strokeWidth]="1.6" />
-            <!--
-              Stays in the DOM when collapsed, hidden only visually, so the link
-              keeps its accessible name. The `title` above is what a sighted
-              reader gets in its place.
-            -->
-            <span class="nav-label">{{ item.label }}</span>
-          </a>
-        </li>
-      }
-    </ul>
+    @for (group of groups(); track group.name) {
+      <div class="nav-group">
+        <p class="nav-group-label" [id]="'nav-group-' + group.name">
+          <span class="fades">{{ group.name }}</span>
+        </p>
+        <ul [attr.aria-labelledby]="'nav-group-' + group.name">
+          @for (item of group.items; track item.path) {
+            <li>
+              <a
+                class="nav-item"
+                [routerLink]="item.path"
+                routerLinkActive="is-active"
+                ariaCurrentWhenActive="page"
+                (click)="navigated.emit()"
+              >
+                <app-icon [name]="item.icon" [strokeWidth]="1.6" />
+                <!--
+                  Always in the DOM and in the accessibility tree: collapsed to the
+                  rail it is clipped and transparent, never removed, so the link
+                  keeps its name. The rail expands on hover and on focus, which is
+                  what a sighted reader gets in place of a tooltip.
+                -->
+                <span class="nav-label fades">{{ item.label }}</span>
+              </a>
+            </li>
+          }
+        </ul>
+      </div>
+    }
   </nav>
 
-  <!--
-    Collapse is a desktop affordance. In drawer mode the sidebar is already
-    dismissible, and a second control that shrinks a full-screen overlay would
-    mean nothing.
-  -->
-  @if (workspaceName()) {
-    <div class="sidebar-workspace">
-      <span class="workspace-label">Workspace</span>
-      <span class="workspace-name" [title]="workspaceName()">{{ workspaceName() }}</span>
-
-      <!--
-        Only when there is somewhere to switch to. With one workspace this
-        control would lead to a list of one, which is a step that exists only to
-        be completed.
-      -->
-      @if (canSwitchWorkspace()) {
-        <button
-          type="button"
-          class="btn btn-ghost btn-sm workspace-action"
-          (click)="workspaceSwitched.emit()"
-        >
-          <span class="nav-label">Switch workspace</span>
-        </button>
-      }
-    </div>
-  }
-
-  @if (userEmail()) {
-    <div class="sidebar-account">
-      <span class="workspace-label">Signed in as</span>
-      <span class="account-email" [title]="userEmail()">{{ userEmail() }}</span>
-      <button
-        type="button"
-        class="btn btn-ghost btn-sm workspace-action"
-        (click)="signedOut.emit()"
-      >
-        <span class="nav-label">Sign out</span>
-      </button>
-    </div>
-  }
-
+  <!-- Pinning is a desktop choice. In drawer mode the sidebar is already an overlay. -->
   @if (!drawer()) {
     <div class="sidebar-footer">
-      <button
-        type="button"
-        class="btn btn-ghost btn-sm collapse-toggle"
-        (click)="collapseToggled.emit()"
-        [attr.aria-expanded]="!collapsed()"
-        aria-controls="primary-navigation"
-        [title]="collapsed() ? 'Expand navigation' : 'Collapse navigation'"
-      >
-        <app-icon [name]="collapsed() ? 'chevron-end' : 'chevron-start'" [strokeWidth]="1.75" />
-        <!--
-          One label, whose text changes with the state. Collapsed, it is hidden
-          visually but still names the button -- adding a second hidden label
-          instead would make a screen reader read both.
-        -->
-        <span class="nav-label">{{
-          collapsed() ? 'Expand navigation' : 'Collapse navigation'
-        }}</span>
+      <button type="button" class="nav-item pin-toggle" (click)="pinToggled.emit()">
+        <app-icon [name]="pinned() ? 'chevron-start' : 'pin'" [strokeWidth]="1.6" />
+        <span class="nav-label fades">{{ pinned() ? 'Unpin sidebar' : 'Pin sidebar' }}</span>
       </button>
     </div>
   }

@@ -22,10 +22,10 @@
         />
       </div>
     } @else if (loading()) {
-      <div class="member-list" aria-busy="true">
+      <div class="data-list member-list" aria-busy="true">
         <p class="visually-hidden" role="status">Loading the team…</p>
         @for (row of skeletonRows; track row) {
-          <div class="member-row member-row-skeleton" aria-hidden="true">
+          <div class="data-row data-row-skeleton" aria-hidden="true">
             <span class="skeleton skeleton-title"></span>
             <span class="skeleton skeleton-text"></span>
             <span class="skeleton skeleton-text"></span>
@@ -48,8 +48,8 @@
     } @else {
       <h2 class="text-section-title">Members</h2>
 
-      <div class="member-list">
-        <div class="member-list-head" aria-hidden="true">
+      <div class="data-list member-list">
+        <div class="data-list-head" aria-hidden="true">
           <span>Member</span>
           <span>Roles</span>
           <span>Joined</span>
@@ -58,8 +58,8 @@
         <ul>
           @for (member of members(); track member.userId) {
             <li>
-              <a class="member-row" [routerLink]="['/team', member.userId]">
-                <span class="member-name">
+              <a class="data-row" [routerLink]="['/team', member.userId]">
+                <span class="data-row-title">
                   <span class="member-email">{{ member.email }}</span>
 
                   @if (member.isOwner) {
@@ -72,7 +72,7 @@
                   }
                 </span>
 
-                <span class="member-roles text-small text-secondary">
+                <span class="data-row-meta">
                   @if (member.roles.length === 0) {
                     No roles yet
                   } @else {
@@ -80,21 +80,23 @@
                   }
                 </span>
 
-                <span class="member-joined text-small text-muted">
-                  <span class="member-joined-label">Joined&nbsp;</span>
+                <span class="data-row-meta">
+                  <span class="data-cell-label">Joined&nbsp;</span>
                   <time [attr.datetime]="member.joinedAt">{{
                     member.joinedAt | date: 'mediumDate'
                   }}</time>
                 </span>
 
-                <app-icon class="member-chevron" name="chevron-end" [strokeWidth]="1.75" />
+                <app-icon class="data-row-chevron" name="chevron-end" [strokeWidth]="1.75" />
               </a>
             </li>
           }
         </ul>
       </div>
 
-      <h2 class="text-section-title invitations-heading">Pending invitations</h2>
+      <h2 id="pending-invitations" class="text-section-title invitations-heading" tabindex="-1">
+        Pending invitations
+      </h2>
 
       @if (revokeFailure(); as error) {
         <p class="alert alert-danger" role="alert">{{ error.message }}</p>
@@ -109,17 +111,17 @@
           </div>
         </div>
       } @else {
-        <div class="member-list">
+        <div class="data-list member-list">
           <ul>
             @for (invitation of pending(); track invitation.id) {
               <li>
-                <div class="member-row invitation-row">
-                  <span class="member-name">
+                <div class="data-row invitation-row">
+                  <span class="data-row-title">
                     <span class="member-email">{{ invitation.email }}</span>
                     <span class="badge badge-neutral">Invited</span>
                   </span>
 
-                  <span class="member-roles text-small text-secondary">
+                  <span class="data-row-meta">
                     @if (invitation.roles.length === 0) {
                       Joins with no roles
                     } @else {
@@ -127,8 +129,8 @@
                     }
                   </span>
 
-                  <span class="member-joined text-small text-muted">
-                    <span class="member-joined-label">Expires&nbsp;</span>
+                  <span class="data-row-meta">
+                    <span class="data-cell-label">Expires&nbsp;</span>
                     <time [attr.datetime]="invitation.expiresAt">{{
                       invitation.expiresAt | date: 'mediumDate'
                     }}</time>
@@ -137,8 +139,9 @@
                   @if (canInvite()) {
                     <button
                       type="button"
-                      class="btn btn-secondary btn-sm invitation-revoke"
+                      class="btn btn-danger-ghost btn-sm invitation-revoke"
                       [disabled]="revoking() === invitation.id"
+                      [attr.aria-label]="'Revoke the invitation for ' + invitation.email"
                       (click)="revoke(invitation)"
                     >
                       {{ revoking() === invitation.id ? 'Revoking…' : 'Revoke' }}
@@ -152,4 +155,13 @@
       }
     }
   </div>
+
+  <app-confirm-dialog
+    #revokeDialog
+    [heading]="'Revoke the invitation for ' + (revokeTarget()?.email ?? '') + '?'"
+    body="Their invitation link stops working immediately and cannot be reinstated. You can invite the same address again later."
+    confirmLabel="Revoke invitation"
+    cancelLabel="Keep invitation"
+    tone="danger"
+  />
 </div>

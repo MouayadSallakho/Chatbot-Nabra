@@ -8,14 +8,17 @@
         pageActions
         type="button"
         class="btn btn-secondary"
+        [class.btn-loading]="refreshing()"
+        [attr.aria-busy]="refreshing()"
         (click)="refresh()"
         [disabled]="refreshing()"
         data-testid="refresh"
       >
+        <app-icon name="refresh" [strokeWidth]="1.75" />
+        <span>Refresh</span>
         @if (refreshing()) {
           <span class="spinner" aria-hidden="true"></span>
         }
-        <span class="btn-label">{{ refreshing() ? 'Refreshing…' : 'Refresh' }}</span>
       </button>
     }
   </app-page-header>
@@ -28,23 +31,30 @@
       -->
       <div class="card">
         <app-empty-state
-          icon="team"
+          icon="customers"
           heading="You do not have access to customers"
           description="Seeing who this workspace talks to needs a permission your roles do not include. Ask somebody who administers this workspace if you need it."
         />
       </div>
     } @else if (loading()) {
-      <div class="card" aria-busy="true">
-        <p class="text-small text-secondary">Loading customers…</p>
+      <div class="data-list customer-list" aria-busy="true">
+        <p class="visually-hidden" role="status">Loading customers…</p>
+        @for (row of skeletonRows; track row) {
+          <div class="data-row data-row-skeleton" aria-hidden="true">
+            <span class="skeleton skeleton-title"></span>
+            <span class="skeleton skeleton-text"></span>
+          </div>
+        }
       </div>
     } @else if (failure(); as error) {
       <div class="card">
         <app-empty-state
-          icon="team"
-          heading="Customers could not be loaded"
+          icon="alert"
+          tone="error"
+          heading="Could not load customers"
           [description]="error.message"
         >
-          <button stateActions type="button" class="btn btn-secondary" (click)="refresh()">
+          <button stateActions type="button" class="btn btn-secondary btn-sm" (click)="refresh()">
             Try again
           </button>
         </app-empty-state>
@@ -52,7 +62,7 @@
     } @else if (rows().length === 0) {
       <div class="card">
         <app-empty-state
-          icon="team"
+          icon="customers"
           heading="Nobody has been in touch yet"
           description="A customer appears here the first time somebody writes to this workspace, on any channel. Nothing is created by a page view."
           data-testid="no-customers"
@@ -60,72 +70,66 @@
       </div>
     } @else {
       <!--
-        Cards rather than a table. Every row carries four unrelated facts, two of
-        which are lists, and a table of those at 390px is a table with a
-        horizontal scrollbar. Each card is a link, so the whole row is the target
-        rather than a small chevron at the end of it.
+        The shared data list: an aligned grid on a wide screen, stacked rows on a
+        narrow one, so the four facts a row carries never need a horizontal
+        scrollbar at 390px. Each row is one link, so the whole row is the target.
       -->
-      <ul class="customer-list" data-testid="customers">
-        @for (customer of rows(); track customer.id) {
-          <li>
-            <a
-              class="customer"
-              [routerLink]="[customer.id]"
-              [attr.data-testid]="'customer-' + customer.id"
-            >
-              <span class="customer-name">{{ customer.label }}</span>
-
-              <span class="customer-channels">
-                <!--
-                  A word, never a colour alone. Somebody who cannot tell the
-                  badges apart still reads which channels this person uses.
-                -->
-                @for (channel of customer.channels; track channel) {
-                  <span class="channel-badge" [class]="'channel-' + channel.toLowerCase()">{{
-                    channel === 'WebChat' ? 'Website' : channel
-                  }}</span>
-                }
-                @if (customer.channels.length === 0) {
-                  <span class="text-small text-muted">No channel yet</span>
-                }
-              </span>
-
-              <span class="text-small text-secondary customer-count">{{
-                conversations(customer.conversationCount)
-              }}</span>
-
-              <span class="text-small text-muted customer-activity">{{
-                activity(customer.lastActivityAt)
-              }}</span>
-            </a>
-          </li>
-        }
-      </ul>
-
-      <div class="customer-paging">
-        <p class="text-small text-muted" data-testid="summary">{{ summary() }}</p>
-
-        <div class="customer-paging-buttons">
-          <button
-            type="button"
-            class="btn btn-secondary"
-            (click)="go(pageNumber() - 1)"
-            [disabled]="!hasPrevious() || refreshing()"
-            data-testid="previous"
-          >
-            Previous
-          </button>
-          <button
-            type="button"
-            class="btn btn-secondary"
-            (click)="go(pageNumber() + 1)"
-            [disabled]="!hasNext() || refreshing()"
-            data-testid="next"
-          >
-            Next
-          </button>
+      <div class="data-list customer-list" [attr.aria-busy]="refreshing()">
+        <div class="data-list-head" aria-hidden="true">
+          <span>Customer</span>
+          <span>Channels</span>
+          <span class="data-cell-end">Conversations</span>
+          <span class="data-cell-end">Last activity</span>
         </div>
+
+        <ul data-testid="customers">
+          @for (customer of rows(); track customer.id) {
+            <li>
+              <a
+                class="data-row"
+                [routerLink]="[customer.id]"
+                [attr.data-testid]="'customer-' + customer.id"
+              >
+                <span class="data-row-title">{{ customer.label }}</span>
+
+                <span class="customer-channels">
+                  <!--
+                    A word, never a colour alone. Somebody who cannot tell the
+                    badges apart still reads which channels this person uses.
+                  -->
+                  @for (channel of customer.channels; track channel) {
+                    <span class="badge badge-plain">{{
+                      channel === 'WebChat' ? 'Website chat' : channel
+                    }}</span>
+                  }
+                  @if (customer.channels.length === 0) {
+                    <span class="text-small text-muted">No channel yet</span>
+                  }
+                </span>
+
+                <span class="data-row-meta data-cell-end num">{{
+                  conversations(customer.conversationCount)
+                }}</span>
+
+                <span class="data-row-meta data-cell-end num">
+                  <span class="data-cell-label">Last activity&nbsp;</span
+                  >{{ activity(customer.lastActivityAt) }}
+                </span>
+              </a>
+            </li>
+          }
+        </ul>
       </div>
+
+      <app-pagination
+        [page]="pageNumber()"
+        [pageSize]="pageSize"
+        [total]="totalCount()"
+        noun="customer"
+        label="Customer pages"
+        [busy]="refreshing()"
+        (pageChange)="go($event)"
+      />
     }
   </div>
 </div>

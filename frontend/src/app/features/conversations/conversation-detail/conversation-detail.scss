@@ -88,6 +88,12 @@
   gap: var(--space-2);
   min-width: 0;
   flex: 1 1 16rem;
+
+  // A button is as wide as its label, not its column: a half-page slab reads
+  // as a banner rather than an action.
+  > .btn {
+    align-self: flex-start;
+  }
 }
 
 // The word, not the colour, is what says who is answering. The colour agrees
@@ -97,14 +103,14 @@
 }
 
 .handling-human {
-  color: var(--color-accent-strong);
+  color: var(--accent);
 }
 
 // A human reply sits with the agent's, because to the customer they are both
 // the business talking. The left border is what distinguishes them from each
 // other, and the sender label above says which is which.
 .message-human {
-  border-inline-start: 3px solid var(--color-accent-strong);
+  border-inline-start: 3px solid var(--accent);
   padding-inline-start: var(--space-3);
 }
 

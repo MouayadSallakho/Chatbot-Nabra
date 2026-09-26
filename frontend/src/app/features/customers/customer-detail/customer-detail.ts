@@ -1,7 +1,10 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  ElementRef,
+  Injector,
   OnInit,
+  afterNextRender,
   computed,
   inject,
   input,
@@ -47,6 +50,8 @@ export class CustomerDetail implements OnInit {
   private readonly api = inject(CustomersApi);
   private readonly workspace = inject(WorkspaceContextService);
   private readonly permissions = inject(PermissionService);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly injector = inject(Injector);
 
   /** How many candidates the merge picker offers at a time. */
   private static readonly CandidatePageSize = 20;
@@ -156,6 +161,8 @@ export class CustomerDetail implements OnInit {
       // Never this customer, and never a record that is already a tombstone: the
       // directory excludes merged records, so the only one to remove is this one.
       this.candidates.set(page.items.filter((row) => row.id !== this.customerId()));
+      // The button that opened the picker has been replaced by it.
+      this.focusAfterRender('.candidate input');
     } catch (error: unknown) {
       this.mergeFailure.set(this.describe(toApiError(error)));
     }
@@ -165,6 +172,7 @@ export class CustomerDetail implements OnInit {
     this.merging.set(false);
     this.target.set(null);
     this.mergeFailure.set(null);
+    this.focusAfterRender('[data-testid="open-merge"]');
   }
 
   protected choose(candidate: CustomerRow): void {
@@ -189,11 +197,22 @@ export class CustomerDetail implements OnInit {
       this.closeMerge();
 
       await this.load();
+      // This page is now the tombstone; the notice saying where the history went
+      // is what the reader needs next.
+      this.focusAfterRender('[data-testid="merged-notice"]');
     } catch (error: unknown) {
       this.mergeFailure.set(this.describe(toApiError(error)));
+      // The confirm button was disabled while it ran, which dropped focus.
+      this.focusAfterRender('[data-testid="merge-failure"]');
     } finally {
       this.mergeRunning.set(false);
     }
+  }
+
+  private focusAfterRender(selector: string): void {
+    afterNextRender(() => this.host.nativeElement.querySelector<HTMLElement>(selector)?.focus(), {
+      injector: this.injector,
+    });
   }
 
   protected date(value: string): string {
@@ -204,7 +223,7 @@ export class CustomerDetail implements OnInit {
   }
 
   protected channelLabel(channel: string): string {
-    return channel === 'WebChat' ? 'Website' : channel;
+    return channel === 'WebChat' ? 'Website chat' : channel;
   }
 
   protected conversations(count: number): string {
@@ -220,25 +239,28 @@ export class CustomerDetail implements OnInit {
    * somebody used and when the workspace first heard from them are the only
    * distinguishing facts the platform actually holds, so they are the ones shown
    * — never a guess, and never anything taken from what was said.
+   *
+   * Found again in Phase 33.5: visitors who arrived on the same day still read
+   * identically, so "first seen" is to the minute and every row ends with a
+   * short reference from the record's own identifier -- the same one in its
+   * address, and the only fact guaranteed to differ between two records.
    */
   protected distinguish(row: CustomerRow): string {
-    return this.summarise(row.channels, row.createdAt);
+    return this.summarise(row.id, row.channels, row.createdAt);
   }
 
   /** The same description, for the customer whose page this is. */
   protected distinguishThis(person: Customer): string {
-    return this.summarise(person.channels, person.createdAt);
+    return this.summarise(person.id, person.channels, person.createdAt);
   }
 
-  private summarise(channels: readonly string[], createdAt: string): string {
+  private summarise(id: string, channels: readonly string[], createdAt: string): string {
     const where =
       channels.length === 0
         ? 'No channel'
         : channels.map((channel) => this.channelLabel(channel)).join(', ');
 
-    return `${where} · first seen ${new Date(createdAt).toLocaleDateString(undefined, {
-      dateStyle: 'medium',
-    })}`;
+    return `${where} · first seen ${this.date(createdAt)} · ref. ${id.slice(-6)}`;
   }
 
   /**

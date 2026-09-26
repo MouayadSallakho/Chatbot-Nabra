@@ -1,53 +1,74 @@
-// Fixed to the end edge of the viewport rather than placed in the layout, so a
-// message never shifts the page it is describing. Logical inset so it moves to
-// the other corner under RTL.
+// Bottom end corner, above everything: a toast may be reporting the result of
+// the dialog that is still closing.
 .toast-host {
   position: fixed;
   inset-block-end: var(--space-5);
   inset-inline-end: var(--space-5);
-  z-index: 60;
+  z-index: var(--z-toast);
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  // The container spans nothing when empty, so it cannot intercept clicks on the
-  // page behind it.
+  // The empty host must never swallow clicks on the page beneath it.
   pointer-events: none;
+}
+
+.toast-region {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+
+  &:empty {
+    display: none;
+  }
 }
 
 .toast {
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  max-inline-size: min(24rem, calc(100vw - var(--space-8)));
+  max-inline-size: min(24rem, calc(100vw - 2 * var(--space-4)));
   padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4);
   background-color: var(--surface-raised);
   color: var(--text-primary);
   border: 1px solid var(--border-default);
-  border-radius: var(--radius-md);
+  border-inline-start: 3px solid var(--success-fg);
+  border-radius: var(--radius-lg);
   box-shadow: var(--shadow-overlay);
   font: var(--text-small);
-  // The messages themselves are interactive again, so the dismiss button works.
   pointer-events: auto;
+  animation: toast-in var(--motion-normal) var(--ease-standard);
 }
 
-// Colour is not the only signal: the text says what happened, and the accent
-// edge reads in greyscale.
-.toast {
-  border-inline-start: 3px solid var(--success-fg);
+// Outcome by shape and word as well as colour: a tick or a triangle.
+.toast-icon {
+  flex: none;
+  color: var(--success-fg);
 }
 
 .toast-error {
   border-inline-start-color: var(--danger-fg);
+
+  .toast-icon {
+    color: var(--danger-fg);
+  }
 }
 
 .toast-text {
   flex: 1;
   min-inline-size: 0;
+  overflow-wrap: anywhere;
 }
 
 .toast-dismiss {
   flex: none;
   color: var(--text-muted);
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
 }
 
 @media (max-width: 575.98px) {

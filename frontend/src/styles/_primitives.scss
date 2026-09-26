@@ -25,12 +25,30 @@
   max-inline-size: var(--page-max-width);
   margin-inline: auto;
   padding-inline: var(--page-gutter);
-  padding-block: var(--space-6) var(--space-10);
+  padding-block: var(--space-6) var(--space-9);
 }
 
-// Vertical rhythm between the major blocks of a page.
+// Vertical rhythm between the major blocks of a page. The page header already
+// ends in its own space, so the first section after it adds none.
 .page-section {
   margin-block-start: var(--space-7);
+}
+
+// A section title and the content it heads: one rhythm everywhere, rather
+// than a list sitting flush under its own heading on some screens.
+:is(h2, h3).text-section-title + * {
+  margin-block-start: var(--space-3);
+}
+
+app-page-header + .page-section,
+app-page-header + * > .page-section:first-child {
+  margin-block-start: 0;
+}
+
+// Forms and single-record screens read best at a measure, not the full width
+// of a 1920px monitor.
+.page-narrow {
+  max-inline-size: 60rem;
 }
 
 // -----------------------------------------------------------------------------
@@ -41,9 +59,9 @@
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
-  min-block-size: 2.25rem; // 36px: comfortable without being chunky
+  min-block-size: var(--control-height);
   padding-inline: var(--space-4);
-  padding-block: var(--space-2);
+  padding-block: 0;
   border: 1px solid transparent;
   border-radius: var(--radius-md);
   font: var(--text-body-strong);
@@ -65,8 +83,8 @@
   // Icons inside buttons track the text size rather than being fixed, so a
   // button in a dense context scales as one piece.
   .icon {
-    inline-size: 1.125em;
-    block-size: 1.125em;
+    inline-size: var(--icon-size);
+    block-size: var(--icon-size);
   }
 }
 
@@ -127,27 +145,87 @@
 }
 
 .btn-sm {
-  min-block-size: 1.875rem; // 30px
+  min-block-size: var(--control-height-sm);
   padding-inline: var(--space-3);
+  gap: var(--space-1);
   font: var(--text-label);
+
+  .icon {
+    inline-size: var(--icon-size-sm);
+    block-size: var(--icon-size-sm);
+  }
+}
+
+.btn-lg {
+  min-block-size: var(--control-height-lg);
+  padding-inline: var(--space-5);
+}
+
+// A low-emphasis destructive action: the rare "Remove" that sits in a list and
+// must not shout, but must still never be mistaken for a neutral one.
+.btn-danger-ghost {
+  background-color: transparent;
+  color: var(--danger-fg);
+
+  &:hover:not(:disabled) {
+    background-color: var(--danger-bg);
+  }
+}
+
+// Reads as a link, behaves as a button: for inline actions inside prose.
+.btn-link {
+  min-block-size: auto;
+  padding: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-weight: 500;
+
+  &:hover:not(:disabled) {
+    text-decoration: underline;
+  }
 }
 
 // A square button whose only content is an icon. The accessible name has to come
 // from aria-label; there is no text to fall back on.
 .btn-icon {
-  inline-size: 2.25rem;
+  inline-size: var(--control-height);
   padding-inline: 0;
+
+  &.btn-sm {
+    inline-size: var(--control-height-sm);
+  }
 }
 
 // Loading-ready. The class reserves the layout and marks the control busy; the
 // spinner element is supplied by whichever component is actually loading, so
 // nothing here pretends to load on its own.
+// The spinner replaces nothing and adds no width that was not already there:
+// it overlays the label, which goes transparent, so the button keeps the size it
+// had and the row it sits in does not jump.
 .btn-loading {
+  position: relative;
   cursor: progress;
+  color: transparent;
 
-  .btn-label {
-    opacity: 0.7;
+  > :not(.spinner) {
+    visibility: hidden;
   }
+
+  > .spinner {
+    position: absolute;
+    inset: 0;
+    margin: auto;
+  }
+}
+
+.btn-primary.btn-loading > .spinner {
+  color: var(--accent-contrast);
+}
+
+.btn-secondary.btn-loading > .spinner,
+.btn-ghost.btn-loading > .spinner {
+  color: var(--text-primary);
 }
 
 .spinner {
@@ -156,7 +234,9 @@
   border: 2px solid currentcolor;
   border-block-start-color: transparent;
   border-radius: var(--radius-pill);
-  animation: spin var(--motion-slow) linear infinite;
+  // A fixed, unhurried turn rather than a motion token: a spinner is feedback,
+  // not decoration, so it keeps turning under reduced motion -- slowly.
+  animation: spin 0.9s linear infinite;
 }
 
 @keyframes spin {
@@ -188,11 +268,75 @@
 
 .card-header {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-4);
+  gap: var(--space-3) var(--space-4);
   padding: var(--space-4) var(--space-5);
   border-block-end: 1px solid var(--border-subtle);
+}
+
+// A sentence of context in a card header belongs under the title it explains,
+// not pushed to the far edge where it reads as a separate thing. Buttons and
+// badges in the header still sit at the end.
+.card-header > p:not(:first-child) {
+  flex-basis: 100%;
+  order: 1;
+  // No max width: a clamped basis would fit beside the title and never wrap.
+  margin-block-start: calc(-1 * var(--space-2));
+  font: var(--text-small);
+  color: var(--text-secondary);
+}
+
+.card-title {
+  font: var(--text-card-title);
+  color: var(--text-primary);
+}
+
+.card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+// As a card's own last row, the actions are its footer: separated, padded, and
+// with the primary action at the end edge where every card puts it.
+.card > .card-actions {
+  justify-content: flex-end;
+  padding: var(--space-4) var(--space-5);
+  border-block-start: 1px solid var(--border-subtle);
+  background-color: var(--surface-inset);
+  border-end-start-radius: var(--radius-lg);
+  border-end-end-radius: var(--radius-lg);
+}
+
+.card-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-5);
+  border-block-start: 1px solid var(--border-subtle);
+}
+
+// A section of a page that is not a card: a heading, an optional line of
+// context, and whatever follows. Most of a page should be this, not a card.
+.section-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+  margin-block-end: var(--space-4);
+}
+
+.section-note {
+  margin-block-start: var(--space-1);
+  max-inline-size: 72ch;
+  font: var(--text-small);
+  color: var(--text-secondary);
 }
 
 // -----------------------------------------------------------------------------
@@ -204,13 +348,14 @@
 .badge {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-2);
-  padding-inline: var(--space-3);
-  padding-block: 0.125rem;
+  gap: 0.375rem;
+  min-block-size: 1.375rem;
+  padding-inline: var(--space-2);
   border: 1px solid transparent;
-  border-radius: var(--radius-pill);
-  font: var(--text-label);
+  border-radius: var(--radius-sm);
+  font: var(--text-caption);
   white-space: nowrap;
+  vertical-align: middle;
 
   &::before {
     content: '';
@@ -252,21 +397,103 @@
   color: var(--info-fg);
 }
 
+// The accent tone: a state that is the workspace's own choice rather than good
+// or bad news -- a conversation a person has taken over, for instance.
+.badge-accent {
+  background-color: var(--accent-subtle);
+  border-color: var(--accent-subtle-border);
+  color: var(--accent);
+}
+
+// Metadata rather than state: a channel, a file type. No dot, because a dot is
+// what says "this is a status".
+.badge-plain {
+  background-color: transparent;
+  border-color: var(--border-default);
+  color: var(--text-secondary);
+
+  &::before {
+    display: none;
+  }
+}
+
+.badge-sm {
+  min-block-size: 1.125rem;
+  padding-inline: 0.375rem;
+}
+
+// A count on an icon or a tab: a number, not a state.
+.count-badge {
+  display: inline-grid;
+  place-items: center;
+  min-inline-size: 1.125rem;
+  block-size: 1.125rem;
+  padding-inline: 0.3125rem;
+  border-radius: var(--radius-pill);
+  background-color: var(--accent);
+  color: var(--accent-contrast);
+  font: 600 0.6875rem / 1 var(--font-sans);
+  font-variant-numeric: tabular-nums;
+}
+
 // -----------------------------------------------------------------------------
 // Forms
 // -----------------------------------------------------------------------------
-// Styling only. No Tenant or AiAgent form exists yet; this is the vocabulary the
-// phase that builds them will use, so that they are consistent by default rather
-// than by review.
+// One field vocabulary: .field > .field-label + control + .field-hint +
+// .field-error. The Bootstrap names several screens were written with --
+// .form-label, .form-control, .form-select, .form-hint, .form-error -- are
+// aliases of the same rules rather than a second system: only Bootstrap's grid
+// is loaded, so those controls were otherwise rendering as browser defaults.
 .field {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
+  min-inline-size: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
 }
 
-.field-label {
+// Related compact fields side by side, where there is room for them.
+.field-row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-4);
+
+  @media (min-width: 40rem) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+// A single-line field does not need a 1300px line: past a readable measure
+// it only makes the form harder to scan. Text areas keep the full width.
+.field:has(> :is(input.input, input.form-control, select)) {
+  max-inline-size: 40rem;
+}
+
+.field-label,
+.form-label {
   font: var(--text-label);
   color: var(--text-primary);
+}
+
+// Utility forms of type tokens that templates reach for by name.
+.text-label {
+  font: var(--text-label);
+}
+
+.text-body-strong {
+  font: var(--text-body-strong);
+}
+
+.text-caption {
+  font: var(--text-caption);
+  color: var(--text-muted);
+}
+
+// Numbers compared down a column line up digit for digit.
+.num {
+  font-variant-numeric: tabular-nums;
 }
 
 // Marks a required control visually. The authoritative signal is the `required`
@@ -278,28 +505,49 @@
   color: var(--danger-fg);
 }
 
-.field-hint {
+.field-hint,
+.form-hint {
   font: var(--text-small);
   color: var(--text-muted);
 }
 
 // The error message. `role="alert"` belongs on the element in the template, not
 // here -- this only styles it.
-.field-error {
+.field-error,
+.form-error {
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  margin: 0;
   font: var(--text-small);
   color: var(--danger-fg);
+
+  .icon {
+    inline-size: var(--icon-size-sm);
+    block-size: var(--icon-size-sm);
+    flex: none;
+  }
+}
+
+// The row a form ends with: the primary action first in reading order, then
+// the way out.
+.form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
 }
 
 .input,
 .textarea,
-.select {
+.select,
+.form-control,
+.form-select {
   inline-size: 100%;
-  min-block-size: 2.25rem;
+  min-block-size: var(--control-height);
   padding-inline: var(--space-3);
   padding-block: var(--space-2);
+  font: var(--text-body);
   background-color: var(--surface-default);
   color: var(--text-primary);
   border: 1px solid var(--border-control);
@@ -329,9 +577,144 @@
   }
 }
 
-.textarea {
+.textarea,
+textarea.form-control {
   min-block-size: 5rem;
   resize: vertical;
+  line-height: 1.55;
+}
+
+// Native select, with the platform arrow replaced by one drawn in the text
+// colour so it follows the theme.
+.select,
+.form-select,
+select.input {
+  appearance: none;
+  padding-inline-end: var(--space-8);
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--text-secondary) 50%),
+    linear-gradient(135deg, var(--text-secondary) 50%, transparent 50%);
+  background-position:
+    right 1.125rem center,
+    right 0.8125rem center;
+  background-size: 0.3125rem 0.3125rem;
+  background-repeat: no-repeat;
+  cursor: pointer;
+}
+
+[dir='rtl'] :is(.select, .form-select, select.input) {
+  background-position:
+    left 0.8125rem center,
+    left 1.125rem center;
+}
+
+// Checkboxes and radios keep their native behaviour and take the accent.
+input[type='checkbox']:not(.switch),
+input[type='radio'],
+.form-check-input {
+  inline-size: 1rem;
+  block-size: 1rem;
+  margin: 0;
+  flex: none;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+// A switch is an immediate on/off setting: a checkbox with role="switch", so it
+// is announced as on or off and toggled by Space.
+.switch {
+  position: relative;
+  inline-size: 2.25rem;
+  block-size: 1.25rem;
+  margin: 0;
+  flex: none;
+  appearance: none;
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius-pill);
+  background-color: var(--surface-muted);
+  cursor: pointer;
+  transition:
+    background-color var(--motion-fast) var(--ease-standard),
+    border-color var(--motion-fast) var(--ease-standard);
+
+  &::after {
+    content: '';
+    position: absolute;
+    inset-block-start: 1px;
+    inset-inline-start: 1px;
+    inline-size: 1rem;
+    block-size: 1rem;
+    border-radius: var(--radius-pill);
+    background-color: var(--text-secondary);
+    transition: transform var(--motion-fast) var(--ease-standard);
+  }
+
+  &:checked {
+    border-color: var(--accent);
+    background-color: var(--accent);
+
+    &::after {
+      background-color: var(--accent-contrast);
+      transform: translateX(calc(var(--direction-flip) * 1rem));
+    }
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+}
+
+// A small exclusive choice drawn as one control: periods, formats, themes.
+// Radios underneath, so arrow keys and the checked state stay the browser's.
+.segmented {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  margin: 0;
+  padding: 2px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background-color: var(--surface-muted);
+}
+
+.segmented-option {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-block-size: calc(var(--control-height-sm) - 6px);
+  padding-inline: var(--space-3);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font: var(--text-label);
+  cursor: pointer;
+  transition:
+    background-color var(--motion-fast) var(--ease-standard),
+    color var(--motion-fast) var(--ease-standard);
+
+  input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  &:hover {
+    color: var(--text-primary);
+  }
+
+  &:has(input:checked) {
+    background-color: var(--surface-default);
+    color: var(--text-primary);
+    box-shadow:
+      0 0 0 1px var(--border-default),
+      var(--shadow-subtle);
+  }
+
+  &:has(input:focus-visible) {
+    outline: var(--focus-ring-width) solid var(--accent);
+    outline-offset: 1px;
+  }
 }
 
 // -----------------------------------------------------------------------------
@@ -343,8 +726,10 @@
 //
 // The wrapper is what makes a wide table survive a narrow screen. Overflow is
 // contained here rather than on the page, so the table scrolls and the layout
-// does not.
-.table-wrap {
+// does not. `.table-scroll` is the same frame under the name two screens used.
+.table-wrap,
+.table-scroll {
+  position: relative; // keeps a visually hidden caption inside the frame
   inline-size: 100%;
   overflow-x: auto;
   border: 1px solid var(--border-default);
@@ -355,7 +740,7 @@
 .table {
   inline-size: 100%;
   border-collapse: collapse;
-  font: var(--text-body);
+  font: var(--text-table);
 
   th,
   td {
@@ -364,12 +749,14 @@
     vertical-align: middle;
   }
 
+  // Column headers are captions: small, quiet, set apart by a tinted band.
   thead th {
     position: sticky;
     inset-block-start: 0;
+    padding-block: var(--space-2);
     background-color: var(--surface-muted);
     color: var(--text-secondary);
-    font: var(--text-label);
+    font: var(--text-caption);
     text-transform: uppercase;
     letter-spacing: var(--letter-spacing-caps);
     border-block-end: 1px solid var(--border-default);
@@ -381,6 +768,10 @@
     transition: background-color var(--motion-fast) var(--ease-standard);
   }
 
+  tbody tr:first-child {
+    border-block-start: 0;
+  }
+
   tbody tr:hover {
     background-color: var(--surface-hover);
   }
@@ -390,6 +781,272 @@
   tbody tr[aria-selected='true'] {
     background-color: var(--surface-selected);
     box-shadow: inset 3px 0 0 0 var(--accent);
+  }
+
+  // Numbers, sizes and money align on the end edge in tabular figures, so a
+  // column of them can be compared at a glance.
+  .numeric,
+  .num {
+    text-align: end;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  // The column of row actions hugs the end edge.
+  .actions {
+    inline-size: 1%;
+    text-align: end;
+    white-space: nowrap;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Data list
+// -----------------------------------------------------------------------------
+// The list-of-records pattern for lists whose rows are links: a table's
+// appearance on a wide screen, a stack of readable rows on a narrow one. A real
+// <table> cannot make a whole row one link without nesting interactive content,
+// so these are a grid; the column labels are the same caption band the table
+// draws. A feature supplies only its column template, via --data-list-columns.
+.data-list {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background-color: var(--surface-default);
+  overflow: hidden;
+
+  ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+}
+
+.data-list-head {
+  display: none;
+}
+
+.data-row {
+  display: grid;
+  gap: var(--space-1) var(--space-4);
+  min-block-size: 3.25rem;
+  padding: var(--space-3) var(--space-4);
+  color: var(--text-primary);
+  font: var(--text-table);
+  text-decoration: none;
+  transition: background-color var(--motion-fast) var(--ease-standard);
+}
+
+a.data-row:hover {
+  background-color: var(--surface-hover);
+  text-decoration: none;
+}
+
+// Focus draws inside the row, so the list's clipped frame cannot cut it off.
+a.data-row:focus-visible {
+  outline-offset: calc(-1 * var(--focus-ring-width));
+  border-radius: 0;
+}
+
+.data-list li + li .data-row,
+.data-row + .data-row {
+  border-block-start: 1px solid var(--border-subtle);
+}
+
+.data-row-title {
+  font: var(--text-body-strong);
+  overflow-wrap: anywhere;
+}
+
+.data-row-meta {
+  min-inline-size: 0;
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+// Inline labels, shown only while the row is stacked and has no column header.
+.data-cell-label {
+  color: var(--text-muted);
+}
+
+.data-row-chevron {
+  display: none;
+  color: var(--text-muted);
+}
+
+.data-row-skeleton {
+  display: grid;
+  gap: var(--space-2);
+}
+
+@media (min-width: 48rem) {
+  .data-list-head,
+  .data-row {
+    grid-template-columns: var(--data-list-columns, minmax(0, 1fr));
+    align-items: center;
+    gap: var(--space-4);
+  }
+
+  .data-list-head {
+    display: grid;
+    padding: var(--space-2) var(--space-4);
+    background-color: var(--surface-muted);
+    border-block-end: 1px solid var(--border-default);
+    color: var(--text-secondary);
+    font: var(--text-caption);
+    text-transform: uppercase;
+    letter-spacing: var(--letter-spacing-caps);
+  }
+
+  .data-cell-label {
+    display: none;
+  }
+
+  .data-cell-end {
+    justify-self: end;
+    text-align: end;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .data-row-chevron {
+    display: inline-flex;
+    justify-self: end;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Toolbar and pagination
+// -----------------------------------------------------------------------------
+// The strip above a list: search and quick filters at the start, list-level
+// actions at the end. It wraps rather than overflowing on a narrow screen.
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  margin-block-end: var(--space-4);
+}
+
+.toolbar-end {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-inline-start: auto;
+}
+
+// The one pagination pattern, rendered by the shared pagination component.
+.pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-block-start: var(--space-3);
+}
+
+.pager-summary {
+  font: var(--text-small);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.pager-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font: var(--text-small);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+// -----------------------------------------------------------------------------
+// Menus
+// -----------------------------------------------------------------------------
+// Overflow menus, the profile menu: a raised surface of menu items. Behaviour
+// (roving focus, Escape, outside click, focus return) is the Menu directive's.
+.menu {
+  position: absolute;
+  z-index: var(--z-dropdown);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-inline-size: 12rem;
+  max-inline-size: min(20rem, calc(100vw - 2 * var(--space-4)));
+  padding: var(--space-1);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background-color: var(--surface-raised);
+  box-shadow: var(--shadow-overlay);
+  text-align: start;
+  animation: menu-in var(--motion-normal) var(--ease-standard);
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  inline-size: 100%;
+  min-block-size: var(--control-height-sm);
+  padding: var(--space-1) var(--space-3);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: none;
+  color: var(--text-primary);
+  font: var(--text-body);
+  text-align: start;
+  text-decoration: none;
+  cursor: pointer;
+
+  .icon {
+    inline-size: var(--icon-size-sm);
+    block-size: var(--icon-size-sm);
+    color: var(--text-secondary);
+  }
+
+  &:hover,
+  &:focus-visible {
+    background-color: var(--surface-hover);
+    text-decoration: none;
+  }
+
+  &:focus-visible {
+    outline-offset: -2px;
+  }
+
+  &[aria-checked='true'] {
+    font-weight: 600;
+  }
+}
+
+.menu-item-danger {
+  color: var(--danger-fg);
+
+  .icon {
+    color: currentcolor;
+  }
+
+  &:hover,
+  &:focus-visible {
+    background-color: var(--danger-bg);
+  }
+}
+
+.menu-separator {
+  margin: var(--space-1) calc(-1 * var(--space-1));
+  border: 0;
+  border-block-start: 1px solid var(--border-default);
+}
+
+.menu-label {
+  padding: var(--space-2) var(--space-3) var(--space-1);
+  color: var(--text-muted);
+  font: var(--text-caption);
+}
+
+@keyframes menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
   }
 }
 
@@ -478,6 +1135,12 @@
   color: var(--danger-fg);
 }
 
+.alert-success {
+  background-color: var(--success-bg);
+  border-color: var(--success-border);
+  color: var(--success-fg);
+}
+
 .alert-info {
   background-color: var(--info-bg);
   border-color: var(--info-border);
@@ -495,6 +1158,50 @@
   background-color: var(--warning-bg);
   border-color: var(--warning-border);
   color: var(--warning-fg);
+}
+
+// The stale-version notice. One treatment wherever an item changed underneath
+// the reader: warning rather than danger, because nothing failed and nothing
+// typed is lost -- the reader's own edits stay on screen until they choose.
+.stale-notice {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-2);
+  margin-block-end: var(--space-5);
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--warning-border);
+  border-radius: var(--radius-lg);
+  background-color: var(--warning-bg);
+  color: var(--text-primary);
+  font: var(--text-small);
+
+  // With a leading icon, the icon takes its own narrow column.
+  &:has(> app-icon) {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+  }
+
+  > app-icon {
+    color: var(--warning-fg);
+  }
+}
+
+.conflict-title {
+  margin: 0;
+  font: var(--text-body-strong);
+}
+
+.conflict-body {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-2);
+}
+
+.conflict-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-block-start: var(--space-1);
 }
 
 // Skeletons. A shape that matches what is coming, so the layout does not jump
@@ -515,6 +1222,11 @@
   background-size: 200% 100%;
   border-radius: var(--radius-sm);
   animation: skeleton-sweep 1.4s var(--ease-standard) infinite;
+
+  // A still placeholder says "loading" just as well; the sweep is decoration.
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
 }
 
 .skeleton-text {

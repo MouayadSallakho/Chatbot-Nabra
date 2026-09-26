@@ -5,7 +5,12 @@ import { provideRouter } from '@angular/router';
 import { LOCAL_STORAGE } from '@app/core/storage/local-storage';
 import { TenantApi } from '@app/core/api/tenant-api';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
-import { memoryStorage, permissionApiGranting } from '@app/testing/test-doubles';
+import {
+  answerConfirmation,
+  memoryStorage,
+  permissionApiGranting,
+  stubDialogs,
+} from '@app/testing/test-doubles';
 import { PermissionApi } from '@app/core/authorization/permission-api';
 import { KnowledgeApi, KnowledgeDocument } from '../knowledge-api';
 import { KnowledgeEditor } from './knowledge-editor';
@@ -308,7 +313,14 @@ describe('KnowledgeEditor', () => {
     it('takes a document out of use with If-Match', async () => {
       await mount(ready);
 
+      // Confirmed first: agents stop drawing on it the moment it goes.
+      stubDialogs(host());
       query<HTMLButtonElement>('[data-testid="disable-button"]')!.click();
+      await settle();
+      http.expectNone(`${documentUrl}/disable`);
+
+      answerConfirmation(host());
+      await settle();
 
       const disable = http.expectOne(`${documentUrl}/disable`);
 

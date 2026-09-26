@@ -1,4 +1,5 @@
 import { Routes } from '@angular/router';
+import { unsavedChangesGuard } from '@app/core/navigation/unsaved-changes';
 import { KnowledgeApi } from '@app/features/knowledge/knowledge-api';
 import { AiAgentApi } from './ai-agent-api';
 
@@ -36,6 +37,7 @@ export const aiAgentRoutes: Routes = [
         // Last, so it cannot swallow 'new'. Route order is the only thing
         // separating a literal segment from a parameter that would match it.
         path: ':aiAgentId',
+        canDeactivate: [unsavedChangesGuard],
         title: 'AI agent',
         loadComponent: () => import('./agent-editor/agent-editor').then((m) => m.AgentEditor),
       },

@@ -5,7 +5,13 @@ import { PermissionService } from '@app/core/authorization/permission-service';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
 import { EmptyState } from '@app/shared/empty-state/empty-state';
 import { PageHeader } from '@app/shared/page-header/page-header';
-import { PlanEntitlement, PlanEntitlementName, PlanUsage, PlanUsageApi } from '../plan-usage-api';
+import {
+  ENTITLEMENT_WORDS,
+  PlanEntitlement,
+  PlanEntitlementName,
+  PlanUsage,
+  PlanUsageApi,
+} from '../plan-usage-api';
 
 /** One entitlement, with the words a reader needs beside it. */
 interface UsageRow {
@@ -27,36 +33,6 @@ interface UsageRow {
   /** The UTC month, for the entitlement measured over one. */
   readonly period: { readonly from: string; readonly to: string } | null;
 }
-
-const LABELS: Readonly<
-  Record<PlanEntitlementName, { readonly label: string; readonly description: string }>
-> = {
-  members: {
-    label: 'Members',
-    description:
-      'People who have joined this workspace. A pending invitation does not take a seat.',
-  },
-  aiAgents: {
-    label: 'AI agents',
-    description: 'Every agent this workspace holds, whatever its status.',
-  },
-  knowledgeDocuments: {
-    label: 'Knowledge documents',
-    description: 'Manual and file-backed documents alike. Replacing a file does not add one.',
-  },
-  webChatEndpoints: {
-    label: 'Website chat',
-    description: 'Configured website chat endpoints. Disabling one does not free it.',
-  },
-  whatsAppConnections: {
-    label: 'WhatsApp',
-    description: 'Configured WhatsApp connections. Disabling one does not free it.',
-  },
-  monthlyProviderOperations: {
-    label: 'AI provider operations',
-    description: 'Calls this workspace made to an AI provider during the current UTC month.',
-  },
-};
 
 /** What each state is called, in words rather than in colour alone. */
 const NOTES: Readonly<Record<PlanEntitlement['state'], string | null>> = {
@@ -208,7 +184,7 @@ export class PlanUsagePage {
     }
 
     return usage.entitlements.map((entitlement) => {
-      const words = LABELS[entitlement.entitlement] ?? {
+      const words = ENTITLEMENT_WORDS[entitlement.entitlement] ?? {
         label: entitlement.entitlement,
         description: '',
       };

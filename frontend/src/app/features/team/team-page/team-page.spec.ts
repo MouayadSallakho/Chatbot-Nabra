@@ -6,7 +6,13 @@ import { TenantApi } from '@app/core/api/tenant-api';
 import { PermissionApi } from '@app/core/authorization/permission-api';
 import { LOCAL_STORAGE } from '@app/core/storage/local-storage';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
-import { memoryStorage, permissionApiGranting } from '@app/testing/test-doubles';
+import { ToastService } from '@app/core/feedback/toast-service';
+import {
+  answerConfirmation,
+  memoryStorage,
+  permissionApiGranting,
+  stubDialogs,
+} from '@app/testing/test-doubles';
 import { Invitation, MemberSummary, TeamApi } from '../team-api';
 import { TeamPage } from './team-page';
 
@@ -156,7 +162,43 @@ describe('TeamPage', () => {
     await settle();
 
     expect(text()).toContain('Invite member');
-    expect(button('Revoke')).toBeDefined();
+    // Named for the address, so a list of Revoke buttons is not a list of twins.
+    expect(button('Revoke')?.getAttribute('aria-label')).toBe(
+      `Revoke the invitation for ${pendingInvitation.email}`,
+    );
+  });
+
+  it('confirms a revoke, says so, and puts focus where the row was', async () => {
+    await mount('members.view', 'members.invite');
+    document.body.append(host());
+
+    flush([owner], [pendingInvitation]);
+    await settle();
+
+    stubDialogs(host());
+    button('Revoke')!.click();
+    await settle();
+
+    // The dialog asks first.
+    answerConfirmation(host());
+    await settle();
+
+    http
+      .expectOne(`/api/tenants/${tenantId}/invitations/${pendingInvitation.id}/revoke`)
+      .flush(null);
+    await settle();
+    flush([owner], []);
+    await settle();
+    await settle();
+
+    expect(
+      TestBed.inject(ToastService)
+        .toasts()
+        .map((toast) => toast.text),
+    ).toContain(`Invitation for ${pendingInvitation.email} revoked.`);
+    expect(document.activeElement).toBe(host().querySelector('#pending-invitations'));
+
+    host().remove();
   });
 
   it('explains a missing permission without asking the server', async () => {

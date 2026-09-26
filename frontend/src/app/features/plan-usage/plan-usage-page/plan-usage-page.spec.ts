@@ -204,7 +204,7 @@ describe('PlanUsagePage', () => {
 
       expect(query('[data-testid="usage-aiAgents"] .usage-bar')).toBeNull();
       expect(query('[data-testid="usage-aiAgents"]')!.textContent).toContain(
-        'does not limit ai agents',
+        'No limit on this plan',
       );
     });
 
@@ -352,7 +352,7 @@ describe('PlanUsagePage', () => {
 
       await settle();
 
-      expect(text()).toContain('could not be loaded');
+      expect(text()).toContain('Could not load plan and usage');
 
       const retry = [...host().querySelectorAll('button')].find((button) =>
         (button.textContent ?? '').includes('Try again'),

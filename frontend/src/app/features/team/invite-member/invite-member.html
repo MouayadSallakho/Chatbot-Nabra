@@ -1,9 +1,10 @@
 <div class="page page-narrow">
   <app-page-header
+    backLink="/team"
+    backLabel="Team"
     heading="Invite member"
     description="Send somebody a link that adds them to this workspace. They join as the account that opens it, so the address here has to be theirs."
   >
-    <a pageActions class="btn btn-secondary" routerLink="/team">Back to team</a>
   </app-page-header>
 
   <div class="page-section">
@@ -21,7 +22,9 @@
         else it could be: it is not stored, and no later request will return it.
       -->
       <div class="card invite-created">
-        <h2 class="text-section-title">Invitation created</h2>
+        <h2 id="invite-created-heading" class="text-section-title" tabindex="-1">
+          Invitation created
+        </h2>
         <p class="text-small text-secondary">
           Send this link to <strong>{{ invitation.email }}</strong> however you normally reach them.
           It works once, expires on its own, and only that address can use it.
@@ -77,14 +80,18 @@
             formControlName="email"
             autocomplete="off"
             inputmode="email"
+            [attr.aria-invalid]="showEmailError()"
+            [attr.aria-describedby]="
+              showEmailError() ? 'invite-email-hint invite-email-error' : 'invite-email-hint'
+            "
           />
-          <p class="text-small text-muted">
+          <p id="invite-email-hint" class="text-small text-muted">
             They must sign in with this address to accept. An invitation cannot be used by a
             different account.
           </p>
 
           @if (showEmailError()) {
-            <p class="form-error" role="alert">Enter the email address to invite.</p>
+            <p id="invite-email-error" class="form-error" role="alert">{{ emailErrorText() }}</p>
           }
         </div>
 

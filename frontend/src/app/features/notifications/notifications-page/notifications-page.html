@@ -56,31 +56,15 @@
         </ul>
       </section>
 
-      @if (pageCount() > 1) {
-        <nav class="pager" aria-label="Notification pages">
-          <button
-            type="button"
-            class="btn btn-secondary btn-sm"
-            [disabled]="page() === 1"
-            (click)="previous()"
-            data-testid="previous"
-          >
-            Previous
-          </button>
-          <span class="text-small text-secondary" aria-live="polite"
-            >Page {{ page() }} of {{ pageCount() }}</span
-          >
-          <button
-            type="button"
-            class="btn btn-secondary btn-sm"
-            [disabled]="page() === pageCount()"
-            (click)="next()"
-            data-testid="next"
-          >
-            Next
-          </button>
-        </nav>
-      }
+      <app-pagination
+        [page]="page()"
+        [pageSize]="pageSize"
+        [total]="totalCount()"
+        noun="notification"
+        label="Notification pages"
+        [busy]="loading()"
+        (pageChange)="goTo($event)"
+      />
     }
   </div>
 </div>

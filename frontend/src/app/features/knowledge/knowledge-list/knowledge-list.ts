@@ -8,6 +8,8 @@ import { WorkspaceContextService } from '@app/core/workspace/workspace-context-s
 import { EmptyState } from '@app/shared/empty-state/empty-state';
 import { Icon } from '@app/shared/icon/icon';
 import { PageHeader } from '@app/shared/page-header/page-header';
+import { Pagination } from '@app/shared/pagination/pagination';
+import { initialPage, pageRecorder } from '@app/shared/pagination/page-query';
 import { DEFAULT_PAGE_SIZE, KnowledgeApi, KnowledgeDocumentPage } from '../knowledge-api';
 
 /**
@@ -25,7 +27,7 @@ import { DEFAULT_PAGE_SIZE, KnowledgeApi, KnowledgeDocumentPage } from '../knowl
 @Component({
   selector: 'app-knowledge-list',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, DatePipe, PageHeader, EmptyState, Icon],
+  imports: [RouterLink, DatePipe, PageHeader, EmptyState, Icon, Pagination],
   templateUrl: './knowledge-list.html',
   styleUrl: './knowledge-list.scss',
 })
@@ -50,7 +52,9 @@ export class KnowledgeList {
   protected readonly page = signal<KnowledgeDocumentPage | null>(null);
 
   /** 1-based, and the only paging state this screen keeps. */
-  protected readonly currentPage = signal(1);
+  protected readonly currentPage = signal(initialPage());
+
+  private readonly recordPage = pageRecorder();
 
   protected readonly pageSize = DEFAULT_PAGE_SIZE;
 
@@ -120,6 +124,7 @@ export class KnowledgeList {
     }
 
     this.currentPage.set(page);
+    this.recordPage(page);
     await this.load();
   }
 

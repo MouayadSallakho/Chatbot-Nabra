@@ -1,21 +1,32 @@
-// The native dialog carries its own centring and top-layer placement, so only
-// the surface itself needs styling.
+// A focused decision: a title that names the action and its object, a sentence
+// on the consequence, and the two ways out -- the safe one first, so it is also
+// where focus lands when the dialog opens.
 .confirm {
-  inline-size: min(26rem, calc(100vw - var(--space-8)));
+  inline-size: min(28rem, calc(100vw - 2 * var(--space-4)));
+  margin: auto;
   padding: var(--space-6);
   background-color: var(--surface-raised);
   color: var(--text-primary);
   border: 1px solid var(--border-default);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-xl);
   box-shadow: var(--shadow-overlay);
+
+  // A long address or name in the title wraps instead of widening the dialog
+  // past its frame.
+  overflow-wrap: anywhere;
 
   &::backdrop {
     background-color: var(--scrim);
+  }
+
+  &[open] {
+    animation: confirm-in var(--motion-normal) var(--ease-standard);
   }
 }
 
 .confirm-body {
   margin-block-start: var(--space-3);
+  overflow-wrap: anywhere;
 }
 
 .confirm-actions {
@@ -24,4 +35,23 @@
   justify-content: flex-end;
   gap: var(--space-2);
   margin-block-start: var(--space-6);
+}
+
+// On a phone the two answers stack, full width: large targets, with the
+// destructive one kept apart from the safe one rather than beside it.
+@media (max-width: 30rem) {
+  .confirm-actions {
+    flex-direction: column-reverse;
+
+    .btn {
+      inline-size: 100%;
+    }
+  }
+}
+
+@keyframes confirm-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
 }

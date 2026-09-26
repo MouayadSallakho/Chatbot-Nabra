@@ -92,12 +92,15 @@ const MESSAGES: Readonly<Record<ApiErrorKind, string>> = {
   notFound: 'That item no longer exists in this workspace.',
   conflict: 'That action is not available for this item right now.',
   gone: 'This invitation is no longer available. Ask whoever invited you for a new one.',
-  stale: 'This item was updated somewhere else since you opened it.',
-  preconditionRequired: 'This item needs to be reloaded before it can be saved.',
+  stale:
+    'This item was updated somewhere else since you opened it. Review the latest version, ' +
+    'then save again.',
+  preconditionRequired:
+    'This page needs the latest version of the item before it can save. Reload it and try again.',
   tooLarge: 'That file is too large for this platform to accept.',
   unsupportedMedia: 'That file is not one of the formats this platform can read.',
   unprocessable: 'No usable text could be read from that file.',
-  invalidResponse: 'The AI provider returned a response this platform could not use.',
+  invalidResponse: 'The AI service returned an answer that could not be used. Try again.',
   // Deliberately not "preview": from Phase 17 this same status also answers a
   // knowledge index, and a sentence naming one capability is simply wrong on
   // the other screen. The hosted chat overrides it entirely, because none of
@@ -105,9 +108,9 @@ const MESSAGES: Readonly<Record<ApiErrorKind, string>> = {
   providerUnavailable:
     'This needs an AI provider, and none is configured on this deployment. Nothing was ' +
     'sent and nothing was changed.',
-  providerTimeout: 'The AI provider took too long to respond. Try again.',
+  providerTimeout: 'The AI service took too long to respond. Try again.',
   rateLimited: 'Too many requests were made just now. Wait a moment and try again.',
-  offline: 'Could not reach the OmniAI backend. Check that it is running, then try again.',
+  offline: 'OmniAI could not be reached. Check your connection, then try again.',
   unknown: 'Something went wrong. Try again, and contact an administrator if it continues.',
 };
 
@@ -182,10 +185,17 @@ export function toApiError(failure: unknown): ApiError {
   };
 }
 
+/** The calls that ask an AI provider for something: a reply, an embedding, a search. */
+const AI_OPERATION = /\/(preview|index|search|messages)(\?|$)/;
+
+/** A 503 from anything that is not an AI operation. */
+const TEMPORARILY_UNAVAILABLE =
+  'This service is temporarily unavailable. Nothing was changed. Try again in a moment.';
+
 /** What a reader is told when the page's antiforgery token was out of date. */
 const ANTIFORGERY_MESSAGE =
-  'This page had been open since before the server last restarted or your session ended, ' +
-  'so its security check was out of date. Nothing was changed. Try again.';
+  "This page's security check had expired. Nothing was changed. The check has been renewed, " +
+  'so try again.';
 
 /**
  * The largest `Retry-After` this client will repeat to a reader.
@@ -286,6 +296,14 @@ function kindOf(status: number): ApiErrorKind {
  * stringified onto the screen.
  */
 function readableMessage(failure: HttpErrorResponse, kind: ApiErrorKind): string {
+  // A 503 names the AI provider only on the calls that use one. Anywhere else --
+  // a list, a record -- it means the service is briefly unavailable, and telling
+  // somebody loading their knowledge list that "this needs an AI provider" would
+  // be both wrong and alarming.
+  if (kind === 'providerUnavailable' && !AI_OPERATION.test(failure.url ?? '')) {
+    return TEMPORARILY_UNAVAILABLE;
+  }
+
   if (!DETAIL_IS_USEFUL.has(failure.status)) {
     return MESSAGES[kind];
   }

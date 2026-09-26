@@ -89,6 +89,7 @@ describe('NotificationPreferencesPage', () => {
 
   it('saves every category against the version it read', async () => {
     await mount();
+    document.body.append(host());
 
     toggle('reports').click();
     await settle();
@@ -115,6 +116,10 @@ describe('NotificationPreferencesPage', () => {
     await settle();
 
     expect(host().querySelector('[data-testid="announcement"]')?.textContent).toContain('saved');
+    // Not left on the body by a Save button that disables itself.
+    expect(document.activeElement).toBe(toggle('reports'));
+
+    host().remove();
   });
 
   it('refuses a stale save in words and offers to reload', async () => {

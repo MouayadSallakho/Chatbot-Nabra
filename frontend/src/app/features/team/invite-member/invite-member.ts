@@ -1,4 +1,13 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  ElementRef,
+  Injector,
+  afterNextRender,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
@@ -38,6 +47,8 @@ export class InviteMember {
   private readonly api = inject(TeamApi);
   private readonly workspace = inject(WorkspaceContextService);
   private readonly permissions = inject(PermissionService);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly injector = inject(Injector);
 
   protected readonly loading = signal(true);
   protected readonly loadFailure = signal<ApiError | null>(null);
@@ -97,6 +108,13 @@ export class InviteMember {
     return control.invalid && (control.touched || this.submitAttempted());
   }
 
+  /** Says what is wrong: an empty field and a malformed address are different mistakes. */
+  protected emailErrorText(): string {
+    return this.form.controls.email.hasError('required')
+      ? 'Enter the email address to invite.'
+      : 'Enter a complete email address, such as name@example.com.';
+  }
+
   protected async load(): Promise<void> {
     const tenantId = this.workspace.tenantId();
 
@@ -133,6 +151,10 @@ export class InviteMember {
     if (!tenantId || this.form.invalid || this.submitting()) {
       this.form.markAllAsTouched();
 
+      if (this.form.invalid) {
+        this.focusAfterRender('#invite-email');
+      }
+
       return;
     }
 
@@ -154,6 +176,8 @@ export class InviteMember {
           `${window.location.origin}/${ACCEPT_INVITATION_PATH}` +
           `#token=${encodeURIComponent(invitation.token)}`,
       });
+      // The form that held focus has just been replaced by the result.
+      this.focusAfterRender('#invite-created-heading');
     } catch (error) {
       this.failure.set(toApiError(error));
     } finally {
@@ -193,5 +217,12 @@ export class InviteMember {
     this.submitAttempted.set(false);
     this.selected.set(new Set());
     this.form.reset();
+    this.focusAfterRender('#invite-email');
+  }
+
+  private focusAfterRender(selector: string): void {
+    afterNextRender(() => this.host.nativeElement.querySelector<HTMLElement>(selector)?.focus(), {
+      injector: this.injector,
+    });
   }
 }

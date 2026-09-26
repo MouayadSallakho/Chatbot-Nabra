@@ -18,6 +18,13 @@
       Sign in to manage your workspace and the AI agents that answer on your behalf.
     </p>
 
+    @if (sessionEnded && !failure()) {
+      <div class="alert alert-info auth-alert" role="status">
+        <app-icon name="info" [strokeWidth]="1.75" />
+        <span>Your session ended. Sign in again to continue where you were.</span>
+      </div>
+    }
+
     @if (failure(); as error) {
       <!--
         `role="alert"` so a screen reader hears the refusal without having to go

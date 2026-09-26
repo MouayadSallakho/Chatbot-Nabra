@@ -192,6 +192,40 @@ describe('InviteMember', () => {
 
     // verify() is the assertion: nothing was sent.
     expect(text()).toContain('Enter the email address to invite.');
+
+    const email = host().querySelector('#invite-email')!;
+
+    expect(email.getAttribute('aria-invalid')).toBe('true');
+    expect(email.getAttribute('aria-describedby')).toContain('invite-email-error');
+  });
+
+  it('names a malformed address as its own mistake, and focuses the field', async () => {
+    await mount('members.view', 'members.invite');
+    document.body.append(host());
+
+    type('not-an-address');
+    submit();
+    await settle();
+
+    expect(text()).toContain('Enter a complete email address');
+    expect(document.activeElement).toBe(host().querySelector('#invite-email'));
+
+    host().remove();
+  });
+
+  it('moves focus to the result, which replaces the form', async () => {
+    await mount('members.view', 'members.invite');
+    document.body.append(host());
+
+    type('bob@example.test');
+    submit();
+    await settle();
+    http.expectOne(invitationsUrl).flush(created);
+    await settle();
+
+    expect(document.activeElement).toBe(host().querySelector('#invite-created-heading'));
+
+    host().remove();
   });
 
   it('shows a conflict in the server’s own words', async () => {

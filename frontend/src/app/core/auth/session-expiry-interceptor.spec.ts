@@ -23,9 +23,11 @@ describe('sessionExpiryInterceptor', () => {
   let auth: AuthService;
   let storage: Storage;
   let navigatedTo: unknown[][];
+  let navigationExtras: unknown[];
 
   beforeEach(() => {
     navigatedTo = [];
+    navigationExtras = [];
     storage = memoryStorage({ [WORKSPACE_STORAGE_KEY]: 'a-workspace-id' });
 
     TestBed.configureTestingModule({
@@ -43,8 +45,9 @@ describe('sessionExpiryInterceptor', () => {
 
     const router = TestBed.inject(Router);
 
-    router.navigate = ((url: unknown[]) => {
+    router.navigate = ((url: unknown[], extras?: { queryParams?: unknown }) => {
       navigatedTo.push(url);
+      navigationExtras.push(extras);
 
       return Promise.resolve(true);
     }) as Router['navigate'];
@@ -70,6 +73,8 @@ describe('sessionExpiryInterceptor', () => {
 
     expect(auth.isAuthenticated()).toBe(false);
     expect(navigatedTo).toEqual([['/', 'sign-in']]);
+    // And says why, so the sign-in screen can explain the sudden change.
+    expect(navigationExtras[0]).toEqual({ queryParams: { reason: 'session-ended' } });
   });
 
   it('forgets the workspace selection on the way out', async () => {

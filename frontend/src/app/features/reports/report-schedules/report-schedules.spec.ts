@@ -172,6 +172,60 @@ describe('ReportSchedules', () => {
     expect(host().querySelector('[data-testid="reload"]')).not.toBeNull();
   });
 
+  it('moves focus into the form and back to what opened it', async () => {
+    await mount('reports.view', 'reports.generate', 'reports.schedule', 'analytics.view');
+    await answerInitial();
+    // Focus only lands on elements in the document.
+    document.body.append(host());
+
+    host().querySelector<HTMLButtonElement>('[data-testid="new-schedule"]')!.click();
+    await settle();
+
+    expect(document.activeElement).toBe(host().querySelector('#schedule-name'));
+
+    // An empty name is refused, and focus stays on the field it is about.
+    host().querySelector<HTMLButtonElement>('[data-testid="save"]')!.click();
+    await settle();
+
+    expect(host().querySelector('#schedule-name-error')).not.toBeNull();
+    expect(document.activeElement).toBe(host().querySelector('#schedule-name'));
+
+    [...host().querySelectorAll<HTMLButtonElement>('button')]
+      .find((button) => button.textContent?.trim() === 'Cancel')!
+      .click();
+    await settle();
+
+    // The button that opened the form was removed while it was open.
+    expect(document.activeElement).toBe(host().querySelector('[data-testid="new-schedule"]'));
+
+    const edit = host().querySelector<HTMLButtonElement>(
+      'button[aria-label="Edit schedule Weekly channels"]',
+    )!;
+    edit.click();
+    await settle();
+    http
+      .expectOne(`${base}/schedules/${schedule.id}`)
+      .flush(schedule, { headers: { ETag: '"v1"' } });
+    await settle();
+
+    expect(document.activeElement).toBe(host().querySelector('#schedule-name'));
+
+    host().querySelector<HTMLButtonElement>('[data-testid="save"]')!.click();
+    await settle();
+    http
+      .expectOne((request) => request.method === 'PUT')
+      .flush(schedule, { headers: { ETag: '"v2"' } });
+    await settle();
+    http.expectOne(`${base}/schedules`).flush({ items: [schedule] });
+    await settle();
+
+    expect(document.activeElement).toBe(
+      host().querySelector('button[aria-label="Edit schedule Weekly channels"]'),
+    );
+
+    host().remove();
+  });
+
   it('says why the platform switched a schedule off', async () => {
     await mount('reports.view', 'reports.generate', 'reports.schedule', 'analytics.view');
     await answerInitial([{ ...schedule, enabled: false, disabledReason: 'owner_lost_permission' }]);

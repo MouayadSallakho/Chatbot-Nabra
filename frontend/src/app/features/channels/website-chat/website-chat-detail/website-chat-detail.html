@@ -1,6 +1,10 @@
 <div class="page">
   @if (!canView()) {
-    <app-page-header heading="Website chat" />
+    <app-page-header
+      backLink="/channels/website-chat"
+      backLabel="Website chat"
+      heading="Website chat"
+    />
 
     <div class="page-section">
       <div class="card">
@@ -12,7 +16,11 @@
       </div>
     </div>
   } @else if (loading()) {
-    <app-page-header heading="Website chat" />
+    <app-page-header
+      backLink="/channels/website-chat"
+      backLabel="Website chat"
+      heading="Website chat"
+    />
 
     <div class="page-section" aria-busy="true">
       <p class="visually-hidden" role="status">Loading chat link…</p>
@@ -22,7 +30,11 @@
       </div>
     </div>
   } @else if (failure(); as error) {
-    <app-page-header heading="Website chat" />
+    <app-page-header
+      backLink="/channels/website-chat"
+      backLabel="Website chat"
+      heading="Website chat"
+    />
 
     <div class="page-section">
       <div class="card">
@@ -40,12 +52,11 @@
     </div>
   } @else if (endpoint(); as current) {
     <app-page-header
+      backLink="/channels/website-chat"
+      backLabel="Website chat"
       [heading]="current.aiAgentName"
       description="A website chat link. Visitors who open it talk to this agent."
     >
-      <a pageActions class="btn btn-secondary" routerLink="/channels/website-chat">
-        Back to website chat
-      </a>
     </app-page-header>
 
     <!--
@@ -55,7 +66,7 @@
     -->
     @if (stale()) {
       <div class="page-section">
-        <div class="card card-body conflict" role="alert">
+        <div class="stale-notice" role="alert">
           <p class="conflict-title">This chat link was updated elsewhere.</p>
           <p class="text-small text-secondary">
             Nothing was changed. Reload to see how it stands now, then try again.
@@ -89,11 +100,11 @@
         </div>
         <div>
           <p class="text-label text-muted">Created</p>
-          <p class="text-body">{{ current.createdAt | date: 'medium' }}</p>
+          <p class="text-body">{{ current.createdAt | date: 'MMM d, y, h:mm a' }}</p>
         </div>
         <div>
           <p class="text-label text-muted">Last changed</p>
-          <p class="text-body">{{ current.updatedAt | date: 'medium' }}</p>
+          <p class="text-body">{{ current.updatedAt | date: 'MMM d, y, h:mm a' }}</p>
         </div>
       </div>
     </div>
@@ -178,4 +189,13 @@
       </div>
     }
   }
+
+  <app-confirm-dialog
+    #disableDialog
+    heading="Disable this website chat?"
+    body="Visitors who open this chat link, or the widget on your website, can no longer start a conversation until it is published again. Existing conversations are kept."
+    confirmLabel="Disable chat"
+    cancelLabel="Keep it published"
+    tone="danger"
+  />
 </div>

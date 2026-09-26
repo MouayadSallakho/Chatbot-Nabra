@@ -1,118 +1,30 @@
-// One markup, two layouts -- the same approach the role and agent lists take,
-// for the same reason. Rows are a list styled as an aligned grid on wide screens
-// and as stacked cards on narrow ones. A real <table> would have meant either a
-// second copy of the markup for mobile or a table that scrolls sideways on a
-// phone, and these rows are navigational rather than tabular data somebody
-// compares column by column.
+// Column template for the shared data list; everything else is the primitive's.
 .member-list {
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-lg);
-  background-color: var(--surface-default);
-  overflow: hidden;
+  --data-list-columns: minmax(0, 2fr) minmax(0, 1.5fr) 10rem 1.5rem;
 }
 
-.member-list-head {
-  display: none;
-}
-
-.member-row {
-  display: grid;
-  gap: var(--space-1) var(--space-4);
-  padding: var(--space-4) var(--space-5);
-  color: var(--text-primary);
-  text-decoration: none;
-  transition: background-color var(--motion-fast) var(--ease-standard);
-}
-
-a.member-row:hover {
-  background-color: var(--surface-hover);
-  text-decoration: none;
-}
-
-li + li .member-row {
-  border-block-start: 1px solid var(--border-subtle);
-}
-
-.member-name {
+.member-list .data-row-title {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2);
-  font: var(--text-body-strong);
-  overflow-wrap: anywhere;
 }
 
-// An address is the longest thing on the row and the one most likely to be a
-// single unbroken word. Without this it forces the grid wider than the viewport
-// on a narrow screen, which is the usual cause of a page that scrolls sideways.
 .member-email {
-  min-width: 0;
+  min-inline-size: 0;
   overflow-wrap: anywhere;
-}
-
-.member-roles {
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-
-.member-chevron {
-  display: none;
-  color: var(--text-muted);
-}
-
-.member-row-skeleton {
-  display: grid;
-  gap: var(--space-2);
 }
 
 .invitations-heading {
-  margin-block-start: var(--space-6);
+  margin-block-start: var(--space-7);
 }
 
-// Stacked by default: the button sits under the details rather than beside them,
-// which is where a thumb can reach it.
 .invitation-revoke {
   justify-self: start;
-  margin-block-start: var(--space-2);
 }
 
-// ----------------------------------------------------------------------------
-// Wide layout
-// ----------------------------------------------------------------------------
-// From Bootstrap's `md`, the same breakpoint the grid classes and the other
-// lists use.
-@media (min-width: 768px) {
-  .member-list-head,
-  .member-row {
-    display: grid;
-    grid-template-columns: minmax(0, 2fr) minmax(0, 1.5fr) 10rem 1.5rem;
-    align-items: center;
-    gap: var(--space-4);
-  }
-
-  .member-list-head {
-    padding: var(--space-3) var(--space-5);
-    background-color: var(--surface-muted);
-    border-block-end: 1px solid var(--border-default);
-    color: var(--text-secondary);
-    font: var(--text-label);
-    text-transform: uppercase;
-    letter-spacing: var(--letter-spacing-caps);
-  }
-
-  // The column header supplies the word on a wide row, so repeating it inside
-  // the cell would be duplication. It stays for the stacked layout, which has no
-  // header.
-  .member-joined-label {
-    display: none;
-  }
-
-  .member-chevron {
-    display: inline-flex;
-    justify-self: end;
-  }
-
+@media (min-width: 48rem) {
   .invitation-revoke {
     justify-self: end;
-    margin-block-start: 0;
   }
 }

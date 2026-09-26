@@ -1,25 +1,3 @@
-// Warning-toned rather than danger-toned, matching the role and member editors:
-// nothing has gone wrong and nothing was lost -- somebody else simply got there
-// first, and the reader has a decision to make.
-.conflict {
-  display: grid;
-  gap: var(--space-2);
-  border-color: var(--border-warning, var(--border-default));
-  background-color: var(--surface-warning, var(--surface-muted));
-}
-
-.conflict-title {
-  font: var(--text-body-strong);
-  margin: 0;
-}
-
-.conflict-actions {
-  display: flex;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-  margin-block-start: var(--space-1);
-}
-
 // Four facts across on a wide screen, stacked on a phone.
 .facts {
   display: grid;

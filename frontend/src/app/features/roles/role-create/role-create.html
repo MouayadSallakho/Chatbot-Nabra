@@ -1,5 +1,7 @@
 <div class="page">
   <app-page-header
+    backLink="/roles"
+    backLabel="Roles & permissions"
     heading="Create role"
     description="A role is a named set of things its holders may do in this workspace."
   >
@@ -10,7 +12,7 @@
     <div class="page-section">
       <div class="card">
         <app-empty-state
-          icon="settings"
+          icon="roles"
           heading="You cannot create roles"
           description="Creating a role needs permissions your roles do not include. Ask somebody who administers this workspace if you need them."
         >
@@ -21,7 +23,7 @@
   } @else if (loading()) {
     <div class="page-section" aria-busy="true">
       <p class="visually-hidden" role="status">Loading permissions…</p>
-      <div class="card">
+      <div class="card card-body">
         <span class="skeleton skeleton-title"></span>
         <span class="skeleton skeleton-text"></span>
       </div>
@@ -44,7 +46,7 @@
   } @else {
     <form [formGroup]="form" (ngSubmit)="create()" novalidate>
       <div class="page-section">
-        <div class="card role-form">
+        <div class="card card-body role-form">
           <div class="field">
             <label class="form-label" for="role-name">Role name</label>
             <input
@@ -74,7 +76,7 @@
         </p>
 
         @for (group of groups(); track group.name) {
-          <fieldset class="card permission-group">
+          <fieldset class="card card-body permission-group">
             <legend class="text-label permission-group-name">{{ group.name }}</legend>
 
             @for (permission of group.permissions; track permission.code) {

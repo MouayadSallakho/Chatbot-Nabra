@@ -1,6 +1,6 @@
 <div class="page">
   @if (!canView()) {
-    <app-page-header heading="Team member" />
+    <app-page-header backLink="/team" backLabel="Team" heading="Team member" />
 
     <div class="page-section">
       <div class="card">
@@ -12,7 +12,7 @@
       </div>
     </div>
   } @else if (loading()) {
-    <app-page-header heading="Team member" />
+    <app-page-header backLink="/team" backLabel="Team" heading="Team member" />
 
     <div class="page-section" aria-busy="true">
       <p class="visually-hidden" role="status">Loading member…</p>
@@ -24,7 +24,7 @@
       </div>
     </div>
   } @else if (failure(); as error) {
-    <app-page-header heading="Team member" />
+    <app-page-header backLink="/team" backLabel="Team" heading="Team member" />
 
     <div class="page-section">
       <div class="card">
@@ -40,6 +40,8 @@
     </div>
   } @else if (member(); as current) {
     <app-page-header
+      backLink="/team"
+      backLabel="Team"
       [heading]="current.email"
       [description]="
         current.isOwner
@@ -47,7 +49,6 @@
           : 'A member of this workspace.'
       "
     >
-      <a pageActions class="btn btn-secondary" routerLink="/team">Back to team</a>
     </app-page-header>
 
     <!--
@@ -58,7 +59,7 @@
     -->
     @if (stale()) {
       <div class="page-section">
-        <div class="card conflict" role="alert">
+        <div class="stale-notice" role="alert">
           <p class="conflict-title">This team member was updated elsewhere.</p>
           <p class="text-small text-secondary">
             Your changes have not been saved and are still on screen. Reload to see their current
@@ -77,11 +78,11 @@
       <div class="card member-facts">
         <div>
           <p class="text-label text-muted">Joined</p>
-          <p class="text-body">{{ current.joinedAt | date: 'medium' }}</p>
+          <p class="text-body">{{ current.joinedAt | date: 'MMM d, y, h:mm a' }}</p>
         </div>
         <div>
           <p class="text-label text-muted">Access last changed</p>
-          <p class="text-body">{{ current.accessUpdatedAt | date: 'medium' }}</p>
+          <p class="text-body">{{ current.accessUpdatedAt | date: 'MMM d, y, h:mm a' }}</p>
         </div>
       </div>
     </div>

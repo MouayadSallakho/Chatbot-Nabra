@@ -176,6 +176,28 @@ describe('WhatsAppDetail', () => {
     expect(text()).toContain('updated somewhere else');
   });
 
+  it('says beside an identifier what is wrong with it', async () => {
+    await mount('Draft', true, 'whatsapp.view', 'whatsapp.manage');
+
+    const numberInput = [...host().querySelectorAll<HTMLInputElement>('input[type="text"]')][1];
+
+    numberInput.value = '9000 45x';
+    numberInput.dispatchEvent(new Event('input'));
+    await settle();
+
+    expect(button('Save settings')?.disabled).toBe(true);
+    expect(numberInput.getAttribute('aria-invalid')).toBe('true');
+    expect(host().querySelector('#detail-phone-id-error')?.textContent).toContain(
+      'Use digits only',
+    );
+
+    numberInput.value = '';
+    numberInput.dispatchEvent(new Event('input'));
+    await settle();
+
+    expect(host().querySelector('#detail-phone-id-error')?.textContent).toContain('Required');
+  });
+
   it('will not let a live connection be reconfigured', async () => {
     await mount('Active', true, 'whatsapp.view', 'whatsapp.manage');
 

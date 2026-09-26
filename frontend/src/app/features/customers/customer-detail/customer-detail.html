@@ -1,29 +1,30 @@
 <div class="page">
   <app-page-header
+    backLink="/customers"
+    backLabel="Customers"
     [heading]="customer()?.label ?? 'Customer'"
     description="Who this is to your workspace, how they reach you, and what they have talked about."
   >
-    <a pageActions class="btn btn-secondary" routerLink="..">Back to customers</a>
   </app-page-header>
 
   <div class="page-section">
     @if (!canView()) {
       <div class="card">
         <app-empty-state
-          icon="team"
+          icon="customers"
           heading="You do not have access to customers"
           description="Seeing who this workspace talks to needs a permission your roles do not include. Ask somebody who administers this workspace if you need it."
         />
       </div>
     } @else if (loading()) {
-      <div class="card" aria-busy="true">
+      <div class="card card-body" aria-busy="true">
         <p class="text-small text-secondary">Loading customer…</p>
       </div>
     } @else if (failure(); as error) {
       <div class="card">
         <app-empty-state
-          icon="team"
-          heading="This customer could not be loaded"
+          icon="customers"
+          heading="Could not load this customer"
           [description]="error.message"
         >
           <button stateActions type="button" class="btn btn-secondary" (click)="reload()">
@@ -37,7 +38,7 @@
           A tombstone still resolves, and says where the history went. A 404 here
           would look like data loss to somebody following an old link.
         -->
-        <div class="card card-notice" role="status" data-testid="merged-notice">
+        <div class="card card-notice" role="status" data-testid="merged-notice" tabindex="-1">
           <p class="text-small">
             This record was combined with another customer, which now holds their channels and their
             conversations.
@@ -85,11 +86,7 @@
             <ul class="identity-list" data-testid="identities">
               @for (identity of person.identities; track identity.channel + identity.reference) {
                 <li class="identity">
-                  <span
-                    class="channel-badge"
-                    [class]="'channel-' + identity.channel.toLowerCase()"
-                    >{{ channelLabel(identity.channel) }}</span
-                  >
+                  <span class="badge badge-plain">{{ channelLabel(identity.channel) }}</span>
                   <span class="text-small">
                     <span class="visually-hidden">Masked identifier, </span>{{ identity.reference }}
                   </span>
@@ -98,7 +95,7 @@
               @for (channel of person.channels; track channel) {
                 @if (channel === 'WebChat') {
                   <li class="identity">
-                    <span class="channel-badge channel-webchat">Website</span>
+                    <span class="badge badge-plain">Website chat</span>
                     <span class="text-small text-muted">
                       No lasting identifier. A website visitor is anonymous, and this platform does
                       not try to recognise them across visits.
@@ -256,7 +253,12 @@
               }
 
               @if (mergeFailure(); as problem) {
-                <p class="text-small form-problem" role="alert" data-testid="merge-failure">
+                <p
+                  class="text-small form-problem"
+                  role="alert"
+                  data-testid="merge-failure"
+                  tabindex="-1"
+                >
                   {{ problem }}
                 </p>
               }
@@ -319,11 +321,7 @@
                     [routerLink]="['/conversations', conversation.id]"
                     [attr.data-testid]="'conversation-' + conversation.id"
                   >
-                    <span
-                      class="channel-badge"
-                      [class]="'channel-' + conversation.channel.toLowerCase()"
-                      >{{ channelLabel(conversation.channel) }}</span
-                    >
+                    <span class="badge badge-plain">{{ channelLabel(conversation.channel) }}</span>
                     <span class="text-small">{{ conversation.status }}</span>
                     <span class="text-small text-muted">{{
                       date(conversation.lastActivityAt)

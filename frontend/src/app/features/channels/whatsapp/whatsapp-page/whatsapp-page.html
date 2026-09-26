@@ -1,6 +1,6 @@
 <div class="page">
   @if (!canView()) {
-    <app-page-header heading="WhatsApp" />
+    <app-page-header backLink="/channels" backLabel="Channels" heading="WhatsApp" />
 
     <div class="page-section">
       <div class="card">
@@ -13,10 +13,11 @@
     </div>
   } @else {
     <app-page-header
+      backLink="/channels"
+      backLabel="Channels"
       heading="WhatsApp"
       description="Numbers customers can message you on. Each number connects to one AI agent, and conversations arrive in the same inbox as every other channel."
     >
-      <a pageActions class="btn btn-secondary" routerLink="/channels">Back to channels</a>
     </app-page-header>
 
     @if (loading()) {
@@ -44,7 +45,7 @@
       </div>
     } @else {
       <div class="page-section">
-        <h2 class="text-section-title">Connected numbers</h2>
+        <h2 id="connected-numbers" class="text-section-title" tabindex="-1">Connected numbers</h2>
 
         @if (connections().length === 0) {
           <div class="card">
@@ -120,11 +121,17 @@
                 autocomplete="off"
                 [value]="wabaId()"
                 (input)="wabaId.set($any($event.target).value)"
-                aria-describedby="waba-hint"
+                [attr.aria-invalid]="notDigits(wabaId())"
+                [attr.aria-describedby]="notDigits(wabaId()) ? 'waba-hint waba-error' : 'waba-hint'"
               />
               <span id="waba-hint" class="text-small text-muted">
                 Digits only, from your Meta app's WhatsApp settings.
               </span>
+              @if (notDigits(wabaId())) {
+                <span id="waba-error" class="form-error">
+                  Use digits only — no spaces, letters or symbols.
+                </span>
+              }
             </label>
 
             <label class="field">
@@ -136,12 +143,20 @@
                 autocomplete="off"
                 [value]="phoneNumberId()"
                 (input)="phoneNumberId.set($any($event.target).value)"
-                aria-describedby="phone-id-hint"
+                [attr.aria-invalid]="notDigits(phoneNumberId())"
+                [attr.aria-describedby]="
+                  notDigits(phoneNumberId()) ? 'phone-id-hint phone-id-error' : 'phone-id-hint'
+                "
               />
               <span id="phone-id-hint" class="text-small text-muted">
                 Digits only. This is the identifier Meta sends with every message, not the phone
                 number itself — it is how an incoming message is matched to this workspace.
               </span>
+              @if (notDigits(phoneNumberId())) {
+                <span id="phone-id-error" class="form-error">
+                  Use digits only — no spaces, letters or symbols.
+                </span>
+              }
             </label>
 
             <label class="field">

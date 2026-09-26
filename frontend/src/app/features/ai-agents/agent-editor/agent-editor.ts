@@ -11,6 +11,7 @@ import {
 import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
+import { HasUnsavedChanges, protectUnsavedChanges } from '@app/core/navigation/unsaved-changes';
 import { ApiError, toApiError } from '@app/core/api/api-error';
 import { ConfirmDialog } from '@app/core/feedback/confirm-dialog';
 import { ToastService } from '@app/core/feedback/toast-service';
@@ -66,7 +67,7 @@ type ConflictSource = 'name' | 'instructions' | 'lifecycle';
   templateUrl: './agent-editor.html',
   styleUrl: './agent-editor.scss',
 })
-export class AgentEditor implements OnInit {
+export class AgentEditor implements OnInit, HasUnsavedChanges {
   private readonly api = inject(AiAgentApi);
   private readonly workspace = inject(WorkspaceContextService);
   private readonly permissions = inject(PermissionService);
@@ -131,6 +132,11 @@ export class AgentEditor implements OnInit {
   /** Any unsaved edit at all, for the navigation warning. */
   protected readonly dirty = computed(() => this.nameChanged() || this.instructionsChanged());
 
+  /** Whether leaving now would lose edits; asked by the route guard. */
+  hasUnsavedChanges(): boolean {
+    return this.dirty();
+  }
+
   protected readonly instructionsRemaining = computed(
     () => AGENT_LIMITS.instructionsMax - this.instructionsValue().length,
   );
@@ -176,6 +182,9 @@ export class AgentEditor implements OnInit {
   ] as Versioned<AiAgent> | undefined;
 
   constructor() {
+    // The tab being closed or reloaded is the other way unsaved edits are lost.
+    protectUnsavedChanges(() => this.dirty());
+
     this.name.valueChanges.subscribe((value) => this.nameValue.set(value));
     this.instructions.valueChanges.subscribe((value) => this.instructionsValue.set(value));
   }

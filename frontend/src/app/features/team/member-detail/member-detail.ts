@@ -10,6 +10,7 @@ import {
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
+import { HasUnsavedChanges, protectUnsavedChanges } from '@app/core/navigation/unsaved-changes';
 import { ApiError, toApiError } from '@app/core/api/api-error';
 import { AuthService } from '@app/core/auth/auth-service';
 import { PermissionService } from '@app/core/authorization/permission-service';
@@ -46,7 +47,7 @@ import { AssignableRole, Member, TeamApi } from '../team-api';
   templateUrl: './member-detail.html',
   styleUrl: './member-detail.scss',
 })
-export class MemberDetail implements OnInit {
+export class MemberDetail implements OnInit, HasUnsavedChanges {
   private readonly api = inject(TeamApi);
   private readonly workspace = inject(WorkspaceContextService);
   private readonly permissions = inject(PermissionService);
@@ -127,6 +128,16 @@ export class MemberDetail implements OnInit {
 
     return current.size !== stored.size || [...current].some((id) => !stored.has(id));
   });
+
+  /** Whether leaving now would lose edits; asked by the route guard. */
+  hasUnsavedChanges(): boolean {
+    return this.dirty();
+  }
+
+  constructor() {
+    // The tab being closed or reloaded is the other way unsaved edits are lost.
+    protectUnsavedChanges(() => this.dirty());
+  }
 
   /**
    * The roles this member holds that the reader could not have granted.

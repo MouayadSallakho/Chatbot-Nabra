@@ -13,17 +13,18 @@
   position: absolute;
   inset-block-start: 2px;
   inset-inline-end: 2px;
-  min-inline-size: 18px;
-  block-size: 18px;
-  padding-inline: 5px;
+  display: inline-grid;
+  place-items: center;
+  min-inline-size: 1.125rem;
+  block-size: 1.125rem;
+  padding-inline: 0.3125rem;
   border-radius: var(--radius-pill);
-  background: var(--danger-solid);
-  color: var(--danger-contrast);
-  font-size: 11px;
-  font-weight: 700;
-  line-height: 18px;
-  text-align: center;
-  // A ring in the surface colour keeps the badge legible over the icon.
+  // A count, in the accent: unread is news, not an alarm. Severity is shown on
+  // each notification, where it can be read with its words.
+  background: var(--accent);
+  color: var(--accent-contrast);
+  font: 600 0.6875rem / 1 var(--font-sans);
+  font-variant-numeric: tabular-nums;
   box-shadow: 0 0 0 2px var(--surface-default);
 }
 
@@ -31,7 +32,7 @@
   position: absolute;
   inset-block-start: calc(100% + var(--space-2));
   inset-inline-end: 0;
-  z-index: 30;
+  z-index: var(--z-dropdown);
   display: flex;
   flex-direction: column;
   inline-size: min(26rem, calc(100vw - 2 * var(--space-4)));

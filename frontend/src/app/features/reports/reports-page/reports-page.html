@@ -29,7 +29,7 @@
     @if (!canView()) {
       <div class="card">
         <app-empty-state
-          icon="analytics"
+          icon="reports"
           heading="You do not have access to reports"
           description="Seeing and downloading reports needs a permission your roles do not include. Ask somebody who administers this workspace if you need it."
         />
@@ -161,7 +161,7 @@
         @if (rows().length === 0) {
           <div class="card">
             <app-empty-state
-              icon="analytics"
+              icon="reports"
               heading="No reports yet"
               description="Reports you and your colleagues generate, and those schedules produce, appear here."
               data-testid="no-executions"
@@ -180,7 +180,7 @@
                   <th scope="col">Requested by</th>
                   <th scope="col">Requested</th>
                   <th scope="col">Status</th>
-                  <th scope="col">Size</th>
+                  <th scope="col" class="numeric">Size</th>
                   <th scope="col"><span class="visually-hidden">Download</span></th>
                 </tr>
               </thead>
@@ -205,7 +205,7 @@
                         <p class="text-small text-secondary failure">{{ reason }}</p>
                       }
                     </td>
-                    <td class="nowrap">{{ sizeLabel(execution.byteLength) }}</td>
+                    <td class="numeric">{{ sizeLabel(execution.byteLength) }}</td>
                     <td>
                       @if (execution.canDownload) {
                         <a
@@ -225,29 +225,19 @@
             </table>
           </div>
 
-          <div class="paging">
-            <p class="text-small text-muted">
-              {{ totalCount() === 1 ? '1 report' : totalCount() + ' reports' }} · kept for 30 days
-            </p>
-            <div class="paging-buttons">
-              <button
-                type="button"
-                class="btn btn-secondary"
-                (click)="go(pageNumber() - 1)"
-                [disabled]="!hasPrevious() || refreshing()"
-              >
-                Previous
-              </button>
-              <button
-                type="button"
-                class="btn btn-secondary"
-                (click)="go(pageNumber() + 1)"
-                [disabled]="!hasNext() || refreshing()"
-              >
-                Next
-              </button>
-            </div>
-          </div>
+          <p class="text-small text-muted retention-note">
+            Generated reports are kept for 30 days.
+          </p>
+
+          <app-pagination
+            [page]="pageNumber()"
+            [pageSize]="pageSize"
+            [total]="totalCount()"
+            noun="report"
+            label="Generated report pages"
+            [busy]="refreshing()"
+            (pageChange)="go($event)"
+          />
         }
       </section>
     }

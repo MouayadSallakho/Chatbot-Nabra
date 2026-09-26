@@ -8,6 +8,8 @@ import { WorkspaceContextService } from '@app/core/workspace/workspace-context-s
 import { EmptyState } from '@app/shared/empty-state/empty-state';
 import { Icon } from '@app/shared/icon/icon';
 import { PageHeader } from '@app/shared/page-header/page-header';
+import { Pagination } from '@app/shared/pagination/pagination';
+import { initialPage, pageRecorder } from '@app/shared/pagination/page-query';
 import { AiAgentApi, AiAgentPage, DEFAULT_PAGE_SIZE } from '../ai-agent-api';
 
 /**
@@ -26,7 +28,7 @@ import { AiAgentApi, AiAgentPage, DEFAULT_PAGE_SIZE } from '../ai-agent-api';
 @Component({
   selector: 'app-agent-list',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, DatePipe, PageHeader, EmptyState, Icon],
+  imports: [RouterLink, DatePipe, PageHeader, EmptyState, Icon, Pagination],
   templateUrl: './agent-list.html',
   styleUrl: './agent-list.scss',
 })
@@ -51,8 +53,10 @@ export class AgentList {
   protected readonly failure = signal<ApiError | null>(null);
   protected readonly page = signal<AiAgentPage | null>(null);
 
-  /** 1-based, and the only paging state this screen keeps. */
-  protected readonly currentPage = signal(1);
+  /** 1-based, and the only paging state this screen keeps. Mirrored in `?page=`. */
+  protected readonly currentPage = signal(initialPage());
+
+  private readonly recordPage = pageRecorder();
 
   protected readonly pageSize = DEFAULT_PAGE_SIZE;
 
@@ -67,19 +71,6 @@ export class AgentList {
   });
 
   protected readonly hasAgents = computed(() => (this.page()?.totalCount ?? 0) > 0);
-
-  /** The range this page covers, for the "1-20 of 34" line. */
-  protected readonly range = computed(() => {
-    const loaded = this.page();
-
-    if (!loaded || loaded.items.length === 0) {
-      return null;
-    }
-
-    const first = (loaded.page - 1) * loaded.pageSize + 1;
-
-    return { first, last: first + loaded.items.length - 1, total: loaded.totalCount };
-  });
 
   constructor() {
     void this.load();
@@ -110,9 +101,19 @@ export class AgentList {
     this.failure.set(null);
 
     try {
-      this.page.set(
-        await firstValueFrom(this.api.list(tenantId, this.currentPage(), this.pageSize)),
+      const loaded = await firstValueFrom(
+        this.api.list(tenantId, this.currentPage(), this.pageSize),
       );
+
+      // A remembered page past the end -- the list shrank since the link was
+      // made -- goes to the last page that exists rather than showing nothing.
+      if (loaded.items.length === 0 && loaded.totalCount > 0 && this.currentPage() > 1) {
+        await this.goTo(Math.ceil(loaded.totalCount / loaded.pageSize), true);
+
+        return;
+      }
+
+      this.page.set(loaded);
     } catch (error) {
       this.failure.set(toApiError(error));
       this.page.set(null);
@@ -121,12 +122,13 @@ export class AgentList {
     }
   }
 
-  protected async goTo(page: number): Promise<void> {
-    if (page < 1 || page > this.totalPages() || page === this.currentPage()) {
+  protected async goTo(page: number, force = false): Promise<void> {
+    if (!force && (page < 1 || page > this.totalPages() || page === this.currentPage())) {
       return;
     }
 
     this.currentPage.set(page);
+    this.recordPage(page);
     await this.load();
   }
 }

@@ -16,22 +16,45 @@
       heading="Conversations"
       description="What customers have said to this workspace, and what its AI agents answered."
     >
-      <button pageActions type="button" class="btn btn-secondary" (click)="load()">Refresh</button>
+      <!--
+        Whether the list is following changes as they happen. A word and a
+        shape, not only a colour: a filled dot for live, a hollow one when it is
+        not, and the text says which.
+      -->
+      <span pageActions class="live-state" [class.is-live]="live()" role="status">
+        <span class="live-dot" aria-hidden="true"></span>
+        {{ live() ? 'Live updates on' : 'Live updates paused' }}
+      </span>
+      <button
+        pageActions
+        type="button"
+        class="btn btn-secondary"
+        [class.btn-loading]="loading() && loaded()"
+        [attr.aria-busy]="loading()"
+        [disabled]="loading()"
+        (click)="load()"
+      >
+        <app-icon name="refresh" [strokeWidth]="1.75" />
+        <span>Refresh</span>
+        @if (loading() && loaded()) {
+          <span class="spinner" aria-hidden="true"></span>
+        }
+      </button>
     </app-page-header>
 
-    @if (loading()) {
+    @if (loading() && !loaded()) {
       <div class="page-section" aria-busy="true">
         <p class="visually-hidden" role="status">Loading conversations…</p>
-        <div class="conversation-list">
+        <div class="data-list conversation-list">
           @for (row of skeletonRows; track row) {
-            <div class="conversation-row conversation-row-skeleton" aria-hidden="true">
+            <div class="data-row data-row-skeleton" aria-hidden="true">
               <span class="skeleton skeleton-title"></span>
               <span class="skeleton skeleton-text"></span>
             </div>
           }
         </div>
       </div>
-    } @else if (failure(); as error) {
+    } @else if (!loaded() && failure(); as error) {
       <div class="page-section">
         <div class="card">
           <app-empty-state
@@ -46,7 +69,7 @@
           </app-empty-state>
         </div>
       </div>
-    } @else if (conversations().length === 0) {
+    } @else if (total() === 0) {
       <div class="page-section">
         <div class="card">
           <app-empty-state
@@ -59,22 +82,35 @@
     } @else {
       <div class="page-section">
         <!--
-          One markup, two layouts -- the same approach the agent, role and member
-          lists take. Rows are a list of links, styled as an aligned grid on wide
-          screens and as stacked cards on narrow ones, because these are
-          navigational rather than tabular data somebody compares column by
-          column.
+          A refresh that fails keeps what is already on screen: the rows the reader
+          was looking at are still true as of the last successful read, and
+          blanking them would lose their place for a network blip.
         -->
-        <div class="conversation-list">
-          <div class="conversation-head" aria-hidden="true">
+        @if (failure(); as error) {
+          <div class="alert alert-danger refresh-failed" role="alert">
+            <app-icon name="alert" [strokeWidth]="1.75" />
+            <span>Could not refresh the list. {{ error.message }}</span>
+          </div>
+        }
+
+        <!--
+          Rows are a list of links, styled as an aligned grid on wide screens and
+          as stacked rows on narrow ones: navigational rather than tabular data.
+        -->
+        <div class="data-list conversation-list" [attr.aria-busy]="loading()">
+          <div class="data-list-head" aria-hidden="true">
             <span>Conversation</span>
             <span>Channel</span>
-            <span>Agent</span>
-            <span>Last activity</span>
+            <span>AI agent</span>
+            <span class="data-cell-end">Last activity</span>
           </div>
 
           @for (conversation of conversations(); track conversation.id) {
-            <a class="conversation-row" [routerLink]="['/conversations', conversation.id]">
+            <a
+              class="data-row"
+              [class.is-human]="conversation.handling === 'Human'"
+              [routerLink]="['/conversations', conversation.id]"
+            >
               <span class="conversation-preview">
                 @if (conversation.lastMessagePreview) {
                   <span class="preview-sender">{{
@@ -87,12 +123,12 @@
               </span>
 
               <span class="conversation-channel">
-                <span class="badge badge-neutral">
+                <span class="badge badge-plain">
                   {{ conversation.channel === 'WebChat' ? 'Website chat' : conversation.channel }}
                 </span>
               </span>
 
-              <span class="conversation-agent">
+              <span class="data-row-meta conversation-agent">
                 {{ conversation.agentName ?? '—' }}
                 <!--
                   Shown only when a person has taken the conversation over. A
@@ -101,27 +137,32 @@
                   It is a word, not a colour.
                 -->
                 @if (conversation.handling === 'Human') {
-                  <span class="badge badge-accent">Human</span>
+                  <span class="badge badge-accent badge-sm">Human</span>
                 }
                 @if (conversation.assignedTo; as member) {
-                  <span class="text-small text-muted assigned">{{ member.email }}</span>
+                  <span class="assigned">{{ member.email }}</span>
                 }
               </span>
 
-              <span class="conversation-activity">
-                {{ conversation.lastActivityAt | date: 'medium' }}
+              <span class="data-row-meta data-cell-end num">
+                <span class="data-cell-label">Last activity&nbsp;</span>
+                <time [attr.datetime]="conversation.lastActivityAt">{{
+                  conversation.lastActivityAt | date: 'MMM d, h:mm a'
+                }}</time>
               </span>
             </a>
           }
         </div>
 
-        <p class="text-small text-muted count">
-          @if (total() === 1) {
-            1 conversation
-          } @else {
-            {{ total() }} conversations
-          }
-        </p>
+        <app-pagination
+          [page]="currentPage()"
+          [pageSize]="pageSize"
+          [total]="total()"
+          noun="conversation"
+          label="Conversation pages"
+          [busy]="loading()"
+          (pageChange)="goTo($event)"
+        />
       </div>
     }
   }

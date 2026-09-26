@@ -1,4 +1,5 @@
 import { Routes } from '@angular/router';
+import { unsavedChangesGuard } from '@app/core/navigation/unsaved-changes';
 import { KnowledgeApi } from './knowledge-api';
 
 /**
@@ -36,6 +37,7 @@ export const knowledgeRoutes: Routes = [
         // separating a literal segment from a parameter that would match it, and
         // 'upload' is now a second literal that would otherwise be read as an id.
         path: ':knowledgeDocumentId',
+        canDeactivate: [unsavedChangesGuard],
         title: 'Knowledge document',
         loadComponent: () =>
           import('./knowledge-editor/knowledge-editor').then((m) => m.KnowledgeEditor),

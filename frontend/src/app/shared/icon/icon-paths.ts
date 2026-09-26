@@ -75,6 +75,62 @@ export const ICON_PATHS = {
   ],
 
   // --- Shell controls ------------------------------------------------------
+  /** Customers: one person, distinct from the two-person Team glyph. */
+  customers: ['M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8z', 'M4.5 20.5a7.5 7.5 0 0 1 15 0'],
+
+  /** Reports: a document with a chart on it. */
+  reports: [
+    'M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z',
+    'M14 3v5h5',
+    'M9 17v-3',
+    'M12 17v-5',
+    'M15 17v-2',
+  ],
+
+  /** Plan and usage: a gauge. */
+  usage: ['M4.5 17a8.5 8.5 0 1 1 15 0', 'M12 13.5l3.5-4', 'M12 15.5a2 2 0 1 0 0-4 2 2 0 0 0 0 4z'],
+
+  /** Billing: a card. */
+  billing: ['M3 6h18v12H3z', 'M3 10h18', 'M7 15h4'],
+
+  /** Roles and permissions: a shield with a tick. */
+  roles: ['M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6z', 'M8.5 12l2.5 2.5 4.5-5'],
+
+  /** Keep the sidebar open: a pin. */
+  pin: ['M9 4h6', 'M10 4v6l-3 4h10l-3-4V4', 'M12 14v6'],
+
+  /** Overflow: three dots in a row. */
+  more: ['M5.5 12h.01', 'M12 12h.01', 'M18.5 12h.01'],
+
+  /** Search: a lens. */
+  search: ['M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14z', 'M20 20l-4-4'],
+
+  /** Sign out: leaving through a door. */
+  'sign-out': ['M10 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4', 'M15 16l4-4-4-4', 'M19 12H9'],
+
+  /** Switch between workspaces: two opposing arrows. */
+  switch: ['M7 4L4 7l3 3', 'M4 7h13', 'M17 20l3-3-3-3', 'M20 17H7'],
+
+  /** Opens a menu or list. */
+  'chevron-down': ['M6 9l6 6 6-6'],
+
+  /** Back, against the reading direction. */
+  'arrow-start': ['M19 12H5', 'M11 6l-6 6 6 6'],
+
+  /** Reload the data on screen. */
+  refresh: [
+    'M20 11a8 8 0 0 0-14.7-4.4L4 8',
+    'M4 3v5h5',
+    'M4 13a8 8 0 0 0 14.7 4.4L20 16',
+    'M20 21v-5h-5',
+  ],
+
+  /** Download a file. */
+  download: ['M12 4v11', 'M7 10l5 5 5-5', 'M5 20h14'],
+
+  /** Add something new. */
+  plus: ['M12 5v14', 'M5 12h14'],
+
   /** Open the navigation drawer. */
   menu: ['M4 7h16', 'M4 12h16', 'M4 17h16'],
 

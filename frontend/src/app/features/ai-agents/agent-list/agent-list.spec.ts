@@ -75,7 +75,7 @@ describe('AgentList', () => {
 
   const host = (): HTMLElement => fixture.nativeElement as HTMLElement;
   const rows = (): HTMLAnchorElement[] => [
-    ...host().querySelectorAll<HTMLAnchorElement>('a.agent-row'),
+    ...host().querySelectorAll<HTMLAnchorElement>('.agent-list a.data-row'),
   ];
 
   afterEach(() => http.verify());
@@ -94,7 +94,7 @@ describe('AgentList', () => {
     await mount();
 
     expect(host().querySelector('[aria-busy="true"]')).not.toBeNull();
-    expect(host().textContent).toContain('Loading agents');
+    expect(host().textContent).toContain('Loading AI agents');
 
     expectList().flush({ items: [], page: 1, pageSize: 20, totalCount: 0 });
     await settle();
@@ -110,12 +110,12 @@ describe('AgentList', () => {
     expectList().flush({ items: [], page: 1, pageSize: 20, totalCount: 0 });
     await settle();
 
-    expect(host().textContent).toContain('No agents yet');
+    expect(host().textContent).toContain('No AI agents yet');
     expect(host().textContent).toContain('replies to customers');
 
     const create = host().querySelector<HTMLAnchorElement>('a[href="/ai-agents/new"]');
 
-    expect(create?.textContent).toContain('Create your first agent');
+    expect(create?.textContent).toContain('Create your first AI agent');
   });
 
   it('lists the agents with their status and last change', async () => {
@@ -204,7 +204,7 @@ describe('AgentList', () => {
     expectList().flush({}, { status: 500, statusText: 'Server Error' });
     await settle();
 
-    expect(host().textContent).toContain('Could not load agents');
+    expect(host().textContent).toContain('Could not load AI agents');
 
     const retry = [...host().querySelectorAll<HTMLButtonElement>('button')].find((button) =>
       button.textContent?.includes('Try again'),
@@ -216,7 +216,7 @@ describe('AgentList', () => {
     expectList().flush({ items: [summary()], page: 1, pageSize: 20, totalCount: 1 });
     await settle();
 
-    expect(host().textContent).not.toContain('Could not load agents');
+    expect(host().textContent).not.toContain('Could not load AI agents');
     expect(rows()).toHaveLength(1);
   });
 
@@ -249,7 +249,7 @@ describe('AgentList', () => {
     it('says what part of the list is on screen', async () => {
       await loadTwoPages();
 
-      expect(host().textContent).toContain('Showing 1–2 of 3');
+      expect(host().textContent).toContain('1–2 of 3 AI agents');
       expect(host().textContent).toContain('Page 1 of 2');
     });
 
@@ -270,7 +270,7 @@ describe('AgentList', () => {
       request.flush({ items: [summary()], page: 2, pageSize: 2, totalCount: 3 });
       await settle();
 
-      expect(host().textContent).toContain('Showing 3–3 of 3');
+      expect(host().textContent).toContain('3–3 of 3 AI agents');
     });
 
     it('disables the controls at the ends of the list', async () => {
@@ -290,7 +290,7 @@ describe('AgentList', () => {
       await settle();
 
       expect(host().textContent).not.toContain('Page 1 of');
-      expect(host().textContent).toContain('Showing 1–1 of 1');
+      expect(host().textContent).toContain('1–1 of 1 AI agent');
     });
   });
 
@@ -302,6 +302,6 @@ describe('AgentList', () => {
 
     const create = host().querySelector<HTMLAnchorElement>('a[href="/ai-agents/new"]');
 
-    expect(create?.textContent).toContain('Create agent');
+    expect(create?.textContent).toContain('New AI agent');
   });
 });

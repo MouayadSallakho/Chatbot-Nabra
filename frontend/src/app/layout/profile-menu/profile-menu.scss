@@ -1,0 +1,70 @@
+:host {
+  display: inline-flex;
+}
+
+// The trigger is the avatar itself: a round target, sized like every other
+// control in the bar, with the product's focus ring.
+:host ::ng-deep .avatar-trigger {
+  display: inline-grid;
+  place-items: center;
+  inline-size: var(--control-height);
+  block-size: var(--control-height);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: none;
+  cursor: pointer;
+
+  &:focus-visible {
+    border-radius: var(--radius-pill);
+  }
+
+  &:hover .avatar,
+  &[aria-expanded='true'] .avatar {
+    border-color: var(--accent);
+  }
+}
+
+.avatar {
+  display: inline-grid;
+  place-items: center;
+  inline-size: 2rem;
+  block-size: 2rem;
+  border: 1px solid var(--accent-subtle-border);
+  border-radius: var(--radius-pill);
+  background-color: var(--accent-subtle);
+  color: var(--accent);
+  font: 600 0.75rem / 1 var(--font-sans);
+  letter-spacing: 0.02em;
+  transition: border-color var(--motion-fast) var(--ease-standard);
+}
+
+.identity {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-inline-size: 14rem;
+  padding: var(--space-2) var(--space-3);
+}
+
+.identity-email,
+.identity-workspace {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.identity-email {
+  font: var(--text-body-strong);
+  color: var(--text-primary);
+}
+
+.identity-workspace {
+  font: var(--text-small);
+  color: var(--text-secondary);
+}
+
+.menu-check {
+  margin-inline-start: auto;
+  color: var(--accent);
+}

@@ -5,31 +5,41 @@
 .topbar {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
-  min-block-size: var(--topbar-height);
-  padding-inline: var(--space-4);
+  gap: var(--space-2);
+  block-size: var(--topbar-height);
+  padding-inline: var(--page-gutter) var(--space-4);
   background-color: var(--surface-default);
   border-block-end: 1px solid var(--border-default);
 }
 
 .topbar-menu {
   flex: none;
+  margin-inline-start: calc(-1 * var(--space-2));
 }
 
 .topbar-context {
-  font: var(--text-body-strong);
-  color: var(--text-secondary);
-  // Long page names truncate rather than pushing the theme control off a phone
-  // screen. `min-inline-size: 0` is what allows a flex child to shrink below its
-  // content width at all.
+  display: flex;
+  align-items: center;
+  // Long workspace names truncate rather than pushing the actions off a phone.
   min-inline-size: 0;
+  font: var(--text-body-strong);
+  color: var(--text-primary);
+}
+
+.topbar-workspace {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+.topbar-workspace-skeleton {
+  inline-size: 9rem;
+  block-size: 0.875rem;
+}
+
 .topbar-actions {
   display: flex;
+  flex: none;
   align-items: center;
   gap: var(--space-2);
   // Pushed to the end edge logically, so it lands on the left under RTL.

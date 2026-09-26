@@ -24,6 +24,9 @@ const OWN_401_IS_MEANINGFUL: readonly string[] = [
 /** The stable code the backend puts on a rejected antiforgery token. */
 export const ANTIFORGERY_INVALID_CODE = 'antiforgery.invalid';
 
+/** The `reason` a session-expiry redirect carries to the sign-in screen. */
+export const SESSION_ENDED = 'session-ended';
+
 /** Whether a failure is the server refusing this page's antiforgery token. */
 function isAntiforgeryRefusal(failure: unknown): boolean {
   if (!(failure instanceof HttpErrorResponse) || failure.status !== 400) {
@@ -95,7 +98,9 @@ export const sessionExpiryInterceptor: HttpInterceptorFn = (request, next) => {
         // would refuse, but only after showing them its name.
         workspace.clear();
 
-        void router.navigate(['/', LOGIN_PATH]);
+        // The reason travels with the redirect, so the sign-in screen can say
+        // why the reader is suddenly there instead of looking like a fault.
+        void router.navigate(['/', LOGIN_PATH], { queryParams: { reason: SESSION_ENDED } });
       }
 
       return throwError(() => failure);

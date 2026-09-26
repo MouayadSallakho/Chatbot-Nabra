@@ -17,11 +17,12 @@ import {
  * writes one attribute does not need one, and the smallest thing that works is
  * the thing that will still be understandable in a year.
  *
- * PERSISTENCE IS PER-BROWSER, BY NECESSITY. `localStorage` is the right store
- * today because there are no user accounts to hang a preference on. Once
- * authentication exists the preference belongs on the user's server-side
- * profile, so that it follows them between devices instead of resetting on each
- * new machine. This service is the only place that would change.
+ * PERSISTENCE IS PER-BROWSER, BY NECESSITY. OmniAI has authenticated users, but
+ * no server-side UI or profile preference contract to store a theme against, so
+ * `localStorage` is the right store today. Once such a contract exists the
+ * preference belongs on the user's server-side profile, so that it follows them
+ * between devices instead of resetting on each new machine. This service is the
+ * only place that would change.
  */
 @Injectable({ providedIn: 'root' })
 export class ThemeService {

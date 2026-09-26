@@ -1,25 +1,3 @@
-// The conflict banner. Warning-toned rather than danger-toned: nothing has gone
-// wrong and nothing was lost -- somebody else simply got there first, and the
-// reader has a decision to make.
-.conflict {
-  display: grid;
-  gap: var(--space-2);
-  border-color: var(--border-warning, var(--border-default));
-  background-color: var(--surface-warning, var(--surface-muted));
-}
-
-.conflict-title {
-  font: var(--text-body-strong);
-  margin: 0;
-}
-
-.conflict-actions {
-  display: flex;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-  margin-block-start: var(--space-1);
-}
-
 .section-note {
   margin-block-end: var(--space-3);
 }
@@ -67,8 +45,10 @@
 
   // A <legend> is positioned into the border by default; the card supplies the
   // frame, so it sits as an ordinary heading instead.
-  float: none;
-  inline-size: auto;
+  // Floated, the legend leaves the fieldset's border and becomes ordinary
+  // content: a heading inside the card, not a label cutting through its edge.
+  float: inline-start;
+  inline-size: 100%;
   padding: 0;
   margin: 0;
 }

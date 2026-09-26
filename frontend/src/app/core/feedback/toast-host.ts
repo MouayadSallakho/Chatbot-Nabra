@@ -1,4 +1,5 @@
-import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
+import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { Icon } from '@app/shared/icon/icon';
 import { ToastService } from './toast-service';
 
@@ -18,32 +19,79 @@ import { ToastService } from './toast-service';
 @Component({
   selector: 'app-toast-host',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Icon],
+  imports: [Icon, NgTemplateOutlet],
   template: `
-    <div class="toast-host" role="status" aria-live="polite" aria-atomic="false">
-      @for (toast of toasts(); track toast.id) {
-        <div class="toast" [class.toast-error]="toast.tone === 'error'">
-          <span class="toast-text">{{ toast.text }}</span>
-          <button
-            type="button"
-            class="btn btn-ghost btn-icon btn-sm toast-dismiss"
-            (click)="dismiss(toast.id)"
-          >
-            <app-icon name="close" [strokeWidth]="1.75" />
-            <span class="visually-hidden">Dismiss</span>
-          </button>
-        </div>
-      }
+    <!--
+      Two live regions, so each kind of message is announced as what it is: a
+      confirmation politely, after whatever the reader is hearing; a failure at
+      once. Hovering or focusing either one holds every toast on screen.
+    -->
+    <div
+      class="toast-host"
+      (mouseenter)="hold()"
+      (mouseleave)="release()"
+      (focusin)="hold()"
+      (focusout)="release()"
+    >
+      <div class="toast-region" role="status" aria-live="polite" aria-atomic="false">
+        @for (toast of successes(); track toast.id) {
+          <ng-container
+            [ngTemplateOutlet]="item"
+            [ngTemplateOutletContext]="{ $implicit: toast }"
+          />
+        }
+      </div>
+      <div class="toast-region" role="alert" aria-atomic="false">
+        @for (toast of errors(); track toast.id) {
+          <ng-container
+            [ngTemplateOutlet]="item"
+            [ngTemplateOutletContext]="{ $implicit: toast }"
+          />
+        }
+      </div>
     </div>
+
+    <ng-template #item let-toast>
+      <div class="toast" [class.toast-error]="toast.tone === 'error'">
+        <app-icon
+          class="toast-icon"
+          [name]="toast.tone === 'error' ? 'alert' : 'check'"
+          [strokeWidth]="1.75"
+        />
+        <span class="toast-text">{{ toast.text }}</span>
+        <button
+          type="button"
+          class="btn btn-ghost btn-icon btn-sm toast-dismiss"
+          (click)="dismiss(toast.id)"
+        >
+          <app-icon name="close" [strokeWidth]="1.75" />
+          <span class="visually-hidden">Dismiss</span>
+        </button>
+      </div>
+    </ng-template>
   `,
   styleUrl: './toast-host.scss',
 })
 export class ToastHost {
   private readonly service = inject(ToastService);
 
-  protected readonly toasts = this.service.toasts;
+  protected readonly successes = computed(() =>
+    this.service.toasts().filter((toast) => toast.tone !== 'error'),
+  );
+
+  protected readonly errors = computed(() =>
+    this.service.toasts().filter((toast) => toast.tone === 'error'),
+  );
 
   protected dismiss(id: number): void {
     this.service.dismiss(id);
+  }
+
+  protected hold(): void {
+    this.service.hold();
+  }
+
+  protected release(): void {
+    this.service.release();
   }
 }

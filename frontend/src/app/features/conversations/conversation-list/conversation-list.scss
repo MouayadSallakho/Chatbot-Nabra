@@ -1,107 +1,97 @@
-// One markup, two layouts -- the same approach the agent, role and member lists
-// take, for the same reason. A real <table> would have meant either a second
-// copy of the markup for mobile or a horizontally scrolling table on a phone,
-// and these rows are navigational rather than tabular data somebody compares
-// column by column.
+// Column template for the shared data list; the rest is the primitive's.
 .conversation-list {
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-  background-color: var(--surface-default);
+  --data-list-columns: minmax(0, 3fr) minmax(0, 1fr) minmax(0, 1.25fr) 8.5rem;
 }
 
-.conversation-head {
-  display: none;
+// A conversation a person has taken over carries an accent edge as well as its
+// "Human" badge, so the exceptions stand out when the list is scanned.
+.data-row.is-human {
+  box-shadow: inset 3px 0 0 0 var(--accent);
 }
 
-.conversation-row {
-  display: grid;
-  gap: var(--space-2);
-  padding: var(--space-4) var(--space-5);
-  text-decoration: none;
-  color: inherit;
-
-  & + & {
-    border-block-start: 1px solid var(--border-default);
-  }
-
-  &:hover {
-    background-color: var(--surface-muted);
-  }
-}
-
-.conversation-row-skeleton {
-  display: grid;
-  gap: var(--space-2);
+[dir='rtl'] .data-row.is-human {
+  box-shadow: inset -3px 0 0 0 var(--accent);
 }
 
 .conversation-preview {
   display: flex;
+  align-items: baseline;
   gap: var(--space-2);
   min-inline-size: 0;
-  align-items: baseline;
 }
 
 .preview-sender {
-  font: var(--text-label);
-  color: var(--text-muted);
   flex: none;
+  color: var(--text-muted);
+  font: var(--text-caption);
   text-transform: uppercase;
-  font-size: 0.75rem;
+  letter-spacing: var(--letter-spacing-caps);
 }
 
-// One line, cut with an ellipsis. A preview that wrapped to four lines would
-// make the list impossible to scan.
 .preview-text {
   min-inline-size: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font: var(--text-body-strong);
 }
 
-.conversation-agent,
-.conversation-activity {
-  color: var(--text-secondary);
-  font-size: 0.875rem;
-  min-inline-size: 0;
-  overflow-wrap: anywhere;
-}
-
-.count {
-  margin-block-start: var(--space-3);
-}
-
-@media (min-width: 900px) {
-  .conversation-head,
-  .conversation-row {
-    display: grid;
-    grid-template-columns: minmax(0, 3fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.2fr);
-    align-items: center;
-    gap: var(--space-4);
-  }
-
-  .conversation-head {
-    padding: var(--space-3) var(--space-5);
-    background-color: var(--surface-muted);
-    border-block-end: 1px solid var(--border-default);
-    font: var(--text-label);
-    color: var(--text-muted);
-    text-transform: uppercase;
-    font-size: 0.75rem;
-  }
-}
-
-// The agent cell now carries up to three things: the agent's name, a badge when
-// a person has taken the conversation over, and who it is assigned to. Stacked,
-// because on a narrow screen they would otherwise push the row sideways.
 .conversation-agent {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-2);
   align-items: baseline;
-  min-width: 0;
+  gap: var(--space-1) var(--space-2);
 }
 
 .assigned {
+  flex-basis: 100%;
+  color: var(--text-muted);
+  font: var(--text-small);
   overflow-wrap: anywhere;
+}
+
+// The live indicator: a filled dot when following changes, a hollow one when
+// not, with the words beside it either way.
+.live-state {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-block-size: var(--control-height);
+  color: var(--text-secondary);
+  font: var(--text-small);
+}
+
+.live-dot {
+  inline-size: 0.5rem;
+  block-size: 0.5rem;
+  border: 1.5px solid var(--text-muted);
+  border-radius: var(--radius-pill);
+}
+
+.live-state.is-live .live-dot {
+  border-color: var(--success-fg);
+  background-color: var(--success-fg);
+}
+
+// Stacked on a phone: the message on its own line, then channel, agent and time
+// on one line beneath it -- four stacked lines per row would show three rows
+// per screen.
+@media (max-width: 47.99rem) {
+  .conversation-list .data-row {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: baseline;
+    column-gap: var(--space-2);
+  }
+
+  .conversation-preview {
+    grid-column: 1 / -1;
+  }
+
+  .conversation-list .data-cell-label {
+    display: none;
+  }
+}
+
+.refresh-failed {
+  margin-block-end: var(--space-4);
 }

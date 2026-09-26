@@ -6,6 +6,7 @@ import { TenantApi } from '@app/core/api/tenant-api';
 import { PermissionApi } from '@app/core/authorization/permission-api';
 import { LOCAL_STORAGE } from '@app/core/storage/local-storage';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
+import { ToastService } from '@app/core/feedback/toast-service';
 import { AiAgentApi } from '@app/features/ai-agents/ai-agent-api';
 import { memoryStorage, permissionApiGranting } from '@app/testing/test-doubles';
 import { WhatsAppApi } from '../../whatsapp-api';
@@ -131,10 +132,17 @@ describe('WhatsAppPage', () => {
     await settle();
 
     expect(button('Connect number')?.disabled).toBe(true);
+    // Said beside the field that is wrong, not only by a disabled button.
+    expect(inputs[0].getAttribute('aria-invalid')).toBe('false');
+    expect(inputs[1].getAttribute('aria-invalid')).toBe('true');
+    expect(inputs[1].getAttribute('aria-describedby')).toContain('phone-id-error');
+    expect(host().querySelector('#phone-id-error')?.textContent).toContain('Use digits only');
+    expect(host().querySelector('#waba-error')).toBeNull();
   });
 
   it('connects a number and re-reads the list', async () => {
     await mount([], 'whatsapp.view', 'whatsapp.manage');
+    document.body.append(host());
 
     const select = host().querySelector<HTMLSelectElement>('select')!;
     select.value = agentId;
@@ -174,6 +182,11 @@ describe('WhatsAppPage', () => {
     await settle();
 
     expect(text()).toContain('+44 7700 900000');
+    // Said, and focus is not left on a button the cleared form disables.
+    expect(TestBed.inject(ToastService).toasts()[0]?.text).toContain('Number connected');
+    expect(document.activeElement).toBe(host().querySelector('#connected-numbers'));
+
+    host().remove();
   });
 
   it('explains a refusal rather than showing an empty list', async () => {

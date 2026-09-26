@@ -24,7 +24,7 @@
     @if (!canView()) {
       <div class="card">
         <app-empty-state
-          icon="analytics"
+          icon="reports"
           heading="You do not have access to reports"
           description="Seeing report schedules needs a permission your roles do not include. Ask somebody who administers this workspace if you need it."
         />
@@ -160,7 +160,7 @@
       @if (schedules().length === 0) {
         <div class="card">
           <app-empty-state
-            icon="analytics"
+            icon="reports"
             heading="No schedules yet"
             [description]="
               canSchedule()
@@ -219,6 +219,7 @@
                           class="btn btn-secondary btn-sm"
                           (click)="startEdit(schedule)"
                           [attr.aria-label]="'Edit schedule ' + schedule.name"
+                          [attr.data-edit-schedule]="schedule.id"
                         >
                           Edit
                         </button>

@@ -6,8 +6,8 @@ import {
   inject,
   input,
   signal,
+  viewChild,
 } from '@angular/core';
-import { RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { ApiError, toApiError } from '@app/core/api/api-error';
 import { PermissionService } from '@app/core/authorization/permission-service';
@@ -15,6 +15,7 @@ import { WorkspaceContextService } from '@app/core/workspace/workspace-context-s
 import { AiAgentApi, AiAgentSummary } from '@app/features/ai-agents/ai-agent-api';
 import { EmptyState } from '@app/shared/empty-state/empty-state';
 import { PageHeader } from '@app/shared/page-header/page-header';
+import { ConfirmDialog } from '@app/core/feedback/confirm-dialog';
 import { WhatsAppApi, WhatsAppConnection } from '../../whatsapp-api';
 
 /**
@@ -32,11 +33,13 @@ import { WhatsAppApi, WhatsAppConnection } from '../../whatsapp-api';
 @Component({
   selector: 'app-whatsapp-detail',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, PageHeader, EmptyState],
+  imports: [PageHeader, EmptyState, ConfirmDialog],
   templateUrl: './whatsapp-detail.html',
   styleUrl: './whatsapp-detail.scss',
 })
 export class WhatsAppDetail implements OnInit {
+  private readonly disableDialog = viewChild.required<ConfirmDialog>('disableDialog');
+
   /** Bound from the route. */
   readonly connectionId = input.required<string>();
 
@@ -222,6 +225,12 @@ export class WhatsAppDetail implements OnInit {
 
   /** Puts the connection into or out of service. */
   protected async setStatus(activate: boolean): Promise<void> {
+    // Switching it off affects customers at once, so it is confirmed first;
+    // switching it back on is not.
+    if (!activate && !(await this.disableDialog().ask())) {
+      return;
+    }
+
     const tenantId = this.workspace.tenantId();
     const expected = this.version();
 
@@ -257,6 +266,18 @@ export class WhatsAppDetail implements OnInit {
     const trimmed = value.trim();
 
     return trimmed.length > 0 && /^[0-9]+$/.test(trimmed);
+  }
+
+  /**
+   * What is wrong with an identifier, said beside it -- otherwise Save settings
+   * is simply disabled and the reader has to guess which field is the reason.
+   */
+  protected idProblem(value: string): string | null {
+    if (value.trim().length === 0) {
+      return 'Required. Use the digits from your Meta app.';
+    }
+
+    return this.digits(value) ? null : 'Use digits only — no spaces, letters or symbols.';
   }
 
   /**

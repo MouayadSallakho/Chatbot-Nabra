@@ -178,12 +178,14 @@ select {
   color: var(--text-primary);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-md);
-  box-shadow: var(--shadow-overlay);
   font: var(--text-body-strong);
   transform: translateY(calc(-100% - var(--space-4)));
   transition: transform var(--motion-fast) var(--ease-standard);
 
+  // The shadow is cast only while the link is on screen. Parked above the
+  // viewport, a 40px blur still reached down into the page's top corner.
   &:focus-visible {
+    box-shadow: var(--shadow-overlay);
     transform: translateY(0);
   }
 }

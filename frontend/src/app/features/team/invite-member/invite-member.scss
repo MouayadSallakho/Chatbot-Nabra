@@ -51,7 +51,7 @@
   border-radius: var(--radius-md);
   background-color: var(--surface-muted);
   color: var(--text-secondary);
-  font: var(--text-code, var(--text-small));
+  font: 400 0.8125rem / 1.5 var(--font-mono);
   font-family: var(--font-mono, ui-monospace, monospace);
   overflow-wrap: anywhere;
 }

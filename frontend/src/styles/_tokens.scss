@@ -176,11 +176,27 @@
   // ---------------------------------------------------------------------------
   // Radius
   // ---------------------------------------------------------------------------
-  --radius-sm: 6px; // inputs, badges, small controls
-  --radius-md: 8px; // buttons, nav items
-  --radius-lg: 12px; // cards and panels
-  --radius-xl: 16px; // the few large surfaces that carry the layout
-  --radius-pill: 999px; // status pills only, where the shape itself carries meaning
+  // Three working levels and nothing larger. Operational surfaces read as
+  // precise when their corners are small; 16-24px rounding everywhere is what
+  // makes an admin product look like a marketing template.
+  --radius-sm: 4px; // badges, checkboxes, compact controls
+  --radius-md: 6px; // buttons, inputs, nav items, menu items
+  --radius-lg: 8px; // cards, panels, tables, menus
+  --radius-xl: 12px; // dialogs and drawers -- the overlays
+  --radius-pill: 999px; // counts only, where the shape itself carries meaning
+
+  // ---------------------------------------------------------------------------
+  // Control sizing
+  // ---------------------------------------------------------------------------
+  // One height per density step, shared by buttons, inputs and selects so a
+  // button beside a field lines up without anybody measuring. The coarse-pointer
+  // override below raises the default to a touch target.
+  --control-height-sm: 2rem; // 32px: dense toolbars, table row actions
+  --control-height: 2.25rem; // 36px: the default
+  --control-height-lg: 2.5rem; // 40px: the primary action of a form
+  --icon-size-sm: 1rem; // 16px: inside compact controls
+  --icon-size: 1.125rem; // 18px: buttons, menus
+  --icon-size-nav: 1.25rem; // 20px: primary navigation
 
   // ---------------------------------------------------------------------------
   // Typography
@@ -202,6 +218,8 @@
   --text-small: 400 0.8125rem / 1.5 var(--font-sans);
   --text-label: 500 0.8125rem / 1.4 var(--font-sans);
   --text-nav: 500 0.875rem / 1.2 var(--font-sans);
+  --text-table: 400 0.8125rem / 1.45 var(--font-sans); // dense data
+  --text-caption: 500 0.75rem / 1.35 var(--font-sans); // meta, column headers
 
   --letter-spacing-tight: -0.011em; // titles only, to close optical gaps at size
   --letter-spacing-caps: 0.04em; // the one place uppercase is used
@@ -210,22 +228,36 @@
   // Motion
   // ---------------------------------------------------------------------------
   // Short enough to read as response rather than as animation.
-  --motion-fast: 120ms;
-  --motion-normal: 200ms;
-  --motion-slow: 320ms;
+  --motion-fast: 150ms; // hover, press, colour
+  --motion-normal: 200ms; // menus, popovers, the sidebar opening
+  --motion-slow: 280ms; // drawers, dialogs, the sidebar closing
   --ease-standard: cubic-bezier(0.2, 0, 0.2, 1);
   --ease-exit: cubic-bezier(0.4, 0, 1, 1);
 
   // ---------------------------------------------------------------------------
   // Layout
   // ---------------------------------------------------------------------------
-  --sidebar-width: 16.5rem; // 264px
-  --sidebar-width-collapsed: 4.5rem; // 72px
+  --sidebar-width: 15rem; // 240px: expanded, pinned or peeking
+  --sidebar-width-collapsed: 4rem; // 64px: the icon rail
   --topbar-height: 3.5rem; // 56px
   --page-max-width: 100rem; // 1600px: wide desktops get room, text stays readable
   --page-gutter: var(--space-6);
+  --drawer-width: 30rem; // contextual side panels
   --focus-ring-width: 2px;
   --focus-ring-offset: 2px;
+
+  // ---------------------------------------------------------------------------
+  // Layers
+  // ---------------------------------------------------------------------------
+  // Named, ordered, and the only z-index values in the product. A menu inside
+  // the header must sit above the peeking sidebar; a dialog above both; the
+  // toast above everything, because it may be announcing the dialog's result.
+  --z-sticky: 10;
+  --z-sidebar: 20;
+  --z-dropdown: 30;
+  --z-drawer: 40;
+  --z-modal: 50;
+  --z-toast: 60;
 
   // Direction multiplier for the one transform that has to mirror under RTL.
   // Transforms do not respond to `dir`, so the drawer takes its direction from
@@ -235,6 +267,34 @@
 
 [dir='rtl'] {
   --direction-flip: -1;
+}
+
+// Touch: every control grows to a comfortable target and the page gutter
+// narrows, rather than shipping a separate mobile component set.
+@media (pointer: coarse) {
+  :root {
+    --control-height-sm: 2.5rem;
+    --control-height: 2.75rem;
+    --control-height-lg: 2.75rem;
+  }
+}
+
+@media (max-width: 575.98px) {
+  :root {
+    --page-gutter: var(--space-4);
+  }
+}
+
+// Reduced motion, at the source. Every transition and animation in the product
+// reads these tokens, so collapsing them here reaches component styles too --
+// which the base layer's universal selector cannot, because any component rule
+// out-ranks `*`. Near zero rather than zero, so transitionend still fires.
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-fast: 0.01ms;
+    --motion-normal: 0.01ms;
+    --motion-slow: 0.01ms;
+  }
 }
 
 // An explicit choice wins, in both directions.

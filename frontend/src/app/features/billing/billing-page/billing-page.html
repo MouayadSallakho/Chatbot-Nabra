@@ -28,20 +28,20 @@
       -->
       <div class="card">
         <app-empty-state
-          icon="settings"
+          icon="billing"
           heading="You do not have access to billing"
           description="Seeing what this workspace pays needs a permission your roles do not include. Ask somebody who administers this workspace if you need it."
         />
       </div>
     } @else if (loading()) {
-      <div class="card" aria-busy="true">
+      <div class="card card-body" aria-busy="true">
         <p class="text-small text-secondary">Loading billing…</p>
       </div>
     } @else if (failure(); as error) {
       <div class="card">
         <app-empty-state
-          icon="settings"
-          heading="Billing could not be loaded"
+          icon="billing"
+          heading="Could not load billing"
           [description]="error.message"
         >
           <button stateActions type="button" class="btn btn-secondary" (click)="refresh()">
@@ -67,7 +67,7 @@
         -->
         <div class="card">
           <app-empty-state
-            icon="settings"
+            icon="billing"
             heading="Subscriptions are not available on this deployment"
             description="This installation is not configured to take payments. Nothing is for sale here and nothing is owed. Your workspace's plan is set by whoever runs this installation."
             data-testid="not-managed"
@@ -274,7 +274,7 @@
           -->
           <div class="card">
             <app-empty-state
-              icon="settings"
+              icon="billing"
               heading="Nothing is on sale yet"
               description="This installation takes payments but has no plans on sale at the moment. Ask whoever runs it if you were expecting to see one."
               data-testid="no-offers"

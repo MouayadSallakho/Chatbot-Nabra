@@ -65,7 +65,9 @@ describe('ConversationList', () => {
   const host = (): HTMLElement => fixture.nativeElement as HTMLElement;
   const text = (): string => host().textContent ?? '';
 
-  const rows = (): HTMLElement[] => [...host().querySelectorAll<HTMLElement>('a.conversation-row')];
+  const rows = (): HTMLElement[] => [
+    ...host().querySelectorAll<HTMLElement>('.conversation-list a.data-row'),
+  ];
 
   const button = (label: string): HTMLButtonElement | undefined =>
     [...host().querySelectorAll('button')].find((candidate) =>
@@ -147,6 +149,26 @@ describe('ConversationList', () => {
 
     expect(text()).toContain('Could not load conversations');
     expect(button('Try again')).toBeTruthy();
+  });
+
+  it('keeps the rows on screen when a refresh fails, and says so', async () => {
+    await mount('conversations.view');
+
+    http.expectOne(url).flush({
+      items: [conversation('c1', 'We close at six.', '2026-09-07T12:00:00Z')],
+      page: 1,
+      pageSize: 20,
+      total: 1,
+    });
+    await settle();
+
+    button('Refresh')!.click();
+    await settle();
+    http.expectOne(url).error(new ProgressEvent('error'), { status: 0 });
+    await settle();
+
+    expect(rows()).toHaveLength(1);
+    expect(text()).toContain('Could not refresh the list.');
   });
 
   it('refreshes by hand rather than polling', async () => {

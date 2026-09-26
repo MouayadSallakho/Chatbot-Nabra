@@ -1,4 +1,5 @@
 import { Routes } from '@angular/router';
+import { unsavedChangesGuard } from '@app/core/navigation/unsaved-changes';
 import { RoleApi } from '@app/core/authorization/role-api';
 
 /**
@@ -35,6 +36,7 @@ export const roleRoutes: Routes = [
         // Last, so it cannot swallow 'new'. Route order is the only thing
         // separating a literal segment from a parameter that would match it.
         path: ':roleId',
+        canDeactivate: [unsavedChangesGuard],
         title: 'Role',
         loadComponent: () => import('./role-editor/role-editor').then((m) => m.RoleEditor),
       },

@@ -4,23 +4,18 @@
 -->
 <a class="skip-link" href="#main-content" (click)="skipToContent($event)">Skip to main content</a>
 
-<div class="shell" [class.is-drawer]="drawer()" [class.is-collapsed]="collapsed()">
+<div class="shell" [class.is-drawer]="drawer()" [class.is-pinned]="pinned()">
   <app-sidebar
     id="primary-navigation"
     class="shell-sidebar"
     [class.is-open]="navOpen()"
-    [collapsed]="collapsed()"
+    [pinned]="pinned()"
     [drawer]="drawer()"
     [open]="navOpen()"
-    [workspaceName]="workspaceName()"
-    [userEmail]="userEmail()"
-    [canSwitchWorkspace]="canSwitchWorkspace()"
     [attr.inert]="navHidden() ? '' : null"
-    (collapseToggled)="toggleCollapsed()"
+    (pinToggled)="togglePinned()"
     (dismissed)="closeNav()"
     (navigated)="onNavigated()"
-    (workspaceSwitched)="switchWorkspace()"
-    (signedOut)="signOut()"
   />
 
   @if (drawer()) {
@@ -45,26 +40,29 @@
   -->
   <div class="shell-content" [attr.inert]="navOpen() ? '' : null">
     <app-topbar
-      [pageTitle]="pageTitle()"
       [drawer]="drawer()"
       [navOpen]="navOpen()"
+      [workspaceName]="workspaceName()"
+      [userEmail]="userEmail()"
+      [canSwitchWorkspace]="canSwitchWorkspace()"
       (menuToggled)="toggleNav()"
+      (workspaceSwitched)="switchWorkspace()"
+      (signedOut)="signOut()"
     />
 
     <!--
       `tabindex="-1"` makes the skip link's target focusable, so following it
-      actually moves focus rather than only scrolling. The outline is suppressed
-      because this is a programmatic focus target, not something the reader
-      navigated to.
+      actually moves focus rather than only scrolling.
     -->
     <main #mainRegion id="main-content" class="shell-main" tabindex="-1">
       <router-outlet />
     </main>
   </div>
-
-  <!--
-    Rendered once, by the shell, because its live region has to exist in the DOM
-    before anything is announced into it.
-  -->
-  <app-toast-host />
 </div>
+
+<!--
+  Rendered once, by the shell, because its live region has to exist in the DOM
+  before anything is announced into it. Outside the grid: it is a fixed layer,
+  and as a grid child it would have claimed a row of its own.
+-->
+<app-toast-host />
