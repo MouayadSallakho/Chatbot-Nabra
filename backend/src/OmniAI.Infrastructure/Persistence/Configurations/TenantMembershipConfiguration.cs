@@ -66,26 +66,20 @@ internal sealed class TenantMembershipConfiguration : IEntityTypeConfiguration<T
             .OnDelete(DeleteBehavior.Restrict)
             .IsRequired();
 
-        // The user key is NOT declared here, and the omission is deliberate and
-        // narrow.
-        //
-        // EF Core requires the two sides of a relationship to agree on their CLR
-        // type. This side is a UserId value object; the principal side is
-        // IdentityUser<Guid>.Id, a plain Guid that belongs to a framework type
-        // this platform does not own and must not reshape. EF refuses to relate
-        // them, and the ways of satisfying it are all worse than this: giving
-        // Identity a strongly-typed key breaks its stores, which round-trip the
-        // key through a string using a TypeConverter that a record struct does
-        // not have; and weakening TenantMembership.UserId to a bare Guid would
-        // remove the type that makes a user id unassignable from a tenant id.
-        //
-        // So the constraint is declared in the migration instead, as
-        // fk_tenant_memberships_user with ON DELETE RESTRICT. It is a real
-        // PostgreSQL foreign key with real referential integrity -- the database
-        // does not care which tool wrote it -- and an integration test asserts it
-        // exists on the applied schema with that delete rule, which is stronger
-        // evidence than an assertion about an EF model would have been.
-        //
+        // The user key. EF cannot relate this UserId to IdentityUser<Guid>.Id
+        // directly -- the CLR types differ, and neither side should change: giving
+        // Identity a strongly-typed key breaks its stores, and weakening this to a
+        // bare Guid would remove the type that makes a user id unassignable from a
+        // tenant id. So it targets UserReferenceRow, the same users table typed
+        // the Domain's way and excluded from migrations. The primary key already
+        // leads with user_id, so the convention adds no index.
+        builder.HasOne<UserReferenceRow>()
+            .WithMany()
+            .HasForeignKey(membership => membership.UserId)
+            .HasConstraintName("fk_tenant_memberships_user")
+            .OnDelete(DeleteBehavior.Restrict)
+            .IsRequired();
+
         // Restrict rather than Cascade, and that is the part worth pausing on. A
         // cascade would mean deleting an account silently removed every one of
         // that person's memberships, and since they are today the only member of

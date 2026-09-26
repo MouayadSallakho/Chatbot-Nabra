@@ -176,7 +176,13 @@ internal sealed class WebChatSessionConfiguration : IEntityTypeConfiguration<Web
     {
         ArgumentNullException.ThrowIfNull(builder);
 
-        builder.ToTable("web_chat_sessions");
+        // An embedded session always knows its origin and a hosted one never has
+        // one: the two columns cannot disagree.
+        builder.ToTable("web_chat_sessions", table =>
+            table.HasCheckConstraint(
+                "ck_web_chat_sessions_embedded_origin",
+                "(client_mode = 'Embedded' AND embedded_origin IS NOT NULL) "
+                + "OR (client_mode <> 'Embedded' AND embedded_origin IS NULL)"));
 
         // The conversation is the identity, which is what makes a second claim on
         // somebody else's conversation unrepresentable rather than merely refused.
@@ -237,8 +243,8 @@ internal sealed class WebChatSessionConfiguration : IEntityTypeConfiguration<Web
 
         // The origin only -- never the page address. A path can carry an order
         // number, a search term or a customer identifier, and none of that is this
-        // platform's business. Null for a hosted session, and a check constraint
-        // in the migration keeps the two columns agreeing with each other.
+        // platform's business. Null for a hosted session, and the table's check
+        // constraint keeps the two columns agreeing with each other.
         builder.Property(session => session.EmbeddedOrigin)
             .HasColumnName("embedded_origin")
             .HasConversion(PersistenceConverters.NullableWebChatOrigin)

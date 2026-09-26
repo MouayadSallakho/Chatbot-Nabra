@@ -202,4 +202,22 @@ internal static class PersistenceSchema
 
     /// <summary>Queued operational emails and where each got to.</summary>
     public const string NotificationEmailsTable = "notification_emails";
+
+    /// <summary>
+    /// The PostgreSQL extension that provides the <c>vector</c> type and the
+    /// HNSW index method.
+    /// </summary>
+    public const string VectorExtension = "vector";
+
+    /// <summary>
+    /// Each document's indexed passages and their embeddings.
+    /// </summary>
+    /// <remarks>
+    /// Written and read in SQL by the knowledge stores, which name it; the model
+    /// describes it so the schema can be derived from the model.
+    /// </remarks>
+    public const string KnowledgeChunksTable = "knowledge_chunks";
+
+    /// <summary>The Identity user table, which foreign keys elsewhere point at.</summary>
+    public const string UsersTable = "users";
 }

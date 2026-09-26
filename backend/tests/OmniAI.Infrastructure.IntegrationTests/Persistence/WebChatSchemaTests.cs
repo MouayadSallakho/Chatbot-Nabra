@@ -69,9 +69,10 @@ public sealed class WebChatSchemaTests(PostgresTestDatabase database)
     {
         // No visitor name, no IP address, no user agent, no email. An anonymous
         // conversation stays anonymous, and this is what would notice a field
-        // being added quietly.
+        // being added quietly. Compared as a set, by name: physical column order
+        // is creation history, not schema meaning.
         object? columns = await database.ExecuteScalarAsync(
-            "SELECT string_agg(column_name, ', ' ORDER BY ordinal_position) "
+            "SELECT string_agg(column_name, ', ' ORDER BY column_name) "
             + "FROM information_schema.columns "
             + "WHERE table_schema = 'public' AND table_name = 'web_chat_sessions'");
 
@@ -80,8 +81,8 @@ public sealed class WebChatSchemaTests(PostgresTestDatabase database)
         // Neither identifies a person; the origin identifies the customer's own
         // site, and it is there so removing that site can revoke the session.
         Assert.Equal(
-            "conversation_id, tenant_id, web_chat_endpoint_id, ai_agent_id, "
-            + "access_token_hash, created_at, expires_at, client_mode, embedded_origin",
+            "access_token_hash, ai_agent_id, client_mode, conversation_id, created_at, "
+            + "embedded_origin, expires_at, tenant_id, web_chat_endpoint_id",
             columns as string);
     }
 

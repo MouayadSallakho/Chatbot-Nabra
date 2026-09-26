@@ -44,7 +44,7 @@ internal sealed class OmniAiUserConfiguration : IEntityTypeConfiguration<OmniAiU
 
     public void Configure(EntityTypeBuilder<OmniAiUser> builder)
     {
-        builder.ToTable("users");
+        builder.ToTable(PersistenceSchema.UsersTable);
 
         builder.Property(user => user.Id).HasColumnName("id");
         builder.Property(user => user.UserName).HasColumnName("user_name").HasMaxLength(MaxKeyLength);
@@ -177,5 +177,32 @@ internal sealed class OmniAiUserTokenConfiguration : IEntityTypeConfiguration<Id
         builder.Property(token => token.LoginProvider).HasColumnName("login_provider");
         builder.Property(token => token.Name).HasColumnName("name");
         builder.Property(token => token.Value).HasColumnName("value");
+    }
+}
+
+/// <summary>
+/// Maps <see cref="UserReferenceRow"/>: the users table as a foreign-key target,
+/// never created or altered by a migration.
+/// </summary>
+/// <remarks>
+/// See <see cref="UserReferenceRow"/> for why it exists. The key name is never
+/// emitted, because the table is excluded from migrations; it only has to differ
+/// from Identity's <c>PK_users</c>, or EF renames that one to keep names unique.
+/// </remarks>
+internal sealed class UserReferenceRowConfiguration : IEntityTypeConfiguration<UserReferenceRow>
+{
+    public void Configure(EntityTypeBuilder<UserReferenceRow> builder)
+    {
+        builder.ToTable(
+            PersistenceSchema.UsersTable,
+            "public",
+            table => table.ExcludeFromMigrations());
+
+        builder.HasKey(user => user.Id).HasName("pk_users_reference");
+
+        builder.Property(user => user.Id)
+            .HasColumnName("id")
+            .HasConversion(PersistenceConverters.UserId)
+            .ValueGeneratedNever();
     }
 }

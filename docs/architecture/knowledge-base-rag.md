@@ -236,13 +236,19 @@ CREATE EXTENSION IF NOT EXISTS vector;
 | --- | --- | --- |
 | `knowledge_documents` | yes | `xmin` shadow concurrency token. |
 | `ai_agent_knowledge_documents` | yes | Composite PK, two composite FKs. |
-| `knowledge_chunks` | **no** | Hand-written SQL. Holds the vectors. |
+| `knowledge_chunks` | schema only | Holds the vectors. Written and read in SQL. |
 
-**Chunks are deliberately outside the EF model.** Keeping the embedding out of it
-means no query and no projection anywhere in the solution can load or publish a
-vector by accident; replacing a chunk set is one `DELETE` and a few parameterised
-`INSERT`s rather than a change-tracked graph of hundreds of entities; and the
-cast to `vector` is written where somebody can see it.
+**Chunks are read and written outside EF.** Keeping the embedding out of every
+query means no query and no projection anywhere in the solution can load or
+publish a vector by accident; replacing a chunk set is one `DELETE` and a few
+parameterised `INSERT`s rather than a change-tracked graph of hundreds of
+entities; and the cast to `vector` is written where somebody can see it.
+
+> **Phase 33.1:** the table itself (columns, keys, check, composite foreign key,
+> both indexes including HNSW, and the `vector` extension) is now described by the
+> model through the internal `KnowledgeChunkRow`, with no set and no repository,
+> so a migration generated from the model creates it. The stores are unchanged.
+> See [database-model-authority.md](database-model-authority.md).
 
 The embedding column is a real `vector(1536)` — not JSON, not base64, not an array
 of text. The value travels as a bound parameter cast server-side (`@embedding::vector`),
@@ -280,6 +286,8 @@ than at `id` alone:
 removed by hand, as in the five migrations before this. A real column of that name
 would shadow PostgreSQL's own and silently disable every optimistic-concurrency
 check on the table. A schema test asserts its absence on all three tables.
+(Phase 33 showed the hand removal was never needed: Npgsql's SQL generator emits
+no DDL for `xmin`.)
 
 ---
 

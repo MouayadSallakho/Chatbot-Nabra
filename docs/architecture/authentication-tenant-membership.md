@@ -461,6 +461,11 @@ constraint is an ordinary PostgreSQL foreign key with real referential integrity
 and it is asserted against `pg_constraint` on the applied schema, which is
 stronger evidence than an assertion about an EF model would have been.
 
+> **Phase 33.1:** the constraint is now declared in the model, not written by
+> hand. It targets `UserReferenceRow`, the same `users` table typed as `UserId`
+> and mapped with `ExcludeFromMigrations`, so neither side's type changed. See
+> [database-model-authority.md](database-model-authority.md).
+
 No `xmin` concurrency token: nothing updates a membership, so there is no lost
 update to prevent, and adding one would imply an edit operation that does not
 exist.

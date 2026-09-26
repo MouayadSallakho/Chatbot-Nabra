@@ -254,6 +254,10 @@ Two things had to be handled, both verified rather than assumed:
   rejects that: `xmin` is a system column present on every table. The generated
   column line is removed from the migration by hand, with a comment saying why.
   Regenerating the migration reintroduces it, and it must be removed again.
+  *Superseded (Phases 33 and 33.1):* the removal was never necessary. The C#
+  operation names `xmin`, but Npgsql's SQL generator emits no DDL for PostgreSQL's
+  system column. Migrations are now generated and never edited; see
+  [database-model-authority.md](database-model-authority.md).
 
 `Message` gets no concurrency token: it is immutable once written, so there is no
 update to lose.

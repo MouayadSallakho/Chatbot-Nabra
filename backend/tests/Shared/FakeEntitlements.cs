@@ -183,7 +183,7 @@ public static class TestPlans
         new(FakePlanCatalog.Empty(), new DefaultPlanOptions { DefaultPlanCode = code });
 }
 
-/// <summary>Identities the Phase 24 migration seeds.</summary>
+/// <summary>Identities of the plans the model seeds (PlanConfiguration).</summary>
 /// <remarks>
 /// Fixtures that write a real workspace to PostgreSQL must name a plan that is
 /// actually there; a generated id would be refused by the foreign key, which is

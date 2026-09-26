@@ -182,6 +182,18 @@ internal sealed class NotificationConfiguration : IEntityTypeConfiguration<Notif
             .OnDelete(DeleteBehavior.Cascade)
             .IsRequired();
 
+        // The recipient is a real account. Cascade, as Phase 32 declared it: a
+        // member's notifications are theirs and go with the account. No index of
+        // its own, as in Phase 32; the recipient indexes below lead with the
+        // workspace. See UserReferenceRow for why the key targets it.
+        builder.HasOne<UserReferenceRow>()
+            .WithMany()
+            .HasForeignKey(notification => notification.RecipientUserId)
+            .HasConstraintName("fk_notifications_recipient_user")
+            .OnDelete(DeleteBehavior.Cascade)
+            .IsRequired()
+            .WithoutConventionIndex();
+
         // One notification per recipient per occurrence. This is the index that
         // turns a replayed dispatch into a no-op.
         builder.HasIndex(notification => new { notification.TenantId, notification.RecipientUserId, notification.DeduplicationKey })
@@ -239,6 +251,17 @@ internal sealed class NotificationPreferencesConfiguration : IEntityTypeConfigur
             .HasConstraintName("fk_notification_preferences_tenant")
             .OnDelete(DeleteBehavior.Cascade)
             .IsRequired();
+
+        // The member the preferences belong to. Cascade, as Phase 32 declared it.
+        // The primary key leads with the workspace, and Phase 32 kept no index
+        // for this key; nor does the model.
+        builder.HasOne<UserReferenceRow>()
+            .WithMany()
+            .HasForeignKey(preferences => preferences.UserId)
+            .HasConstraintName("fk_notification_preferences_user")
+            .OnDelete(DeleteBehavior.Cascade)
+            .IsRequired()
+            .WithoutConventionIndex();
 
         builder.Property<uint>(PersistenceSchema.XminConcurrencyToken)
             .HasColumnName(PersistenceSchema.XminConcurrencyToken)
@@ -330,6 +353,15 @@ internal sealed class NotificationEmailConfiguration : IEntityTypeConfiguration<
             .HasConstraintName("fk_notification_emails_notification")
             .OnDelete(DeleteBehavior.Cascade)
             .IsRequired();
+
+        // The recipient account. Cascade and unindexed, as Phase 32 declared it.
+        builder.HasOne<UserReferenceRow>()
+            .WithMany()
+            .HasForeignKey(email => email.RecipientUserId)
+            .HasConstraintName("fk_notification_emails_recipient_user")
+            .OnDelete(DeleteBehavior.Cascade)
+            .IsRequired()
+            .WithoutConventionIndex();
 
         // One email per notification: a replayed dispatch cannot queue a second.
         builder.HasIndex(email => email.NotificationId)

@@ -85,7 +85,64 @@ internal sealed class PlanConfiguration : IEntityTypeConfiguration<Plan>
 
         // No concurrency token. Nobody edits a plan: a change of commercial
         // meaning is a new plan, so there is no concurrent write to lose.
+
+        Seed(builder);
     }
+
+    /// <summary>
+    /// The plans this platform ships with, as model seed data.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Exactly the four rows the Phase 24 and Phase 25 migrations inserted, with
+    /// the same ids, codes, limits and dates, so a database built from the model
+    /// holds the same catalogue as one built from the old chain. Configuration and
+    /// test fixtures name these codes and ids.
+    /// </para>
+    /// <para>
+    /// <c>legacy</c> is what pre-plan workspaces were moved onto; <c>development</c>
+    /// is what development and test deployments name; both are unlimited, which
+    /// is null, never a large number. <c>starter</c> and <c>free</c> are real,
+    /// finite plans. Changing what a plan means for workspaces already on it is
+    /// not done by editing these rows: a new plan is added and workspaces move.
+    /// </para>
+    /// </remarks>
+    private static void Seed(EntityTypeBuilder<Plan> builder)
+    {
+        DateTimeOffset phase24 = new(2026, 9, 20, 0, 0, 0, TimeSpan.Zero);
+        DateTimeOffset phase25 = new(2026, 9, 22, 0, 0, 0, TimeSpan.Zero);
+
+        builder.HasData(
+            SeedRow("01a12000-0000-7000-8000-000000000001", "legacy", "Legacy (unlimited)", null, null, null, null, null, null, phase24),
+            SeedRow("01a12000-0000-7000-8000-000000000002", "development", "Development (unlimited)", null, null, null, null, null, null, phase24),
+            SeedRow("01a12000-0000-7000-8000-000000000003", "starter", "Starter", 5, 3, 25, 1, 1, 2000, phase24),
+            SeedRow("019995b8-0000-7000-8000-00000000f8ee", "free", "Free", 2, 1, 10, 1, 0, 200, phase25));
+    }
+
+    private static object SeedRow(
+        string id,
+        string code,
+        string displayName,
+        int? maxMembers,
+        int? maxAiAgents,
+        int? maxKnowledgeDocuments,
+        int? maxWebChatEndpoints,
+        int? maxWhatsAppConnections,
+        int? maxMonthlyProviderOperations,
+        DateTimeOffset createdAt) =>
+        new
+        {
+            Id = PlanId.From(new Guid(id)),
+            Code = PlanCode.Create(code),
+            DisplayName = PlanDisplayName.Create(displayName),
+            MaxMembersValue = maxMembers,
+            MaxAiAgentsValue = maxAiAgents,
+            MaxKnowledgeDocumentsValue = maxKnowledgeDocuments,
+            MaxWebChatEndpointsValue = maxWebChatEndpoints,
+            MaxWhatsAppConnectionsValue = maxWhatsAppConnections,
+            MaxMonthlyProviderOperationsValue = maxMonthlyProviderOperations,
+            CreatedAt = createdAt,
+        };
 
     /// <summary>
     /// Maps one cap to a genuinely nullable column.

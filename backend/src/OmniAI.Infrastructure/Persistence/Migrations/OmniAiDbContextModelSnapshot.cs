@@ -21,6 +21,7 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                 .HasAnnotation("ProductVersion", "10.0.11")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
+            NpgsqlModelBuilderExtensions.HasPostgresExtension(modelBuilder, "vector");
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
             modelBuilder.HasSequence("message_ingestion_sequence");
@@ -773,6 +774,10 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("AssignedTo")
+                        .HasDatabaseName("ix_conversations_assigned_to")
+                        .HasFilter("assigned_to IS NOT NULL");
+
                     b.HasIndex("TenantId", "LastActivityAt")
                         .HasDatabaseName("ix_conversations_tenant_last_activity");
 
@@ -868,7 +873,8 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("tenant_id");
 
-                    b.HasKey("Id");
+                    b.HasKey("Id")
+                        .HasName("pk_conversation_human_replies");
 
                     b.HasIndex("ConversationId")
                         .HasDatabaseName("ix_human_replies_conversation");
@@ -876,8 +882,6 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                     b.HasIndex("MessageId")
                         .IsUnique()
                         .HasDatabaseName("ux_human_replies_message");
-
-                    b.HasIndex("TenantId");
 
                     b.HasIndex("ConversationId", "ClientMessageId")
                         .IsUnique()
@@ -1177,7 +1181,10 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                     b.HasIndex("TenantId")
                         .HasDatabaseName("ix_knowledge_documents_tenant");
 
-                    b.ToTable("knowledge_documents", (string)null);
+                    b.ToTable("knowledge_documents", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_knowledge_documents_index_complete", "(indexed_fingerprint IS NULL AND indexed_profile IS NULL AND indexed_at IS NULL) OR (indexed_fingerprint IS NOT NULL AND indexed_profile IS NOT NULL AND indexed_at IS NOT NULL)");
+                        });
                 });
 
             modelBuilder.Entity("OmniAI.Domain.Knowledge.KnowledgeIndexAttempt", b =>
@@ -1644,6 +1651,48 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("ck_plans_max_web_chat_endpoints_not_negative", "\"max_web_chat_endpoints\" IS NULL OR \"max_web_chat_endpoints\" >= 0");
 
                             t.HasCheckConstraint("ck_plans_max_whatsapp_connections_not_negative", "\"max_whatsapp_connections\" IS NULL OR \"max_whatsapp_connections\" >= 0");
+                        });
+
+                    b.HasData(
+                        new
+                        {
+                            Id = new Guid("01a12000-0000-7000-8000-000000000001"),
+                            Code = "legacy",
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 9, 20, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            DisplayName = "Legacy (unlimited)"
+                        },
+                        new
+                        {
+                            Id = new Guid("01a12000-0000-7000-8000-000000000002"),
+                            Code = "development",
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 9, 20, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            DisplayName = "Development (unlimited)"
+                        },
+                        new
+                        {
+                            Id = new Guid("01a12000-0000-7000-8000-000000000003"),
+                            Code = "starter",
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 9, 20, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            DisplayName = "Starter",
+                            MaxAiAgentsValue = 3,
+                            MaxKnowledgeDocumentsValue = 25,
+                            MaxMembersValue = 5,
+                            MaxMonthlyProviderOperationsValue = 2000,
+                            MaxWebChatEndpointsValue = 1,
+                            MaxWhatsAppConnectionsValue = 1
+                        },
+                        new
+                        {
+                            Id = new Guid("019995b8-0000-7000-8000-00000000f8ee"),
+                            Code = "free",
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 9, 22, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            DisplayName = "Free",
+                            MaxAiAgentsValue = 1,
+                            MaxKnowledgeDocumentsValue = 10,
+                            MaxMembersValue = 2,
+                            MaxMonthlyProviderOperationsValue = 200,
+                            MaxWebChatEndpointsValue = 1,
+                            MaxWhatsAppConnectionsValue = 0
                         });
                 });
 
@@ -2177,7 +2226,10 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("EndpointId", "TenantId");
 
-                    b.ToTable("web_chat_sessions", (string)null);
+                    b.ToTable("web_chat_sessions", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_web_chat_sessions_embedded_origin", "(client_mode = 'Embedded' AND embedded_origin IS NOT NULL) OR (client_mode <> 'Embedded' AND embedded_origin IS NULL)");
+                        });
                 });
 
             modelBuilder.Entity("OmniAI.Domain.WhatsApp.InboundWhatsAppMessage", b =>
@@ -2354,6 +2406,11 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("ConversationId")
                         .HasDatabaseName("ix_whatsapp_contacts_conversation");
+
+                    b.HasIndex("ConnectionId", "CustomerId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_whatsapp_contacts_current")
+                        .HasFilter("is_current");
 
                     b.ToTable("whatsapp_contacts", (string)null);
                 });
@@ -2576,6 +2633,80 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                     b.ToTable("data_protection_keys", (string)null);
                 });
 
+            modelBuilder.Entity("OmniAI.Infrastructure.Persistence.KnowledgeChunkRow", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("content");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Embedding")
+                        .IsRequired()
+                        .HasColumnType("vector(1536)")
+                        .HasColumnName("embedding");
+
+                    b.Property<string>("EmbeddingProfile")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("embedding_profile");
+
+                    b.Property<Guid>("KnowledgeDocumentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("knowledge_document_id");
+
+                    b.Property<int>("Ordinal")
+                        .HasColumnType("integer")
+                        .HasColumnName("ordinal");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_knowledge_chunks");
+
+                    b.HasAlternateKey("KnowledgeDocumentId", "Ordinal")
+                        .HasName("ux_knowledge_chunks_document_ordinal");
+
+                    b.HasIndex("Embedding")
+                        .HasDatabaseName("ix_knowledge_chunks_embedding");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("Embedding"), "hnsw");
+                    NpgsqlIndexBuilderExtensions.HasOperators(b.HasIndex("Embedding"), new[] { "vector_cosine_ops" });
+
+                    b.HasIndex("TenantId", "KnowledgeDocumentId")
+                        .HasDatabaseName("ix_knowledge_chunks_tenant_document");
+
+                    b.ToTable("knowledge_chunks", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_knowledge_chunks_ordinal", "ordinal >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("OmniAI.Infrastructure.Persistence.UserReferenceRow", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_users_reference");
+
+                    b.ToTable("users", "public", t =>
+                        {
+                            t.ExcludeFromMigrations();
+                        });
+                });
+
             modelBuilder.Entity("OmniAI.Infrastructure.Persistence.WhatsAppCredentialRow", b =>
                 {
                     b.Property<Guid>("ConnectionId")
@@ -2779,6 +2910,13 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_conversations_tenant");
 
+                    b.HasOne("OmniAI.Domain.Tenants.TenantMembership", null)
+                        .WithMany()
+                        .HasForeignKey("AssignedTo", "TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_conversations_assigned_member")
+                        .HasAnnotation("OmniAI:SuppressForeignKeyIndex", true);
+
                     b.HasOne("OmniAI.Domain.Customers.Customer", null)
                         .WithMany()
                         .HasForeignKey("TenantId", "CustomerId")
@@ -2826,7 +2964,16 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
-                        .HasConstraintName("fk_human_replies_tenant");
+                        .HasConstraintName("fk_human_replies_tenant")
+                        .HasAnnotation("OmniAI:SuppressForeignKeyIndex", true);
+
+                    b.HasOne("OmniAI.Domain.Tenants.TenantMembership", null)
+                        .WithMany()
+                        .HasForeignKey("Sender", "TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_human_replies_sender_member")
+                        .HasAnnotation("OmniAI:SuppressForeignKeyIndex", true);
                 });
 
             modelBuilder.Entity("OmniAI.Domain.Conversations.Message", b =>
@@ -2932,10 +3079,27 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_knowledge_sources_tenant");
+
+                    b.HasOne("OmniAI.Domain.Knowledge.KnowledgeDocument", null)
+                        .WithMany()
+                        .HasForeignKey("KnowledgeDocumentId", "TenantId")
+                        .HasPrincipalKey("Id", "TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_knowledge_sources_document")
+                        .HasAnnotation("OmniAI:SuppressForeignKeyIndex", true);
                 });
 
             modelBuilder.Entity("OmniAI.Domain.Notifications.Notification", b =>
                 {
+                    b.HasOne("OmniAI.Infrastructure.Persistence.UserReferenceRow", null)
+                        .WithMany()
+                        .HasForeignKey("RecipientUserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_notifications_recipient_user")
+                        .HasAnnotation("OmniAI:SuppressForeignKeyIndex", true);
+
                     b.HasOne("OmniAI.Domain.Tenants.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
@@ -2946,6 +3110,14 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("OmniAI.Domain.Notifications.NotificationEmail", b =>
                 {
+                    b.HasOne("OmniAI.Infrastructure.Persistence.UserReferenceRow", null)
+                        .WithMany()
+                        .HasForeignKey("RecipientUserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_notification_emails_recipient_user")
+                        .HasAnnotation("OmniAI:SuppressForeignKeyIndex", true);
+
                     b.HasOne("OmniAI.Domain.Notifications.Notification", null)
                         .WithMany()
                         .HasForeignKey("TenantId", "NotificationId")
@@ -2973,6 +3145,14 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_notification_preferences_tenant");
+
+                    b.HasOne("OmniAI.Infrastructure.Persistence.UserReferenceRow", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_notification_preferences_user")
+                        .HasAnnotation("OmniAI:SuppressForeignKeyIndex", true);
                 });
 
             modelBuilder.Entity("OmniAI.Domain.Plans.WorkspacePlanAssignment", b =>
@@ -3036,6 +3216,13 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_tenant_memberships_tenant");
+
+                    b.HasOne("OmniAI.Infrastructure.Persistence.UserReferenceRow", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_tenant_memberships_user");
                 });
 
             modelBuilder.Entity("OmniAI.Domain.WebChat.WebChatAllowedOrigin", b =>
@@ -3177,6 +3364,18 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_whatsapp_deliveries_message");
+                });
+
+            modelBuilder.Entity("OmniAI.Infrastructure.Persistence.KnowledgeChunkRow", b =>
+                {
+                    b.HasOne("OmniAI.Domain.Knowledge.KnowledgeDocument", null)
+                        .WithMany()
+                        .HasForeignKey("KnowledgeDocumentId", "TenantId")
+                        .HasPrincipalKey("Id", "TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_knowledge_chunks_document")
+                        .HasAnnotation("OmniAI:SuppressForeignKeyIndex", true);
                 });
 
             modelBuilder.Entity("OmniAI.Infrastructure.Persistence.WhatsAppCredentialRow", b =>

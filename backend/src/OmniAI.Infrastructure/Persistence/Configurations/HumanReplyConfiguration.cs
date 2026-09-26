@@ -26,7 +26,8 @@ internal sealed class HumanReplyConfiguration : IEntityTypeConfiguration<HumanRe
     {
         builder.ToTable(PersistenceSchema.HumanRepliesTable);
 
-        builder.HasKey(reply => reply.Id);
+        // Named as Phase 19 created it, lower-case like the other hand-named keys.
+        builder.HasKey(reply => reply.Id).HasName("pk_conversation_human_replies");
 
         builder.Property(reply => reply.Id)
             .HasColumnName("id")
@@ -83,7 +84,24 @@ internal sealed class HumanReplyConfiguration : IEntityTypeConfiguration<HumanRe
             .HasForeignKey(reply => reply.TenantId)
             .HasConstraintName("fk_human_replies_tenant")
             .OnDelete(DeleteBehavior.Restrict)
-            .IsRequired();
+            .IsRequired()
+            // Nothing reads replies by workspace alone, so the tenant key keeps no
+            // index of its own (HandoffSchemaTests asserts it is absent).
+            .WithoutConventionIndex();
+
+        // The sender must belong to the workspace the reply was sent in: the same
+        // composite guarantee as a conversation's assignee, and the reason this
+        // table carries a tenant its message does not. Restrict, so a member's
+        // authorship cannot vanish with their membership. Unindexed, as in Phase
+        // 19: nothing looks replies up by sender.
+        builder.HasOne<TenantMembership>()
+            .WithMany()
+            .HasForeignKey(reply => new { reply.Sender, reply.TenantId })
+            .HasPrincipalKey(membership => new { membership.UserId, membership.TenantId })
+            .HasConstraintName("fk_human_replies_sender_member")
+            .OnDelete(DeleteBehavior.Restrict)
+            .IsRequired()
+            .WithoutConventionIndex();
 
         // <strong>The idempotency boundary, and it lives here rather than in a
         // handler.</strong> Two concurrent requests carrying the same client

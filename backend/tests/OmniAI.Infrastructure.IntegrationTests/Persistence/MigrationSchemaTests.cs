@@ -13,12 +13,14 @@ namespace OmniAI.Infrastructure.IntegrationTests.Persistence;
 /// Guards on the migration itself, rather than on the behaviour it enables.
 /// </summary>
 /// <remarks>
-/// Migrations are generated from the model and must not need hand edits (from
-/// Phase 33 on; several earlier migrations were edited, and the notes below
-/// record why). The schema a migration produces can still regress silently when
-/// the model changes, so these tests make that regression a failing test instead
-/// of a broken deployment — and the xmin tests check the model itself, not a
-/// migration file.
+/// Migrations are generated from the model and are never edited by hand. Since
+/// Phase 33.1 the repository holds one Initial baseline generated that way; the
+/// hand-edited development history it replaced remains in Git. The schema a
+/// migration produces can still regress silently when the model changes, so these
+/// tests make that regression a failing test instead of a broken deployment — and
+/// the xmin tests check the model itself, not a migration file.
+/// <c>DatabaseModelAuthorityTests</c> holds the wider rule that the migrated
+/// schema is exactly the schema the model derives.
 /// </remarks>
 public sealed class MigrationSchemaTests(PostgresTestDatabase database)
     : IClassFixture<PostgresTestDatabase>
@@ -26,10 +28,10 @@ public sealed class MigrationSchemaTests(PostgresTestDatabase database)
     [Fact]
     public void The_migration_script_never_creates_an_xmin_column()
     {
-        // Npgsql 10 scaffolds `xmin` as a physical column for a row-version
-        // concurrency token. PostgreSQL rejects that: xmin is a system column
-        // that already exists on every table. The generated line is therefore
-        // removed by hand, and this is what notices if it comes back.
+        // The migration C# does name `xmin` for every row-version token -- EF's
+        // differ is provider-agnostic -- but Npgsql's SQL generator recognises
+        // PostgreSQL's system column and emits nothing for it. This checks the
+        // rendered script, which is what reaches the database.
         using OmniAiDbContext context = database.CreateContext();
 
         string script = context.GetService<IMigrator>().GenerateScript();
@@ -73,83 +75,19 @@ public sealed class MigrationSchemaTests(PostgresTestDatabase database)
     }
 
     [Fact]
-    public async Task Every_migration_is_applied_to_the_test_database()
+    public async Task The_single_initial_baseline_is_applied_to_the_test_database()
     {
-        // Each accepted migration is a committed baseline that was not rewritten;
-        // every phase that changes the schema adds one beside them. All must be
-        // present, in order, or these suites are testing a schema nobody will
-        // deploy.
+        // Phase 33.1 replaced the development migration history with one Initial
+        // generated from the model and never edited (the old history remains in
+        // Git). Every phase that changes the schema adds one generated migration
+        // beside it; all must be present, in order, or these suites are testing a
+        // schema nobody will deploy.
         using OmniAiDbContext context = database.CreateContext();
 
         string[] applied = [.. await context.Database.GetAppliedMigrationsAsync()];
 
-        Assert.Equal(20, applied.Length);
-        Assert.EndsWith("InitialPersistence", applied[0], StringComparison.Ordinal);
-        Assert.EndsWith("AddAiAgents", applied[1], StringComparison.Ordinal);
-        Assert.EndsWith("AddIdentityAndTenantMemberships", applied[2], StringComparison.Ordinal);
-        Assert.EndsWith("AddTenantRolesAndPermissions", applied[3], StringComparison.Ordinal);
-        Assert.EndsWith(
-            "AddTenantInvitationsAndMemberAccessVersioning",
-            applied[4],
-            StringComparison.Ordinal);
-        Assert.EndsWith(
-            "AddWebsiteChatAndConversationRuntime",
-            applied[5],
-            StringComparison.Ordinal);
-        Assert.EndsWith("AddWebChatSessionExpiry", applied[6], StringComparison.Ordinal);
-        Assert.EndsWith(
-            "AddKnowledgeBaseAndVectorIndex",
-            applied[7],
-            StringComparison.Ordinal);
-        Assert.EndsWith(
-            "AddWebChatWidgetEmbedding",
-            applied[8],
-            StringComparison.Ordinal);
-        Assert.EndsWith(
-            "AddHumanHandoffAndAssignment",
-            applied[9],
-            StringComparison.Ordinal);
-        Assert.EndsWith(
-            "AddWhatsAppCloudApiChannel",
-            applied[10],
-            StringComparison.Ordinal);
-        Assert.EndsWith(
-            "AddKnowledgeFileSources",
-            applied[11],
-            StringComparison.Ordinal);
-        Assert.EndsWith(
-            "AddAnalyticsIndexes",
-            applied[12],
-            StringComparison.Ordinal);
-        Assert.EndsWith(
-            "AddAiProviderUsageAccounting",
-            applied[13],
-            StringComparison.Ordinal);
-        Assert.EndsWith(
-            "AddWorkspacePlansAndEntitlements",
-            applied[14],
-            StringComparison.Ordinal);
-        Assert.EndsWith(
-            "AddUnifiedCustomerIdentity",
-            applied[16],
-            StringComparison.Ordinal);
-        Assert.EndsWith(
-            "AddReportsExportsAndScheduling",
-            applied[17],
-            StringComparison.Ordinal);
-        Assert.EndsWith(
-            "AddOperationalNotifications",
-            applied[18],
-            StringComparison.Ordinal);
-        Assert.EndsWith(
-            "AddReliabilityHardening",
-            applied[19],
-            StringComparison.Ordinal);
-
-        Assert.EndsWith(
-            "AddSaasSubscriptionBilling",
-            applied[15],
-            StringComparison.Ordinal);
+        Assert.Single(applied);
+        Assert.EndsWith("_Initial", applied[0], StringComparison.Ordinal);
     }
 
     /// <remarks>
@@ -200,9 +138,8 @@ public sealed class MigrationSchemaTests(PostgresTestDatabase database)
     [Fact]
     public async Task The_knowledge_sources_table_has_no_physical_xmin_column()
     {
-        // The same hand-edit guard, aimed at the table Phase 21 added. Npgsql's
-        // scaffolder emitted the column again and it was removed again by hand;
-        // this is what notices if a future regeneration puts it back.
+        // The xmin guard, aimed at the table Phase 21 added: its row-version
+        // token must stay PostgreSQL's system column, never a physical one.
         object? columns = await database.ExecuteScalarAsync(
             "SELECT count(*) FROM information_schema.columns "
             + "WHERE table_schema = 'public' AND table_name = 'knowledge_sources' "
@@ -231,10 +168,8 @@ public sealed class MigrationSchemaTests(PostgresTestDatabase database)
     [Fact]
     public async Task The_whatsapp_connections_table_has_no_physical_xmin_column()
     {
-        // The same hand-edit guard, aimed at the table Phase 20 added. Npgsql's
-        // scaffolder emitted the column again and it was removed again by hand;
-        // this is what notices if a future regeneration puts it back and turns a
-        // working entity tag into a column that shadows PostgreSQL's own.
+        // The xmin guard, aimed at the table Phase 20 added. A physical column
+        // would turn a working entity tag into one that shadows PostgreSQL's own.
         object? columns = await database.ExecuteScalarAsync(
             "SELECT count(*) FROM information_schema.columns "
             + "WHERE table_schema = 'public' AND table_name = 'whatsapp_connections' "
@@ -246,9 +181,7 @@ public sealed class MigrationSchemaTests(PostgresTestDatabase database)
     [Fact]
     public async Task The_ai_agents_table_has_no_user_column_named_xmin()
     {
-        // The hand-edit guard, aimed at the table Phase 7 added. The scaffolder
-        // emitted the column again for ai_agents and it was removed again by hand,
-        // so this is what notices if a future regeneration puts it back.
+        // The xmin guard, aimed at the table Phase 7 added.
         object? columns = await database.ExecuteScalarAsync(
             "SELECT count(*) FROM information_schema.columns " +
             "WHERE table_schema = 'public' AND table_name = 'ai_agents' AND column_name = 'xmin'");

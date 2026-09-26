@@ -510,6 +510,9 @@ unique index on `knowledge_document_id`, its tenant index, the tenant foreign ke
 **No physical `xmin` column.** Concurrency uses PostgreSQL's own system column
 through a shadow property, as every other aggregate here does. The generated
 migration's physical column was removed by hand, and a schema test asserts
-`knowledge_sources` has no `xmin` column of its own.
+`knowledge_sources` has no `xmin` column of its own. (Since Phase 33.1 the
+composite document key is declared in the model as well, and the hand-edited
+migration has been replaced by a generated Initial; see
+[database-model-authority.md](database-model-authority.md).)
 
 No historical migration was edited. The existing pgvector schema is untouched.

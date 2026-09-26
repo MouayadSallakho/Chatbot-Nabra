@@ -5,13 +5,14 @@ using OmniAI.Testing;
 namespace OmniAI.Infrastructure.IntegrationTests.Persistence;
 
 /// <summary>
-/// What the Phase 19 migration actually built.
+/// The human handoff schema Phase 19 introduced.
 /// </summary>
 /// <remarks>
-/// The migration was edited by hand, so these assert the edits rather than the
-/// scaffolder's output: the backfilled column, the composite foreign keys that
-/// make a cross-workspace assignment unrepresentable, and the unique index the
-/// reply idempotency depends on.
+/// Phase 19's migration was edited by hand; since Phase 33.1 every one of those
+/// objects is declared in the model instead. These assert the result: the
+/// handling column, the composite foreign keys that make a cross-workspace
+/// assignment unrepresentable, and the unique index the reply idempotency
+/// depends on.
 /// </remarks>
 public sealed class HandoffSchemaTests(PostgresTestDatabase database)
     : IClassFixture<PostgresTestDatabase>

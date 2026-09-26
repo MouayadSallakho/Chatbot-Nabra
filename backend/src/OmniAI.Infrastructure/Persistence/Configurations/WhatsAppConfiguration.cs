@@ -235,14 +235,18 @@ internal sealed class WhatsAppContactConfiguration : IEntityTypeConfiguration<Wh
             .HasDatabaseName("ix_whatsapp_contacts_conversation");
 
         // Every mapping of a connection, including superseded ones. The partial
-        // unique index in the migration covers only the current mapping, so it
-        // cannot serve the cascade when a connection is removed.
+        // unique index below covers only the current mapping, so it cannot serve
+        // the cascade when a connection is removed.
         builder.HasIndex(contact => contact.ConnectionId)
             .HasDatabaseName("ix_whatsapp_contacts_connection");
 
-        // The partial unique index is declared in the migration: EF cannot
-        // express "unique where is_current", and without the filter a customer
-        // could only ever have one conversation in their life. See the migration.
+        // One current conversation per customer per number. Partial, because
+        // superseded mappings are kept: without the filter a customer could only
+        // ever have one conversation in their life.
+        builder.HasIndex(contact => new { contact.ConnectionId, contact.CustomerId })
+            .IsUnique()
+            .HasDatabaseName("ux_whatsapp_contacts_current")
+            .HasFilter("is_current");
     }
 }
 

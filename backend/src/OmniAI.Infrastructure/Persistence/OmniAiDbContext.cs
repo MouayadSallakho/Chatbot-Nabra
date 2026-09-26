@@ -238,9 +238,10 @@ public sealed class OmniAiDbContext(DbContextOptions<OmniAiDbContext> options)
     /// </summary>
     /// <remarks>
     /// There is deliberately no <c>KnowledgeChunks</c> beside this. Chunks carry
-    /// the embeddings, and keeping them out of the model is what makes it
-    /// impossible for a query or a projection anywhere in the solution to load or
-    /// publish a vector by accident. They are written and read by
+    /// the embeddings, so no set exposes them: nothing in the solution can query
+    /// or project a vector by accident. The table is described in the model by
+    /// the internal <c>KnowledgeChunkRow</c>, which exists so the schema is
+    /// derivable from the model, and is written and read only by
     /// <c>KnowledgeIndexStore</c> and <c>KnowledgeSearchStore</c>, in SQL.
     /// </remarks>
     public DbSet<AgentKnowledgeAssignment> AgentKnowledgeAssignments =>
@@ -336,6 +337,11 @@ public sealed class OmniAiDbContext(DbContextOptions<OmniAiDbContext> options)
 
         base.OnModelCreating(builder);
 
+        // pgvector, for knowledge_chunks.embedding and its HNSW index. Declared
+        // in the model so a migration generated from it creates the extension
+        // before the table that needs its type. See database-model-authority.md.
+        builder.HasPostgresExtension(PersistenceSchema.VectorExtension);
+
         // The allocator for message ingestion order. See PersistenceSchema for
         // why a sequence rather than a per-conversation counter.
         builder.HasSequence<long>(PersistenceSchema.MessageIngestionSequenceName)
@@ -343,6 +349,24 @@ public sealed class OmniAiDbContext(DbContextOptions<OmniAiDbContext> options)
             .IncrementsBy(1);
 
         builder.ApplyConfigurationsFromAssembly(typeof(OmniAiDbContext).Assembly);
+    }
+
+    /// <summary>
+    /// Installs the conventions this model relies on.
+    /// </summary>
+    /// <param name="configurationBuilder">The convention configuration.</param>
+    /// <remarks>
+    /// One replacement: EF's foreign-key index convention, extended so a
+    /// relationship can opt out of its automatic index in the model rather than
+    /// in a hand-edited migration. See <see cref="ForeignKeyIndexPolicy"/>.
+    /// </remarks>
+    protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
+    {
+        ArgumentNullException.ThrowIfNull(configurationBuilder);
+
+        base.ConfigureConventions(configurationBuilder);
+
+        ForeignKeyIndexPolicy.Apply(configurationBuilder);
     }
 
     /// <summary>

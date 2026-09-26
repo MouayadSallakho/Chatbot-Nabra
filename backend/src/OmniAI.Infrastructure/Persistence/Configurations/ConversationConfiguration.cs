@@ -48,16 +48,9 @@ internal sealed class ConversationConfiguration : IEntityTypeConfiguration<Conve
             .IsRequired();
 
         // Nullable, because unassigned is the ordinary state of a conversation
-        // and not a missing value: most of them are nobody's in particular.
-        //
-        // The composite foreign key that makes a cross-workspace assignment
-        // unrepresentable -- (assigned_to, tenant_id) into the membership table's
-        // own primary key -- is declared in the migration rather than here.
-        // tenant_memberships is keyed on (user_id, tenant_id), and EF cannot
-        // express a composite principal key for a single-column dependent
-        // without modelling membership as a navigation on this aggregate, which
-        // would put the workspace's entire membership graph inside a
-        // conversation. A schema test asserts the constraint exists.
+        // and not a missing value: most of them are nobody's in particular. The
+        // composite key that makes a cross-workspace assignment unrepresentable
+        // is declared below.
         builder.Property(conversation => conversation.AssignedTo)
             .HasColumnName("assigned_to")
             .HasConversion(PersistenceConverters.NullableUserId);
@@ -102,6 +95,30 @@ internal sealed class ConversationConfiguration : IEntityTypeConfiguration<Conve
             .HasConstraintName("fk_conversations_customer")
             .OnDelete(DeleteBehavior.Restrict)
             .IsRequired();
+
+        // An assignee must be a member of this conversation's workspace:
+        // (assigned_to, tenant_id) into the membership table's own primary key,
+        // both columns read from this row. Optional, because assigned_to is
+        // nullable and PostgreSQL does not check a key with a null part. No
+        // navigation: the workspace's membership graph does not belong inside a
+        // conversation. Restrict, so a member holding conversations cannot be
+        // removed out from under them.
+        //
+        // Its index is the partial one below rather than EF's automatic one.
+        builder.HasOne<TenantMembership>()
+            .WithMany()
+            .HasForeignKey(conversation => new { conversation.AssignedTo, conversation.TenantId })
+            .HasPrincipalKey(membership => new { membership.UserId, membership.TenantId })
+            .HasConstraintName("fk_conversations_assigned_member")
+            .OnDelete(DeleteBehavior.Restrict)
+            .IsRequired(false)
+            .WithoutConventionIndex();
+
+        // "Assigned to me" and the membership key's own check. Partial, because
+        // most conversations are unassigned and have nothing to index.
+        builder.HasIndex(conversation => conversation.AssignedTo)
+            .HasDatabaseName("ix_conversations_assigned_to")
+            .HasFilter("assigned_to IS NOT NULL");
 
         // One customer's history, newest first -- the customer detail page's only
         // query, and the ordering the merge has to preserve.

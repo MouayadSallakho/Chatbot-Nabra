@@ -299,6 +299,12 @@ scaffolder got wrong or could not express:
 3. The scaffolder's index over the human-replies tenant foreign key is dropped:
    nothing reads replies by workspace alone.
 
+> **Phase 33.1:** items 2 and 3 now live in the model. EF can express both
+> composite keys through `HasPrincipalKey` on the membership key, and the
+> dropped index is an explicit `WithoutConventionIndex()` on the relationship.
+> The development migrations were replaced by one generated, unedited Initial.
+> See [database-model-authority.md](database-model-authority.md).
+
 No historical migration was edited. No physical `xmin` column exists.
 
 ---

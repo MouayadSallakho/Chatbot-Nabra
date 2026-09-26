@@ -104,10 +104,20 @@ internal sealed class KnowledgeSourceConfiguration : IEntityTypeConfiguration<Kn
         builder.HasIndex(source => source.TenantId)
             .HasDatabaseName("ix_knowledge_sources_tenant");
 
-        // The composite foreign key into (id, tenant_id) on the documents table is
-        // written by hand in the migration: EF cannot express a key into a pair
-        // that is not the principal's primary key without modelling a navigation
-        // the Domain has no business carrying. See the migration.
+        // Into (id, tenant_id) on the documents table, so a source cannot describe
+        // another workspace's document. Cascade, because a source is metadata
+        // about its document and means nothing once the document is gone. No
+        // navigation is needed: the key targets the documents' alternate key.
+        // ux_knowledge_sources_document already leads with the document, so the
+        // key needs no index of its own.
+        builder.HasOne<KnowledgeDocument>()
+            .WithMany()
+            .HasForeignKey(source => new { source.KnowledgeDocumentId, source.TenantId })
+            .HasPrincipalKey(document => new { document.Id, document.TenantId })
+            .HasConstraintName("fk_knowledge_sources_document")
+            .OnDelete(DeleteBehavior.Cascade)
+            .IsRequired()
+            .WithoutConventionIndex();
 
         builder.Property<uint>(PersistenceSchema.XminConcurrencyToken)
             .HasColumnName(PersistenceSchema.XminConcurrencyToken)
