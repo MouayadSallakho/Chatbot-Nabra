@@ -241,7 +241,7 @@ internal sealed class RedisPublicChatProtection : IPublicChatProtection
                 .ScriptEvaluateAsync(DecisionScript, keys, values)
                 .ConfigureAwait(false);
         }
-        catch (Exception failure) when (IsProtectionStoreFailure(failure))
+        catch (Exception failure) when (IsProtectionStoreFailure(failure, cancellationToken))
         {
             // The one translation in this class, and it is the fail-closed path.
             // The caller cannot proceed on an unknown answer because there is no
@@ -289,10 +289,30 @@ internal sealed class RedisPublicChatProtection : IPublicChatProtection
     /// allowed"; anything else is a bug in this code and must not be dressed up as
     /// an outage, because doing so would hide it behind a message that tells
     /// operators to look at Redis.
+    /// <para>
+    /// <strong><c>IOException</c> included from Phase 34.</strong> With Redis
+    /// paused (accepting TCP, never answering), the script call surfaced
+    /// "Unable to read data from the transport connection" as a bare
+    /// <c>IOException</c> over a <c>SocketException</c>, which escaped as a 500.
+    /// It still failed closed — nothing had been written — but the caller got a
+    /// server error instead of the refusal this class promises. It is only ever
+    /// raised here by the connection to the store, so it means the same thing as
+    /// the others.
+    /// </para>
+    /// <para>
+    /// <strong>A cancellation the caller did not ask for is one too.</strong> The
+    /// same drill produced a <c>TaskCanceledException</c> from the script call: the
+    /// client cancels in-flight commands when it abandons a stalled connection.
+    /// The call is not given the caller's token, so such a cancellation cannot be
+    /// the visitor giving up — it is the store being unusable. A cancellation while
+    /// the caller's own token is cancelled is left alone: that request was
+    /// abandoned, not refused.
+    /// </para>
     /// </remarks>
-    private static bool IsProtectionStoreFailure(Exception failure) =>
+    internal static bool IsProtectionStoreFailure(Exception failure, CancellationToken caller = default) =>
         failure is RedisException or ObjectDisposedException or TimeoutException
-            or System.Net.Sockets.SocketException;
+            or System.Net.Sockets.SocketException or System.IO.IOException
+        || (failure is OperationCanceledException && !caller.IsCancellationRequested);
 
     /// <summary>
     /// One fully-qualified counter name.

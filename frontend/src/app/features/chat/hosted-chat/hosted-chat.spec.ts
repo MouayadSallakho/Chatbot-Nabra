@@ -672,6 +672,50 @@ describe('HostedChat', () => {
     expect(alertText()).toContain('no answer came back just now');
   });
 
+  it('never claims a message was received when the chat could not take it', async () => {
+    // Phase 34 Redis drill: with the protection store down the server stored
+    // nothing, yet the visitor was told "Your message was received".
+    await open();
+    await sendFirst('Are you there?');
+
+    http
+      .expectOne(messagesUrl)
+      .flush(
+        { title: 'Chat unavailable', detail: 'This chat is temporarily unavailable.' },
+        { status: 503, statusText: 'Service Unavailable' },
+      );
+    await settle();
+
+    http.expectOne(messagesUrl).flush({ items: [], nextCursor: null });
+    await settle();
+
+    expect(alertText()).not.toContain('received');
+    expect(alertText()).toContain('try sending it again');
+  });
+
+  it('still says the message was received when the answer timed out after it was stored', async () => {
+    await open();
+    await sendFirst('Are you there?');
+
+    http
+      .expectOne(messagesUrl)
+      .flush(
+        { title: 'AI generation timed out', detail: 'No answer.' },
+        { status: 504, statusText: 'Gateway Timeout' },
+      );
+    await settle();
+
+    http.expectOne(messagesUrl).flush({
+      items: [
+        { id: 'c1', sender: 'Customer', text: 'Are you there?', sentAt: '2026-09-07T12:00:00Z' },
+      ],
+      nextCursor: null,
+    });
+    await settle();
+
+    expect(alertText()).toContain('Your message was received');
+  });
+
   it('keeps the visitor’s words in the box when a send fails', async () => {
     await open();
     await sendFirst('Important question');

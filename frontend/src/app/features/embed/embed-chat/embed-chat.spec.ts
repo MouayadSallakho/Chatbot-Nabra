@@ -424,6 +424,8 @@ describe('EmbedChat', () => {
     expect(text()).toContain('no answer came back');
     expect(text()).not.toContain('provider');
     expect(text()).not.toContain('configured');
+    // Phase 34: a 503 may mean nothing was stored, so it never claims receipt.
+    expect(text()).not.toContain('was received');
   });
 
   it('stamps the theme the workspace chose, and leaves System to the visitor', async () => {

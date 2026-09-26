@@ -92,12 +92,23 @@ internal sealed class RedisRealtimeTickets : IRealtimeTickets
 
         IDatabase database = _redis.GetDatabase();
 
-        await database
-            .StringSetAsync(
-                KeyFor(ticket),
-                claim,
-                TimeSpan.FromSeconds(LifetimeSeconds))
-            .ConfigureAwait(false);
+        try
+        {
+            await database
+                .StringSetAsync(
+                    KeyFor(ticket),
+                    claim,
+                    TimeSpan.FromSeconds(LifetimeSeconds))
+                .ConfigureAwait(false);
+        }
+        catch (Exception failure) when (
+            WebChat.Protection.RedisPublicChatProtection.IsProtectionStoreFailure(failure, cancellationToken))
+        {
+            // Phase 34: with the store down this used to escape as a 500. The
+            // truthful answer is the one an unconfigured deployment already gives:
+            // live updates are unavailable; messages still work.
+            throw new RealtimeUnavailableException();
+        }
 
         return new RealtimeTicket(ticket, LifetimeSeconds);
     }

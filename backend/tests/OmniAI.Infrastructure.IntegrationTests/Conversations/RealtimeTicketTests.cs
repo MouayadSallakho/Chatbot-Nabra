@@ -170,4 +170,17 @@ public sealed class RealtimeTicketTests(RedisTestServer redis)
 
         Assert.NotEqual(first.Value, second.Value);
     }
+
+    [Fact]
+    public async Task An_unreachable_store_refuses_a_ticket_as_live_updates_unavailable()
+    {
+        // Phase 34 Redis drill: with the store down, issuing a ticket escaped as a
+        // 500. It is now the same refusal an unconfigured deployment gives (503).
+        await using ConnectionMultiplexer unreachable = await ConnectionMultiplexer.ConnectAsync(
+            "127.0.0.1:1,abortConnect=false,connectTimeout=250,syncTimeout=250,asyncTimeout=250,connectRetry=1");
+        RedisRealtimeTickets tickets = new(unreachable, _redis.KeyPrefix);
+
+        await Assert.ThrowsAsync<RealtimeUnavailableException>(() =>
+            tickets.IssueAsync(ConversationId.From(Guid.NewGuid()), WebChatClientMode.Hosted));
+    }
 }

@@ -1,4 +1,3 @@
-using System.Data;
 using System.Data.Common;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
@@ -80,7 +79,7 @@ internal sealed class KnowledgeSearchStore(OmniAiDbContext context) : IKnowledge
         // EXISTS rather than COUNT: the question is whether there is anything at
         // all, and a workspace with fifty thousand chunks should not be counted to
         // find that out.
-        await using NpgsqlCommand command = await CommandAsync(
+        return await OnRequestConnectionAsync(
                 $"""
                 SELECT EXISTS (
                   SELECT 1
@@ -88,14 +87,16 @@ internal sealed class KnowledgeSearchStore(OmniAiDbContext context) : IKnowledge
                 {EligibilityPredicate}
                 )
                 """,
+                async command =>
+                {
+                    Bind(command, tenantId, aiAgentId, profile);
+
+                    object? answer = await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
+
+                    return answer is true;
+                },
                 cancellationToken)
             .ConfigureAwait(false);
-
-        Bind(command, tenantId, aiAgentId, profile);
-
-        object? answer = await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
-
-        return answer is true;
     }
 
     public async Task<IReadOnlyList<KnowledgeMatch>> SearchAsync(
@@ -110,7 +111,7 @@ internal sealed class KnowledgeSearchStore(OmniAiDbContext context) : IKnowledge
         ArgumentNullException.ThrowIfNull(query);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(limit);
 
-        await using NpgsqlCommand command = await CommandAsync(
+        return await OnRequestConnectionAsync<IReadOnlyList<KnowledgeMatch>>(
                 $"""
                 SELECT d.id, d.title, c.ordinal, c.content,
                        c.embedding <=> @query::vector AS distance
@@ -119,31 +120,33 @@ internal sealed class KnowledgeSearchStore(OmniAiDbContext context) : IKnowledge
                  ORDER BY c.embedding <=> @query::vector, d.id, c.ordinal
                  LIMIT @limit
                 """,
+                async command =>
+                {
+                    Bind(command, tenantId, aiAgentId, profile);
+
+                    command.Parameters.AddWithValue("query", VectorLiterals.Render(query));
+                    command.Parameters.AddWithValue("limit", limit);
+
+                    List<KnowledgeMatch> matches = [];
+
+                    await using DbDataReader reader = await command
+                        .ExecuteReaderAsync(cancellationToken)
+                        .ConfigureAwait(false);
+
+                    while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                    {
+                        matches.Add(new KnowledgeMatch(
+                            reader.GetGuid(0),
+                            reader.GetString(1),
+                            reader.GetInt32(2),
+                            reader.GetString(3),
+                            reader.GetDouble(4)));
+                    }
+
+                    return matches;
+                },
                 cancellationToken)
             .ConfigureAwait(false);
-
-        Bind(command, tenantId, aiAgentId, profile);
-
-        command.Parameters.AddWithValue("query", VectorLiterals.Render(query));
-        command.Parameters.AddWithValue("limit", limit);
-
-        List<KnowledgeMatch> matches = [];
-
-        await using DbDataReader reader = await command
-            .ExecuteReaderAsync(cancellationToken)
-            .ConfigureAwait(false);
-
-        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
-        {
-            matches.Add(new KnowledgeMatch(
-                reader.GetGuid(0),
-                reader.GetString(1),
-                reader.GetInt32(2),
-                reader.GetString(3),
-                reader.GetDouble(4)));
-        }
-
-        return matches;
     }
 
     private static void Bind(
@@ -158,29 +161,50 @@ internal sealed class KnowledgeSearchStore(OmniAiDbContext context) : IKnowledge
     }
 
     /// <summary>
-    /// A command on the request's own connection.
+    /// Runs one command on the request's own connection, and gives the connection
+    /// back as soon as it is done.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// The EF connection rather than a fresh one, so a search taking place inside
     /// a request that is already holding a transaction sees that transaction, and
     /// so this does not open a second connection per turn.
+    /// </para>
+    /// <para>
+    /// <strong>Opened and closed through EF, never directly (Phase 34).</strong> The
+    /// connection used to be opened on the <c>DbConnection</c> itself, which EF does
+    /// not track, so it stayed open -- checked out of the pool -- for the rest of
+    /// the request. For a customer turn that is the whole provider call, during
+    /// which the turn also holds its conversation-lock connection and the ledger
+    /// asks for one more. Under load that exhausted PostgreSQL's connection limit,
+    /// and with bounded pools it starved them: turns held one pool's connections
+    /// while waiting for the other's, until the pool timeout (client-side
+    /// starvation, not a database deadlock). <c>OpenConnectionAsync</c>/<c>CloseConnectionAsync</c> are
+    /// reference-counted: inside a transaction (which EF opened) the connection
+    /// stays open and enlisted; otherwise it returns to the pool here.
+    /// </para>
     /// </remarks>
-    private async Task<NpgsqlCommand> CommandAsync(string sql, CancellationToken cancellationToken)
+    private async Task<T> OnRequestConnectionAsync<T>(
+        string sql,
+        Func<NpgsqlCommand, Task<T>> run,
+        CancellationToken cancellationToken)
     {
-        DbConnection connection = _context.Database.GetDbConnection();
+        await _context.Database.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
 
-        if (connection.State != ConnectionState.Open)
+        try
         {
-            await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+            await using NpgsqlCommand command = new(sql, (NpgsqlConnection)_context.Database.GetDbConnection());
+
+            if (_context.Database.CurrentTransaction?.GetDbTransaction() is NpgsqlTransaction active)
+            {
+                command.Transaction = active;
+            }
+
+            return await run(command).ConfigureAwait(false);
         }
-
-        NpgsqlCommand command = new(sql, (NpgsqlConnection)connection);
-
-        if (_context.Database.CurrentTransaction?.GetDbTransaction() is NpgsqlTransaction active)
+        finally
         {
-            command.Transaction = active;
+            await _context.Database.CloseConnectionAsync().ConfigureAwait(false);
         }
-
-        return command;
     }
 }

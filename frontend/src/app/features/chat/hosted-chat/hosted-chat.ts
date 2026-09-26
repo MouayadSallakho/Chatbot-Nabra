@@ -349,7 +349,20 @@ export class HostedChat implements OnInit {
    */
   private explain(failure: ApiError): ApiError {
     switch (failure.kind) {
+      // A 503 must not claim the message was received (Phase 34). It answers both
+      // "the AI step could not run" (message stored) and "the chat could not take
+      // the message at all" -- an unreachable protection store, a withdrawn chat,
+      // an unavailable database -- where nothing was stored. The page re-reads the
+      // transcript afterwards, so a visitor can see which; the sentence stays true
+      // in both cases and still names no cause.
       case 'providerUnavailable':
+        return {
+          ...failure,
+          message:
+            'Sorry — no answer came back just now. You can try sending it again in a moment.',
+        };
+
+      // A timeout or an unusable answer happens after the message was stored.
       case 'providerTimeout':
       case 'invalidResponse':
         return {

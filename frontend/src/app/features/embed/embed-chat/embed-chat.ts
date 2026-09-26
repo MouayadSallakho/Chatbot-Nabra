@@ -468,7 +468,16 @@ export class EmbedChat implements OnInit {
    */
   private explain(failure: ApiError): ApiError {
     switch (failure.kind) {
+      // As on the hosted page (Phase 34): a 503 may mean nothing was stored, so it
+      // must not say the message was received.
       case 'providerUnavailable':
+        return {
+          ...failure,
+          message:
+            'Sorry — no answer came back just now. You can try sending it again in a moment.',
+        };
+
+      // A timeout or an unusable answer happens after the message was stored.
       case 'providerTimeout':
       case 'invalidResponse':
         return {

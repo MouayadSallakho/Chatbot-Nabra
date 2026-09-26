@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using OmniAI.Application.Concurrency;
 using OmniAI.Application.Knowledge;
 using OmniAI.Application.Knowledge.Persistence;
@@ -49,6 +50,56 @@ public sealed class KnowledgeSearchStoreTests(PostgresTestDatabase database)
 
         return await KnowledgeWorld.Search(context)
             .HasEligibleChunksAsync(workspace, agent, KnowledgeWorld.Profile);
+    }
+
+    // ------------------------------------------------ connection lifetime (Phase 34)
+
+    [Fact]
+    public async Task A_search_gives_the_request_connection_back_when_it_is_done()
+    {
+        // Found under load: the search opened the request's connection directly,
+        // EF never closed it, and every customer turn then held it through the
+        // whole provider call -- one extra pooled connection per turn in flight.
+        TenantId workspace = await _world.WorkspaceAsync();
+        AiAgent agent = await _world.AgentAsync(workspace);
+        Versioned<KnowledgeDocument> document = await _world.DocumentAsync(workspace);
+        float[] vector = KnowledgeWorld.Axis(1);
+
+        await _world.IndexAsync(document.Value.Id, workspace, document.Version, ("Passage.", vector));
+        await _world.AssignAsync(agent, document.Value.Id);
+
+        await using OmniAiDbContext context = _world.Context();
+        KnowledgeSearchStore store = KnowledgeWorld.Search(context);
+
+        Assert.True(await store.HasEligibleChunksAsync(workspace, agent.Id, KnowledgeWorld.Profile));
+        Assert.Equal(System.Data.ConnectionState.Closed, context.Database.GetDbConnection().State);
+
+        Assert.Single(await store.SearchAsync(
+            workspace,
+            agent.Id,
+            KnowledgeWorld.Profile,
+            EmbeddingVector.Create(vector, KnowledgeWorld.Dimensions),
+            5));
+        Assert.Equal(System.Data.ConnectionState.Closed, context.Database.GetDbConnection().State);
+    }
+
+    [Fact]
+    public async Task A_search_inside_a_transaction_uses_it_and_leaves_it_open()
+    {
+        TenantId workspace = await _world.WorkspaceAsync();
+        AiAgent agent = await _world.AgentAsync(workspace);
+
+        await using OmniAiDbContext context = _world.Context();
+        await using Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction transaction =
+            await context.Database.BeginTransactionAsync();
+
+        Assert.False(await KnowledgeWorld.Search(context)
+            .HasEligibleChunksAsync(workspace, agent.Id, KnowledgeWorld.Profile));
+
+        Assert.Equal(System.Data.ConnectionState.Open, context.Database.GetDbConnection().State);
+        Assert.Same(transaction, context.Database.CurrentTransaction);
+
+        await transaction.CommitAsync();
     }
 
     // ----------------------------------------------------------- round trip

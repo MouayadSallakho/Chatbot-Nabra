@@ -192,9 +192,12 @@ internal sealed partial class DomainProblemDetailsHandler(
     };
 
     private static string OperatorReason(Exception exception, string detail) =>
-        exception is PublicChatProtectionUnavailableException unprotected
-            ? unprotected.Reason
-            : detail;
+        exception switch
+        {
+            PublicChatProtectionUnavailableException unprotected => unprotected.Reason,
+            _ when DatabaseUnavailability.Recognises(exception, out string reason) => reason,
+            _ => detail,
+        };
 
     /// <summary>
     /// Records an expected outcome at the level its status deserves.
@@ -793,6 +796,18 @@ internal sealed partial class DomainProblemDetailsHandler(
             malformed.StatusCode,
             "Malformed request",
             "The request body could not be read. It must be JSON matching the documented shape."),
+
+        // Phase 34. The database could not be reached or could not take another
+        // connection (overload, failover, outage). 503, the same answer readiness
+        // gives, rather than a 500 claiming a server bug. The sentence is fixed and
+        // says nothing about the database; the operator's log gets the SQLSTATE.
+        // No Retry-After: how long an outage lasts is not something this process
+        // knows. See DatabaseUnavailability for exactly what is (and is not)
+        // recognised.
+        _ when DatabaseUnavailability.Recognises(exception, out _) => (
+            StatusCodes.Status503ServiceUnavailable,
+            "Service temporarily unavailable",
+            "The service could not complete this request right now. Please try again shortly."),
 
         _ => null,
     };
