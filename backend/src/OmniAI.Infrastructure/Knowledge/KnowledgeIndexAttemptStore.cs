@@ -1,4 +1,6 @@
+using Microsoft.EntityFrameworkCore;
 using Npgsql;
+using OmniAI.Application.Knowledge;
 using OmniAI.Application.Knowledge.Persistence;
 using OmniAI.Domain.Knowledge;
 using OmniAI.Infrastructure.Notifications;
@@ -42,18 +44,33 @@ internal sealed class KnowledgeIndexAttemptStore(OmniAiDbContext context) : IKno
 
         """;
 
+    /// <summary>The single-flight index: one Started attempt per document.</summary>
+    internal const string InFlightIndex = "ux_knowledge_index_attempts_in_flight";
+
     private readonly OmniAiDbContext _context = context ?? throw new ArgumentNullException(nameof(context));
 
     public async Task StartAsync(KnowledgeIndexAttempt attempt, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(attempt);
 
-        // Committed on its own, before any embedding request. It is the anchor.
+        // Committed on its own, before any embedding request. It is the anchor,
+        // and (Phase 35) the single-flight gate: a second Started attempt for the
+        // same document is refused by the index, before anything is sent.
         _context.KnowledgeIndexAttempts.Add(attempt);
 
         try
         {
             await _context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (DbUpdateException failure) when (failure.InnerException is PostgresException
+        {
+            SqlState: PostgresErrorCodes.UniqueViolation,
+            ConstraintName: InFlightIndex,
+        })
+        {
+            throw new KnowledgeIndexingInProgressException(
+                "This document is already being indexed. Nothing was sent; try again once that finishes.",
+                failure);
         }
         finally
         {

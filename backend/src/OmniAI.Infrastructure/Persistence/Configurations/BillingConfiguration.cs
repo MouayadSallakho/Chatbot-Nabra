@@ -458,5 +458,25 @@ internal sealed class BillingEventConfiguration : IEntityTypeConfiguration<Billi
         // What the worker's claim scans.
         builder.HasIndex(stored => new { stored.Status, stored.ReceivedAt })
             .HasDatabaseName("ix_billing_events_status_received");
+
+        // Phase 35: claim ownership. Infrastructure state, not a business fact, so
+        // shadow properties rather than members of the aggregate. The token is a
+        // concurrency token: a worker whose claim was taken over (its lease lapsed
+        // and another instance claimed the event) saves with the old token and
+        // matches nothing, so a stale owner can never settle an event.
+        builder.Property<Guid?>(BillingEventClaim.TokenProperty)
+            .HasColumnName("claim_token")
+            .IsConcurrencyToken();
+
+        builder.Property<DateTimeOffset?>(BillingEventClaim.ClaimedAtProperty)
+            .HasColumnName("claimed_at");
     }
+}
+
+/// <summary>Names of the billing-event claim shadow properties.</summary>
+internal static class BillingEventClaim
+{
+    public const string TokenProperty = "ClaimToken";
+
+    public const string ClaimedAtProperty = "ClaimedAt";
 }

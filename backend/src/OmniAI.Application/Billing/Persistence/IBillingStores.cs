@@ -109,14 +109,57 @@ public interface IBillingEventInbox
     /// Takes a batch of events for this worker and nobody else.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// One atomic statement, so several instances asking together get disjoint
-    /// sets and a worker that dies leaves rows that look old and come back.
+    /// sets.
+    /// </para>
+    /// <para>
+    /// <strong>A claim is a lease (Phase 35).</strong> An event another worker has
+    /// claimed is not claimable again until that claim is older than
+    /// <paramref name="lease"/> — before, a second instance could take an event that
+    /// was still being processed. Once the lease has lapsed the event is claimed
+    /// again with a new owner, and the old owner can no longer settle it.
+    /// </para>
     /// </remarks>
     Task<IReadOnlyList<BillingEvent>> ClaimAsync(
         int batchSize,
         int maxAttempts,
         DateTimeOffset now,
+        TimeSpan lease,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Records what became of an event this worker holds.
+    /// </summary>
+    /// <exception cref="BillingEventOwnershipLostException">
+    /// The claim this event was loaded under is no longer the current one: the
+    /// lease lapsed and another worker took it. Nothing was written.
+    /// </exception>
     Task SaveAsync(BillingEvent billingEvent, CancellationToken cancellationToken = default);
+}
+
+/// <summary>
+/// The worker holding a billing event is no longer its owner (Phase 35).
+/// </summary>
+/// <remarks>
+/// Its lease lapsed and another worker claimed the event. The stale worker must
+/// stop: it may not apply subscription state or settle the event, because the new
+/// owner is doing both. Not a failure to retry.
+/// </remarks>
+public sealed class BillingEventOwnershipLostException : Exception
+{
+    public BillingEventOwnershipLostException()
+        : base("This worker's claim on the billing event is no longer current.")
+    {
+    }
+
+    public BillingEventOwnershipLostException(string message)
+        : base(message)
+    {
+    }
+
+    public BillingEventOwnershipLostException(string message, Exception innerException)
+        : base(message, innerException)
+    {
+    }
 }

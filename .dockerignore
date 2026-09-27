@@ -1,0 +1,23 @@
+# Build context for deploy/*.Dockerfile (context = repository root).
+# Keep secrets, local state and build output out of every image.
+.git
+.github
+.vs
+.vscode
+.claude
+**/bin
+**/obj
+**/node_modules
+frontend/.angular
+frontend/dist
+artifacts
+**/*.user
+**/*.env
+**/.env*
+!deploy/.env.example
+**/*.pfx
+**/*.pem
+**/*.key
+**/*.crt
+deploy/certs
+tools/performance/results

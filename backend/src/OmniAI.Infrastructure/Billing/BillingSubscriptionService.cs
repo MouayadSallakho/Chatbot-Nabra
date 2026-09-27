@@ -64,6 +64,7 @@ internal sealed class BillingSubscriptionService(
         BillingProvider provider,
         ProviderSubscriptionSnapshot snapshot,
         bool mayBegin = false,
+        BillingEvent? claimedEvent = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
@@ -73,6 +74,16 @@ internal sealed class BillingSubscriptionService(
             .ConfigureAwait(false);
 
         await LockAsync(tenantId, cancellationToken).ConfigureAwait(false);
+
+        // Phase 35: a worker whose lease lapsed while it was reading the provider
+        // must not change anything. Proved here, in this transaction, and held
+        // until it commits; the rollback on throw writes nothing.
+        if (claimedEvent is not null)
+        {
+            await BillingEventOwnership
+                .FenceAsync(_context, claimedEvent, cancellationToken)
+                .ConfigureAwait(false);
+        }
 
         WorkspaceSubscription? subscription = await _context.WorkspaceSubscriptions
             .FirstOrDefaultAsync(

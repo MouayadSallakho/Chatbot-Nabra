@@ -226,16 +226,55 @@ public sealed record ClaimedEmail(
 public interface INotificationEmailOutbox
 {
     /// <summary>
-    /// Claims pending emails that are due, marking them Sending, with
-    /// <c>FOR UPDATE SKIP LOCKED</c>.
+    /// Takes ownership of pending emails that are due, with <c>FOR UPDATE SKIP
+    /// LOCKED</c> and a fresh claim token. They stay <c>Pending</c>: owning an email
+    /// is not having tried to send it.
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <strong>Phase 35.</strong> Claiming used to move the whole batch to
+    /// <c>Sending</c>, so a worker killed before its first SMTP attempt left every
+    /// claimed email to be reconciled as <c>Unknown</c> and never delivered, though
+    /// nothing had been handed to any server. Ownership and "dispatch may have
+    /// happened" are now separate: see <see cref="BeginDispatchAsync"/>.
+    /// </para>
+    /// <para>
+    /// A pending email whose claim is older than <paramref name="reclaimClaimedBefore"/>
+    /// belonged to a worker that stopped before dispatching it, and is claimed again.
+    /// Its old owner cannot then dispatch or settle it: both are conditional on the
+    /// token, which the new claim replaced.
+    /// </para>
+    /// <para>
+    /// <see cref="ClaimedEmail.Attempts"/> is the attempt number the dispatch will
+    /// be, which is what the retry arithmetic needs.
+    /// </para>
+    /// </remarks>
     Task<IReadOnlyList<ClaimedEmail>> ClaimAsync(
         int batchSize,
         int maxAttempts,
         DateTimeOffset now,
+        DateTimeOffset reclaimClaimedBefore,
         CancellationToken cancellationToken = default);
 
-    /// <summary>Records a final outcome. Conditional on the claim.</summary>
+    /// <summary>
+    /// The dispatch boundary: moves one owned email to <c>Sending</c> immediately
+    /// before it is handed to the SMTP server, counting the attempt.
+    /// </summary>
+    /// <remarks>
+    /// Returns false when this worker no longer owns it (it was reclaimed); the
+    /// caller must then not send. From <c>Sending</c> onwards a crash can only end in
+    /// <c>Unknown</c> — never a resend (<see cref="AbandonStaleAsync"/>).
+    /// </remarks>
+    Task<bool> BeginDispatchAsync(
+        NotificationEmailId id,
+        Guid claimToken,
+        DateTimeOffset now,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Records a final outcome. Conditional on the claim. <c>Skipped</c> settles an
+    /// owned email that was never dispatched; every other outcome settles one that was.
+    /// </summary>
     Task<bool> SettleAsync(
         NotificationEmailId id,
         Guid claimToken,
@@ -253,7 +292,8 @@ public interface INotificationEmailOutbox
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Marks emails a crashed worker left in Sending as Unknown.
+    /// Marks emails a crashed worker left in Sending as Unknown. Only emails that
+    /// crossed the dispatch boundary are in Sending (Phase 35).
     /// </summary>
     /// <remarks>
     /// Never back to Pending: the worker may have handed the message over before

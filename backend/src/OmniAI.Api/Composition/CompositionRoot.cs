@@ -59,6 +59,7 @@ using OmniAI.Application.Tenants.GetTenantById;
 using OmniAI.Application.Tenants.ListMyTenants;
 using OmniAI.Application.Tenants;
 using OmniAI.Infrastructure.DependencyInjection;
+using OmniAI.Infrastructure.Persistence;
 using OmniAI.Infrastructure.Time;
 using OmniAI.Infrastructure.Security;
 using OmniAI.Infrastructure.WebChat.Protection;
@@ -103,6 +104,10 @@ internal static class CompositionRoot
         ArgumentNullException.ThrowIfNull(configuration);
         ArgumentNullException.ThrowIfNull(environment);
 
+        // Phase 35: a deployment missing what it cannot run correctly without
+        // refuses to start, naming the keys, instead of degrading at first use.
+        ProductionConfiguration.Validate(configuration, environment);
+
         // How this process learns the scheme the browser actually used, across a
         // TLS-terminating proxy, and which proxies it will believe. Registered
         // before authentication because every cookie decision depends on it.
@@ -117,7 +122,12 @@ internal static class CompositionRoot
 
         // Infrastructure decides how persistence is built; the composition root
         // only decides where its configuration comes from.
-        services.AddOmniAiPersistence(configuration.GetConnectionString(DatabaseConnectionName));
+        // Phase 35: every pool sized and every database wait bounded explicitly,
+        // and outside Development the declared connection budget must hold.
+        DatabaseConnectionPolicy databasePolicy = DatabaseConnectionPolicy.FromConfiguration(configuration);
+        databasePolicy.Validate(requireBudget: !environment.IsDevelopment());
+
+        services.AddOmniAiPersistence(configuration.GetConnectionString(DatabaseConnectionName), databasePolicy);
 
         // Authenticated encryption for the credentials this platform stores on a
         // workspace's behalf. The ephemeral key is allowed in Development only:

@@ -45,6 +45,9 @@ public abstract class ProductionApiFixture : IAsyncLifetime
     private readonly RedisTestServer _redis = new();
     private readonly ConcurrentBag<string> _failures = [];
 
+    private readonly string _reports =
+        Path.Combine(Path.GetTempPath(), $"omniai-production-fixture-{Guid.NewGuid():N}");
+
     private WebApplicationFactory<Program>? _application;
 
     /// <summary>The address the simulated TCP connection appears to come from.</summary>
@@ -92,6 +95,19 @@ public abstract class ProductionApiFixture : IAsyncLifetime
                 // than quietly creating an unlimited one.
                 builder.UseSetting("Plans:DefaultPlanCode", "development");
                 builder.UseSetting(ApiKeySetting, string.Empty);
+
+                // Phase 35: Production requires a declared connection budget. One
+                // instance with the default pools (25 + 15 + 2) fits 50.
+                builder.UseSetting("Database:Budget:Connections", "50");
+                builder.UseSetting("Database:Budget:MaxInstances", "1");
+
+                // Phase 35: Production refuses to start without these. A fresh
+                // random key per fixture, never a committed one; reports go to a
+                // private temporary directory outside the repository.
+                builder.UseSetting(
+                    "OMNIAI_SECRET_MASTER_KEY",
+                    Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)));
+                builder.UseSetting("Reports:Storage:RootPath", _reports);
 
                 builder.UseSetting(
                     "ConnectionStrings:OmniAiProtectionRedis",
@@ -145,6 +161,11 @@ public abstract class ProductionApiFixture : IAsyncLifetime
         // running in parallel against the same server.
         await _redis.ClearAsync();
         await _database.DisposeAsync();
+
+        if (Directory.Exists(_reports))
+        {
+            Directory.Delete(_reports, recursive: true);
+        }
     }
 
     /// <summary>

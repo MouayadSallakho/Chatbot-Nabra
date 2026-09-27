@@ -50,12 +50,17 @@ public sealed class WebChatSchemaTests(PostgresTestDatabase database)
         // notification_emails.claim_token and notification_occurrences.claim_token
         // are Phase 32's, and are the same kind of worker lease token: random,
         // server-only, cleared on settlement, granting nothing.
+        //
+        // billing_events.claim_token is Phase 35's billing-worker lease token, of
+        // the same kind: a new random value per claim, compared by the database to
+        // prove ownership, cleared when the event settles.
         Assert.Equal(
             "ai_provider_usages.cached_input_tokens:bigint, "
             + "ai_provider_usages.input_tokens:bigint, "
             + "ai_provider_usages.output_tokens:bigint, "
             + "ai_provider_usages.reasoning_tokens:bigint, "
             + "ai_provider_usages.total_tokens:bigint, "
+            + "billing_events.claim_token:uuid, "
             + "notification_emails.claim_token:uuid, "
             + "notification_occurrences.claim_token:uuid, "
             + "report_executions.claim_token:uuid, "

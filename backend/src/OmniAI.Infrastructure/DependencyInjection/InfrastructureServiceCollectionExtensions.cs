@@ -76,11 +76,21 @@ public static class InfrastructureServiceCollectionExtensions
     /// fabricated default that quietly points somewhere real.
     /// </para>
     /// </param>
+    /// <param name="policy">
+    /// Pool sizes and timeouts (Phase 35). Applied to every pool this method
+    /// creates, overriding anything the connection string says, so the declared
+    /// connection budget is the one actually in force.
+    /// </param>
     public static IServiceCollection AddOmniAiPersistence(
         this IServiceCollection services,
-        string? connectionString)
+        string? connectionString,
+        DatabaseConnectionPolicy? policy = null)
     {
         ArgumentNullException.ThrowIfNull(services);
+
+        DatabaseConnectionPolicy connections = policy ?? new DatabaseConnectionPolicy();
+
+        services.AddSingleton(connections);
 
         services.AddDbContext<OmniAiDbContext>(options =>
         {
@@ -90,7 +100,7 @@ public static class InfrastructureServiceCollectionExtensions
             }
             else
             {
-                options.UseNpgsql(connectionString);
+                options.UseNpgsql(connections.ApplicationConnectionString(connectionString));
             }
         });
 
@@ -172,7 +182,7 @@ public static class InfrastructureServiceCollectionExtensions
             ? throw new InvalidOperationException(
                 "Website chat needs a database connection string. Set "
                 + "ConnectionStrings:OmniAiDatabase.")
-            : NpgsqlDataSource.Create(connectionString));
+            : NpgsqlDataSource.Create(connections.ConversationLockConnectionString(connectionString)));
 
         services.AddScoped<IConversationLock, PostgresConversationLock>();
 

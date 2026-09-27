@@ -189,6 +189,21 @@ public sealed class IndexKnowledgeDocumentHandler(
 
         try
         {
+            if (attempt is not null)
+            {
+                // Phase 35: holding the single-flight slot, look again. An attempt
+                // that ran while this request was on its way has, by the time this
+                // one could start, already written its index (it settles only
+                // after writing), so the version read above is stale and nothing
+                // is sent. Refused as a changed document: that is what happened.
+                Versioned<KnowledgeDocument>? current = await _documents
+                    .FindAsync(tenantId, documentId, cancellationToken)
+                    .ConfigureAwait(false)
+                    ?? throw new KnowledgeDocumentVersionMismatchException();
+
+                KnowledgeConcurrency.RequireExpectedVersion(current, stored.Version);
+            }
+
             (writes, calls) = await EmbedAsync(chunks, profile, tenantId, cancellationToken)
                 .ConfigureAwait(false);
 

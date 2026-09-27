@@ -66,9 +66,12 @@ internal sealed class PostgresConversationLock(NpgsqlDataSource dataSource) : IC
             command.CommandText = "SELECT pg_advisory_lock(@key)";
             command.Parameters.AddWithValue("key", KeyFor(conversationId));
 
-            // No command timeout: the wait is as long as the conversation ahead of
-            // it takes, and cancellation is what ends it early.
-            command.CommandTimeout = 0;
+            // The wait is bounded by the data source's command timeout, which the
+            // connection policy sets to Database:Timeouts:ConversationLockWaitSeconds
+            // (Phase 35). It used to be unbounded, so a turn queued against an
+            // unresponsive server never ended; the bound comfortably exceeds the
+            // turn ahead of it (one provider call, at most one provider timeout).
+            // Cancellation still ends it earlier.
 
             await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
 

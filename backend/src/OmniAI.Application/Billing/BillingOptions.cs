@@ -1,3 +1,4 @@
+using OmniAI.Application.Billing.Persistence;
 using OmniAI.Application.Plans;
 using OmniAI.Domain;
 using OmniAI.Domain.Billing;
@@ -163,11 +164,20 @@ public interface IBillingSubscriptionService
     /// Whether a subscription may be created when the workspace has none. True
     /// only for a checkout this platform started and can trace to the workspace.
     /// </param>
+    /// <param name="claimedEvent">
+    /// The claimed event this change is made on behalf of, if any (Phase 35). Its
+    /// claim is re-checked, and the row locked, inside the same transaction that
+    /// changes the subscription — so a worker whose lease has lapsed changes nothing.
+    /// </param>
+    /// <exception cref="BillingEventOwnershipLostException">
+    /// <paramref name="claimedEvent"/>'s claim is no longer current. Nothing was written.
+    /// </exception>
     Task<BillingApplyOutcome> ApplyAsync(
         TenantId tenantId,
         BillingProvider provider,
         ProviderSubscriptionSnapshot snapshot,
         bool mayBegin = false,
+        BillingEvent? claimedEvent = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>Ends grace for one workspace and assigns the fallback plan.</summary>

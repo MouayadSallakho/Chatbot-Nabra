@@ -101,21 +101,30 @@ public sealed class KnowledgeLoadTests(KnowledgeLoadApiFixture api, ITestOutputH
         Assert.Equal((long)embeddings.Calls, ledger[0][0]);
         Assert.Equal(0L, ledger[0][1]);
 
-        // Phase 34 finding, recorded rather than hidden: every concurrent request
-        // for the same version records its own attempt and pays for its own batch
-        // before the version check; the winner is Succeeded and each loser settles
-        // truthfully as Failed / document_changed (no alert, no retry). Accounting
-        // is exact; the cost is multiplied by duplicate concurrent requests.
+        // Phase 34 found every concurrent request for one version paying for its
+        // own batch. Phase 35 single flight: one attempt is admitted and pays;
+        // the others are refused before sending anything (409 while it runs, or
+        // 412 once it has written the index they read before), so the provider
+        // received exactly one version's worth of inputs.
         List<object?[]> attempts = await api.QueryAsync(
             "select status, coalesce(failure_code, ''), count(*) from knowledge_index_attempts where document_id = @d group by 1, 2 order by 1",
             ("d", document.Id));
         output.WriteLine(string.Join("; ", attempts.Select(row => $"{row[0]}/{row[1]} x{row[2]}")));
 
+        Assert.Equal(1, statuses.Count(status => status == HttpStatusCode.OK));
+        Assert.All(
+            statuses.Where(status => status != HttpStatusCode.OK),
+            status => Assert.True(status is HttpStatusCode.Conflict or HttpStatusCode.PreconditionFailed, status.ToString()));
+
         Assert.DoesNotContain(attempts, row => (string)row[0]! == "Started");
         Assert.Equal(1L, attempts.Where(row => (string)row[0]! == "Succeeded").Sum(row => (long)row[2]!));
-        Assert.Equal(
-            (long)statuses.Count(status => status == HttpStatusCode.PreconditionFailed),
-            attempts.Where(row => (string)row[1]! == "document_changed").Sum(row => (long)row[2]!));
+        Assert.All(
+            attempts.Where(row => (string)row[0]! != "Succeeded"),
+            row => Assert.Equal("document_changed", (string)row[1]!));
+
+        long chunks = (long)(await api.QueryAsync(
+            "select count(*) from knowledge_chunks where knowledge_document_id = @d", ("d", document.Id)))[0][0]!;
+        Assert.Equal(chunks, (long)embeddings.Inputs);
     }
 
     [Fact]

@@ -7,7 +7,7 @@ using OmniAI.Infrastructure.Reliability;
 
 namespace OmniAI.Infrastructure.DependencyInjection;
 
-/// <summary>Stale-work reconciliation: provider operations and indexing attempts left in flight.</summary>
+/// <summary>Stale-work reconciliation: provider operations, indexing attempts and conversation turns left in flight.</summary>
 public static class ReliabilityServiceCollectionExtensions
 {
     public static IServiceCollection AddOmniAiReliability(
@@ -38,6 +38,7 @@ public static class ReliabilityServiceCollectionExtensions
 
         services.AddScoped<ProviderUsageReconciler>();
         services.AddScoped<KnowledgeAttemptReconciler>();
+        services.AddScoped<ConversationTurnReconciler>();
         services.AddHostedService<StaleWorkReconciliationWorker>();
 
         return services;

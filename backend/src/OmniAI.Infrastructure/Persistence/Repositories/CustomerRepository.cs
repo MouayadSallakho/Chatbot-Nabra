@@ -49,51 +49,229 @@ internal sealed class CustomerRepository(OmniAiDbContext context) : ICustomerRep
 
         int total = await canonical.CountAsync(cancellationToken).ConfigureAwait(false);
 
-        // A left join with aggregates: one round trip, and PostgreSQL does the
-        // counting. A customer with no conversations at all -- possible only after
-        // a merge moved their history away -- still appears, with a count of zero.
-        var page1 = await canonical
-            .GroupJoin(
-                _context.Conversations.AsNoTracking()
-                    .Where(conversation => conversation.TenantId == tenantId),
-                customer => customer.Id,
-                conversation => conversation.CustomerId,
-                (customer, conversations) => new
-                {
-                    customer.Id,
-                    customer.DisplayName,
-                    customer.CreatedAt,
-                    ConversationCount = conversations.Count(),
-                    LastActivityAt = conversations
-                        .Max(conversation => (DateTimeOffset?)conversation.LastActivityAt),
-                })
-            // Nulls last, explicitly. PostgreSQL sorts them first on a descending
-            // order, which would put every customer who has no history at the top
-            // of a screen whose whole purpose is recent activity.
-            .OrderBy(row => row.LastActivityAt == null)
-            .ThenByDescending(row => row.LastActivityAt)
-            .ThenByDescending(row => row.Id)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .ToListAsync(cancellationToken)
+        int skip = (page - 1) * pageSize;
+
+        // The order is unchanged: latest conversation activity first, customers
+        // with no history last, the id breaking ties. What changed (Phase 35) is
+        // how the page is found -- see OrderedPageAsync.
+        IReadOnlyList<CustomerId> ids =
+            await OrderedPageAsync(tenantId, canonical, skip, pageSize, cancellationToken)
+                .ConfigureAwait(false);
+
+        if (ids.Count == 0)
+        {
+            return ([], total);
+        }
+
+        var customers = await canonical
+            .Where(customer => ids.Contains(customer.Id))
+            .Select(customer => new { customer.Id, customer.DisplayName, customer.CreatedAt })
+            .ToDictionaryAsync(customer => customer.Id, cancellationToken)
+            .ConfigureAwait(false);
+
+        // The page's aggregates, for exactly the ids on it: an index range per
+        // customer, not a pass over the workspace.
+        var activity = await _context.Conversations
+            .AsNoTracking()
+            .Where(conversation => conversation.TenantId == tenantId && ids.Contains(conversation.CustomerId))
+            .GroupBy(conversation => conversation.CustomerId)
+            .Select(group => new
+            {
+                CustomerId = group.Key,
+                Count = group.Count(),
+                LastActivityAt = group.Max(conversation => conversation.LastActivityAt),
+            })
+            .ToDictionaryAsync(row => row.CustomerId, cancellationToken)
             .ConfigureAwait(false);
 
         IReadOnlyDictionary<CustomerId, IReadOnlyList<ChannelKind>> channels =
-            await ChannelsAsync(
-                    tenantId,
-                    [.. page1.Select(row => row.Id)],
-                    cancellationToken)
+            await ChannelsAsync(tenantId, [.. ids], cancellationToken).ConfigureAwait(false);
+
+        List<CustomerDirectoryRow> rows = new(ids.Count);
+
+        foreach (CustomerId id in ids)
+        {
+            // Merged or removed between the two reads: left off this page rather
+            // than shown half-described.
+            if (!customers.TryGetValue(id, out var customer))
+            {
+                continue;
+            }
+
+            bool active = activity.TryGetValue(id, out var used);
+
+            rows.Add(new CustomerDirectoryRow(
+                customer.Id,
+                customer.DisplayName,
+                active ? used!.Count : 0,
+                active ? used!.LastActivityAt : null,
+                customer.CreatedAt,
+                channels.TryGetValue(id, out IReadOnlyList<ChannelKind>? kinds) ? kinds : []));
+        }
+
+        return (rows, total);
+    }
+
+    /// <summary>
+    /// A customer id as PostgreSQL orders <c>uuid</c>: by its canonical text,
+    /// byte for byte. Ties are broken in memory here and must match the database.
+    /// </summary>
+    private static string PostgresUuidOrder(CustomerId id) =>
+        id.Value.ToString("D", CultureInfo.InvariantCulture);
+
+    /// <summary>
+    /// The ids on one page of the directory, in directory order, without ranking the
+    /// whole workspace (Phase 35).
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <strong>Why.</strong> Ordering by each customer's latest conversation made
+    /// PostgreSQL compute that maximum for every customer before taking twenty:
+    /// linear in the workspace, about 3.6 µs a customer in Phase 34 and a projected
+    /// ~360 ms a page at 100k. No index can serve a sort key that is an aggregate
+    /// over another table.
+    /// </para>
+    /// <para>
+    /// <strong>How.</strong> Walking conversations newest first, on the existing
+    /// <c>(tenant_id, last_activity_at)</c> index, each customer first appears at
+    /// their latest activity. So the first <c>skip + take</c> customers are all
+    /// inside a short prefix of that walk. The prefix is widened until it holds
+    /// enough customers; the activity of the last one needed is then a threshold,
+    /// and every conversation at or after it is aggregated exactly — ties at the
+    /// threshold included, so the order is the same as the full sort, not an
+    /// approximation of it. Cost follows the depth of the page asked for, not the
+    /// size of the workspace. No schema or write-path change was needed.
+    /// </para>
+    /// <para>
+    /// Customers with no conversations (only possible after a merge moved their
+    /// history away) come last, by id, exactly as before; they are only ever
+    /// looked for once every active customer is already on an earlier position.
+    /// </para>
+    /// </remarks>
+    private async Task<IReadOnlyList<CustomerId>> OrderedPageAsync(
+        TenantId tenantId,
+        IQueryable<Customer> canonical,
+        int skip,
+        int take,
+        CancellationToken cancellationToken)
+    {
+        int wanted = skip + take;
+
+        // No join to the customers here, deliberately: a merge moves every
+        // conversation to the surviving customer in the same transaction that
+        // tombstones the source, so a conversation always names a canonical
+        // customer. A semi-join "just in case" let the planner hash the whole
+        // workspace's customers before taking the window -- the linear cost this
+        // method exists to remove. The rows are still read from canonical
+        // customers only (ListAsync), so a stray id could never be shown.
+        IQueryable<Conversation> conversations = _context.Conversations
+            .AsNoTracking()
+            .Where(conversation => conversation.TenantId == tenantId);
+
+        DateTimeOffset? threshold = null;
+        List<CustomerId> everyActive = [];
+
+        for (int window = Math.Max(wanted * 4, 64); ; window = checked(window * 4))
+        {
+            var recent = await conversations
+                .OrderByDescending(conversation => conversation.LastActivityAt)
+                .Take(window)
+                .Select(conversation => new { conversation.CustomerId, conversation.LastActivityAt })
+                .ToListAsync(cancellationToken)
                 .ConfigureAwait(false);
 
-        return (
-            [.. page1.Select(row => new CustomerDirectoryRow(
-                row.Id,
-                row.DisplayName,
-                row.ConversationCount,
-                row.LastActivityAt,
-                row.CreatedAt,
-                channels.TryGetValue(row.Id, out IReadOnlyList<ChannelKind>? kinds) ? kinds : []))],
-            total);
+            // First appearance in newest-first order is each customer's latest.
+            List<(CustomerId Id, DateTimeOffset Latest)> seen = [];
+            HashSet<CustomerId> distinct = [];
+
+            foreach (var row in recent)
+            {
+                if (distinct.Add(row.CustomerId))
+                {
+                    seen.Add((row.CustomerId, row.LastActivityAt));
+                }
+            }
+
+            if (seen.Count >= wanted)
+            {
+                threshold = seen[wanted - 1].Latest;
+
+                break;
+            }
+
+            if (recent.Count < window)
+            {
+                // The whole workspace's history is in hand: every active customer.
+                everyActive = [.. seen.Select(customer => customer.Id)];
+
+                break;
+            }
+        }
+
+        if (threshold is { } since)
+        {
+            var ranked = await conversations
+                .Where(conversation => conversation.LastActivityAt >= since)
+                .GroupBy(conversation => conversation.CustomerId)
+                .Select(group => new
+                {
+                    Id = group.Key,
+                    Latest = group.Max(conversation => conversation.LastActivityAt),
+                })
+                .ToListAsync(cancellationToken)
+                .ConfigureAwait(false);
+
+            return
+            [
+                .. ranked
+                    .OrderByDescending(row => row.Latest)
+                    .ThenByDescending(row => PostgresUuidOrder(row.Id), StringComparer.Ordinal)
+                    .Skip(skip)
+                    .Take(take)
+                    .Select(row => row.Id),
+            ];
+        }
+
+        // Fewer active customers than the page reaches: re-rank them exactly (the
+        // walk's order has no id tie-break), then continue with the inactive ones.
+        var active = await conversations
+            .GroupBy(conversation => conversation.CustomerId)
+            .Select(group => new
+            {
+                Id = group.Key,
+                Latest = group.Max(conversation => conversation.LastActivityAt),
+            })
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        List<CustomerId> ordered =
+        [
+            .. active
+                .OrderByDescending(row => row.Latest)
+                .ThenByDescending(row => PostgresUuidOrder(row.Id), StringComparer.Ordinal)
+                .Select(row => row.Id),
+        ];
+
+        List<CustomerId> result = [.. ordered.Skip(skip).Take(take)];
+
+        if (result.Count < take)
+        {
+            int inactiveSkip = Math.Max(0, skip - ordered.Count);
+
+            List<CustomerId> inactive = await canonical
+                .Where(customer => !_context.Conversations.Any(conversation =>
+                    conversation.TenantId == tenantId && conversation.CustomerId == customer.Id))
+                .OrderByDescending(customer => customer.Id)
+                .Skip(inactiveSkip)
+                .Take(take - result.Count)
+                .Select(customer => customer.Id)
+                .ToListAsync(cancellationToken)
+                .ConfigureAwait(false);
+
+            result.AddRange(inactive);
+        }
+
+        return result;
     }
 
     public async Task<Versioned<Customer>?> FindAsync(

@@ -1,5 +1,7 @@
 using System.Net.Sockets;
 using MailKit;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using MailKit.Net.Smtp;
 using MailKit.Security;
 using MimeKit;
@@ -23,9 +25,13 @@ namespace OmniAI.Infrastructure.Notifications.Email;
 /// have accepted it.
 /// </para>
 /// <para>
-/// <strong>Nothing is logged here.</strong> No protocol logger is attached, so no
-/// SMTP transcript — with its addresses, credentials and content — is written
-/// anywhere. Exceptions are reduced to stable codes before they leave.
+/// <strong>Nothing about a message is logged here.</strong> No protocol logger is
+/// attached, so no SMTP transcript — with its addresses, credentials and content
+/// — is written anywhere. Exceptions are reduced to stable codes before they
+/// leave. The one exception (Phase 35): a failure to reach the relay logs its
+/// configured host, port and the exception's type, because <c>connect_failed</c>
+/// alone left an operator unable to tell a refused port from a rejected
+/// certificate.
 /// </para>
 /// <para>
 /// <strong>Addressing is the server's.</strong> The sender is configuration; the
@@ -34,9 +40,14 @@ namespace OmniAI.Infrastructure.Notifications.Email;
 /// add a <c>Bcc:</c>.
 /// </para>
 /// </remarks>
-internal sealed class SmtpOperationalEmailSender(OperationalEmailOptions options) : IOperationalEmailSender
+internal sealed partial class SmtpOperationalEmailSender(
+    OperationalEmailOptions options,
+    ILogger<SmtpOperationalEmailSender>? logger = null) : IOperationalEmailSender
 {
     private readonly OperationalEmailOptions _options = options ?? throw new ArgumentNullException(nameof(options));
+
+    private readonly ILogger<SmtpOperationalEmailSender> _logger =
+        logger ?? NullLogger<SmtpOperationalEmailSender>.Instance;
 
     public bool IsConfigured => true;
 
@@ -74,6 +85,9 @@ internal sealed class SmtpOperationalEmailSender(OperationalEmailOptions options
             }
             catch (Exception failure) when (IsConnectFailure(failure))
             {
+                // The type only: an exception message can quote the server's reply.
+                LogConnectFailed(_options.Smtp.Host!.Trim(), _options.Smtp.Port, failure.GetType().Name);
+
                 return new(OperationalEmailOutcome.NotSent, NotificationEmailFailures.ConnectFailed);
             }
 
@@ -127,6 +141,11 @@ internal sealed class SmtpOperationalEmailSender(OperationalEmailOptions options
 
         return mime;
     }
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "Operational email could not reach the SMTP relay {Host}:{Port} ({FailureType}); it stays pending and will be retried.")]
+    private partial void LogConnectFailed(string host, int port, string failureType);
 
     private SecureSocketOptions SocketOptions() => _options.Smtp.Security switch
     {

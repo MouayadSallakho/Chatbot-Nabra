@@ -213,7 +213,9 @@ internal sealed partial class OperationalEmailWorker(
             }
 
             claimed = await queue
-                .ClaimAsync(_options.EmailBatchSize, _options.EmailMaxAttempts, now, cancellationToken)
+                // Owned-but-undispatched emails whose owner stopped (claim older
+                // than the lease) are claimed again (Phase 35).
+                .ClaimAsync(_options.EmailBatchSize, _options.EmailMaxAttempts, now, now - _options.EmailSendingLease, cancellationToken)
                 .ConfigureAwait(false);
         }
 

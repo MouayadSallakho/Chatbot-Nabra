@@ -33,28 +33,36 @@ internal sealed class NotificationEmailOutbox(OmniAiDbContext context) : INotifi
         int batchSize,
         int maxAttempts,
         DateTimeOffset now,
+        DateTimeOffset reclaimClaimedBefore,
         CancellationToken cancellationToken = default)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(batchSize);
 
+        // Ownership only (Phase 35): the rows stay Pending, and the attempt is
+        // counted at the dispatch boundary, not here. Unowned rows, and rows whose
+        // owner stopped before dispatching them (claim older than the lease), are
+        // candidates. The bounded MATERIALIZED form, because the IN (... LIMIT ...)
+        // form is not guaranteed to respect its limit (Phase 33).
         await using NpgsqlCommand command = await Command(
                 """
-                UPDATE notification_emails
-                   SET status = 'Sending',
-                       attempts = attempts + 1,
-                       claim_token = gen_random_uuid(),
-                       claimed_at = @now
-                 WHERE id IN (
-                    SELECT candidate.id
-                      FROM notification_emails candidate
-                     WHERE candidate.status = 'Pending'
-                       AND candidate.available_at <= @now
-                       AND candidate.attempts < @max_attempts
-                     ORDER BY candidate.available_at, candidate.id
+                WITH candidate AS MATERIALIZED (
+                    SELECT id
+                      FROM notification_emails
+                     WHERE status = 'Pending'
+                       AND available_at <= @now
+                       AND attempts < @max_attempts
+                       AND (claim_token IS NULL OR claimed_at < @reclaim_before)
+                     ORDER BY available_at, id
                      LIMIT @batch_size
                      FOR UPDATE SKIP LOCKED
-                 )
-                RETURNING id, notification_id, tenant_id, recipient_user_id, category, claim_token, attempts
+                )
+                UPDATE notification_emails e
+                   SET claim_token = gen_random_uuid(),
+                       claimed_at = @now
+                  FROM candidate
+                 WHERE e.id = candidate.id
+                   AND e.status = 'Pending'
+                RETURNING e.id, e.notification_id, e.tenant_id, e.recipient_user_id, e.category, e.claim_token, e.attempts + 1
                 """,
                 cancellationToken)
             .ConfigureAwait(false);
@@ -62,6 +70,7 @@ internal sealed class NotificationEmailOutbox(OmniAiDbContext context) : INotifi
         command.Parameters.AddWithValue("now", now.ToUniversalTime());
         command.Parameters.AddWithValue("max_attempts", maxAttempts);
         command.Parameters.AddWithValue("batch_size", batchSize);
+        command.Parameters.AddWithValue("reclaim_before", reclaimClaimedBefore.ToUniversalTime());
 
         List<ClaimedEmail> claimed = [];
 
@@ -80,6 +89,35 @@ internal sealed class NotificationEmailOutbox(OmniAiDbContext context) : INotifi
         }
 
         return claimed;
+    }
+
+    public async Task<bool> BeginDispatchAsync(
+        NotificationEmailId id,
+        Guid claimToken,
+        DateTimeOffset now,
+        CancellationToken cancellationToken = default)
+    {
+        // The ambiguity boundary. Conditional on still owning the row and it still
+        // being Pending, so a reclaimed email is never dispatched by its old owner.
+        // claimed_at restarts here so the Sending lease measures the dispatch.
+        await using NpgsqlCommand command = await Command(
+                """
+                UPDATE notification_emails
+                   SET status = 'Sending',
+                       attempts = attempts + 1,
+                       claimed_at = @now
+                 WHERE id = @id
+                   AND status = 'Pending'
+                   AND claim_token = @token
+                """,
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        command.Parameters.AddWithValue("now", now.ToUniversalTime());
+        command.Parameters.AddWithValue("id", id.Value);
+        command.Parameters.AddWithValue("token", claimToken);
+
+        return await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false) == 1;
     }
 
     public async Task<bool> SettleAsync(
@@ -104,12 +142,17 @@ internal sealed class NotificationEmailOutbox(OmniAiDbContext context) : INotifi
                        settled_at = @now,
                        claim_token = NULL
                  WHERE id = @id
-                   AND status = 'Sending'
+                   AND status = @from
                    AND claim_token = @token
                 """,
                 cancellationToken)
             .ConfigureAwait(false);
 
+        // Skipped is decided before dispatch (an owned, Pending email); every other
+        // outcome is the result of a dispatch (Sending).
+        command.Parameters.AddWithValue(
+            "from",
+            status == NotificationEmailStatus.Skipped ? "Pending" : "Sending");
         command.Parameters.AddWithValue("status", status.ToString());
         command.Parameters.AddWithValue("code", Bounded(failureCode) is string code ? code : DBNull.Value);
         command.Parameters.AddWithValue("now", now.ToUniversalTime());

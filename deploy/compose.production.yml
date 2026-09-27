@@ -1,0 +1,240 @@
+# OmniAI production topology (single host, Docker Compose).
+#
+#   edge (nginx, TLS)  ->  api-a, api-b  ->  postgres (pg17 + pgvector), redis
+#                          migrator (runs once, before the APIs, as the owner role)
+#
+# Every secret comes from deploy/.env (never committed; start from .env.example)
+# or, better, from your secret store. Nothing here contains a credential.
+# See docs/operations/production-deployment.md for the procedure.
+#
+#   docker compose -f deploy/compose.production.yml --env-file deploy/.env up -d
+#
+# Multi-host note: the report volume must be shared by every API instance
+# (FileSystemReportArtifactStore is single-host storage). On more than one host,
+# use a shared filesystem or replace the store before scaling out.
+
+name: omniai
+
+x-api: &api
+  image: ${OMNIAI_API_IMAGE:-omniai-api:latest}
+  restart: unless-stopped
+  depends_on:
+    migrator-privileges:
+      condition: service_completed_successfully
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+  # Kestrel drains in-flight requests on SIGTERM; workers stop and their leases
+  # or reconcilers recover whatever was in hand.
+  stop_grace_period: 30s
+  read_only: true
+  tmpfs:
+    - /tmp:size=64m
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  cpus: ${OMNIAI_API_CPUS:-2}
+  mem_limit: ${OMNIAI_API_MEMORY:-2g}
+  pids_limit: 512
+  volumes:
+    - reports:/var/lib/omniai/reports
+  environment:
+    ASPNETCORE_ENVIRONMENT: Production
+    ConnectionStrings__OmniAiDatabase: "Host=postgres;Port=5432;Database=${OMNIAI_DB:?};Username=omniai_app;Password=${OMNIAI_APP_PASSWORD:?};GSS Encryption Mode=Disable"
+    ConnectionStrings__OmniAiProtectionRedis: "redis:6379,password=${OMNIAI_REDIS_PASSWORD:?}"
+    Database__Budget__Connections: ${OMNIAI_DB_BUDGET_CONNECTIONS:?}
+    Database__Budget__MaxInstances: "2"
+    Database__Pools__ApplicationPoolSize: ${OMNIAI_DB_APP_POOL:-25}
+    Database__Pools__ConversationLockPoolSize: ${OMNIAI_DB_LOCK_POOL:-15}
+    OMNIAI_SECRET_MASTER_KEY: ${OMNIAI_SECRET_MASTER_KEY:?}
+    PUBLIC_CHAT_NETWORK_KEY_SECRET: ${PUBLIC_CHAT_NETWORK_KEY_SECRET:?}
+    Plans__DefaultPlanCode: ${OMNIAI_DEFAULT_PLAN_CODE:?}
+    Reports__Storage__RootPath: /var/lib/omniai/reports
+    # Only the edge's fixed address may set X-Forwarded-Proto / -For.
+    ForwardedHeaders__KnownProxies__0: 172.30.35.10
+    Billing__FallbackPlanCode: ${OMNIAI_BILLING_FALLBACK_PLAN_CODE:-}
+    Billing__ReturnBaseUrl: ${OMNIAI_PUBLIC_BASE_URL:-}
+    Email__AppBaseUrl: ${OMNIAI_PUBLIC_BASE_URL:-}
+  # Optional provider credentials (OpenAI, Stripe, WhatsApp, SMTP) come ONLY
+  # from this file, never from interpolation: compose resolves ${VAR} from the
+  # calling shell before --env-file, so a key that merely exists in an
+  # operator's shell would otherwise silently switch live traffic on (it did in
+  # the Phase 35 drill). An absent file = every optional integration off.
+  # Template: deploy/providers.env.example.
+  env_file:
+    - path: ${OMNIAI_PROVIDERS_FILE:-./providers.env}
+      required: false
+  # Readiness, probed from inside the container (the image carries no curl):
+  # healthy only when the database answers with every migration applied and
+  # Redis answers PING.
+  healthcheck:
+    test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8080 && printf 'GET /health/ready HTTP/1.0\\r\\nHost: localhost\\r\\n\\r\\n' >&3 && head -1 <&3 | grep -q ' 200 '"]
+    interval: 5s
+    timeout: 4s
+    retries: 3
+    start_period: 20s
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    restart: unless-stopped
+    command:
+      - postgres
+      - -c
+      - max_connections=${OMNIAI_PG_MAX_CONNECTIONS:-100}
+      - -c
+      - shared_buffers=${OMNIAI_PG_SHARED_BUFFERS:-256MB}
+      - -c
+      - password_encryption=scram-sha-256
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${OMNIAI_PG_SUPERUSER_PASSWORD:?}
+      POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256
+      OMNIAI_DB: ${OMNIAI_DB:?}
+      OMNIAI_OWNER_PASSWORD: ${OMNIAI_OWNER_PASSWORD:?}
+      OMNIAI_APP_PASSWORD: ${OMNIAI_APP_PASSWORD:?}
+      OMNIAI_APP_CONNECTION_LIMIT: ${OMNIAI_DB_BUDGET_CONNECTIONS:?}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./postgres/10-omniai-roles.sh:/docker-entrypoint-initdb.d/10-omniai-roles.sh:ro
+    cpus: ${OMNIAI_PG_CPUS:-2}
+    mem_limit: ${OMNIAI_PG_MEMORY:-2g}
+    shm_size: 256m
+    stop_grace_period: 60s
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ${OMNIAI_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks: [data]
+
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    # Ephemeral by design: rate-limit counters, realtime tickets and the SignalR
+    # backplane. Losing them fails public writes closed (503) until it is back;
+    # nothing durable lives here, so no persistence and no eviction.
+    command:
+      - redis-server
+      - --requirepass
+      - ${OMNIAI_REDIS_PASSWORD:?}
+      - --appendonly
+      - "no"
+      - --save
+      - ""
+      - --maxmemory
+      - ${OMNIAI_REDIS_MAXMEMORY:-256mb}
+      - --maxmemory-policy
+      - noeviction
+    environment:
+      REDISCLI_AUTH: ${OMNIAI_REDIS_PASSWORD:?}
+    # Started as the redis user directly: with every capability dropped the
+    # image's entrypoint could not switch to it from root.
+    user: redis
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    cpus: 1
+    mem_limit: 384m
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks: [data]
+
+  migrator:
+    image: ${OMNIAI_MIGRATOR_IMAGE:-omniai-migrator:latest}
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # The owner role: the only role allowed to change the schema. Long
+      # command timeout because an index build on a large table can take minutes.
+      OMNIAI_DESIGN_CONNECTION: "Host=postgres;Port=5432;Database=${OMNIAI_DB:?};Username=omniai_owner;Password=${OMNIAI_OWNER_PASSWORD:?};GSS Encryption Mode=Disable;Command Timeout=900"
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    networks: [data]
+
+  # After every migration run: the runtime role may READ the migration history
+  # (readiness checks it) but never write it. Default privileges would otherwise
+  # give it DML on this owner-created table like on every other. Idempotent.
+  migrator-privileges:
+    image: pgvector/pgvector:pg17
+    user: postgres
+    restart: "no"
+    depends_on:
+      migrator:
+        condition: service_completed_successfully
+    environment:
+      PGHOST: postgres
+      PGDATABASE: ${OMNIAI_DB:?}
+      PGUSER: omniai_owner
+      PGPASSWORD: ${OMNIAI_OWNER_PASSWORD:?}
+    entrypoint:
+      - psql
+      - --no-psqlrc
+      - -v
+      - ON_ERROR_STOP=1
+      - -q
+      - -c
+      - REVOKE ALL ON "__EFMigrationsHistory" FROM omniai_app; GRANT SELECT ON "__EFMigrationsHistory" TO omniai_app;
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m
+      - /var/run/postgresql:size=1m
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    networks: [data]
+
+  api-a:
+    <<: *api
+    hostname: api-a
+    networks:
+      edge:
+        ipv4_address: 172.30.35.21
+      data: {}
+
+  api-b:
+    <<: *api
+    hostname: api-b
+    networks:
+      edge:
+        ipv4_address: 172.30.35.22
+      data: {}
+
+  edge:
+    image: ${OMNIAI_EDGE_IMAGE:-omniai-edge:latest}
+    restart: unless-stopped
+    ports:
+      - "${OMNIAI_EDGE_BIND:-127.0.0.1}:${OMNIAI_EDGE_HTTP_PORT:-8080}:8080"
+      - "${OMNIAI_EDGE_BIND:-127.0.0.1}:${OMNIAI_EDGE_HTTPS_PORT:-8443}:8443"
+    environment:
+      OMNIAI_PUBLIC_HTTPS_PORT_SUFFIX: ${OMNIAI_PUBLIC_HTTPS_PORT_SUFFIX:-}
+    volumes:
+      - ${OMNIAI_TLS_DIR:?}:/etc/nginx/certs:ro
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    cpus: 1
+    mem_limit: 256m
+    networks:
+      edge:
+        ipv4_address: 172.30.35.10
+
+volumes:
+  pgdata:
+  reports:
+
+networks:
+  edge:
+    ipam:
+      config:
+        - subnet: 172.30.35.0/24
+  # No route out: the database and Redis are reachable only from the APIs and
+  # the migrator.
+  data:
+    internal: true

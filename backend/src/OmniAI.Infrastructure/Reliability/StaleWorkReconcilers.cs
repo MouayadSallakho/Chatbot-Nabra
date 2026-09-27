@@ -144,3 +144,76 @@ internal sealed class KnowledgeAttemptReconciler(OmniAiDbContext context)
         return (int)(long)(await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) ?? 0L);
     }
 }
+
+/// <summary>
+/// Settles conversation turns a crashed or restarted process left
+/// <c>Generating</c> (Phase 35).
+/// </summary>
+/// <remarks>
+/// <para>
+/// <strong>Generating → Failed: "no reply was produced", which is true.</strong>
+/// A reply is stored in the same transaction that completes its turn, so a turn
+/// still Generating has no reply. The customer's message stays exactly where it
+/// is. A turn that somehow names a reply is settled Completed instead; the CASE is
+/// there so the statement can never contradict the row it reads.
+/// </para>
+/// <para>
+/// <strong>No provider is called and nothing is regenerated.</strong> Whether the
+/// provider billed the interrupted request is the ledger's to record (its own
+/// reconciler settles it Unknown). A resend with the same client message id is
+/// then told the turn failed, instead of "in progress" for ever, and is not
+/// answered again: the existing rule that a failed turn is never retried, because
+/// a reply costs money and may have been half-produced.
+/// </para>
+/// <para>
+/// Sources: a process that died mid-turn, and a turn whose request was cancelled
+/// (a client disconnect or shutdown), which the runner deliberately does not settle.
+/// </para>
+/// <para>
+/// <strong>Safe against a live turn.</strong> The threshold is validated beyond the
+/// longest a turn can legitimately stay open. A completion that nevertheless lands
+/// afterwards overwrites Failed with Completed and its stored reply: late, but
+/// truthful, and never a second reply.
+/// </para>
+/// <para>
+/// Multi-instance safe and bounded exactly like the other reconcilers:
+/// <c>MATERIALIZED</c> candidates with <c>FOR UPDATE SKIP LOCKED</c>, and the
+/// update repeats <c>status = 'Generating'</c>.
+/// </para>
+/// </remarks>
+internal sealed class ConversationTurnReconciler(OmniAiDbContext context)
+{
+    private readonly OmniAiDbContext _context = context ?? throw new ArgumentNullException(nameof(context));
+
+    /// <returns>How many turns were settled.</returns>
+    public async Task<int> ReconcileAsync(DateTimeOffset startedBefore, DateTimeOffset now, int batchSize, CancellationToken cancellationToken = default)
+    {
+        await using NpgsqlCommand command = await NotificationOccurrenceSql.CommandAsync(
+                _context,
+                """
+                WITH stale AS MATERIALIZED (
+                    SELECT candidate.id
+                      FROM conversation_turns candidate
+                     WHERE candidate.status = 'Generating'
+                       AND candidate.created_at < @cutoff
+                     ORDER BY candidate.created_at, candidate.id
+                     LIMIT @batch_size
+                     FOR UPDATE SKIP LOCKED
+                )
+                UPDATE conversation_turns turn
+                   SET status = CASE WHEN turn.reply_message_id IS NULL THEN 'Failed' ELSE 'Completed' END,
+                       updated_at = GREATEST(turn.updated_at, @now)
+                  FROM stale
+                 WHERE turn.id = stale.id
+                   AND turn.status = 'Generating'
+                """,
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        command.Parameters.AddWithValue("now", now.ToUniversalTime());
+        command.Parameters.AddWithValue("cutoff", startedBefore.ToUniversalTime());
+        command.Parameters.AddWithValue("batch_size", batchSize);
+
+        return await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+    }
+}

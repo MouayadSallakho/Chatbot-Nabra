@@ -375,6 +375,13 @@ internal sealed class ConversationTurnConfiguration : IEntityTypeConfiguration<C
         builder.HasIndex(turn => turn.CustomerMessageId)
             .IsUnique()
             .HasDatabaseName("ux_conversation_turns_customer_message");
+
+        // Phase 35: the stale-turn reconciler's only query, over the handful of
+        // turns still Generating. Without it every pass would scan every turn
+        // ever taken.
+        builder.HasIndex(turn => turn.CreatedAt)
+            .HasDatabaseName("ix_conversation_turns_generating")
+            .HasFilter("status = 'Generating'");
     }
 }
 

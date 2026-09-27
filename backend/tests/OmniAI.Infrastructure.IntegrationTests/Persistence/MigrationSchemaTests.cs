@@ -75,7 +75,7 @@ public sealed class MigrationSchemaTests(PostgresTestDatabase database)
     }
 
     [Fact]
-    public async Task The_single_initial_baseline_is_applied_to_the_test_database()
+    public async Task The_initial_baseline_and_every_later_migration_are_applied_in_order()
     {
         // Phase 33.1 replaced the development migration history with one Initial
         // generated from the model and never edited (the old history remains in
@@ -85,9 +85,17 @@ public sealed class MigrationSchemaTests(PostgresTestDatabase database)
         using OmniAiDbContext context = database.CreateContext();
 
         string[] applied = [.. await context.Database.GetAppliedMigrationsAsync()];
+        string[] known = [.. context.Database.GetMigrations()];
 
-        Assert.Single(applied);
+        // Every migration this build knows, applied, in order -- and the history
+        // still starts at the one Initial baseline (no rebaseline since 33.1).
+        Assert.Equal(known, applied);
         Assert.EndsWith("_Initial", applied[0], StringComparison.Ordinal);
+        Assert.Single(applied, migration => migration.EndsWith("_Initial", StringComparison.Ordinal));
+
+        // Phase 35 added exactly one.
+        Assert.Equal(2, applied.Length);
+        Assert.EndsWith("_ProductionReadinessHardening", applied[1], StringComparison.Ordinal);
     }
 
     /// <remarks>
@@ -131,8 +139,16 @@ public sealed class MigrationSchemaTests(PostgresTestDatabase database)
             "SELECT count(*) FROM pg_indexes "
             + "WHERE tablename IN ('messages', 'conversation_turns')");
 
-        // Two apiece: the primary key and the one join key each already had.
-        Assert.Equal(5L, Convert.ToInt64(count, CultureInfo.InvariantCulture));
+        // Phase 22 added none of these. Five from before it, plus one since:
+        // Phase 35's partial index over turns still Generating, the stale-turn
+        // reconciler's only query (asserted by name below, so a different sixth
+        // index cannot hide behind the count).
+        Assert.Equal(6L, Convert.ToInt64(count, CultureInfo.InvariantCulture));
+
+        object? generating = await database.ExecuteScalarAsync(
+            "SELECT indexdef FROM pg_indexes WHERE indexname = 'ix_conversation_turns_generating'");
+
+        Assert.Contains("WHERE ((status)::text = 'Generating'::text)", generating as string, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -46,6 +46,25 @@ internal sealed class BillingWorkerOptions
     /// </remarks>
     public TimeSpan GraceSweepInterval { get; set; } = TimeSpan.FromMinutes(5);
 
+    /// <summary>
+    /// How long a claimed event belongs to the worker that claimed it (Phase 35).
+    /// </summary>
+    /// <remarks>
+    /// Within the lease no other instance can take the event; after it, the event is
+    /// claimable again and the old owner can no longer settle it. It must outlast the
+    /// slowest legitimate processing, or a live worker would lose events it is still
+    /// working on: see <see cref="MinimumClaimLease"/>.
+    /// </remarks>
+    public TimeSpan ClaimLease { get; set; } = TimeSpan.FromMinutes(15);
+
+    /// <summary>
+    /// The shortest lease startup accepts: two provider round trips at their worst
+    /// (the Stripe library's 80 s request timeout, tried up to three times with its
+    /// default two network retries) plus two minutes for the database work.
+    /// </summary>
+    public static readonly TimeSpan MinimumClaimLease =
+        (2 * 3 * TimeSpan.FromSeconds(80)) + TimeSpan.FromMinutes(2);
+
     public void Validate()
     {
         if (IdleInterval <= TimeSpan.Zero || IdleInterval > TimeSpan.FromMinutes(5))
@@ -71,6 +90,13 @@ internal sealed class BillingWorkerOptions
             throw new InvalidOperationException(
                 $"{SectionName}:GraceSweepInterval must be between zero and six hours.");
         }
+
+        if (ClaimLease < MinimumClaimLease || ClaimLease > TimeSpan.FromHours(6))
+        {
+            throw new InvalidOperationException(
+                $"{SectionName}:ClaimLease must be at least {MinimumClaimLease.TotalMinutes:0} minutes "
+                + "(the slowest legitimate processing of one event) and at most six hours.");
+        }
     }
 }
 
@@ -83,6 +109,14 @@ internal sealed class BillingWorkerOptions
 /// safe.</strong> Two web servers both running this worker take disjoint sets
 /// rather than the same event twice, and an instance that dies leaves rows that
 /// come back rather than rows that are lost.
+/// </para>
+/// <para>
+/// <strong>A claim is a lease with a token (Phase 35).</strong> Nobody else can
+/// take an event while its lease runs; once it lapses, a new claim writes a new
+/// token. The old owner then can neither change the subscription (fenced, in the
+/// subscription transaction, on its token) nor settle the event (the token is the
+/// row's concurrency token). It stops without writing. Local state is still
+/// re-read from the provider, so the new owner's apply is the same idempotent one.
 /// </para>
 /// <para>
 /// <strong>Nothing here logs a payload.</strong> An event is identified by its
@@ -148,10 +182,26 @@ internal sealed partial class BillingEventWorker(
                 _options.BatchSize,
                 _options.MaxAttempts,
                 _clock.GetUtcNow(),
+                _options.ClaimLease,
                 cancellationToken)
             .ConfigureAwait(false);
 
+        OmniAiDbContext claimContext = scope.ServiceProvider.GetRequiredService<OmniAiDbContext>();
+
+        // The token each claim granted, taken from the rows this claim wrote.
+        // Carried into each event's own unit of work, where it is the proof of
+        // ownership: an event whose token has changed since belongs to someone else.
+        List<(BillingEventId Id, Guid Token)> owned = [];
+
         foreach (BillingEvent stored in claimed)
+        {
+            if (BillingEventOwnership.TokenOf(claimContext, stored) is { } token)
+            {
+                owned.Add((stored.Id, token));
+            }
+        }
+
+        foreach ((BillingEventId id, Guid token) in owned)
         {
             using System.Diagnostics.Activity work = OmniAiTracing.StartWork("billing-event");
 
@@ -160,7 +210,7 @@ internal sealed partial class BillingEventWorker(
             // make one workspace's contention everybody else's problem.
             await using AsyncServiceScope inner = _scopes.CreateAsyncScope();
 
-            await HandleAsync(inner.ServiceProvider, stored.Id, cancellationToken)
+            await HandleAsync(inner.ServiceProvider, id, token, cancellationToken)
                 .ConfigureAwait(false);
         }
 
@@ -170,6 +220,7 @@ internal sealed partial class BillingEventWorker(
     private async Task HandleAsync(
         IServiceProvider services,
         BillingEventId id,
+        Guid token,
         CancellationToken cancellationToken)
     {
         try
@@ -185,6 +236,14 @@ internal sealed partial class BillingEventWorker(
                 return;
             }
 
+            // Reclaimed between this pass's claim and now: not ours any more.
+            if (BillingEventOwnership.TokenOf(context, stored) != token)
+            {
+                LogOwnershipLost(id.Value);
+
+                return;
+            }
+
             await services
                 .GetRequiredService<ApplyProviderBillingEvent>()
                 .HandleAsync(stored, cancellationToken)
@@ -192,17 +251,82 @@ internal sealed partial class BillingEventWorker(
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
+            // Shutdown mid-event. Left claimed: the lease brings it back, and the
+            // attempt already counted is the honest record of an interrupted one.
             throw;
+        }
+        catch (BillingEventOwnershipLostException)
+        {
+            // Another worker holds it now and is doing all of it. Nothing this
+            // worker did was written; there is nothing to undo or retry.
+            LogOwnershipLost(id.Value);
         }
 #pragma warning disable CA1031 // One event's failure must not end the batch.
         catch (Exception failure)
 #pragma warning restore CA1031
         {
-            // Left claimed, with its attempt already counted. The next pass picks
-            // it up while attempts remain, which is the right answer for the
-            // transient failures that reach here: a provider timeout, a contended
-            // lock, a connection dropped mid-transaction.
+            // A transient failure: a provider timeout, a contended lock, a
+            // connection dropped mid-transaction. The attempt is already counted;
+            // handing the event back lets the next pass retry it rather than
+            // waiting out the lease, while MaxAttempts still bounds the retries.
             LogEventFailed(id.Value, failure);
+
+            await ReleaseAsync(id, token, failure, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// Hands an event back after a transient failure, if this worker still owns it.
+    /// </summary>
+    /// <remarks>
+    /// In a fresh unit of work, because the failed one may hold a broken connection
+    /// or a half-applied change. If even this fails the event stays claimed and
+    /// comes back when the lease lapses, which is slower but equally correct.
+    /// </remarks>
+    private async Task ReleaseAsync(
+        BillingEventId id,
+        Guid token,
+        Exception failure,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await using AsyncServiceScope scope = _scopes.CreateAsyncScope();
+
+            OmniAiDbContext context = scope.ServiceProvider.GetRequiredService<OmniAiDbContext>();
+
+            BillingEvent? stored = await context.BillingEvents
+                .FirstOrDefaultAsync(candidate => candidate.Id == id, cancellationToken)
+                .ConfigureAwait(false);
+
+            if (stored is null
+                || stored.Status != BillingEventStatus.Claimed
+                || BillingEventOwnership.TokenOf(context, stored) != token)
+            {
+                return;
+            }
+
+            // The exception's type only: its message can carry provider text.
+            stored.Release($"Transient failure ({failure.GetType().Name}); will be retried.");
+
+            await scope.ServiceProvider
+                .GetRequiredService<IBillingEventInbox>()
+                .SaveAsync(stored, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (BillingEventOwnershipLostException)
+        {
+            LogOwnershipLost(id.Value);
+        }
+#pragma warning disable CA1031 // The lease is the fallback; the batch goes on.
+        catch (Exception releaseFailure)
+#pragma warning restore CA1031
+        {
+            LogReleaseFailed(id.Value, releaseFailure);
         }
     }
 
@@ -223,6 +347,16 @@ internal sealed partial class BillingEventWorker(
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Billing event {EventId} could not be applied.")]
     private partial void LogEventFailed(Guid eventId, Exception failure);
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "Billing event {EventId} was claimed by another worker; this worker stopped without writing.")]
+    private partial void LogOwnershipLost(Guid eventId);
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "Billing event {EventId} could not be handed back; it returns when its claim lease lapses.")]
+    private partial void LogReleaseFailed(Guid eventId, Exception failure);
 }
 
 /// <summary>

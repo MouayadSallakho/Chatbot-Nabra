@@ -137,7 +137,7 @@ internal sealed class NotificationHarness(PostgresTestDatabase database)
 
         await using (OmniAiDbContext context = _database.CreateContext())
         {
-            claimed = await new NotificationEmailOutbox(context).ClaimAsync(50, maxAttempts, Clock.GetUtcNow());
+            claimed = await new NotificationEmailOutbox(context).ClaimAsync(50, maxAttempts, Clock.GetUtcNow(), Clock.GetUtcNow() - TimeSpan.FromMinutes(10));
         }
 
         List<NotificationEmailStatus?> statuses = [];

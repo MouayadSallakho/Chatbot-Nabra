@@ -224,15 +224,13 @@ public sealed class CapacityApiFixture : LoadApiFixture
     protected override IReadOnlyDictionary<string, string> HostSettings =>
         new Dictionary<string, string>(StringComparer.Ordinal)
         {
-            // Optional: the deployment-level pool bound under evaluation, applied the
-            // way an operator would — in the connection string, nowhere else.
-            ["ConnectionStrings:OmniAiDatabase"] =
-                Environment.GetEnvironmentVariable("OMNIAI_PERF_MAX_POOL") is { Length: > 0 } maxPool
-                    ? new Npgsql.NpgsqlConnectionStringBuilder(Database.ConnectionString)
-                    {
-                        MaxPoolSize = int.Parse(maxPool, System.Globalization.CultureInfo.InvariantCulture),
-                    }.ConnectionString
-                    : Database.ConnectionString,
+            // Optional: the pool bound under evaluation, applied the way an operator
+            // does from Phase 35 — through the connection policy, which overrides
+            // any pool size in the connection string. Both pools get the value.
+            ["Database:Pools:ApplicationPoolSize"] =
+                Environment.GetEnvironmentVariable("OMNIAI_PERF_MAX_POOL") ?? "25",
+            ["Database:Pools:ConversationLockPoolSize"] =
+                Environment.GetEnvironmentVariable("OMNIAI_PERF_MAX_POOL") ?? "15",
             // Optional: evaluate the log level a deployment runs with (Phase 34 finding:
             // before Phase 34 the shipped defaults logged every SQL command at Information).
             ["Logging:LogLevel:Microsoft.EntityFrameworkCore"] =

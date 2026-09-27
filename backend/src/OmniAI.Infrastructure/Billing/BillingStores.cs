@@ -1,6 +1,7 @@
 using System.Data;
 using System.Data.Common;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Storage;
 using Npgsql;
 using OmniAI.Application.Billing;
@@ -8,6 +9,7 @@ using OmniAI.Application.Billing.Persistence;
 using OmniAI.Domain.Billing;
 using OmniAI.Domain.Tenants;
 using OmniAI.Infrastructure.Persistence;
+using OmniAI.Infrastructure.Persistence.Configurations;
 
 namespace OmniAI.Infrastructure.Billing;
 
@@ -288,6 +290,91 @@ internal sealed class BillingCheckoutIntentStore(OmniAiDbContext context)
 }
 
 /// <summary>
+/// Who currently owns a claimed billing event (Phase 35).
+/// </summary>
+/// <remarks>
+/// <para>
+/// <strong>The claim token is the ownership.</strong> Every claim writes a new
+/// one; a worker holds the token it was granted, read from the row it claimed.
+/// Everything that acts for the event proves it still holds that token, in the
+/// database, at the moment it writes — never from memory.
+/// </para>
+/// <para>
+/// Two checks, because the event causes two writes. The subscription change is
+/// fenced by <see cref="FenceAsync"/> inside its own transaction; the settlement
+/// is fenced by the token being the row's concurrency token.
+/// </para>
+/// </remarks>
+internal static class BillingEventOwnership
+{
+    /// <summary>
+    /// The claim token a tracked event was loaded with.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">
+    /// The event is not tracked by this context, so there is no claim to prove.
+    /// </exception>
+    public static Guid? TokenOf(OmniAiDbContext context, BillingEvent billingEvent)
+    {
+        EntityEntry<BillingEvent> entry = context.Entry(billingEvent);
+
+        if (entry.State == EntityState.Detached)
+        {
+            throw new InvalidOperationException(
+                "A billing event must be loaded by the same unit of work that acts on it.");
+        }
+
+        return entry.Property<Guid?>(BillingEventClaim.TokenProperty).OriginalValue;
+    }
+
+    /// <summary>
+    /// Proves, inside the caller's transaction, that the event is still this
+    /// worker's — and keeps it so until that transaction ends.
+    /// </summary>
+    /// <remarks>
+    /// <c>FOR UPDATE</c> on the event row: a reclaim is an UPDATE of that row, so
+    /// it cannot land between this check and the caller's commit (the claim skips
+    /// locked rows, so it simply does not take this one yet). The caller must
+    /// already have a transaction open, or the lock would end with this statement.
+    /// </remarks>
+    /// <exception cref="BillingEventOwnershipLostException">
+    /// The event has been claimed again since this worker took it.
+    /// </exception>
+    public static async Task FenceAsync(
+        OmniAiDbContext context,
+        BillingEvent billingEvent,
+        CancellationToken cancellationToken)
+    {
+        if (context.Database.CurrentTransaction is null)
+        {
+            throw new InvalidOperationException(
+                "The ownership fence must run inside the transaction it protects.");
+        }
+
+        Guid? token = TokenOf(context, billingEvent);
+
+        List<int> owned = token is { } held
+            ? await context.Database
+                .SqlQueryRaw<int>(
+                    $$"""
+                     SELECT 1 AS "Value"
+                       FROM {{PersistenceSchema.BillingEventsTable}}
+                      WHERE id = {0} AND status = 'Claimed' AND claim_token = {1}
+                        FOR UPDATE
+                     """,
+                    billingEvent.Id.Value,
+                    held)
+                .ToListAsync(cancellationToken)
+                .ConfigureAwait(false)
+            : [];
+
+        if (owned.Count == 0)
+        {
+            throw new BillingEventOwnershipLostException();
+        }
+    }
+}
+
+/// <summary>
 /// The durable inbox of verified provider events.
 /// </summary>
 /// <remarks>
@@ -335,36 +422,46 @@ internal sealed class BillingEventInbox(OmniAiDbContext context) : IBillingEvent
         int batchSize,
         int maxAttempts,
         DateTimeOffset now,
+        TimeSpan lease,
         CancellationToken cancellationToken = default)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(batchSize);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxAttempts);
 
         // One statement, so several instances asking at the same moment get
-        // disjoint sets. A worker that dies mid-batch leaves rows claimed; they
-        // are picked up again once their attempt count still allows it, rather
-        // than being lost.
+        // disjoint sets. Phase 35: a Claimed event is claimable again only once its
+        // claim is older than the lease (before, the next poll of any instance could
+        // take an event still being processed). A worker that dies leaves its
+        // events to come back after the lease. The bounded MATERIALIZED form: the
+        // IN (... LIMIT ...) form was shown in Phase 33 not to respect its limit.
         await using NpgsqlCommand command = await CommandAsync(
                 $"""
-                 UPDATE {PersistenceSchema.BillingEventsTable}
-                    SET status = 'Claimed',
-                        attempts = attempts + 1
-                  WHERE id IN (
-                     SELECT waiting.id
-                       FROM {PersistenceSchema.BillingEventsTable} waiting
-                      WHERE waiting.status IN ('Pending', 'Claimed')
-                        AND waiting.attempts < @max_attempts
-                      ORDER BY waiting.received_at
+                 WITH candidate AS MATERIALIZED (
+                     SELECT id
+                       FROM {PersistenceSchema.BillingEventsTable}
+                      WHERE attempts < @max_attempts
+                        AND (status = 'Pending'
+                             OR (status = 'Claimed' AND (claimed_at IS NULL OR claimed_at < @lease_cutoff)))
+                      ORDER BY received_at
                       LIMIT @batch_size
                       FOR UPDATE SKIP LOCKED
-                  )
-                 RETURNING id
+                 )
+                 UPDATE {PersistenceSchema.BillingEventsTable} e
+                    SET status = 'Claimed',
+                        attempts = e.attempts + 1,
+                        claim_token = gen_random_uuid(),
+                        claimed_at = @now
+                   FROM candidate
+                  WHERE e.id = candidate.id
+                 RETURNING e.id
                  """,
                 cancellationToken)
             .ConfigureAwait(false);
 
         command.Parameters.AddWithValue("max_attempts", maxAttempts);
         command.Parameters.AddWithValue("batch_size", batchSize);
+        command.Parameters.AddWithValue("now", now.ToUniversalTime());
+        command.Parameters.AddWithValue("lease_cutoff", (now - lease).ToUniversalTime());
 
         List<Guid> claimed = [];
 
@@ -402,13 +499,40 @@ internal sealed class BillingEventInbox(OmniAiDbContext context) : IBillingEvent
     {
         ArgumentNullException.ThrowIfNull(billingEvent);
 
+        // Phase 35: only an event loaded by this unit of work carries the claim
+        // token it was loaded with. Attaching a detached one would make its
+        // "original" token whatever it holds now -- null once settled -- and the
+        // concurrency check would then match a row another worker already settled.
         if (_context.Entry(billingEvent).State == EntityState.Detached)
         {
-            _context.BillingEvents.Attach(billingEvent);
-            _context.Entry(billingEvent).State = EntityState.Modified;
+            throw new BillingEventOwnershipLostException(
+                "A billing event can only be settled by the unit of work that loaded it under its claim.");
         }
 
-        await _context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        // Settled or handed back: nobody owns it any more. The concurrency token
+        // still checks the ORIGINAL claim token, so a stale owner's save matches no
+        // row and is refused instead of overwriting the new owner's work.
+        if (billingEvent.Status != BillingEventStatus.Claimed)
+        {
+            EntityEntry<BillingEvent> entry = _context.Entry(billingEvent);
+            entry.Property<Guid?>(BillingEventClaim.TokenProperty).CurrentValue = null;
+            entry.Property<DateTimeOffset?>(BillingEventClaim.ClaimedAtProperty).CurrentValue = null;
+        }
+
+        try
+        {
+            await _context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (DbUpdateConcurrencyException lost)
+        {
+            // Nothing was written. Detached so this context cannot retry the stale
+            // write by accident on a later save.
+            _context.Entry(billingEvent).State = EntityState.Detached;
+
+            throw new BillingEventOwnershipLostException(
+                "The billing event was claimed by another worker before it could be settled.",
+                lost);
+        }
     }
 
     /// <summary>The provider event id: one row per event, per provider.</summary>

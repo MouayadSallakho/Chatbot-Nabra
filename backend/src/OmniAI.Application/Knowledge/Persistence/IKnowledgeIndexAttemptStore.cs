@@ -20,6 +20,10 @@ namespace OmniAI.Application.Knowledge.Persistence;
 public interface IKnowledgeIndexAttemptStore
 {
     /// <summary>Records and commits a Started attempt.</summary>
+    /// <exception cref="KnowledgeIndexingInProgressException">
+    /// Another attempt for the same document is still Started (Phase 35). Nothing
+    /// was written, and the caller must not send any embedding request.
+    /// </exception>
     Task StartAsync(KnowledgeIndexAttempt attempt, CancellationToken cancellationToken = default);
 
     /// <returns><see langword="false"/> when the attempt was no longer Started.</returns>

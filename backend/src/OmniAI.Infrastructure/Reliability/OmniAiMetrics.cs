@@ -8,6 +8,7 @@ internal static class ReconciledKinds
 {
     public const string ProviderUsage = "provider_usage";
     public const string KnowledgeAttempt = "knowledge_attempt";
+    public const string ConversationTurn = "conversation_turn";
     public const string ReportOrphan = "report_orphan";
     public const string ReportMissingFile = "report_missing_file";
 }

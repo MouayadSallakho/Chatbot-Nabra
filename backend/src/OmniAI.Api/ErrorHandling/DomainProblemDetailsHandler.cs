@@ -403,6 +403,10 @@ internal sealed partial class DomainProblemDetailsHandler(
             StatusCodes.Status412PreconditionFailed,
             "Precondition failed",
             staleKnowledge.Message),
+        KnowledgeIndexingInProgressException indexing => (
+            StatusCodes.Status409Conflict,
+            "Indexing already in progress",
+            indexing.Message),
         KnowledgeDocumentPageValidationException knowledgePaging => (
             StatusCodes.Status400BadRequest,
             "Invalid page request",

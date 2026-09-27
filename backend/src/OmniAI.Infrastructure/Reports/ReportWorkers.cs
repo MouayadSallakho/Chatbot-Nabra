@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -147,6 +148,12 @@ internal sealed partial class ReportGenerationWorker(
 
             // A scope each: one report's queries and transaction are nobody else's.
             await using AsyncServiceScope scope = scopes.CreateAsyncScope();
+
+            // Phase 35: report generation reads whole periods (up to the row
+            // limits), so its statements get the deliberate long-command class
+            // rather than the ordinary bound every request runs under.
+            scope.ServiceProvider.GetRequiredService<Persistence.OmniAiDbContext>().Database.SetCommandTimeout(
+                scope.ServiceProvider.GetRequiredService<Persistence.DatabaseConnectionPolicy>().LongCommandTimeoutSeconds);
 
             long started = System.Diagnostics.Stopwatch.GetTimestamp();
 

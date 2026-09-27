@@ -21,7 +21,10 @@ namespace OmniAI.Infrastructure.Reliability;
 /// </para>
 /// <para>
 /// Defaults: 15 minutes for provider operations (30 s default timeout), 30 minutes
-/// for indexing attempts (13 calls × 30 s ≈ 6.5 minutes at the defaults).
+/// for indexing attempts (13 calls × 30 s ≈ 6.5 minutes at the defaults), and 15
+/// minutes for conversation turns (Phase 35: a turn is open from the moment its
+/// customer message is stored until its reply is — one retrieval embedding plus
+/// one generation, so at most two provider timeouts).
 /// </para>
 /// </remarks>
 internal sealed class ReliabilityOptions
@@ -34,6 +37,8 @@ internal sealed class ReliabilityOptions
     public TimeSpan ProviderOperationStaleAfter { get; set; } = TimeSpan.FromMinutes(15);
 
     public TimeSpan KnowledgeAttemptStaleAfter { get; set; } = TimeSpan.FromMinutes(30);
+
+    public TimeSpan ConversationTurnStaleAfter { get; set; } = TimeSpan.FromMinutes(15);
 
     public TimeSpan Interval { get; set; } = TimeSpan.FromMinutes(1);
 
@@ -55,6 +60,12 @@ internal sealed class ReliabilityOptions
                 $"{SectionName}:{nameof(KnowledgeAttemptStaleAfter)} must exceed the longest indexing attempt ({indexingBound}) by {Margin.TotalMinutes} minutes.");
         }
 
+        if (ConversationTurnStaleAfter < (providerTimeout * 2) + Margin)
+        {
+            throw new InvalidOperationException(
+                $"{SectionName}:{nameof(ConversationTurnStaleAfter)} must be at least twice the provider timeout plus {Margin.TotalMinutes} minutes.");
+        }
+
         if (Interval <= TimeSpan.Zero || Interval > TimeSpan.FromHours(1))
         {
             throw new InvalidOperationException($"{SectionName}:{nameof(Interval)} must be between zero and one hour.");
@@ -72,9 +83,10 @@ internal sealed class ReliabilityOptions
 /// </summary>
 /// <remarks>
 /// <para>
-/// Two reconcilers, each isolated from the other's failure: provider operations
-/// left Started become Unknown, and indexing attempts left Started are settled and
-/// alerted on exactly once. Both are single conditional statements with
+/// Three reconcilers, each isolated from the others' failure: provider operations
+/// left Started become Unknown, indexing attempts left Started are settled and
+/// alerted on exactly once, and (Phase 35) conversation turns left Generating are
+/// settled Failed. Both are single conditional statements with
 /// <c>FOR UPDATE SKIP LOCKED</c>, so every instance can run this at once.
 /// </para>
 /// <para>
@@ -113,12 +125,21 @@ internal sealed partial class StaleWorkReconciliationWorker(
                     stoppingToken)
                 .ConfigureAwait(false);
 
+            int turns = await RunAsync(
+                    ReconciledKinds.ConversationTurn,
+                    (scope, now, token) => scope.GetRequiredService<ConversationTurnReconciler>()
+                        .ReconcileAsync(now - _options.ConversationTurnStaleAfter, now, _options.BatchSize, token),
+                    stoppingToken)
+                .ConfigureAwait(false);
+
             if (stoppingToken.IsCancellationRequested)
             {
                 return;
             }
 
-            bool more = providers >= _options.BatchSize || attempts >= _options.BatchSize;
+            bool more = providers >= _options.BatchSize
+                || attempts >= _options.BatchSize
+                || turns >= _options.BatchSize;
 
             if (!more && !await ReportWorkerDelay.WaitAsync(_options.Interval, clock, stoppingToken).ConfigureAwait(false))
             {

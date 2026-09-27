@@ -2,6 +2,7 @@ using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using OmniAI.Application.Notifications;
+using OmniAI.Domain.Tenants;
 using OmniAI.Domain.Authorization;
 using OmniAI.Domain.Notifications;
 using OmniAI.Domain.Users;
@@ -156,20 +157,164 @@ public sealed class OperationalEmailTests(PostgresTestDatabase database)
         Assert.Equal(6, ids.Count);
         Assert.Equal(6, ids.Distinct().Count());
 
-        // A worker whose claim was taken over cannot overwrite the outcome.
-        ClaimedEmail anyone = claims.SelectMany(claim => claim).First();
+        List<ClaimedEmail> owned = [.. claims.SelectMany(claim => claim)];
+        ClaimedEmail anyone = owned[0];
 
         await using OmniAiDbContext context = database.CreateContext();
         NotificationEmailOutbox outbox = new(context);
 
+        // Claiming is ownership, not dispatch (Phase 35): everything is still Pending.
+        Assert.All(await harness.EmailsAsync(world.Tenant), email => Assert.Equal(NotificationEmailStatus.Pending, email.Status));
+
+        // Only the owner can cross the dispatch boundary or settle.
+        Assert.False(await outbox.BeginDispatchAsync(anyone.Id, Guid.NewGuid(), now));
+        Assert.True(await outbox.BeginDispatchAsync(anyone.Id, anyone.ClaimToken, now));
         Assert.False(await outbox.SettleAsync(anyone.Id, Guid.NewGuid(), NotificationEmailStatus.Sent, null, now));
         Assert.True(await outbox.SettleAsync(anyone.Id, anyone.ClaimToken, NotificationEmailStatus.Sent, null, now));
 
-        // A crashed worker's Sending rows become Unknown, never Pending again.
-        Assert.Equal(5, await outbox.AbandonStaleAsync(now.AddMinutes(1), now.AddMinutes(1)));
-        Assert.All(
-            (await harness.EmailsAsync(world.Tenant)).Where(email => email.Id != anyone.Id),
-            email => Assert.Equal(NotificationEmailStatus.Unknown, email.Status));
+        // Two more cross the boundary, then every worker dies.
+        Assert.True(await outbox.BeginDispatchAsync(owned[1].Id, owned[1].ClaimToken, now));
+        Assert.True(await outbox.BeginDispatchAsync(owned[2].Id, owned[2].ClaimToken, now));
+
+        // Only what may have been handed to a server becomes Unknown, never Pending again.
+        Assert.Equal(2, await outbox.AbandonStaleAsync(now.AddMinutes(1), now.AddMinutes(1)));
+
+        IReadOnlyList<NotificationEmail> emails = await harness.EmailsAsync(world.Tenant);
+        Assert.Equal(NotificationEmailStatus.Unknown, emails.Single(email => email.Id == owned[1].Id).Status);
+        Assert.Equal(NotificationEmailStatus.Unknown, emails.Single(email => email.Id == owned[2].Id).Status);
+
+        // The three never dispatched are still Pending and, once their claim has
+        // lapsed, are claimed again with new tokens.
+        List<Guid> undispatched = [.. owned.Skip(3).Select(email => email.Id.Value)];
+        Assert.All(undispatched, id => Assert.Equal(NotificationEmailStatus.Pending, emails.Single(email => email.Id.Value == id).Status));
+
+        IReadOnlyList<ClaimedEmail> reclaimed = await outbox.ClaimAsync(10, 3, now.AddMinutes(20), now.AddMinutes(10));
+        Assert.Equal(undispatched.Order(), reclaimed.Select(email => email.Id.Value).Order());
+
+        // The dead owner's tokens can neither dispatch nor settle any more.
+        foreach (ClaimedEmail stale in owned.Skip(3))
+        {
+            Assert.False(await outbox.BeginDispatchAsync(stale.Id, stale.ClaimToken, now.AddMinutes(20)));
+            Assert.False(await outbox.SettleAsync(stale.Id, stale.ClaimToken, NotificationEmailStatus.Skipped, "x", now.AddMinutes(20)));
+        }
+    }
+
+    [Fact]
+    public async Task A_worker_killed_before_dispatch_loses_nothing_and_the_email_is_delivered_once()
+    {
+        // Phase 35 crash boundary A: owned, never dispatched, owner dies.
+        await using SmtpSink sink = new();
+        (ReportWorld world, NotificationHarness harness) = await QueuedWithSinkAsync(sink);
+
+        DateTimeOffset now = harness.Clock.GetUtcNow();
+        ClaimedEmail dead = Assert.Single(await ClaimAsync(now), email => email.TenantId == world.Tenant);
+
+        // Nothing happens until the dead owner's claim lapses ...
+        Assert.DoesNotContain(await ClaimAsync(now.AddMinutes(1)), email => email.TenantId == world.Tenant);
+
+        // ... then another worker owns it and delivers it through the real SMTP path.
+        harness.Clock.Advance(TimeSpan.FromMinutes(11));
+        Assert.Equal([NotificationEmailStatus.Sent], await SendWithSinkAsync(harness, sink, world.Tenant));
+        Assert.Single(sink.Messages);
+
+        // The old owner cannot dispatch it a second time.
+        await using OmniAiDbContext context = database.CreateContext();
+        Assert.False(await new NotificationEmailOutbox(context).BeginDispatchAsync(dead.Id, dead.ClaimToken, harness.Clock.GetUtcNow()));
+        Assert.Single(sink.Messages);
+        Assert.Equal(NotificationEmailStatus.Sent, Assert.Single(await harness.EmailsAsync(world.Tenant)).Status);
+    }
+
+    [Fact]
+    public async Task A_worker_killed_after_the_dispatch_boundary_is_Unknown_and_never_resent()
+    {
+        // Phase 35 crash boundary B: the email may have been handed over.
+        await using SmtpSink sink = new();
+        (ReportWorld world, NotificationHarness harness) = await QueuedWithSinkAsync(sink);
+
+        DateTimeOffset now = harness.Clock.GetUtcNow();
+        ClaimedEmail claimed = Assert.Single(await ClaimAsync(now), email => email.TenantId == world.Tenant);
+
+        await using (OmniAiDbContext context = database.CreateContext())
+        {
+            Assert.True(await new NotificationEmailOutbox(context).BeginDispatchAsync(claimed.Id, claimed.ClaimToken, now));
+        }
+
+        // The process dies here. After the Sending lease it is Unknown ...
+        harness.Clock.Advance(TimeSpan.FromMinutes(11));
+
+        await using (OmniAiDbContext context = database.CreateContext())
+        {
+            NotificationEmailOutbox outbox = new(context);
+            DateTimeOffset later = harness.Clock.GetUtcNow();
+
+            Assert.Equal(1, await outbox.AbandonStaleAsync(later - TimeSpan.FromMinutes(10), later));
+
+            // ... and no later claim ever picks it up again. (The class shares one
+            // database, so other tests' emails may be claimed; this one never is.)
+            Assert.DoesNotContain(
+                await outbox.ClaimAsync(50, 3, later.AddHours(1), later.AddHours(1)),
+                email => email.Id == claimed.Id);
+
+            // A late settlement from the dead worker changes nothing.
+            Assert.False(await outbox.SettleAsync(claimed.Id, claimed.ClaimToken, NotificationEmailStatus.Sent, null, later));
+        }
+
+        Assert.Empty(await SendWithSinkAsync(harness, sink, world.Tenant));
+        Assert.Empty(sink.Messages);
+        Assert.Equal(NotificationEmailStatus.Unknown, Assert.Single(await harness.EmailsAsync(world.Tenant)).Status);
+    }
+
+    private async Task<(ReportWorld World, NotificationHarness Harness)> QueuedWithSinkAsync(SmtpSink sink)
+    {
+        ArgumentNullException.ThrowIfNull(sink);
+
+        ReportWorld world = await ReportWorld.CreateAsync(database);
+        NotificationHarness harness = new(database);
+
+        await harness.EmailEverythingAsync(world.Tenant, world.Owner);
+        await harness.RecordAsync(world.Tenant, NotificationKind.BillingPastDue, $"sub:PastDue:{Guid.NewGuid():N}");
+        await harness.DispatchAllAsync();
+
+        Assert.Single(await harness.EmailsAsync(world.Tenant));
+
+        return (world, harness);
+    }
+
+    /// <summary>
+    /// What the worker does for every due email of one workspace, through a real
+    /// loopback SMTP sender. Other workspaces' emails in the shared database are
+    /// left alone.
+    /// </summary>
+    private async Task<List<NotificationEmailStatus?>> SendWithSinkAsync(NotificationHarness harness, SmtpSink sink, TenantId tenant)
+    {
+        IOperationalEmailSender sender = NotificationsServiceCollectionExtensions.SenderFor(Loopback(sink.Port), Configuration(), requireLiveEmailOptIn: true);
+        DateTimeOffset now = harness.Clock.GetUtcNow();
+        IReadOnlyList<ClaimedEmail> claimed;
+
+        await using (OmniAiDbContext context = database.CreateContext())
+        {
+            claimed = await new NotificationEmailOutbox(context).ClaimAsync(10, 3, now, now - TimeSpan.FromMinutes(10));
+        }
+
+        List<NotificationEmailStatus?> statuses = [];
+
+        foreach (ClaimedEmail email in claimed.Where(email => email.TenantId == tenant))
+        {
+            await using OmniAiDbContext context = database.CreateContext();
+
+            statuses.Add(await new OperationalEmailDispatcher(
+                    new NotificationEmailOutbox(context),
+                    new NotificationStore(context),
+                    NotificationHarness.Authority(context),
+                    new OmniAI.Infrastructure.Identity.IdentityAccountDirectory(context),
+                    new OmniAI.Infrastructure.Persistence.Repositories.TenantRepository(context),
+                    sender,
+                    new OperationalEmailLinks(new Uri("http://localhost:4200/")),
+                    harness.Clock)
+                .SendAsync(email, 3));
+        }
+
+        return statuses;
     }
 
     // ------------------------------------------------------ SMTP, for real
@@ -212,7 +357,7 @@ public sealed class OperationalEmailTests(PostgresTestDatabase database)
 
         await using (OmniAiDbContext context = database.CreateContext())
         {
-            claimed = Assert.Single(await new NotificationEmailOutbox(context).ClaimAsync(10, 3, harness.Clock.GetUtcNow()));
+            claimed = Assert.Single(await new NotificationEmailOutbox(context).ClaimAsync(10, 3, harness.Clock.GetUtcNow(), harness.Clock.GetUtcNow() - TimeSpan.FromMinutes(10)));
         }
 
         await using (OmniAiDbContext context = database.CreateContext())
@@ -463,7 +608,7 @@ public sealed class OperationalEmailTests(PostgresTestDatabase database)
     {
         await using OmniAiDbContext context = database.CreateContext();
 
-        return await new NotificationEmailOutbox(context).ClaimAsync(3, 3, now);
+        return await new NotificationEmailOutbox(context).ClaimAsync(3, 3, now, now - TimeSpan.FromMinutes(10));
     }
 
     private static OperationalEmailOptions Loopback(int port)

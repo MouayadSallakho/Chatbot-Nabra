@@ -135,6 +135,7 @@ public sealed class ApplyProviderBillingEvent(
         }
 
         string? refusal = await ApplyAsync(
+                stored,
                 intent.TenantId,
                 providerSubscriptionId,
                 mayBegin: true,
@@ -173,6 +174,7 @@ public sealed class ApplyProviderBillingEvent(
         return subscription is null
             ? "This subscription does not belong to any workspace on this deployment."
             : await ApplyAsync(
+                    stored,
                     subscription.TenantId,
                     providerSubscriptionId,
                     mayBegin: false,
@@ -181,6 +183,7 @@ public sealed class ApplyProviderBillingEvent(
     }
 
     private async Task<string?> ApplyAsync(
+        BillingEvent stored,
         TenantId tenantId,
         ProviderReference providerSubscriptionId,
         bool mayBegin,
@@ -196,7 +199,7 @@ public sealed class ApplyProviderBillingEvent(
         }
 
         BillingApplyOutcome outcome = await _lifecycle
-            .ApplyAsync(tenantId, _provider.Provider, snapshot, mayBegin, cancellationToken)
+            .ApplyAsync(tenantId, _provider.Provider, snapshot, mayBegin, stored, cancellationToken)
             .ConfigureAwait(false);
 
         return outcome switch

@@ -1,0 +1,108 @@
+# OmniAI edge server blocks. Rendered by the nginx image entrypoint with envsubst;
+# only OMNIAI_* variables are substituted (NGINX_ENVSUBST_FILTER), so nginx
+# variables such as $host are left alone.
+#
+# OMNIAI_PUBLIC_HTTPS_PORT_SUFFIX: "" when HTTPS is published on 443, ":8443" locally.
+
+# Plain HTTP only redirects. HSTS then keeps browsers on HTTPS.
+server {
+    listen 8080;
+    server_name _;
+
+    location / {
+        return 308 https://$host${OMNIAI_PUBLIC_HTTPS_PORT_SUFFIX}$request_uri;
+    }
+}
+
+server {
+    listen 8443 ssl;
+    http2 on;
+    server_name _;
+
+    ssl_certificate     /etc/nginx/certs/tls.crt;
+    ssl_certificate_key /etc/nginx/certs/tls.key;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers off;
+    ssl_session_cache shared:tls:10m;
+    ssl_session_timeout 1d;
+    ssl_session_tickets off;
+
+    include /etc/nginx/spa-csp.conf;
+
+    # ---- proxied to the API -------------------------------------------
+
+    # Every proxied location includes /etc/nginx/omniai-proxy.conf (Host,
+    # X-Forwarded-*, HSTS, failover). Included per location, never set at server
+    # level: nginx drops ALL inherited proxy_set_header / add_header directives in
+    # a location that declares any of its own, which silently stripped the
+    # forwarded headers from the WebSocket location in the first draft.
+
+    location ^~ /api/ {
+        include /etc/nginx/omniai-proxy.conf;
+        proxy_set_header Connection "";
+        # An AI turn can legitimately take a lock wait plus a generation.
+        proxy_read_timeout 120s;
+        proxy_send_timeout 60s;
+        proxy_pass http://omniai_api;
+    }
+
+    location ^~ /hubs/ {
+        include /etc/nginx/omniai-proxy.conf;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $connection_upgrade;
+        proxy_read_timeout 1h;
+        proxy_send_timeout 1h;
+        proxy_buffering off;
+        proxy_pass http://omniai_hubs;
+    }
+
+    location ^~ /widget/ {
+        include /etc/nginx/omniai-proxy.conf;
+        proxy_set_header Connection "";
+        proxy_read_timeout 30s;
+        proxy_pass http://omniai_api;
+    }
+
+    # Health is for the deployment's own probes on the private network,
+    # and OpenAPI is not mapped in Production; neither is public.
+    location ^~ /health { return 404; }
+    location ^~ /openapi { return 404; }
+
+    # ---- the SPA -------------------------------------------------------
+
+    root /usr/share/nginx/html;
+
+    # Content-hashed bundles: cache for a year.
+    location ~* "\.(?:js|css|woff2?|svg|png|ico|webp)$" {
+        add_header Cache-Control "public, max-age=31536000, immutable" always;
+        add_header X-Content-Type-Options nosniff always;
+        add_header Strict-Transport-Security "max-age=31536000" always;
+        try_files $uri =404;
+    }
+
+    # The embed document is framed by customer sites. Which sites may use a
+    # widget is enforced by the API (the endpoint's allowed origins, checked
+    # on every embed request and ticket), so the frame itself may load
+    # anywhere; everything else refuses to be framed.
+    location /embed/ {
+        add_header Content-Security-Policy "default-src 'self'; script-src 'self' $spa_script_hashes; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' wss://$http_host; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors *" always;
+        add_header Cache-Control "no-cache" always;
+        add_header X-Content-Type-Options nosniff always;
+        add_header Referrer-Policy strict-origin always;
+        add_header Strict-Transport-Security "max-age=31536000" always;
+        # Not try_files: its fallback is an internal redirect, and the response
+        # would then carry the headers of `location /` (frame-ancestors 'none').
+        rewrite ^ /index.html break;
+    }
+
+    location / {
+        add_header Content-Security-Policy "default-src 'self'; script-src 'self' $spa_script_hashes; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' wss://$http_host; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'" always;
+        add_header X-Frame-Options DENY always;
+        add_header Cache-Control "no-cache" always;
+        add_header X-Content-Type-Options nosniff always;
+        add_header Referrer-Policy no-referrer always;
+        add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()" always;
+        add_header Strict-Transport-Security "max-age=31536000" always;
+        try_files $uri $uri/ /index.html;
+    }
+}

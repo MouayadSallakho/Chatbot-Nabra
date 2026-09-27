@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Npgsql;
@@ -110,8 +111,19 @@ internal sealed class ReadinessDatabase : IAsyncDisposable
 
     private readonly NpgsqlDataSource? _source;
 
-    public ReadinessDatabase(IConfiguration configuration)
+    public ReadinessDatabase(IConfiguration configuration, IServiceScopeFactory scopes)
     {
+        ArgumentNullException.ThrowIfNull(scopes);
+
+        _required = new Lazy<string[]>(() =>
+        {
+            using IServiceScope scope = scopes.CreateScope();
+
+            return [.. scope.ServiceProvider
+                .GetRequiredService<OmniAI.Infrastructure.Persistence.OmniAiDbContext>()
+                .Database.GetMigrations()];
+        });
+
         string? connectionString = configuration.GetConnectionString("OmniAiDatabase");
 
         if (string.IsNullOrWhiteSpace(connectionString))
@@ -135,6 +147,14 @@ internal sealed class ReadinessDatabase : IAsyncDisposable
     /// <summary>Null when no database is configured, which is itself not ready.</summary>
     public NpgsqlDataSource? Source => _source;
 
+    /// <summary>
+    /// Every migration this build contains, read once from the model assembly
+    /// (no database access).
+    /// </summary>
+    public string[] RequiredMigrations() => _required.Value;
+
+    private readonly Lazy<string[]> _required;
+
     public ValueTask DisposeAsync() => _source?.DisposeAsync() ?? ValueTask.CompletedTask;
 }
 
@@ -150,7 +170,17 @@ internal sealed class DatabaseReadinessCheck(ReadinessDatabase database) : IHeal
             return HealthCheckResult.Unhealthy("No database is configured.");
         }
 
-        NpgsqlCommand command = source.CreateCommand("SELECT 1");
+        // Phase 35: ready only against a schema this build can use. Every
+        // migration this version knows must have been applied (by the deployment's
+        // one-off migration step); a schema that is *ahead* stays ready, which is
+        // what a rolling deploy needs. A missing history table fails the query,
+        // which is unready too. The list comes from the model assembly, not the
+        // database.
+        string[] required = database.RequiredMigrations();
+
+        NpgsqlCommand command = source.CreateCommand(
+            """SELECT count(*) FROM "__EFMigrationsHistory" WHERE "MigrationId" = ANY(@required)""");
+        command.Parameters.AddWithValue("required", required);
 
         // Not given the probe's token. Npgsql answers a cancellation by opening a
         // second connection to send a cancel request, and against a server that
@@ -173,9 +203,12 @@ internal sealed class DatabaseReadinessCheck(ReadinessDatabase database) : IHeal
 
         // A failure or the budget running out propagates to the health-check
         // service, which logs it and reports Unhealthy; the body never carries it.
-        await query.WaitAsync(cancellationToken).ConfigureAwait(false);
+        object? applied = await query.WaitAsync(cancellationToken).ConfigureAwait(false);
 
-        return HealthCheckResult.Healthy();
+        return applied is long count && count == required.Length
+            ? HealthCheckResult.Healthy()
+            : HealthCheckResult.Unhealthy(
+                "The database schema is missing migrations this version requires; run the migration step.");
     }
 }
 

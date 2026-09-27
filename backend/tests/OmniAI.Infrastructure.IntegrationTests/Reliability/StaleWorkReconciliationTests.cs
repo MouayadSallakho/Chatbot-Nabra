@@ -271,10 +271,13 @@ public sealed class StaleWorkReconciliationTests(PostgresTestDatabase database)
     public async Task One_knowledge_pass_settles_at_most_one_batch()
     {
         TenantId tenant = await _world.WorkspaceAsync();
-        Versioned<KnowledgeDocument> document = await _world.DocumentAsync(tenant);
 
+        // Four documents: since Phase 35 a document has at most one Started
+        // attempt, which the database enforces.
         for (int i = 0; i < 4; i++)
         {
+            Versioned<KnowledgeDocument> document = await _world.DocumentAsync(tenant, $"Policy {i}");
+
             await StartAttemptAsync(tenant, document.Value.Id, DateTimeOffset.UtcNow.AddHours(-3).AddMinutes(i));
         }
 

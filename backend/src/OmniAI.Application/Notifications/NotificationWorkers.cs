@@ -304,6 +304,16 @@ public sealed class OperationalEmailDispatcher(
 
         OperationalEmailMessage message = OperationalEmailRenderer.Render(notification, to, workspace, _links);
 
+        // The dispatch boundary (Phase 35), crossed immediately before the message
+        // is handed to the SMTP server and never earlier. Up to here a crash leaves
+        // the email Pending and reclaimable; from here a crash can only end in
+        // Unknown, never a resend. If the email was reclaimed meanwhile, its new
+        // owner sends it and this worker must not.
+        if (!await _queue.BeginDispatchAsync(claimed.Id, claimed.ClaimToken, _clock.GetUtcNow(), CancellationToken.None).ConfigureAwait(false))
+        {
+            return null;
+        }
+
         OperationalEmailResult result = await _sender.SendAsync(message, cancellationToken).ConfigureAwait(false);
 
         DateTimeOffset now = _clock.GetUtcNow();

@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using OmniAI.Application.Notifications;
 using OmniAI.Infrastructure.Notifications;
 using OmniAI.Infrastructure.Notifications.Email;
@@ -20,7 +21,8 @@ public static class NotificationsServiceCollectionExtensions
     public static IServiceCollection AddOmniAiNotifications(
         this IServiceCollection services,
         IConfiguration configuration,
-        bool requireLiveEmailOptIn)
+        bool requireLiveEmailOptIn,
+        ILoggerFactory? loggers = null)
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configuration);
@@ -35,7 +37,8 @@ public static class NotificationsServiceCollectionExtensions
         email.Validate();
 
         services.AddSingleton(email);
-        services.AddSingleton<IOperationalEmailSender>(SenderFor(email, configuration, requireLiveEmailOptIn));
+        services.AddSingleton<IOperationalEmailSender>(provider =>
+            SenderFor(email, configuration, requireLiveEmailOptIn, provider.GetService<ILoggerFactory>()));
 
         // Only ever read when a sender is configured, which requires a validated
         // address. The placeholder is never put in an email.
@@ -78,7 +81,8 @@ public static class NotificationsServiceCollectionExtensions
     internal static IOperationalEmailSender SenderFor(
         OperationalEmailOptions email,
         IConfiguration configuration,
-        bool requireLiveEmailOptIn)
+        bool requireLiveEmailOptIn,
+        ILoggerFactory? loggers = null)
     {
         if (!email.IsConfigured)
         {
@@ -92,6 +96,8 @@ public static class NotificationsServiceCollectionExtensions
                 OperationalEmailOptions.LiveEmailOptInValue,
                 StringComparison.Ordinal);
 
-        return withheld ? new WithheldOperationalEmailSender() : new SmtpOperationalEmailSender(email);
+        return withheld
+            ? new WithheldOperationalEmailSender()
+            : new SmtpOperationalEmailSender(email, loggers?.CreateLogger<SmtpOperationalEmailSender>());
     }
 }

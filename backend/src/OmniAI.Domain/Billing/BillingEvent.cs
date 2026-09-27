@@ -196,6 +196,20 @@ public sealed class BillingEvent
         Failure = Shorten(reason);
     }
 
+    /// <summary>
+    /// Hands a claimed event back for another attempt after a transient failure.
+    /// </summary>
+    /// <remarks>
+    /// Unlike <see cref="Retry"/>, it does not count an attempt: claiming already
+    /// did. Without it a transient failure would wait out the whole claim lease
+    /// before any worker could try again.
+    /// </remarks>
+    public void Release(string reason)
+    {
+        Status = BillingEventStatus.Pending;
+        Failure = Shorten(reason);
+    }
+
     private static string Shorten(string reason) =>
         reason.Length <= 400 ? reason : reason[..400];
 }

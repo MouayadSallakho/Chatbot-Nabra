@@ -437,6 +437,15 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("attempts");
 
+                    b.Property<Guid?>("ClaimToken")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("claim_token");
+
+                    b.Property<DateTimeOffset?>("ClaimedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("claimed_at");
+
                     b.Property<string>("EventType")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -829,6 +838,10 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                         .HasColumnName("updated_at");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("CreatedAt")
+                        .HasDatabaseName("ix_conversation_turns_generating")
+                        .HasFilter("status = 'Generating'");
 
                     b.HasIndex("CustomerMessageId")
                         .IsUnique()
@@ -1226,8 +1239,13 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_knowledge_index_attempts_started")
                         .HasFilter("status = 'Started'");
 
-                    b.HasIndex("DocumentId", "TenantId")
+                    b.HasIndex(new[] { "DocumentId", "TenantId" }, "ix_knowledge_index_attempts_document")
                         .HasDatabaseName("ix_knowledge_index_attempts_document");
+
+                    b.HasIndex(new[] { "DocumentId", "TenantId" }, "ux_knowledge_index_attempts_in_flight")
+                        .IsUnique()
+                        .HasDatabaseName("ux_knowledge_index_attempts_in_flight")
+                        .HasFilter("status = 'Started'");
 
                     b.ToTable("knowledge_index_attempts", null, t =>
                         {

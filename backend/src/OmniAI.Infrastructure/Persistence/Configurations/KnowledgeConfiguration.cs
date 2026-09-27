@@ -261,8 +261,20 @@ internal sealed class KnowledgeIndexAttemptConfiguration : IEntityTypeConfigurat
             .HasFilter("status = 'Started'");
 
         // Leads with the document so it also serves the composite foreign key.
-        builder.HasIndex(attempt => new { attempt.DocumentId, attempt.TenantId })
+        // Named in the model (not only in the database) because the single-flight
+        // index below covers the same columns: unnamed, EF would treat the two as
+        // one index and drop this one.
+        builder.HasIndex(attempt => new { attempt.DocumentId, attempt.TenantId }, "ix_knowledge_index_attempts_document")
             .HasDatabaseName("ix_knowledge_index_attempts_document");
+
+        // Phase 35: single flight. At most one Started attempt per document, so
+        // concurrent re-index requests cannot each send paid embedding batches for
+        // one version; the second insert loses and spends nothing. Partial, so it
+        // cannot serve the foreign key's cascade on its own.
+        builder.HasIndex(attempt => new { attempt.DocumentId, attempt.TenantId }, KnowledgeIndexAttemptStore.InFlightIndex)
+            .IsUnique()
+            .HasDatabaseName(KnowledgeIndexAttemptStore.InFlightIndex)
+            .HasFilter("status = 'Started'");
     }
 }
 
