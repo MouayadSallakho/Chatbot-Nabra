@@ -9,7 +9,7 @@ import { LOGIN_PATH } from '@app/core/auth/auth-guard';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
 import { HOME_PATH } from '@app/layout/navigation';
 import { Icon } from '@app/shared/icon/icon';
-import { BrandMark } from '@app/shared/brand-mark/brand-mark';
+import { EntryFrame } from '@app/layout/entry-frame/entry-frame';
 
 /** Mirrors the Domain's own tenant rules, for immediate feedback only. */
 const SLUG_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
@@ -38,7 +38,7 @@ const NAME_MAX = 200;
 @Component({
   selector: 'app-workspace-setup',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [BrandMark, ReactiveFormsModule, Icon],
+  imports: [EntryFrame, ReactiveFormsModule, Icon],
   templateUrl: './workspace-setup.html',
   styleUrl: './workspace-setup.scss',
 })
@@ -57,7 +57,7 @@ export class WorkspaceSetup {
   protected readonly retrying = signal(false);
   protected readonly creating = signal(false);
 
-  protected readonly slugLimits = { min: SLUG_MIN, max: SLUG_MAX };
+  protected readonly slugHint = $localize`:@@workspaceSetup.slug.hint:Lowercase letters, numbers and hyphens. Between ${SLUG_MIN}:min: and ${SLUG_MAX}:max: characters.`;
 
   private readonly submitAttempted = signal(false);
 
@@ -79,6 +79,14 @@ export class WorkspaceSetup {
 
   /** Whether the account's workspaces could not be loaded at all. */
   protected readonly unreachable = computed(() => this.status() === 'unavailable');
+
+  /** Each workspace with the first letter of its name, for the tile beside it. */
+  protected readonly options = computed(() =>
+    this.workspaces().map((workspace) => ({
+      workspace,
+      initial: Array.from(workspace.name.trim())[0]?.toLocaleUpperCase() ?? '',
+    })),
+  );
 
   /** Whether there is a choice of existing workspaces to present. */
   protected readonly hasWorkspaces = computed(() => this.workspaces().length > 0);

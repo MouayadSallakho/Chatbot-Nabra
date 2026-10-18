@@ -146,4 +146,27 @@ describe('Arabic renders', () => {
     expect(unreadText(7, 'ar')).toBe('7 إشعارات غير مقروءة');
     expect(unreadText(57, 'ar')).toBe('57 إشعارًا غير مقروء');
   });
+
+  it('writes registration, its story panel and its example in Arabic, with Western digits', async () => {
+    const { Register } = await import('@app/features/auth/register/register');
+    const { provideHttpClient } = await import('@angular/common/http');
+    const { provideHttpClientTesting } = await import('@angular/common/http/testing');
+
+    TestBed.configureTestingModule({
+      providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting()],
+    });
+    const fixture = TestBed.createComponent(Register);
+    fixture.detectChanges();
+    const root = fixture.nativeElement as HTMLElement;
+
+    expect(text(root.querySelector('h1'))).toBe('أنشئ حسابك');
+    expect(text(root.querySelector('#password-hint'))).toBe(
+      '12 حرفًا على الأقل. العبارة التي يسهل تذكّرها خيار جيد.',
+    );
+    expect(text(root.querySelector('#entry-story-title'))).toBe('صوتان… بنبرة واحدة');
+    expect(text(root.querySelector('figcaption'))).toBe('محادثة توضيحية');
+    expect(text(root.querySelector('.bubble-ai .bubble-speaker'))).toBe('الذكاء الاصطناعي');
+    expect(text(root.querySelector('.handoff-divider'))).toBe('استلم أحد أعضاء الفريق المحادثة');
+    expect(text(root.querySelector('[data-testid="entry-language"]'))).toBe('English العربية');
+  });
 });

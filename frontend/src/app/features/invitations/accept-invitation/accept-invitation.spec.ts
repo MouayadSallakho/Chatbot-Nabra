@@ -277,4 +277,32 @@ describe('AcceptInvitation', () => {
     // learn a colleague's address.
     expect(text()).not.toContain('@');
   });
+
+  describe('the page around it (Phase 36.5)', () => {
+    it('withholds the language switch while the token waits in memory', async () => {
+      // Switching language reloads the page, and the token lives nowhere else.
+      openLinkWith(`#token=${token}`);
+
+      await mount(false);
+
+      expect(text()).toContain('You have been invited');
+      expect(host().querySelector('[data-testid="entry-language"]')).toBeNull();
+    });
+
+    it('offers it again once the invitation is spent, and shows the workspace joined', async () => {
+      openLinkWith(`#token=${token}`);
+
+      await mount(true);
+
+      http.expectOne(acceptUrl).flush({ tenantId: 't1', name: 'acme Trading', slug: 'acme' });
+      await settle();
+
+      const tile = host().querySelector('.joined-workspace-tile');
+
+      expect(tile?.textContent?.trim()).toBe('A');
+      expect(tile?.getAttribute('aria-hidden')).toBe('true');
+      expect(host().querySelector('.joined-workspace strong')?.getAttribute('dir')).toBe('auto');
+      expect(host().querySelector('[data-testid="entry-language"]')).not.toBeNull();
+    });
+  });
 });

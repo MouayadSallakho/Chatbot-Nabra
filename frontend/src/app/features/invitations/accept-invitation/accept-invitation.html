@@ -1,75 +1,103 @@
-<div class="auth">
-  <main class="auth-card card" id="main-content" tabindex="-1">
-    <div class="auth-brand">
-      <app-brand-mark class="brand-mark" />
-      <span class="brand-name" i18n="@@brand.name">Nabra</span>
-    </div>
-
-    @switch (state()) {
-      @case ('reading') {
-        <h1 class="text-page-title">Opening your invitation…</h1>
-        <p class="auth-lead text-body text-secondary" role="status">One moment.</p>
-      }
-
-      @case ('needsAccount') {
-        <!--
-          The expected case, not an error: most people opening an invitation do
-          not have an account yet. The token waits in memory while they sign in
-          or register, and acceptance continues by itself when they return.
-        -->
-        <h1 class="text-page-title">You have been invited</h1>
-        <p class="auth-lead text-body text-secondary">
-          Sign in with the address this invitation was sent to, or create an account with it, and
-          you will join the workspace straight away.
-        </p>
-
-        <div class="auth-actions">
-          <a class="btn btn-primary" [routerLink]="loginPath">Sign in</a>
-          <a class="btn btn-secondary" [routerLink]="registerPath">Create account</a>
-        </div>
-
-        <p class="auth-note text-small text-muted">
-          Keep this tab open. If you close it, open your invitation link again.
-        </p>
-      }
-
-      @case ('accepting') {
-        <h1 class="text-page-title">Joining the workspace…</h1>
-        <p class="auth-lead text-body text-secondary" role="status">One moment.</p>
-      }
-
-      @case ('accepted') {
-        <h1 class="text-page-title">You are in</h1>
-        <p class="auth-lead text-body text-secondary">
-          You have joined <strong>{{ workspaceName() }}</strong
-          >. What you can do there depends on the roles you were given — an administrator can change
-          them at any time.
-        </p>
-
-        <div class="auth-actions">
-          <button type="button" class="btn btn-primary" (click)="open()">Open workspace</button>
-        </div>
-      }
-
-      @case ('failed') {
-        <!--
-          One shape for every refusal. Whether the invitation was used, withdrawn,
-          expired, or written to a different account, the reader's next step is
-          the same: ask for a new one. The server's own sentence says which it
-          was; nothing here adds detail about somebody else's account.
-        -->
-        <h1 class="text-page-title">This invitation cannot be used</h1>
-
-        @if (failure(); as error) {
-          <p class="auth-alert alert alert-danger" role="alert">{{ error.message }}</p>
-        }
-
-        <div class="auth-actions">
-          <a class="btn btn-secondary" [routerLink]="homePath" i18n="@@invitation.goHome"
-            >Go to Nabra</a
-          >
-        </div>
-      }
+<!--
+  The language switch reloads the page, and the token lives only in memory: it
+  is offered only once no invitation is waiting (accepted, refused, or none).
+-->
+<app-entry-frame [languageSwitch]="!hasToken()">
+  @switch (state()) {
+    @case ('reading') {
+      <h1 class="text-page-title" i18n="@@invitation.reading.heading">Opening your invitation…</h1>
+      <p class="auth-lead text-body text-secondary" role="status" i18n="@@invitation.wait">
+        One moment.
+      </p>
     }
-  </main>
-</div>
+
+    @case ('needsAccount') {
+      <!--
+        The expected case, not an error: most people opening an invitation do
+        not have an account yet. The token waits in memory while they sign in
+        or register, and acceptance continues by itself when they return.
+      -->
+      <h1 class="text-page-title" i18n="@@invitation.invited.heading">You have been invited</h1>
+      <p class="auth-lead text-body text-secondary" i18n="@@invitation.invited.lead">
+        A team has invited you to join their workspace on Nabra. Sign in with the address this
+        invitation was sent to, or create an account with it, and you will join straight away.
+      </p>
+
+      <div class="auth-actions">
+        <a class="btn btn-primary btn-lg" [routerLink]="loginPath" i18n="@@invitation.signIn"
+          >Sign in</a
+        >
+        <a
+          class="btn btn-secondary btn-lg"
+          [routerLink]="registerPath"
+          i18n="@@invitation.createAccount"
+          >Create account</a
+        >
+      </div>
+
+      <p class="auth-note text-small text-muted" i18n="@@invitation.keepTab">
+        Keep this tab open. If you close it, open your invitation link again.
+      </p>
+    }
+
+    @case ('accepting') {
+      <h1 class="text-page-title" i18n="@@invitation.accepting.heading">Joining the workspace…</h1>
+      <p class="auth-lead text-body text-secondary" role="status" i18n="@@invitation.wait">
+        One moment.
+      </p>
+    }
+
+    @case ('accepted') {
+      <h1 class="text-page-title" i18n="@@invitation.accepted.heading">You are in</h1>
+
+      <!-- The workspace, as the top bar will show it: its first letter and its name. -->
+      <p class="joined-workspace">
+        <span class="joined-workspace-tile" aria-hidden="true">{{ workspaceInitial() }}</span>
+        <span class="joined-workspace-text">
+          <span class="text-small text-secondary" i18n="@@invitation.accepted.joined"
+            >You have joined</span
+          >
+          <strong class="text-card-title" dir="auto">{{ workspaceName() }}</strong>
+        </span>
+      </p>
+
+      <p class="auth-lead text-body text-secondary" i18n="@@invitation.accepted.roles">
+        What you can do there depends on the roles you were given. An administrator can change them
+        at any time.
+      </p>
+
+      <div class="auth-actions">
+        <button
+          type="button"
+          class="btn btn-primary btn-lg"
+          (click)="open()"
+          i18n="@@invitation.openWorkspace"
+        >
+          Open workspace
+        </button>
+      </div>
+    }
+
+    @case ('failed') {
+      <!--
+        One shape for every refusal. Whether the invitation was used, withdrawn,
+        expired, or written to a different account, the reader's next step is
+        the same: ask for a new one. The server's own sentence says which it
+        was; nothing here adds detail about somebody else's account.
+      -->
+      <h1 class="text-page-title" i18n="@@invitation.failed.heading">
+        This invitation cannot be used
+      </h1>
+
+      @if (failure(); as error) {
+        <p class="auth-alert alert alert-danger" role="alert" dir="auto">{{ error.message }}</p>
+      }
+
+      <div class="auth-actions">
+        <a class="btn btn-secondary btn-lg" [routerLink]="homePath" i18n="@@invitation.goHome"
+          >Go to Nabra</a
+        >
+      </div>
+    }
+  }
+</app-entry-frame>

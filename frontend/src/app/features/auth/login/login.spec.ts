@@ -5,6 +5,7 @@ import { Router, provideRouter } from '@angular/router';
 import { LOCAL_STORAGE } from '@app/core/storage/local-storage';
 import { memoryStorage, permissionApiGranting } from '@app/testing/test-doubles';
 import { PermissionApi } from '@app/core/authorization/permission-api';
+import { InvitationHandoff } from '@app/core/invitations/invitation-handoff';
 import { Login } from './login';
 
 /**
@@ -296,5 +297,36 @@ describe('Login', () => {
     const link = host().querySelector<HTMLAnchorElement>('a[href="/create-account"]');
 
     expect(link).not.toBeNull();
+  });
+
+  describe('the page around the form (Phase 36.5)', () => {
+    it('offers English and العربية before sign-in', () => {
+      expect(host().querySelector('[data-testid="entry-language-en"]')).not.toBeNull();
+      expect(host().querySelector('[data-testid="entry-language-ar"]')).not.toBeNull();
+    });
+
+    it('withholds the language switch while an invitation waits, because the reload would lose it', () => {
+      TestBed.inject(InvitationHandoff).hold('invitation-secret');
+      fixture.detectChanges();
+
+      expect(host().querySelector('[data-testid="entry-language"]')).toBeNull();
+    });
+
+    it('leaves password managers and pasting alone', () => {
+      expect(emailBox().getAttribute('autocomplete')).toBe('username');
+      expect(passwordBox().getAttribute('autocomplete')).toBe('current-password');
+      expect(emailBox().getAttribute('dir')).toBe('ltr');
+      for (const box of [emailBox(), passwordBox()]) {
+        expect(box.hasAttribute('onpaste')).toBe(false);
+        expect(box.hasAttribute('readonly')).toBe(false);
+      }
+    });
+
+    it('has exactly one heading of the first level, and it is the task', () => {
+      const headings = host().querySelectorAll('h1');
+
+      expect(headings).toHaveLength(1);
+      expect(headings[0].textContent?.trim()).toBe('Sign in');
+    });
   });
 });

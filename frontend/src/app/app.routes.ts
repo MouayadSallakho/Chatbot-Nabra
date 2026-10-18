@@ -55,6 +55,27 @@ const designLabRoutes: Routes =
     : [];
 
 /**
+ * The unbuilt-area placeholder with a sample name, inside the shell (Phase 36.5).
+ *
+ * Every navigation entry is built, so nothing else reaches the placeholder, and
+ * a screen nobody can open cannot be reviewed. DEVELOPMENT ONLY, compiled out of
+ * the production build exactly like the Design Lab above, and its area name
+ * says it is a sample.
+ */
+const designLabShellRoutes: Routes =
+  typeof ngDevMode === 'undefined' || ngDevMode
+    ? [
+        {
+          path: 'design-lab-unbuilt-area',
+          title: $localize`:@@lab.unbuiltArea:Sample area`,
+          data: { area: $localize`:@@lab.unbuiltArea:Sample area` },
+          loadComponent: () =>
+            import('@app/features/placeholder/placeholder').then((m) => m.Placeholder),
+        },
+      ]
+    : [];
+
+/**
  * Three tiers, and the order of the guards on each is the design.
  *
  * <strong>Anonymous.</strong> Sign-in and registration, behind `anonymousGuard`
@@ -239,6 +260,7 @@ export const routes: Routes = [
           ),
       },
       ...placeholderRoutes,
+      ...designLabShellRoutes,
       // Deliberate, and deliberately not a redirect: bouncing an unknown address
       // to the overview leaves the reader unsure whether their link was wrong or
       // the page moved.

@@ -1,44 +1,12 @@
-// A centred single-purpose page. Deliberately outside the admin shell: there is
-// no workspace yet, so navigation to workspace-scoped areas would lead nowhere.
-.setup {
-  display: grid;
-  place-items: center;
-  min-block-size: 100vh;
-  min-block-size: 100dvh;
-  padding: var(--space-6);
-  background-color: var(--surface-page);
-}
-
-.setup-card {
-  inline-size: 100%;
-  max-inline-size: 32rem;
-  padding: var(--space-7);
-
-  &:focus-visible {
-    outline: none;
-  }
-}
-
-.setup-brand {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  margin-block-end: var(--space-6);
-}
-
-.brand-mark {
-  inline-size: 1.75rem;
-  block-size: 1.75rem;
-  flex: none;
-}
-
-.brand-name {
-  font: var(--text-section-title);
-  letter-spacing: var(--letter-spacing-tight);
-}
-
+// Choosing or creating a workspace, inside EntryFrame: outside the admin shell,
+// because there is no workspace yet and its navigation would lead nowhere.
 .setup-lead {
   margin-block-start: var(--space-3);
+  max-inline-size: 52ch;
+}
+
+.setup-next {
+  margin-block-start: var(--space-2);
   max-inline-size: 52ch;
 }
 
@@ -53,6 +21,10 @@
   margin-block-start: var(--space-6);
 }
 
+.setup-form .input {
+  min-block-size: var(--control-height-lg);
+}
+
 .setup-actions {
   display: flex;
   flex-wrap: wrap;
@@ -61,7 +33,12 @@
 }
 
 .setup-form .setup-actions {
-  margin-block-start: 0;
+  margin-block-start: var(--space-1);
+}
+
+// The primary action of the form fills the line, like sign-in's.
+.setup-actions .btn-primary {
+  flex: 1 1 auto;
 }
 
 // -----------------------------------------------------------------------------
@@ -83,12 +60,12 @@
 .workspace-option {
   inline-size: 100%;
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 0 var(--space-3);
-  padding: var(--space-4);
+  padding: var(--space-3) var(--space-4);
   text-align: start;
-  background-color: var(--surface-raised);
+  background-color: var(--surface-default);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
   color: inherit;
@@ -99,7 +76,7 @@
 
   &:hover {
     background-color: var(--surface-hover);
-    border-color: var(--border-strong);
+    border-color: var(--border-control);
   }
 
   &:focus-visible {
@@ -108,16 +85,29 @@
   }
 }
 
-.workspace-name {
+// The same mark the top bar gives a workspace: its first letter on a neutral
+// tile. Never a colour: the voices are not decoration.
+.workspace-tile {
   grid-column: 1;
+  grid-row: 1 / span 2;
+  display: grid;
+  place-items: center;
+  inline-size: 2.25rem;
+  block-size: 2.25rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background-color: var(--surface-muted);
+  font: var(--text-card-title);
 }
 
+.workspace-name,
 .workspace-slug {
-  grid-column: 1;
+  grid-column: 2;
+  overflow-wrap: anywhere;
 }
 
 .workspace-chevron {
-  grid-column: 2;
+  grid-column: 3;
   grid-row: 1 / span 2;
   color: var(--text-muted);
 }
@@ -128,8 +118,10 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: space-between;
   gap: var(--space-2);
   margin-block-start: var(--space-6);
   padding-block-start: var(--space-5);
   border-block-start: 1px solid var(--border-subtle);
+  overflow-wrap: anywhere;
 }

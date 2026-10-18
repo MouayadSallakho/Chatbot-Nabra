@@ -71,8 +71,10 @@ export const BRAND_MARK_PATHS = {
       fill: currentcolor;
     }
 
+    /* As specific as the voice rules above, or they win and the colours stay. */
     @media (forced-colors: active) {
-      path {
+      .voice-ai,
+      .voice-human {
         fill: CanvasText;
       }
     }

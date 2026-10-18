@@ -113,7 +113,9 @@
       that moment with something honest instead of a blank white page.
 
       It lives inside <app-root> so Angular replaces it on bootstrap; there is no
-      code anywhere that has to remember to remove it. Its styles are inline
+      code anywhere that has to remember to remove it. The first page is a lazy
+      chunk that lands a moment later, so the root draws the same lockup
+      (src/app/core/boot/boot-state.ts) until it does: keep the two in step. Its styles are inline
       (it has no component stylesheet), but every colour is a design token: the
       global stylesheet is a blocking <link> in <head>, so the tokens exist by
       the time this paints, and the script above has already chosen the theme.

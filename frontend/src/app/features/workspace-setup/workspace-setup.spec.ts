@@ -346,4 +346,38 @@ describe('WorkspaceSetup', () => {
       expect(storage.getItem(WORKSPACE_STORAGE_KEY)).toBeNull();
     });
   });
+
+  describe('the welcome (Phase 36.5)', () => {
+    it('gives a new account a direction after its first workspace', async () => {
+      mount();
+      await render([]);
+
+      expect(host().textContent).toContain('Next, you will set up an AI agent');
+      expect(slugBox().getAttribute('dir')).toBe('ltr');
+    });
+
+    it('marks each workspace with its first letter and keeps the slug left to right', async () => {
+      mount();
+      await render([acme, rival]);
+
+      const options = [...host().querySelectorAll('.workspace-option')];
+
+      expect(options.map((option) => option.querySelector('.workspace-tile')?.textContent)).toEqual(
+        ['A', 'R'],
+      );
+      expect(options[0].querySelector('.workspace-tile')?.getAttribute('aria-hidden')).toBe('true');
+      expect(options[0].querySelector('.workspace-name')?.getAttribute('dir')).toBe('auto');
+      expect(options[0].querySelector('.workspace-slug bdi')?.getAttribute('dir')).toBe('ltr');
+    });
+
+    it('does not repeat the first-workspace direction when creating another', async () => {
+      mount();
+      await render([acme, rival]);
+
+      buttonSaying('Create another workspace')!.click();
+      await settle();
+
+      expect(host().textContent).not.toContain('Next, you will set up an AI agent');
+    });
+  });
 });

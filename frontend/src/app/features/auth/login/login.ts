@@ -13,7 +13,7 @@ import { WorkspaceContextService } from '@app/core/workspace/workspace-context-s
 import { WORKSPACE_SETUP_PATH } from '@app/core/workspace/workspace-guard';
 import { HOME_PATH } from '@app/layout/navigation';
 import { Icon } from '@app/shared/icon/icon';
-import { BrandMark } from '@app/shared/brand-mark/brand-mark';
+import { EntryFrame } from '@app/layout/entry-frame/entry-frame';
 
 /**
  * The sign-in screen.
@@ -33,7 +33,7 @@ import { BrandMark } from '@app/shared/brand-mark/brand-mark';
 @Component({
   selector: 'app-login',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [BrandMark, ReactiveFormsModule, RouterLink, Icon],
+  imports: [EntryFrame, ReactiveFormsModule, RouterLink, Icon],
   templateUrl: './login.html',
   styleUrl: '../auth-page.scss',
 })
@@ -51,6 +51,9 @@ export class Login {
     inject(ActivatedRoute).snapshot.queryParamMap.get('reason') === SESSION_ENDED;
 
   protected readonly registerPath = REGISTER_PATH;
+
+  /** Whether this sign-in is a step inside accepting an invitation. */
+  protected readonly invitationPending = this.invitations.pending;
 
   protected readonly submitting = signal(false);
   protected readonly failure = signal<ApiError | null>(null);

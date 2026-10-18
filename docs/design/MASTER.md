@@ -6,7 +6,7 @@
 > Page-level exceptions live in `docs/design/pages/<page>.md` and must name the rule they override.
 
 - Status: approved direction, implemented at the foundation (Phase 36.2)
-- Last updated: 2026-10-18 (brand step: the public name is Nabra / نبرة)
+- Last updated: 2026-10-18 (Phase 36.5: the entry pages, `docs/design/pages/entry.md`)
 - Started from: the "Two Voices" direction approved for the Phase 36 redesign (reference
   `OmniAI-UI-Pack/reference/omniai-directions.html`, "Two Voices" tab)
 - Implementation: `frontend/src/styles/_tokens.scss` (values), `_fonts.scss`, `_base.scss`,
@@ -199,7 +199,9 @@ so the swap shifts nothing.
   220 ms; dialogs and drawers 320 ms; the "Take over" sweep 320 ms emphasized; route changes a
   150 ms crossfade of the content area only, through View Transitions, skipped on first load and
   instant for a query-only change (a list's next page); the command palette 220 ms on the enter
-  curve.
+  curve; on the entry pages (sign-in, registration, invitation, workspace), the one signature:
+  the mark's Ember shape settles into place, 600 ms emphasized after 150 ms, once per page load,
+  none under reduced motion.
 - Not in the admin: count-ups, stagger on every visit, parallax, fade-up on sections, bounce.
 - Reduced motion: the duration tokens collapse to ~0 at the source, so every component follows;
   View Transitions and keyframe animations stop; state changes stay visible.
@@ -239,7 +241,8 @@ so the swap shifts nothing.
 7. Voice displays (chip, split, track, divider) are drawn only from real API data.
 8. No CDN, font service or third-party request from the application.
 9. Components use semantic tokens only; shared rules go to the global layers, not budgets.
-10. Sample content exists only in the development-only Design Lab, labelled as sample.
+10. Sample content exists only in the development-only Design Lab, labelled as sample. One
+    page exception: the labelled example conversation on the entry pages (`pages/entry.md`).
 
 ## 11. Avoid in this project (as of 2026-10)
 
@@ -272,4 +275,9 @@ used for warnings, or amber that reads orange.
 | 2026-10-18 | No match emphasis inside Arabic words in the palette | A change of weight inside a word breaks Arabic letter joining | 36.4 |
 | 2026-10-18 | The public name is Nabra / نبرة ("tone of voice"); OmniAI stays the internal code name and is never shown | Two voices, the AI and the team, in one tone: the direction's own idea, in a word that works in both languages | Product owner (brand step) |
 | 2026-10-18 | The mark keeps its geometry; it now reads as two voices in one tone, not as the letter "O" | The shapes already draw the duet; only the letter reading belonged to the old name | Brand step |
+| 2026-10-18 | Entry pages share `EntryFrame`: the form column, and from 1024 px a story panel (mark, tagline, promise, example conversation); form first under a compact header below that | One door for the four pages before the shell; the task first in the document and on a phone | 36.5 |
+| 2026-10-18 | The entry story shows an example conversation, labelled as one, outside the Design Lab (exception to rules 7 and 10, `pages/entry.md`) | The brief asks for real UI fragments; the label, the absence of data-like details and the scope keep it honest | 36.5 |
+| 2026-10-18 | Entry signature: the Ember shape of the mark settles into place (translate only, 600 ms, once per load, none under reduced motion) | The name's idea, a person stepping into the AI's tone, without touching the heading or the form | 36.5 |
+| 2026-10-18 | Language switch before sign-in (English / العربية), withheld while an invitation token waits in memory | The switch reloads the page, which would lose the invitation | 36.5 |
+| 2026-10-18 | Not found is a calm state, not an error: the path as an LTR island (no query or fragment) and one way back | Nothing failed; showing the path lets a reader spot a typo or report the link | 36.5 |
 | 2026-10-18 | Icon files versioned (`nabra-icon.v1.svg`, `nabra-icon.v1.ico`); the next change is v2 | The edge caches .svg and .ico for a year (`immutable`) while index.html is `no-cache`: only a new name reaches people who visited before | Brand step |

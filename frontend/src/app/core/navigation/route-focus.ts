@@ -29,7 +29,10 @@ export const HEADING_WAIT_MS = 3000;
  * focus somewhere inside the content (a form opened, a result shown), that is
  * left alone: the page knows better than the shell what was just done.
  *
- * Started by the shell (`AppShell`) so it only runs inside the product.
+ * Started by the shell (`AppShell`) and, from Phase 36.5, by the frame of the
+ * pages before it (`EntryFrame`), so moving from sign-in to registration, or
+ * signing in, lands on the new page's heading too. Both put the content in
+ * `#main-content`.
  */
 @Injectable({ providedIn: 'root' })
 export class RouteFocus {

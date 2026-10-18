@@ -1,151 +1,207 @@
-<div class="setup">
-  <main class="setup-card card" id="main-content" tabindex="-1">
-    <div class="setup-brand">
-      <app-brand-mark class="brand-mark" />
-      <span class="brand-name" i18n="@@brand.name">Nabra</span>
+<app-entry-frame>
+  @if (unreachable()) {
+    <!--
+      The account's workspaces could not be read. Deliberately no create form
+      here: offering one would invite a duplicate workspace to repair a problem
+      that is almost always a backend that is not running.
+    -->
+    <h1 class="text-page-title" i18n="@@workspaceSetup.unreachable.title">
+      Nabra is not responding
+    </h1>
+    <p class="setup-lead text-body text-secondary" i18n="@@workspaceSetup.unreachable.lead">
+      You are signed in, but your workspaces could not be loaded just now. Nothing has been changed.
+    </p>
+
+    <div class="alert alert-danger setup-alert" role="alert">
+      <app-icon name="alert" [strokeWidth]="1.75" />
+      <span i18n="@@workspaceSetup.unreachable.check"
+        >Check your connection and try again in a moment.</span
+      >
     </div>
 
-    @if (unreachable()) {
-      <!--
-        The account's workspaces could not be read. Deliberately no create form
-        here: offering one would invite a duplicate workspace to repair a problem
-        that is almost always a backend that is not running.
-      -->
-      <h1 class="text-page-title" i18n="@@workspaceSetup.unreachable.title">
-        Nabra is not responding
-      </h1>
-      <p class="setup-lead text-body text-secondary">
-        You are signed in, but your workspaces could not be loaded just now. Nothing has been
-        changed.
+    <div class="setup-actions">
+      <button
+        type="button"
+        class="btn btn-primary btn-lg"
+        (click)="retry()"
+        [disabled]="retrying()"
+      >
+        @if (retrying()) {
+          <span class="spinner" aria-hidden="true"></span>
+          <span class="btn-label" i18n="@@workspaceSetup.retrying">Retrying…</span>
+        } @else {
+          <span class="btn-label" i18n="@@workspaceSetup.retry">Try again</span>
+        }
+      </button>
+      <button
+        type="button"
+        class="btn btn-ghost btn-lg"
+        (click)="signOut()"
+        i18n="@@workspaceSetup.signOut"
+      >
+        Sign out
+      </button>
+    </div>
+  } @else {
+    @if (hasWorkspaces() && !creating()) {
+      <h1 class="text-page-title" i18n="@@workspaceSetup.choose.title">Choose a workspace</h1>
+      <p class="setup-lead text-body text-secondary" i18n="@@workspaceSetup.choose.lead">
+        These are the workspaces your account belongs to.
       </p>
 
-      <div class="alert alert-danger setup-alert" role="alert">
-        <app-icon name="alert" [strokeWidth]="1.75" />
-        <span>Check your connection and try again in a moment.</span>
-      </div>
+      <!--
+        A list of buttons rather than a select: the whole action is "go here",
+        and a dropdown plus a confirm button would be two steps where one will do.
+      -->
+      <ul class="workspace-list">
+        @for (option of options(); track option.workspace.id) {
+          <li>
+            <button type="button" class="workspace-option" (click)="choose(option.workspace)">
+              <span class="workspace-tile" aria-hidden="true">{{ option.initial }}</span>
+              <span class="workspace-name text-card-title" dir="auto">{{
+                option.workspace.name
+              }}</span>
+              <span class="workspace-slug text-small text-muted"
+                ><bdi dir="ltr">{{ option.workspace.slug }}</bdi></span
+              >
+              <app-icon class="workspace-chevron" name="chevron-end" [strokeWidth]="1.75" />
+            </button>
+          </li>
+        }
+      </ul>
 
       <div class="setup-actions">
-        <button type="button" class="btn btn-primary" (click)="retry()" [disabled]="retrying()">
-          @if (retrying()) {
-            <span class="spinner" aria-hidden="true"></span>
-          }
-          <span class="btn-label">{{ retrying() ? 'Retrying…' : 'Try again' }}</span>
+        <button
+          type="button"
+          class="btn btn-secondary"
+          (click)="startCreating()"
+          i18n="@@workspaceSetup.createAnother"
+        >
+          Create another workspace
         </button>
-        <button type="button" class="btn btn-ghost" (click)="signOut()">Sign out</button>
       </div>
     } @else {
-      @if (hasWorkspaces() && !creating()) {
-        <h1 class="text-page-title">Choose a workspace</h1>
-        <p class="setup-lead text-body text-secondary">
-          These are the workspaces your account belongs to.
-        </p>
-
-        <!--
-          A list of links rather than a select: the whole action is "go here", and
-          a dropdown plus a confirm button would be two steps where one will do.
-        -->
-        <ul class="workspace-list">
-          @for (workspace of workspaces(); track workspace.id) {
-            <li>
-              <button type="button" class="workspace-option" (click)="choose(workspace)">
-                <span class="workspace-name text-card-title">{{ workspace.name }}</span>
-                <span class="workspace-slug text-small text-muted">{{ workspace.slug }}</span>
-                <app-icon class="workspace-chevron" name="chevron-end" [strokeWidth]="1.75" />
-              </button>
-            </li>
-          }
-        </ul>
-
-        <div class="setup-actions">
-          <button type="button" class="btn btn-secondary" (click)="startCreating()">
-            Create another workspace
-          </button>
-        </div>
-      } @else {
-        <h1 class="text-page-title">
-          {{ hasWorkspaces() ? 'Create another workspace' : 'Create your workspace' }}
+      @if (hasWorkspaces()) {
+        <h1 class="text-page-title" i18n="@@workspaceSetup.createAnother.title">
+          Create another workspace
         </h1>
-        <p class="setup-lead text-body text-secondary">
-          A workspace holds your AI agents. You will be its first member.
+      } @else {
+        <h1 class="text-page-title" i18n="@@workspaceSetup.create.title">Create your workspace</h1>
+      }
+      <p class="setup-lead text-body text-secondary" i18n="@@workspaceSetup.create.lead">
+        A workspace holds your AI agents. You will be its first member.
+      </p>
+      @if (!hasWorkspaces()) {
+        <!-- What comes after, so the first screen of a new account has a direction. -->
+        <p class="setup-next text-small text-secondary" i18n="@@workspaceSetup.create.next">
+          Next, you will set up an AI agent, give it knowledge to answer from, and connect your
+          website chat.
         </p>
-
-        @if (failure(); as error) {
-          <div class="alert alert-danger setup-alert" role="alert">
-            <app-icon name="alert" [strokeWidth]="1.75" />
-            <span>{{ error.message }}</span>
-          </div>
-        }
-
-        <form class="setup-form" [formGroup]="form" (ngSubmit)="create()" novalidate>
-          <div class="field">
-            <label class="field-label field-required" for="workspace-name">Workspace name</label>
-            <input
-              id="workspace-name"
-              class="input"
-              type="text"
-              formControlName="name"
-              autocomplete="organization"
-              [attr.aria-invalid]="showError('name') ? 'true' : null"
-              [attr.aria-describedby]="showError('name') ? 'workspace-name-error' : null"
-              (input)="suggestSlug()"
-            />
-            @if (showError('name')) {
-              <p class="field-error" id="workspace-name-error" role="alert">
-                <app-icon name="alert" [strokeWidth]="1.75" />
-                <span>A workspace name is required.</span>
-              </p>
-            }
-          </div>
-
-          <div class="field">
-            <label class="field-label field-required" for="workspace-slug">Workspace slug</label>
-            <input
-              id="workspace-slug"
-              class="input"
-              type="text"
-              formControlName="slug"
-              autocomplete="off"
-              autocapitalize="off"
-              spellcheck="false"
-              [attr.aria-invalid]="showError('slug') ? 'true' : null"
-              [attr.aria-describedby]="
-                showError('slug')
-                  ? 'workspace-slug-hint workspace-slug-error'
-                  : 'workspace-slug-hint'
-              "
-            />
-            <p class="field-hint" id="workspace-slug-hint">
-              Lowercase letters, numbers and hyphens. Between {{ slugLimits.min }} and
-              {{ slugLimits.max }} characters.
-            </p>
-            @if (showError('slug')) {
-              <p class="field-error" id="workspace-slug-error" role="alert">
-                <app-icon name="alert" [strokeWidth]="1.75" />
-                <span>Use lowercase letters, numbers and hyphens only.</span>
-              </p>
-            }
-          </div>
-
-          <div class="setup-actions">
-            <button type="submit" class="btn btn-primary" [disabled]="submitting()">
-              @if (submitting()) {
-                <span class="spinner" aria-hidden="true"></span>
-              }
-              <span class="btn-label">
-                {{ submitting() ? 'Creating…' : 'Create workspace' }}
-              </span>
-            </button>
-            @if (hasWorkspaces()) {
-              <button type="button" class="btn btn-ghost" (click)="cancelCreating()">Cancel</button>
-            }
-          </div>
-        </form>
       }
 
-      <p class="setup-account text-small text-muted">
-        Signed in as {{ user()?.email }}.
-        <button type="button" class="btn btn-ghost btn-sm" (click)="signOut()">Sign out</button>
-      </p>
+      @if (failure(); as error) {
+        <div class="alert alert-danger setup-alert" role="alert">
+          <app-icon name="alert" [strokeWidth]="1.75" />
+          <span dir="auto">{{ error.message }}</span>
+        </div>
+      }
+
+      <form class="setup-form" [formGroup]="form" (ngSubmit)="create()" novalidate>
+        <div class="field">
+          <label
+            class="field-label field-required"
+            for="workspace-name"
+            i18n="@@workspaceSetup.name.label"
+            >Workspace name</label
+          >
+          <input
+            id="workspace-name"
+            class="input"
+            type="text"
+            dir="auto"
+            formControlName="name"
+            autocomplete="organization"
+            [attr.aria-invalid]="showError('name') ? 'true' : null"
+            [attr.aria-describedby]="showError('name') ? 'workspace-name-error' : null"
+            (input)="suggestSlug()"
+          />
+          @if (showError('name')) {
+            <p class="field-error" id="workspace-name-error" role="alert">
+              <app-icon name="alert" [strokeWidth]="1.75" />
+              <span i18n="@@workspaceSetup.name.error">A workspace name is required.</span>
+            </p>
+          }
+        </div>
+
+        <div class="field">
+          <label
+            class="field-label field-required"
+            for="workspace-slug"
+            i18n="@@workspaceSetup.slug.label"
+            >Workspace slug</label
+          >
+          <!-- A slug is Latin letters, digits and hyphens: left-to-right in either language. -->
+          <input
+            id="workspace-slug"
+            class="input"
+            type="text"
+            dir="ltr"
+            formControlName="slug"
+            autocomplete="off"
+            autocapitalize="off"
+            spellcheck="false"
+            [attr.aria-invalid]="showError('slug') ? 'true' : null"
+            [attr.aria-describedby]="
+              showError('slug') ? 'workspace-slug-hint workspace-slug-error' : 'workspace-slug-hint'
+            "
+          />
+          <p class="field-hint" id="workspace-slug-hint">{{ slugHint }}</p>
+          @if (showError('slug')) {
+            <p class="field-error" id="workspace-slug-error" role="alert">
+              <app-icon name="alert" [strokeWidth]="1.75" />
+              <span i18n="@@workspaceSetup.slug.error"
+                >Use lowercase letters, numbers and hyphens only.</span
+              >
+            </p>
+          }
+        </div>
+
+        <div class="setup-actions">
+          <button type="submit" class="btn btn-primary btn-lg" [disabled]="submitting()">
+            @if (submitting()) {
+              <span class="spinner" aria-hidden="true"></span>
+              <span class="btn-label" i18n="@@workspaceSetup.creating">Creating…</span>
+            } @else {
+              <span class="btn-label" i18n="@@workspaceSetup.submit">Create workspace</span>
+            }
+          </button>
+          @if (hasWorkspaces()) {
+            <button
+              type="button"
+              class="btn btn-ghost btn-lg"
+              (click)="cancelCreating()"
+              i18n="@@workspaceSetup.cancel"
+            >
+              Cancel
+            </button>
+          }
+        </div>
+      </form>
     }
-  </main>
-</div>
+
+    <p class="setup-account text-small text-muted">
+      <span>
+        <span i18n="@@workspaceSetup.signedInAs">Signed in as</span>
+        <bdi dir="ltr">{{ user()?.email }}</bdi>
+      </span>
+      <button
+        type="button"
+        class="btn btn-ghost btn-sm"
+        (click)="signOut()"
+        i18n="@@workspaceSetup.signOut"
+      >
+        Sign out
+      </button>
+    </p>
+  }
+</app-entry-frame>

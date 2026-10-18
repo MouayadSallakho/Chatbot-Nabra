@@ -1,0 +1,105 @@
+<div class="entry">
+  <header class="entry-header">
+    <!-- The lockup, in the page's language. The mark is decorative beside it. -->
+    <span class="entry-lockup">
+      <app-brand-mark class="entry-lockup-mark" />
+      <span class="entry-wordmark" i18n="@@brand.name">Nabra</span>
+    </span>
+
+    @if (languageSwitch()) {
+      <!--
+        Each language in its own name, its own lang and its own direction, so
+        somebody who cannot read the current page still finds theirs. A choice
+        reloads the page in that language.
+      -->
+      <div
+        class="segmented entry-language"
+        role="group"
+        aria-label="Language"
+        i18n-aria-label="@@entry.language"
+        data-testid="entry-language"
+      >
+        @for (option of languages; track option.value) {
+          <button
+            type="button"
+            class="segmented-option"
+            [attr.lang]="option.value"
+            [attr.dir]="option.dir"
+            [attr.aria-pressed]="option.value === current"
+            [attr.data-testid]="'entry-language-' + option.value"
+            (click)="choose(option.value)"
+          >
+            {{ option.name }}
+          </button>
+        }
+      </div>
+    }
+  </header>
+
+  <main class="entry-main" id="main-content" tabindex="-1">
+    <div class="entry-content">
+      <ng-content />
+    </div>
+  </main>
+
+  <!-- From 1024px only: what Nabra is, told with its own parts. -->
+  <aside class="entry-story" aria-labelledby="entry-story-title" data-testid="entry-story">
+    <svg
+      class="entry-story-mark"
+      [class.is-settling]="settle"
+      viewBox="2 4 23 23"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path class="mark-ai" [attr.d]="markPaths.ai" />
+      <path class="mark-human" [attr.d]="markPaths.human" />
+    </svg>
+
+    <h2 id="entry-story-title" class="entry-tagline" i18n="@@entry.tagline">
+      Two voices. One tone.
+    </h2>
+    <p class="entry-promise" i18n="@@entry.promise">
+      The AI answers your customers. A person on your team steps in the moment one is needed.
+    </p>
+
+    <!--
+      An illustration, and labelled as one: the product's own bubbles, voice
+      words and handoff divider, with nothing a reader could take for data.
+    -->
+    <figure class="entry-example" aria-hidden="true">
+      <figcaption class="entry-example-caption" i18n="@@entry.example.caption">
+        Example conversation
+      </figcaption>
+      <ol class="entry-transcript">
+        <li class="bubble bubble-customer">
+          <span class="bubble-speaker" i18n="@@entry.example.customer">Customer</span>
+          <span i18n="@@entry.example.question"
+            >Can I still return a jacket I bought three weeks ago?</span
+          >
+        </li>
+        <li class="bubble bubble-ai">
+          <span class="bubble-speaker">{{ voiceWords.ai }}</span>
+          <span i18n="@@entry.example.answer"
+            >Yes. Returns are accepted within 30 days of delivery, unworn and with the tags
+            on.</span
+          >
+        </li>
+        <li class="bubble bubble-customer">
+          <span class="bubble-speaker" i18n="@@entry.example.customer">Customer</span>
+          <span i18n="@@entry.example.followUp"
+            >The zip broke on the first day. Can someone take a look?</span
+          >
+        </li>
+        <li class="handoff-divider handoff-to-human">
+          <span i18n="@@transcript.handoff.toPerson">A person took over</span>
+        </li>
+        <li class="bubble bubble-human">
+          <span class="bubble-speaker">{{ voiceWords.human }}</span>
+          <span i18n="@@entry.example.reply"
+            >I am sorry about that. I will send you a replacement today.</span
+          >
+        </li>
+      </ol>
+    </figure>
+  </aside>
+</div>

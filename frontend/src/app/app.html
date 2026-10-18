@@ -1,6 +1,10 @@
 <!--
   Everything visible lives in the shell, which is a routed layout component.
   Keeping the root empty is what stops AppComponent slowly becoming the
-  application: there is nowhere here to put "just one" global control.
+  application: there is nowhere here to put "just one" global control. The only
+  exception is the loading state, until the first page lands (App).
 -->
 <router-outlet />
+@if (!landed()) {
+  <app-boot-state />
+}

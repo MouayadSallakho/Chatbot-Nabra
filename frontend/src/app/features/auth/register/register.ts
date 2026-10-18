@@ -11,7 +11,7 @@ import {
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
 import { WORKSPACE_SETUP_PATH } from '@app/core/workspace/workspace-guard';
 import { Icon } from '@app/shared/icon/icon';
-import { BrandMark } from '@app/shared/brand-mark/brand-mark';
+import { EntryFrame } from '@app/layout/entry-frame/entry-frame';
 
 /**
  * The minimum password length, mirroring the server's policy.
@@ -38,7 +38,7 @@ const PASSWORD_MIN_LENGTH = 12;
 @Component({
   selector: 'app-register',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [BrandMark, ReactiveFormsModule, RouterLink, Icon],
+  imports: [EntryFrame, ReactiveFormsModule, RouterLink, Icon],
   templateUrl: './register.html',
   styleUrl: '../auth-page.scss',
 })
@@ -49,7 +49,12 @@ export class Register {
   private readonly router = inject(Router);
 
   protected readonly loginPath = LOGIN_PATH;
-  protected readonly minLength = PASSWORD_MIN_LENGTH;
+
+  protected readonly passwordHint = $localize`:@@register.password.hint:At least ${PASSWORD_MIN_LENGTH}:count: characters. A memorable phrase works well.`;
+  protected readonly passwordError = $localize`:@@register.password.error:Use at least ${PASSWORD_MIN_LENGTH}:count: characters.`;
+
+  /** Whether this registration is a step inside accepting an invitation. */
+  protected readonly invitationPending = this.invitations.pending;
 
   protected readonly submitting = signal(false);
   protected readonly failure = signal<ApiError | null>(null);

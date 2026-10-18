@@ -1,116 +1,125 @@
-<div class="auth">
-  <main class="auth-card card" id="main-content" tabindex="-1">
-    <div class="auth-brand">
-      <app-brand-mark class="brand-mark" />
-      <span class="brand-name" i18n="@@brand.name">Nabra</span>
+<!--
+  The language switch is withheld while an invitation waits in memory: switching
+  reloads the page, and the reload would lose the invitation.
+-->
+<app-entry-frame [languageSwitch]="!invitationPending()">
+  <h1 class="text-page-title" i18n="@@register.heading">Create your account</h1>
+  <p class="auth-lead text-body text-secondary" i18n="@@register.lead">
+    Your account signs you in. You will choose or create a workspace next.
+  </p>
+
+  @if (failure(); as error) {
+    <div class="alert alert-danger auth-alert" role="alert">
+      <app-icon name="alert" [strokeWidth]="1.75" />
+      <span dir="auto">{{ error.message }}</span>
+    </div>
+  }
+
+  <form class="auth-form" [formGroup]="form" (ngSubmit)="submit()" novalidate>
+    <div class="field">
+      <label class="field-label field-required" for="email" i18n="@@auth.email.label"
+        >Email address</label
+      >
+      <!-- An address is left-to-right in either language. -->
+      <input
+        id="email"
+        class="input"
+        type="email"
+        dir="ltr"
+        formControlName="email"
+        autocomplete="username"
+        inputmode="email"
+        autocapitalize="off"
+        spellcheck="false"
+        [attr.aria-invalid]="showError('email') ? 'true' : null"
+        [attr.aria-describedby]="showError('email') ? 'email-hint email-error' : 'email-hint'"
+      />
+      <p class="field-hint" id="email-hint" i18n="@@register.email.hint">
+        This is the address you will sign in with.
+      </p>
+      @if (showError('email')) {
+        <p class="field-error" id="email-error" role="alert">
+          <app-icon name="alert" [strokeWidth]="1.75" />
+          <span i18n="@@register.email.error">Enter a valid email address.</span>
+        </p>
+      }
     </div>
 
-    <h1 class="text-page-title">Create your account</h1>
-    <p class="auth-lead text-body text-secondary">
-      Your account signs you in. You will choose or create a workspace next.
-    </p>
-
-    @if (failure(); as error) {
-      <div class="alert alert-danger auth-alert" role="alert">
-        <app-icon name="alert" [strokeWidth]="1.75" />
-        <span>{{ error.message }}</span>
-      </div>
-    }
-
-    <form class="auth-form" [formGroup]="form" (ngSubmit)="submit()" novalidate>
-      <div class="field">
-        <label class="field-label field-required" for="email">Email address</label>
+    <div class="field">
+      <label class="field-label field-required" for="password" i18n="@@auth.password.label"
+        >Password</label
+      >
+      <!--
+        `autocomplete="new-password"` is what invites a password manager to
+        offer a generated one. The hint is tied to the input with
+        aria-describedby so the requirement is announced with the field rather
+        than only visible beside it.
+      -->
+      <div class="password-field">
         <input
-          id="email"
+          id="password"
           class="input"
-          type="email"
-          formControlName="email"
-          autocomplete="username"
-          inputmode="email"
-          autocapitalize="off"
-          spellcheck="false"
-          [attr.aria-invalid]="showError('email') ? 'true' : null"
-          [attr.aria-describedby]="showError('email') ? 'email-error' : null"
+          [type]="passwordVisible() ? 'text' : 'password'"
+          formControlName="password"
+          autocomplete="new-password"
+          [attr.aria-invalid]="showError('password') ? 'true' : null"
+          [attr.aria-describedby]="
+            showError('password') ? 'password-hint password-error' : 'password-hint'
+          "
         />
-        <p class="field-hint" id="email-hint">This is the address you will sign in with.</p>
-        @if (showError('email')) {
-          <p class="field-error" id="email-error" role="alert">
-            <app-icon name="alert" [strokeWidth]="1.75" />
-            <span>Enter a valid email address.</span>
-          </p>
-        }
-      </div>
-
-      <div class="field">
-        <label class="field-label field-required" for="password">Password</label>
-        <!--
-          `autocomplete="new-password"` is what invites a password manager to
-          offer a generated one. The hint is tied to the input with
-          aria-describedby so the requirement is announced with the field rather
-          than only visible beside it.
-        -->
-        <div class="password-field">
-          <input
-            id="password"
-            class="input"
-            [type]="passwordVisible() ? 'text' : 'password'"
-            formControlName="password"
-            autocomplete="new-password"
-            [attr.aria-invalid]="showError('password') ? 'true' : null"
-            [attr.aria-describedby]="
-              showError('password') ? 'password-hint password-error' : 'password-hint'
-            "
-          />
-          <button
-            type="button"
-            class="btn btn-ghost btn-sm password-toggle"
-            (click)="togglePassword()"
-            [attr.aria-pressed]="passwordVisible()"
-          >
-            {{ passwordVisible() ? 'Hide' : 'Show' }}
-            <span class="visually-hidden">password</span>
-          </button>
-        </div>
-        <!--
-          Length, and nothing else. There is deliberately no rule demanding a
-          digit or a symbol: those push everybody towards the same predictable
-          substitutions while adding very little, and a longer passphrase is both
-          stronger and easier to remember.
-        -->
-        <p class="field-hint" id="password-hint">
-          At least {{ minLength }} characters. A memorable phrase works well.
-        </p>
-        @if (showError('password')) {
-          <p class="field-error" id="password-error" role="alert">
-            <app-icon name="alert" [strokeWidth]="1.75" />
-            <span>Use at least {{ minLength }} characters.</span>
-          </p>
-        }
-      </div>
-
-      <div class="auth-actions">
-        <button type="submit" class="btn btn-primary" [disabled]="submitting()">
-          @if (submitting()) {
-            <span class="spinner" aria-hidden="true"></span>
+        <button
+          type="button"
+          class="btn btn-ghost btn-sm password-toggle"
+          (click)="togglePassword()"
+          [attr.aria-pressed]="passwordVisible()"
+        >
+          @if (passwordVisible()) {
+            <span i18n="@@auth.password.hide">Hide</span>
+          } @else {
+            <span i18n="@@auth.password.show">Show</span>
           }
-          <span class="btn-label">{{ submitting() ? 'Creating account…' : 'Create account' }}</span>
+          <span class="visually-hidden" i18n="@@auth.password.toggleObject">password</span>
         </button>
       </div>
-    </form>
+      <!--
+        Length, and nothing else. There is deliberately no rule demanding a
+        digit or a symbol: those push everybody towards the same predictable
+        substitutions while adding very little, and a longer passphrase is both
+        stronger and easier to remember.
+      -->
+      <p class="field-hint" id="password-hint">{{ passwordHint }}</p>
+      @if (showError('password')) {
+        <p class="field-error" id="password-error" role="alert">
+          <app-icon name="alert" [strokeWidth]="1.75" />
+          <span>{{ passwordError }}</span>
+        </p>
+      }
+    </div>
 
-    <p class="auth-alternate text-small text-secondary">
-      Already have an account?
-      <a [routerLink]="['/', loginPath]">Sign in</a>
-    </p>
+    <div class="auth-actions">
+      <button type="submit" class="btn btn-primary btn-lg" [disabled]="submitting()">
+        @if (submitting()) {
+          <span class="spinner" aria-hidden="true"></span>
+          <span class="btn-label" i18n="@@register.submitting">Creating account…</span>
+        } @else {
+          <span class="btn-label" i18n="@@register.submit">Create account</span>
+        }
+      </button>
+    </div>
+  </form>
 
-    <!--
-      Stated rather than implied. Email confirmation is a later phase, and
-      somebody should know their address has not been verified before they rely
-      on it for recovery that does not exist yet either.
-    -->
-    <p class="auth-note text-small text-muted">
-      Email addresses are not verified yet, and there is no password reset. Keep your password
-      somewhere safe.
-    </p>
-  </main>
-</div>
+  <p class="auth-alternate text-small text-secondary">
+    <span i18n="@@register.haveAccount">Already have an account?</span>
+    <a [routerLink]="['/', loginPath]" i18n="@@register.signIn">Sign in</a>
+  </p>
+
+  <!--
+    Stated rather than implied. Email confirmation is a later phase, and
+    somebody should know their address has not been verified before they rely
+    on it for recovery that does not exist yet either.
+  -->
+  <p class="auth-note text-small text-muted" i18n="@@register.note">
+    Email addresses are not verified yet, and there is no password reset. Keep your password
+    somewhere safe.
+  </p>
+</app-entry-frame>

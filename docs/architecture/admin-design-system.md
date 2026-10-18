@@ -641,6 +641,10 @@ decoration. Transitions use transforms, opacity and colour; no
 - **Command palette:** the dialog enters in 220ms on the enter curve (fade, 8px
   of travel, scale from 0.98) over a fading scrim, and leaves at once. The
   bell's panel enters like a menu (220ms).
+- **The entry pages' signature** (Phase 36.5, D24): the mark's Ember shape
+  settles into the room the Lagoon shape keeps for it, translate only, 600ms on
+  the emphasized curve after 150ms, once per page load, none under reduced
+  motion. Never on the heading or the form.
 - Not in the admin: count-ups, stagger on every visit, parallax, fade-up on
   sections, bounce.
 
@@ -751,6 +755,31 @@ its letter joining.
 
 **Cost.** Loaded through `@defer (when requested; prefetch on idle)`: 17.3 kB
 raw, 5.8 kB gzip, in a lazy chunk; nothing of it is in the startup JavaScript.
+
+## D24. Entry pages (Phase 36.5)
+
+**What they are.** Sign-in, registration, an invitation, and choosing or
+creating a workspace: the pages before the shell, sharing `EntryFrame`
+(`layout/entry-frame/`). The full brief, the layout per width and the one
+exception to MASTER rules 7 and 10 are in `docs/design/pages/entry.md`.
+
+**Frame.** A `header` (the lockup, then English / العربية), one `main` holding
+the page's content, and from 1024px an `aside` story panel named by its tagline:
+the mark, the promise, and an example conversation built from the transcript
+primitives, labelled "Example conversation" and `aria-hidden`. Below 1024px the
+panel is not drawn and the form follows a compact header. The `h1` is the task
+("Sign in"), never animated.
+
+**Language before sign-in.** A `.segmented` group of buttons (`aria-pressed`)
+that reloads into the chosen language through `LanguageService`. Withheld while
+an invitation token waits in memory, because the reload would lose it.
+
+**Copy.** Every string on these pages, and on not-found and the placeholder, is
+now a translated message; server sentences (a refused sign-in, a taken slug)
+still arrive in English and render with `dir="auto"` (D22).
+
+**Not found** is a calm state: the path that matched nothing as an LTR island,
+without its query or fragment, and one primary way back.
 
 ## Deferred
 

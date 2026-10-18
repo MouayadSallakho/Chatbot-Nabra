@@ -23,7 +23,7 @@ import { InvitationHandoff } from '@app/core/invitations/invitation-handoff';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
 import { HOME_PATH } from '@app/layout/navigation';
 import { AcceptedInvitation, TeamApi } from '@app/features/team/team-api';
-import { BrandMark } from '@app/shared/brand-mark/brand-mark';
+import { EntryFrame } from '@app/layout/entry-frame/entry-frame';
 
 /** What this screen is currently doing. */
 type AcceptState = 'reading' | 'needsAccount' | 'accepting' | 'accepted' | 'failed';
@@ -59,7 +59,7 @@ type AcceptState = 'reading' | 'needsAccount' | 'accepting' | 'accepted' | 'fail
 @Component({
   selector: 'app-accept-invitation',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [BrandMark, RouterLink],
+  imports: [EntryFrame, RouterLink],
   templateUrl: './accept-invitation.html',
   styleUrl: '../../auth/auth-page.scss',
 })
@@ -81,6 +81,11 @@ export class AcceptInvitation implements OnInit {
 
   /** Whether a token was found at all. */
   protected readonly hasToken = computed(() => this.handoff.pending());
+
+  /** The joined workspace's first letter, for the tile beside its name. */
+  protected readonly workspaceInitial = computed(
+    () => Array.from(this.workspaceName()?.trim() ?? '')[0]?.toLocaleUpperCase() ?? '',
+  );
 
   ngOnInit(): void {
     this.begin();
@@ -185,9 +190,7 @@ export class AcceptInvitation implements OnInit {
       this.failure.set({
         kind: 'unknown',
         status: 0,
-        message:
-          'This invitation link is missing its code. Open the link you were sent again, or ' +
-          'ask for a new invitation.',
+        message: $localize`:@@invitation.missingCode:This invitation link is missing its code. Open the link you were sent again, or ask for a new invitation.`,
       });
 
       return;
@@ -261,9 +264,7 @@ export class AcceptInvitation implements OnInit {
 
     return {
       ...failure,
-      message:
-        'This invitation was sent to a different account. Sign out and open the link again ' +
-        'as the address it was sent to.',
+      message: $localize`:@@invitation.otherAccount:This invitation was sent to a different account. Sign out and open the link again as the address it was sent to.`,
     };
   }
 

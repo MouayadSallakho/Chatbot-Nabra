@@ -815,6 +815,34 @@ label:has(> input[type='checkbox'], > input[type='radio']) {
   }
 }
 
+// The same control with buttons instead of radios, for a choice that acts at
+// once (the language before sign-in). The pressed option is drawn like a checked
+// one, with a control-strength edge so its state reads at 3:1 on the well.
+button.segmented-option {
+  border: 0;
+  background-color: transparent;
+
+  &[aria-pressed='true'] {
+    background-color: var(--surface-default);
+    color: var(--text-primary);
+    box-shadow: 0 0 0 1px var(--border-control);
+  }
+
+  &:focus-visible {
+    outline: var(--focus-ring-width) solid var(--focus-ring);
+    outline-offset: 1px;
+  }
+
+  // Forced colours drop the edge (a box-shadow) and the fill: a system outline,
+  // inside the option so nothing moves, says which one is pressed instead.
+  @media (forced-colors: active) {
+    &[aria-pressed='true'] {
+      outline: 2px solid Highlight;
+      outline-offset: -2px;
+    }
+  }
+}
+
 // -----------------------------------------------------------------------------
 // Tables
 // -----------------------------------------------------------------------------
