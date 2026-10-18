@@ -2,12 +2,13 @@
 // Global stylesheet
 // =============================================================================
 //
-// Four layers, in cascade order:
+// Five layers, in cascade order:
 //
 //   fonts       the self-hosted faces and their metric-matched fallbacks
 //   tokens      the values everything else resolves to
 //   base        element defaults, typography, focus, reduced motion
 //   primitives  the reusable visual vocabulary
+//   charts      the shared marks, axes and legends of src/app/shared/charts
 //
 // Bootstrap's grid is loaded before this file, from angular.json, so anything
 // here can override it without needing specificity tricks or !important.
@@ -21,6 +22,7 @@
 @use 'styles/tokens';
 @use 'styles/base';
 @use 'styles/primitives';
+@use 'styles/charts';
 
 // -----------------------------------------------------------------------------
 // Bootstrap grid, bound to our spacing scale

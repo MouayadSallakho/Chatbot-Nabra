@@ -233,4 +233,33 @@ describe('ReportSchedules', () => {
     expect(text()).toContain('Off');
     expect(text()).toContain('no longer has the permissions this report needs');
   });
+
+  it('asks before an open editor with edits is left, and only then', async () => {
+    await mount('reports.view', 'reports.generate', 'reports.schedule', 'analytics.view');
+    await answerInitial();
+
+    const page = fixture.componentInstance;
+
+    expect(page.hasUnsavedChanges()).toBe(false);
+
+    host().querySelector<HTMLButtonElement>('[data-testid="new-schedule"]')!.click();
+    await settle();
+
+    expect(page.hasUnsavedChanges()).toBe(false);
+
+    const name = host().querySelector<HTMLInputElement>('#schedule-name')!;
+
+    name.value = 'Monday numbers';
+    name.dispatchEvent(new Event('input'));
+    await settle();
+
+    expect(page.hasUnsavedChanges()).toBe(true);
+
+    [...host().querySelectorAll<HTMLButtonElement>('button')]
+      .find((button) => button.textContent?.trim() === 'Cancel')!
+      .click();
+    await settle();
+
+    expect(page.hasUnsavedChanges()).toBe(false);
+  });
 });

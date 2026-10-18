@@ -1,7 +1,9 @@
 <div class="page">
   <app-page-header
     heading="Analytics"
-    description="What your workspace actually handled. Every number here is counted from real conversations — there is no sample data."
+    i18n-heading="@@analytics.heading"
+    description="What your workspace actually handled. Every number here is counted from real conversations; there is no sample data."
+    i18n-description="@@analytics.description"
   >
     @if (canView()) {
       <button
@@ -14,8 +16,14 @@
       >
         @if (refreshing()) {
           <span class="spinner" aria-hidden="true"></span>
+        } @else {
+          <app-icon name="refresh" [strokeWidth]="1.75" />
         }
-        <span class="btn-label">{{ refreshing() ? 'Refreshing…' : 'Refresh' }}</span>
+        @if (refreshing()) {
+          <span class="btn-label" i18n="@@analytics.refreshing">Refreshing…</span>
+        } @else {
+          <span class="btn-label" i18n="@@analytics.refresh">Refresh</span>
+        }
       </button>
     }
   </app-page-header>
@@ -31,24 +39,24 @@
         <app-empty-state
           icon="analytics"
           heading="You do not have access to analytics"
+          i18n-heading="@@analytics.denied.heading"
           description="Seeing this workspace's numbers needs a permission your roles do not include. Ask somebody who administers this workspace if you need it."
+          i18n-description="@@analytics.denied.body"
         />
       </div>
     } @else {
       <!--
-        The period control. A radio group rather than three buttons: these are
-        one setting with three values, and that is what a screen reader should
-        hear and what arrow keys should move between.
+        The period: one setting with three values, so a radio group. It scopes
+        everything below it except "Right now", which says so.
       -->
       <div class="range-bar">
-        <fieldset class="range-picker">
-          <legend class="range-legend">Period</legend>
+        <fieldset class="segmented range-picker">
+          <legend class="visually-hidden" i18n="@@analytics.period">Period</legend>
           @for (option of ranges; track option.value) {
-            <label class="range-option" [class.range-selected]="range() === option.value">
+            <label class="segmented-option">
               <input
                 type="radio"
                 name="analytics-range"
-                class="visually-hidden"
                 [value]="option.value"
                 [checked]="range() === option.value"
                 [disabled]="refreshing()"
@@ -60,371 +68,329 @@
           }
         </fieldset>
 
-        @if (dashboard(); as data) {
-          <p class="text-small text-muted range-note">
-            {{ data.period.days }} days to today, counted in
-            <abbr title="Coordinated Universal Time">{{ data.period.timeZone }}</abbr
-            >.
-          </p>
+        @if (period(); as sentence) {
+          <p class="range-note" data-testid="period">{{ sentence }}</p>
         }
       </div>
 
       @if (loading()) {
-        <div class="summary-grid" aria-busy="true">
-          <p class="visually-hidden" role="status">Loading analytics…</p>
-          @for (card of skeletonCards; track card) {
-            <div class="card summary-card" aria-hidden="true">
-              <div class="card-body">
+        <!-- The shape of the page to come: the figures strip and two panels. -->
+        <div class="analytics-skeleton" aria-busy="true">
+          <p class="visually-hidden" role="status" i18n="@@analytics.loading">Loading analytics…</p>
+          <div class="figures" aria-hidden="true">
+            @for (cell of [0, 1, 2, 3]; track cell) {
+              <div class="figure">
                 <span class="skeleton skeleton-text"></span>
-                <span class="skeleton skeleton-title"></span>
+                <span class="skeleton figure-skeleton"></span>
               </div>
+            }
+          </div>
+          <div class="card card-body skeleton-panel" aria-hidden="true">
+            <span class="skeleton skeleton-title"></span>
+            <span class="skeleton skeleton-bar"></span>
+          </div>
+        </div>
+      } @else if (dashboard(); as data) {
+        @if (staleSince(); as since) {
+          <!--
+            A refresh failed. The figures already on screen stay, and the page
+            says how old they are rather than passing them off as new.
+          -->
+          <div class="alert alert-warning stale-figures" role="alert" data-testid="stale">
+            <app-icon name="alert" [strokeWidth]="1.75" />
+            <span i18n="@@analytics.stale"
+              >Could not refresh. These figures were read at {{ since }}.</span
+            >
+            <button type="button" class="btn btn-secondary btn-sm" (click)="load()">
+              <span i18n="@@analytics.tryAgain">Try again</span>
+            </button>
+          </div>
+        }
+
+        <!--
+          Says out loud what just arrived, for somebody who changed the period or
+          pressed Refresh and cannot see the figures update. Polite and
+          off-screen: it announces without moving focus.
+        -->
+        <p class="visually-hidden" role="status" data-testid="announcement">{{ announcement() }}</p>
+
+        <div
+          class="analytics-body"
+          [class.is-refreshing]="refreshing()"
+          [attr.aria-busy]="refreshing()"
+        >
+          <!-- What happened in the period. -->
+          <dl class="figures" data-testid="summary">
+            <div class="figure">
+              <dt i18n="@@analytics.figure.conversations">Conversations started</dt>
+              <dd class="figure-value" data-testid="summary-conversations">
+                {{ data.summary.conversationsStarted | localNumber }}
+              </dd>
+            </div>
+            <div class="figure">
+              <dt i18n="@@analytics.figure.customer">Customer messages</dt>
+              <dd class="figure-value" data-testid="summary-customer">
+                {{ data.summary.customerMessages | localNumber }}
+              </dd>
+            </div>
+            <div class="figure">
+              <dt i18n="@@analytics.figure.ai">AI replies</dt>
+              <dd class="figure-value" data-testid="summary-ai">
+                {{ data.summary.aiMessages | localNumber }}
+              </dd>
+            </div>
+            <div class="figure">
+              <dt i18n="@@analytics.figure.team">Replies from the team</dt>
+              <dd class="figure-value" data-testid="summary-human">
+                {{ data.summary.humanMessages | localNumber }}
+              </dd>
+            </div>
+          </dl>
+          @if (data.summary.systemMessages > 0) {
+            <p class="figures-note" i18n="@@analytics.systemMessages">
+              Nabra notices, such as handoffs, are counted apart and in none of these:
+              {{ data.summary.systemMessages | localNumber }}.
+            </p>
+          }
+
+          <div class="analytics-pair">
+            <!--
+              Right now, whatever period is selected. Said on the page, because a
+              reader looking at a 7-day view would otherwise assume these numbers
+              were about the same seven days.
+            -->
+            <section
+              class="card card-body now-panel"
+              aria-labelledby="now-heading"
+              data-testid="snapshot"
+            >
+              <h2 id="now-heading" class="panel-title" i18n="@@analytics.now.heading">Right now</h2>
+              <p class="panel-note" i18n="@@analytics.now.note">
+                Open conversations at this moment, not during the selected period.
+              </p>
+              <p class="now-value">{{ data.current.openConversations | localNumber }}</p>
+              <app-voice-split
+                [ai]="data.current.openHandledByAi"
+                [human]="data.current.openHandledByHuman"
+                subject="openConversations"
+              />
+            </section>
+
+            <div class="card card-body">
+              <app-stacked-bar
+                heading="Who replied to customers"
+                i18n-heading="@@analytics.replies.heading"
+                [level]="2"
+                [summary]="repliesSummary()"
+                [parts]="replyParts()"
+                categoryLabel="Voice"
+                i18n-categoryLabel="@@analytics.table.voice"
+                valueLabel="Replies"
+                i18n-valueLabel="@@analytics.table.replies"
+              />
+            </div>
+          </div>
+
+          @if (!hasActivity()) {
+            <!--
+              The honest empty state. The zeroes above are real; this explains
+              them rather than drawing a sample chart nobody can act on.
+            -->
+            <div class="card" data-testid="empty">
+              <app-empty-state
+                icon="analytics"
+                heading="No activity in this period"
+                i18n-heading="@@analytics.empty.heading"
+                description="Nobody started a conversation and no messages were exchanged in the selected period. Try a longer period, or connect a channel so customers can reach your agents. Any provider usage is still reported below."
+                i18n-description="@@analytics.empty.body"
+              />
+            </div>
+          } @else {
+            <section class="card card-body day-panel" aria-labelledby="days-heading">
+              <h2 id="days-heading" class="panel-title" i18n="@@analytics.days.heading">
+                Day by day
+              </h2>
+              <app-column-chart
+                heading="Messages per day"
+                i18n-heading="@@analytics.days.messages"
+                categoryLabel="Day"
+                i18n-categoryLabel="@@analytics.table.day"
+                [summary]="messagesSummary()"
+                [series]="series"
+                [points]="points()"
+                data-testid="messages-chart"
+              />
+              <app-area-chart
+                heading="Conversations started per day"
+                i18n-heading="@@analytics.days.conversations"
+                categoryLabel="Day"
+                i18n-categoryLabel="@@analytics.table.day"
+                [summary]="conversationsSummary()"
+                [series]="conversationSeries"
+                [points]="points()"
+                [plotHeight]="140"
+                data-testid="conversations-chart"
+              />
+            </section>
+
+            <div class="analytics-pair">
+              <div class="card card-body" data-testid="channels">
+                @if (singleChannel(); as sentence) {
+                  <h2 class="panel-title" i18n="@@analytics.channels.heading">Channels</h2>
+                  <p class="panel-note">{{ sentence }}</p>
+                } @else if (channelBars().length > 0) {
+                  <app-bar-chart
+                    heading="Channels"
+                    i18n-heading="@@analytics.channels.heading"
+                    [level]="2"
+                    [summary]="channelsSummary()"
+                    [bars]="channelBars()"
+                    categoryLabel="Channel"
+                    i18n-categoryLabel="@@analytics.table.channel"
+                    valueLabel="Conversations"
+                    i18n-valueLabel="@@analytics.table.conversations"
+                  />
+                } @else {
+                  <h2 class="panel-title" i18n="@@analytics.channels.heading">Channels</h2>
+                  <p class="panel-note" i18n="@@analytics.channels.none">
+                    No conversation started on any channel in this period.
+                  </p>
+                }
+              </div>
+
+              <section class="card card-body" aria-labelledby="agents-heading">
+                <h2 id="agents-heading" class="panel-title" i18n="@@analytics.agents.heading">
+                  AI agents
+                </h2>
+                <p class="panel-note" i18n="@@analytics.agents.note">
+                  The ten busiest agents in this period. Replies from the team are counted in the
+                  agent's conversations, not against the agent.
+                </p>
+                @if (data.agents.length === 0) {
+                  <p class="panel-note" i18n="@@analytics.agents.none">
+                    No conversations were attributed to an agent in this period.
+                  </p>
+                } @else {
+                  <div
+                    class="table-scroll"
+                    appScrollRegion="AI agents table"
+                    i18n-appScrollRegion="@@analytics.agents.region"
+                  >
+                    <table class="table" data-testid="agents">
+                      <caption class="visually-hidden" i18n="@@analytics.agents.caption">
+                        Activity per AI agent
+                      </caption>
+                      <thead>
+                        <tr>
+                          <th scope="col" i18n="@@analytics.agents.agent">Agent</th>
+                          <th scope="col" class="numeric" i18n="@@analytics.table.conversations">
+                            Conversations
+                          </th>
+                          <th scope="col" class="numeric" i18n="@@analytics.series.customers">
+                            Customers
+                          </th>
+                          <th scope="col" class="numeric" i18n="@@analytics.series.ai">AI</th>
+                          <th scope="col" class="numeric" i18n="@@analytics.series.team">Team</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        @for (agent of data.agents; track agent.aiAgentId) {
+                          <tr>
+                            <!-- Interpolated, never markup: an agent name is workspace-authored text. -->
+                            <th scope="row" class="agent-name" dir="auto">{{ agent.name }}</th>
+                            <td class="numeric">{{ agent.conversationsStarted | localNumber }}</td>
+                            <td class="numeric">{{ agent.customerMessages | localNumber }}</td>
+                            <td class="numeric">{{ agent.aiMessages | localNumber }}</td>
+                            <td class="numeric">{{ agent.humanMessages | localNumber }}</td>
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                  </div>
+                }
+              </section>
+            </div>
+
+            <div class="analytics-pair">
+              <!-- AI outcomes. Exact, because the runtime records each one. -->
+              @if (data.aiOperations.attempts > 0) {
+                <div class="card card-body" data-testid="ai-operations">
+                  <app-stacked-bar
+                    heading="How AI reply attempts ended"
+                    i18n-heading="@@analytics.outcome.heading"
+                    [level]="2"
+                    [summary]="outcomeSummary()"
+                    [parts]="outcomeParts()"
+                    categoryLabel="Outcome"
+                    i18n-categoryLabel="@@analytics.table.outcome"
+                    valueLabel="Attempts"
+                    i18n-valueLabel="@@analytics.table.attempts"
+                  />
+                </div>
+              }
+
+              <!-- WhatsApp delivery. Present only when there is outbound history. -->
+              @if (data.whatsappDelivery) {
+                <section
+                  class="card card-body"
+                  aria-labelledby="delivery-heading"
+                  data-testid="whatsapp-delivery"
+                >
+                  <h2 id="delivery-heading" class="panel-title" i18n="@@analytics.delivery.heading">
+                    WhatsApp delivery
+                  </h2>
+                  <p class="panel-note" i18n="@@analytics.delivery.note">
+                    Where outbound WhatsApp messages got to, as WhatsApp last reported.
+                  </p>
+                  <dl class="delivery-list">
+                    @for (row of deliveryRows(); track row.key) {
+                      <div
+                        class="delivery-row"
+                        [class.is-failed]="row.key === 'failed' && row.value > 0"
+                      >
+                        <dt>
+                          @if (row.key === 'failed' && row.value > 0) {
+                            <app-icon name="alert" [strokeWidth]="1.75" />
+                          }
+                          {{ row.label }}
+                        </dt>
+                        <dd>{{ row.value | localNumber }}</dd>
+                      </div>
+                    }
+                  </dl>
+                </section>
+              }
             </div>
           }
+
+          <!--
+            Provider usage. Outside the activity guard on purpose: indexing a
+            document and previewing an agent both cost money and produce no
+            conversation, so a workspace with no messages can still have spent
+            something -- and that is exactly the workspace whose owner wants to be
+            told.
+          -->
+          <app-provider-usage [usage]="data.aiUsage" [models]="data.models" />
         </div>
       } @else if (failure(); as error) {
         <!--
           Announced, because a refresh that fails changes nothing visible above
           the fold: somebody who pressed the button and heard nothing would
-          reasonably believe the numbers on screen were the new ones.
+          reasonably believe the figures on screen were the new ones.
         -->
         <div class="card" role="alert">
           <app-empty-state
             icon="alert"
             tone="error"
             heading="Could not load analytics"
+            i18n-heading="@@analytics.failed"
             [description]="error.message"
           >
             <button stateActions type="button" class="btn btn-secondary btn-sm" (click)="load()">
-              Try again
+              <span i18n="@@analytics.tryAgain">Try again</span>
             </button>
           </app-empty-state>
         </div>
-      } @else if (dashboard(); as data) {
-        <!--
-          Says out loud what just arrived, for somebody who changed the period or
-          pressed Refresh and cannot see the cards update. Polite and off-screen:
-          it announces without moving focus, so nothing is stolen from whatever
-          the reader was on.
-        -->
-        <p class="visually-hidden" role="status" data-testid="announcement">
-          {{ data.period.days }} days: {{ data.summary.conversationsStarted }} conversations,
-          {{ data.summary.customerMessages }} customer messages, {{ data.summary.aiMessages }} AI
-          replies, {{ data.summary.humanMessages }} human replies.
-        </p>
-
-        <!-- What happened in the period. -->
-        <div class="summary-grid" data-testid="summary">
-          <div class="card summary-card">
-            <div class="card-body">
-              <p class="summary-label">Conversations started</p>
-              <p class="summary-value" data-testid="summary-conversations">
-                {{ data.summary.conversationsStarted }}
-              </p>
-            </div>
-          </div>
-          <div class="card summary-card">
-            <div class="card-body">
-              <p class="summary-label">Customer messages</p>
-              <p class="summary-value" data-testid="summary-customer">
-                {{ data.summary.customerMessages }}
-              </p>
-            </div>
-          </div>
-          <div class="card summary-card">
-            <div class="card-body">
-              <p class="summary-label">AI replies</p>
-              <p class="summary-value" data-testid="summary-ai">{{ data.summary.aiMessages }}</p>
-            </div>
-          </div>
-          <div class="card summary-card">
-            <div class="card-body">
-              <p class="summary-label">Human replies</p>
-              <p class="summary-value" data-testid="summary-human">
-                {{ data.summary.humanMessages }}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <!--
-          Right now, whatever period is selected. Said out loud on the page,
-          because a reader looking at a 7-day view would otherwise assume these
-          three were about the same seven days.
-        -->
-        <div class="card snapshot-card">
-          <div class="card-header">
-            <h2 class="card-title">Right now</h2>
-            <p class="text-small text-muted">
-              The state of the workspace at this moment, not during the selected period.
-            </p>
-          </div>
-          <div class="card-body snapshot-body" data-testid="snapshot">
-            <p>
-              <span class="snapshot-value">{{ data.current.openConversations }}</span> open
-            </p>
-            <p>
-              <span class="snapshot-value">{{ data.current.openHandledByAi }}</span> handled by AI
-            </p>
-            <p>
-              <span class="snapshot-value">{{ data.current.openHandledByHuman }}</span> handled by a
-              person
-            </p>
-          </div>
-        </div>
-
-        @if (!hasActivity()) {
-          <!--
-            The honest empty state. Zeroes above are real; this explains them
-            rather than drawing a sample chart nobody can act on.
-          -->
-          <div class="card" data-testid="empty">
-            <app-empty-state
-              icon="analytics"
-              heading="No activity in this period"
-              description="Nobody started a conversation and no messages were exchanged in the selected period. Try a longer period, or connect a channel so customers can reach your agents. Any provider usage is still reported below."
-            />
-          </div>
-        } @else {
-          <!-- Daily activity. -->
-          <div class="card">
-            <div class="card-header">
-              <h2 class="card-title">Daily activity</h2>
-              <p class="text-small text-muted">
-                Messages per day, in UTC. Busiest day: {{ busiestDay() }}.
-              </p>
-            </div>
-
-            <div class="card-body">
-              @if (hasDailyActivity()) {
-                <!--
-                  Drawn with CSS, not a chart library. It is decorative: the
-                  table underneath carries the same numbers, which is what a
-                  screen reader reads and what somebody checking a figure wants.
-                -->
-                <div class="chart" aria-hidden="true">
-                  @for (bar of bars(); track bar.date) {
-                    <div class="chart-column" [title]="bar.label + ': ' + bar.total">
-                      <div class="chart-stack" [style.height.%]="bar.height">
-                        <span class="chart-part chart-human" [style.flex-grow]="bar.human"></span>
-                        <span class="chart-part chart-ai" [style.flex-grow]="bar.ai"></span>
-                        <span
-                          class="chart-part chart-customer"
-                          [style.flex-grow]="bar.customer"
-                        ></span>
-                      </div>
-                    </div>
-                  }
-                </div>
-
-                <!--
-                  The legend names each series in words as well as colour, so it
-                  is readable without distinguishing the two.
-                -->
-                <ul class="chart-legend text-small text-secondary">
-                  <li><span class="swatch swatch-customer"></span> Customer</li>
-                  <li><span class="swatch swatch-ai"></span> AI</li>
-                  <li><span class="swatch swatch-human"></span> Human</li>
-                </ul>
-              } @else {
-                <p class="text-small text-secondary">
-                  No messages were sent on any day in this period.
-                </p>
-              }
-
-              <details class="daily-table">
-                <summary class="text-small">Daily numbers</summary>
-                <div class="table-scroll" appScrollRegion="Daily activity table">
-                  <table class="table" data-testid="daily-table">
-                    <caption class="visually-hidden">
-                      Activity per day, in UTC
-                    </caption>
-                    <thead>
-                      <tr>
-                        <th scope="col">Day</th>
-                        <th scope="col" class="numeric">Started</th>
-                        <th scope="col" class="numeric">Customer</th>
-                        <th scope="col" class="numeric">AI</th>
-                        <th scope="col" class="numeric">Human</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      @for (day of data.dailyActivity; track day.date) {
-                        <tr>
-                          <th scope="row">{{ day.date }}</th>
-                          <td class="numeric">{{ day.conversationsStarted }}</td>
-                          <td class="numeric">{{ day.customerMessages }}</td>
-                          <td class="numeric">{{ day.aiMessages }}</td>
-                          <td class="numeric">{{ day.humanMessages }}</td>
-                        </tr>
-                      }
-                    </tbody>
-                  </table>
-                </div>
-              </details>
-            </div>
-          </div>
-
-          <!-- Channels. -->
-          <div class="card">
-            <div class="card-header">
-              <h2 class="card-title">Channels</h2>
-              <p class="text-small text-muted">
-                Where conversations came from. Only channels this workspace has actually used are
-                listed.
-              </p>
-            </div>
-            <div class="card-body">
-              @if (data.channels.length === 0) {
-                <p class="text-small text-secondary">No conversations on any channel yet.</p>
-              } @else {
-                <ul class="channel-list" data-testid="channels">
-                  @for (channel of data.channels; track channel.channel) {
-                    <li class="channel-row">
-                      <span class="channel-name">{{ channelName(channel.channel) }}</span>
-                      <span class="channel-bar" aria-hidden="true">
-                        <span
-                          class="channel-fill"
-                          [style.width.%]="channelShare(channel.conversationsStarted)"
-                        ></span>
-                      </span>
-                      <span class="channel-count text-small">
-                        {{ channel.conversationsStarted }}
-                        {{ channel.conversationsStarted === 1 ? 'conversation' : 'conversations' }}
-                        ({{ channelShare(channel.conversationsStarted) }}%)
-                      </span>
-                    </li>
-                  }
-                </ul>
-              }
-            </div>
-          </div>
-
-          <!-- Agents. -->
-          <div class="card">
-            <div class="card-header">
-              <h2 class="card-title">AI agents</h2>
-              <p class="text-small text-muted">
-                The ten busiest agents in this period. Human replies are counted in the agent's
-                conversations, not against the agent.
-              </p>
-            </div>
-            <div class="card-body">
-              @if (data.agents.length === 0) {
-                <p class="text-small text-secondary">
-                  No conversations were attributed to an agent in this period.
-                </p>
-              } @else {
-                <div class="table-scroll" appScrollRegion="AI agents table">
-                  <table class="table" data-testid="agents">
-                    <caption class="visually-hidden">
-                      Activity per AI agent
-                    </caption>
-                    <thead>
-                      <tr>
-                        <th scope="col">Agent</th>
-                        <th scope="col" class="numeric">Conversations</th>
-                        <th scope="col" class="numeric">Customer</th>
-                        <th scope="col" class="numeric">AI replies</th>
-                        <th scope="col" class="numeric">Human replies</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      @for (agent of data.agents; track agent.aiAgentId) {
-                        <tr>
-                          <!--
-                            Interpolated, never rendered as markup: an agent name
-                            is workspace-authored text.
-                          -->
-                          <th scope="row" class="agent-name">{{ agent.name }}</th>
-                          <td class="numeric">{{ agent.conversationsStarted }}</td>
-                          <td class="numeric">{{ agent.customerMessages }}</td>
-                          <td class="numeric">{{ agent.aiMessages }}</td>
-                          <td class="numeric">{{ agent.humanMessages }}</td>
-                        </tr>
-                      }
-                    </tbody>
-                  </table>
-                </div>
-              }
-            </div>
-          </div>
-
-          <!-- AI operations. Exact, because the runtime records each outcome. -->
-          @if (data.aiOperations.attempts > 0) {
-            <div class="card">
-              <div class="card-header">
-                <h2 class="card-title">AI replies attempted</h2>
-                <p class="text-small text-muted">
-                  How answer attempts ended. Counted from what the runtime recorded, not estimated.
-                </p>
-              </div>
-              <div class="card-body outcome-body" data-testid="ai-operations">
-                <p>
-                  <span class="outcome-value">{{ data.aiOperations.attempts }}</span> attempted
-                </p>
-                <p>
-                  <span class="outcome-value">{{ data.aiOperations.completed }}</span> completed
-                </p>
-                <p>
-                  <span class="outcome-value">{{ data.aiOperations.failed }}</span> failed
-                </p>
-                @if (data.aiOperations.inProgress > 0) {
-                  <p>
-                    <span class="outcome-value">{{ data.aiOperations.inProgress }}</span> still
-                    running
-                  </p>
-                }
-              </div>
-            </div>
-          }
-
-          <!-- WhatsApp delivery. Present only when there is outbound history. -->
-          @if (data.whatsappDelivery; as delivery) {
-            <div class="card">
-              <div class="card-header">
-                <h2 class="card-title">WhatsApp delivery</h2>
-                <p class="text-small text-muted">
-                  Where outbound WhatsApp messages got to, as WhatsApp last reported.
-                </p>
-              </div>
-              <div class="card-body outcome-body" data-testid="whatsapp-delivery">
-                <p>
-                  <span class="outcome-value">{{ delivery.pending }}</span> pending
-                </p>
-                <p>
-                  <span class="outcome-value">{{ delivery.sending }}</span> sending
-                </p>
-                <p>
-                  <span class="outcome-value">{{ delivery.sent }}</span> sent
-                </p>
-                <p>
-                  <span class="outcome-value">{{ delivery.delivered }}</span> delivered
-                </p>
-                <p>
-                  <span class="outcome-value">{{ delivery.read }}</span> read
-                </p>
-                <p>
-                  <span class="outcome-value">{{ delivery.failed }}</span> failed
-                </p>
-                <p>
-                  <span class="outcome-value">{{ delivery.unknown }}</span> unknown
-                </p>
-              </div>
-            </div>
-          }
-        }
-
-        <!--
-          Provider usage. Outside the activity guard on purpose: indexing a
-          document and previewing an agent both cost money and produce no
-          conversation, so a workspace with no messages can still have spent
-          something — and that is exactly the workspace whose owner wants to be
-          told.
-
-          Its own component, because it is a self-contained subject with its own
-          vocabulary: calls, tokens, and an estimate of what a provider was paid.
-        -->
-        <app-provider-usage [usage]="data.aiUsage" [models]="data.models" />
       }
     }
   </div>

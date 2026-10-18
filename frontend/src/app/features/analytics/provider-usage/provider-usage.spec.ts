@@ -46,11 +46,35 @@ describe('ProviderUsageCard', () => {
 
   const text = (): string => (fixture.nativeElement as HTMLElement).textContent ?? '';
 
-  it('renders nothing at all without a provider call to report', () => {
+  it('says in one sentence that there was nothing to report, without a figure', () => {
     mount(null);
 
-    // Not an empty card, and not a card of noughts. There is nothing to say.
-    expect((fixture.nativeElement as HTMLElement).querySelector('.card')).toBeNull();
+    const host = fixture.nativeElement as HTMLElement;
+
+    // Not a card of noughts: no chart, no amount, no currency. One sentence.
+    expect(host.querySelector('[data-testid="ai-usage"]')).toBeNull();
+    expect(host.querySelector('.chart')).toBeNull();
+    expect(host.querySelector('[data-testid="ai-usage-none"]')?.textContent).toContain(
+      'No calls to an AI provider in this period',
+    );
+    expect(text()).not.toMatch(/\$|0\.00/);
+  });
+
+  it('draws calls and tokens by kind of operation, each with its table', () => {
+    mount({ ...usage, embeddingCalls: 1, calls: 3, embeddingInputTokens: 900 });
+
+    const host = fixture.nativeElement as HTMLElement;
+    const charts = [...host.querySelectorAll('app-bar-chart')];
+
+    expect(
+      charts.map((chart) => chart.querySelector('.chart-frame-title')?.textContent?.trim()),
+    ).toEqual(['Calls by kind of operation', 'Tokens by kind']);
+    expect(charts[1].textContent).toContain('Embedding input');
+    expect(charts[1].textContent).toContain('900');
+
+    for (const chart of charts) {
+      expect(chart.querySelector('[data-testid="chart-view-toggle"]')).not.toBeNull();
+    }
   });
 
   it('shows an amount smaller than a penny rather than rounding it away', () => {

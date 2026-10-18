@@ -233,6 +233,16 @@ export const ICON_PATHS = {
 
   /** Under construction: this area is not built yet. */
   blueprint: ['M4 4h16v16H4z', 'M4 9h16', 'M9 9v11', 'M13 13h4', 'M13 16.5h4'],
+
+  // --- Charts and reports (Phase 36.7) -----------------------------------------
+  /** A chart read as a table: a frame, a header row and one column rule. */
+  table: ['M4 5h16v14H4z', 'M4 10h16', 'M4 14.5h16', 'M10 10v9'],
+
+  /** Waiting or generating: a clock face. Symmetric enough never to mirror. */
+  clock: ['M21 12a9 9 0 1 0-18 0 9 9 0 0 0 18 0z', 'M12 7v5l3 2'],
+
+  /** A schedule: a calendar page with two rings. */
+  calendar: ['M4 6h16v14H4z', 'M4 10h16', 'M8 3v4', 'M16 3v4'],
 } as const;
 
 /** Every glyph the product can draw. */

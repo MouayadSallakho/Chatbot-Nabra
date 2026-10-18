@@ -1,67 +1,77 @@
 <div class="page">
   <app-page-header
     heading="Overview"
-    [description]="
-      workspaceName()
-        ? 'What needs attention in ' + workspaceName() + ', and what is happening now.'
-        : 'What needs attention, and what is happening now.'
-    "
+    i18n-heading="@@overview.heading"
+    [description]="description()"
   />
 
-  <!-- 1. What needs attention -->
+  <!-- 1. What needs me -->
   <section class="page-section" aria-labelledby="attention-heading">
     <div class="section-header">
-      <h2 id="attention-heading" class="text-section-title">Needs attention</h2>
+      <h2 id="attention-heading" class="text-section-title" i18n="@@overview.attention.heading">
+        Needs attention
+      </h2>
     </div>
 
     @if (loading()) {
-      <div class="card attention-empty" aria-busy="true">
-        <span class="skeleton skeleton-text attention-skeleton" aria-hidden="true"></span>
-        <p class="visually-hidden" role="status">Checking what needs attention…</p>
+      <div class="attention-grid" aria-busy="true">
+        <p class="visually-hidden" role="status" i18n="@@overview.attention.loading">
+          Checking what needs attention…
+        </p>
+        <div class="card attention-card" aria-hidden="true">
+          <span class="skeleton skeleton-text attention-skeleton"></span>
+          <span class="skeleton skeleton-text"></span>
+        </div>
       </div>
     } @else if (attention().length === 0) {
-      <div class="card attention-empty" data-testid="attention-clear">
+      <div class="card attention-clear" data-testid="attention-clear">
         <span class="attention-icon tone-clear" aria-hidden="true">
           <app-icon name="check" [strokeWidth]="2" />
         </span>
-        <p>Nothing needs attention right now.</p>
+        <p i18n="@@overview.attention.clear">Nothing needs you right now.</p>
       </div>
     } @else {
-      <ul class="card attention-list" data-testid="attention">
+      <ul class="attention-grid" data-testid="attention">
         @for (item of attention(); track item.id) {
-          <li class="attention-item">
+          <li
+            class="card attention-card"
+            [class]="'card attention-card is-' + item.tone"
+            [attr.data-testid]="'attention-' + item.id"
+          >
             <!--
-              Severity is carried by the icon's shape and by the words in the
-              title as well as by colour: a stop sign, a triangle, a circled i.
+              Severity is carried by the icon's shape and by its word as well
+              as by colour: a stop sign, a triangle, a circled i, a refresh.
             -->
-            <span
-              class="attention-icon"
-              [class]="'attention-icon tone-' + item.tone"
-              aria-hidden="true"
-            >
-              <app-icon
-                [name]="
-                  item.tone === 'critical' ? 'critical' : item.tone === 'warning' ? 'alert' : 'info'
-                "
-                [strokeWidth]="1.75"
-              />
-            </span>
-            <div class="attention-text">
-              <p class="attention-title">
-                <span class="visually-hidden">{{
-                  item.tone === 'critical'
-                    ? 'Critical: '
-                    : item.tone === 'warning'
-                      ? 'Warning: '
-                      : ''
-                }}</span
-                >{{ item.title }}
-              </p>
-              <p class="attention-detail">{{ item.detail }}</p>
+            <p class="attention-tone">
+              <span [class]="'attention-icon tone-' + item.tone" aria-hidden="true">
+                <app-icon [name]="toneIcons[item.tone]" [strokeWidth]="1.75" />
+              </span>
+              <span>{{ toneWords[item.tone] }}</span>
+            </p>
+            <p class="attention-title">{{ item.title }}</p>
+            @if (item.meter; as meter) {
+              <div class="attention-meter">
+                <app-meter
+                  [value]="meter.value"
+                  [max]="meter.max"
+                  [state]="meter.state"
+                  [label]="meter.label"
+                  [valueText]="meter.text"
+                />
+                <p class="attention-meter-text">{{ meter.text }}</p>
+              </div>
+            }
+            <p class="attention-detail">{{ item.detail }}</p>
+            <div class="attention-action">
+              @if (item.link; as link) {
+                <a class="btn btn-secondary btn-sm" [routerLink]="link">{{ item.action }}</a>
+              } @else {
+                <button type="button" class="btn btn-secondary btn-sm" (click)="retry()">
+                  <app-icon name="refresh" [strokeWidth]="1.75" />
+                  <span>{{ item.action }}</span>
+                </button>
+              }
             </div>
-            <a class="btn btn-secondary btn-sm attention-action" [routerLink]="item.link">
-              {{ item.action }}
-            </a>
           </li>
         }
       </ul>
@@ -71,108 +81,99 @@
   @if (canSeeNumbers()) {
     @if (dashboardFailed()) {
       <div class="page-section">
-        <div class="alert alert-danger" role="alert">
+        <div class="alert alert-danger" role="alert" data-testid="numbers-failed">
           <app-icon name="alert" [strokeWidth]="1.75" />
-          <span
+          <span i18n="@@overview.numbersFailed"
             >Activity numbers could not be loaded. Everything else on this page is current.</span
           >
-          <button type="button" class="btn btn-secondary btn-sm" (click)="load()">Try again</button>
+          <button type="button" class="btn btn-secondary btn-sm" (click)="retry()">
+            <span i18n="@@overview.action.tryAgain">Try again</span>
+          </button>
         </div>
       </div>
     } @else {
-      <!-- 2. What is happening now -->
-      <section class="page-section" aria-labelledby="now-heading">
-        <div class="section-header">
-          <h2 id="now-heading" class="text-section-title">Right now</h2>
-          @if (canSeeConversations()) {
-            <a class="section-link" routerLink="/conversations">Open conversations</a>
+      <div class="overview-numbers">
+        <!-- 2. What is happening now: the page's one signature, the voice split. -->
+        <section class="page-section now" aria-labelledby="now-heading">
+          <div class="section-header">
+            <h2 id="now-heading" class="text-section-title" i18n="@@overview.now.heading">
+              Right now
+            </h2>
+            @if (canSeeConversations()) {
+              <a class="section-link" routerLink="/conversations" i18n="@@overview.now.link"
+                >Open conversations</a
+              >
+            }
+          </div>
+
+          <div class="card card-body now-card" [attr.aria-busy]="loading()" data-testid="now">
+            <p class="now-label" i18n="@@overview.now.open">Open conversations</p>
+            @if (dashboard(); as d) {
+              <p class="now-value">{{ d.current.openConversations | localNumber }}</p>
+              <app-voice-split
+                [ai]="d.current.openHandledByAi"
+                [human]="d.current.openHandledByHuman"
+                subject="openConversations"
+              />
+              <p class="now-note" i18n="@@overview.now.note">
+                Whoever is answering each one at this moment, whatever day it started.
+              </p>
+            } @else {
+              <span class="skeleton now-skeleton" aria-hidden="true"></span>
+              <span class="skeleton skeleton-bar" aria-hidden="true"></span>
+            }
+          </div>
+        </section>
+
+        <!-- 3. How the week went -->
+        <section class="page-section week" aria-labelledby="week-heading">
+          <div class="section-header">
+            <h2 id="week-heading" class="text-section-title" i18n="@@overview.week.heading">
+              Last 7 days
+            </h2>
+            <a class="section-link" routerLink="/analytics" i18n="@@overview.week.link"
+              >View analytics</a
+            >
+          </div>
+
+          <dl class="figures" [attr.aria-busy]="loading()" data-testid="week">
+            @if (dashboard()) {
+              @for (figure of figures(); track figure.key) {
+                <div class="figure">
+                  <dt>{{ figure.label }}</dt>
+                  <dd class="figure-value">{{ figure.value | localNumber }}</dd>
+                  <dd class="figure-shape">
+                    <app-sparkline [values]="figure.days" [tone]="figure.tone" />
+                  </dd>
+                </div>
+              }
+            } @else {
+              @for (cell of [0, 1, 2, 3]; track cell) {
+                <div class="figure" aria-hidden="true">
+                  <dt><span class="skeleton skeleton-text figure-skeleton-label"></span></dt>
+                  <dd><span class="skeleton figure-skeleton"></span></dd>
+                </div>
+              }
+            }
+          </dl>
+
+          @if (dashboard()) {
+            <div class="card card-body week-chart">
+              <app-column-chart
+                heading="Messages per day"
+                i18n-heading="@@overview.week.chart"
+                categoryLabel="Day"
+                i18n-categoryLabel="@@analytics.table.day"
+                [summary]="weekSummary()"
+                [series]="series"
+                [points]="points()"
+                [tableExtras]="tableExtras"
+                [plotHeight]="140"
+              />
+            </div>
           }
-        </div>
-
-        <dl class="metrics metrics-3" [attr.aria-busy]="loading()">
-          <div class="metric">
-            <dt>Open conversations</dt>
-            <dd class="metric-value">
-              @if (dashboard(); as d) {
-                {{ d.current.openConversations | localNumber }}
-              } @else {
-                <span class="skeleton metric-skeleton" aria-hidden="true"></span>
-              }
-            </dd>
-          </div>
-          <div class="metric">
-            <dt>Handled by AI</dt>
-            <dd class="metric-value">
-              @if (dashboard(); as d) {
-                {{ d.current.openHandledByAi | localNumber }}
-              } @else {
-                <span class="skeleton metric-skeleton" aria-hidden="true"></span>
-              }
-            </dd>
-          </div>
-          <div class="metric">
-            <dt>Handled by a person</dt>
-            <dd class="metric-value">
-              @if (dashboard(); as d) {
-                {{ d.current.openHandledByHuman | localNumber }}
-              } @else {
-                <span class="skeleton metric-skeleton" aria-hidden="true"></span>
-              }
-            </dd>
-          </div>
-        </dl>
-      </section>
-
-      <!-- 3. What changed -->
-      <section class="page-section" aria-labelledby="week-heading">
-        <div class="section-header">
-          <h2 id="week-heading" class="text-section-title">Last 7 days</h2>
-          <a class="section-link" routerLink="/analytics">View analytics</a>
-        </div>
-
-        <dl class="metrics metrics-4" [attr.aria-busy]="loading()">
-          <div class="metric">
-            <dt>Conversations started</dt>
-            <dd class="metric-value">
-              @if (dashboard(); as d) {
-                {{ d.summary.conversationsStarted | localNumber }}
-              } @else {
-                <span class="skeleton metric-skeleton" aria-hidden="true"></span>
-              }
-            </dd>
-          </div>
-          <div class="metric">
-            <dt>Customer messages</dt>
-            <dd class="metric-value">
-              @if (dashboard(); as d) {
-                {{ d.summary.customerMessages | localNumber }}
-              } @else {
-                <span class="skeleton metric-skeleton" aria-hidden="true"></span>
-              }
-            </dd>
-          </div>
-          <div class="metric">
-            <dt>AI replies</dt>
-            <dd class="metric-value">
-              @if (dashboard(); as d) {
-                {{ d.summary.aiMessages | localNumber }}
-              } @else {
-                <span class="skeleton metric-skeleton" aria-hidden="true"></span>
-              }
-            </dd>
-          </div>
-          <div class="metric">
-            <dt>Replies from people</dt>
-            <dd class="metric-value">
-              @if (dashboard(); as d) {
-                {{ d.summary.humanMessages | localNumber }}
-              } @else {
-                <span class="skeleton metric-skeleton" aria-hidden="true"></span>
-              }
-            </dd>
-          </div>
-        </dl>
-      </section>
+        </section>
+      </div>
     }
   }
 
@@ -180,7 +181,9 @@
   @if (shortcuts().length > 0) {
     <section class="page-section" aria-labelledby="shortcuts-heading">
       <div class="section-header">
-        <h2 id="shortcuts-heading" class="text-section-title">Shortcuts</h2>
+        <h2 id="shortcuts-heading" class="text-section-title" i18n="@@overview.shortcuts.heading">
+          Shortcuts
+        </h2>
       </div>
 
       <ul class="shortcuts">

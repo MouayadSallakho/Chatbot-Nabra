@@ -228,28 +228,6 @@ function base(tenantId: string): string {
   return `/api/tenants/${tenantId}/reports`;
 }
 
-/** The words for a format, as a person says them. */
-export function formatLabel(format: ReportFormat): string {
-  return format === 'Xlsx' ? 'Excel (XLSX)' : format.toUpperCase();
-}
-
-/** A byte count a person can read. */
-export function sizeLabel(bytes: number | null): string {
-  if (bytes === null) {
-    return '—';
-  }
-
-  if (bytes < 1024) {
-    return `${bytes} B`;
-  }
-
-  if (bytes < 1024 * 1024) {
-    return `${(bytes / 1024).toFixed(1)} KB`;
-  }
-
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
 /** A UTC date range, written out, with the last day included. */
 export function periodLabel(from: string, lastDay: string, language: AppLanguage = 'en'): string {
   const format = (value: string): string =>

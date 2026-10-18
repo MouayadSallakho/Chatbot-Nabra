@@ -1,7 +1,9 @@
 <div class="page">
   <app-page-header
     heading="Reports"
-    description="Export this workspace's numbers as CSV, Excel or PDF. Counts and safe labels only — never the text of a conversation."
+    i18n-heading="@@reports.heading"
+    description="Export this workspace's numbers as CSV, Excel or PDF. Counts and safe labels only, never the text of a conversation."
+    i18n-description="@@reports.description"
   >
     @if (canView()) {
       <button
@@ -14,8 +16,11 @@
       >
         @if (refreshing()) {
           <span class="spinner" aria-hidden="true"></span>
+          <span class="btn-label" i18n="@@reports.refreshing">Refreshing…</span>
+        } @else {
+          <app-icon name="refresh" [strokeWidth]="1.75" />
+          <span class="btn-label" i18n="@@reports.refresh">Refresh</span>
         }
-        <span class="btn-label">{{ refreshing() ? 'Refreshing…' : 'Refresh' }}</span>
       </button>
     }
   </app-page-header>
@@ -31,122 +36,172 @@
         <app-empty-state
           icon="reports"
           heading="You do not have access to reports"
+          i18n-heading="@@reports.denied.heading"
           description="Seeing and downloading reports needs a permission your roles do not include. Ask somebody who administers this workspace if you need it."
+          i18n-description="@@reports.denied.body"
         />
       </div>
     } @else if (loading()) {
-      <div class="card card-body" aria-busy="true">
-        <p class="text-small text-secondary">Loading reports…</p>
+      <!-- The shape to come: the catalogue beside its panel, then the list. -->
+      <div class="generate-layout" aria-busy="true">
+        <p class="visually-hidden" role="status" i18n="@@reports.loading">Loading reports…</p>
+        <div class="catalogue" aria-hidden="true">
+          @for (row of [0, 1, 2, 3]; track row) {
+            <div class="catalogue-item is-skeleton">
+              <span class="skeleton skeleton-text"></span>
+              <span class="skeleton skeleton-text"></span>
+            </div>
+          }
+        </div>
+        <div class="card card-body generate-panel" aria-hidden="true">
+          <span class="skeleton skeleton-title"></span>
+          <span class="skeleton skeleton-text"></span>
+        </div>
       </div>
     } @else {
       @if (failure(); as error) {
         <p class="alert alert-danger" role="alert">{{ error.message }}</p>
       }
 
-      <section class="card card-body generate" aria-labelledby="generate-heading">
-        <h2 id="generate-heading" class="text-section-title">Generate a report</h2>
+      <section class="generate" aria-labelledby="generate-heading">
+        <h2 id="generate-heading" class="text-section-title" i18n="@@reports.generate.heading">
+          Generate a report
+        </h2>
 
         @if (!canGenerate()) {
-          <p class="text-small text-secondary" data-testid="no-generate">
+          <p class="calm-note" data-testid="no-generate" i18n="@@reports.generate.denied">
             You can download reports that have already been generated, but creating new ones needs a
             permission your roles do not include.
           </p>
         } @else if (catalog()?.storageConfigured === false) {
-          <p class="alert alert-warning" role="status" data-testid="no-storage">
+          <p
+            class="alert alert-warning"
+            role="status"
+            data-testid="no-storage"
+            i18n="@@reports.generate.noStorage"
+          >
             Reports cannot be generated on this deployment because report storage is not configured.
           </p>
         } @else if (reports().length === 0) {
-          <p class="text-small text-secondary" data-testid="no-reports">
+          <p class="calm-note" data-testid="no-reports" i18n="@@reports.generate.none">
             None of the reports is available to you. Each report also needs permission to read the
             data it contains, such as analytics or customers.
           </p>
         } @else {
-          <form class="generate-form" [formGroup]="form" (ngSubmit)="submit()" novalidate>
-            <div class="field">
-              <label class="field-label" for="report-type">Report</label>
-              <select
-                id="report-type"
-                class="select"
-                formControlName="type"
-                aria-describedby="report-type-hint"
-              >
-                @for (entry of reports(); track entry.type) {
-                  <option [value]="entry.type">{{ entry.title }}</option>
-                }
-              </select>
-              <p id="report-type-hint" class="text-small text-muted">
-                {{ selected()?.description }}
-              </p>
-            </div>
-
-            <div class="field">
-              <label class="field-label" for="report-range">Period</label>
-              <select
-                id="report-range"
-                class="select"
-                formControlName="range"
-                aria-describedby="report-range-hint"
-              >
-                <option value="7d">Last 7 days</option>
-                <option value="30d">Last 30 days</option>
-                <option value="90d">Last 90 days</option>
-                <option value="custom">Choose dates</option>
-              </select>
-              <p id="report-range-hint" class="text-small text-muted">
-                Whole days in UTC, including today. At most {{ catalog()?.maxRangeDays }} days.
-              </p>
-            </div>
-
-            @if (selectedRange() === 'custom') {
-              <div class="field-row">
-                <div class="field">
-                  <label class="field-label" for="report-from">From</label>
-                  <input id="report-from" class="input" type="date" formControlName="from" />
-                </div>
-                <div class="field">
-                  <label class="field-label" for="report-through">Through</label>
-                  <input id="report-through" class="input" type="date" formControlName="through" />
-                </div>
-              </div>
-            }
-
-            <fieldset class="field formats">
-              <legend class="field-label">Format</legend>
-              <div class="format-options">
-                @for (format of formats(); track format) {
-                  <label class="format-option">
-                    <input
-                      type="radio"
-                      class="form-check-input"
-                      formControlName="format"
-                      [value]="format"
-                    />
-                    <span>{{ formatLabel(format) }}</span>
-                  </label>
-                }
-              </div>
+          <form class="generate-layout" [formGroup]="form" (ngSubmit)="submit()" novalidate>
+            <!--
+              The catalogue is the choice: one card per report, each a radio with
+              its description and formats, so a reader picks by what a report
+              holds rather than by a name in a closed list.
+            -->
+            <fieldset class="catalogue" data-testid="catalogue">
+              <legend class="visually-hidden" i18n="@@reports.field.report">Report</legend>
+              @for (entry of reports(); track entry.type) {
+                <label class="catalogue-item" [attr.data-testid]="'report-' + entry.type">
+                  <input
+                    type="radio"
+                    class="form-check-input"
+                    formControlName="type"
+                    [value]="entry.type"
+                  />
+                  <span class="catalogue-text">
+                    <span class="catalogue-title">{{ entry.title }}</span>
+                    <span class="catalogue-description">{{ entry.description }}</span>
+                    <span class="catalogue-meta">
+                      <span class="catalogue-formats">{{ entry.formatList }}</span>
+                      @if (entry.canSchedule) {
+                        <span class="catalogue-schedulable">
+                          <app-icon name="calendar" [strokeWidth]="1.75" />
+                          <span i18n="@@reports.catalogue.schedulable">Can be scheduled</span>
+                        </span>
+                      }
+                    </span>
+                  </span>
+                </label>
+              }
             </fieldset>
 
-            @if (formError(); as problem) {
-              <p class="form-error" role="alert" data-testid="form-error">{{ problem }}</p>
-            }
+            <div class="card card-body generate-panel">
+              <div class="field">
+                <label class="field-label" for="report-range" i18n="@@reports.field.period"
+                  >Period</label
+                >
+                <select
+                  id="report-range"
+                  class="select"
+                  formControlName="range"
+                  aria-describedby="report-range-hint"
+                >
+                  <option value="7d" i18n="@@reports.range.7d">Last 7 days</option>
+                  <option value="30d" i18n="@@reports.range.30d">Last 30 days</option>
+                  <option value="90d" i18n="@@reports.range.90d">Last 90 days</option>
+                  <option value="custom" i18n="@@reports.range.custom">Choose dates</option>
+                </select>
+                <p id="report-range-hint" class="field-hint" i18n="@@reports.range.hint">
+                  Whole days in UTC, including today. At most {{ catalog()?.maxRangeDays }} days.
+                </p>
+              </div>
 
-            @if (submitFailure(); as error) {
-              <p class="alert alert-danger" role="alert" data-testid="submit-error">
-                {{ error.message }}
-              </p>
-            }
+              @if (selectedRange() === 'custom') {
+                <div class="field-row">
+                  <div class="field">
+                    <label class="field-label" for="report-from" i18n="@@reports.field.from"
+                      >From</label
+                    >
+                    <input id="report-from" class="input" type="date" formControlName="from" />
+                  </div>
+                  <div class="field">
+                    <label class="field-label" for="report-through" i18n="@@reports.field.through"
+                      >Through</label
+                    >
+                    <input
+                      id="report-through"
+                      class="input"
+                      type="date"
+                      formControlName="through"
+                    />
+                  </div>
+                </div>
+              }
 
-            <div class="form-actions">
+              <fieldset class="field">
+                <legend class="field-label" i18n="@@reports.field.format">Format</legend>
+                <div class="segmented">
+                  @for (format of formats(); track format) {
+                    <label class="segmented-option">
+                      <input type="radio" formControlName="format" [value]="format" />
+                      <span>{{ formatLabel(format) }}</span>
+                    </label>
+                  }
+                </div>
+              </fieldset>
+
+              @if (formError(); as problem) {
+                <p class="form-error" role="alert" data-testid="form-error">
+                  <app-icon name="alert" [strokeWidth]="1.75" />
+                  <span>{{ problem }}</span>
+                </p>
+              }
+
+              @if (submitFailure(); as error) {
+                <p class="alert alert-danger" role="alert" data-testid="submit-error">
+                  {{ error.message }}
+                </p>
+              }
+
               <button
                 type="submit"
                 class="btn btn-primary"
                 [disabled]="submitting()"
                 data-testid="generate"
               >
-                {{ submitting() ? 'Requesting…' : 'Generate report' }}
+                @if (submitting()) {
+                  <span i18n="@@reports.requesting">Requesting…</span>
+                } @else {
+                  <span i18n="@@reports.generate.button">Generate report</span>
+                }
               </button>
-              <p class="text-small text-muted">
+              <p class="field-hint" i18n="@@reports.generate.note">
                 Reports are generated in the background and appear below. You are notified when
                 yours is ready; the file itself is never emailed.
               </p>
@@ -156,67 +211,84 @@
       </section>
 
       <section class="generated" aria-labelledby="generated-heading">
-        <h2 id="generated-heading" class="text-section-title">Generated reports</h2>
+        <h2 id="generated-heading" class="text-section-title" i18n="@@reports.generated.heading">
+          Generated reports
+        </h2>
 
         @if (rows().length === 0) {
           <div class="card">
             <app-empty-state
               icon="reports"
               heading="No reports yet"
+              i18n-heading="@@reports.generated.empty.heading"
               description="Reports you and your colleagues generate, and those schedules produce, appear here."
+              i18n-description="@@reports.generated.empty.body"
               data-testid="no-executions"
             />
           </div>
         } @else {
-          <div class="table-wrap" appScrollRegion="Generated reports table">
+          <div
+            class="table-wrap"
+            appScrollRegion="Generated reports table"
+            i18n-appScrollRegion="@@reports.generated.region"
+          >
             <table class="table" data-testid="executions">
-              <caption class="visually-hidden">
+              <caption class="visually-hidden" i18n="@@reports.generated.caption">
                 Generated reports, newest first
               </caption>
               <thead>
                 <tr>
-                  <th scope="col">Report</th>
-                  <th scope="col">Period (UTC)</th>
-                  <th scope="col">Requested by</th>
-                  <th scope="col">Requested</th>
-                  <th scope="col">Status</th>
-                  <th scope="col" class="numeric">Size</th>
-                  <th scope="col"><span class="visually-hidden">Download</span></th>
+                  <th scope="col" i18n="@@reports.column.report">Report</th>
+                  <th scope="col" i18n="@@reports.column.period">Period (UTC)</th>
+                  <th scope="col" i18n="@@reports.column.requested">Requested</th>
+                  <th scope="col" i18n="@@reports.column.status">Status</th>
+                  <th scope="col">
+                    <span class="visually-hidden" i18n="@@reports.column.download">Download</span>
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 @for (execution of rows(); track execution.id) {
                   <tr [attr.data-testid]="'execution-' + execution.id">
                     <td class="report-name">
-                      {{ execution.title }}
-                      <span class="text-small text-muted format">{{
-                        formatLabel(execution.format)
-                      }}</span>
+                      <span class="report-title">{{ title(execution) }}</span>
+                      <span class="report-meta">
+                        <span dir="ltr">{{ formatLabel(execution.format) }}</span>
+                        @if (execution.byteLength !== null) {
+                          <span aria-hidden="true">·</span>
+                          <span>{{ size(execution.byteLength) }}</span>
+                        }
+                      </span>
                     </td>
                     <td class="nowrap">{{ period(execution) }}</td>
-                    <td class="requester">{{ requester(execution) }}</td>
-                    <td class="nowrap">{{ when(execution.requestedAt) }}</td>
+                    <td class="requester">
+                      <span dir="auto">{{ requester(execution) }}</span>
+                      <span class="report-meta">{{ when(execution.requestedAt) }}</span>
+                    </td>
                     <td>
-                      <!-- The word is the status; the colour only repeats it. -->
-                      <span class="badge" [class]="'badge ' + statusTone(execution)">{{
-                        statusLabel(execution)
-                      }}</span>
-                      @if (execution.failureReason; as reason) {
-                        <p class="text-small text-secondary failure">{{ reason }}</p>
+                      <!-- The word is the status; the badge's own glyph and colour repeat it. -->
+                      <span [class]="'badge ' + statusTone(execution.status)">
+                        <span>{{ statusLabel(execution.status) }}</span>
+                      </span>
+                      @if (failureSentence(execution); as reason) {
+                        <p class="failure">{{ reason }}</p>
                       }
                     </td>
-                    <td class="numeric">{{ sizeLabel(execution.byteLength) }}</td>
-                    <td>
+                    <td class="actions">
                       @if (execution.canDownload) {
                         <a
                           class="btn btn-secondary btn-sm"
                           [href]="downloadUrl(execution)"
                           [attr.aria-label]="downloadName(execution)"
                           data-testid="download"
-                          >Download</a
                         >
+                          <app-icon name="download" [strokeWidth]="1.75" />
+                          <span i18n="@@reports.download">Download</span>
+                        </a>
                       } @else if (execution.status === 'Completed') {
-                        <span class="text-small text-muted">Needs more access</span>
+                        <span class="report-meta" i18n="@@reports.download.needsAccess"
+                          >Needs more access</span
+                        >
                       }
                     </td>
                   </tr>
@@ -225,7 +297,7 @@
             </table>
           </div>
 
-          <p class="text-small text-muted retention-note">
+          <p class="retention-note" i18n="@@reports.retention">
             Generated reports are kept for 30 days.
           </p>
 

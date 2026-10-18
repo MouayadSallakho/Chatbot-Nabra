@@ -23,8 +23,10 @@ import {
   ReportType,
   ReportsApi,
   SaveReportSchedule,
-  formatLabel,
 } from '../reports-api';
+import { formatLabel, frequencyLabel, reportTitle, statusLabel } from '../reports-words';
+import { Icon } from '@app/shared/icon/icon';
+import { HasUnsavedChanges, protectUnsavedChanges } from '@app/core/navigation/unsaved-changes';
 import { ReportsNav } from '../reports-nav/reports-nav';
 import { LocaleFormat } from '@app/core/i18n/locale-format';
 import { ScrollRegion } from '@app/shared/scroll-region/scroll-region';
@@ -44,11 +46,11 @@ import { ScrollRegion } from '@app/shared/scroll-region/scroll-region';
 @Component({
   selector: 'app-report-schedules',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, PageHeader, EmptyState, ReportsNav, ScrollRegion],
+  imports: [ReactiveFormsModule, PageHeader, EmptyState, ReportsNav, ScrollRegion, Icon],
   templateUrl: './report-schedules.html',
   styleUrl: './report-schedules.scss',
 })
-export class ReportSchedules {
+export class ReportSchedules implements HasUnsavedChanges {
   private readonly locale = inject(LocaleFormat);
 
   private readonly api = inject(ReportsApi);
@@ -102,7 +104,15 @@ export class ReportSchedules {
   protected readonly formatLabel = formatLabel;
 
   constructor() {
+    // An open editor with edits is asked about before it is lost, as in every
+    // other editor (Phase 36.7 brings the schedule editor in line).
+    protectUnsavedChanges(() => this.hasUnsavedChanges());
+
     void this.load();
+  }
+
+  hasUnsavedChanges(): boolean {
+    return this.formOpen() && this.form.dirty;
   }
 
   protected startCreate(): void {
@@ -199,7 +209,9 @@ export class ReportSchedules {
               ),
             );
 
-      this.announcement.set(`Schedule "${saved.value.name}" saved.`);
+      const name = saved.value.name;
+
+      this.announcement.set($localize`:@@schedules.announce.saved:Schedule “${name}:name:” saved.`);
       this.formOpen.set(false);
       this.editing.set(null);
 
@@ -263,8 +275,12 @@ export class ReportSchedules {
         this.api.setScheduleEnabled(tenantId, schedule.id, !schedule.enabled, versioned.etag),
       );
 
+      const name = saved.value.name;
+
       this.announcement.set(
-        `Schedule "${saved.value.name}" turned ${saved.value.enabled ? 'on' : 'off'}.`,
+        saved.value.enabled
+          ? $localize`:@@schedules.announce.on:Schedule “${name}:name:” turned on.`
+          : $localize`:@@schedules.announce.off:Schedule “${name}:name:” turned off.`,
       );
 
       await this.reload();
@@ -275,9 +291,20 @@ export class ReportSchedules {
     }
   }
 
-  protected title(type: ReportType): string {
-    return this.schedulable().find((entry) => entry.type === type)?.title ?? type;
+  protected title(type: ReportType, fallback?: string): string {
+    return reportTitle(
+      type,
+      fallback ?? this.schedulable().find((entry) => entry.type === type)?.title ?? type,
+    );
   }
+
+  /** The schedulable reports, named in the reader's language. */
+  protected readonly choices = computed(() =>
+    this.schedulable().map((entry) => ({
+      type: entry.type,
+      title: reportTitle(entry.type, entry.title),
+    })),
+  );
 
   protected formatsFor(type: ReportType | ''): readonly ReportFormat[] {
     return (
@@ -289,34 +316,50 @@ export class ReportSchedules {
     return this.locale.date(value, 'dateTime', 'UTC');
   }
 
+  /** "Edit schedule Weekly channels": the row's buttons name their schedule. */
+  protected editName(schedule: ReportSchedule): string {
+    const name = schedule.name;
+
+    return $localize`:@@schedules.editName:Edit schedule ${name}:name:`;
+  }
+
+  protected toggleName(schedule: ReportSchedule): string {
+    const name = schedule.name;
+
+    return schedule.enabled
+      ? $localize`:@@schedules.turnOffName:Turn off schedule ${name}:name:`
+      : $localize`:@@schedules.turnOnName:Turn on schedule ${name}:name:`;
+  }
+
   protected frequencyLabel(schedule: ReportSchedule): string {
-    return schedule.frequency === 'Weekly'
-      ? 'Weekly · previous 7 days'
-      : 'Monthly · previous calendar month';
+    return frequencyLabel(schedule.frequency);
   }
 
   protected lastLabel(schedule: ReportSchedule): string {
     const last = schedule.lastExecution;
 
     if (last === null) {
-      return 'Not generated yet';
+      return $localize`:@@schedules.last.none:Not generated yet`;
     }
 
     switch (last.status) {
-      case 'Completed':
-        return `Ready · ${this.when(last.requestedAt)} UTC`;
+      case 'Completed': {
+        const when = this.when(last.requestedAt);
+
+        return $localize`:@@schedules.last.ready:Ready · ${when}:when: UTC`;
+      }
       case 'Failed':
-        return 'Last run failed';
+        return $localize`:@@schedules.last.failed:Last run failed`;
       case 'Expired':
-        return 'Last report expired';
+        return $localize`:@@schedules.last.expired:Last report expired`;
       default:
-        return 'Generating';
+        return statusLabel(last.status);
     }
   }
 
   protected disabledReason(schedule: ReportSchedule): string | null {
     return schedule.disabledReason === 'owner_lost_permission'
-      ? 'Switched off automatically: the member who owned it no longer has the permissions this report needs.'
+      ? $localize`:@@schedules.disabled.ownerLostPermission:Switched off automatically: the member who owned it no longer has the permissions this report needs.`
       : null;
   }
 

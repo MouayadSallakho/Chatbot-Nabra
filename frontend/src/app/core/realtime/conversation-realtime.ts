@@ -1,4 +1,4 @@
-import { DestroyRef, Injectable, NgZone, inject, signal } from '@angular/core';
+import { DestroyRef, Injectable, InjectionToken, NgZone, inject, signal } from '@angular/core';
 import {
   HubConnection,
   HubConnectionBuilder,
@@ -12,6 +12,20 @@ const CONVERSATION_CHANGED = 'conversationChanged';
 
 /** Where the workspace hub lives. */
 const WORKSPACE_HUB = '/hubs/workspace-inbox';
+
+/**
+ * Where a hub connection's builder comes from: SignalR's own, in the product.
+ *
+ * A token rather than a direct `new HubConnectionBuilder()` so a test supplies
+ * a stand-in through TestBed. Mocking the `@microsoft/signalr` module instead
+ * was order-dependent: the unit-test builder runs specs without isolation and
+ * splits shared code into chunks, so whichever spec loaded this service first
+ * decided which SignalR it was bound to (Phase 36.7, revision 1).
+ */
+export const HUB_CONNECTION_BUILDER = new InjectionToken<() => HubConnectionBuilder>(
+  'HUB_CONNECTION_BUILDER',
+  { providedIn: 'root', factory: () => () => new HubConnectionBuilder() },
+);
 
 /**
  * What a listener is told: the conversation that changed, or `null` when the
@@ -43,6 +57,7 @@ export type ConversationChanged = (conversationId: string | null) => void;
 export class ConversationRealtime {
   private readonly zone = inject(NgZone);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly createBuilder = inject(HUB_CONNECTION_BUILDER);
 
   private connection: HubConnection | null = null;
   private tenantId: string | null = null;
@@ -99,7 +114,7 @@ export class ConversationRealtime {
     let connection: HubConnection;
 
     try {
-      connection = new HubConnectionBuilder()
+      connection = this.createBuilder()
         .withUrl(WORKSPACE_HUB)
         .withAutomaticReconnect(ADMIN_RECONNECT_POLICY)
         .configureLogging(LogLevel.Warning)

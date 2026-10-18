@@ -26,10 +26,19 @@ import {
   ReportRequest,
   ReportType,
   ReportsApi,
-  formatLabel,
   periodLabel,
-  sizeLabel,
 } from '../reports-api';
+import {
+  failureSentence,
+  formatLabel,
+  reportDescription,
+  reportTitle,
+  requesterLabel,
+  sizeLabel,
+  statusLabel,
+  statusTone,
+} from '../reports-words';
+import { Icon } from '@app/shared/icon/icon';
 import { ReportsNav } from '../reports-nav/reports-nav';
 import { LocaleFormat } from '@app/core/i18n/locale-format';
 import { ScrollRegion } from '@app/shared/scroll-region/scroll-region';
@@ -54,7 +63,15 @@ import { ScrollRegion } from '@app/shared/scroll-region/scroll-region';
 @Component({
   selector: 'app-reports-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, PageHeader, EmptyState, ReportsNav, ScrollRegion, Pagination],
+  imports: [
+    ReactiveFormsModule,
+    PageHeader,
+    EmptyState,
+    ReportsNav,
+    ScrollRegion,
+    Pagination,
+    Icon,
+  ],
   templateUrl: './reports-page.html',
   styleUrl: './reports-page.scss',
 })
@@ -92,7 +109,15 @@ export class ReportsPage {
   protected readonly formError = signal<string | null>(null);
   protected readonly announcement = signal('');
 
-  protected readonly reports = computed(() => this.catalog()?.reports ?? []);
+  /** The catalogue, in the reader's language. The server decides which reports appear. */
+  protected readonly reports = computed(() =>
+    (this.catalog()?.reports ?? []).map((entry) => ({
+      ...entry,
+      title: reportTitle(entry.type, entry.title),
+      description: reportDescription(entry.type, entry.description),
+      formatList: entry.formats.map((format) => formatLabel(format)).join(' · '),
+    })),
+  );
   protected readonly rows = computed(() => this.page()?.items ?? []);
   protected readonly totalCount = computed(() => this.page()?.totalCount ?? 0);
 
@@ -128,7 +153,18 @@ export class ReportsPage {
   private pollTimer: ReturnType<typeof setTimeout> | null = null;
 
   protected readonly formatLabel = formatLabel;
-  protected readonly sizeLabel = sizeLabel;
+  protected readonly statusLabel = statusLabel;
+  protected readonly statusTone = statusTone;
+  protected readonly failureSentence = failureSentence;
+  protected readonly requester = requesterLabel;
+
+  protected size(bytes: number | null): string {
+    return sizeLabel(bytes, this.locale.language);
+  }
+
+  protected title(execution: ReportExecution): string {
+    return reportTitle(execution.type, execution.title);
+  }
 
   constructor() {
     this.form.valueChanges.pipe(takeUntilDestroyed()).subscribe((value) => {
@@ -198,7 +234,12 @@ export class ReportsPage {
       const execution = await firstValueFrom(this.api.request(tenantId, request));
 
       this.pendingKey = null;
-      this.announcement.set(`${execution.title} requested. Its status is ${execution.status}.`);
+      const title = this.title(execution);
+      const status = statusLabel(execution.status);
+
+      this.announcement.set(
+        $localize`:@@reports.announce.requested:${title}:title: requested. Its status: ${status}:status:.`,
+      );
       this.pageNumber.set(1);
 
       await this.loadPage();
@@ -219,49 +260,17 @@ export class ReportsPage {
     return periodLabel(execution.periodFrom, execution.periodLastDay, this.locale.language);
   }
 
-  protected requester(execution: ReportExecution): string {
-    if (execution.scheduleName !== null) {
-      return `Schedule: ${execution.scheduleName}`;
-    }
-
-    return execution.requestedByMe ? 'You' : 'Another team member';
-  }
-
   protected when(value: string): string {
     return this.locale.date(value, 'dateTime');
   }
 
-  protected statusLabel(execution: ReportExecution): string {
-    switch (execution.status) {
-      case 'Pending':
-        return 'Waiting';
-      case 'Running':
-        return 'Generating';
-      case 'Completed':
-        return 'Ready';
-      case 'Failed':
-        return 'Failed';
-      case 'Expired':
-        return 'Expired';
-    }
-  }
-
-  protected statusTone(execution: ReportExecution): string {
-    switch (execution.status) {
-      case 'Completed':
-        return 'badge-success';
-      case 'Failed':
-        return 'badge-danger';
-      case 'Expired':
-        return 'badge-neutral';
-      default:
-        return 'badge-info';
-    }
-  }
-
   /** A download link's name, spoken in full: which report, which period, which format. */
   protected downloadName(execution: ReportExecution): string {
-    return `Download ${execution.title}, ${this.period(execution)}, ${formatLabel(execution.format)}`;
+    const title = this.title(execution);
+    const period = this.period(execution);
+    const format = formatLabel(execution.format);
+
+    return $localize`:@@reports.download.name:Download ${title}:title:, ${period}:period:, ${format}:format:`;
   }
 
   private validate(
@@ -271,7 +280,7 @@ export class ReportsPage {
     through: string,
   ): string | null {
     if (type === '') {
-      return 'Choose a report.';
+      return $localize`:@@reports.error.chooseReport:Choose a report.`;
     }
 
     if (range !== 'custom') {
@@ -279,11 +288,11 @@ export class ReportsPage {
     }
 
     if (from === '' || through === '') {
-      return 'Choose both a start and an end date.';
+      return $localize`:@@reports.error.bothDates:Choose both a start and an end date.`;
     }
 
     if (through < from) {
-      return 'The end date must be on or after the start date.';
+      return $localize`:@@reports.error.order:The end date must be on or after the start date.`;
     }
 
     const days =
@@ -291,7 +300,9 @@ export class ReportsPage {
     const max = this.catalog()?.maxRangeDays ?? 366;
 
     if (days > max) {
-      return `A report can cover at most ${max} days.`;
+      const limit = this.locale.number(max);
+
+      return $localize`:@@reports.error.tooLong:A report can cover at most ${limit}:max: days.`;
     }
 
     return null;
@@ -319,10 +330,12 @@ export class ReportsPage {
         if (current.status === 'Pending' || current.status === 'Running') {
           this.watch(tenantId, executionId, attempt + 1);
         } else {
+          const title = this.title(current);
+
           this.announcement.set(
             current.status === 'Completed'
-              ? `${current.title} is ready to download.`
-              : `${current.title} could not be generated.`,
+              ? $localize`:@@reports.announce.ready:${title}:title: is ready to download.`
+              : $localize`:@@reports.announce.failed:${title}:title: could not be generated.`,
           );
         }
       } catch {

@@ -14,13 +14,14 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [RouterLink, RouterLinkActive],
   template: `
-    <nav class="reports-nav" aria-label="Reports">
+    <nav class="reports-nav" aria-label="Reports" i18n-aria-label="@@reports.nav.label">
       <a
         class="reports-nav-link"
         routerLink="/reports"
         routerLinkActive="active"
         ariaCurrentWhenActive="page"
         [routerLinkActiveOptions]="{ exact: true }"
+        i18n="@@reports.nav.generate"
         >Generate and download</a
       >
       <a
@@ -28,6 +29,7 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
         routerLink="/reports/schedules"
         routerLinkActive="active"
         ariaCurrentWhenActive="page"
+        i18n="@@reports.nav.schedules"
         >Schedules</a
       >
     </nav>

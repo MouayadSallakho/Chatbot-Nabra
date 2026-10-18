@@ -24,12 +24,32 @@ import { Voice } from '@app/shared/voice/voice';
 import { VoiceChip } from '@app/shared/voice/voice-chip';
 import { VoiceSplit } from '@app/shared/voice/voice-split';
 import { VoiceTrack } from '@app/shared/voice/voice-track';
+import { AreaChart } from '@app/shared/charts/area-chart';
+import { BarChart } from '@app/shared/charts/bar-chart';
+import { ChartBar, ChartPart, ChartPoint, ChartSeries } from '@app/shared/charts/chart-model';
+import { ColumnChart } from '@app/shared/charts/column-chart';
+import { Meter } from '@app/shared/charts/meter';
+import { Sparkline } from '@app/shared/charts/sparkline';
+import { StackedBar } from '@app/shared/charts/stacked-bar';
+import type { AnalyticsAiUsage, AnalyticsModelUsage } from '@app/features/analytics/analytics-api';
+import { ProviderUsageCard } from '@app/features/analytics/provider-usage/provider-usage';
 
 /** A named group of colour tokens, drawn as swatches with their live values. */
 interface TokenGroup {
   readonly title: string;
   readonly tokens: readonly string[];
 }
+
+/** Seven sample days for the chart components (customers, team, AI, conversations). */
+const SAMPLE_CHART_DAYS: readonly Readonly<Record<string, number>>[] = [
+  { customer: 42, human: 9, ai: 35, conversations: 14 },
+  { customer: 51, human: 12, ai: 40, conversations: 17 },
+  { customer: 38, human: 6, ai: 33, conversations: 12 },
+  { customer: 64, human: 21, ai: 44, conversations: 22 },
+  { customer: 57, human: 15, ai: 43, conversations: 19 },
+  { customer: 23, human: 4, ai: 19, conversations: 8 },
+  { customer: 11, human: 2, ai: 9, conversations: 4 },
+];
 
 /** One line of the sample transcript. */
 interface SampleMessage {
@@ -296,6 +316,13 @@ const SAMPLE_ROWS: readonly SampleRow[] = SAMPLE_TRANSCRIPT.map((message, index)
     VoiceChip,
     VoiceSplit,
     VoiceTrack,
+    AreaChart,
+    BarChart,
+    ColumnChart,
+    Meter,
+    Sparkline,
+    StackedBar,
+    ProviderUsageCard,
   ],
   templateUrl: './design-lab.html',
   styleUrl: './design-lab.scss',
@@ -328,6 +355,93 @@ export class DesignLab {
   protected readonly demoVoice = signal<Voice>('ai');
 
   protected readonly samplePage = signal(2);
+
+  /** Phase 36.7: sample series for the chart components, written here and labelled as sample. */
+  protected readonly chartSeries: readonly ChartSeries[] = [
+    {
+      key: 'customer',
+      label: $localize`:@@lab.charts.customers:Customers (sample)`,
+      tone: 'customer',
+    },
+    { key: 'human', label: $localize`:@@lab.charts.team:Team (sample)`, tone: 'human' },
+    { key: 'ai', label: $localize`:@@lab.charts.ai:AI (sample)`, tone: 'ai' },
+  ];
+
+  protected readonly chartPoints: readonly ChartPoint[] = SAMPLE_CHART_DAYS.map((values, index) => {
+    const day = index + 1;
+    const label = $localize`:@@lab.charts.day:Day ${day}:day:`;
+
+    return {
+      key: `day-${day}`,
+      label,
+      longLabel: label,
+      partial: index === SAMPLE_CHART_DAYS.length - 1,
+      values,
+    };
+  });
+
+  protected readonly lineSeries: readonly ChartSeries[] = [
+    {
+      key: 'conversations',
+      label: $localize`:@@lab.charts.conversations:Conversations (sample)`,
+      tone: 'neutral',
+    },
+  ];
+
+  protected readonly sampleBars: readonly ChartBar[] = [
+    { key: 'a', label: $localize`:@@lab.charts.categoryA:Sample A`, value: 64, note: '58%' },
+    { key: 'b', label: $localize`:@@lab.charts.categoryB:Sample B`, value: 31, note: '28%' },
+    { key: 'c', label: $localize`:@@lab.charts.categoryC:Sample C`, value: 15, note: '14%' },
+  ];
+
+  protected readonly sampleParts: readonly ChartPart[] = [
+    { key: 'ai', label: $localize`:@@lab.charts.ai:AI (sample)`, value: 223, tone: 'ai' },
+    { key: 'human', label: $localize`:@@lab.charts.team:Team (sample)`, value: 69, tone: 'human' },
+  ];
+
+  protected readonly sampleUsage: AnalyticsAiUsage = {
+    calls: 412,
+    generationCalls: 318,
+    embeddingCalls: 94,
+    succeeded: 398,
+    failed: 9,
+    unresolved: 5,
+    generationInputTokens: 1_284_000,
+    generationCachedInputTokens: 402_000,
+    generationOutputTokens: 186_500,
+    generationReasoningTokens: 21_000,
+    embeddingInputTokens: 655_000,
+    unratedCalls: 12,
+    ratedCost: [
+      { currency: 'USD', estimatedCost: 3.418275, calls: 360 },
+      { currency: 'EUR', estimatedCost: 0.004812, calls: 26 },
+    ],
+  };
+
+  protected readonly sampleModels: readonly AnalyticsModelUsage[] = [
+    {
+      provider: 'Sample',
+      model: 'sample-generation-model',
+      operationType: 'TextGeneration',
+      calls: 318,
+      inputTokens: 1_284_000,
+      outputTokens: 186_500,
+      estimatedCost: 3.418275,
+      currency: 'USD',
+      unratedCalls: 0,
+    },
+    {
+      provider: 'Sample',
+      model: 'sample-embedding-model',
+      operationType: 'Embedding',
+      calls: 94,
+      inputTokens: 655_000,
+      outputTokens: 0,
+      estimatedCost: null,
+      currency: null,
+      unratedCalls: 12,
+    },
+  ];
 
   protected readonly switchOn = signal(true);
 

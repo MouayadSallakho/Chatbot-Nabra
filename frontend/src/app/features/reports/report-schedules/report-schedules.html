@@ -1,7 +1,9 @@
 <div class="page">
   <app-page-header
-    heading="Reports"
+    heading="Report schedules"
+    i18n-heading="@@schedules.heading"
     description="Weekly and monthly reports, generated automatically for each completed period."
+    i18n-description="@@schedules.description"
   >
     @if (canView() && canSchedule() && schedulable().length > 0 && !formOpen()) {
       <button
@@ -11,7 +13,8 @@
         (click)="startCreate()"
         data-testid="new-schedule"
       >
-        New schedule
+        <app-icon name="plus" [strokeWidth]="1.75" />
+        <span i18n="@@schedules.new">New schedule</span>
       </button>
     }
   </app-page-header>
@@ -26,39 +29,54 @@
         <app-empty-state
           icon="reports"
           heading="You do not have access to reports"
+          i18n-heading="@@reports.denied.heading"
           description="Seeing report schedules needs a permission your roles do not include. Ask somebody who administers this workspace if you need it."
+          i18n-description="@@schedules.denied.body"
         />
       </div>
     } @else if (loading()) {
-      <div class="card card-body" aria-busy="true">
-        <p class="text-small text-secondary">Loading schedules…</p>
+      <div class="card card-body schedules-skeleton" aria-busy="true">
+        <p class="visually-hidden" role="status" i18n="@@schedules.loading">Loading schedules…</p>
+        <span class="skeleton skeleton-text" aria-hidden="true"></span>
+        <span class="skeleton skeleton-text" aria-hidden="true"></span>
+        <span class="skeleton skeleton-text" aria-hidden="true"></span>
       </div>
     } @else {
       <!-- What a schedule does, stated once and plainly. -->
-      <p class="alert alert-info delivery-note" data-testid="delivery-note">
-        Generated reports are available in Reports. The file is never emailed or sent anywhere else;
-        if you turn on Reports in your notification preferences, you get an email that links here.
-        Weekly schedules run every Monday for the previous seven days; monthly schedules run on the
-        first of the month for the previous calendar month. All times are UTC.
-      </p>
+      <div class="alert alert-info delivery-note" data-testid="delivery-note">
+        <app-icon name="info" [strokeWidth]="1.75" />
+        <p i18n="@@schedules.deliveryNote">
+          Generated reports are available in Reports. The file is never emailed or sent anywhere
+          else; if you turn on Reports in your notification preferences, you get an email that links
+          here. Weekly schedules run every Monday for the previous seven days; monthly schedules run
+          on the first of the month for the previous calendar month. All times are UTC.
+        </p>
+      </div>
 
       @if (failure(); as error) {
         <p class="alert alert-danger" role="alert">{{ error.message }}</p>
       }
 
       @if (formOpen()) {
-        <section class="card card-body" aria-labelledby="schedule-form-heading">
+        <section class="card card-body schedule-editor" aria-labelledby="schedule-form-heading">
           <h2 id="schedule-form-heading" class="text-section-title">
-            {{ editing() === null ? 'New schedule' : 'Edit schedule' }}
+            @if (editing() === null) {
+              <span i18n="@@schedules.new">New schedule</span>
+            } @else {
+              <span i18n="@@schedules.edit">Edit schedule</span>
+            }
           </h2>
 
           <form class="schedule-form" [formGroup]="form" (ngSubmit)="save()" novalidate>
             <div class="field">
-              <label class="field-label" for="schedule-name">Name</label>
+              <label class="field-label" for="schedule-name" i18n="@@schedules.field.name"
+                >Name</label
+              >
               <input
                 id="schedule-name"
                 class="input"
                 type="text"
+                dir="auto"
                 formControlName="name"
                 maxlength="100"
                 autocomplete="off"
@@ -67,31 +85,39 @@
               />
               @if (nameError()) {
                 <p id="schedule-name-error" class="form-error" role="alert">
-                  Give the schedule a name of up to 100 characters.
+                  <app-icon name="alert" [strokeWidth]="1.75" />
+                  <span i18n="@@schedules.field.nameError"
+                    >Give the schedule a name of up to 100 characters.</span
+                  >
                 </p>
               }
             </div>
 
             <div class="field">
-              <label class="field-label" for="schedule-type">Report</label>
+              <label class="field-label" for="schedule-type" i18n="@@reports.field.report"
+                >Report</label
+              >
               <select id="schedule-type" class="select" formControlName="type">
-                @for (entry of schedulable(); track entry.type) {
+                @for (entry of choices(); track entry.type) {
                   <option [value]="entry.type">{{ entry.title }}</option>
                 }
               </select>
             </div>
 
-            <div class="field">
-              <label class="field-label" for="schedule-format">Format</label>
-              <select id="schedule-format" class="select" formControlName="format">
+            <fieldset class="field">
+              <legend class="field-label" i18n="@@reports.field.format">Format</legend>
+              <div class="segmented">
                 @for (format of formatsFor(form.controls.type.value); track format) {
-                  <option [value]="format">{{ formatLabel(format) }}</option>
+                  <label class="segmented-option">
+                    <input type="radio" formControlName="format" [value]="format" />
+                    <span>{{ formatLabel(format) }}</span>
+                  </label>
                 }
-              </select>
-            </div>
+              </div>
+            </fieldset>
 
             <fieldset class="field">
-              <legend class="field-label">How often</legend>
+              <legend class="field-label" i18n="@@schedules.field.frequency">How often</legend>
               <div class="frequency-options">
                 <label class="frequency-option">
                   <input
@@ -100,9 +126,12 @@
                     formControlName="frequency"
                     value="Weekly"
                   />
-                  <span
-                    >Weekly <span class="text-small text-muted">— the previous 7 days</span></span
-                  >
+                  <span class="frequency-text">
+                    <span i18n="@@schedules.frequency.weekly">Weekly</span>
+                    <span class="frequency-hint" i18n="@@schedules.frequency.weeklyHint"
+                      >Every Monday, for the previous 7 days</span
+                    >
+                  </span>
                 </label>
                 <label class="frequency-option">
                   <input
@@ -111,34 +140,41 @@
                     formControlName="frequency"
                     value="Monthly"
                   />
-                  <span
-                    >Monthly
-                    <span class="text-small text-muted">— the previous calendar month</span></span
-                  >
+                  <span class="frequency-text">
+                    <span i18n="@@schedules.frequency.monthly">Monthly</span>
+                    <span class="frequency-hint" i18n="@@schedules.frequency.monthlyHint"
+                      >On the 1st, for the previous calendar month</span
+                    >
+                  </span>
                 </label>
               </div>
             </fieldset>
 
             @if (saveFailure(); as error) {
               <div class="alert alert-danger" role="alert" data-testid="save-error">
-                <p class="alert-text">
+                <app-icon name="alert" [strokeWidth]="1.75" />
+                <div>
+                  <p class="alert-text">
+                    @if (error.kind === 'stale') {
+                      <span i18n="@@schedules.stale"
+                        >This schedule was changed somewhere else since you opened it. Your edit was
+                        not saved.</span
+                      >
+                    } @else {
+                      {{ error.message }}
+                    }
+                  </p>
                   @if (error.kind === 'stale') {
-                    This schedule was changed somewhere else since you opened it. Your edit was not
-                    saved.
-                  } @else {
-                    {{ error.message }}
+                    <button
+                      type="button"
+                      class="btn btn-secondary btn-sm"
+                      (click)="reloadEditing()"
+                      data-testid="reload"
+                    >
+                      <span i18n="@@schedules.reload">Reload the schedule</span>
+                    </button>
                   }
-                </p>
-                @if (error.kind === 'stale') {
-                  <button
-                    type="button"
-                    class="btn btn-secondary btn-sm"
-                    (click)="reloadEditing()"
-                    data-testid="reload"
-                  >
-                    Reload the schedule
-                  </button>
-                }
+                </div>
               </div>
             }
 
@@ -149,9 +185,20 @@
                 [disabled]="saving()"
                 data-testid="save"
               >
-                {{ saving() ? 'Saving…' : 'Save schedule' }}
+                @if (saving()) {
+                  <span i18n="@@schedules.saving">Saving…</span>
+                } @else {
+                  <span i18n="@@schedules.save">Save schedule</span>
+                }
               </button>
-              <button type="button" class="btn btn-ghost" (click)="cancel()">Cancel</button>
+              <button
+                type="button"
+                class="btn btn-ghost"
+                (click)="cancel()"
+                i18n="@@schedules.cancel"
+              >
+                Cancel
+              </button>
             </div>
           </form>
         </section>
@@ -159,54 +206,71 @@
 
       @if (schedules().length === 0) {
         <div class="card">
-          <app-empty-state
-            icon="reports"
-            heading="No schedules yet"
-            [description]="
-              canSchedule()
-                ? 'Create one to have a report generated every week or every month.'
-                : 'Creating schedules needs a permission your roles do not include.'
-            "
-            data-testid="no-schedules"
-          />
+          @if (canSchedule()) {
+            <app-empty-state
+              icon="calendar"
+              heading="No schedules yet"
+              i18n-heading="@@schedules.empty.heading"
+              description="Create one to have a report generated every week or every month."
+              i18n-description="@@schedules.empty.body"
+              data-testid="no-schedules"
+            />
+          } @else {
+            <app-empty-state
+              icon="calendar"
+              heading="No schedules yet"
+              i18n-heading="@@schedules.empty.heading"
+              description="Creating schedules needs a permission your roles do not include."
+              i18n-description="@@schedules.empty.denied"
+              data-testid="no-schedules"
+            />
+          }
         </div>
       } @else {
-        <div class="table-wrap" appScrollRegion="Report schedules table">
+        <div
+          class="table-wrap"
+          appScrollRegion="Report schedules table"
+          i18n-appScrollRegion="@@schedules.region"
+        >
           <table class="table" data-testid="schedules">
-            <caption class="visually-hidden">
+            <caption class="visually-hidden" i18n="@@schedules.caption">
               Report schedules
             </caption>
             <thead>
               <tr>
-                <th scope="col">Name</th>
-                <th scope="col">Report</th>
-                <th scope="col">Frequency</th>
-                <th scope="col">Status</th>
-                <th scope="col">Next run (UTC)</th>
-                <th scope="col">Last report</th>
-                <th scope="col"><span class="visually-hidden">Actions</span></th>
+                <th scope="col" i18n="@@schedules.field.name">Name</th>
+                <th scope="col" i18n="@@reports.column.report">Report</th>
+                <th scope="col" i18n="@@schedules.column.frequency">Frequency</th>
+                <th scope="col" i18n="@@reports.column.status">Status</th>
+                <th scope="col" i18n="@@schedules.column.nextRun">Next run (UTC)</th>
+                <th scope="col" i18n="@@schedules.column.last">Last report</th>
+                <th scope="col">
+                  <span class="visually-hidden" i18n="@@schedules.column.actions">Actions</span>
+                </th>
               </tr>
             </thead>
             <tbody>
               @for (schedule of schedules(); track schedule.id) {
                 <tr [attr.data-testid]="'schedule-' + schedule.id">
-                  <td class="schedule-name">{{ schedule.name }}</td>
+                  <td class="schedule-name" dir="auto">{{ schedule.name }}</td>
                   <td>
-                    {{ schedule.title }}
-                    <span class="text-small text-muted format">{{
-                      formatLabel(schedule.format)
-                    }}</span>
+                    {{ title(schedule.type, schedule.title) }}
+                    <span class="format">{{ formatLabel(schedule.format) }}</span>
                   </td>
                   <td class="frequency">{{ frequencyLabel(schedule) }}</td>
                   <td>
-                    <span
-                      class="badge"
-                      [class]="schedule.enabled ? 'badge badge-success' : 'badge badge-neutral'"
-                    >
-                      {{ schedule.enabled ? 'On' : 'Off' }}
-                    </span>
+                    <!-- The word is the state; the badge's own glyph and colour repeat it. -->
+                    @if (schedule.enabled) {
+                      <span class="badge badge-success">
+                        <span i18n="@@schedules.on">On</span>
+                      </span>
+                    } @else {
+                      <span class="badge badge-neutral">
+                        <span i18n="@@schedules.off">Off</span>
+                      </span>
+                    }
                     @if (disabledReason(schedule); as reason) {
-                      <p class="text-small text-secondary reason">{{ reason }}</p>
+                      <p class="reason">{{ reason }}</p>
                     }
                   </td>
                   <td class="nowrap">{{ schedule.enabled ? when(schedule.nextRunAt) : '—' }}</td>
@@ -218,34 +282,37 @@
                           type="button"
                           class="btn btn-secondary btn-sm"
                           (click)="startEdit(schedule)"
-                          [attr.aria-label]="'Edit schedule ' + schedule.name"
+                          [attr.aria-label]="editName(schedule)"
                           [attr.data-edit-schedule]="schedule.id"
                         >
-                          Edit
+                          <span i18n="@@schedules.editShort">Edit</span>
                         </button>
                         <button
                           type="button"
                           class="btn btn-secondary btn-sm"
                           (click)="toggle(schedule)"
                           [disabled]="busy() === schedule.id"
-                          [attr.aria-label]="
-                            (schedule.enabled ? 'Turn off schedule ' : 'Turn on schedule ') +
-                            schedule.name
-                          "
+                          [attr.aria-label]="toggleName(schedule)"
                           data-testid="toggle"
                         >
-                          {{ schedule.enabled ? 'Turn off' : 'Turn on' }}
+                          @if (schedule.enabled) {
+                            <span i18n="@@schedules.turnOff">Turn off</span>
+                          } @else {
+                            <span i18n="@@schedules.turnOn">Turn on</span>
+                          }
                         </button>
                       </div>
                     }
                     @if (rowFailure(); as failed) {
                       @if (failed.id === schedule.id) {
-                        <p class="text-small form-error" role="alert">
-                          {{
-                            failed.error.kind === 'stale'
-                              ? 'Changed elsewhere — refresh and try again.'
-                              : failed.error.message
-                          }}
+                        <p class="form-error" role="alert">
+                          @if (failed.error.kind === 'stale') {
+                            <span i18n="@@schedules.rowStale"
+                              >Changed elsewhere. Refresh and try again.</span
+                            >
+                          } @else {
+                            {{ failed.error.message }}
+                          }
                         </p>
                       }
                     }

@@ -1,7 +1,7 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
 import { LOCAL_STORAGE } from '@app/core/storage/local-storage';
 import { TenantApi } from '@app/core/api/tenant-api';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
@@ -252,8 +252,9 @@ describe('AnalyticsDashboardPage', () => {
 
       expect(query('[data-testid="empty"]')?.textContent).toContain('No activity in this period');
 
-      // And no chart at all, rather than a flat sample line.
-      expect(query('.chart')).toBeNull();
+      // And no daily chart at all, rather than a flat sample line.
+      expect(query('[data-testid="messages-chart"]')).toBeNull();
+      expect(query('.chart-column')).toBeNull();
       expect(query('[data-testid="agents"]')).toBeNull();
     });
 
@@ -290,34 +291,52 @@ describe('AnalyticsDashboardPage', () => {
       await mount();
       await answer(busy);
 
-      expect(host().querySelectorAll('.chart-column').length).toBe(2);
+      const chart = query('[data-testid="messages-chart"]')!;
 
-      // The chart is decorative; the table is the accessible representation and
-      // carries the same numbers.
-      const table = query('[data-testid="daily-table"]');
+      expect(chart.querySelectorAll('.chart-column').length).toBe(2);
 
-      expect(table?.textContent).toContain('2026-09-15');
+      // The table is the chart's twin: the same numbers, one switch away.
+      chart.querySelector<HTMLButtonElement>('[data-testid="chart-view-toggle"]')!.click();
+      await settle();
+
+      const table = chart.querySelector('[data-testid="chart-table"]');
+
+      expect(table?.textContent).toContain('September 15, 2026');
       expect(table?.textContent).toContain('24');
       expect(table?.querySelectorAll('th[scope="col"]').length).toBe(5);
       expect(table?.querySelectorAll('th[scope="row"]').length).toBe(2);
+      expect(chart.querySelector('[data-testid="chart-view-toggle"]')?.textContent).toContain(
+        'View as chart',
+      );
     });
 
-    it('hides the chart from assistive technology because the table is the real one', async () => {
+    it('hides the drawing from assistive technology and says what it shows in words', async () => {
       await mount();
       await answer(busy);
 
-      expect(query('.chart')?.getAttribute('aria-hidden')).toBe('true');
+      const chart = query('[data-testid="messages-chart"]')!;
+
+      expect(chart.querySelector('svg')?.getAttribute('aria-hidden')).toBe('true');
+      expect(chart.querySelector('[data-testid="chart-summary"]')?.textContent).toContain(
+        'Customers: 40, team: 7, AI: 31.',
+      );
+
+      // One tab stop that reads the days aloud, with its instructions.
+      const surface = chart.querySelector('[data-testid="chart-surface"]');
+
+      expect(surface?.getAttribute('tabindex')).toBe('0');
+      expect(surface?.getAttribute('aria-describedby')).toBeTruthy();
     });
 
     it('names each series in words as well as colour', async () => {
       await mount();
       await answer(busy);
 
-      const legend = query('.chart-legend');
+      const legend = query('[data-testid="messages-chart"] [data-testid="chart-legend"]');
 
-      expect(legend?.textContent).toContain('Customer');
+      expect(legend?.textContent).toContain('Customers');
       expect(legend?.textContent).toContain('AI');
-      expect(legend?.textContent).toContain('Human');
+      expect(legend?.textContent).toContain('Team');
     });
 
     it('breaks the period down by channel', async () => {
@@ -347,8 +366,10 @@ describe('AnalyticsDashboardPage', () => {
       await mount();
       await answer(busy);
 
-      expect(query('[data-testid="ai-operations"]')?.textContent).toContain('33');
-      expect(query('[data-testid="ai-operations"]')?.textContent).toContain('failed');
+      expect(query('[data-testid="ai-operations"]')?.textContent).toContain(
+        'AI reply attempts in this period: 33. Failed: 2.',
+      );
+      expect(query('[data-testid="ai-operations"]')?.textContent).toContain('Completed');
     });
 
     it('omits the AI outcome panel when nothing was attempted', async () => {
@@ -365,7 +386,8 @@ describe('AnalyticsDashboardPage', () => {
       await mount();
       await answer(busy);
 
-      expect(query('[data-testid="whatsapp-delivery"]')?.textContent).toContain('delivered');
+      expect(query('[data-testid="whatsapp-delivery"]')?.textContent).toContain('Delivered');
+      expect(query('[data-testid="whatsapp-delivery"]')?.textContent).toContain('Not delivered');
     });
 
     it('omits WhatsApp delivery entirely for a workspace that has never used it', async () => {
@@ -377,14 +399,18 @@ describe('AnalyticsDashboardPage', () => {
   });
 
   describe('provider usage', () => {
-    it('is absent entirely for a workspace that never called a provider', async () => {
+    it('says there were no provider calls rather than showing a card of noughts', async () => {
       await mount();
       await answer(empty);
 
-      // Not a card of noughts. "No calls" and "calls that cost nothing" are
-      // different facts, and only one of them is true here.
+      // "No calls" and "calls that cost nothing" are different facts, and only
+      // one of them is true here: a sentence, never a zero or a currency.
       expect(query('[data-testid="ai-usage"]')).toBeNull();
       expect(query('[data-testid="ai-models"]')).toBeNull();
+      expect(query('[data-testid="ai-usage-none"]')?.textContent).toContain(
+        'No calls to an AI provider in this period',
+      );
+      expect(query('[data-testid="ai-usage-none"]')?.textContent).not.toMatch(/\$|0\.00/);
     });
 
     it('is reported even when the workspace held no conversations at all', async () => {
@@ -411,11 +437,11 @@ describe('AnalyticsDashboardPage', () => {
 
       const text = usage!.textContent ?? '';
 
-      expect(text).toContain('40');
-      expect(text).toContain('31 generation');
-      expect(text).toContain('9 embedding');
+      expect(text).toContain('Provider calls in this period: 40. Generation: 31, embedding: 9.');
       expect(text).toContain('120,000');
-      expect(text).toContain('40,000');
+      expect(text).toContain('cached: 40,000');
+      expect(text).toContain('reasoning: 3,000');
+      expect(text).toContain('Outcome unknown');
     });
 
     it('calls the figure an estimate and never anything stronger', async () => {
@@ -513,7 +539,7 @@ describe('AnalyticsDashboardPage', () => {
 
       expect(second).toContain('test-embed-a');
       expect(second).toContain('Not priced');
-      expect(second).toContain('9 unrated');
+      expect(second).toContain('unrated: 9');
     });
   });
 
@@ -568,7 +594,8 @@ describe('AnalyticsDashboardPage', () => {
       request.flush({ ...empty, period: { ...empty.period, range: '7d', days: 7 } });
       await settle();
 
-      expect(host().textContent).toContain('7 days to today');
+      expect(query<HTMLInputElement>('[data-testid="range-7d"]')!.checked).toBe(true);
+      expect(query('[data-testid="period"]')?.textContent).toContain('Sep 14, 2026');
     });
 
     it('does not re-read when the period already selected is chosen again', async () => {
@@ -586,6 +613,20 @@ describe('AnalyticsDashboardPage', () => {
       await answer(empty);
 
       expect(host().textContent).toContain('UTC');
+    });
+
+    it('starts from the period in the address', async () => {
+      TestBed.overrideProvider(ActivatedRoute, {
+        useValue: { snapshot: { queryParamMap: convertToParamMap({ period: '90d' }) } },
+      });
+      await mount();
+
+      const request = pending();
+
+      expect(request.request.params.get('range')).toBe('90d');
+
+      request.flush(empty);
+      await settle();
     });
 
     it('offers exactly the three bounded periods', async () => {
@@ -641,8 +682,8 @@ describe('AnalyticsDashboardPage', () => {
       const announcement = query('[data-testid="announcement"]');
 
       expect(announcement?.getAttribute('role')).toBe('status');
-      expect(announcement?.textContent).toContain('12 conversations');
-      expect(announcement?.textContent).toContain('40 customer messages');
+      expect(announcement?.textContent).toContain('conversations started 12');
+      expect(announcement?.textContent).toContain('customer messages 40');
 
       // Off-screen rather than absent: a reader who changed the period and
       // cannot see the cards still hears what changed, and focus stays where
@@ -662,6 +703,20 @@ describe('AnalyticsDashboardPage', () => {
   });
 
   describe('failure', () => {
+    it('keeps the figures on screen when a refresh fails, and says how old they are', async () => {
+      await mount();
+      await answer(busy);
+
+      query<HTMLButtonElement>('[data-testid="refresh"]')!.click();
+      await settle();
+
+      pending().flush(null, { status: 500, statusText: 'Server Error' });
+      await settle();
+
+      expect(query('[data-testid="stale"]')?.textContent).toContain('Could not refresh.');
+      expect(query('[data-testid="summary-conversations"]')?.textContent?.trim()).toBe('12');
+    });
+
     it('explains a failed read and offers to try again', async () => {
       await mount();
 

@@ -1,53 +1,53 @@
 // -----------------------------------------------------------------------------
-// Needs attention
+// Needs attention: one card per thing, most serious first, one action each.
 // -----------------------------------------------------------------------------
-.attention-list {
+.attention-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 19rem), 1fr));
+  gap: var(--space-3);
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.attention-item {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: start;
-  gap: var(--space-2) var(--space-3);
+.attention-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
   padding: var(--space-4) var(--space-5);
 
-  & + & {
-    border-block-start: 1px solid var(--border-subtle);
+  // The most serious cards carry their status colour on the inline-start edge
+  // too, beside the icon and the word.
+  &.is-critical {
+    border-inline-start: 3px solid var(--danger-fg);
+  }
+
+  &.is-warning {
+    border-inline-start: 3px solid var(--warning-fg);
   }
 }
 
-.attention-action {
-  grid-column: 2;
-  justify-self: start;
-}
-
-@media (min-width: 40rem) {
-  .attention-item {
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    align-items: center;
-  }
-
-  .attention-action {
-    grid-column: auto;
-  }
+.attention-tone {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font: var(--text-caption);
+  color: var(--text-secondary);
 }
 
 .attention-icon {
   display: inline-grid;
   place-items: center;
-  inline-size: 2rem;
-  block-size: 2rem;
+  inline-size: 1.75rem;
+  block-size: 1.75rem;
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
   background-color: var(--surface-muted);
   color: var(--text-secondary);
 
   .icon {
-    inline-size: var(--icon-size);
-    block-size: var(--icon-size);
+    inline-size: 1.125rem;
+    block-size: 1.125rem;
   }
 }
 
@@ -77,90 +77,84 @@
 
 .attention-title {
   font: var(--text-body-strong);
+  color: var(--text-primary);
   overflow-wrap: anywhere;
 }
 
-.attention-detail {
+.attention-detail,
+.attention-meter-text {
   font: var(--text-small);
   color: var(--text-secondary);
 }
 
-.attention-empty {
+.attention-meter {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.attention-action {
+  margin-block-start: auto;
+  padding-block-start: var(--space-2);
+}
+
+.attention-clear {
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  min-block-size: 4rem;
   padding: var(--space-4) var(--space-5);
   color: var(--text-secondary);
 }
 
 .attention-skeleton {
-  inline-size: 18rem;
-  max-inline-size: 60%;
+  inline-size: 60%;
 }
 
 // -----------------------------------------------------------------------------
-// Metrics
+// Right now, beside the week from 1280px.
 // -----------------------------------------------------------------------------
-// One bordered strip divided into cells rather than a wall of floating cards:
-// the numbers are read together, so they sit together.
+.overview-numbers {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0 var(--space-6);
+
+  @media (min-width: 80rem) {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+    align-items: start;
+  }
+}
+
 .section-link {
   font: var(--text-label);
 }
 
-.metrics {
+.now-card {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  margin: 0;
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-lg);
-  background-color: var(--surface-default);
-  overflow: hidden;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-3);
 }
 
-.metric {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  padding: var(--space-4) var(--space-5);
-  // Dividers from the grid gap would need a background trick; a border on
-  // every cell, clipped by the frame, is simpler and exact at every width.
-  box-shadow:
-    1px 0 0 var(--border-subtle),
-    0 1px 0 var(--border-subtle);
-
-  dt {
-    font: var(--text-label);
-    color: var(--text-secondary);
-  }
-
-  dd {
-    margin: 0;
-  }
+.now-label {
+  font: var(--text-label);
+  color: var(--text-secondary);
 }
 
-.metric-value {
-  font: 600 1.75rem / 1.2 var(--font-sans);
-  letter-spacing: var(--letter-spacing-tight);
+.now-value {
+  font: var(--text-display);
   color: var(--text-primary);
-  font-variant-numeric: tabular-nums;
 }
 
-.metric-skeleton {
-  display: inline-block;
-  inline-size: 4rem;
-  block-size: 1.5rem;
-  vertical-align: middle;
+.now-note {
+  font: var(--text-small);
+  color: var(--text-muted);
 }
 
-@media (min-width: 48rem) {
-  .metrics-3 {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
+.now-skeleton {
+  inline-size: 5rem;
+  block-size: 2.5rem;
+}
 
-  .metrics-4 {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
+.week-chart {
+  margin-block-start: var(--space-4);
 }
 
 // -----------------------------------------------------------------------------
@@ -174,7 +168,6 @@
   padding: 0;
   list-style: none;
 
-  // Tiles in a row share one height, even when a label wraps.
   li {
     display: flex;
   }

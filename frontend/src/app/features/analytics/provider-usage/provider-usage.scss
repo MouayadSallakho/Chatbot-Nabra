@@ -1,90 +1,89 @@
-// This card deliberately matches the dashboard's summary cards: a provider call
-// count and a conversation count are the same kind of fact, and making them look
-// like different kinds would be a design decision nobody meant to take.
-//
-// The rules are restated here rather than borrowed, because Angular encapsulates
-// component styles: the dashboard's own stylesheet does not reach this
-// component's DOM, and a class name that merely looks shared would silently do
-// nothing. Every value below is a token, so the two stay in step.
+:host {
+  display: block;
+}
+
+.usage {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4);
+  margin-block-start: var(--space-4);
+}
+
+.usage-intro,
+.usage-none {
+  max-inline-size: 72ch;
+  font: var(--text-small);
+  color: var(--text-secondary);
+}
 
 .usage-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
-  gap: var(--space-4);
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-5);
+
+  @media (min-width: 64rem) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
 }
 
-.usage-value {
-  margin: 0;
-  font: 600 1.75rem / 1.2 var(--font-sans);
-  letter-spacing: var(--letter-spacing-tight);
-  color: var(--text-primary);
-  font-variant-numeric: tabular-nums;
-}
-
-.usage-label {
-  margin: 0;
-  font: var(--text-label);
-  color: var(--text-secondary);
-}
-
-.usage-figure,
-.usage-cost-row {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  min-inline-size: 0;
-}
-
-// The estimate is separated from the counts by a rule, so nobody reads a cost as
-// though it were one of the measured figures above it. One is what a provider
-// reported; the other is arithmetic this platform did.
 .usage-cost {
-  margin-block-start: var(--space-5);
-  padding-block-start: var(--space-4);
-  border-block-start: 1px solid var(--border-subtle);
+  display: grid;
+  gap: var(--space-3);
+  align-content: start;
 }
 
 .usage-cost-title {
-  margin: 0 0 var(--space-2);
-  font: var(--text-label);
-  color: var(--text-secondary);
+  font: var(--text-card-title);
+  color: var(--text-primary);
 }
 
 .usage-cost-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2) var(--space-6);
+  display: grid;
+  gap: var(--space-3);
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-// Unrated calls are a caveat on the figure above, not an error. Warning colour
-// rather than danger: nothing has gone wrong, something is simply unknown.
+.usage-cost-row {
+  display: grid;
+  gap: var(--space-1);
+}
+
+// Proportional figures at display size; the amount is one LTR island so a
+// currency symbol and its digits never split across a right-to-left line.
+.usage-cost-value {
+  justify-self: start;
+  font: 600 1.75rem / 1.2 var(--font-sans);
+  color: var(--text-primary);
+}
+
+.usage-cost-note,
+.usage-cost-none {
+  font: var(--text-small);
+  color: var(--text-secondary);
+}
+
+// "Unrated does not mean free": a warning about the figure, in warning ink on
+// its own background, with the words carrying the meaning.
 .usage-warning {
-  margin: var(--space-3) 0 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--warning-border);
+  border-radius: var(--radius-md);
+  background-color: var(--warning-bg);
   color: var(--warning-fg);
+  font: var(--text-small);
 }
 
-// Tables get their own scroller rather than widening the page.
-.table-scroll {
-  overflow-x: auto;
-}
-
-.numeric {
-  text-align: end;
-  font-variant-numeric: tabular-nums;
-}
-
-// A model name is a published identifier: "gpt-5-mini-2026-08-07" broken across
-// four lines at a hyphen is barely readable and cannot be copied. Kept whole,
-// and the table's own scroller handles a narrow screen -- which is what it is
-// there for.
 .model-name {
-  white-space: nowrap;
-  font-weight: 600;
+  min-inline-size: 10rem;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
 }
 
 .model-unrated {
   display: block;
+  font: var(--text-small);
+  color: var(--text-muted);
 }

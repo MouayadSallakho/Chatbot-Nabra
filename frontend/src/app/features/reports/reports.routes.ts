@@ -1,4 +1,5 @@
 import { Routes } from '@angular/router';
+import { unsavedChangesGuard } from '@app/core/navigation/unsaved-changes';
 import { ReportsApi } from './reports-api';
 
 /**
@@ -23,6 +24,8 @@ export const reportsRoutes: Routes = [
         title: $localize`:@@title.reportSchedules:Report schedules`,
         loadComponent: () =>
           import('./report-schedules/report-schedules').then((m) => m.ReportSchedules),
+        // An open schedule editor with edits is asked about before it is lost.
+        canDeactivate: [unsavedChangesGuard],
       },
     ],
   },

@@ -64,6 +64,7 @@
       <a href="#lab-feedback" i18n="@@lab.feedback.short">Feedback</a>
       <a href="#lab-voices" i18n="@@lab.voices.short">Voices</a>
       <a href="#lab-transcript" i18n="@@lab.transcript.short">Transcript</a>
+      <a href="#lab-charts" i18n="@@lab.charts.short">Charts</a>
     </nav>
 
     <!-- Colour ----------------------------------------------------------- -->
@@ -744,6 +745,88 @@ Answer briefly. Hand over to a person for refunds.</textarea>
           </li>
         }
       </ol>
+    </section>
+    <section class="lab-section" id="lab-charts" aria-labelledby="lab-charts-title">
+      <h2 id="lab-charts-title" class="text-section-title" i18n="@@lab.charts">
+        Charts (sample data)
+      </h2>
+      <p class="section-note" i18n="@@lab.charts.note">
+        Every number in this section is sample data written for this page; product screens draw only
+        what the API returns. Charts mirror with the page language, not with the preview direction
+        above: switch the language to see them right to left.
+      </p>
+
+      <div class="card card-body">
+        <app-column-chart
+          heading="Messages per day (sample)"
+          i18n-heading="@@lab.charts.columns"
+          summary="Sample: customers, team and AI stacked per day; the last day is still running."
+          i18n-summary="@@lab.charts.columns.summary"
+          categoryLabel="Day"
+          i18n-categoryLabel="@@analytics.table.day"
+          [series]="chartSeries"
+          [points]="chartPoints"
+        />
+      </div>
+
+      <div class="card card-body">
+        <app-area-chart
+          heading="Conversations per day (sample)"
+          i18n-heading="@@lab.charts.area"
+          summary="Sample: one daily series as a line over a light wash."
+          i18n-summary="@@lab.charts.area.summary"
+          categoryLabel="Day"
+          i18n-categoryLabel="@@analytics.table.day"
+          [series]="lineSeries"
+          [points]="chartPoints"
+          [plotHeight]="140"
+        />
+      </div>
+
+      <div class="card card-body">
+        <app-bar-chart
+          heading="Bars (sample)"
+          i18n-heading="@@lab.charts.bars"
+          summary="Sample: one series by category, values at the tips."
+          i18n-summary="@@lab.charts.bars.summary"
+          categoryLabel="Category"
+          i18n-categoryLabel="@@lab.charts.category"
+          valueLabel="Count"
+          i18n-valueLabel="@@usage.table.count"
+          [bars]="sampleBars"
+        />
+      </div>
+
+      <div class="card card-body">
+        <app-stacked-bar
+          heading="AI and team (sample)"
+          i18n-heading="@@lab.charts.stacked"
+          summary="Sample: parts of one whole, AI against the team."
+          i18n-summary="@@lab.charts.stacked.summary"
+          categoryLabel="Voice"
+          i18n-categoryLabel="@@analytics.table.voice"
+          valueLabel="Replies"
+          i18n-valueLabel="@@analytics.table.replies"
+          [parts]="sampleParts"
+        />
+      </div>
+
+      <div class="card card-body lab-row">
+        <app-sparkline [values]="[14, 17, 12, 22, 19, 8, 4]" />
+        <app-sparkline [values]="[35, 40, 33, 44, 43, 19, 9]" tone="ai" />
+        <app-sparkline [values]="[9, 12, 6, 21, 15, 4, 2]" tone="human" />
+        <app-meter
+          [value]="9"
+          [max]="10"
+          state="warning"
+          label="Sample limit"
+          i18n-label="@@lab.charts.meter"
+          valueText="9 of 10 used (sample)"
+          i18n-valueText="@@lab.charts.meter.text"
+        />
+      </div>
+
+      <app-provider-usage [usage]="sampleUsage" [models]="sampleModels" />
     </section>
   </main>
 

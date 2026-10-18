@@ -1,0 +1,461 @@
+// =============================================================================
+// Charts (Phase 36.7)
+// =============================================================================
+// The shared look of `src/app/shared/charts/`. Global rather than per
+// component: six small components draw the same marks, and component styles
+// are budgeted at 4 kB each.
+//
+// The dataviz mark spec, in tokens: hairline solid gridlines one step off the
+// surface; 2px lines with round joins; 4px rounded data ends, square at the
+// baseline; a 2px surface gap between touching marks; markers with a 2px
+// surface ring; text in text tokens, never in a series colour. Colour is a
+// role (`.chart-tone-*`), and every role is repeated in words on the page.
+// -----------------------------------------------------------------------------
+
+// Roles. Lagoon and Ember are the voices and nothing else; customers and single
+// series are neutral; danger only for a failure; muted is a lighter step of the
+// neutral for something unsettled ("still running"), always with its word.
+.chart-tone-ai {
+  --chart-tone: var(--chart-ai);
+}
+
+.chart-tone-human {
+  --chart-tone: var(--chart-human);
+}
+
+.chart-tone-customer {
+  --chart-tone: var(--chart-customer);
+}
+
+.chart-tone-neutral {
+  --chart-tone: var(--chart-neutral);
+}
+
+.chart-tone-danger {
+  --chart-tone: var(--danger-fg);
+}
+
+.chart-tone-warning {
+  --chart-tone: var(--warning-fg);
+}
+
+.chart-tone-muted {
+  --chart-tone: color-mix(in srgb, var(--chart-neutral) 45%, var(--surface-default));
+}
+
+// -----------------------------------------------------------------------------
+// Frame
+// -----------------------------------------------------------------------------
+.chart {
+  display: block;
+  min-inline-size: 0;
+
+  // A chart takes the width it is given and draws to it; its own drawing never
+  // widens it (the SVG starts at a default width until it is measured).
+  contain: inline-size;
+}
+
+.chart-frame {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-3);
+  min-inline-size: 0;
+}
+
+.chart-frame-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+}
+
+.chart-frame-titles {
+  display: grid;
+  gap: var(--space-1);
+  min-inline-size: 0;
+  flex: 1 1 16rem;
+}
+
+.chart-frame-title {
+  font: var(--text-card-title);
+  color: var(--text-primary);
+}
+
+.chart-frame-summary {
+  max-inline-size: 72ch;
+  font: var(--text-small);
+  color: var(--text-secondary);
+}
+
+.chart-frame-toggle {
+  flex: none;
+}
+
+// -----------------------------------------------------------------------------
+// Plot
+// -----------------------------------------------------------------------------
+.chart-plot {
+  position: relative;
+  min-inline-size: 0;
+}
+
+.chart-surface {
+  border-radius: var(--radius-sm);
+  touch-action: pan-y;
+
+  &:focus-visible {
+    outline: var(--focus-ring-width) solid var(--focus-ring);
+    outline-offset: 2px;
+  }
+}
+
+// Drawn left-to-right on purpose: every x is mirrored in code for Arabic, so
+// text anchors keep their plain meaning. Text inside still shapes correctly.
+.chart-svg {
+  display: block;
+  overflow: visible;
+  direction: ltr; // rtl-lint-ignore token-lint-ignore: every x is mirrored in code (time-series-chart.ts), so the drawing itself stays left-to-right
+}
+
+.chart-grid-line {
+  stroke: var(--chart-grid);
+  stroke-width: 1;
+  shape-rendering: crispEdges;
+
+  &.is-baseline {
+    stroke: var(--border-strong);
+  }
+}
+
+.chart-tick {
+  fill: var(--text-muted);
+  font: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+.chart-active-band {
+  fill: var(--surface-hover);
+}
+
+.chart-mark {
+  fill: var(--chart-tone);
+}
+
+// Today, so far: lighter, and said in words in the readout and the table.
+.chart-column.is-partial .chart-mark {
+  fill-opacity: 0.55;
+}
+
+.chart-line {
+  fill: none;
+  stroke: var(--chart-tone);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.chart-area {
+  fill: var(--chart-tone);
+  fill-opacity: 0.1;
+}
+
+.chart-dot {
+  fill: var(--chart-tone);
+  stroke: var(--surface-default);
+  stroke-width: 2;
+}
+
+.chart-crosshair {
+  stroke: var(--border-strong);
+  stroke-width: 1;
+  shape-rendering: crispEdges;
+}
+
+// The pointer's readout. Values lead, labels follow; series keyed by a short
+// stroke rather than a box. Hidden from assistive technology: the keyboard
+// path speaks the same numbers, and the table holds them all.
+.chart-readout {
+  position: absolute;
+  inset-block-start: 0;
+  z-index: var(--z-sticky);
+  display: grid;
+  gap: 2px; // token-lint-ignore: tight readout rows, below the 4px scale on purpose
+  inline-size: 12.25rem;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background-color: var(--surface-raised);
+  box-shadow: var(--shadow-overlay);
+  pointer-events: none;
+}
+
+.chart-readout-title {
+  font: var(--text-caption);
+  color: var(--text-secondary);
+}
+
+.chart-readout-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font: var(--text-small);
+  color: var(--text-secondary);
+}
+
+.chart-readout-value {
+  min-inline-size: 2.5ch;
+  font: var(--text-numeric);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
+.chart-key {
+  flex: none;
+  inline-size: 0.875rem;
+  block-size: 0.625rem;
+  border-radius: 2px;
+  background-color: var(--chart-tone);
+
+  &.is-line {
+    block-size: 3px;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Legend and table
+// -----------------------------------------------------------------------------
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-5);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font: var(--text-small);
+  color: var(--text-secondary);
+
+  li {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+}
+
+.chart-swatch {
+  flex: none;
+  inline-size: 0.625rem;
+  block-size: 0.625rem;
+  border-radius: 3px;
+  background-color: var(--chart-tone);
+
+  &.is-line {
+    inline-size: 0.875rem;
+    block-size: 3px;
+    border-radius: 2px;
+  }
+}
+
+.chart-legend-value {
+  font: var(--text-numeric);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
+.chart-note {
+  font: var(--text-small);
+  color: var(--text-muted);
+}
+
+.chart-table {
+  max-block-size: 22rem;
+}
+
+// -----------------------------------------------------------------------------
+// Horizontal bars
+// -----------------------------------------------------------------------------
+.bar-chart {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bar-chart-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-1) var(--space-3);
+  align-items: center;
+
+  @media (min-width: 36rem) {
+    grid-template-columns: minmax(6rem, 14rem) minmax(0, 1fr) auto;
+  }
+}
+
+.bar-chart-label {
+  min-inline-size: 0;
+  overflow-wrap: anywhere;
+  font: var(--text-small);
+  color: var(--text-primary);
+}
+
+.bar-chart-track {
+  display: block;
+  min-inline-size: 0;
+
+  svg {
+    display: block;
+  }
+}
+
+.bar-chart-value {
+  font: var(--text-numeric);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+// -----------------------------------------------------------------------------
+// One bar of parts, sparkline, meter
+// -----------------------------------------------------------------------------
+.stacked-bar svg {
+  display: block;
+}
+
+.stacked-bar-track {
+  fill: var(--surface-inset);
+}
+
+.sparkline {
+  display: inline-block;
+  line-height: 0;
+
+  svg {
+    display: block;
+  }
+}
+
+.meter {
+  display: block;
+  min-inline-size: 8rem;
+  block-size: 0.5rem;
+  overflow: hidden;
+  border-radius: 4px;
+  background-color: var(--surface-inset);
+}
+
+.meter-fill {
+  display: block;
+  block-size: 100%;
+  border-start-end-radius: 4px;
+  border-end-end-radius: 4px;
+  background-color: var(--chart-neutral);
+
+  .meter.is-warning & {
+    background-color: var(--warning-fg);
+  }
+
+  .meter.is-critical & {
+    background-color: var(--danger-fg);
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Figures: a strip of headline counts (Overview, Analytics). Proportional
+// figures at this size; tabular only where numbers align in columns.
+// -----------------------------------------------------------------------------
+.figures {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background-color: var(--surface-default);
+
+  @media (min-width: 48rem) {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.figure {
+  display: grid;
+  align-content: start;
+  gap: var(--space-1);
+  padding: var(--space-4) var(--space-5);
+  box-shadow:
+    1px 0 0 var(--border-subtle),
+    0 1px 0 var(--border-subtle);
+
+  dt {
+    font: var(--text-label);
+    color: var(--text-secondary);
+  }
+
+  dd {
+    margin: 0;
+  }
+}
+
+.figure-value {
+  font: 600 1.75rem / 1.2 var(--font-sans);
+  color: var(--text-primary);
+}
+
+.figure-skeleton {
+  display: block;
+  inline-size: 4rem;
+  block-size: 1.75rem;
+}
+
+.figure-skeleton-label {
+  inline-size: 7rem;
+}
+
+// -----------------------------------------------------------------------------
+// Forced colours: the system palette replaces the tones, and each series keeps
+// a different system colour so a stack still separates.
+// -----------------------------------------------------------------------------
+@media (forced-colors: active) {
+  .chart-mark,
+  .chart-area,
+  .chart-key,
+  .chart-swatch,
+  .meter-fill {
+    forced-color-adjust: none;
+    fill: CanvasText;
+    background-color: CanvasText;
+  }
+
+  .chart-tone-human,
+  .chart-tone-danger {
+    --chart-tone: Highlight;
+
+    &.chart-mark,
+    &.chart-key,
+    &.chart-swatch {
+      fill: Highlight;
+      background-color: Highlight;
+    }
+  }
+
+  .chart-tone-customer,
+  .chart-tone-muted {
+    &.chart-mark,
+    &.chart-key,
+    &.chart-swatch {
+      fill: GrayText;
+      background-color: GrayText;
+    }
+  }
+
+  .chart-line {
+    forced-color-adjust: none;
+    stroke: CanvasText;
+  }
+
+  .meter {
+    border: 1px solid CanvasText;
+  }
+}

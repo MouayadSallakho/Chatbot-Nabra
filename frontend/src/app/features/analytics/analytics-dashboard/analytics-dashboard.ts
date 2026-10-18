@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { ApiError, toApiError } from '@app/core/api/api-error';
 import { PermissionService } from '@app/core/authorization/permission-service';
@@ -12,23 +13,29 @@ import {
   AnalyticsRange,
   DEFAULT_ANALYTICS_RANGE,
 } from '../analytics-api';
+import {
+  conversationsSummary,
+  dailyPoints,
+  messagesSummary,
+  periodSentence,
+  rangeWord,
+  repliesSummary,
+  senderSeries,
+  utcDay,
+} from '../analytics-words';
 import { ProviderUsageCard } from '../provider-usage/provider-usage';
-import { LocaleFormat, formatDate } from '@app/core/i18n/locale-format';
+import { LocaleFormat } from '@app/core/i18n/locale-format';
+import { LocalNumberPipe } from '@app/core/i18n/locale-pipes';
 import { AppLanguage } from '@app/core/i18n/language';
+import { channelWord } from '@app/shared/channel/channel-badge';
+import { AreaChart } from '@app/shared/charts/area-chart';
+import { BarChart } from '@app/shared/charts/bar-chart';
+import { ChartBar, ChartPart, ChartSeries } from '@app/shared/charts/chart-model';
+import { ColumnChart } from '@app/shared/charts/column-chart';
+import { StackedBar } from '@app/shared/charts/stacked-bar';
+import { Icon } from '@app/shared/icon/icon';
 import { ScrollRegion } from '@app/shared/scroll-region/scroll-region';
-
-/** One bar in the activity chart, already scaled. */
-interface ActivityBar {
-  readonly date: string;
-  readonly label: string;
-  readonly total: number;
-  readonly customer: number;
-  readonly ai: number;
-  readonly human: number;
-
-  /** Height as a percentage of the busiest day, 0–100. */
-  readonly height: number;
-}
+import { VoiceSplit } from '@app/shared/voice/voice-split';
 
 /**
  * The workspace analytics dashboard.
@@ -38,25 +45,40 @@ interface ActivityBar {
  * with no activity shows zeroes and says so. A dashboard that invents a plausible
  * line is worse than an empty one, because somebody will make a decision from it.
  *
- * <strong>Provider usage is internal accounting, and lives in its own
- * component.</strong> It reports what this workspace's calls to AI providers are
- * estimated to have cost <em>us</em>, from rates an operator configured — not an
- * invoice, a charge or an amount due. See {@link ProviderUsageCard}, which owns
- * that vocabulary and the rules that keep it honest.
+ * <strong>Voices keep their colours.</strong> Lagoon is the AI and Ember the
+ * team in every series here; customers are neutral, and a single series is
+ * neutral ink. Every colour is repeated in words: a legend, a summary sentence,
+ * and a table behind each chart.
  *
- * <strong>The chart is drawn with CSS, and it is not the only representation.</strong>
- * No chart library was added. Every bar is also a row in a table below it, which
- * is what a screen reader reads and what somebody checking a number actually
- * wants. Colour distinguishes the series, and so does the text beside it.
+ * <strong>Partial data says so.</strong> The last day of a period is today, and
+ * today is not over: it is drawn lighter and labelled "so far". A refresh that
+ * fails keeps the figures already on screen and says how old they are, rather
+ * than blanking the page or pretending they are new.
+ *
+ * <strong>Provider usage is internal accounting, and lives in its own
+ * component.</strong> See {@link ProviderUsageCard}.
  *
  * <strong>Nothing polls.</strong> Analytics is not realtime, and a page that
  * refreshed itself would move numbers under a reader mid-sentence. Refresh is a
- * button.
+ * button; the period lives in the address (`?period=7d`), so a shared link
+ * opens the same view.
  */
 @Component({
   selector: 'app-analytics-dashboard',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [PageHeader, EmptyState, ProviderUsageCard, ScrollRegion],
+  imports: [
+    PageHeader,
+    EmptyState,
+    ProviderUsageCard,
+    ScrollRegion,
+    LocalNumberPipe,
+    Icon,
+    VoiceSplit,
+    ColumnChart,
+    AreaChart,
+    BarChart,
+    StackedBar,
+  ],
   templateUrl: './analytics-dashboard.html',
   styleUrl: './analytics-dashboard.scss',
 })
@@ -66,21 +88,35 @@ export class AnalyticsDashboardPage {
   private readonly api = inject(AnalyticsApi);
   private readonly workspace = inject(WorkspaceContextService);
   private readonly permissions = inject(PermissionService);
+  private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
 
   /** Whether these numbers are the reader's to see at all. */
   protected readonly canView = computed(() => this.permissions.has('analytics.view'));
 
-  protected readonly ranges = ANALYTICS_RANGES;
+  protected readonly ranges = ANALYTICS_RANGES.map((option) => ({
+    value: option.value,
+    label: rangeWord(option.value),
+  }));
 
-  protected readonly range = signal<AnalyticsRange>(DEFAULT_ANALYTICS_RANGE);
+  protected readonly range = signal<AnalyticsRange>(initialRange(this.route));
 
   protected readonly loading = signal(true);
   protected readonly refreshing = signal(false);
   protected readonly failure = signal<ApiError | null>(null);
   protected readonly dashboard = signal<AnalyticsDashboard | null>(null);
 
-  /** Placeholder cards, so the loading state has the shape of the real one. */
-  protected readonly skeletonCards = [0, 1, 2, 3];
+  /** When the figures on screen were read; shown only if a later read failed. */
+  private readonly readAt = signal<Date | null>(null);
+
+  /** A refresh that failed while earlier figures stay on screen. */
+  protected readonly staleSince = computed(() => {
+    const at = this.readAt();
+
+    return this.failure() !== null && this.dashboard() !== null && at !== null
+      ? this.locale.date(at, 'time')
+      : null;
+  });
 
   /**
    * Whether the workspace did anything at all in this period.
@@ -104,73 +140,205 @@ export class AnalyticsDashboardPage {
     );
   });
 
-  /**
-   * The daily bars, scaled to the busiest day.
-   *
-   * Scaled here rather than in the template so the arithmetic is testable and
-   * happens once per load instead of once per change detection pass.
-   */
-  protected readonly bars = computed<readonly ActivityBar[]>(() => {
-    const days = this.dashboard()?.dailyActivity ?? [];
+  protected readonly period = computed(() => {
+    const dashboard = this.dashboard();
 
-    const totals = days.map((day) => day.customerMessages + day.aiMessages + day.humanMessages);
+    return dashboard ? periodSentence(dashboard, this.locale.language) : '';
+  });
 
-    const busiest = Math.max(0, ...totals);
+  protected readonly series = senderSeries();
 
-    return days.map((day, index) => ({
-      date: day.date,
-      label: formatDay(day.date, this.locale.language),
-      total: totals[index],
-      customer: day.customerMessages,
-      ai: day.aiMessages,
-      human: day.humanMessages,
+  protected readonly conversationSeries: readonly ChartSeries[] = [
+    {
+      key: 'conversations',
+      label: $localize`:@@analytics.series.conversations:Conversations started`,
+      tone: 'neutral',
+    },
+  ];
 
-      // A day with nothing in it is a floor, not a full-height bar: dividing by
-      // a busiest of zero would otherwise produce NaN or 100%.
-      height: busiest === 0 ? 0 : Math.round((totals[index] / busiest) * 100),
+  protected readonly points = computed(() => {
+    const dashboard = this.dashboard();
+
+    return dashboard ? dailyPoints(dashboard, this.locale.language) : [];
+  });
+
+  protected readonly messagesSummary = computed(() => {
+    const dashboard = this.dashboard();
+
+    return dashboard ? messagesSummary(dashboard, this.locale.language) : '';
+  });
+
+  protected readonly conversationsSummary = computed(() => {
+    const dashboard = this.dashboard();
+
+    return dashboard ? conversationsSummary(dashboard, this.locale.language) : '';
+  });
+
+  protected readonly replyParts = computed<readonly ChartPart[]>(() => {
+    const summary = this.dashboard()?.summary;
+
+    return [
+      {
+        key: 'ai',
+        label: $localize`:@@analytics.series.ai:AI`,
+        value: summary?.aiMessages ?? 0,
+        tone: 'ai',
+      },
+      {
+        key: 'human',
+        label: $localize`:@@analytics.series.team:Team`,
+        value: summary?.humanMessages ?? 0,
+        tone: 'human',
+      },
+    ];
+  });
+
+  protected readonly repliesSummary = computed(() => {
+    const summary = this.dashboard()?.summary;
+
+    return repliesSummary(
+      summary?.aiMessages ?? 0,
+      summary?.humanMessages ?? 0,
+      this.locale.language,
+    );
+  });
+
+  /** Channels as bars, each with its share of the period's conversations. */
+  protected readonly channelBars = computed<readonly ChartBar[]>(() => {
+    const dashboard = this.dashboard();
+    const total = dashboard?.summary.conversationsStarted ?? 0;
+
+    return (dashboard?.channels ?? []).map((channel) => ({
+      key: channel.channel,
+      label: channelWord(channel.channel),
+      value: channel.conversationsStarted,
+      note: total === 0 ? '' : this.locale.percent(channel.conversationsStarted / total),
     }));
   });
 
-  /** The busiest day's total, for the chart's axis label. */
-  protected readonly busiestDay = computed(() =>
-    Math.max(0, ...this.bars().map((bar) => bar.total)),
-  );
+  protected readonly channelsSummary = computed(() => {
+    const bars = this.channelBars();
+    const busiest = [...bars].sort((a, b) => b.value - a.value)[0];
 
-  /** Whether any day in the period had anything on it. */
-  protected readonly hasDailyActivity = computed(() => this.busiestDay() > 0);
+    if (!busiest) {
+      return '';
+    }
+
+    const name = busiest.label;
+    const share = busiest.note ?? '';
+
+    return $localize`:@@analytics.channels.summary:Where conversations started. Most came through ${name}:channel: (${share}:share:).`;
+  });
+
+  /** With one channel there is nothing to compare: a sentence, not a one-bar chart. */
+  protected readonly singleChannel = computed(() => {
+    const bars = this.channelBars();
+
+    if (bars.length !== 1) {
+      return '';
+    }
+
+    const name = bars[0].label;
+    const count = this.locale.number(bars[0].value);
+
+    return $localize`:@@analytics.channels.single:Every conversation in this period started on ${name}:channel:: ${count}:count:.`;
+  });
+
+  /** How AI reply attempts ended: the expected outcome in ink, failures in danger. */
+  protected readonly outcomeParts = computed<readonly ChartPart[]>(() => {
+    const operations = this.dashboard()?.aiOperations;
+    const parts: ChartPart[] = [
+      {
+        key: 'completed',
+        label: $localize`:@@analytics.outcome.completed:Completed`,
+        value: operations?.completed ?? 0,
+        tone: 'neutral',
+      },
+      {
+        key: 'failed',
+        label: $localize`:@@analytics.outcome.failed:Failed`,
+        value: operations?.failed ?? 0,
+        tone: 'danger',
+      },
+    ];
+
+    if ((operations?.inProgress ?? 0) > 0) {
+      parts.push({
+        key: 'running',
+        label: $localize`:@@analytics.outcome.running:Still running`,
+        value: operations?.inProgress ?? 0,
+        tone: 'muted',
+      });
+    }
+
+    return parts;
+  });
+
+  protected readonly outcomeSummary = computed(() => {
+    const operations = this.dashboard()?.aiOperations;
+    const attempts = this.locale.number(operations?.attempts ?? 0);
+    const failed = this.locale.number(operations?.failed ?? 0);
+
+    return $localize`:@@analytics.outcome.summary:AI reply attempts in this period: ${attempts}:attempts:. Failed: ${failed}:failed:. Counted from what the runtime recorded, not estimated.`;
+  });
+
+  /** WhatsApp delivery, in the order a message travels. */
+  protected readonly deliveryRows = computed(() => {
+    const delivery = this.dashboard()?.whatsappDelivery;
+
+    if (!delivery) {
+      return [];
+    }
+
+    return [
+      {
+        key: 'pending',
+        label: $localize`:@@analytics.delivery.pending:Waiting to send`,
+        value: delivery.pending,
+      },
+      {
+        key: 'sending',
+        label: $localize`:@@analytics.delivery.sending:Sending`,
+        value: delivery.sending,
+      },
+      { key: 'sent', label: $localize`:@@analytics.delivery.sent:Sent`, value: delivery.sent },
+      {
+        key: 'delivered',
+        label: $localize`:@@analytics.delivery.delivered:Delivered`,
+        value: delivery.delivered,
+      },
+      { key: 'read', label: $localize`:@@analytics.delivery.read:Read`, value: delivery.read },
+      {
+        key: 'failed',
+        label: $localize`:@@analytics.delivery.failed:Not delivered`,
+        value: delivery.failed,
+      },
+      {
+        key: 'unknown',
+        label: $localize`:@@analytics.delivery.unknown:Unknown`,
+        value: delivery.unknown,
+      },
+    ];
+  });
+
+  /** Said once when numbers arrive, for somebody who cannot see the cards change. */
+  protected readonly announcement = computed(() => {
+    const dashboard = this.dashboard();
+
+    if (!dashboard) {
+      return '';
+    }
+
+    const range = rangeWord(dashboard.period.range as AnalyticsRange) || dashboard.period.range;
+    const n = (value: number) => this.locale.number(value);
+
+    return $localize`:@@analytics.announcement:${range}:range:: conversations started ${n(dashboard.summary.conversationsStarted)}:conversations:, customer messages ${n(dashboard.summary.customerMessages)}:customer:, AI replies ${n(dashboard.summary.aiMessages)}:ai:, replies from the team ${n(dashboard.summary.humanMessages)}:team:.`;
+  });
 
   protected readonly tenantId = computed(() => this.workspace.tenantId() ?? '');
 
   constructor() {
     void this.load();
-  }
-
-  /** The words a reader sees for each channel. */
-  protected channelName(channel: string): string {
-    switch (channel) {
-      case 'WebChat':
-        return 'Website chat';
-      case 'WhatsApp':
-        return 'WhatsApp';
-      case 'Instagram':
-        return 'Instagram';
-      case 'Messenger':
-        return 'Messenger';
-      default:
-        return channel;
-    }
-  }
-
-  /**
-   * One channel's share of the period's conversations, as a percentage.
-   *
-   * Of conversations rather than of messages, because that is what the bar sits
-   * beside. Zero conversations means zero share rather than a division by zero.
-   */
-  protected channelShare(conversations: number): number {
-    const total = this.dashboard()?.summary.conversationsStarted ?? 0;
-
-    return total === 0 ? 0 : Math.round((conversations / total) * 100);
   }
 
   /** Switches the period. Re-reads, because the numbers are all period-scoped. */
@@ -180,6 +348,13 @@ export class AnalyticsDashboardPage {
     }
 
     this.range.set(range);
+
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { period: range === DEFAULT_ANALYTICS_RANGE ? null : range },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
 
     await this.load();
   }
@@ -197,7 +372,11 @@ export class AnalyticsDashboardPage {
     const tenantId = this.tenantId();
 
     if (!tenantId) {
-      this.failure.set({ kind: 'unknown', status: 0, message: 'No workspace is selected.' });
+      this.failure.set({
+        kind: 'unknown',
+        status: 0,
+        message: $localize`:@@analytics.noWorkspace:No workspace is selected.`,
+      });
       this.loading.set(false);
 
       return;
@@ -211,17 +390,16 @@ export class AnalyticsDashboardPage {
       return;
     }
 
-    // Two flags, because they mean different things to a reader: the first load
-    // has nothing to show yet, while a refresh has the previous numbers on
-    // screen and should not blank them.
+    // The first load has nothing to show yet; a refresh keeps the previous
+    // figures on screen, dimmed, rather than blanking them.
     this.refreshing.set(true);
     this.failure.set(null);
 
     try {
       this.dashboard.set(await firstValueFrom(this.api.dashboard(tenantId, this.range())));
+      this.readAt.set(new Date());
     } catch (error) {
       this.failure.set(toApiError(error));
-      this.dashboard.set(null);
     } finally {
       this.loading.set(false);
       this.refreshing.set(false);
@@ -229,19 +407,19 @@ export class AnalyticsDashboardPage {
   }
 }
 
+/** The period from the address, or the default; anything else in `?period=` is ignored. */
+function initialRange(route: ActivatedRoute): AnalyticsRange {
+  const requested = route.snapshot.queryParamMap.get('period');
+
+  return ANALYTICS_RANGES.some((option) => option.value === requested)
+    ? (requested as AnalyticsRange)
+    : DEFAULT_ANALYTICS_RANGE;
+}
+
 /**
- * A `yyyy-MM-dd` string as a short day label.
- *
- * Parsed as UTC deliberately: the buckets are UTC days, and letting the browser
- * read a bare date in local time would shift every label by a day for half the
- * world.
+ * A `yyyy-MM-dd` string as a short day label, read as the UTC day it is.
+ * Kept as the page's export for its callers; the words live in `analytics-words`.
  */
 export function formatDay(date: string, language: AppLanguage = 'en'): string {
-  const [year, month, day] = date.split('-').map(Number);
-
-  if (!year || !month || !day) {
-    return date;
-  }
-
-  return formatDate(language, new Date(Date.UTC(year, month - 1, day)), 'dayMonth', 'UTC');
+  return utcDay(date, language, 'dayMonth');
 }

@@ -1,5 +1,6 @@
 import { TestBed } from '@angular/core/testing';
-import { ConversationRealtime } from './conversation-realtime';
+import type { HubConnectionBuilder } from '@microsoft/signalr';
+import { ConversationRealtime, HUB_CONNECTION_BUILDER } from './conversation-realtime';
 
 // A stand-in for the SignalR client: the test is about how many connections
 // the service opens and who hears about a change, not about the transport.
@@ -31,34 +32,47 @@ class FakeConnection {
   }
 }
 
-vi.mock('@microsoft/signalr', () => ({
-  HubConnectionState: { Disconnected: 'Disconnected' },
-  LogLevel: { Warning: 3 },
-  HubConnectionBuilder: class {
-    withUrl() {
-      return this;
-    }
-    withAutomaticReconnect() {
-      return this;
-    }
-    configureLogging() {
-      return this;
-    }
-    build() {
-      const connection = new FakeConnection();
+/**
+ * A stand-in for SignalR's builder, handed to the service through its
+ * injection token. Not a module mock: specs share one module registry in this
+ * runner, so a `vi.mock` of `@microsoft/signalr` depended on which spec loaded
+ * the service first (Phase 36.7, revision 1).
+ */
+class FakeBuilder {
+  withUrl(): this {
+    return this;
+  }
 
-      built.push(connection);
+  withAutomaticReconnect(): this {
+    return this;
+  }
 
-      return connection;
-    }
-  },
-}));
+  configureLogging(): this {
+    return this;
+  }
+
+  build(): FakeConnection {
+    const connection = new FakeConnection();
+
+    built.push(connection);
+
+    return connection;
+  }
+}
 
 describe('ConversationRealtime', () => {
   const tenant = '11111111-1111-7111-8111-111111111111';
 
   beforeEach(() => {
     built.length = 0;
+    TestBed.configureTestingModule({
+      providers: [
+        {
+          provide: HUB_CONNECTION_BUILDER,
+          useValue: () => new FakeBuilder() as unknown as HubConnectionBuilder,
+        },
+      ],
+    });
   });
 
   const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
