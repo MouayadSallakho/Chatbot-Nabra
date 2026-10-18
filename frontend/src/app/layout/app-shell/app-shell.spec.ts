@@ -233,8 +233,24 @@ describe('AppShell', () => {
 
       // The page names itself in its own <h1>; the bar carries what every page
       // shares -- which workspace it is about.
-      expect(query('.topbar-context')?.textContent?.trim()).toBe('Workspace: Acme Trading');
+      expect(query('.workspace-name')?.textContent?.trim()).toBe('Workspace: Acme Trading');
       expect(query('h1')?.textContent).toContain('Knowledge');
+    });
+
+    it('marks the workspace with its own first letter, hidden from assistive technology', async () => {
+      await render('/knowledge');
+
+      const mark = query('.workspace-mark');
+
+      expect(mark?.textContent?.trim()).toBe('A');
+      expect(mark?.getAttribute('aria-hidden')).toBe('true');
+    });
+
+    it('offers no workspace switch from the top bar when there is nowhere to switch to', async () => {
+      await render('/knowledge');
+
+      expect(query('[data-testid="workspace-switch"]')).toBeNull();
+      expect(query('p.workspace')).not.toBeNull();
     });
 
     it('groups the navigation under labelled sections', async () => {
@@ -378,10 +394,158 @@ describe('AppShell', () => {
       expect(menuButton()?.getAttribute('aria-expanded')).toBe('false');
     });
 
+    it('puts focus on the new page, not back on the trigger, after navigating', async () => {
+      await render('/overview', { desktop: false });
+
+      menuButton()?.click();
+      await settle();
+
+      [...host().querySelectorAll<HTMLAnchorElement>('.sidebar-nav .nav-item')]
+        .find((anchor) => anchor.textContent?.includes('Knowledge'))
+        ?.click();
+      await settle();
+      await settle();
+
+      // The reader chose a page: they arrive at its heading (RouteFocus).
+      expect(document.activeElement?.tagName).toBe('H1');
+      expect(document.activeElement?.textContent).toContain('Knowledge');
+    });
+
     it('offers no pin control, which would mean nothing for an overlay', async () => {
       await render('/overview', { desktop: false });
 
       expect(query('.pin-toggle')).toBeNull();
+    });
+  });
+
+  describe('focus after a navigation', () => {
+    it('leaves the first load to the browser', async () => {
+      await render('/overview');
+
+      expect(document.activeElement).toBe(document.body);
+    });
+
+    it("moves focus to the new page's heading", async () => {
+      await render('/overview');
+
+      await harness.navigateByUrl('/knowledge');
+      await settle();
+
+      expect(document.activeElement?.tagName).toBe('H1');
+      expect(document.activeElement?.textContent).toContain('Knowledge');
+      // A reading position, reachable by script, not a stop in the tab order.
+      expect(document.activeElement?.getAttribute('tabindex')).toBe('-1');
+    });
+
+    it('leaves focus alone when only the query string changes', async () => {
+      await render('/knowledge');
+
+      const skipLink = query<HTMLAnchorElement>('a.skip-link')!;
+
+      skipLink.focus();
+      await harness.navigateByUrl('/knowledge?page=2');
+      await settle();
+
+      expect(document.activeElement).toBe(skipLink);
+    });
+  });
+
+  describe('command palette', () => {
+    const original = {
+      showModal: HTMLDialogElement.prototype.showModal,
+      close: HTMLDialogElement.prototype.close,
+    };
+
+    // jsdom has no modal dialogs; these do what the palette relies on.
+    beforeEach(() => {
+      HTMLDialogElement.prototype.showModal = function (this: HTMLDialogElement) {
+        this.setAttribute('open', '');
+      };
+      HTMLDialogElement.prototype.close = function (this: HTMLDialogElement) {
+        this.removeAttribute('open');
+        this.dispatchEvent(new Event('close'));
+      };
+    });
+
+    afterEach(() => {
+      HTMLDialogElement.prototype.showModal = original.showModal;
+      HTMLDialogElement.prototype.close = original.close;
+    });
+
+    const trigger = () => query<HTMLButtonElement>('[data-testid="palette-trigger"]');
+    const palette = () => query<HTMLDialogElement>('dialog.palette');
+    const ctrlK = () =>
+      document.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          key: 'k',
+          code: 'KeyK',
+          ctrlKey: true,
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+
+    /** The palette's code arrives through @defer; give it the turns it needs. */
+    async function settlePalette(): Promise<void> {
+      for (let turn = 0; turn < 4; turn++) {
+        await settle();
+      }
+    }
+
+    it('offers a labelled trigger that announces its shortcut', async () => {
+      await render('/overview');
+
+      expect(trigger()?.textContent).toContain('Search or jump to…');
+      expect(trigger()?.getAttribute('aria-haspopup')).toBe('dialog');
+      expect(trigger()?.getAttribute('aria-keyshortcuts')).toBe('Control+K');
+      expect(trigger()?.getAttribute('aria-expanded')).toBe('false');
+    });
+
+    it('opens with Ctrl+K from anywhere, with focus in its field', async () => {
+      await render('/overview');
+
+      ctrlK();
+      await settlePalette();
+
+      expect(palette()?.hasAttribute('open')).toBe(true);
+      expect(trigger()?.getAttribute('aria-expanded')).toBe('true');
+      expect(document.activeElement?.getAttribute('role')).toBe('combobox');
+    });
+
+    it('closes with Ctrl+K pressed again', async () => {
+      await render('/overview');
+
+      ctrlK();
+      await settlePalette();
+      ctrlK();
+      await settlePalette();
+
+      expect(palette()?.hasAttribute('open')).toBe(false);
+      expect(trigger()?.getAttribute('aria-expanded')).toBe('false');
+    });
+
+    it('opens from the trigger', async () => {
+      await render('/overview');
+
+      trigger()?.click();
+      await settlePalette();
+
+      expect(palette()?.hasAttribute('open')).toBe(true);
+    });
+
+    it('does not open over a confirmation that is waiting for an answer', async () => {
+      await render('/overview');
+
+      const waiting = document.createElement('dialog');
+
+      waiting.setAttribute('open', '');
+      document.body.appendChild(waiting);
+
+      ctrlK();
+      await settlePalette();
+
+      expect(palette()?.hasAttribute('open') ?? false).toBe(false);
+      waiting.remove();
     });
   });
 

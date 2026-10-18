@@ -49,10 +49,11 @@ answer a customer.
 App (root)                    router outlet only, deliberately empty
 └── AppShell                  layout route: owns pinned + drawer state
     ├── Sidebar               navigation model, rail peek state (its own)
-    ├── Topbar                drawer trigger, workspace context
+    ├── Topbar                drawer trigger, workspace identity + switch, palette trigger
     │   ├── NotificationBell
-    │   └── ProfileMenu       identity, theme, preferences, switch, sign out
+    │   └── ProfileMenu       identity, theme, language, preferences, switch, sign out
     ├── <router-outlet>       lazily loaded feature pages
+    ├── CommandPalette        @defer: loaded on first Ctrl+K (or when idle), a modal dialog
     └── ToastHost             outside the grid: a fixed layer
 ```
 
@@ -63,9 +64,10 @@ The root component holds nothing. That is a deliberate guard -- the root is the
 easiest place in an Angular application to accumulate global state and
 "temporary" markup.
 
-The shell owns exactly two pieces of state: whether the sidebar is **pinned**
-(which decides the grid) and whether the **drawer** is open (which the top bar's
-trigger reports). Whether the rail is **peeking** changes no layout, so it is
+The shell owns three pieces of state: whether the sidebar is **pinned**
+(which decides the grid), whether the **drawer** is open (which the top bar's
+trigger reports) and whether the **command palette** is open (Phase 36.4; the
+top bar's trigger reports it too). Whether the rail is **peeking** changes no layout, so it is
 the sidebar's own. The shell owns no feature logic and loads no data.
 
 The toast host sits outside the grid. As a grid child it had claimed an implicit
@@ -368,7 +370,8 @@ navigation should not carry one.
 
 ## D12. Sidebar
 
-Five shallow sections -- **Work** (Overview, Conversations, Customers), **AI**
+Five shallow sections, labelled in sentence case (36.4: no uppercase labels;
+Arabic has no case) -- **Work** (Overview, Conversations, Customers), **AI**
 (AI Agents, Knowledge), **Channels**, **Insights** (Analytics, Reports),
 **Workspace** (Team, Roles & permissions, Plan & usage, Billing) -- with daily
 work first and administration last. Every destination has its own glyph.
@@ -391,9 +394,18 @@ not sent anywhere.
 
 The current page is marked three ways: the neutral selected fill, ink text at a
 heavier weight and a 2px ink marker on the inline-start edge -- the marker is
-what still reads in greyscale and on the rail, and it mirrors in RTL through
-`--direction-flip`. `aria-current="page"` announces it. The brand row carries
-the mark (D17).
+what still reads in greyscale and on the rail. Since Phase 36.4 the marker is
+the shared `.edge-marker` primitive: a short rounded bar placed with a logical
+inset (it mirrors in RTL with no transform), replacing an inset shadow that
+followed the item's rounded corner and read as a bracket. The command palette's
+highlighted option uses the same marker. `aria-current="page"` announces it.
+The brand row carries the lockup: the mark (D17) and the "OmniAI" wordmark in
+the narrowed heading face; on the rail only the mark shows.
+
+**Workspace identity lives in the top bar, not the sidebar** (decided 36.4).
+The top bar exists at every width and the rail does not; the rail stays a
+stable 64px column of destinations; and the switch belongs next to the name it
+changes. The sidebar's footer keeps only the pin control.
 
 ## D13. Mobile navigation
 
@@ -408,22 +420,43 @@ fail for keyboard users. `inert` is what prevents it. While the drawer is open,
 surface: focus cannot escape behind it and a screen reader cannot wander into
 hidden content.
 
-Opening moves focus into the drawer. Closing — by Escape, the close button, the
-scrim, or navigating — returns focus to the trigger.
+Opening moves focus into the drawer (its 44px close button). Closing by Escape,
+the close button or the scrim returns focus to the trigger. **Closing by
+navigating puts focus on the new page's heading instead** (changed in 36.4,
+with `RouteFocus`, D18): the reader chose a page, and returning them to the
+trigger left them a whole Tab sequence away from it.
 
 No hover logic runs in drawer mode, and navigation items grow to 44px targets
-under `pointer: coarse`. The closed drawer casts no shadow, so nothing of it
-bleeds onto the page edge.
+under `pointer: coarse`. The open drawer rounds the edge that faces the page
+(logical corners, so it mirrors) and casts the overlay shadow; the closed drawer
+casts none, so nothing of it bleeds onto the page edge. Opening the command
+palette closes the drawer first: two modal surfaces never stack.
 
 ## D14. Top bar
 
 Global context and global actions only: the drawer trigger (narrow screens), the
-workspace every screen is about, the notification bell and the account menu.
-Page actions belong to the page header.
+workspace every screen is about, the command palette's trigger, the
+notification bell and the account menu. Page actions belong to the page header.
 
-The **account menu** shows the signed-in address and the workspace, the theme
-(System / Light / Dark as `menuitemradio`), notification preferences, switch
-workspace (only when there is another) and sign out. Initials come from the
+**Workspace identity (36.4).** The workspace's first letter on a neutral tile
+(the account initials' family; no colour, no invented logo; an Arabic name gives
+an Arabic letter), then the name in an isolate that truncates at its own end in
+either language ("Northwind Opera…", never "…Operations"). When the account has
+another workspace, the whole identity is a link to the chooser with a switch
+glyph -- the same destination as "Switch workspace" in the account menu. Below
+576px the tile gives way to the name.
+
+**Palette trigger (36.4).** A quiet, field-shaped button -- "Search or jump
+to…" with the shortcut in a `kbd` -- that opens the command palette (D23). It
+is a button with `aria-haspopup="dialog"`, `aria-expanded` and
+`aria-keyshortcuts`, not a field: it searches nothing itself. Below 768px only
+its icon shows; the words stay its accessible name.
+
+The **account menu** opens on the same face the trigger shows: the initials
+beside the signed-in address and the workspace, each truncating inside its own
+isolate. It holds the theme (System / Light / Dark as `menuitemradio`), the
+language (each in its own name, `lang` and `dir`), notification preferences,
+switch workspace (only when there is another) and sign out. Initials come from the
 address; there is no invented display name, role or avatar image. It is built on
 the shared `Menu` (D21).
 
@@ -441,6 +474,14 @@ every detail and create page), a **status** slot beside the title, the
 description, and the **actions** at the end of the title row with the primary
 one last. Back links return to the parent exactly as it was left -- the same page
 of a list -- through `NavigationHistory` (D21).
+
+Two Voices rhythm (36.4): tight inside the block (4-8px), 24px after it. The
+back link is a 28px target, the title balances across two lines rather than
+leaving an orphan, the description is capped at 72ch, and the actions row is
+one title line tall so the buttons centre on the title's first line. All 73
+in-shell page headers render through `PageHeader`; pages outside the shell
+(sign-in, registration, the workspace chooser, invitation acceptance, the
+hosted chat and widget, the Design Lab) keep their own `<h1>`.
 
 ## D16. Primitives
 
@@ -540,6 +581,21 @@ Treated as a product requirement, not a pass at the end.
 - Visible `:focus-visible` rings everywhere, one treatment defined once: 2px of
   ink with a 2px offset, drawn with `outline` so it survives forced colours
 - Escape closes the drawer; focus returns to the trigger
+- **Focus after navigation (36.4, `core/navigation/route-focus.ts`):** after
+  every change of page, focus moves to the new page's `<h1>` (given
+  `tabindex="-1"`, no ring: a reading position, like the skip link's target).
+  It waits up to 3s for a page that renders its heading after loading, then
+  settles on the content region. Not on the first load, not for a change of
+  query string or fragment only (the pager keeps focus), and never over a
+  choice the new page already made (focus already inside the content)
+- **Pager focus (36.4):** while a page loads, the pager's buttons are
+  `aria-disabled` and ignore presses rather than `disabled`, which had dropped
+  focus to the body; at either end of the list focus moves to the other button
+- **Command palette (D23):** a modal `<dialog>` (the page behind is inert)
+  holding an editable combobox (`aria-activedescendant`, `aria-controls`,
+  `aria-autocomplete="list"`, `aria-expanded`) and a grouped listbox (groups
+  labelled by their heading, after the APG grouped-listbox example). Focus
+  stays in the field; Escape returns it to where it was
 - Labels never removed for assistive technology, only hidden visually
 - Status conveyed by shape and text as well as colour; each voice by its glyph
   and word as well as Lagoon or Ember
@@ -571,7 +627,16 @@ decoration. Transitions use transforms, opacity and colour; no
   Transitions API (`withViewTransitions({ skipInitialTransition: true })`). Only
   `.shell-main` carries a `view-transition-name`, and the root snapshot does not
   animate, so the sidebar and top bar never flicker; a no-op in browsers without
-  View Transitions.
+  View Transitions. Since 36.4 `onViewTransitionCreated`
+  (`core/navigation/route-transition.ts`) makes the transition **instant** when
+  only the query string or fragment changes (a list's next page) and under
+  reduced motion, by marking `<html>` with `route-transition-instant` until it
+  finishes. Instant rather than `skipTransition()`: skipping rejects the
+  transition's `ready` promise, which the router logs as a console error in
+  development on every page of a list.
+- **Command palette:** the dialog enters in 220ms on the enter curve (fade, 8px
+  of travel, scale from 0.98) over a fading scrim, and leaves at once. The
+  bell's panel enters like a menu (220ms).
 - Not in the admin: count-ups, stagger on every visit, parallax, fade-up on
   sections, bounce.
 
@@ -615,12 +680,16 @@ learned them all.
 | Page in the URL | `shared/pagination/page-query.ts` | `?page=` read on open and replaced (not pushed) on change; bad values mean page one; a remembered page past the end goes to the last page |
 | Data list | `.data-list` primitive | One look for Agents, Knowledge, Conversations, Customers, Roles and Team |
 | Menu | `shared/menu` | Arrow keys, Home / End, Escape and focus return, Tab closes, outside press closes, flips to the side with room |
+| Command palette | `layout/command-palette` | Ctrl+K / Command+K anywhere; destinations from `NAV_ITEMS` and permissions (`visibleNavItems`, shared with the sidebar); quick actions behind the permission their page uses; commands, never data, and it says so (D23) |
+| Focus after navigation | `core/navigation/route-focus.ts` | The new page's heading takes focus; query-only changes and a page's own focus choice are left alone |
+| Key | `.kbd` primitive | A key as printed on a keyboard; always an LTR island, never translated |
+| Current-item marker | `.edge-marker` primitive | The 2px ink bar on the start edge, for the current page and the highlighted palette option |
 | Confirmation | `core/feedback/confirm-dialog` | Native `<dialog>`; content rendered only while open; focus on the safe answer; backdrop and Escape cancel; title names action and object, body the consequence; `ask()` resolves the answer |
 | Unsaved changes | `core/navigation/unsaved-changes.ts` | Route guard plus tab-close prompt on the agent, knowledge, role and member editors -- only when something is actually unsaved |
 | Stale version | `.stale-notice` | Warning tone; the reader's edits stay on screen; one "Reload latest version" action |
 | Toasts | `core/feedback/toast-*` | Successes polite, errors `role="alert"` and longer-lived; hovering or focusing holds them |
 | Keep content on refresh | lists | A failed refresh keeps the rows and says so inline, instead of blanking the list |
-| Focus continuity | each screen, via `afterNextRender` | When the control that held focus is removed or disabled by its own action, focus moves to the next meaningful place instead of the body: into a form that just opened (schedule, merge picker), to the first invalid field on a refused submit, back to the opener on Cancel or Save, to the result that replaced a form (invitation created, merged notice), to the section heading when a row is removed (revoked invitation, connected number), and into the composer after Take over or a sent reply |
+| Focus continuity | each screen, via `afterNextRender`; between pages, the shell's `RouteFocus` | When the control that held focus is removed or disabled by its own action, focus moves to the next meaningful place instead of the body: into a form that just opened (schedule, merge picker), to the first invalid field on a refused submit, back to the opener on Cancel or Save, to the result that replaced a form (invitation created, merged notice), to the section heading when a row is removed (revoked invitation, connected number), and into the composer after Take over or a sent reply |
 | Field errors | forms | An error is shown beside its field, linked by `aria-describedby` and marked `aria-invalid`; a disabled submit button is never the only explanation. An empty field and a malformed value get different sentences |
 | Error copy | `core/api/api-error.ts` | No status codes or internals; a 503 blames an AI provider only on AI operations; session expiry arrives at sign-in with a sentence saying why |
 
@@ -649,6 +718,35 @@ Deferred rather than faked. Each needs a server capability first.
 | KPI trends and period-over-period comparison | The dashboard returns one period, no comparison |
 | Overview count of documents needing indexing | No aggregate; counting would mean reading every page |
 | Server-held UI preferences (theme, pin) | No profile preferences endpoint; both stay in `localStorage` |
+| Searching records from the command palette, and "recent" items in it | No search endpoint across conversations, customers or documents, and no server-held history; the palette searches commands only (D23) |
+
+## D23. Command palette (Phase 36.4)
+
+**What it is.** Ctrl+K (Command+K on Apple devices; matched on the physical K
+key, so it works with an Arabic layout active) or the top bar's trigger opens a
+palette that jumps to any page the member may open and runs a few quick
+actions: create an AI agent (`ai-agents.create`), upload a knowledge file
+(`knowledge.manage`), invite a member (`members.invite`), open the notification
+panel, switch workspace (only with another to go to), choose a theme, choose a
+language. Pressing the shortcut again closes it; it does not open over a
+confirmation that is waiting for an answer.
+
+**What it is not.** It searches commands on the device, never data, and never
+calls the server. The line under the field says so ("It does not search
+conversations, customers or other records"), so nobody types a customer's name
+and concludes the customer does not exist. Searching records needs a server
+search endpoint (D22).
+
+**Matching.** Every word of the query must match; a word that starts a word of
+the label ranks first, one inside the label next, one among the keywords last.
+Case, Latin accents, tashkeel and tatweel are ignored, and the Arabic letters
+people type interchangeably (hamza forms of alef and plain alef, taa marbuta and
+haa, alef maqsura and yaa, hamza on waw and yaa) count as one. The typed part is
+emphasised in Latin labels only: a change of weight inside an Arabic word breaks
+its letter joining.
+
+**Cost.** Loaded through `@defer (when requested; prefetch on idle)`: 17.3 kB
+raw, 5.8 kB gzip, in a lazy chunk; nothing of it is in the startup JavaScript.
 
 ## Deferred
 

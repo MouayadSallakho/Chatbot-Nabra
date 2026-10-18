@@ -12,7 +12,13 @@ import {
 } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 import { Icon } from '@app/shared/icon/icon';
-import { NAV_GROUPS, NAV_GROUP_LABELS, NAV_ITEMS, NavGroup, NavItem } from '@app/layout/navigation';
+import {
+  NAV_GROUPS,
+  NAV_GROUP_LABELS,
+  NavGroup,
+  NavItem,
+  visibleNavItems,
+} from '@app/layout/navigation';
 import { PermissionService } from '@app/core/authorization/permission-service';
 import { BrandMark } from '@app/shared/brand-mark/brand-mark';
 
@@ -116,9 +122,7 @@ export class Sidebar {
    * with no entries is dropped rather than shown as a lone heading.
    */
   protected readonly groups = computed<readonly VisibleGroup[]>(() => {
-    const visible = NAV_ITEMS.filter(
-      (item) => item.permissions === undefined || this.permissions.hasAny(...item.permissions),
-    );
+    const visible = visibleNavItems((...codes) => this.permissions.hasAny(...codes));
 
     return NAV_GROUPS.map((name) => ({
       name,

@@ -19,6 +19,9 @@ export const MediaQueries = {
    * reflowed at a different one would tear the two apart.
    */
   desktop: '(min-width: 992px)',
+
+  /** The reader asked the operating system for less motion. */
+  reducedMotion: '(prefers-reduced-motion: reduce)',
 } as const;
 
 /** Builds a `MediaQueryList` for a query. Replaced wholesale in tests. */

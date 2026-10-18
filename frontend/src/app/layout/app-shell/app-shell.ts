@@ -1,6 +1,7 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  DOCUMENT,
   ElementRef,
   Injector,
   afterNextRender,
@@ -23,6 +24,9 @@ import { WORKSPACE_SETUP_PATH } from '@app/core/workspace/workspace-guard';
 import { Sidebar } from '@app/layout/sidebar/sidebar';
 import { Topbar } from '@app/layout/topbar/topbar';
 import { NavigationHistory } from '@app/core/navigation/navigation-history';
+import { RouteFocus } from '@app/core/navigation/route-focus';
+import { CommandPalette } from '@app/layout/command-palette/command-palette';
+import { isApplePlatform, isPaletteShortcut } from '@app/layout/command-palette/shortcut';
 
 /**
  * Where the desktop pin preference is kept.
@@ -49,7 +53,7 @@ export const PINNED_STORAGE_KEY = 'omniai.sidebar-pinned';
 @Component({
   selector: 'app-shell',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterOutlet, Sidebar, Topbar, ToastHost],
+  imports: [RouterOutlet, Sidebar, Topbar, ToastHost, CommandPalette],
   templateUrl: './app-shell.html',
   styleUrl: './app-shell.scss',
   host: {
@@ -58,6 +62,10 @@ export const PINNED_STORAGE_KEY = 'omniai.sidebar-pinned';
     // still catch it -- but binding at the document also covers the case where
     // focus has ended up on the body.
     '(document:keydown.escape)': 'onEscape()',
+    // Ctrl+K (Command+K on Apple devices) opens the command palette from
+    // anywhere in the product, a text field included: it is not a text-editing
+    // key on those platforms (shortcut.ts).
+    '(document:keydown)': 'onKeydown($event)',
   },
 })
 export class AppShell {
@@ -66,6 +74,8 @@ export class AppShell {
   private readonly workspace = inject(WorkspaceContextService);
   private readonly auth = inject(AuthService);
   private readonly injector = inject(Injector);
+  private readonly document = inject(DOCUMENT);
+  private readonly apple = isApplePlatform(this.document.defaultView?.navigator);
 
   private readonly sidebar = viewChild.required(Sidebar);
   private readonly topbar = viewChild.required(Topbar);
@@ -118,6 +128,14 @@ export class AppShell {
   /** Whether there is another workspace to switch to. */
   protected readonly canSwitchWorkspace = this.workspace.hasChoice;
 
+  /**
+   * Whether the command palette is showing, and whether it has ever been asked
+   * for: the palette's code is loaded on first use (`@defer` in the template),
+   * so somebody who never opens it never downloads it.
+   */
+  protected readonly paletteOpen = signal(false);
+  protected readonly paletteRequested = signal(false);
+
   /** Emits once per completed navigation. */
   private readonly navigation = toSignal(
     this.router.events.pipe(filter((event) => event instanceof NavigationEnd)),
@@ -128,6 +146,10 @@ export class AppShell {
     // Started with the shell, before the first detail page can ask it where the
     // reader came from.
     inject(NavigationHistory);
+
+    // Puts focus on each new page's heading, so a keyboard or screen reader
+    // user arrives at the page rather than staying on the link they followed.
+    inject(RouteFocus);
 
     // A new page starts at the top. The scrolling region is the shell's main
     // element rather than the document, which is also why Angular's own scroll
@@ -170,7 +192,10 @@ export class AppShell {
     afterNextRender(() => this.sidebar().focusFirstControl(), { injector: this.injector });
   }
 
-  protected closeNav(): void {
+  /**
+   * Closes the drawer. Focus goes back to the trigger unless told otherwise.
+   */
+  protected closeNav(restoreFocus = true): void {
     if (!this.drawerOpen()) {
       return;
     }
@@ -180,19 +205,68 @@ export class AppShell {
     // Focus goes back where it came from. Leaving it on a control that has just
     // slid off screen means the next Tab restarts at the top of the document,
     // which is the moment a keyboard reader loses their place.
-    afterNextRender(() => this.topbar().focusMenuButton(), { injector: this.injector });
+    if (restoreFocus) {
+      afterNextRender(() => this.topbar().focusMenuButton(), { injector: this.injector });
+    }
   }
 
   /**
    * Closes the drawer after a navigation.
    *
    * On a phone the drawer covers the page it has just navigated to, so leaving
-   * it open would hide the result of the reader's own action.
+   * it open would hide the result of the reader's own action. Focus does not go
+   * back to the trigger here (it did until Phase 36.4): the reader chose a page,
+   * and `RouteFocus` puts them on its heading.
    */
   protected onNavigated(): void {
     if (this.drawer()) {
-      this.closeNav();
+      this.closeNav(false);
     }
+  }
+
+  protected onKeydown(event: KeyboardEvent): void {
+    if (!isPaletteShortcut(event, this.apple)) {
+      return;
+    }
+
+    // Another modal (a confirmation) owns the page; the palette must not
+    // stack on top of a question that is waiting for an answer.
+    const otherModal = [...this.document.querySelectorAll('dialog[open]')].some(
+      (dialog) => !dialog.classList.contains('palette'),
+    );
+
+    if (otherModal) {
+      return;
+    }
+
+    event.preventDefault();
+
+    if (this.paletteOpen()) {
+      this.paletteOpen.set(false);
+    } else {
+      this.openPalette();
+    }
+  }
+
+  protected openPalette(): void {
+    // The drawer is a modal surface of its own; the palette replaces it rather
+    // than opening over it, and focus returns to the drawer's trigger.
+    if (this.drawerOpen()) {
+      this.drawerOpen.set(false);
+      this.topbar().focusMenuButton();
+    }
+
+    this.paletteRequested.set(true);
+    this.paletteOpen.set(true);
+  }
+
+  protected onPaletteClosed(): void {
+    this.paletteOpen.set(false);
+  }
+
+  /** The palette's "Open the notification panel" action. */
+  protected openNotifications(): void {
+    this.topbar().openNotifications();
   }
 
   protected onEscape(): void {

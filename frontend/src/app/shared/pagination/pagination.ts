@@ -1,4 +1,14 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input, output } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  DOCUMENT,
+  ElementRef,
+  afterRenderEffect,
+  computed,
+  inject,
+  input,
+  output,
+} from '@angular/core';
 import { LocaleFormat } from '@app/core/i18n/locale-format';
 import { PluralForms, pluralMessage } from '@app/core/i18n/plural';
 import { Icon } from '@app/shared/icon/icon';
@@ -104,6 +114,12 @@ const WORDS: Readonly<Record<PagedItems, PagedItemsWords>> = {
  *
  * The summary is a polite live region, so a screen reader hears which rows are
  * now showing after a page change without focus moving anywhere.
+ *
+ * Focus stays on the button that was pressed. While the page loads the buttons
+ * say they are unavailable (`aria-disabled`) and ignore presses rather than
+ * being disabled, which would drop focus to the page body (Phase 36.4). At
+ * either end of the list the pressed button does become disabled, and focus
+ * moves to the other one -- the next meaningful place.
  */
 @Component({
   selector: 'app-pagination',
@@ -121,8 +137,9 @@ const WORDS: Readonly<Record<PagedItems, PagedItemsWords>> = {
             <button
               type="button"
               class="btn btn-secondary btn-sm"
-              [disabled]="page() <= 1 || busy()"
-              (click)="pageChange.emit(page() - 1)"
+              [disabled]="page() <= 1"
+              [attr.aria-disabled]="busy() || null"
+              (click)="turn(page() - 1)"
             >
               <app-icon name="chevron-start" [strokeWidth]="1.75" />
               <span i18n="@@pager.previous">Previous</span>
@@ -131,8 +148,9 @@ const WORDS: Readonly<Record<PagedItems, PagedItemsWords>> = {
             <button
               type="button"
               class="btn btn-secondary btn-sm"
-              [disabled]="page() >= pageCount() || busy()"
-              (click)="pageChange.emit(page() + 1)"
+              [disabled]="page() >= pageCount()"
+              [attr.aria-disabled]="busy() || null"
+              (click)="turn(page() + 1)"
             >
               <span i18n="@@pager.next">Next</span>
               <app-icon name="chevron-end" [strokeWidth]="1.75" />
@@ -167,6 +185,15 @@ export class Pagination {
 
   readonly pageChange = output<number>();
 
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly document = inject(DOCUMENT);
+
+  /**
+   * The page a button was pressed on, while focus may need a new home once the
+   * new page has settled; null otherwise.
+   */
+  private pressedOn: number | null = null;
+
   protected readonly label = computed(() => WORDS[this.items()].label());
 
   protected readonly pageCount = computed(() =>
@@ -190,6 +217,38 @@ export class Pagination {
       WORDS[this.items()].ofTotal(this.format.number(this.total())),
     ),
   );
+
+  constructor() {
+    afterRenderEffect(() => {
+      // Acts once the new page is in place and nothing is loading.
+      const page = this.page();
+
+      if (this.busy() || this.pressedOn === null || this.pressedOn === page) {
+        return;
+      }
+
+      this.pressedOn = null;
+
+      const focused = this.document.activeElement;
+      const lost =
+        !focused || focused === this.document.body || (focused as HTMLButtonElement).disabled;
+
+      if (lost) {
+        this.host.nativeElement
+          .querySelector<HTMLButtonElement>('.pager-controls button:not(:disabled)')
+          ?.focus();
+      }
+    });
+  }
+
+  protected turn(target: number): void {
+    if (this.busy()) {
+      return;
+    }
+
+    this.pressedOn = this.page();
+    this.pageChange.emit(target);
+  }
 
   protected readonly pageOf = computed(() => {
     const page = this.format.number(this.page());

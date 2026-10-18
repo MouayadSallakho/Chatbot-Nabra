@@ -3,6 +3,8 @@ import {
   Component,
   DestroyRef,
   ElementRef,
+  Injector,
+  afterNextRender,
   computed,
   inject,
   signal,
@@ -45,8 +47,13 @@ import { Icon } from '@app/shared/icon/icon';
 export class NotificationBell {
   protected readonly center = inject(NotificationCenter);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly injector = inject(Injector);
 
   private readonly button = viewChild.required<ElementRef<HTMLButtonElement>>('bell');
+  private readonly heading = viewChild<ElementRef<HTMLElement>>('heading');
+
+  /** Skeleton rows while the first list loads: as many as the panel shows. */
+  protected readonly placeholders = [0, 1, 2];
 
   protected readonly open = signal(false);
 
@@ -68,6 +75,30 @@ export class NotificationBell {
         takeUntilDestroyed(inject(DestroyRef)),
       )
       .subscribe(() => this.open.set(false));
+  }
+
+  /**
+   * Opens the panel and moves focus to its heading.
+   *
+   * For the command palette's "Open the notification panel": the reader asked
+   * for the panel from somewhere else, so focus goes into it -- Tab continues
+   * through its items, and Escape returns focus to the bell.
+   */
+  openPanel(): void {
+    // On the next task: a mouse choice in the palette is still the click being
+    // dispatched, and when it reaches the document it would count as a click
+    // outside the bell and close the panel it had just opened.
+    setTimeout(() => {
+      if (!this.open()) {
+        this.toggle();
+      }
+
+      afterNextRender(() => this.heading()?.nativeElement.focus(), { injector: this.injector });
+    });
+  }
+
+  protected retry(): void {
+    void this.center.loadRecent();
   }
 
   protected toggle(): void {

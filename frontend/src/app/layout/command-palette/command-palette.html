@@ -1,0 +1,132 @@
+<dialog
+  #dialog
+  class="palette"
+  aria-labelledby="palette-title"
+  data-testid="command-palette"
+  (cancel)="onCancel($event)"
+  (click)="onDialogClick($event)"
+>
+  <div class="palette-body">
+    <h2 id="palette-title" class="visually-hidden" i18n="@@palette.title">Command palette</h2>
+
+    <div class="palette-field">
+      <app-icon name="search" [strokeWidth]="1.75" />
+      <!--
+        An editable combobox: focus stays here while the arrow keys move the
+        highlighted option, which aria-activedescendant names. dir="auto" so
+        a query in either script lays out the way it was typed.
+      -->
+      <input
+        #field
+        type="text"
+        role="combobox"
+        aria-autocomplete="list"
+        aria-controls="palette-listbox"
+        aria-describedby="palette-scope"
+        [attr.aria-expanded]="count() > 0"
+        [attr.aria-activedescendant]="activeId()"
+        aria-label="Find a page or an action"
+        i18n-aria-label="@@palette.inputLabel"
+        placeholder="Type a page or an action…"
+        i18n-placeholder="@@palette.placeholder"
+        autocomplete="off"
+        spellcheck="false"
+        dir="auto"
+        data-testid="palette-input"
+        (input)="onInput($event)"
+        (keydown)="onKeydown($event)"
+      />
+      <button type="button" class="palette-close" (click)="dismiss()" data-testid="palette-close">
+        <kbd class="kbd" dir="ltr" aria-hidden="true">Esc</kbd>
+        <span class="visually-hidden" i18n="@@palette.close">Close</span>
+      </button>
+    </div>
+
+    <p id="palette-scope" class="palette-scope" i18n="@@palette.scope">
+      Finds pages and actions. It does not search conversations, customers or other records.
+    </p>
+
+    <div
+      #list
+      id="palette-listbox"
+      class="palette-list"
+      role="listbox"
+      aria-label="Pages and actions"
+      i18n-aria-label="@@palette.listLabel"
+    >
+      @for (section of sections(); track section.group) {
+        <div
+          class="palette-group"
+          role="group"
+          [attr.aria-labelledby]="'palette-group-' + section.group"
+        >
+          <p
+            class="palette-group-label"
+            role="presentation"
+            [id]="'palette-group-' + section.group"
+          >
+            {{ section.label }}
+          </p>
+          @for (entry of section.entries; track entry.command.id) {
+            <!-- erp-lint-ignore: clickable-non-interactive -- an APG listbox option under aria-activedescendant: never tabbable, the combobox owns the keys -->
+            <div
+              class="palette-option"
+              role="option"
+              [id]="optionId(entry.command)"
+              [attr.aria-selected]="entry.index === active()"
+              [class.edge-marker]="entry.index === active()"
+              [attr.data-testid]="'palette-option-' + entry.command.id"
+              (pointermove)="point(entry.index)"
+              (click)="choose(entry.command)"
+            >
+              <app-icon [name]="entry.command.icon" [strokeWidth]="1.6" />
+              <span
+                class="palette-option-label"
+                [attr.lang]="entry.command.lang ?? null"
+                [attr.dir]="entry.command.dir ?? null"
+              >
+                <!--
+                  Each part in its own element: whitespace between elements is
+                  dropped by the compiler, so formatting can never put a space
+                  inside the word ("Know ledge").
+                -->
+                <span>{{ entry.parts.before }}</span>
+                @if (entry.parts.match) {
+                  <mark>{{ entry.parts.match }}</mark>
+                }
+                <span>{{ entry.parts.after }}</span>
+              </span>
+              @if (entry.command.hint; as hint) {
+                <span class="palette-option-hint">{{ hint }}</span>
+              }
+            </div>
+          }
+        </div>
+      }
+    </div>
+
+    @if (count() === 0) {
+      <p class="palette-empty" data-testid="palette-empty">{{ noResults() }}</p>
+    }
+
+    <!-- For the eye; a keyboard reader already has these keys from the combobox role. -->
+    <div class="palette-footer" aria-hidden="true">
+      <span
+        ><kbd class="kbd" dir="ltr">↑</kbd><kbd class="kbd" dir="ltr">↓</kbd>
+        <ng-container i18n="@@palette.keys.move">to move</ng-container></span
+      >
+      <span
+        ><kbd class="kbd" dir="ltr">Enter</kbd>
+        <ng-container i18n="@@palette.keys.choose">to choose</ng-container></span
+      >
+      <span
+        ><kbd class="kbd" dir="ltr">Esc</kbd>
+        <ng-container i18n="@@palette.keys.close">to close</ng-container></span
+      >
+    </div>
+
+    <p class="visually-hidden" aria-live="polite" data-testid="palette-results">
+      {{ resultsLabel() }}
+    </p>
+  </div>
+</dialog>

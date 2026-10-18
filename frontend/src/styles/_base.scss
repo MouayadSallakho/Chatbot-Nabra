@@ -241,6 +241,13 @@ select {
   view-transition-name: route-content;
 }
 
+// After a navigation, focus lands on the new page's heading (RouteFocus). It is
+// a reading position, not a control: no ring, as for the content region the
+// skip link focuses. The next Tab continues into the page from there.
+.shell-main h1[tabindex='-1']:focus {
+  outline: none;
+}
+
 ::view-transition-old(root),
 ::view-transition-new(root) {
   animation: none;
@@ -252,6 +259,14 @@ select {
 
 ::view-transition-new(route-content) {
   animation: route-in var(--duration-sm) var(--ease-enter) both;
+}
+
+// Same page, new query string (a list's next page), or reduced motion: the
+// transition runs and finishes at once (route-transition.ts).
+.route-transition-instant::view-transition-group(*),
+.route-transition-instant::view-transition-old(*),
+.route-transition-instant::view-transition-new(*) {
+  animation: none;
 }
 
 @keyframes route-out {

@@ -264,6 +264,74 @@ describe('NotificationBell', () => {
     expect(document.activeElement).toBe(bell());
   });
 
+  it('holds the shape of the list while it loads', async () => {
+    await mount();
+    await answerCount(2);
+
+    bell().click();
+    await settle();
+
+    const loading = host().querySelector('[data-testid="notifications-loading"]');
+
+    expect(loading?.getAttribute('aria-busy')).toBe('true');
+    expect(loading?.textContent).toContain('Loading notifications…');
+
+    http.expectOne((request) => request.url === base).flush(page([unread], 2));
+    await settle();
+
+    expect(host().querySelector('[data-testid="notifications-loading"]')).toBeNull();
+  });
+
+  it('says what belongs here when there is nothing yet', async () => {
+    await mount();
+    await answerCount(0);
+    await openPanel([], 0);
+
+    const empty = host().querySelector('[data-testid="notifications-empty"]');
+
+    expect(empty?.textContent).toContain('No notifications yet');
+    expect(empty?.textContent).toContain('will appear here');
+    expect(host().querySelector('[data-testid="mark-all-read"]')).toBeNull();
+  });
+
+  it('explains a failure and offers to try again', async () => {
+    await mount();
+    await answerCount(1);
+
+    bell().click();
+    await settle();
+    http
+      .expectOne((request) => request.url === base)
+      .flush(null, { status: 500, statusText: 'Server Error' });
+    await settle();
+
+    expect(host().querySelector('[role="alert"]')?.textContent).toContain(
+      'Notifications could not be loaded.',
+    );
+
+    host().querySelector<HTMLButtonElement>('[data-testid="notifications-retry"]')!.click();
+    await settle();
+    http.expectOne((request) => request.url === base).flush(page([unread], 1));
+    await settle();
+
+    expect(host().querySelectorAll('[data-testid="notification"]')).toHaveLength(1);
+  });
+
+  it('opens on request from elsewhere and puts focus on its heading', async () => {
+    await mount();
+    await answerCount(1);
+
+    // The command palette's "Open the notification panel".
+    fixture.componentInstance.openPanel();
+    await settle();
+    http.expectOne((request) => request.url === base).flush(page([unread], 1));
+    await settle();
+
+    expect(panel()).not.toBeNull();
+    expect(bell().getAttribute('aria-expanded')).toBe('true');
+    expect(document.activeElement?.id).toBe('notification-panel-heading');
+  });
+
   it('keeps the count on the server side: the center exposes nothing it did not read', async () => {
     await mount();
     await answerCount(5);

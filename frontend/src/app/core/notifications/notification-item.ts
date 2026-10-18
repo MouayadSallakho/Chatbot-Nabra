@@ -94,7 +94,7 @@ import {
       display: grid;
       grid-template-columns: auto minmax(0, 1fr);
       gap: var(--space-3);
-      padding: var(--space-3) var(--space-4);
+      padding: var(--space-4) var(--space-4) var(--space-3);
     }
 
     .notification-icon {
@@ -163,7 +163,12 @@ import {
       color: var(--text-muted);
     }
 
+    // A link, so ink and underlined; its target is taller than its text
+    // (WCAG 2.5.8 asks for 24px, the panel gives 28px).
     .notification-action {
+      display: inline-flex;
+      align-items: center;
+      min-block-size: 1.75rem;
       color: var(--link);
       font-weight: 600;
     }

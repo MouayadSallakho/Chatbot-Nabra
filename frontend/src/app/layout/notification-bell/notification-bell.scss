@@ -11,8 +11,8 @@
 
 .bell-badge {
   position: absolute;
-  inset-block-start: 2px;
-  inset-inline-end: 2px;
+  inset-block-start: 1px;
+  inset-inline-end: 1px;
   display: inline-grid;
   place-items: center;
   min-inline-size: 1.125rem;
@@ -36,31 +36,48 @@
   display: flex;
   flex-direction: column;
   inline-size: min(26rem, calc(100vw - 2 * var(--space-4)));
-  max-block-size: min(34rem, calc(100vh - var(--topbar-height) - var(--space-6)));
+  max-block-size: min(36rem, calc(100dvh - var(--topbar-height) - var(--space-6)));
   border: 1px solid var(--border-default);
   border-radius: var(--radius-lg);
   background: var(--surface-raised);
   box-shadow: var(--shadow-overlay);
   overflow: hidden;
-}
-
-.panel-header,
-.panel-footer {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
-  padding: var(--space-3) var(--space-4);
+  transform-origin: top;
+  animation: menu-in var(--duration-md) var(--ease-enter);
 }
 
 .panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4);
   border-block-end: 1px solid var(--border-subtle);
+}
+
+.panel-heading {
+  min-inline-size: 0;
 }
 
 .panel-title {
   margin: 0;
   font: var(--text-card-title);
+
+  // Focused by the palette's "Open the notification panel": a reading
+  // position, like a page heading after a navigation, not a control.
+  &:focus {
+    outline: none;
+  }
+}
+
+.panel-count {
+  color: var(--text-muted);
+  font: var(--text-caption);
+}
+
+.panel-mark-all {
+  flex: none;
+  gap: var(--space-1);
 }
 
 .panel-body {
@@ -80,16 +97,87 @@
   }
 }
 
-.panel-empty,
-.panel-alert {
-  margin: var(--space-4);
+// Loading: the geometry of a notification (icon, title, body, meta).
+.skeleton-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+
+.skeleton-icon {
+  inline-size: 1.125rem;
+  block-size: 1.125rem;
+  border-radius: var(--radius-pill);
+}
+
+.skeleton-lines {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+
+  .skeleton-title {
+    inline-size: 55%;
+  }
+
+  .skeleton-meta {
+    inline-size: 35%;
+    block-size: 0.75rem;
+  }
+}
+
+// Empty and failed: a short, centred statement and, when it helps, one action.
+.panel-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-8) var(--space-6);
+  text-align: center;
+}
+
+.panel-state-icon {
+  display: inline-grid;
+  place-items: center;
+  inline-size: 2.5rem;
+  block-size: 2.5rem;
+  margin-block-end: var(--space-1);
+  border-radius: var(--radius-pill);
+  background: var(--surface-inset);
+  color: var(--text-secondary);
+
+  &.is-error {
+    background: var(--danger-bg);
+    color: var(--danger-fg);
+  }
+}
+
+.panel-state-title {
+  font: var(--text-body-strong);
+}
+
+.panel-state-text {
+  max-inline-size: 30ch;
+  color: var(--text-secondary);
+  font: var(--text-small);
+  overflow-wrap: anywhere;
 }
 
 .panel-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-1) var(--space-3);
+  padding: var(--space-2) var(--space-4);
   border-block-start: 1px solid var(--border-subtle);
   font: var(--text-small);
 
+  // Links stay links (ink, underlined), with a target taller than their text.
   a {
+    display: inline-flex;
+    align-items: center;
+    min-block-size: 2rem;
     color: var(--link);
     font-weight: 600;
   }
@@ -102,7 +190,11 @@
   .panel {
     position: fixed;
     inset-block-start: calc(var(--topbar-height) + var(--space-2));
-    inset-inline: var(--space-4);
+    inset-inline: var(--space-3);
     inline-size: auto;
+  }
+
+  .panel-footer a {
+    min-block-size: 2.75rem;
   }
 }

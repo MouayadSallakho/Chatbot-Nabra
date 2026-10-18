@@ -12,6 +12,7 @@ import {
   withViewTransitions,
 } from '@angular/router';
 import { AppTitleStrategy } from '@app/core/title/app-title-strategy';
+import { onRouteViewTransition } from '@app/core/navigation/route-transition';
 import { AuthService } from '@app/core/auth/auth-service';
 import { sessionExpiryInterceptor } from '@app/core/auth/session-expiry-interceptor';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
@@ -76,9 +77,13 @@ export const appConfig: ApplicationConfig = {
       withComponentInputBinding(),
       // A short crossfade of the content area between pages (styles/_base.scss
       // draws it; only `.shell-main` takes part, so the shell never flickers).
-      // Skipped on the first load, which has nothing to fade from, and a no-op
-      // in browsers without View Transitions.
-      withViewTransitions({ skipInitialTransition: true }),
+      // Skipped on the first load, which has nothing to fade from; for a change
+      // of query string or fragment only, and under reduced motion
+      // (route-transition.ts); and a no-op in browsers without View Transitions.
+      withViewTransitions({
+        skipInitialTransition: true,
+        onViewTransitionCreated: onRouteViewTransition,
+      }),
     ),
     { provide: TitleStrategy, useClass: AppTitleStrategy },
   ],

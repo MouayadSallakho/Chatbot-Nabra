@@ -51,6 +51,8 @@
       [workspaceName]="workspaceName()"
       [userEmail]="userEmail()"
       [canSwitchWorkspace]="canSwitchWorkspace()"
+      [paletteOpen]="paletteOpen()"
+      (paletteRequested)="openPalette()"
       (menuToggled)="toggleNav()"
       (workspaceSwitched)="switchWorkspace()"
       (signedOut)="signOut()"
@@ -65,6 +67,20 @@
     </main>
   </div>
 </div>
+
+<!--
+  The command palette. Its code is fetched the first time it is asked for, or
+  ahead of time once the browser is idle, so it never weighs on startup and is
+  usually already there by the first Ctrl+K. Outside the inert content: it is a
+  modal dialog of its own.
+-->
+@defer (when paletteRequested(); prefetch on idle) {
+  <app-command-palette
+    [open]="paletteOpen()"
+    (closed)="onPaletteClosed()"
+    (notificationsRequested)="openNotifications()"
+  />
+}
 
 <!--
   Rendered once, by the shell, because its live region has to exist in the DOM

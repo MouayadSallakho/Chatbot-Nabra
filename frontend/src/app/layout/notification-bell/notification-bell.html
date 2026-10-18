@@ -2,6 +2,7 @@
   #bell
   type="button"
   class="btn btn-ghost btn-icon bell"
+  [class.has-unread]="center.unread() > 0"
   [attr.aria-expanded]="open()"
   aria-controls="notification-panel"
   [attr.aria-label]="name()"
@@ -33,47 +34,74 @@
     data-testid="notification-panel"
   >
     <header class="panel-header">
-      <h2 id="notification-panel-heading" class="panel-title" i18n="@@notifications.panelTitle">
-        Notifications
-      </h2>
+      <div class="panel-heading">
+        <h2
+          #heading
+          id="notification-panel-heading"
+          class="panel-title"
+          tabindex="-1"
+          i18n="@@notifications.panelTitle"
+        >
+          Notifications
+        </h2>
+        <p class="panel-count" data-testid="panel-unread">{{ center.unreadLabel() }}</p>
+      </div>
       @if (center.unread() > 0) {
         <button
           type="button"
-          class="btn btn-ghost btn-sm"
+          class="btn btn-ghost btn-sm panel-mark-all"
           (click)="markAllRead()"
           data-testid="mark-all-read"
-          i18n="@@notifications.markAllRead"
         >
-          Mark all as read
+          <app-icon name="check" [strokeWidth]="2" />
+          <ng-container i18n="@@notifications.markAllRead">Mark all as read</ng-container>
         </button>
       }
     </header>
 
     <div class="panel-body">
       @if (center.failure(); as error) {
-        <p class="alert alert-danger panel-alert" role="alert">
-          <ng-container i18n="@@notifications.loadFailed"
-            >Notifications could not be loaded.</ng-container
+        <div class="panel-state" role="alert">
+          <span class="panel-state-icon is-error"
+            ><app-icon name="critical" [strokeWidth]="1.6"
+          /></span>
+          <p class="panel-state-title" i18n="@@notifications.loadFailed">
+            Notifications could not be loaded.
+          </p>
+          <p class="panel-state-text">{{ error.message }}</p>
+          <button
+            type="button"
+            class="btn btn-secondary btn-sm"
+            (click)="retry()"
+            data-testid="notifications-retry"
+            i18n="@@notifications.retry"
           >
-          {{ error.message }}
-        </p>
+            Try again
+          </button>
+        </div>
       } @else if (center.loading() && center.recent().length === 0) {
-        <p
-          class="panel-empty text-small text-secondary"
-          aria-busy="true"
-          i18n="@@notifications.loading"
-        >
-          Loading notifications…
-        </p>
+        <!-- The shape of three notifications, so nothing jumps when they arrive. -->
+        <ul class="panel-list" aria-busy="true" data-testid="notifications-loading">
+          <li class="visually-hidden" i18n="@@notifications.loading">Loading notifications…</li>
+          @for (row of placeholders; track row) {
+            <li class="skeleton-row" aria-hidden="true">
+              <span class="skeleton skeleton-icon"></span>
+              <span class="skeleton-lines">
+                <span class="skeleton skeleton-title"></span>
+                <span class="skeleton skeleton-text"></span>
+                <span class="skeleton skeleton-meta"></span>
+              </span>
+            </li>
+          }
+        </ul>
       } @else if (center.recent().length === 0) {
-        <p
-          class="panel-empty text-small text-secondary"
-          data-testid="notifications-empty"
-          i18n="@@notifications.empty"
-        >
-          You have no notifications. Operational alerts — reports, usage, billing, knowledge and
-          WhatsApp delivery — will appear here.
-        </p>
+        <div class="panel-state" data-testid="notifications-empty">
+          <span class="panel-state-icon"><app-icon name="bell" [strokeWidth]="1.6" /></span>
+          <p class="panel-state-title" i18n="@@notifications.emptyTitle">No notifications yet</p>
+          <p class="panel-state-text" i18n="@@notifications.emptyText">
+            Report, usage, billing, knowledge and WhatsApp delivery alerts will appear here.
+          </p>
+        </div>
       } @else {
         <ul
           class="panel-list"

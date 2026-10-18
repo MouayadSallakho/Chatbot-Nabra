@@ -17,26 +17,91 @@
   margin-inline-start: calc(-1 * var(--space-2));
 }
 
+// -----------------------------------------------------------------------------
+// Workspace identity
+// -----------------------------------------------------------------------------
 .topbar-context {
   display: flex;
-  align-items: center;
   // Long workspace names truncate rather than pushing the actions off a phone.
   min-inline-size: 0;
-  font: var(--text-body-strong);
+}
+
+.workspace {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-inline-size: 0;
+  min-block-size: 2.25rem;
+  padding-inline: var(--space-1) var(--space-2);
+  margin-inline-start: calc(-1 * var(--space-1));
+  border-radius: var(--radius-md);
   color: var(--text-primary);
+  font: var(--text-body-strong);
+  text-decoration: none;
 }
 
-.topbar-workspace {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+// The workspace's mark: its first letter on a neutral tile, the same family as
+// the account's initials. No colour: the voices are not decoration.
+.workspace-mark {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  inline-size: 1.75rem;
+  block-size: 1.75rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-muted);
+  font: 650 0.8125rem / 1 var(--font-sans);
 }
 
-.topbar-workspace-skeleton {
+// The name is the truncating box, not its line: an isolate with its own
+// direction, so a Latin name in the Arabic interface loses its end, not its
+// start ("Northwind Opera…", never "…Operations").
+.workspace-name {
+  display: flex;
+  min-inline-size: 0;
+
+  bdi {
+    min-inline-size: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.workspace-name-skeleton {
   inline-size: 9rem;
   block-size: 0.875rem;
 }
 
+.workspace-switch {
+  display: inline-flex;
+  flex: none;
+  color: var(--text-muted);
+
+  .icon {
+    inline-size: var(--icon-size-sm);
+    block-size: var(--icon-size-sm);
+  }
+}
+
+.workspace.is-link {
+  transition: background-color var(--duration-sm) var(--ease-standard);
+
+  &:hover {
+    background-color: var(--surface-hover);
+    color: var(--text-primary);
+    text-decoration: none;
+
+    .workspace-switch {
+      color: var(--text-primary);
+    }
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Actions
+// -----------------------------------------------------------------------------
 .topbar-actions {
   display: flex;
   flex: none;
@@ -44,4 +109,93 @@
   gap: var(--space-2);
   // Pushed to the end edge logically, so it lands on the left under RTL.
   margin-inline-start: auto;
+}
+
+// Quiet and field-shaped: a hairline, muted words and the key that opens it.
+.palette-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  inline-size: 16rem;
+  block-size: var(--control-height);
+  margin-inline-end: var(--space-2);
+  padding-inline: var(--space-3) var(--space-2);
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius-md);
+  background: var(--surface-muted);
+  color: var(--text-muted);
+  font: var(--text-body);
+  cursor: pointer;
+  transition:
+    background-color var(--duration-sm) var(--ease-standard),
+    color var(--duration-sm) var(--ease-standard);
+
+  .icon {
+    flex: none;
+    inline-size: var(--icon-size-sm);
+    block-size: var(--icon-size-sm);
+  }
+
+  &:hover {
+    background: var(--surface-hover);
+    color: var(--text-secondary);
+  }
+}
+
+.palette-trigger-text {
+  flex: 1;
+  min-inline-size: 0;
+  overflow: hidden;
+  text-align: start;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+// Tablet: a shorter field. Phone: the icon alone, a square target like the
+// bell's; the words stay as the accessible name, visually hidden.
+@media (max-width: 1199.98px) {
+  .palette-trigger {
+    inline-size: 12rem;
+  }
+}
+
+@media (max-width: 767.98px) {
+  .palette-trigger {
+    justify-content: center;
+    inline-size: var(--control-height);
+    margin-inline-end: 0;
+    padding: 0;
+    border-color: transparent;
+    background: none;
+    color: var(--text-primary);
+
+    .icon {
+      inline-size: var(--icon-size);
+      block-size: var(--icon-size);
+    }
+  }
+
+  .palette-trigger-text {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .palette-trigger-key {
+    display: none;
+  }
+
+  .topbar-actions {
+    gap: var(--space-1);
+  }
+}
+
+// A phone: the name is worth more than its mark.
+@media (max-width: 575.98px) {
+  .workspace-mark {
+    display: none;
+  }
 }

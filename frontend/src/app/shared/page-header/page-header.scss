@@ -2,6 +2,9 @@
   display: block;
 }
 
+// Two Voices rhythm: the way up, then the title row, then one sentence. Tight
+// inside the block (4-8px), generous after it (24px), so the header reads as one
+// unit sitting above the page rather than as three loose lines.
 .page-header {
   display: flex;
   flex-direction: column;
@@ -9,16 +12,21 @@
   padding-block-end: var(--space-6);
 }
 
-// The way up. Quiet, above the title, and always in the same place.
+// The way up. Quiet, above the title, and always in the same place; a 28px
+// target, taller than its 13px label.
 .page-header-back {
   display: inline-flex;
   align-items: center;
   align-self: flex-start;
   gap: var(--space-1);
-  min-block-size: 1.5rem;
+  min-block-size: 1.75rem;
+  margin-inline-start: calc(-1 * var(--space-1));
+  padding-inline: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
   color: var(--text-secondary);
   font: var(--text-label);
   text-decoration: none;
+  transition: color var(--duration-sm) var(--ease-standard);
 
   .icon {
     inline-size: var(--icon-size-sm);
@@ -28,6 +36,7 @@
   &:hover {
     color: var(--text-primary);
     text-decoration: underline;
+    text-underline-offset: 3px;
   }
 }
 
@@ -54,6 +63,7 @@
   h1 {
     min-inline-size: 0;
     overflow-wrap: anywhere;
+    text-wrap: balance; // an enhancement: two even lines rather than one orphan
   }
 }
 
@@ -63,13 +73,17 @@
   max-inline-size: 72ch;
   font: var(--text-body);
   color: var(--text-secondary);
+  text-wrap: pretty;
 }
 
+// The actions line up with the title's first line: the row is as tall as one
+// line of the page title, and the buttons are centred in it.
 .page-header-actions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2);
+  min-block-size: 2.25rem;
 
   // Nothing projected, no gap. Comments left behind by the framework do not
   // count as content for :empty.

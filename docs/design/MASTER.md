@@ -5,7 +5,7 @@
 > Page-level exceptions live in `docs/design/pages/<page>.md` and must name the rule they override.
 
 - Status: approved direction, implemented at the foundation (Phase 36.2)
-- Last updated: 2026-10-18
+- Last updated: 2026-10-18 (Phase 36.4: shell and navigation)
 - Started from: the "Two Voices" direction approved for the Phase 36 redesign (reference
   `OmniAI-UI-Pack/reference/omniai-directions.html`, "Two Voices" tab)
 - Implementation: `frontend/src/styles/_tokens.scss` (values), `_fonts.scss`, `_base.scss`,
@@ -175,7 +175,9 @@ so the swap shifts nothing.
   emphasized `(.05,.7,.1,1)`.
 - Where: press 100 ms (1 px settle); hover and colour 150 ms; menus and a new message settling
   220 ms; dialogs and drawers 320 ms; the "Take over" sweep 320 ms emphasized; route changes a
-  150 ms crossfade of the content area only, through View Transitions, skipped on first load.
+  150 ms crossfade of the content area only, through View Transitions, skipped on first load and
+  instant for a query-only change (a list's next page); the command palette 220 ms on the enter
+  curve.
 - Not in the admin: count-ups, stagger on every visit, parallax, fade-up on sections, bounce.
 - Reduced motion: the duration tokens collapse to ~0 at the source, so every component follows;
   View Transitions and keyframe animations stop; state changes stay visible.
@@ -208,7 +210,8 @@ so the swap shifts nothing.
 1. Lagoon means the AI and Ember means a person. Nothing else uses either colour.
 2. Ink is the action colour. One primary (ink) action per view.
 3. Links are ink and underlined.
-4. Selection is neutral (`--surface-selected`), plus a 2 px ink edge for the current nav item.
+4. Selection is neutral (`--surface-selected`), plus a 2 px ink edge (`.edge-marker`) for the
+   current nav item and the command palette's highlighted option.
 5. Shadows only on overlays (menus, dialogs, toasts, the peeking sidebar).
 6. Every status carries its own icon and word; every voice its glyph and word.
 7. Voice displays (chip, split, track, divider) are drawn only from real API data.
@@ -239,3 +242,9 @@ used for warnings, or amber that reads orange.
 | 2026-10-18 | Route crossfade is 150 ms on both halves | Inside the direction's 150-200 ms window; navigation is frequent | 36.2 |
 | 2026-10-18 | English and Arabic through `@angular/localize` at runtime; language kept per browser, browser language by default; public pages follow the visitor | Decision record `localisation-arabic-rtl.md` (Option B) | Product owner (36.3a) |
 | 2026-10-18 | Voice chips in Arabic: الذكاء الاصطناعي (AI), الفريق (Person); charts mirror in Arabic | Approved with Option B | Product owner (36.3a) |
+| 2026-10-18 | Workspace identity in the top bar (first-letter tile + name, a link to the chooser when there is another workspace); the sidebar keeps the brand lockup and the pin | The top bar exists at every width, the rail does not; the switch sits next to the name it changes | 36.4 |
+| 2026-10-18 | Sidebar group labels in sentence case | Uppercase labels shout, and Arabic has no case; matches every other label in Two Voices | 36.4 |
+| 2026-10-18 | The current-item marker is a short rounded 2 px bar (`.edge-marker`) instead of an inset shadow | The shadow followed the item's rounded corner and read as a bracket; a logical inset mirrors with no transform | 36.4 |
+| 2026-10-18 | Command palette (Ctrl/Cmd+K): pages and quick actions only, never data, and it says so; loaded on first use | Keyboard-first navigation without implying a search the API cannot do | 36.4 |
+| 2026-10-18 | Focus moves to the new page's heading after every page change; a drawer closed by navigating no longer returns focus to its trigger | A keyboard or screen-reader user arrives at the page they chose | 36.4 |
+| 2026-10-18 | No match emphasis inside Arabic words in the palette | A change of weight inside a word breaks Arabic letter joining | 36.4 |

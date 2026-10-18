@@ -2,19 +2,22 @@
   <span menuTrigger class="avatar" aria-hidden="true">{{ initials() }}</span>
 
   <div class="identity" role="presentation">
+    <span class="avatar avatar-lg" aria-hidden="true">{{ initials() }}</span>
     <!--
       The lines follow the page's direction (so they align with the menu), and
       the values inside are isolated: an address is left-to-right in either
       language, a workspace name is whatever its owner typed.
     -->
-    <span class="identity-email" [title]="email()"
-      ><bdi dir="ltr">{{ email() }}</bdi></span
-    >
-    @if (workspaceName()) {
-      <span class="identity-workspace" [title]="workspaceName()"
-        ><bdi>{{ workspaceName() }}</bdi></span
+    <span class="identity-lines">
+      <span class="identity-email" [title]="email()"
+        ><bdi dir="ltr">{{ email() }}</bdi></span
       >
-    }
+      @if (workspaceName()) {
+        <span class="identity-workspace" [title]="workspaceName()"
+          ><bdi dir="auto">{{ workspaceName() }}</bdi></span
+        >
+      }
+    </span>
   </div>
 
   <hr class="menu-separator" role="separator" />

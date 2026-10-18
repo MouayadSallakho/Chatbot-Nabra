@@ -238,3 +238,16 @@ export const NAV_ITEMS: readonly NavItem[] = [
 
 /** Where the application lands, and where "not found" sends people back to. */
 export const HOME_PATH = 'overview';
+
+/**
+ * The navigation entries a member has a reason to see.
+ *
+ * One rule for every place that offers destinations -- the sidebar and the
+ * command palette -- so the two can never disagree about what somebody may
+ * open. Not authorisation: the server decides regardless (see `permissions`).
+ */
+export function visibleNavItems(
+  hasAny: (...codes: readonly PermissionCode[]) => boolean,
+): readonly NavItem[] {
+  return NAV_ITEMS.filter((item) => item.permissions === undefined || hasAny(...item.permissions));
+}

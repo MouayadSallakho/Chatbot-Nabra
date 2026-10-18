@@ -19,21 +19,63 @@
 
   <!--
     Global context: which workspace every screen is about. Context, not a
-    heading -- the page's own <h1> lives in its page header.
+    heading -- the page's own <h1> lives in its page header. With another
+    workspace to go to, the name is also the way there: a link to the chooser,
+    the same place "Switch workspace" in the account menu leads.
   -->
-  <p class="topbar-context">
-    <span class="visually-hidden" i18n="@@shell.workspacePrefix">Workspace: </span>
+  <div class="topbar-context">
     @if (workspaceName()) {
-      <span class="topbar-workspace" dir="auto" [title]="workspaceName()">{{
-        workspaceName()
-      }}</span>
+      @if (canSwitchWorkspace()) {
+        <a class="workspace is-link" [routerLink]="switchPath" data-testid="workspace-switch">
+          <span class="workspace-mark" aria-hidden="true">{{ monogram() }}</span>
+          <span class="workspace-name"
+            ><span class="visually-hidden" i18n="@@shell.workspacePrefix">Workspace: </span
+            ><bdi dir="auto">{{ workspaceName() }}</bdi
+            ><span class="visually-hidden">. </span></span
+          >
+          <span class="workspace-switch">
+            <app-icon name="switch" [strokeWidth]="1.75" />
+            <span class="visually-hidden" i18n="@@shell.switchWorkspace">Switch workspace</span>
+          </span>
+        </a>
+      } @else {
+        <p class="workspace" data-testid="workspace-name">
+          <span class="workspace-mark" aria-hidden="true">{{ monogram() }}</span>
+          <span class="workspace-name"
+            ><span class="visually-hidden" i18n="@@shell.workspacePrefix">Workspace: </span
+            ><bdi dir="auto">{{ workspaceName() }}</bdi></span
+          >
+        </p>
+      }
     } @else {
-      <!-- Holds the bar's height while the workspace loads, so nothing shifts. -->
-      <span class="skeleton topbar-workspace-skeleton" aria-hidden="true"></span>
+      <!-- Holds the bar's height and the name's place while the workspace loads. -->
+      <span class="workspace" aria-hidden="true">
+        <span class="skeleton workspace-mark"></span>
+        <span class="skeleton workspace-name-skeleton"></span>
+      </span>
     }
-  </p>
+  </div>
 
   <div class="topbar-actions">
+    <!--
+      The command palette. A quiet field-shaped button rather than a field: it
+      opens the palette, it does not search anything itself. On a phone only its
+      icon shows; the words stay its accessible name.
+    -->
+    <button
+      type="button"
+      class="palette-trigger"
+      aria-haspopup="dialog"
+      [attr.aria-expanded]="paletteOpen()"
+      [attr.aria-keyshortcuts]="shortcutAria"
+      data-testid="palette-trigger"
+      (click)="paletteRequested.emit()"
+    >
+      <app-icon name="search" [strokeWidth]="1.75" />
+      <span class="palette-trigger-text" i18n="@@shell.paletteTrigger">Search or jump to…</span>
+      <kbd class="kbd palette-trigger-key" dir="ltr" aria-hidden="true">{{ shortcut }}</kbd>
+    </button>
+
     <app-notification-bell />
     <app-profile-menu
       [email]="userEmail()"

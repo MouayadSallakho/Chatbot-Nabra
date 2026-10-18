@@ -81,14 +81,20 @@
   flex: none;
 }
 
+// The lockup: the mark and the wordmark in the heading face, narrowed like
+// every title. "OmniAI" is a name and Latin in both languages, so it keeps its
+// tracking under Arabic too.
 .brand-name {
-  font: var(--text-card-title);
-  font-size: 1rem;
-  letter-spacing: var(--letter-spacing-tight);
+  font: 650 1.0625rem / 1 var(--font-sans);
+  font-stretch: var(--heading-stretch);
+  letter-spacing: -0.01em; // rtl-lint-ignore: the wordmark is always Latin
   color: var(--text-primary);
 }
 
 .sidebar-dismiss {
+  // The close button is the drawer's first stop, and a thumb's.
+  min-inline-size: 2.75rem;
+  min-block-size: 2.75rem;
   margin-inline-start: auto;
 }
 
@@ -119,10 +125,10 @@
   block-size: 1.5rem;
   margin-block-start: var(--space-1);
   padding-inline: 0.625rem;
+  // Sentence case, as everywhere in Two Voices: uppercase labels shout, and
+  // Arabic has no case to set at all.
   color: var(--text-muted);
   font: var(--text-caption);
-  text-transform: uppercase;
-  letter-spacing: var(--letter-spacing-caps);
 
   &::before {
     content: '';
@@ -148,11 +154,12 @@
 // A nav item: the icon sits on the rail's centre line in every state, so the
 // icons never move when the panel expands or collapses.
 .nav-item {
+  position: relative;
   display: flex;
   align-items: center;
   gap: var(--space-3);
   inline-size: 100%;
-  min-block-size: 2.125rem;
+  min-block-size: 2.25rem;
   padding-inline: 0.625rem;
   border: 0;
   border-radius: var(--radius-md);
@@ -217,7 +224,8 @@
   background-color: var(--surface-selected);
   color: var(--text-primary);
   font-weight: 600;
-  box-shadow: inset calc(var(--direction-flip) * 2px) 0 0 0 var(--action);
+  // The 2px ink marker on the start edge is `.edge-marker` (_primitives.scss),
+  // added with the class by routerLinkActive.
 }
 
 // -----------------------------------------------------------------------------
@@ -241,6 +249,20 @@
 .sidebar.is-drawer {
   inline-size: 100%;
   border-inline-end: none;
+  // The edge that faces the page is rounded like every other overlay; the edge
+  // against the screen stays square. Logical corners, so it mirrors in Arabic.
+  border-start-end-radius: var(--radius-xl);
+  border-end-end-radius: var(--radius-xl);
+  overflow: hidden;
+
+  .sidebar-brand {
+    min-block-size: var(--topbar-height);
+    padding-inline-end: var(--space-2);
+  }
+
+  .sidebar-nav {
+    padding-block-start: var(--space-2);
+  }
 }
 
 .sidebar.is-drawer.is-open {
