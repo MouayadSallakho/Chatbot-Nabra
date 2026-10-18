@@ -2,7 +2,7 @@
   <main class="setup-card card" id="main-content" tabindex="-1">
     <div class="setup-brand">
       <app-brand-mark class="brand-mark" />
-      <span class="brand-name">OmniAI</span>
+      <span class="brand-name" i18n="@@brand.name">Nabra</span>
     </div>
 
     @if (unreachable()) {
@@ -11,7 +11,9 @@
         here: offering one would invite a duplicate workspace to repair a problem
         that is almost always a backend that is not running.
       -->
-      <h1 class="text-page-title">OmniAI is not responding</h1>
+      <h1 class="text-page-title" i18n="@@workspaceSetup.unreachable.title">
+        Nabra is not responding
+      </h1>
       <p class="setup-lead text-body text-secondary">
         You are signed in, but your workspaces could not be loaded just now. Nothing has been
         changed.

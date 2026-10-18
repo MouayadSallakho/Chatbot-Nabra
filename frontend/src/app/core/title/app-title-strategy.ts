@@ -1,9 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { Title } from '@angular/platform-browser';
 import { RouterStateSnapshot, TitleStrategy } from '@angular/router';
-
-/** Appended so a browser tab still identifies the product. */
-const PRODUCT_NAME = 'OmniAI';
+import { PRODUCT_NAME } from '@app/core/brand/brand';
 
 /**
  * Builds the browser tab title from the active route.
@@ -11,7 +9,7 @@ const PRODUCT_NAME = 'OmniAI';
  * Angular's default strategy sets the tab to the route title alone, which would
  * leave a reader with several tabs open looking at "Overview" and "Settings"
  * with nothing saying which product they belong to. Appending the product name
- * costs one class and fixes that.
+ * ("Overview · Nabra", "نظرة عامة · نبرة") costs one class and fixes that.
  *
  * The route title is used as-is otherwise, so the tab, the top bar and the route
  * definition all read from a single string.

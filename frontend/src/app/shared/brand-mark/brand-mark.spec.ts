@@ -38,11 +38,11 @@ describe('BrandMark', () => {
     expect(svg().getAttribute('aria-hidden')).toBe('true');
     expect(svg().hasAttribute('role')).toBe(false);
 
-    fixture.componentInstance.label.set('OmniAI');
+    fixture.componentInstance.label.set('Nabra');
     fixture.detectChanges();
 
     expect(svg().getAttribute('role')).toBe('img');
-    expect(svg().getAttribute('aria-label')).toBe('OmniAI');
+    expect(svg().getAttribute('aria-label')).toBe('Nabra');
     expect(svg().hasAttribute('aria-hidden')).toBe(false);
   });
 

@@ -1,6 +1,6 @@
 # Arabic glossary
 
-The terms OmniAI uses, so the same thing is called the same thing on every screen. Approved in
+The terms Nabra uses, so the same thing is called the same thing on every screen. Approved in
 Phase 36.3a (`docs/architecture/localisation-arabic-rtl.md`, section 6); a native reviewer refines
 it before each page phase ships.
 
@@ -67,4 +67,4 @@ their noun (an agent is مفعّل, a channel is مفعّلة), so they are sepa
 | Theme                | المظهر                       | مظهر               | no      | Light فاتح, Dark داكن, System حسب النظام                 |
 | Language             | اللغة                        |                    | no      |                                                          |
 | WhatsApp             | واتساب                       | واتساب             | yes     | Meta's Arabic form; Instagram إنستجرام, Messenger ماسنجر |
-| OmniAI               | OmniAI                       | OmniAI             | yes     | never translated                                         |
+| Nabra                | نبرة                         | نبرة               | yes     | the product's name; "OmniAI" is a code name, never copy  |

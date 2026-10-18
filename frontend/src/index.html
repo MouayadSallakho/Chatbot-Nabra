@@ -2,17 +2,19 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>OmniAI Admin</title>
+    <title>Nabra</title>
     <base href="/" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <!--
       The mark as SVG (it follows the browser's colour scheme), with the .ico for
       browsers that cannot use an SVG icon. Both are unhashed files from public/,
-      which the edge caches for a year by extension: a new mark needs a new file
-      name, not a new file under the old one.
+      which the edge caches for a year by extension (`public, max-age=31536000,
+      immutable` in deploy/edge), while this page is served `no-cache`: a new
+      mark needs a new file name, never a new file under the old one. Versioned
+      since the Nabra brand step; the next change is v2.
     -->
-    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
-    <link rel="icon" href="favicon.ico" sizes="16x16 32x32 48x48" />
+    <link rel="icon" type="image/svg+xml" href="nabra-icon.v1.svg" />
+    <link rel="icon" href="nabra-icon.v1.ico" sizes="16x16 32x32 48x48" />
     <!--
       Theme and language resolution, before first paint.
 
@@ -116,8 +118,10 @@
       global stylesheet is a blocking <link> in <head>, so the tokens exist by
       the time this paints, and the script above has already chosen the theme.
 
-      The mark is the same geometry as BrandMark and public/favicon.svg. It does
-      not move: this is a loading state, not a splash screen.
+      The lockup -- the mark and the wordmark, Nabra or نبرة -- is the same as
+      the sidebar's; the mark has the geometry of BrandMark and
+      public/nabra-icon.v1.svg. Nothing moves: this is a loading state, not a
+      splash screen.
 
       aria-live and role="status" so a screen reader is told something is
       happening rather than meeting silence.
@@ -138,30 +142,65 @@
           font-family: var(--font-sans, system-ui, sans-serif);
         "
       >
-        <svg
-          viewBox="2 4 23 23"
-          width="40"
-          height="40"
-          aria-hidden="true"
-          focusable="false"
-          style="display: block"
-        >
-          <path
-            style="fill: var(--voice-ai-fg, #0e7c72)"
-            d="M4.4 18.35 3.5 23l4.7-1.6.54-.21A9.5 9.5 0 0 1 17.02 7 8.5 8.5 0 0 0 4.4 18.35Z"
-          />
-          <path
-            style="fill: var(--voice-human-fg, #c2410c)"
-            d="M17 9a7.5 7.5 0 0 1 5.8 12.25l.8 4.25-4.1-1.4A7.5 7.5 0 1 1 17 9Z"
-          />
-        </svg>
+        <div style="display: flex; align-items: center; gap: 0.75rem">
+          <svg
+            viewBox="2 4 23 23"
+            width="36"
+            height="36"
+            aria-hidden="true"
+            focusable="false"
+            style="display: block"
+          >
+            <path
+              style="fill: var(--voice-ai-fg, #0e7c72)"
+              d="M4.4 18.35 3.5 23l4.7-1.6.54-.21A9.5 9.5 0 0 1 17.02 7 8.5 8.5 0 0 0 4.4 18.35Z"
+            />
+            <path
+              style="fill: var(--voice-human-fg, #c2410c)"
+              d="M17 9a7.5 7.5 0 0 1 5.8 12.25l.8 4.25-4.1-1.4A7.5 7.5 0 1 1 17 9Z"
+            />
+          </svg>
+          <!--
+            The wordmark, in the page's language. The width and tracking tokens
+            narrow "Nabra" in Instrument Sans and leave "نبرة" (IBM Plex Sans
+            Arabic) at full width and untracked, through :lang(ar).
+          -->
+          <span
+            class="boot-wordmark"
+            data-boot-lang="en"
+            lang="en"
+            style="
+              color: var(--text-primary, #16181b);
+              font-size: 1.375rem;
+              font-weight: 650;
+              font-stretch: var(--heading-stretch, 86%);
+              letter-spacing: var(--letter-spacing-tight, 0);
+              line-height: 1.4;
+            "
+            >Nabra</span
+          >
+          <span
+            class="boot-wordmark"
+            data-boot-lang="ar"
+            lang="ar"
+            style="
+              color: var(--text-primary, #16181b);
+              font-size: 1.375rem;
+              font-weight: 650;
+              font-stretch: var(--heading-stretch, 86%);
+              letter-spacing: var(--letter-spacing-tight, 0);
+              line-height: 1.4;
+            "
+            >نبرة</span
+          >
+        </div>
         <p
           role="status"
           aria-live="polite"
           style="margin: 0; color: var(--text-muted, #5f646d); font-size: 0.875rem"
         >
-          <span data-boot-lang="en" lang="en">Loading OmniAI…</span>
-          <span data-boot-lang="ar" lang="ar">جارٍ تحميل <bdi>OmniAI</bdi>…</span>
+          <span data-boot-lang="en" lang="en">Loading…</span>
+          <span data-boot-lang="ar" lang="ar">جارٍ التحميل…</span>
         </p>
       </div>
     </app-root>

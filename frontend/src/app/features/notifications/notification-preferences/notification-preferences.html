@@ -9,10 +9,14 @@
   <p class="visually-hidden" aria-live="polite" data-testid="announcement">{{ announcement() }}</p>
 
   <div class="page-section">
-    <p class="alert alert-info" data-testid="in-app-note">
+    <p
+      class="alert alert-info"
+      data-testid="in-app-note"
+      i18n="@@notificationPreferences.inAppNote"
+    >
       In-app notifications are always on. Email is off unless you turn a category on here, and it is
       only ever sent to your own account's address. Emails never contain report files — they link to
-      OmniAI, where you sign in as usual.
+      Nabra, where you sign in as usual.
     </p>
 
     @if (!emailConfigured()) {

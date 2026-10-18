@@ -2,7 +2,7 @@
   <main class="auth-card card" id="main-content" tabindex="-1">
     <div class="auth-brand">
       <app-brand-mark class="brand-mark" />
-      <span class="brand-name">OmniAI</span>
+      <span class="brand-name" i18n="@@brand.name">Nabra</span>
     </div>
 
     @switch (state()) {
@@ -65,7 +65,9 @@
         }
 
         <div class="auth-actions">
-          <a class="btn btn-secondary" [routerLink]="homePath">Go to OmniAI</a>
+          <a class="btn btn-secondary" [routerLink]="homePath" i18n="@@invitation.goHome"
+            >Go to Nabra</a
+          >
         </div>
       }
     }

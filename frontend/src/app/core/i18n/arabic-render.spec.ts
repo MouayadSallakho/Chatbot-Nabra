@@ -1,10 +1,12 @@
 // @ts-expect-error No Node type declarations are installed in this workspace.
 import { readFileSync } from 'node:fs';
-import { LOCALE_ID, Type } from '@angular/core';
+import { Component, LOCALE_ID, Type } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { registerLocaleData } from '@angular/common';
 import localeAr from '@angular/common/locales/ar';
 import { clearTranslations, loadTranslations } from '@angular/localize';
+import { Title } from '@angular/platform-browser';
+import { Router, TitleStrategy, provideRouter } from '@angular/router';
 
 /**
  * A few real renders in Arabic, with the real catalogue.
@@ -115,6 +117,25 @@ describe('Arabic renders', () => {
 
     expect(NAV_ITEMS[0].label).toBe('نظرة عامة');
     expect(NAV_GROUP_LABELS.Workspace).toBe('مساحة العمل');
+  });
+
+  it('names the product نبرة, in the wordmark and in the tab title', async () => {
+    const { PRODUCT_NAME } = await import('@app/core/brand/brand');
+    const { AppTitleStrategy } = await import('@app/core/title/app-title-strategy');
+
+    @Component({ template: '' })
+    class Blank {}
+
+    TestBed.configureTestingModule({
+      providers: [
+        provideRouter([{ path: 'overview', title: 'نظرة عامة', component: Blank }]),
+        { provide: TitleStrategy, useClass: AppTitleStrategy },
+      ],
+    });
+    await TestBed.inject(Router).navigateByUrl('/overview');
+
+    expect(PRODUCT_NAME).toBe('نبرة');
+    expect(TestBed.inject(Title).getTitle()).toBe('نظرة عامة · نبرة');
   });
 
   it('counts unread notifications with Arabic plurals', async () => {

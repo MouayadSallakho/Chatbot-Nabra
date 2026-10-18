@@ -255,3 +255,23 @@ code {
   border-radius: var(--radius-card);
   background-color: var(--surface-muted);
 }
+
+// The two lockups: the wordmark beside the mark, as the sidebar and sign-in
+// set it; the title utilities give each script its own width and tracking.
+// Far apart, so the two names never read as one phrase.
+.lockup-row {
+  gap: var(--space-10);
+  margin-block-start: var(--space-4);
+}
+
+.lockup {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.lockup-name {
+  font: var(--text-section-title);
+  font-stretch: var(--heading-stretch);
+  letter-spacing: var(--letter-spacing-tight);
+}

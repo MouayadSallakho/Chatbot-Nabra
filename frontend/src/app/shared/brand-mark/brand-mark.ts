@@ -9,8 +9,10 @@ export const BRAND_MARK_PATHS = {
 } as const;
 
 /**
- * The OmniAI mark: two rounded speech shapes overlapping into an "O" -- the AI
- * (Lagoon) and a person on the team (Ember), the duet every conversation is.
+ * The Nabra mark: two rounded speech shapes, overlapping -- the AI (Lagoon) and
+ * a person on the team (Ember): two voices in one tone, which is what the name
+ * نبرة ("tone of voice") says. Since the brand step the shapes no longer stand
+ * for the letter "O" of the code name; the geometry is unchanged.
  *
  * DRAWN, NOT MASKED. The Lagoon shape is pre-cut: its path is the AI bubble
  * minus the Ember bubble grown by a 2-unit gap, computed once (Phase 36.2). So
@@ -24,8 +26,8 @@ export const BRAND_MARK_PATHS = {
  * Decorative by default (the wordmark beside it carries the name). Pass
  * `label` where the mark stands alone, and it becomes a named image.
  *
- * The same geometry is in public/favicon.svg and the index.html loading state;
- * keep the three in step.
+ * The same geometry is in public/nabra-icon.v1.svg (and its .ico) and the
+ * index.html loading state; keep the three in step.
  */
 @Component({
   selector: 'app-brand-mark',

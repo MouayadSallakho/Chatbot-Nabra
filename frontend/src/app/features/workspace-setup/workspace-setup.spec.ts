@@ -296,7 +296,7 @@ describe('WorkspaceSetup', () => {
     });
 
     it('reports a connection problem rather than an empty account', () => {
-      expect(host().textContent).toContain('OmniAI is not responding');
+      expect(host().textContent).toContain('Nabra is not responding');
       expect(host().textContent).toContain('Nothing has been changed');
     });
 

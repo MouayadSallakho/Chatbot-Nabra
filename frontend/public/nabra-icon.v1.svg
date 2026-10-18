@@ -1,6 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="2 4 23 23">
-  <!-- The OmniAI mark: the AI (Lagoon) and a person (Ember). Same geometry as
-       src/app/shared/brand-mark/brand-mark.ts; keep the two in step. -->
+  <!-- The Nabra mark: two voices in one tone, the AI (Lagoon) and a person
+       (Ember). Same geometry as src/app/shared/brand-mark/brand-mark.ts; keep
+       the two in step, and give a changed mark a new file name (v2). -->
   <style>
     .ai { fill: #0e7c72; }
     .human { fill: #c2410c; }

@@ -194,7 +194,7 @@
     <section class="lab-section" id="lab-mark" aria-labelledby="lab-mark-title">
       <h2 id="lab-mark-title" class="text-section-title" i18n="@@lab.mark">The mark</h2>
       <p class="section-note" i18n="@@lab.mark.note">
-        Two speech shapes overlapping into an "O". Never mirrored.
+        Two speech shapes, two voices in one tone: the AI and the team. Never mirrored.
       </p>
       <div class="lab-row mark-row">
         <app-brand-mark style="--brand-mark-size: 16px" />
@@ -204,6 +204,22 @@
         <span class="mark-on-ink"
           ><app-brand-mark tone="mono" style="--brand-mark-size: 28px"
         /></span>
+      </div>
+      <!--
+        The lockup in both of its forms, whatever the page's language: each name
+        is written in its own language and direction, never translated here.
+      -->
+      <div class="lab-row lockup-row" data-testid="lab-lockups">
+        <span class="lockup" lang="en" dir="ltr"
+          ><app-brand-mark style="--brand-mark-size: 28px" /><span class="lockup-name"
+            >Nabra</span
+          ></span
+        >
+        <span class="lockup" lang="ar" dir="rtl"
+          ><app-brand-mark style="--brand-mark-size: 28px" /><span class="lockup-name"
+            >نبرة</span
+          ></span
+        >
       </div>
     </section>
 

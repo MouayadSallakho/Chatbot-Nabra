@@ -1,16 +1,38 @@
 # Design brief (MASTER.md): "Two Voices"
 
-> The single source of truth for OmniAI's visual and interaction decisions.
+> The single source of truth for Nabra's visual and interaction decisions (OmniAI is the
+> internal code name; see section 0).
 > Read it before any UI work. Change it only by adding a row to the decisions log (section 12).
 > Page-level exceptions live in `docs/design/pages/<page>.md` and must name the rule they override.
 
 - Status: approved direction, implemented at the foundation (Phase 36.2)
-- Last updated: 2026-10-18 (Phase 36.4: shell and navigation)
+- Last updated: 2026-10-18 (brand step: the public name is Nabra / نبرة)
 - Started from: the "Two Voices" direction approved for the Phase 36 redesign (reference
   `OmniAI-UI-Pack/reference/omniai-directions.html`, "Two Voices" tab)
 - Implementation: `frontend/src/styles/_tokens.scss` (values), `_fonts.scss`, `_base.scss`,
   `_primitives.scss`, `src/app/shared/voice/`, `src/app/shared/brand-mark/`. The development-only
   Design Lab (`/design-lab`) shows all of it on one page.
+
+## 0. Name
+
+- **Nabra** in English, **نبرة** in Arabic. The only name people who use the product ever see or
+  hear: the wordmark, tab titles, sentences, accessible names, the loading state.
+- Meaning: نبرة is "tone of voice". Every conversation has two voices, the AI and the team; Nabra is
+  the one tone they speak in. The name says what the mark draws.
+- Arabic form: نبرة, written in Arabic in Arabic copy and never transliterated there. Inside a
+  sentence it takes the grammar of a feminine noun ("نبرة لا تستجيب", "الانتقال إلى نبرة",
+  "تسجيل الدخول إلى نبرة"). In English copy it is "Nabra", never "NABRA" or "nabra".
+- Tagline: "Two voices. One tone." / «صوتان… بنبرة واحدة».
+- Wordmark: "Nabra" in Instrument Sans, narrowed like every title (`--heading-stretch`, tight
+  tracking); "نبرة" in IBM Plex Sans Arabic at full width with no tracking (the same tokens under
+  `:lang(ar)`). Always beside the mark, in the page's language: sidebar, sign-in, registration,
+  invitation, workspace chooser, loading state. No other font files.
+- Tab titles: "<page> · Nabra" and "<page> · نبرة" (`AppTitleStrategy`).
+- **"OmniAI" is never shown to users.** It is the internal code name only: the repository,
+  namespaces, folders, CSS classes, `data-testid`s, i18n message IDs, `localStorage` and cookie
+  keys, protocol strings and headers, the database, Docker and environment variables. Copy
+  always says Nabra or نبرة; the source of the name in code is `src/app/core/brand/brand.ts`
+  (message `@@brand.name`).
 
 ## 1. Product and audience
 
@@ -29,7 +51,7 @@
 
 ## 2. Design direction
 
-- Concept: every OmniAI conversation is a duet between the AI and the team. The interface gives
+- Concept: every Nabra conversation is a duet between the AI and the team. The interface gives
   each voice one colour and shows the handoff between them everywhere. Colour is information,
   not decoration; everything else is calm ink on porcelain.
 - Principles:
@@ -55,7 +77,7 @@
 | 3 | Voice track (`app-voice-track`) | conversation detail header | 4 px; the real sequence of reply authors; renders nothing it cannot derive |
 | 4 | Handoff divider (`.handoff-divider`) | transcripts | only where the replying voice changes, from real message authors or real handoff events |
 | 5 | The "Take over" moment | conversation header chip | the chip sweeps Lagoon → Ember in 320 ms (emphasized); "Return to AI" reverses; instant under reduced motion |
-| 6 | The mark (`app-brand-mark`) | sidebar, sign-in, favicon, loading state | two speech shapes overlapping into an "O"; works at 16 px and in one colour; never mirrored |
+| 6 | The mark (`app-brand-mark`) | sidebar, sign-in, favicon, loading state | two speech shapes, two voices in one tone (no longer the letter "O" of the code name; geometry unchanged); works at 16 px and in one colour; never mirrored |
 
 One signature per page: a page leads with at most one of 2, 3 or 5; chips are vocabulary, not
 a signature.
@@ -248,3 +270,6 @@ used for warnings, or amber that reads orange.
 | 2026-10-18 | Command palette (Ctrl/Cmd+K): pages and quick actions only, never data, and it says so; loaded on first use | Keyboard-first navigation without implying a search the API cannot do | 36.4 |
 | 2026-10-18 | Focus moves to the new page's heading after every page change; a drawer closed by navigating no longer returns focus to its trigger | A keyboard or screen-reader user arrives at the page they chose | 36.4 |
 | 2026-10-18 | No match emphasis inside Arabic words in the palette | A change of weight inside a word breaks Arabic letter joining | 36.4 |
+| 2026-10-18 | The public name is Nabra / نبرة ("tone of voice"); OmniAI stays the internal code name and is never shown | Two voices, the AI and the team, in one tone: the direction's own idea, in a word that works in both languages | Product owner (brand step) |
+| 2026-10-18 | The mark keeps its geometry; it now reads as two voices in one tone, not as the letter "O" | The shapes already draw the duet; only the letter reading belonged to the old name | Brand step |
+| 2026-10-18 | Icon files versioned (`nabra-icon.v1.svg`, `nabra-icon.v1.ico`); the next change is v2 | The edge caches .svg and .ico for a year (`immutable`) while index.html is `no-cache`: only a new name reaches people who visited before | Brand step |

@@ -337,8 +337,9 @@ the bundle exists. The duplication is unavoidable and is guarded by
 `theme-startup.spec.ts`, which pins the literals so that renaming a constant
 fails a test whose name says which file to edit.
 
-The loading state inside `<app-root>` shows the mark (the same geometry as
-`BrandMark` and `public/favicon.svg`) and "Loading OmniAI…". Its styles are
+The loading state inside `<app-root>` shows the lockup -- the mark (the same
+geometry as `BrandMark` and `public/nabra-icon.v1.svg`) beside the wordmark,
+Nabra or نبرة by `lang` -- and "Loading…" / "جارٍ التحميل…". Its styles are
 inline but its colours are tokens: the global stylesheet is a blocking `<link>`,
 so they resolve before it paints, already in the right theme. It does not move:
 a loading state, not a splash screen.
@@ -560,13 +561,16 @@ Glyphs are stored as **path data** and rendered via `<path [attr.d]>`; no SVG
 source passes through `innerHTML`. Icons are `aria-hidden`; the accessible name
 belongs to the control.
 
-**The mark** (`shared/brand-mark/`) is two rounded speech shapes overlapping into
-an "O": Lagoon for the AI, Ember for a person. The Lagoon shape is pre-cut around
+**The mark** (`shared/brand-mark/`) is two rounded speech shapes overlapping:
+Lagoon for the AI, Ember for a person -- two voices in one tone, which is what the
+name Nabra (نبرة, "tone of voice") says. Until the brand step the shapes also read
+as the "O" of the code name; the geometry is unchanged. The Lagoon shape is pre-cut around
 the Ember one, so it needs no mask or `url(#id)`, reads at 16px, works in a
 single colour (`tone="mono"`, and in forced colours) and is never mirrored. The
-same geometry is in `public/favicon.svg` (which follows the browser's colour
-scheme), the regenerated `favicon.ico` (16, 32, 48) and the `index.html` loading
-state.
+same geometry is in `public/nabra-icon.v1.svg` (which follows the browser's
+colour scheme), `public/nabra-icon.v1.ico` (16, 32, 48) and the `index.html`
+loading state. The icon files carry a version in their names because the edge
+caches them for a year: a changed mark ships as v2, never under the old name.
 
 ## D18. Accessibility baseline
 

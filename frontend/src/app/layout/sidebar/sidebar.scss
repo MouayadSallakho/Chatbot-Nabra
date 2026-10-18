@@ -81,13 +81,14 @@
   flex: none;
 }
 
-// The lockup: the mark and the wordmark in the heading face, narrowed like
-// every title. "OmniAI" is a name and Latin in both languages, so it keeps its
-// tracking under Arabic too.
+// The lockup: the mark and the wordmark -- "Nabra" in Instrument Sans,
+// narrowed like every title; "نبرة" in IBM Plex Sans Arabic, where the
+// width and tracking tokens are 100% and 0. The line is tall enough for the
+// dots of ب and ة, which a clipped `.fades` box would otherwise cut.
 .brand-name {
-  font: 650 1.0625rem / 1 var(--font-sans);
+  font: 650 1.0625rem / 1.4 var(--font-sans);
   font-stretch: var(--heading-stretch);
-  letter-spacing: -0.01em; // rtl-lint-ignore: the wordmark is always Latin
+  letter-spacing: var(--letter-spacing-tight);
   color: var(--text-primary);
 }
 

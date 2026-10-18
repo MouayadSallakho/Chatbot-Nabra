@@ -103,7 +103,7 @@ const MESSAGES: Readonly<Record<ApiErrorKind, string>> = {
   providerUnavailable: $localize`:@@apiError.providerUnavailable:This needs an AI provider, and none is configured on this deployment. Nothing was sent and nothing was changed.`,
   providerTimeout: $localize`:@@apiError.providerTimeout:The AI service took too long to respond. Try again.`,
   rateLimited: $localize`:@@apiError.rateLimited:Too many requests were made just now. Wait a moment and try again.`,
-  offline: $localize`:@@apiError.offline:OmniAI could not be reached. Check your connection, then try again.`,
+  offline: $localize`:@@apiError.offline:Nabra could not be reached. Check your connection, then try again.`,
   unknown: $localize`:@@apiError.unknown:Something went wrong. Try again, and contact an administrator if it continues.`,
 };
 
