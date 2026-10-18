@@ -6,7 +6,7 @@
 > Page-level exceptions live in `docs/design/pages/<page>.md` and must name the rule they override.
 
 - Status: approved direction, implemented at the foundation (Phase 36.2)
-- Last updated: 2026-10-18 (Phase 36.5: the entry pages, `docs/design/pages/entry.md`)
+- Last updated: 2026-10-18 (Phase 36.6: the inbox and customers)
 - Started from: the "Two Voices" direction approved for the Phase 36 redesign (reference
   `OmniAI-UI-Pack/reference/omniai-directions.html`, "Two Voices" tab)
 - Implementation: `frontend/src/styles/_tokens.scss` (values), `_fonts.scss`, `_base.scss`,
@@ -281,3 +281,12 @@ used for warnings, or amber that reads orange.
 | 2026-10-18 | Language switch before sign-in (English / العربية), withheld while an invitation token waits in memory | The switch reloads the page, which would lose the invitation | 36.5 |
 | 2026-10-18 | Not found is a calm state, not an error: the path as an LTR island (no query or fragment) and one way back | Nothing failed; showing the path lets a reader spot a typo or report the link | 36.5 |
 | 2026-10-18 | Icon files versioned (`nabra-icon.v1.svg`, `nabra-icon.v1.ico`); the next change is v2 | The edge caches .svg and .ico for a year (`immutable`) while index.html is `no-cache`: only a new name reaches people who visited before | Brand step |
+| 2026-10-18 | The inbox is a workspace of panes from 1280px: conversation list, transcript, details panel (collapsible, remembered per browser); below 1280px the list and the conversation are two pages, and a conversation fills a screen at least 600px tall (header, scrolling transcript, composer) | The list must stay in view while somebody works a queue; a short or zoomed screen scrolls as a page so nobody reads through a letterbox | 36.6 |
+| 2026-10-18 | The pane holding the page's `h1` is whichever is the page: the list's title on `/conversations`, the conversation's title once one is open | Exactly one `h1`, and focus lands on the conversation a reader opened | 36.6 |
+| 2026-10-18 | Every inbox row carries a voice chip; the only attention marker is "Waiting for the team" (a person is answering and the customer wrote last), as a warning badge with its word | The API has no unread state or attention flag; that one fact follows from the handoff rules | 36.6 |
+| 2026-10-18 | The "Take over" sweep is a clip-path wipe of the new voice's chip over the old voice's tint, from the reading start (mirrored in RTL), 320 ms emphasized, instant under reduced motion; the change is announced politely | Signature element 5, made literal; compositor-cheap on a 22px element | 36.6 |
+| 2026-10-18 | Transcripts draw the newest 100 messages and 50 more per "Show earlier messages"; the reading column is capped at 56rem; `content-visibility` rejected | Measured on 232 messages: 60 fps scrolling, 33 ms per step unthrottled; content-visibility made scrolled frames about four times slower | 36.6 |
+| 2026-10-18 | Only messages that arrive while the reader is here settle in (220 ms); a reader scrolled up gets a "N new messages" button instead of a jump | MASTER section 7, without animating a whole transcript on open | 36.6 |
+| 2026-10-18 | Composer: Enter adds a line (unchanged); Ctrl/Cmd+Enter sends; a retry reuses the draft's idempotency key; drafts are kept per conversation in memory only | Keyboard-first without changing what Enter does; a lost response must not store a reply twice | 36.6 |
+| 2026-10-18 | Unnamed customers are named on the client by the server's own rule, in the reader's language ("Anonymous visitor" / «زائر مجهول») | The server's label is English only; which records are named never changes | 36.6 |
+| 2026-10-18 | Route crossfade is skipped between two panes of one workspace while they sit side by side (`data.panes`) | Opening another conversation changes one pane; fading the content area would flash the list | 36.6 |

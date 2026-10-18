@@ -1,0 +1,43 @@
+:host {
+  display: block;
+}
+
+// One pane at a time below 1280px: the list, or the open conversation. The
+// list is kept in the document while a conversation is open, out of sight, so
+// Back finds it exactly as it was.
+.inbox:not(.is-panes) {
+  &.is-open .inbox-list-pane,
+  &:not(.is-open) .inbox-detail-pane {
+    display: none;
+  }
+}
+
+// An open conversation filling a tall narrow screen: the pane is the height of
+// the content area, and the conversation scrolls its transcript inside it.
+:host(.page-fills-content) .inbox,
+:host(.page-fills-content) .inbox-detail-pane {
+  block-size: 100%;
+}
+
+// Side by side from 1280px. The inbox fills the content area and each pane
+// scrolls on its own (the shell stops scrolling a page that fills it: see
+// `.page-fills-content` in _primitives.scss), so the list never scrolls away from
+// the conversation beside it.
+.inbox.is-panes {
+  display: grid;
+  grid-template-columns: clamp(20rem, 24vw, 25rem) minmax(0, 1fr);
+  block-size: 100%;
+  min-block-size: 0;
+
+  .inbox-list-pane {
+    min-block-size: 0;
+    overflow-y: auto;
+    border-inline-end: 1px solid var(--border-default);
+    background-color: var(--surface-default);
+  }
+
+  .inbox-detail-pane {
+    min-inline-size: 0;
+    min-block-size: 0;
+  }
+}

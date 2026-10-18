@@ -9,7 +9,8 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  padding-block-end: var(--space-6);
+  // A pane (the inbox list) tightens this with --page-header-end.
+  padding-block-end: var(--page-header-end, var(--space-6));
 }
 
 // The way up. Quiet, above the title, and always in the same place; a 28px
@@ -60,7 +61,7 @@
   align-items: center;
   gap: var(--space-2) var(--space-3);
 
-  h1 {
+  :is(h1, h2) {
     min-inline-size: 0;
     overflow-wrap: anywhere;
     text-wrap: balance; // an enhancement: two even lines rather than one orphan

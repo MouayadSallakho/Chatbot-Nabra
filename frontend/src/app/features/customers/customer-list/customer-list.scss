@@ -1,10 +1,57 @@
 // Column template for the shared data list; the rest is the primitive's.
 .customer-list {
-  --data-list-columns: minmax(0, 2fr) minmax(0, 1.5fr) 8rem 10rem;
+  --data-list-columns: minmax(0, 2fr) minmax(0, 1.6fr) 9rem 11rem;
+}
+
+.customer-who {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-inline-size: 0;
+}
+
+// Neutral, never a voice colour: a customer is the other side of the duet.
+.customer-tile {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  inline-size: 2rem;
+  block-size: 2rem;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background-color: var(--surface-muted);
+  color: var(--text-secondary);
+  font: var(--text-label);
+
+  &.is-unnamed {
+    border-style: dashed;
+    background-color: transparent;
+    color: var(--text-muted);
+  }
+
+  .icon {
+    inline-size: 1rem;
+    block-size: 1rem;
+  }
+}
+
+.customer-name.is-unnamed {
+  color: var(--text-secondary);
+  font-weight: 400;
 }
 
 .customer-channels {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-1);
+  gap: var(--space-1) var(--space-3);
+}
+
+.customer-skeleton {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-3);
+
+  .skeleton-title {
+    margin: 0;
+  }
 }

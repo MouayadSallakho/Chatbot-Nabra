@@ -1,146 +1,252 @@
-.facts {
-  display: grid;
-  gap: var(--space-4);
+:host {
+  display: block;
+  block-size: 100%;
+}
 
-  p {
-    margin: 0;
+// Filling the screen (`is-fill`): the transcript scrolls between the header and
+// the composer. From 1280px (`is-panes`) the details panel sits beside it. On a
+// short screen neither applies: the conversation scrolls as a page, with the
+// composer stuck to the bottom of the content area.
+.conversation.is-fill {
+  display: flex;
+  flex-direction: column;
+  block-size: 100%;
+
+  .conversation-main {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-block-size: 0;
   }
 
-  @media (min-width: 768px) {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+  .conversation-details.is-inline {
+    flex: none;
+    max-block-size: 40%;
+    overflow-y: auto;
   }
 }
 
-.transcript {
+.conversation.is-panes {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+// On a phone filling the screen the explanation under the handoff button is
+// read by the button's description only; the header stays short.
+.conversation.is-fill:not(.is-panes) .handling-help {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.conversation-header,
+.conversation-footer {
+  padding: var(--space-4) var(--page-gutter);
+  background-color: var(--surface-default);
+}
+
+.is-panes .conversation-header,
+.is-panes .conversation-footer {
+  padding-inline: var(--space-5);
+}
+
+.conversation-header {
   display: grid;
   gap: var(--space-3);
-  margin: 0;
-  padding: 0;
-  list-style: none;
+  border-block-end: 1px solid var(--border-default);
 }
 
-// Sender is carried by a label, by alignment and by surface -- never by colour
-// alone. Anybody who cannot rely on hue still reads who said what from the name
-// above each message.
-.message {
-  display: grid;
+.conversation-back {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
   gap: var(--space-1);
-  padding: var(--space-4);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-lg);
-  background-color: var(--surface-default);
-  max-inline-size: 46rem;
+  min-block-size: 1.75rem;
+  color: var(--text-secondary);
+  font: var(--text-label);
+  text-decoration: none;
 
-  p {
-    margin: 0;
+  .icon {
+    inline-size: var(--icon-size-sm);
+    block-size: var(--icon-size-sm);
   }
 }
 
-.message-customer {
-  border-inline-start: 3px solid var(--border-strong, var(--border-default));
+.conversation-title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
 }
 
-.message-agent {
-  background-color: var(--surface-muted);
-  margin-inline-start: auto;
+.conversation-title-text {
+  min-inline-size: 0;
 }
 
-.message-meta {
+.conversation-title {
+  font: var(--text-section-title);
+  font-stretch: var(--heading-stretch, 100%);
+}
+
+.conversation-meta {
+  margin: var(--space-1) 0 0;
+  color: var(--text-secondary);
+  font: var(--text-small);
+  font-variant-numeric: tabular-nums;
+}
+
+.conversation-tools {
   display: flex;
   gap: var(--space-2);
+}
+
+// The handoff moment: the voice chip, the sentence, the one action.
+.handling-bar {
+  display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
-  font-size: 0.8125rem;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+
+  .handling-action {
+    margin-inline-start: auto;
+  }
 }
 
-.message-sender {
+.handling-sentence {
   font: var(--text-body-strong);
-  font-size: 0.8125rem;
 }
 
-// Whole message, wrapped. Interior spacing and line breaks carry meaning in a
-// message, so they are preserved rather than collapsed -- and a long unbroken
-// string wraps instead of forcing the page sideways.
-.message-text {
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
+.handling-help {
+  margin: calc(-1 * var(--space-1)) 0 0;
+  color: var(--text-muted);
+  font: var(--text-small);
+}
+
+// The sweep: the new voice's chip wipes in from the reading start over the
+// old voice's tint, 320 ms on the emphasized curve. Under reduced motion the
+// duration tokens collapse, so the change is instant and still complete.
+.handling-chip {
+  display: inline-flex;
+  border-radius: var(--radius-pill);
+
+  &.from-ai {
+    background-color: var(--voice-ai-tint);
+  }
+
+  &.from-human {
+    background-color: var(--voice-human-tint);
+  }
+
+  &.is-sweeping app-voice-chip {
+    animation: handoff-sweep var(--duration-lg) var(--ease-emphasized);
+  }
+}
+
+@keyframes handoff-sweep {
+  from {
+    clip-path: inset(0 100% 0 0 round 999px);
+  }
+
+  to {
+    clip-path: inset(0 0 0 0 round 999px);
+  }
+}
+
+@keyframes handoff-sweep-rtl {
+  from {
+    clip-path: inset(0 0 0 100% round 999px);
+  }
+
+  to {
+    clip-path: inset(0 0 0 0 round 999px);
+  }
+}
+
+:host-context([dir='rtl']) .handling-chip.is-sweeping app-voice-chip {
+  animation-name: handoff-sweep-rtl;
+}
+
+.conversation-alert {
+  margin: 0;
+}
+
+.conversation-details {
+  inline-size: clamp(17rem, 20vw, 21rem);
+  min-block-size: 0;
+  overflow-y: auto;
+  border-inline-start: 1px solid var(--border-default);
+  background-color: var(--surface-default);
+
+  &.is-inline {
+    inline-size: auto;
+    border-inline-start: 0;
+    border-block-end: 1px solid var(--border-default);
+  }
+}
+
+// Stuck to the bottom of the content area below 1280px; its own row above.
+.conversation-footer {
+  position: sticky;
+  inset-block-end: 0;
+  z-index: var(--z-sticky);
+  display: grid;
+  gap: var(--space-3);
+  border-block-start: 1px solid var(--border-default);
+
+  // Holding only the floating button, it takes no room of its own.
+  &:not(:has(> :not(.new-messages))) {
+    padding-block: 0;
+    border-block-start: 0;
+  }
+
+  &:empty {
+    display: none;
+  }
+}
+
+// Floats above the footer, centred, while messages wait below the view.
+.new-messages {
+  position: absolute;
+  inset-block-end: calc(100% + var(--space-3));
+  inset-inline-start: 50%;
+  transform: translateX(calc(var(--direction-flip) * -50%));
+  border-radius: var(--radius-pill);
+  box-shadow: var(--shadow-overlay);
 }
 
 .transcript-more {
   display: flex;
   justify-content: center;
-  margin-block-start: var(--space-4);
 }
 
-// Handling and assignment, side by side on a wide screen and stacked on a
-// narrow one. Not a grid with fixed columns: the two controls are different
-// widths and a select that has to fit an email address is the wider of them.
-.handling-controls {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-6);
-  align-items: flex-start;
+.composer-withheld {
+  margin: 0;
+  color: var(--text-secondary);
+  font: var(--text-small);
 }
 
-.handling-action {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  min-width: 0;
-  flex: 1 1 16rem;
+// Every state before the conversation: the same frame as the page.
+.conversation-state {
+  display: grid;
+  align-content: start;
+  gap: var(--space-4);
+  padding: var(--space-6) var(--page-gutter);
 
-  // A button is as wide as its label, not its column: a half-page slab reads
-  // as a banner rather than an action.
-  > .btn {
-    align-self: flex-start;
+  &.is-panes {
+    padding-inline: var(--space-5);
   }
 }
 
-// The word, not the colour, is what says who is answering. The colour agrees
-// with it; it does not carry it alone.
-.handling {
-  font: var(--text-body-strong);
-}
-
-.handling-human {
-  color: var(--voice-human-strong);
-}
-
-// A human reply sits with the agent's, because to the customer they are both
-// the business talking. The left border is what distinguishes them from each
-// other, and the sender label above says which is which.
-.message-human {
-  border-inline-start: 2px solid var(--voice-human-fg);
-  padding-inline-start: var(--space-3);
-}
-
-.composer {
-  display: flex;
-  flex-direction: column;
+.conversation-skeleton {
+  display: grid;
   gap: var(--space-3);
-  margin-block-start: var(--space-5);
-}
 
-.composer-input {
-  width: 100%;
-  resize: vertical;
-  min-height: 5rem;
-}
-
-.composer-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-3);
-  align-items: center;
-  justify-content: space-between;
-}
-
-.composer-hint {
-  margin-block-start: var(--space-5);
-}
-
-// Sits under the message it describes, quiet enough not to compete with the
-// customer's own words.
-.message-delivery {
-  margin-block-start: var(--space-2);
+  .skeleton-meta {
+    inline-size: 55%;
+    margin-block-end: var(--space-2);
+  }
 }

@@ -200,6 +200,23 @@ select {
   border: 0;
 }
 
+// The same, below 576px only: a button label that becomes the icon's accessible
+// name on a phone, or a sentence a chip beside it already says. Never for
+// anything only the text carries.
+@media (max-width: 35.99rem) {
+  .visually-hidden-narrow {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
+}
+
 // The first thing in the tab order. Hidden until focused, then a real, visible
 // control -- a keyboard reader should not have to tab through the whole sidebar
 // on every page to reach the content.

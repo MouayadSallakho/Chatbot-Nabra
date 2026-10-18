@@ -1,13 +1,22 @@
 import { Routes } from '@angular/router';
+import { MediaQueries } from '@app/core/media/media';
 import { WhatsAppApi } from '@app/features/channels/whatsapp-api';
 import { ConversationsApi } from './conversations-api';
+import { InboxState } from './inbox-state';
 
 /**
- * The conversation inbox.
+ * The conversation inbox (Phase 36.6: a workspace, not two pages).
  *
- * `ConversationsApi` is provided here rather than in the root injector: it is
- * used only by these pages, so scoping it to the feature keeps it inside the
- * lazily loaded chunk, as every other feature area does.
+ * `/conversations` is the inbox itself: the list, plus a child outlet. From
+ * 1280px the open conversation sits beside the list (`data.panes`), so the
+ * list stays in view while somebody works one conversation after another.
+ * Below that the same two routes behave as they always have: the list, and a
+ * conversation page with a way back. The addresses, `?page=` and Back are
+ * unchanged.
+ *
+ * `ConversationsApi` and `InboxState` are provided here rather than in the root
+ * injector: they are used only by these screens, so scoping them keeps them in
+ * the lazily loaded chunk, as every other feature area does.
  *
  * `WhatsAppApi` is here for one read: a WhatsApp conversation shows who it is
  * with and whether each reply reached them, and that is channel-specific
@@ -16,13 +25,16 @@ import { ConversationsApi } from './conversations-api';
 export const conversationRoutes: Routes = [
   {
     path: '',
-    providers: [ConversationsApi, WhatsAppApi],
+    providers: [ConversationsApi, WhatsAppApi, InboxState],
+    data: { panes: MediaQueries.inbox },
+    loadComponent: () =>
+      import('./conversation-inbox/conversation-inbox').then((m) => m.ConversationInbox),
     children: [
       {
         path: '',
         title: $localize`:@@title.conversations:Conversations`,
         loadComponent: () =>
-          import('./conversation-list/conversation-list').then((m) => m.ConversationList),
+          import('./inbox-placeholder/inbox-placeholder').then((m) => m.InboxPlaceholder),
       },
       {
         path: ':conversationId',

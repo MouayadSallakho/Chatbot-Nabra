@@ -1,314 +1,294 @@
-<div class="page">
-  @if (!canView()) {
-    <app-page-header
-      backLink="/conversations"
-      backLabel="Conversations"
-      i18n-backLabel="@@back.conversations"
-      heading="Conversation"
-    />
+@if (!canView() || loading() || failure() || !conversation()) {
+  <!-- Every state before the conversation itself: one frame, the same heading. -->
+  <div class="conversation-state" [class.is-panes]="panes() && canView()">
+    <!-- A way back whenever the list is not beside this pane. -->
+    @if (!panes() || !canView()) {
+      <a class="conversation-back" href="/conversations" (click)="goBack($event)">
+        <app-icon name="arrow-start" [strokeWidth]="1.75" />
+        <span
+          ><span class="visually-hidden" i18n="@@pageHeader.backTo">Back to </span
+          ><span i18n="@@back.conversations">Conversations</span></span
+        >
+      </a>
+    }
 
-    <div class="page-section">
+    @if (!canView()) {
+      <h1 class="text-page-title">{{ fallbackTitle }}</h1>
       <div class="card">
         <app-empty-state
           icon="conversations"
           heading="You do not have access to conversations"
-          description="Reading what customers said to this workspace needs a permission your roles do not include."
+          i18n-heading="@@inbox.denied.heading"
+          description="Reading what customers said to this workspace needs a permission your roles do not include. Ask somebody who administers this workspace if you need it."
+          i18n-description="@@inbox.denied.body"
         />
       </div>
-    </div>
-  } @else if (loading()) {
-    <app-page-header
-      backLink="/conversations"
-      backLabel="Conversations"
-      i18n-backLabel="@@back.conversations"
-      heading="Conversation"
-    />
-
-    <div class="page-section" aria-busy="true">
-      <p class="visually-hidden" role="status">Loading conversation…</p>
-      <div class="card card-body">
-        <span class="skeleton skeleton-title"></span>
-        <span class="skeleton skeleton-text"></span>
+    } @else if (loading()) {
+      <!-- The real layout's shapes: title, meta, the handling bar, then bubbles. -->
+      <div class="conversation-skeleton" aria-busy="true">
+        <h1 class="visually-hidden">{{ fallbackTitle }}</h1>
+        <p class="visually-hidden" role="status" i18n="@@conversation.loading">
+          Loading conversation…
+        </p>
+        <span class="skeleton skeleton-title" aria-hidden="true"></span>
+        <span class="skeleton skeleton-text skeleton-meta" aria-hidden="true"></span>
+        <span class="skeleton skeleton-bar" aria-hidden="true"></span>
+        <span class="skeleton skeleton-bubble" aria-hidden="true"></span>
+        <span class="skeleton skeleton-bubble skeleton-bubble-end" aria-hidden="true"></span>
+        <span class="skeleton skeleton-bubble" aria-hidden="true"></span>
       </div>
-    </div>
-  } @else if (failure(); as error) {
-    <app-page-header
-      backLink="/conversations"
-      backLabel="Conversations"
-      i18n-backLabel="@@back.conversations"
-      heading="Conversation"
-    />
-
-    <div class="page-section">
+    } @else if (failure(); as error) {
+      <h1 class="text-page-title">{{ fallbackTitle }}</h1>
       <div class="card">
         <app-empty-state
           icon="alert"
           tone="error"
-          [heading]="
-            error.kind === 'notFound' ? 'Conversation not found' : 'Could not load conversation'
-          "
+          [heading]="error.kind === 'notFound' ? notFoundHeading : loadFailedHeading"
           [description]="error.message"
         >
-          <a stateActions class="btn btn-secondary btn-sm" routerLink="/conversations">
-            Back to conversations
-          </a>
+          <a
+            stateActions
+            class="btn btn-secondary btn-sm"
+            routerLink="/conversations"
+            i18n="@@conversation.backToList"
+            >Back to conversations</a
+          >
         </app-empty-state>
       </div>
-    </div>
-  } @else if (conversation(); as current) {
-    <app-page-header
-      backLink="/conversations"
-      backLabel="Conversations"
-      i18n-backLabel="@@back.conversations"
-      heading="Conversation"
-      [description]="
-        current.channel === 'WebChat'
-          ? 'A website chat conversation.'
-          : 'A conversation on ' + current.channel + '.'
-      "
-    >
-      <button pageActions type="button" class="btn btn-secondary" (click)="load()">Refresh</button>
-    </app-page-header>
-
-    <div class="page-section">
-      <div class="card card-body facts">
-        <div>
-          <p class="text-label text-muted">Channel</p>
-          <p class="text-body">
-            {{ current.channel === 'WebChat' ? 'Website chat' : current.channel }}
-          </p>
-        </div>
-        <div>
-          <p class="text-label text-muted">AI agent</p>
-          <p class="text-body">{{ current.agentName ?? '—' }}</p>
-        </div>
-        <div>
-          <p class="text-label text-muted">Started</p>
-          <p class="text-body">{{ current.startedAt | localDate: 'dateTime' }}</p>
-        </div>
-        <div>
-          <p class="text-label text-muted">Last activity</p>
-          <p class="text-body">{{ current.lastActivityAt | localDate: 'dateTime' }}</p>
-        </div>
-        <div>
-          <p class="text-label text-muted">Answered by</p>
-          <!--
-            A word, not a colour. Somebody who cannot rely on hue still reads
-            which of two quite different things is happening to this customer.
-          -->
-          <p class="text-body">
-            <span class="handling" [class.handling-human]="isHuman()">
-              {{ isHuman() ? 'A person' : 'The AI' }}
-            </span>
-          </p>
-        </div>
-        <div>
-          <p class="text-label text-muted">Assigned to</p>
-          <p class="text-body">{{ current.assignedTo?.email ?? 'Nobody' }}</p>
-        </div>
-        @if (whatsAppFacts(); as whatsapp) {
-          <div>
-            <p class="text-label text-muted">Customer</p>
-            <!--
-              Masked by the server and never sent in full. Enough to recognise
-              who you are talking to; not a contact list, and not a phone number
-              in a screenshot.
-            -->
-            <p class="text-body">{{ whatsapp.customerReference }}</p>
-          </div>
+    }
+  </div>
+} @else if (conversation(); as current) {
+  <div
+    class="conversation"
+    [class.is-panes]="panes()"
+    [class.is-fill]="fill()"
+    [class.has-details]="detailsOpen()"
+  >
+    <section class="conversation-main" aria-labelledby="conversation-title">
+      <header class="conversation-header">
+        @if (!panes()) {
+          <a class="conversation-back" href="/conversations" (click)="goBack($event)">
+            <app-icon name="arrow-start" [strokeWidth]="1.75" />
+            <span
+              ><span class="visually-hidden" i18n="@@pageHeader.backTo">Back to </span
+              ><span i18n="@@back.conversations">Conversations</span></span
+            >
+          </a>
         }
-      </div>
-    </div>
 
-    @if (canHandoff() || canAssign()) {
-      <div class="page-section">
-        <div class="card card-body handling-controls">
+        <div class="conversation-title-row">
+          <div class="conversation-title-text">
+            <h1 id="conversation-title" class="conversation-title" tabindex="-1">{{ title() }}</h1>
+            <p class="conversation-meta">{{ meta() }}</p>
+          </div>
+
+          <div class="conversation-tools">
+            <button
+              type="button"
+              class="btn btn-ghost btn-sm"
+              (click)="refresh()"
+              data-testid="refresh-conversation"
+            >
+              <app-icon name="refresh" [strokeWidth]="1.75" />
+              <span class="visually-hidden-narrow" i18n="@@inbox.refresh">Refresh</span>
+            </button>
+            <button
+              type="button"
+              class="btn btn-secondary btn-sm"
+              [attr.aria-expanded]="detailsOpen()"
+              aria-controls="conversation-details"
+              (click)="toggleDetails()"
+              data-testid="toggle-details"
+            >
+              <app-icon name="info" [strokeWidth]="1.75" />
+              <span class="visually-hidden-narrow" i18n="@@conversation.details">Details</span>
+            </button>
+          </div>
+        </div>
+
+        <!--
+          The handoff moment. Who is answering, as a voice chip (glyph and word)
+          and a sentence, beside the one action that changes it. When it changes,
+          the chip sweeps to the new voice: 320 ms, emphasized, instant under
+          reduced motion.
+        -->
+        <div class="handling-bar" data-testid="handling">
+          <span
+            class="handling-chip"
+            [class.is-sweeping]="sweep() !== null"
+            [class.from-ai]="sweep() === 'human'"
+            [class.from-human]="sweep() === 'ai'"
+            (animationend)="endSweep()"
+          >
+            <app-voice-chip [voice]="voice()" />
+          </span>
+          <!-- On a phone the chip says it; the sentence stays for a screen reader. -->
+          <span class="handling-sentence visually-hidden-narrow">{{ handlingText() }}</span>
+
           @if (canHandoff()) {
-            <div class="handling-action">
-              @if (isHuman()) {
-                <button
-                  type="button"
-                  class="btn btn-secondary"
-                  [disabled]="working()"
-                  (click)="returnToAi()"
-                >
-                  {{ working() ? 'Working…' : 'Return to AI' }}
-                </button>
-                <p class="text-small text-muted">
-                  The AI answers new messages again. Anything the customer sent while you were
-                  handling this stays unanswered by it.
-                </p>
-              } @else {
-                <button
-                  type="button"
-                  class="btn btn-primary"
-                  [disabled]="working()"
-                  (click)="takeOver()"
-                  data-testid="take-over"
-                >
-                  {{ working() ? 'Working…' : 'Take over' }}
-                </button>
-                <p class="text-small text-muted">
-                  The AI stops answering this conversation until you hand it back.
-                </p>
-              }
-            </div>
-          }
-
-          @if (canAssign()) {
-            <div class="handling-action">
-              <label class="text-label" for="conversation-assignee">Assign to</label>
-              <select
-                id="conversation-assignee"
-                class="input"
+            @if (isHuman()) {
+              <button
+                type="button"
+                class="btn btn-secondary handling-action"
+                [class.btn-loading]="working()"
+                [attr.aria-busy]="working() || null"
                 [disabled]="working()"
-                [value]="current.assignedTo?.userId ?? ''"
-                (change)="onAssignmentChange($event)"
+                aria-describedby="handling-help"
+                (click)="returnToAi()"
+                data-testid="return-to-ai"
               >
-                <option value="">Nobody</option>
-                @for (member of assignees(); track member.userId) {
-                  <option [value]="member.userId">{{ member.email }}</option>
+                <span class="btn-label" i18n="@@conversation.returnToAi">Return to AI</span>
+                @if (working()) {
+                  <span class="spinner" aria-hidden="true"></span>
                 }
-              </select>
-              <p class="text-small text-muted">
-                Routing only. It gives that colleague no permission they did not already have.
-              </p>
-            </div>
+              </button>
+            } @else {
+              <button
+                type="button"
+                class="btn btn-primary handling-action"
+                [class.btn-loading]="working()"
+                [attr.aria-busy]="working() || null"
+                [disabled]="working()"
+                aria-describedby="handling-help"
+                (click)="takeOver()"
+                data-testid="take-over"
+              >
+                <span class="btn-label" i18n="@@conversation.takeOver">Take over</span>
+                @if (working()) {
+                  <span class="spinner" aria-hidden="true"></span>
+                }
+              </button>
+            }
           }
         </div>
+
+        @if (canHandoff()) {
+          <p id="handling-help" class="handling-help">
+            @if (isHuman()) {
+              <span i18n="@@conversation.returnHelp"
+                >The AI answers new messages again. Anything the customer sent while you were
+                handling this stays unanswered by it.</span
+              >
+            } @else {
+              <span i18n="@@conversation.takeOverHelp"
+                >The AI stops answering this conversation until you hand it back.</span
+              >
+            }
+          </p>
+        }
+
+        <p class="visually-hidden" role="status">{{ handoffAnnouncement() }}</p>
+
+        <app-voice-track class="conversation-track" [messages]="messages()" [partial]="hasMore()" />
 
         @if (actionFailure(); as error) {
-          <p class="form-error" role="alert">{{ error.message }}</p>
-        }
-      </div>
-    }
-
-    <div class="page-section">
-      <h2 class="text-section-title">Transcript</h2>
-
-      @if (messages().length === 0) {
-        <div class="card card-body">
-          <p class="text-small text-muted">
-            This conversation has no messages. Somebody opened the chat and did not say anything.
-          </p>
-        </div>
-      } @else {
-        <!--
-          In ingestion order, oldest first -- the order this platform received the
-          messages, which is the only order it guarantees. Never sorted by the
-          timestamp shown beside each one.
-
-          Sender is carried by a label and by layout, not by colour alone, so the
-          distinction survives for anybody who cannot rely on hue.
-        -->
-        <!--
-          A polite live region, so a screen-reader user hears a message that
-          arrives while they are reading rather than discovering it later.
-          Polite and not assertive: an incoming message is worth knowing about
-          and is never worth interrupting somebody mid-sentence for.
-        -->
-        <ol class="transcript" aria-live="polite" aria-relevant="additions">
-          @for (message of messages(); track message.id) {
-            <li
-              class="message"
-              [class.message-customer]="message.sender === 'Customer'"
-              [class.message-agent]="message.sender === 'AiAgent'"
-              [class.message-human]="message.sender === 'HumanAgent'"
-            >
-              <p class="message-meta">
-                <span class="message-sender">{{ senderName(message) }}</span>
-                <span class="text-muted">{{ message.sentAt | localDate: 'dateTime' }}</span>
-
-                @if (deliveryStatus(message.id); as delivery) {
-                  <!--
-                    A word, not a colour: whether a reply reached the customer is
-                    exactly the kind of thing somebody who cannot rely on hue must
-                    still be able to read.
-                  -->
-                  <span
-                    class="badge badge-sm"
-                    [class.badge-success]="delivery === 'Delivered' || delivery === 'Read'"
-                    [class.badge-danger]="delivery === 'Failed'"
-                    [class.badge-warning]="delivery === 'Unknown'"
-                    [class.badge-neutral]="
-                      delivery !== 'Delivered' &&
-                      delivery !== 'Read' &&
-                      delivery !== 'Failed' &&
-                      delivery !== 'Unknown'
-                    "
-                    >{{ delivery }}</span
+          @if (error.kind === 'stale') {
+            <div class="stale-notice conversation-alert" role="alert" data-testid="stale">
+              <app-icon name="alert" [strokeWidth]="1.75" />
+              <div class="conflict-body">
+                <p class="conflict-title" i18n="@@conversation.stale.title">
+                  Somebody else changed this conversation
+                </p>
+                <p>{{ error.message }}</p>
+                <div class="conflict-actions">
+                  <button
+                    type="button"
+                    class="btn btn-secondary btn-sm"
+                    (click)="load()"
+                    i18n="@@conversation.stale.reload"
                   >
-                }
-              </p>
-              <p class="message-text">{{ message.text }}</p>
-
-              @if (deliveryStatus(message.id); as delivery) {
-                @if (deliveryHint(delivery); as hint) {
-                  <p class="text-small text-muted message-delivery">{{ hint }}</p>
-                }
-              }
-            </li>
+                    Show the latest version
+                  </button>
+                </div>
+              </div>
+            </div>
+          } @else {
+            <p class="form-error conversation-alert" role="alert">{{ error.message }}</p>
           }
-        </ol>
+        }
+      </header>
+
+      @if (detailsOpen() && !panes()) {
+        <aside
+          id="conversation-details"
+          class="conversation-details is-inline"
+          aria-labelledby="conversation-details-title"
+        >
+          <app-conversation-context
+            [conversation]="current"
+            [whatsApp]="whatsAppFacts()"
+            [assignees]="assignees()"
+            [canAssign]="canAssign()"
+            [working]="working()"
+            (assign)="assign($event)"
+          />
+        </aside>
+      }
+
+      <app-conversation-transcript
+        [conversationId]="current.id"
+        [messages]="messages()"
+        [handling]="current.handling"
+        [agentName]="current.agentName"
+        [whatsApp]="whatsAppFacts()"
+        (unseenChange)="unseen.set($event)"
+      />
+
+      <footer class="conversation-footer">
+        @if (unseen() > 0) {
+          <button
+            type="button"
+            class="btn btn-secondary btn-sm new-messages"
+            (click)="showNewest()"
+            data-testid="new-messages"
+          >
+            <app-icon name="chevron-down" [strokeWidth]="1.75" />
+            <span>{{ unseenText() }}</span>
+          </button>
+        }
 
         @if (hasMore()) {
           <div class="transcript-more">
             <button
               type="button"
               class="btn btn-secondary btn-sm"
+              [class.btn-loading]="loadingMore()"
               [disabled]="loadingMore()"
               (click)="loadMore()"
+              i18n="@@conversation.loadNewer"
             >
-              {{ loadingMore() ? 'Loading…' : 'Load older messages' }}
+              Load newer messages
             </button>
           </div>
         }
-      }
 
-      @if (canReply()) {
-        @if (isHuman()) {
-          <!--
-            Not a <form>. Send is an ordinary button, so nothing here depends on
-            native form submission — which keeps this composer identical in shape
-            to the one inside the sandboxed widget iframe, where submission is not
-            available at all. Enter adds a new line and never sends: a reply to a
-            customer is not something a stray keystroke should post.
-          -->
-          <div class="composer">
-            <label class="visually-hidden" for="conversation-reply">Your reply</label>
-            <textarea
-              id="conversation-reply"
-              class="input composer-input"
-              rows="3"
-              [formControl]="reply"
-              [attr.maxlength]="maxLength"
-              placeholder="Reply to the customer…"
-            ></textarea>
-
-            <div class="composer-actions">
-              <p class="text-small text-muted">
-                The customer sees this as the business replying, not as you.
-              </p>
-              <button
-                type="button"
-                class="btn btn-primary"
-                [disabled]="!canSend() || reply.invalid"
-                (click)="send()"
-              >
-                {{ sending() ? 'Sending…' : 'Send reply' }}
-              </button>
-            </div>
-
-            @if (sendFailure(); as error) {
-              <p class="form-error" role="alert">{{ error.message }}</p>
-            }
-          </div>
-        } @else {
-          <p class="text-small text-muted composer-hint">
-            The AI is answering this conversation. Take it over to reply yourself.
-          </p>
+        @if (canReply()) {
+          @if (isHuman()) {
+            <app-conversation-composer [conversationId]="current.id" (sent)="onSent($event)" />
+          } @else {
+            <p class="composer-withheld" i18n="@@conversation.composerWithheld">
+              The AI is answering this conversation. Take it over to reply yourself.
+            </p>
+          }
         }
-      }
-    </div>
-  }
-</div>
+      </footer>
+    </section>
+
+    @if (detailsOpen() && panes()) {
+      <aside
+        id="conversation-details"
+        class="conversation-details"
+        aria-labelledby="conversation-details-title"
+      >
+        <app-conversation-context
+          [conversation]="current"
+          [whatsApp]="whatsAppFacts()"
+          [assignees]="assignees()"
+          [canAssign]="canAssign()"
+          [working]="working()"
+          (assign)="assign($event)"
+        />
+      </aside>
+    }
+  </div>
+}

@@ -1,4 +1,5 @@
 import { Routes } from '@angular/router';
+import { unsavedChangesGuard } from '@app/core/navigation/unsaved-changes';
 import { CustomersApi } from './customers-api';
 
 /**
@@ -21,6 +22,9 @@ export const customersRoutes: Routes = [
       {
         path: ':customerId',
         title: $localize`:@@title.customer:Customer`,
+        // A typed and unsaved name is asked about before it is lost, as in
+        // every other editor (Phase 36.6).
+        canDeactivate: [unsavedChangesGuard],
         loadComponent: () =>
           import('./customer-detail/customer-detail').then((m) => m.CustomerDetail),
       },

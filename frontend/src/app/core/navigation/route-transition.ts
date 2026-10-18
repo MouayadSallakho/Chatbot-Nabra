@@ -39,7 +39,12 @@ export const INSTANT_TRANSITION_CLASS = 'route-transition-instant';
  * list -- because the page itself stays put and a fade would read as the
  * screen reloading. Not for a reader who asked for reduced motion either (the
  * stylesheet's media query already says so; this makes it independent of
- * which rule wins).
+ * which rule wins). Nor between two panes of one workspace -- opening another
+ * conversation while the inbox shows its list beside it (Phase 36.6) -- because
+ * only one pane changes, and fading the whole content area would flash the
+ * list the reader is working from. A route marks itself as such a workspace
+ * with `data: { panes: '<media query>' }`, the width from which its panes sit
+ * side by side; below it, its children are ordinary pages again.
  *
  * The transition is made instant rather than skipped: `skipTransition()`
  * rejects the transition's `ready` promise, which the router reports as a
@@ -48,9 +53,12 @@ export const INSTANT_TRANSITION_CLASS = 'route-transition-instant';
  * context (the router calls it inside one).
  */
 export function onRouteViewTransition({ transition, from, to }: ViewTransitionInfo): void {
-  const reduced = inject(MEDIA_QUERY_FACTORY)(MediaQueries.reducedMotion).matches;
+  const media = inject(MEDIA_QUERY_FACTORY);
+  const reduced = media(MediaQueries.reducedMotion).matches;
+  const panes = sharedPaneWorkspace(from, to);
+  const sideBySide = panes !== null && media(panes).matches;
 
-  if (!reduced && pathOfSnapshot(from) !== pathOfSnapshot(to)) {
+  if (!reduced && !sideBySide && pathOfSnapshot(from) !== pathOfSnapshot(to)) {
     return;
   }
 
@@ -59,4 +67,33 @@ export function onRouteViewTransition({ transition, from, to }: ViewTransitionIn
 
   root.classList.add(INSTANT_TRANSITION_CLASS);
   transition.finished.then(done, done);
+}
+
+/**
+ * The media query of a pane workspace both routes sit in, or null.
+ *
+ * The outermost route carrying `data.panes` on each side, compared by its
+ * configuration: children inherit their parent's data, so the first match
+ * walking down is the workspace itself.
+ */
+function sharedPaneWorkspace(
+  from: ActivatedRouteSnapshot,
+  to: ActivatedRouteSnapshot,
+): string | null {
+  const workspace = (root: ActivatedRouteSnapshot) => {
+    for (let route: ActivatedRouteSnapshot | null = root; route; route = route.firstChild) {
+      const panes: unknown = route.data?.['panes'];
+
+      if (typeof panes === 'string') {
+        return { config: route.routeConfig, panes };
+      }
+    }
+
+    return null;
+  };
+
+  const left = workspace(from);
+  const right = workspace(to);
+
+  return left !== null && right !== null && left.config === right.config ? left.panes : null;
 }

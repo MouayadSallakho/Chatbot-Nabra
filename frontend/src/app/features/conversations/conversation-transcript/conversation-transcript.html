@@ -1,0 +1,124 @@
+<h2 class="visually-hidden" i18n="@@transcript.heading">Messages</h2>
+
+@if (messages().length === 0) {
+  <p class="transcript-empty" i18n="@@transcript.empty">
+    This conversation has no messages. Somebody opened the chat and did not say anything.
+  </p>
+} @else {
+  @if (hiddenCount() > 0) {
+    <div class="transcript-earlier">
+      <button
+        type="button"
+        class="btn btn-secondary btn-sm"
+        (click)="showEarlier()"
+        data-testid="show-earlier"
+        i18n="@@transcript.showEarlier"
+      >
+        Show earlier messages
+      </button>
+    </div>
+  }
+
+  <!--
+    In ingestion order, oldest first: the order this platform received the
+    messages, which is the only order it guarantees. Never sorted by the time
+    shown beside each one.
+  -->
+  <ol class="transcript" data-testid="transcript">
+    @for (row of rows(); track row.key) {
+      @switch (row.kind) {
+        @case ('day') {
+          <li class="transcript-day">
+            <h3>{{ row.label }}</h3>
+          </li>
+        }
+        @case ('handoff') {
+          <li
+            class="handoff-divider"
+            [class.handoff-to-human]="row.to === 'human'"
+            [class.handoff-to-ai]="row.to === 'ai'"
+          >
+            @if (row.to === 'human') {
+              <span i18n="@@transcript.handoff.toPerson">A person took over</span>
+            } @else {
+              <span i18n="@@transcript.handoff.toAi">Back with the AI</span>
+            }
+          </li>
+        }
+        @case ('message') {
+          @if (row.message.sender === 'System') {
+            <li class="transcript-note">
+              <span class="text-muted">{{ speaker(row.message) }}</span>
+              <span class="message-text" dir="auto">{{ row.message.text }}</span>
+            </li>
+          } @else {
+            <li
+              class="bubble"
+              [class.bubble-customer]="row.voice === null"
+              [class.bubble-ai]="row.voice === 'ai'"
+              [class.bubble-human]="row.voice === 'human'"
+              [class.is-fresh]="fresh().has(row.message.id)"
+            >
+              <span class="bubble-speaker">
+                @if (row.voice === 'ai') {
+                  <app-icon class="bubble-glyph" name="ai" [strokeWidth]="1.8" />
+                } @else if (row.voice === 'human') {
+                  <app-icon class="bubble-glyph" name="person" [strokeWidth]="1.8" />
+                }
+                @if (row.voice === 'human' && row.message.sentBy) {
+                  <bdi dir="ltr" class="bubble-name">{{ speaker(row.message) }}</bdi>
+                } @else {
+                  <span class="bubble-name" dir="auto">{{ speaker(row.message) }}</span>
+                }
+                <time
+                  class="bubble-time"
+                  [attr.datetime]="row.message.sentAt"
+                  [attr.title]="fullTime(row.message)"
+                  >{{ time(row.message) }}</time
+                >
+              </span>
+              <span class="message-text" dir="auto">{{ row.message.text }}</span>
+
+              @if (delivery(row.message); as status) {
+                <!--
+                  A word, not a colour: whether a reply reached the customer is
+                  exactly the kind of thing somebody who cannot rely on hue must
+                  still be able to read.
+                -->
+                <span class="bubble-delivery">
+                  <span
+                    class="badge badge-sm"
+                    [class.badge-success]="status === 'Delivered' || status === 'Read'"
+                    [class.badge-danger]="status === 'Failed'"
+                    [class.badge-warning]="status === 'Unknown'"
+                    [class.badge-neutral]="
+                      status !== 'Delivered' &&
+                      status !== 'Read' &&
+                      status !== 'Failed' &&
+                      status !== 'Unknown'
+                    "
+                    >{{ deliveryWord(status) }}</span
+                  >
+                  @if (deliveryHint(status); as hint) {
+                    <span class="text-small text-muted">{{ hint }}</span>
+                  }
+                </span>
+              }
+            </li>
+          }
+        }
+      }
+    }
+
+    @if (awaitingAi()) {
+      <li class="transcript-tail" data-testid="awaiting-ai">
+        <span i18n="@@transcript.awaitingAi"
+          >The AI has not replied to the last message. When it cannot answer, nothing is sent to the
+          customer and nothing appears here.</span
+        >
+      </li>
+    }
+  </ol>
+}
+
+<p class="visually-hidden" aria-live="polite">{{ announcement() }}</p>

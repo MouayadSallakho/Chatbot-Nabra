@@ -19,7 +19,18 @@ import { WorkspaceContextService } from '@app/core/workspace/workspace-context-s
 import { EmptyState } from '@app/shared/empty-state/empty-state';
 import { PageHeader } from '@app/shared/page-header/page-header';
 import { LocaleFormat } from '@app/core/i18n/locale-format';
+import { HasUnsavedChanges, protectUnsavedChanges } from '@app/core/navigation/unsaved-changes';
+import { ChannelBadge, channelWord } from '@app/shared/channel/channel-badge';
+import { VoiceChip } from '@app/shared/voice/voice-chip';
 import { Customer, CustomerRow, CustomersApi } from '../customers-api';
+import { conversationsPhrase, customerName } from '../customer-words';
+
+/** What tells one record apart from another in the merge step. */
+export interface Distinction {
+  readonly where: string;
+  readonly firstSeen: string;
+  readonly reference: string;
+}
 
 /**
  * One customer: who they are, how they reach this workspace, and what they have
@@ -43,11 +54,11 @@ import { Customer, CustomerRow, CustomersApi } from '../customers-api';
 @Component({
   selector: 'app-customer-detail',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [PageHeader, EmptyState, RouterLink, FormsModule],
+  imports: [PageHeader, EmptyState, RouterLink, FormsModule, ChannelBadge, VoiceChip],
   templateUrl: './customer-detail.html',
   styleUrl: './customer-detail.scss',
 })
-export class CustomerDetail implements OnInit {
+export class CustomerDetail implements OnInit, HasUnsavedChanges {
   private readonly locale = inject(LocaleFormat);
 
   private readonly api = inject(CustomersApi);
@@ -94,6 +105,25 @@ export class CustomerDetail implements OnInit {
   protected readonly dirty = computed(
     () => this.draft().trim() !== (this.customer()?.displayName ?? ''),
   );
+
+  /** The customer's name in the reader's language (see `customerName`). */
+  protected readonly name = computed(() => {
+    const person = this.customer();
+
+    return person ? customerName(person) : $localize`:@@customers.one:Customer`;
+  });
+
+  protected readonly description = $localize`:@@customer.description:Who this is to your workspace, how they reach you, and what they have talked about.`;
+
+  constructor() {
+    // Closing or reloading the tab is the other way a typed name is lost.
+    protectUnsavedChanges(() => this.hasUnsavedChanges());
+  }
+
+  /** A name typed and not saved, on a record that can still be named. */
+  hasUnsavedChanges(): boolean {
+    return this.canManage() && this.merged() === null && this.customer() !== null && this.dirty();
+  }
 
   /**
    * Loads on init rather than in the constructor.
@@ -222,12 +252,31 @@ export class CustomerDetail implements OnInit {
     return this.locale.date(value, 'dateTime');
   }
 
-  protected channelLabel(channel: string): string {
-    return channel === 'WebChat' ? 'Website chat' : channel;
+  protected conversations(count: number): string {
+    return conversationsPhrase(this.locale.language, count);
   }
 
-  protected conversations(count: number): string {
-    return count === 1 ? '1 conversation' : `${count} conversations`;
+  /** "This customer has 2 conversations.", for a reader who may not see them. */
+  protected historyCount(count: number): string {
+    const phrase = this.conversations(count);
+
+    return $localize`:@@customer.history.count:This customer has ${phrase}:count:.`;
+  }
+
+  protected customerName(row: CustomerRow): string {
+    return customerName(row);
+  }
+
+  /** Open or closed, as a word, for the history list. */
+  protected statusWord(status: string): string {
+    switch (status) {
+      case 'Open':
+        return $localize`:@@conversation.status.open:Open`;
+      case 'Closed':
+        return $localize`:@@conversation.status.closed:Closed`;
+      default:
+        return status;
+    }
   }
 
   /**
@@ -245,22 +294,18 @@ export class CustomerDetail implements OnInit {
    * short reference from the record's own identifier -- the same one in its
    * address, and the only fact guaranteed to differ between two records.
    */
-  protected distinguish(row: CustomerRow): string {
-    return this.summarise(row.id, row.channels, row.createdAt);
-  }
-
-  /** The same description, for the customer whose page this is. */
-  protected distinguishThis(person: Customer): string {
-    return this.summarise(person.id, person.channels, person.createdAt);
-  }
-
-  private summarise(id: string, channels: readonly string[], createdAt: string): string {
+  protected distinguish(row: CustomerRow | Customer): Distinction {
     const where =
-      channels.length === 0
-        ? 'No channel'
-        : channels.map((channel) => this.channelLabel(channel)).join(', ');
+      row.channels.length === 0
+        ? $localize`:@@customer.noChannel:No channel`
+        : row.channels.map((channel) => channelWord(channel)).join($localize`:@@list.separator:, `);
+    const date = this.date(row.createdAt);
 
-    return `${where} · first seen ${this.date(createdAt)} · ref. ${id.slice(-6)}`;
+    return {
+      where,
+      firstSeen: $localize`:@@customer.firstSeenOn:first seen ${date}:date:`,
+      reference: row.id.slice(-6),
+    };
   }
 
   /**
@@ -272,18 +317,18 @@ export class CustomerDetail implements OnInit {
    */
   private describe(error: ApiError): string {
     if (error.kind === 'stale') {
-      return 'Somebody else changed this customer while you were editing. Reload the page and apply your change again — nothing you typed has been lost.';
+      return $localize`:@@customer.failure.stale:Somebody else changed this customer while you were editing. Reload the page and apply your change again — nothing you typed has been lost.`;
     }
 
     if (error.kind === 'conflict') {
-      return 'This customer has already been combined with another one. Reload the page to see where their history went.';
+      return $localize`:@@customer.failure.merged:This customer has already been combined with another one. Reload the page to see where their history went.`;
     }
 
     if (error.kind === 'preconditionRequired') {
-      return 'This page is out of date. Reload it and try again.';
+      return $localize`:@@customer.failure.outOfDate:This page is out of date. Reload it and try again.`;
     }
 
-    return error.message || 'That could not be saved.';
+    return error.message || $localize`:@@customer.failure.unknown:That could not be saved.`;
   }
 
   private apply(customer: Customer, version: string): void {

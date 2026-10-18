@@ -66,7 +66,7 @@ describe('ConversationList', () => {
   const text = (): string => host().textContent ?? '';
 
   const rows = (): HTMLElement[] => [
-    ...host().querySelectorAll<HTMLElement>('.conversation-list a.data-row'),
+    ...host().querySelectorAll<HTMLElement>('[data-testid="conversation-rows"] a.conversation-row'),
   ];
 
   const button = (label: string): HTMLButtonElement | undefined =>
@@ -196,5 +196,120 @@ describe('ConversationList', () => {
     await settle();
 
     expect(text()).toContain('do not have access to conversations');
+  });
+
+  it('marks the open conversation, and gives up the page heading beside it', async () => {
+    await mount('conversations.view');
+    fixture.componentRef.setInput('selectedId', 'c2');
+    fixture.componentRef.setInput('isPage', false);
+
+    http.expectOne(url).flush({
+      items: [
+        conversation('c1', 'We close at six.', '2026-09-07T12:00:00Z'),
+        conversation('c2', 'Certainly.', '2026-09-07T11:00:00Z'),
+      ],
+      page: 1,
+      pageSize: 20,
+      total: 2,
+    });
+    await settle();
+
+    const current = host().querySelectorAll('a[aria-current="page"]');
+
+    expect(current).toHaveLength(1);
+    expect(current[0].textContent).toContain('Certainly.');
+    // The open conversation's heading is the page's; the list's is a section's.
+    expect(host().querySelector('h1')).toBeNull();
+    expect(host().querySelector('h2')?.textContent).toContain('Conversations');
+  });
+
+  it('says the team owes a reply only where the data says so', async () => {
+    // A person is answering and the customer wrote last: the AI will not
+    // answer in that mode, so somebody on the team must. Nothing else is
+    // marked: the API carries no unread state to mark with.
+    await mount('conversations.view');
+
+    http.expectOne(url).flush({
+      items: [
+        {
+          ...conversation('c1', 'Is anyone there?', '2026-09-07T12:00:00Z'),
+          handling: 'Human',
+          lastMessageSender: 'Customer',
+        },
+        {
+          ...conversation('c2', 'Answered.', '2026-09-07T11:00:00Z'),
+          handling: 'Human',
+          lastMessageSender: 'HumanAgent',
+        },
+        { ...conversation('c3', 'Hello?', '2026-09-07T10:00:00Z'), lastMessageSender: 'Customer' },
+      ],
+      page: 1,
+      pageSize: 20,
+      total: 3,
+    });
+    await settle();
+
+    const waiting = rows().map((row) => row.textContent?.includes('Waiting for the team'));
+
+    expect(waiting).toEqual([true, false, false]);
+  });
+
+  it('names who is answering each conversation in a word, with its glyph', async () => {
+    await mount('conversations.view');
+
+    http.expectOne(url).flush({
+      items: [
+        { ...conversation('c1', 'Mine now.', '2026-09-07T12:00:00Z'), handling: 'Human' },
+        { ...conversation('c2', 'Hello.', '2026-09-07T11:00:00Z'), handling: 'Ai' },
+      ],
+      page: 1,
+      pageSize: 20,
+      total: 2,
+    });
+    await settle();
+
+    const voices = rows().map((row) =>
+      row.querySelector('app-voice-chip')?.getAttribute('data-voice'),
+    );
+
+    expect(voices).toEqual(['human', 'ai']);
+    expect(rows()[0].textContent).toContain('Person');
+    expect(rows()[1].textContent).toContain('AI');
+  });
+
+  it('moves between rows with the arrow keys, Home and End', async () => {
+    await mount('conversations.view');
+    document.body.append(host());
+
+    http.expectOne(url).flush({
+      items: [
+        conversation('c1', 'One', '2026-09-07T12:00:00Z'),
+        conversation('c2', 'Two', '2026-09-07T11:00:00Z'),
+        conversation('c3', 'Three', '2026-09-07T10:00:00Z'),
+      ],
+      page: 1,
+      pageSize: 20,
+      total: 3,
+    });
+    await settle();
+
+    const press = (key: string) =>
+      document.activeElement!.dispatchEvent(
+        new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }),
+      );
+
+    rows()[0].focus();
+    press('ArrowDown');
+    expect(document.activeElement).toBe(rows()[1]);
+    press('End');
+    expect(document.activeElement).toBe(rows()[2]);
+    press('ArrowDown');
+    expect(document.activeElement).toBe(rows()[2]);
+    press('Home');
+    expect(document.activeElement).toBe(rows()[0]);
+    press('ArrowUp');
+    expect(document.activeElement).toBe(rows()[0]);
+
+    host().remove();
   });
 });

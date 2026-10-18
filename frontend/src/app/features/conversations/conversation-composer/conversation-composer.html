@@ -1,0 +1,78 @@
+<div class="composer" [class.is-sending]="sending()">
+  <label class="visually-hidden" for="conversation-reply" i18n="@@composer.label">Your reply</label>
+  <textarea
+    id="conversation-reply"
+    class="input composer-input"
+    rows="3"
+    dir="auto"
+    [value]="text()"
+    [readOnly]="sending()"
+    [attr.aria-invalid]="tooLong() || null"
+    [attr.maxlength]="maxLength"
+    aria-describedby="composer-hint composer-count"
+    placeholder="Reply to the customer…"
+    i18n-placeholder="@@composer.placeholder"
+    (input)="onInput($event)"
+    (keydown)="onKeydown($event)"
+  ></textarea>
+
+  <div class="composer-footer">
+    <p id="composer-hint" class="composer-hint">
+      <span i18n="@@composer.hint"
+        >The customer sees this as the business replying, not as you.</span
+      >
+      <!-- Key names are Latin on every keyboard: one LTR island, never translated. -->
+      <span class="composer-keys"
+        ><bdi dir="ltr"><kbd class="kbd">Ctrl</kbd> + <kbd class="kbd">Enter</kbd></bdi>
+        <span i18n="@@composer.keys">to send</span></span
+      >
+    </p>
+
+    <span id="composer-count" class="composer-count" [class.is-over]="tooLong()">
+      @if (showCount()) {
+        {{ countText() }}
+      }
+    </span>
+
+    <button
+      type="button"
+      class="btn btn-primary"
+      [class.btn-loading]="sending()"
+      [attr.aria-busy]="sending() || null"
+      [disabled]="empty() || tooLong()"
+      [attr.aria-disabled]="sending() || null"
+      (click)="send()"
+      data-testid="send-reply"
+    >
+      <span class="btn-label" i18n="@@composer.send">Send reply</span>
+      @if (sending()) {
+        <span class="spinner" aria-hidden="true"></span>
+      }
+    </button>
+  </div>
+
+  <p class="visually-hidden" role="status">
+    @if (sending()) {
+      <span i18n="@@composer.sending">Sending your reply…</span>
+    }
+  </p>
+
+  @if (failure()) {
+    <div class="alert alert-danger composer-failed" role="alert" data-testid="send-failed">
+      <span>
+        <span i18n="@@composer.failed">Your reply was not sent.</span>
+        {{ failureText() }}
+      </span>
+      @if (retryable()) {
+        <button
+          type="button"
+          class="btn btn-secondary btn-sm"
+          (click)="send()"
+          i18n="@@composer.retry"
+        >
+          Try again
+        </button>
+      }
+    </div>
+  }
+</div>

@@ -41,7 +41,11 @@ import { Icon } from '@app/shared/icon/icon';
       <div class="page-header-row">
         <div class="page-header-text">
           <div class="page-header-title">
-            <h1 class="text-page-title">{{ heading() }}</h1>
+            @if (level() === 1) {
+              <h1 class="text-page-title" [attr.dir]="headingDir()">{{ heading() }}</h1>
+            } @else {
+              <h2 class="text-page-title" [attr.dir]="headingDir()">{{ heading() }}</h2>
+            }
             <ng-content select="[pageStatus]" />
           </div>
           @if (description()) {
@@ -69,6 +73,20 @@ export class PageHeader {
    * element a tooltip.
    */
   readonly heading = input.required<string>();
+
+  /**
+   * The heading's level: 1 for a page, 2 for a pane that is not the page right
+   * now (the inbox list beside an open conversation, whose heading is the
+   * page's). Same size either way; only the document outline changes.
+   */
+  readonly level = input<1 | 2>(1);
+
+  /**
+   * `auto` when the heading is somebody's own text -- a customer's name -- so an
+   * Arabic name reads right to left on an English page and the other way
+   * round. Left unset for headings the product writes, which follow the page.
+   */
+  readonly headingDir = input<'auto' | null>(null);
 
   /** One sentence on what the page is for. Optional. */
   readonly description = input('');

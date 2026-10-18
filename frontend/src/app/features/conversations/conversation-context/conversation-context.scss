@@ -1,0 +1,67 @@
+// A column of short sections from 1280px, a card under the header below it.
+:host {
+  display: grid;
+  align-content: start;
+  gap: var(--space-5);
+  padding: var(--space-5);
+}
+
+.context-title {
+  font: var(--text-card-title);
+}
+
+.context-section {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-2);
+  padding-block-start: var(--space-4);
+  border-block-start: 1px solid var(--border-subtle);
+}
+
+.context-heading {
+  color: var(--text-secondary);
+  font: var(--text-caption);
+
+  label {
+    font: inherit;
+  }
+}
+
+.context-value {
+  margin: 0;
+  font: var(--text-body);
+  overflow-wrap: anywhere;
+}
+
+.context-hint {
+  margin: 0;
+  color: var(--text-muted);
+  font: var(--text-small);
+}
+
+.select {
+  inline-size: 100%;
+}
+
+.context-facts {
+  display: grid;
+  gap: var(--space-3);
+  inline-size: 100%;
+  margin: 0;
+
+  div {
+    display: grid;
+    gap: 2px;
+  }
+
+  dt {
+    color: var(--text-muted);
+    font: var(--text-caption);
+  }
+
+  dd {
+    margin: 0;
+    font: var(--text-body);
+    font-variant-numeric: tabular-nums;
+  }
+}

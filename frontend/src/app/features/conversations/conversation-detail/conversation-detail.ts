@@ -4,54 +4,87 @@ import {
   DestroyRef,
   ElementRef,
   Injector,
-  OnInit,
   afterNextRender,
   computed,
+  effect,
   inject,
-  signal,
   input,
+  signal,
+  untracked,
+  viewChild,
 } from '@angular/core';
-import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { ApiError, toApiError } from '@app/core/api/api-error';
 import { Versioned } from '@app/core/api/versioned';
 import { PermissionService } from '@app/core/authorization/permission-service';
 import { ConversationRealtime } from '@app/core/realtime/conversation-realtime';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
+import { MediaQueries, mediaQuerySignal } from '@app/core/media/media';
+import { LocaleFormat } from '@app/core/i18n/locale-format';
+import { pluralMessage } from '@app/core/i18n/plural';
+import { NavigationHistory } from '@app/core/navigation/navigation-history';
 import { WhatsAppApi, WhatsAppConversationFacts } from '@app/features/channels/whatsapp-api';
 import { EmptyState } from '@app/shared/empty-state/empty-state';
-import { PageHeader } from '@app/shared/page-header/page-header';
-import { LocalDatePipe } from '@app/core/i18n/locale-pipes';
+import { Icon } from '@app/shared/icon/icon';
+import { VoiceChip } from '@app/shared/voice/voice-chip';
+import { VoiceTrack } from '@app/shared/voice/voice-track';
+import { Voice } from '@app/shared/voice/voice';
+import { channelWord } from '@app/shared/channel/channel-badge';
 import {
   ConversationDetail as Conversation,
   ConversationsApi,
   TranscriptMessage,
+  TranscriptPage,
   WorkspaceMember,
 } from '../conversations-api';
+import { InboxState } from '../inbox-state';
+import { ConversationTranscript } from '../conversation-transcript/conversation-transcript';
+import { ConversationComposer } from '../conversation-composer/conversation-composer';
+import { ConversationContext } from '../conversation-context/conversation-context';
+import {
+  conversationTitle,
+  handlingSentence,
+  messagesPhrase,
+  statusWord,
+} from '../conversation-words';
+import { mergeMessages, refreshCursor } from '../transcript-rows';
 
-/** The longest reply the platform stores. Matches the Domain's own bound. */
-const MAX_REPLY_LENGTH = 32_000;
+/** Messages per transcript read: the server's maximum. */
+export const MESSAGE_PAGE = 200;
 
 /**
- * One conversation, worked from the admin.
+ * How many pages a first read follows before it stops and offers the rest.
  *
- * <strong>The transcript is paged by ingestion sequence, never by time.</strong>
- * A cursor of "after sequence N" stays correct while the conversation is still
- * being added to; a page number would shift under every new message, and sorting
- * by timestamp would reorder a history the platform deliberately keeps in the
- * order it received it.
+ * The transcript is read forward from its first message (the API pages only
+ * that way), so reaching the newest messages of a very long conversation means
+ * reading through it. Fifty pages is ten thousand messages; past that the
+ * reader is offered the next ones rather than the screen reading without end.
+ */
+export const MAX_FIRST_READ_PAGES = 50;
+
+/**
+ * One conversation, worked from the inbox.
+ *
+ * <strong>The handoff is the heart of it.</strong> The header says who is
+ * answering in a voice chip (glyph and word) and offers the one action that
+ * changes it: Take over, or Return to AI. When it changes, the chip sweeps from
+ * one voice to the other (320 ms, instant under reduced motion), and the voice
+ * track under it shows the real sequence of reply authors.
+ *
+ * <strong>The transcript is read in ingestion order, to its end.</strong> The
+ * API pages forward from the first message, never by time; the screen follows
+ * the pages so the newest messages and the composer are what the reader sees,
+ * and a re-read continues from (just before) the end of what is on screen.
  *
  * <strong>Live updates carry an identifier, and this screen re-reads.</strong>
  * Nothing is appended from a realtime payload, because there is no payload: the
  * server says a conversation changed and the authoritative transcript comes from
- * the same API a Refresh button would call. That is what keeps the order right
- * and keeps a revoked reader from seeing anything.
+ * the same API a Refresh button calls. That keeps the order right and keeps a
+ * revoked reader from seeing anything.
  *
- * <strong>The refresh does not steal focus or scroll.</strong> Somebody
- * mid-sentence in the composer when a customer replies keeps their cursor and
- * their draft: the incoming messages are merged into the list, and nothing about
- * the composer is touched.
+ * <strong>Every write that can be stale is conditional.</strong> Handoff and
+ * assignment present the version read; a 412 is reported and never retried.
  *
  * <strong>Every control is permission-aware, and the server decides
  * anyway.</strong> Hiding a button somebody cannot use is courtesy; the API
@@ -60,22 +93,46 @@ const MAX_REPLY_LENGTH = 32_000;
 @Component({
   selector: 'app-conversation-detail',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, RouterLink, PageHeader, EmptyState, LocalDatePipe],
+  imports: [
+    RouterLink,
+    EmptyState,
+    Icon,
+    VoiceChip,
+    VoiceTrack,
+    ConversationTranscript,
+    ConversationComposer,
+    ConversationContext,
+  ],
   templateUrl: './conversation-detail.html',
   styleUrl: './conversation-detail.scss',
 })
-export class ConversationDetail implements OnInit {
+export class ConversationDetail {
   private readonly api = inject(ConversationsApi);
   private readonly workspace = inject(WorkspaceContextService);
   private readonly permissions = inject(PermissionService);
   private readonly whatsapp = inject(WhatsAppApi);
   private readonly realtime = inject(ConversationRealtime);
-  private readonly destroyRef = inject(DestroyRef);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly injector = inject(Injector);
+  private readonly format = inject(LocaleFormat);
+  private readonly router = inject(Router);
+  private readonly history = inject(NavigationHistory);
+  private readonly inbox = inject(InboxState, { optional: true });
 
   /** From the route, through `withComponentInputBinding`. */
   readonly conversationId = input.required<string>();
+
+  /** Whether the conversation sits beside the list (1280px and wider). */
+  protected readonly panes = mediaQuerySignal(MediaQueries.inbox);
+
+  private readonly tall = mediaQuerySignal(MediaQueries.tall);
+
+  /**
+   * Whether the conversation fills the screen, its transcript scrolling between
+   * the header and the composer: always beside the list, and on a narrower
+   * screen when it is tall enough. Otherwise it scrolls as a page.
+   */
+  protected readonly fill = computed(() => this.panes() || this.tall());
 
   protected readonly loading = signal(true);
   protected readonly failure = signal<ApiError | null>(null);
@@ -86,14 +143,12 @@ export class ConversationDetail implements OnInit {
   /** The version a handoff or an assignment must present back. */
   private readonly version = signal<string | null>(null);
 
-  /** Where the next page continues from, or null at the end of the transcript. */
+  /** Where the next page continues from, or null once the end has been read. */
   protected readonly cursor = signal<number | null>(null);
 
   protected readonly assignees = signal<readonly WorkspaceMember[]>([]);
   protected readonly working = signal(false);
-  protected readonly sending = signal(false);
   protected readonly actionFailure = signal<ApiError | null>(null);
-  protected readonly sendFailure = signal<ApiError | null>(null);
 
   protected readonly canView = computed(() => this.permissions.has('conversations.view'));
   protected readonly canReply = computed(() => this.permissions.has('conversations.reply'));
@@ -105,27 +160,103 @@ export class ConversationDetail implements OnInit {
   /** Whether a person is answering this conversation. */
   protected readonly isHuman = computed(() => this.conversation()?.handling === 'Human');
 
-  /** Whether live updates are arriving. Shown quietly; never an error. */
-  protected readonly live = this.realtime.live;
+  protected readonly voice = computed<Voice>(() => (this.isHuman() ? 'human' : 'ai'));
 
-  protected readonly maxLength = MAX_REPLY_LENGTH;
+  protected readonly handlingText = computed(() =>
+    handlingSentence(this.conversation()?.handling ?? 'Ai'),
+  );
 
-  /**
-   * The composer.
-   *
-   * Its own control rather than a form group: there is one field, and a group
-   * would be ceremony around it.
-   */
-  protected readonly reply = new FormControl('', {
-    nonNullable: true,
-    validators: [Validators.required, Validators.maxLength(MAX_REPLY_LENGTH)],
+  /** The voice the chip is sweeping to, for the length of the sweep; null otherwise. */
+  protected readonly sweep = signal<Voice | null>(null);
+
+  /** Said once, politely, when who is answering changes while the reader is here. */
+  protected readonly handoffAnnouncement = signal('');
+
+  protected readonly title = computed(() => {
+    const current = this.conversation();
+
+    return current ? conversationTitle(channelWord(current.channel)) : this.fallbackTitle;
   });
 
-  /** The composer is usable only when a person is actually handling this. */
-  protected readonly canSend = computed(() => this.canReply() && this.isHuman() && !this.sending());
+  protected readonly fallbackTitle = $localize`:@@conversation.heading:Conversation`;
 
-  ngOnInit(): void {
-    void this.load();
+  protected readonly notFoundHeading = $localize`:@@conversation.notFound:Conversation not found`;
+
+  protected readonly loadFailedHeading = $localize`:@@conversation.loadFailed:Could not load this conversation`;
+
+  protected readonly meta = computed(() => {
+    const current = this.conversation();
+
+    if (!current) {
+      return '';
+    }
+
+    const started = this.format.date(current.startedAt, 'dateTime');
+
+    return [
+      $localize`:@@conversation.meta.started:Started ${started}:date:`,
+      messagesPhrase(this.format.language, current.messageCount),
+      statusWord(current.status),
+    ].join(' · ');
+  });
+
+  /** Messages that arrived below the reader's view, for the "new messages" button. */
+  protected readonly unseen = signal(0);
+
+  protected readonly unseenText = computed(() => {
+    const count = this.unseen();
+    const n = this.format.number(count);
+
+    return pluralMessage(this.format.language, count, {
+      zero: $localize`:@@conversation.unseen.other:${n}:count: new messages`,
+      one: $localize`:@@conversation.unseen.one:1 new message`,
+      two: $localize`:@@conversation.unseen.two:${n}:count: new messages`,
+      few: $localize`:@@conversation.unseen.few:${n}:count: new messages`,
+      many: $localize`:@@conversation.unseen.many:${n}:count: new messages`,
+      other: $localize`:@@conversation.unseen.other:${n}:count: new messages`,
+    });
+  });
+
+  /** The details panel below 1280px: closed until asked for, never remembered. */
+  private readonly narrowDetails = signal(false);
+
+  /** Beside the transcript from 1280px, remembered per browser; above it below that. */
+  private readonly wideDetails = this.inbox?.detailsOpen ?? signal(true);
+
+  protected readonly detailsOpen = computed(() =>
+    this.panes() ? this.wideDetails() : this.narrowDetails(),
+  );
+
+  private readonly transcript = viewChild(ConversationTranscript);
+  private readonly composer = viewChild(ConversationComposer);
+
+  /**
+   * The WhatsApp side of this conversation, when it came from there.
+   *
+   * Null for every other channel, and null when the read failed -- this is extra
+   * detail beside a transcript that is already on screen, so a failure here
+   * must not take the conversation down with it.
+   */
+  protected readonly whatsAppFacts = signal<WhatsAppConversationFacts | null>(null);
+
+  /** Whether this conversation arrived over WhatsApp. */
+  protected readonly isWhatsApp = computed(() => this.conversation()?.channel === 'WhatsApp');
+
+  /** Which conversation the screen's state belongs to, so a reused screen starts over. */
+  private loadedFor: string | null = null;
+
+  constructor() {
+    // The inbox reuses this screen when another conversation is opened beside
+    // the list, so it loads on every change of id, not once.
+    effect(() => {
+      const id = this.conversationId();
+
+      untracked(() => {
+        if (id !== this.loadedFor) {
+          void this.load();
+        }
+      });
+    });
 
     const tenantId = this.workspace.tenantId();
 
@@ -137,7 +268,7 @@ export class ConversationDetail implements OnInit {
         }
       });
 
-      this.destroyRef.onDestroy(stop);
+      inject(DestroyRef).onDestroy(stop);
     }
 
     if (tenantId && this.canAssign()) {
@@ -145,45 +276,11 @@ export class ConversationDetail implements OnInit {
     }
   }
 
-  /**
-   * The WhatsApp side of this conversation, when it came from there.
-   *
-   * Null for every other channel, and null when the read failed — this is extra
-   * detail beside a transcript that is already on screen, so a failure here
-   * must not take the conversation down with it.
-   */
-  protected readonly whatsAppFacts = signal<WhatsAppConversationFacts | null>(null);
-
-  /** Whether this conversation arrived over WhatsApp. */
-  protected readonly isWhatsApp = computed(() => this.conversation()?.channel === 'WhatsApp');
-
-  /**
-   * How a reply to this customer went, by message id.
-   *
-   * <strong>Only meaningful on a channel with a delivery step.</strong> A website
-   * visitor is reading the transcript, so a reply is delivered by being stored.
-   * On WhatsApp it is a separate attempt that can fail, be refused, or end
-   * unknown, and a colleague needs to be able to see which.
-   */
-  protected deliveryStatus(messageId: string): string | null {
-    return this.whatsAppFacts()?.deliveryStatuses[messageId] ?? null;
-  }
-
-  /** A sentence for a delivery state that needs explaining. */
-  protected deliveryHint(status: string): string | null {
-    if (status === 'Failed') {
-      return 'This reply did not reach the customer.';
-    }
-
-    if (status === 'Unknown') {
-      return 'Whether this reply reached the customer is not known. It was not sent again.';
-    }
-
-    return null;
-  }
-
   protected async load(): Promise<void> {
     const tenantId = this.workspace.tenantId();
+    const id = this.conversationId();
+
+    this.loadedFor = id;
 
     if (!tenantId || !this.canView()) {
       this.loading.set(false);
@@ -193,65 +290,135 @@ export class ConversationDetail implements OnInit {
 
     this.loading.set(true);
     this.failure.set(null);
+    this.actionFailure.set(null);
+    this.sweep.set(null);
+    this.unseen.set(0);
 
     try {
-      await this.read(tenantId, { replaceTranscript: true });
+      await this.read(tenantId, id, { replaceTranscript: true });
     } catch (error) {
-      this.failure.set(toApiError(error));
+      if (id === this.conversationId()) {
+        this.failure.set(toApiError(error));
+      }
     } finally {
-      this.loading.set(false);
+      if (id === this.conversationId()) {
+        this.loading.set(false);
+        this.takeFocusIfAsked();
+      }
     }
   }
 
   /**
-   * Re-reads after a live notification.
+   * Re-reads after a live notification or Refresh.
    *
    * Deliberately not `load()`: that flips the screen to its loading state, which
    * would tear the transcript and the composer down every time a customer typed.
    * A refresh of something already on screen is not a load.
    */
-  private async refresh(): Promise<void> {
+  protected async refresh(): Promise<void> {
     const tenantId = this.workspace.tenantId();
 
-    if (!tenantId) {
+    if (!tenantId || this.loading() || this.conversation() === null) {
       return;
     }
 
     try {
-      await this.read(tenantId, { replaceTranscript: false });
+      await this.read(tenantId, this.conversationId(), { replaceTranscript: false });
     } catch {
       // A failed background refresh leaves what is on screen, which is the last
       // thing the server confirmed. Reporting it would put an error banner over
-      // a correct transcript because one poll lost a race.
+      // a correct transcript because one read lost a race.
     }
   }
 
-  private async read(tenantId: string, options: { replaceTranscript: boolean }): Promise<void> {
-    const detail: Versioned<Conversation> = await firstValueFrom(
-      this.api.get(tenantId, this.conversationId()),
-    );
+  private async read(
+    tenantId: string,
+    id: string,
+    options: { replaceTranscript: boolean },
+  ): Promise<void> {
+    const detail: Versioned<Conversation> = await firstValueFrom(this.api.get(tenantId, id));
+
+    if (id !== this.conversationId()) {
+      return;
+    }
+
+    this.adopt(detail, { announce: !options.replaceTranscript });
+
+    if (options.replaceTranscript) {
+      // From the first message forward, page after page, to the newest.
+      let all: readonly TranscriptMessage[] = [];
+      let after: number | null = null;
+
+      for (let pages = 0; pages < MAX_FIRST_READ_PAGES; pages++) {
+        const page: TranscriptPage = await firstValueFrom(
+          this.api.messages(tenantId, id, after, MESSAGE_PAGE),
+        );
+
+        all = mergeMessages(all, page.items);
+        after = page.nextCursor;
+
+        if (after === null) {
+          break;
+        }
+      }
+
+      if (id !== this.conversationId()) {
+        return;
+      }
+
+      this.messages.set(all);
+      this.cursor.set(after);
+    } else {
+      // From a little before the end of what is on screen: what arrived since,
+      // plus a short overlap for a message that committed late.
+      let after = refreshCursor(this.messages());
+      let incoming: readonly TranscriptMessage[] = [];
+
+      for (let pages = 0; pages < MAX_FIRST_READ_PAGES; pages++) {
+        const page: TranscriptPage = await firstValueFrom(
+          this.api.messages(tenantId, id, after, MESSAGE_PAGE),
+        );
+
+        incoming = mergeMessages(incoming, page.items);
+        after = page.nextCursor;
+
+        if (after === null) {
+          break;
+        }
+      }
+
+      if (id !== this.conversationId()) {
+        return;
+      }
+
+      this.messages.update((current) => mergeMessages(current, incoming));
+    }
+
+    await this.readWhatsApp(tenantId, id);
+  }
+
+  /**
+   * Takes in a version of the conversation, from a read or a write.
+   *
+   * When who is answering changed under a reader who was already here -- their
+   * own Take over, or a colleague's seen through a live update -- the chip
+   * sweeps to the new voice and the change is announced once.
+   */
+  private adopt(detail: Versioned<Conversation>, { announce }: { announce: boolean }): void {
+    const before = this.conversation();
+    const changed =
+      announce &&
+      before !== null &&
+      before.id === detail.value.id &&
+      before.handling !== detail.value.handling;
 
     this.conversation.set(detail.value);
     this.version.set(detail.etag);
 
-    // The whole first page, every time. The alternative — fetching only after
-    // the last sequence on screen — sounds cheaper and is wrong here: a reader
-    // who has paged back through history would have a cursor pointing into the
-    // middle of it, and appending from there would duplicate or skip.
-    const page = await firstValueFrom(this.api.messages(tenantId, this.conversationId()));
-
-    if (options.replaceTranscript) {
-      this.messages.set(page.items);
-      this.cursor.set(page.nextCursor);
-
-      await this.readWhatsApp(tenantId);
-
-      return;
+    if (changed) {
+      this.sweep.set(detail.value.handling === 'Human' ? 'human' : 'ai');
+      this.handoffAnnouncement.set(handlingSentence(detail.value.handling));
     }
-
-    this.messages.update((current) => merge(current, page.items));
-
-    await this.readWhatsApp(tenantId);
   }
 
   /**
@@ -262,7 +429,7 @@ export class ConversationDetail implements OnInit {
    * refused to show a conversation because one extra read failed would be worse
    * than one missing a badge.
    */
-  private async readWhatsApp(tenantId: string): Promise<void> {
+  private async readWhatsApp(tenantId: string, id: string): Promise<void> {
     if (!this.isWhatsApp()) {
       this.whatsAppFacts.set(null);
 
@@ -270,18 +437,20 @@ export class ConversationDetail implements OnInit {
     }
 
     try {
-      this.whatsAppFacts.set(
-        await firstValueFrom(this.whatsapp.conversation(tenantId, this.conversationId())),
-      );
+      this.whatsAppFacts.set(await firstValueFrom(this.whatsapp.conversation(tenantId, id)));
     } catch {
       this.whatsAppFacts.set(null);
     }
   }
 
-  /** Appends the next page, keeping what is already on screen. */
+  /**
+   * Continues past the first read's limit (only a conversation of more than
+   * ten thousand messages ever needs this).
+   */
   protected async loadMore(): Promise<void> {
     const tenantId = this.workspace.tenantId();
     const after = this.cursor();
+    const id = this.conversationId();
 
     if (!tenantId || after === null || this.loadingMore()) {
       return;
@@ -290,12 +459,14 @@ export class ConversationDetail implements OnInit {
     this.loadingMore.set(true);
 
     try {
-      const page = await firstValueFrom(this.api.messages(tenantId, this.conversationId(), after));
+      const page: TranscriptPage = await firstValueFrom(
+        this.api.messages(tenantId, id, after, MESSAGE_PAGE),
+      );
 
-      this.messages.update((current) => merge(current, page.items));
+      this.messages.update((current) => mergeMessages(current, page.items));
       this.cursor.set(page.nextCursor);
     } catch (error) {
-      this.failure.set(toApiError(error));
+      this.actionFailure.set(toApiError(error));
     } finally {
       this.loadingMore.set(false);
     }
@@ -330,70 +501,45 @@ export class ConversationDetail implements OnInit {
     await this.change((tenantId, version) =>
       firstValueFrom(this.api.assign(tenantId, this.conversationId(), member, version)),
     );
+
+    // The select was disabled while the change ran, which dropped focus.
+    this.focusAfterRender('#conversation-assignee');
   }
 
-  /** Reads the member id out of a select, mapping the empty option to null. */
-  protected onAssignmentChange(event: Event): void {
-    const chosen = (event.target as HTMLSelectElement).value;
-
-    void this.assign(chosen === '' ? null : chosen);
+  /** A reply the composer stored: on screen at once, without waiting for the re-read. */
+  protected onSent(message: TranscriptMessage): void {
+    this.messages.update((current) => mergeMessages(current, [message]));
   }
 
-  /**
-   * Sends the reply in the composer.
-   *
-   * <strong>The idempotency key is generated before the request, not
-   * after.</strong> A key minted per attempt would make a retry a different
-   * message, which is exactly what the key exists to prevent: the browser
-   * retries a request whose response was lost, and the second one must be
-   * recognised as the same reply.
-   */
-  protected async send(): Promise<void> {
-    const tenantId = this.workspace.tenantId();
-    const text = this.reply.value.trim();
+  protected toggleDetails(): void {
+    if (this.panes()) {
+      if (this.inbox) {
+        this.inbox.toggleDetails();
+      } else {
+        this.wideDetails.update((open) => !open);
+      }
+    } else {
+      this.narrowDetails.update((open) => !open);
+    }
+  }
 
-    if (!tenantId || !this.canSend() || text.length === 0) {
+  protected showNewest(): void {
+    this.transcript()?.scrollToEnd();
+    this.composer()?.focusBox();
+  }
+
+  protected endSweep(): void {
+    this.sweep.set(null);
+  }
+
+  /** The way back to the list below 1280px: the same page of it, when that is where the reader came from. */
+  protected goBack(event: MouseEvent): void {
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
       return;
     }
 
-    this.sending.set(true);
-    this.sendFailure.set(null);
-
-    const clientMessageId = crypto.randomUUID();
-
-    try {
-      const stored = await firstValueFrom(
-        this.api.reply(tenantId, this.conversationId(), clientMessageId, text),
-      );
-
-      this.messages.update((current) => merge(current, [stored]));
-      this.reply.setValue('');
-      // Send is disabled while sending and again by the empty composer, so focus
-      // has been dropped; back where the next reply is written.
-      this.focusAfterRender('#conversation-reply');
-    } catch (error) {
-      // The draft is left exactly as typed. Clearing a composer whose send
-      // failed is how somebody loses a paragraph they will have to write again.
-      this.sendFailure.set(toApiError(error));
-    } finally {
-      this.sending.set(false);
-    }
-  }
-
-  /** How a sender is named above their message. */
-  protected senderName(message: TranscriptMessage): string {
-    switch (message.sender) {
-      case 'Customer':
-        return 'Customer';
-      case 'AiAgent':
-        return this.conversation()?.agentName ?? 'AI agent';
-      case 'HumanAgent':
-        // Inside the workspace, naming the colleague is the point. The customer
-        // is told something entirely different — see the public clients.
-        return message.sentBy?.email ?? 'Colleague';
-      default:
-        return 'System';
-    }
+    event.preventDefault();
+    void this.router.navigateByUrl(this.history.returnUrl('/conversations'));
   }
 
   private async loadAssignees(tenantId: string): Promise<void> {
@@ -411,9 +557,9 @@ export class ConversationDetail implements OnInit {
    * <strong>A refused precondition is not retried.</strong> A 412 means somebody
    * else changed this conversation, so repeating the request would apply an
    * intention formed against a state that no longer exists. The reader is told,
-   * and the screen keeps what they were looking at.
+   * and the screen keeps what they were looking at. Returns whether the change
+   * was made.
    */
-  /** Whether the change was made. */
   private async change(
     write: (tenantId: string, version: string) => Promise<Versioned<Conversation>>,
   ): Promise<boolean> {
@@ -430,8 +576,8 @@ export class ConversationDetail implements OnInit {
     try {
       const updated = await write(tenantId, version);
 
-      this.conversation.set(updated.value);
-      this.version.set(updated.etag);
+      this.adopt(updated, { announce: true });
+      this.inbox?.touched();
 
       return true;
     } catch (error) {
@@ -443,30 +589,17 @@ export class ConversationDetail implements OnInit {
     }
   }
 
+  /** Opened from the list: the conversation's heading takes focus once it is here. */
+  private takeFocusIfAsked(): void {
+    if (this.inbox?.focusOnOpen()) {
+      this.inbox.focusOnOpen.set(false);
+      this.focusAfterRender('#conversation-title');
+    }
+  }
+
   private focusAfterRender(selector: string): void {
     afterNextRender(() => this.host.nativeElement.querySelector<HTMLElement>(selector)?.focus(), {
       injector: this.injector,
     });
   }
-}
-
-/**
- * Folds newly read messages into what is on screen, without duplicating.
- *
- * Keyed on the ingestion sequence, which is the platform's own ordering and is
- * unique within a conversation. Sorting by it afterwards is what makes a reply
- * that arrived while a page was being read appear in the right place rather than
- * at the bottom.
- */
-function merge(
-  current: readonly TranscriptMessage[],
-  incoming: readonly TranscriptMessage[],
-): readonly TranscriptMessage[] {
-  const bySequence = new Map(current.map((message) => [message.sequence, message]));
-
-  for (const message of incoming) {
-    bySequence.set(message.sequence, message);
-  }
-
-  return [...bySequence.values()].sort((left, right) => left.sequence - right.sequence);
 }

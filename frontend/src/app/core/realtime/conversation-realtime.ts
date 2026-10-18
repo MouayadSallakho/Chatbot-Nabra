@@ -65,6 +65,11 @@ export class ConversationRealtime {
     this.listeners.add(onChanged);
 
     if (this.tenantId !== tenantId) {
+      // Claimed at once, before anything is awaited. The inbox subscribes its
+      // list and its open conversation in the same tick (Phase 36.6); a second
+      // call arriving while the first was still tearing down used to see no
+      // workspace yet and open a second, then a third, socket.
+      this.tenantId = tenantId;
       void this.restart(tenantId);
     }
 
@@ -78,9 +83,12 @@ export class ConversationRealtime {
   }
 
   private async restart(tenantId: string): Promise<void> {
-    await this.stop();
+    await this.disconnect();
 
-    this.tenantId = tenantId;
+    // Another workspace was asked for while this one was tearing down.
+    if (this.tenantId !== tenantId) {
+      return;
+    }
 
     // Building the connection is inside the try, not before it. `withUrl`
     // resolves the address against the document, which throws outright where
@@ -159,11 +167,17 @@ export class ConversationRealtime {
     }
   }
 
+  /** Stops listening altogether: the last listener has gone. */
   private async stop(): Promise<void> {
+    this.tenantId = null;
+    await this.disconnect();
+  }
+
+  /** Closes the socket, if there is one, without forgetting which workspace is wanted. */
+  private async disconnect(): Promise<void> {
     const connection = this.connection;
 
     this.connection = null;
-    this.tenantId = null;
     this.live.set(false);
 
     if (connection && connection.state !== HubConnectionState.Disconnected) {

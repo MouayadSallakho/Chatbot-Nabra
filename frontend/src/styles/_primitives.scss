@@ -51,6 +51,20 @@ app-page-header + * > .page-section:first-child {
   max-inline-size: 60rem;
 }
 
+// A routed page that fills the content area and scrolls its own panes (the
+// inbox's three panes from 1280px). The content area stops scrolling while it
+// is shown, so there is one scrollbar per pane and never a second one around
+// them. Set on the routed component's host element.
+.shell-main:has(> .page-fills-content) {
+  overflow: hidden;
+  scrollbar-gutter: auto;
+}
+
+.page-fills-content {
+  display: block;
+  block-size: 100%;
+}
+
 // -----------------------------------------------------------------------------
 // Buttons
 // -----------------------------------------------------------------------------
@@ -1490,6 +1504,24 @@ a.data-row:hover .data-row-chevron {
   block-size: 1rem;
   inline-size: 40%;
   margin-block: var(--space-2);
+}
+
+// A control-height bar (a toolbar, the inbox's handling bar) and a transcript
+// bubble, on the customer's side or (with -end) the business's.
+.skeleton-bar {
+  block-size: var(--control-height);
+  inline-size: 70%;
+  margin-block-end: var(--space-5);
+}
+
+.skeleton-bubble {
+  block-size: 4rem;
+  inline-size: min(28rem, 70%);
+  border-radius: var(--radius-bubble);
+}
+
+.skeleton-bubble-end {
+  justify-self: end;
 }
 
 @keyframes skeleton-sweep {

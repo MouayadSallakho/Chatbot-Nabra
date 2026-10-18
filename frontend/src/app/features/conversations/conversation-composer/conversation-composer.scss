@@ -1,0 +1,76 @@
+// The composer sits at the bottom of the conversation: in its own row from
+// 1280px, and stuck to the bottom of the content area below that, so the box is
+// always in reach while the transcript scrolls above it.
+:host {
+  display: block;
+}
+
+.composer {
+  display: grid;
+  gap: var(--space-2);
+}
+
+// Grows with what is written, from three lines to about ten, then scrolls.
+// `field-sizing` is an enhancement; without it the box keeps three rows and
+// can be resized by hand.
+.composer-input {
+  inline-size: 100%;
+  min-block-size: 5rem;
+  max-block-size: 16rem;
+  resize: vertical;
+  font: var(--text-reading);
+  field-sizing: content;
+}
+
+.composer.is-sending .composer-input {
+  color: var(--text-secondary);
+}
+
+.composer-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+
+  .btn {
+    margin-inline-start: auto;
+  }
+}
+
+.composer-hint {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  margin: 0;
+  color: var(--text-muted);
+  font: var(--text-small);
+}
+
+.composer-keys {
+  white-space: nowrap;
+
+  // A touch screen has no Ctrl key to press.
+  @media (pointer: coarse) {
+    display: none;
+  }
+}
+
+.composer-count {
+  color: var(--text-secondary);
+  font: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+
+  &:empty {
+    display: none;
+  }
+
+  &.is-over {
+    color: var(--danger-fg);
+  }
+}
+
+.composer-failed {
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+}

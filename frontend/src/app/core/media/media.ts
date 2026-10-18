@@ -20,6 +20,21 @@ export const MediaQueries = {
    */
   desktop: '(min-width: 992px)',
 
+  /**
+   * Wide enough for the inbox's three panes (Phase 36.6): the conversation list
+   * stays beside the open conversation. The inbox's stylesheets switch layout
+   * at exactly this width, written in px there too, so the two never disagree.
+   */
+  inbox: '(min-width: 1280px)',
+
+  /**
+   * Tall enough for a conversation to fill the screen with its own scrolling
+   * transcript between a header and a composer. Shorter (a landscape phone, a
+   * 200% zoom) and it scrolls as an ordinary page, so nobody reads through a
+   * letterbox.
+   */
+  tall: '(min-height: 600px)',
+
   /** The reader asked the operating system for less motion. */
   reducedMotion: '(prefers-reduced-motion: reduce)',
 } as const;

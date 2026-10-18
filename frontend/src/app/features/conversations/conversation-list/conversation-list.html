@@ -1,20 +1,26 @@
-<div class="page">
+<div class="inbox-list" [class.is-pane]="panes()">
   @if (!canView()) {
-    <app-page-header heading="Conversations" />
+    <app-page-header
+      heading="Conversations"
+      i18n-heading="@@inbox.heading"
+      [level]="isPage() ? 1 : 2"
+    />
 
-    <div class="page-section">
-      <div class="card">
-        <app-empty-state
-          icon="conversations"
-          heading="You do not have access to conversations"
-          description="Reading what customers said to this workspace needs a permission your roles do not include. Ask somebody who administers this workspace if you need it."
-        />
-      </div>
+    <div class="card">
+      <app-empty-state
+        icon="conversations"
+        heading="You do not have access to conversations"
+        i18n-heading="@@inbox.denied.heading"
+        description="Reading what customers said to this workspace needs a permission your roles do not include. Ask somebody who administers this workspace if you need it."
+        i18n-description="@@inbox.denied.body"
+      />
     </div>
   } @else {
     <app-page-header
       heading="Conversations"
-      description="What customers have said to this workspace, and what its AI agents answered."
+      i18n-heading="@@inbox.heading"
+      [level]="isPage() ? 1 : 2"
+      [description]="panes() ? '' : description"
     >
       <!--
         Whether the list is following changes as they happen. A word and a
@@ -23,19 +29,24 @@
       -->
       <span pageActions class="live-state" [class.is-live]="live()" role="status">
         <span class="live-dot" aria-hidden="true"></span>
-        {{ live() ? 'Live updates on' : 'Live updates paused' }}
+        @if (live()) {
+          <span i18n="@@inbox.live.on">Live updates on</span>
+        } @else {
+          <span i18n="@@inbox.live.off">Live updates paused</span>
+        }
       </span>
       <button
         pageActions
         type="button"
-        class="btn btn-secondary"
+        class="btn btn-secondary btn-sm"
         [class.btn-loading]="loading() && loaded()"
         [attr.aria-busy]="loading()"
         [disabled]="loading()"
         (click)="load()"
+        data-testid="refresh-list"
       >
         <app-icon name="refresh" [strokeWidth]="1.75" />
-        <span>Refresh</span>
+        <span i18n="@@inbox.refresh">Refresh</span>
         @if (loading() && loaded()) {
           <span class="spinner" aria-hidden="true"></span>
         }
@@ -43,126 +54,137 @@
     </app-page-header>
 
     @if (loading() && !loaded()) {
-      <div class="page-section" aria-busy="true">
-        <p class="visually-hidden" role="status">Loading conversations…</p>
-        <div class="data-list conversation-list">
+      <div aria-busy="true">
+        <p class="visually-hidden" role="status" i18n="@@inbox.loading">Loading conversations…</p>
+        <ul class="conversation-rows">
           @for (row of skeletonRows; track row) {
-            <div class="data-row data-row-skeleton" aria-hidden="true">
-              <span class="skeleton skeleton-title"></span>
+            <li class="conversation-row is-skeleton" aria-hidden="true">
+              <span class="skeleton row-skeleton-top"></span>
               <span class="skeleton skeleton-text"></span>
-            </div>
+              <span class="skeleton row-skeleton-short"></span>
+            </li>
           }
-        </div>
+        </ul>
       </div>
     } @else if (!loaded() && failure(); as error) {
-      <div class="page-section">
-        <div class="card">
-          <app-empty-state
-            icon="alert"
-            tone="error"
-            heading="Could not load conversations"
-            [description]="error.message"
+      <div class="card">
+        <app-empty-state
+          icon="alert"
+          tone="error"
+          heading="Could not load conversations"
+          i18n-heading="@@inbox.loadFailed"
+          [description]="error.message"
+        >
+          <button
+            stateActions
+            type="button"
+            class="btn btn-secondary btn-sm"
+            (click)="load()"
+            i18n="@@inbox.tryAgain"
           >
-            <button stateActions type="button" class="btn btn-secondary btn-sm" (click)="load()">
-              Try again
-            </button>
-          </app-empty-state>
-        </div>
+            Try again
+          </button>
+        </app-empty-state>
       </div>
     } @else if (total() === 0) {
-      <div class="page-section">
-        <div class="card">
-          <app-empty-state
-            icon="conversations"
-            heading="No conversations yet"
-            description="When somebody opens one of this workspace's chat links and says something, the conversation appears here."
-          />
-        </div>
-      </div>
-    } @else {
-      <div class="page-section">
-        <!--
-          A refresh that fails keeps what is already on screen: the rows the reader
-          was looking at are still true as of the last successful read, and
-          blanking them would lose their place for a network blip.
-        -->
-        @if (failure(); as error) {
-          <div class="alert alert-danger refresh-failed" role="alert">
-            <app-icon name="alert" [strokeWidth]="1.75" />
-            <span>Could not refresh the list. {{ error.message }}</span>
-          </div>
-        }
-
-        <!--
-          Rows are a list of links, styled as an aligned grid on wide screens and
-          as stacked rows on narrow ones: navigational rather than tabular data.
-        -->
-        <div class="data-list conversation-list" [attr.aria-busy]="loading()">
-          <div class="data-list-head" aria-hidden="true">
-            <span>Conversation</span>
-            <span>Channel</span>
-            <span>AI agent</span>
-            <span class="data-cell-end">Last activity</span>
-          </div>
-
-          @for (conversation of conversations(); track conversation.id) {
-            <a
-              class="data-row"
-              [class.is-human]="conversation.handling === 'Human'"
-              [routerLink]="['/conversations', conversation.id]"
-            >
-              <span class="conversation-preview">
-                @if (conversation.lastMessagePreview) {
-                  <span class="preview-sender">{{
-                    senderLabel(conversation.lastMessageSender)
-                  }}</span>
-                  <span class="preview-text">{{ conversation.lastMessagePreview }}</span>
-                } @else {
-                  <span class="text-muted">No messages yet</span>
-                }
-              </span>
-
-              <span class="conversation-channel">
-                <span class="badge badge-plain">
-                  {{ conversation.channel === 'WebChat' ? 'Website chat' : conversation.channel }}
-                </span>
-              </span>
-
-              <span class="data-row-meta conversation-agent">
-                {{ conversation.agentName ?? '—' }}
-                <!--
-                  Shown only when a person has taken the conversation over. A
-                  badge on every row saying "AI" would be noise on the ordinary
-                  case; what a supervisor scans this list for is the exception.
-                  It is a word and a glyph, not a colour: the human voice chip.
-                -->
-                @if (conversation.handling === 'Human') {
-                  <app-voice-chip voice="human" size="sm" />
-                }
-                @if (conversation.assignedTo; as member) {
-                  <span class="assigned">{{ member.email }}</span>
-                }
-              </span>
-
-              <span class="data-row-meta data-cell-end num">
-                <span class="data-cell-label">Last activity&nbsp;</span>
-                <time [attr.datetime]="conversation.lastActivityAt">{{
-                  conversation.lastActivityAt | localDate: 'dayMonthTime'
-                }}</time>
-              </span>
-            </a>
-          }
-        </div>
-
-        <app-pagination
-          [page]="currentPage()"
-          [pageSize]="pageSize"
-          [total]="total()"
-          items="conversations"
-          [busy]="loading()"
-          (pageChange)="goTo($event)"
+      <div class="card">
+        <app-empty-state
+          icon="conversations"
+          heading="No conversations yet"
+          i18n-heading="@@inbox.empty.heading"
+          description="When somebody opens one of this workspace's chat links and says something, the conversation appears here."
+          i18n-description="@@inbox.empty.body"
         />
       </div>
+    } @else {
+      <!--
+        A refresh that fails keeps what is already on screen: the rows the reader
+        was looking at are still true as of the last successful read, and
+        blanking them would lose their place for a network blip.
+      -->
+      @if (failure(); as error) {
+        <div class="alert alert-danger refresh-failed" role="alert">
+          <app-icon name="alert" [strokeWidth]="1.75" />
+          <span
+            ><span i18n="@@inbox.refreshFailed">Could not refresh the list.</span>
+            {{ error.message }}</span
+          >
+        </div>
+      }
+
+      <!--
+        A list of links, one per conversation. Each row says who is answering
+        (the voice chip: glyph and word), where it is happening, when it last
+        moved, the last message and who wrote it, and who it is routed to.
+      -->
+      <ul
+        class="conversation-rows"
+        [attr.aria-busy]="loading()"
+        (keydown)="onKeydown($event)"
+        data-testid="conversation-rows"
+      >
+        @for (row of rows(); track row.conversation.id) {
+          <li>
+            <a
+              class="conversation-row"
+              [class.is-selected]="row.conversation.id === selectedId()"
+              [class.edge-marker]="row.conversation.id === selectedId()"
+              [attr.aria-current]="row.conversation.id === selectedId() ? 'page' : null"
+              [routerLink]="['/conversations', row.conversation.id]"
+              queryParamsHandling="preserve"
+              (click)="opened()"
+              [attr.data-testid]="'conversation-' + row.conversation.id"
+            >
+              <span class="row-top">
+                <app-voice-chip
+                  [voice]="row.conversation.handling === 'Human' ? 'human' : 'ai'"
+                  size="sm"
+                />
+                <app-channel-badge [channel]="row.conversation.channel" />
+                <time
+                  class="row-time"
+                  [attr.datetime]="row.conversation.lastActivityAt"
+                  [attr.title]="row.whenFull"
+                  >{{ row.when }}</time
+                >
+              </span>
+
+              <span class="row-preview">
+                @if (row.conversation.lastMessagePreview) {
+                  <span class="row-sender">{{ row.sender }}</span>
+                  <span class="row-text" dir="auto">{{ row.conversation.lastMessagePreview }}</span>
+                } @else {
+                  <span class="row-text text-muted" i18n="@@inbox.noMessages">No messages yet</span>
+                }
+              </span>
+
+              @if (row.conversation.assignedTo || row.waiting) {
+                <span class="row-bottom">
+                  @if (row.waiting) {
+                    <span class="badge badge-warning badge-sm" i18n="@@inbox.waiting"
+                      >Waiting for the team</span
+                    >
+                  }
+                  @if (row.conversation.assignedTo; as member) {
+                    <span class="row-assigned" i18n="@@inbox.assignedTo"
+                      >Assigned to <bdi dir="ltr">{{ member.email }}</bdi></span
+                    >
+                  }
+                </span>
+              }
+            </a>
+          </li>
+        }
+      </ul>
+
+      <app-pagination
+        [page]="currentPage()"
+        [pageSize]="pageSize"
+        [total]="total()"
+        items="conversations"
+        [busy]="loading()"
+        (pageChange)="goTo($event)"
+      />
     }
   }
 </div>

@@ -1,7 +1,9 @@
 <div class="page">
   <app-page-header
     heading="Customers"
+    i18n-heading="@@customers.heading"
     description="Everybody this workspace has talked to, however they got in touch. One person can reach you on more than one channel."
+    i18n-description="@@customers.description"
   >
     @if (canView()) {
       <button
@@ -15,7 +17,7 @@
         data-testid="refresh"
       >
         <app-icon name="refresh" [strokeWidth]="1.75" />
-        <span>Refresh</span>
+        <span i18n="@@inbox.refresh">Refresh</span>
         @if (refreshing()) {
           <span class="spinner" aria-hidden="true"></span>
         }
@@ -33,16 +35,18 @@
         <app-empty-state
           icon="customers"
           heading="You do not have access to customers"
+          i18n-heading="@@customers.denied.heading"
           description="Seeing who this workspace talks to needs a permission your roles do not include. Ask somebody who administers this workspace if you need it."
+          i18n-description="@@customers.denied.body"
         />
       </div>
     } @else if (loading()) {
       <div class="data-list customer-list" aria-busy="true">
-        <p class="visually-hidden" role="status">Loading customers…</p>
+        <p class="visually-hidden" role="status" i18n="@@customers.loading">Loading customers…</p>
         @for (row of skeletonRows; track row) {
-          <div class="data-row data-row-skeleton" aria-hidden="true">
+          <div class="data-row customer-skeleton" aria-hidden="true">
+            <span class="skeleton customer-tile"></span>
             <span class="skeleton skeleton-title"></span>
-            <span class="skeleton skeleton-text"></span>
           </div>
         }
       </div>
@@ -52,9 +56,16 @@
           icon="alert"
           tone="error"
           heading="Could not load customers"
+          i18n-heading="@@customers.loadFailed"
           [description]="error.message"
         >
-          <button stateActions type="button" class="btn btn-secondary btn-sm" (click)="refresh()">
+          <button
+            stateActions
+            type="button"
+            class="btn btn-secondary btn-sm"
+            (click)="refresh()"
+            i18n="@@inbox.tryAgain"
+          >
             Try again
           </button>
         </app-empty-state>
@@ -64,7 +75,9 @@
         <app-empty-state
           icon="customers"
           heading="Nobody has been in touch yet"
+          i18n-heading="@@customers.empty.heading"
           description="A customer appears here the first time somebody writes to this workspace, on any channel. Nothing is created by a page view."
+          i18n-description="@@customers.empty.body"
           data-testid="no-customers"
         />
       </div>
@@ -76,44 +89,58 @@
       -->
       <div class="data-list customer-list" [attr.aria-busy]="refreshing()">
         <div class="data-list-head" aria-hidden="true">
-          <span>Customer</span>
-          <span>Channels</span>
-          <span class="data-cell-end">Conversations</span>
-          <span class="data-cell-end">Last activity</span>
+          <span i18n="@@customers.column.customer">Customer</span>
+          <span i18n="@@customers.column.channels">Channels</span>
+          <span class="data-cell-end" i18n="@@customers.column.conversations">Conversations</span>
+          <span class="data-cell-end" i18n="@@customers.column.lastActivity">Last activity</span>
         </div>
 
         <ul data-testid="customers">
-          @for (customer of rows(); track customer.id) {
+          @for (row of rows(); track row.customer.id) {
             <li>
               <a
                 class="data-row"
-                [routerLink]="[customer.id]"
-                [attr.data-testid]="'customer-' + customer.id"
+                [routerLink]="[row.customer.id]"
+                [attr.data-testid]="'customer-' + row.customer.id"
               >
-                <span class="data-row-title">{{ customer.label }}</span>
+                <span class="customer-who">
+                  <!--
+                    A first letter for somebody with a name, a person outline for
+                    somebody without one: the difference between "Rania Haddad"
+                    and "Anonymous visitor" is visible before either is read.
+                  -->
+                  <span class="customer-tile" [class.is-unnamed]="!row.named" aria-hidden="true">
+                    @if (row.initial) {
+                      {{ row.initial }}
+                    } @else {
+                      <app-icon name="person" [strokeWidth]="1.6" />
+                    }
+                  </span>
+                  <span
+                    class="data-row-title customer-name"
+                    [class.is-unnamed]="!row.named"
+                    dir="auto"
+                    >{{ row.name }}</span
+                  >
+                </span>
 
                 <span class="customer-channels">
-                  <!--
-                    A word, never a colour alone. Somebody who cannot tell the
-                    badges apart still reads which channels this person uses.
-                  -->
-                  @for (channel of customer.channels; track channel) {
-                    <span class="badge badge-plain">{{
-                      channel === 'WebChat' ? 'Website chat' : channel
-                    }}</span>
+                  @for (channel of row.customer.channels; track channel) {
+                    <app-channel-badge [channel]="channel" />
                   }
-                  @if (customer.channels.length === 0) {
-                    <span class="text-small text-muted">No channel yet</span>
+                  @if (row.customer.channels.length === 0) {
+                    <span class="text-small text-muted" i18n="@@customers.noChannel"
+                      >No channel yet</span
+                    >
                   }
                 </span>
 
-                <span class="data-row-meta data-cell-end num">{{
-                  conversations(customer.conversationCount)
-                }}</span>
+                <span class="data-row-meta data-cell-end num">{{ row.conversations }}</span>
 
                 <span class="data-row-meta data-cell-end num">
-                  <span class="data-cell-label">Last activity&nbsp;</span
-                  >{{ activity(customer.lastActivityAt) }}
+                  <span class="data-cell-label"
+                    ><span i18n="@@customers.column.lastActivity">Last activity</span>&nbsp;</span
+                  >{{ row.activity }}
                 </span>
               </a>
             </li>

@@ -29,17 +29,49 @@ function snapshot(...paths: string[]): ActivatedRouteSnapshot {
   return { url: [], firstChild: child } as unknown as ActivatedRouteSnapshot;
 }
 
+/**
+ * `/conversations/<id>` under a workspace route that lays its children out as
+ * panes from `MediaQueries.inbox`: the shape the inbox's routes have. The
+ * workspace's configuration object is shared, as the router's would be.
+ */
+const inboxConfig = { path: '' };
+
+function inbox(...ids: string[]): ActivatedRouteSnapshot {
+  const child = ids.length
+    ? ({
+        url: [new UrlSegment(ids[0], {})],
+        data: { panes: MediaQueries.inbox },
+        firstChild: null,
+      } as unknown)
+    : null;
+  const workspace = {
+    url: [],
+    data: { panes: MediaQueries.inbox },
+    routeConfig: inboxConfig,
+    firstChild: child,
+  };
+  const feature = { url: [new UrlSegment('conversations', {})], data: {}, firstChild: workspace };
+
+  return { url: [], data: {}, firstChild: feature } as unknown as ActivatedRouteSnapshot;
+}
+
 describe('route transition', () => {
   let reduced: boolean;
+  let wide: boolean;
 
   beforeEach(() => {
     reduced = false;
+    wide = false;
     TestBed.configureTestingModule({
       providers: [
         provideRouter([]),
         {
           provide: MEDIA_QUERY_FACTORY,
-          useFactory: () => new FakeMediaMatcher({ [MediaQueries.reducedMotion]: reduced }).factory,
+          useFactory: () =>
+            new FakeMediaMatcher({
+              [MediaQueries.reducedMotion]: reduced,
+              [MediaQueries.inbox]: wide,
+            }).factory,
         },
       ],
     });
@@ -103,5 +135,19 @@ describe('route transition', () => {
     reduced = true;
 
     expect(await instant(snapshot('overview'), snapshot('knowledge'))).toBe(true);
+  });
+
+  it('does not crossfade between two panes of one workspace while they sit side by side', async () => {
+    // Opening another conversation beside the list changes one pane; fading the
+    // whole content area would flash the list the reader is working from.
+    wide = true;
+
+    expect(await instant(inbox(), inbox('c1'))).toBe(true);
+    expect(await instant(inbox('c1'), inbox('c2'))).toBe(true);
+  });
+
+  it('crossfades between the same two routes when the panes are pages', async () => {
+    // Below the workspace's width the list and the conversation are two pages.
+    expect(await instant(inbox(), inbox('c1'))).toBe(false);
   });
 });

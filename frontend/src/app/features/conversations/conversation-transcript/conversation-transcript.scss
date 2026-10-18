@@ -1,0 +1,148 @@
+// On a short screen the transcript is part of the page and the content area
+// scrolls it. Filling the screen (every width from 1280px, and a tall phone) it
+// is its own scrolling region between the header and the composer. Scroll
+// anchoring keeps the reader's place when content above them changes size;
+// the component handles the rest (see `showEarlier`).
+:host {
+  display: block;
+  padding: var(--space-4) var(--page-gutter) var(--space-6);
+  background-color: var(--surface-page);
+  overflow-anchor: auto;
+}
+
+:host-context(.conversation.is-panes) {
+  padding-inline: var(--space-5);
+}
+
+:host-context(.conversation.is-fill) {
+  flex: 1 1 auto;
+  min-block-size: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+// A reading column, centred in a wide pane: on a 1920px screen the customer
+// and the business stay within one glance of each other.
+.transcript {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-inline-size: 56rem;
+  margin: 0 auto;
+  padding: 0;
+  list-style: none;
+}
+
+// Bubbles that were already there when the conversation opened do not move;
+// only a message that arrives while the reader is here settles in (220 ms,
+// MASTER.md section 7). The keyframes are the shared `bubble-settle`.
+.bubble {
+  animation: none;
+}
+
+.bubble.is-fresh {
+  animation: bubble-settle var(--duration-md) var(--ease-enter);
+}
+
+.bubble-speaker {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+  flex-wrap: wrap;
+}
+
+.bubble-glyph {
+  flex: none;
+  inline-size: 0.875rem;
+  block-size: 0.875rem;
+}
+
+.bubble-name {
+  min-inline-size: 0;
+  overflow-wrap: anywhere;
+}
+
+.bubble-time {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  font-weight: 400;
+}
+
+// Whole message, wrapped. Interior spacing and line breaks carry meaning in a
+// message, so they are preserved rather than collapsed, and a long unbroken
+// string wraps instead of forcing the page sideways.
+.message-text {
+  display: block;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.bubble-delivery {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+  margin-block-start: var(--space-2);
+}
+
+// A calendar day, between hairlines. A real heading (h3, under the hidden
+// "Messages" h2), so a screen reader can move from day to day.
+.transcript-day {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-block: var(--space-3) var(--space-1);
+  color: var(--text-muted);
+
+  &::before,
+  &::after {
+    content: '';
+    flex: 1;
+    border-block-start: 1px solid var(--border-subtle);
+  }
+
+  h3 {
+    font: var(--text-caption);
+  }
+}
+
+.handoff-divider {
+  margin-block: var(--space-2);
+}
+
+// The platform talking about the conversation, not somebody in it: centred,
+// small, no bubble.
+.transcript-note {
+  align-self: center;
+  max-inline-size: 36rem;
+  font: var(--text-small);
+  text-align: center;
+}
+
+// Owed a reply while the AI is handling: a quiet note at the end, with its own
+// icon-free wording -- it is information, not an error.
+.transcript-tail {
+  align-self: center;
+  max-inline-size: 32rem;
+  margin-block-start: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font: var(--text-small);
+  text-align: center;
+}
+
+.transcript-earlier {
+  display: flex;
+  justify-content: center;
+  margin-block-end: var(--space-4);
+}
+
+.transcript-empty {
+  max-inline-size: 36rem;
+  margin: var(--space-6) auto;
+  color: var(--text-secondary);
+  font: var(--text-small);
+  text-align: center;
+}

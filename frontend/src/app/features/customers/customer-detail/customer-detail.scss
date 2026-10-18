@@ -1,87 +1,130 @@
 // Every value is a semantic token, so the page is readable in both themes
 // without a second stylesheet.
 
-.page-section {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-5);
-}
-
 .card-notice {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
+  margin-block-end: var(--space-5);
   padding: var(--space-4);
   border-color: var(--info-border);
   background: var(--info-bg);
   color: var(--info-fg);
 }
 
-.customer-identity {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-5);
-}
-
+// The facts strip under the heading: four short facts in a row, wrapping.
 .customer-facts {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-5);
-  margin: 0;
+  gap: var(--space-3) var(--space-7);
+  margin: 0 0 var(--space-6);
 
   div {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-1);
-    min-width: 0;
+    display: grid;
+    gap: 2px;
+    min-inline-size: 0;
   }
 
-  dt,
+  dt {
+    color: var(--text-muted);
+    font: var(--text-caption);
+  }
+
   dd {
     margin: 0;
-  }
-
-  dd {
-    color: var(--text-primary);
-    font-weight: 600;
-
+    font: var(--text-body-strong);
+    font-variant-numeric: tabular-nums;
     // A customer's label is whatever somebody typed, including one very long
     // word. Breaking it is better than pushing the page sideways.
     overflow-wrap: anywhere;
   }
 }
 
+// What the customer is (main) beside what can be done to the record (side).
+.customer-layout {
+  display: grid;
+  gap: var(--space-5);
+  align-items: start;
+
+  @media (min-width: 64rem) {
+    grid-template-columns: minmax(0, 1.6fr) minmax(18rem, 1fr);
+  }
+}
+
+.customer-main,
+.customer-side {
+  display: grid;
+  gap: var(--space-5);
+  min-inline-size: 0;
+}
+
 .customer-subheading {
   margin: 0 0 var(--space-3);
-  font-size: 0.8125rem;
-  font-weight: 650;
-  letter-spacing: var(--letter-spacing-caps);
-  text-transform: uppercase;
-  color: var(--text-muted);
+  color: var(--text-secondary);
+  font: var(--text-label);
 }
 
 .identity-list,
 .history-list,
 .candidate-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
+  display: grid;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
+.identity-list,
+.history-list {
+  li + li {
+    border-block-start: 1px solid var(--border-subtle);
+  }
+}
+
 .identity {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-3);
+  align-items: baseline;
+  gap: var(--space-1) var(--space-4);
+  padding: var(--space-3) var(--space-5);
 }
 
-// The badge carries the channel's name. Colour is an addition to the word,
-// never a replacement for it.
+.identity-reference {
+  font: var(--text-numeric);
+  font-variant-numeric: tabular-nums;
+}
+
+.history {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-3) var(--space-5);
+  color: inherit;
+  text-decoration: none;
+  transition: background-color var(--duration-sm) var(--ease-standard);
+
+  &:hover {
+    background-color: var(--surface-hover);
+    color: inherit;
+  }
+
+  &:focus-visible {
+    outline-offset: calc(-1 * var(--focus-ring-width));
+  }
+}
+
+.history-status {
+  font: var(--text-small);
+}
+
+.history-time {
+  margin-inline-start: auto;
+  color: var(--text-muted);
+  font: var(--text-small);
+  font-variant-numeric: tabular-nums;
+}
 
 .customer-name-form,
 .customer-merge {
@@ -92,8 +135,7 @@
 }
 
 .customer-name-form .field {
-  width: 100%;
-  max-width: 28rem;
+  inline-size: 100%;
 }
 
 .form-problem {
@@ -108,74 +150,86 @@
 }
 
 .merge-picker {
-  width: 100%;
+  inline-size: 100%;
   margin: 0;
   padding: 0;
   border: 0;
 }
 
+.candidate-list {
+  gap: var(--space-2);
+  max-block-size: 22rem;
+  overflow-y: auto;
+}
+
 .candidate {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-3);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-1) var(--space-3);
   padding: var(--space-3);
-  border: 1px solid var(--border-subtle);
+  border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
-  background: var(--surface-raised);
   cursor: pointer;
 
   &:hover {
-    border-color: var(--border-default);
+    background-color: var(--surface-hover);
+  }
+
+  // Chosen is neutral, like every selection: the selected surface and a
+  // control-strength edge, never a voice or status colour.
+  &.is-chosen {
+    border-color: var(--border-control);
+    background-color: var(--surface-selected);
   }
 }
 
 .candidate-details {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  min-width: 0;
+  display: grid;
+  gap: 2px;
+  min-inline-size: 0;
 }
 
 .candidate-name {
-  font-weight: 600;
-  color: var(--text-primary);
+  font: var(--text-body-strong);
   overflow-wrap: anywhere;
+}
+
+.candidate-count {
+  grid-column: 2;
 }
 
 // Warning colours, because this is the one operation on the page that cannot be
 // undone. The words say so too: colour is never the only signal.
 .merge-confirmation {
-  width: 100%;
+  inline-size: 100%;
   padding: var(--space-4);
   border: 1px solid var(--warning-border);
   border-radius: var(--radius-lg);
   background: var(--warning-bg);
-  color: var(--warning-fg);
+  color: var(--text-primary);
 
   p {
     margin: 0 0 var(--space-2);
+    overflow-wrap: anywhere;
 
     &:last-child {
-      margin-bottom: 0;
+      margin-block-end: 0;
     }
   }
 }
 
-.history {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-3);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  background: var(--surface-raised);
-  color: inherit;
-  text-decoration: none;
+.customer-skeleton {
+  display: grid;
+  gap: var(--space-5);
+}
 
-  &:hover {
-    border-color: var(--border-default);
-    background: var(--surface-muted);
-  }
+.customer-skeleton-facts {
+  block-size: 2.5rem;
+  inline-size: min(36rem, 90%);
+}
+
+.customer-skeleton-card {
+  block-size: 12rem;
+  border-radius: var(--radius-lg);
 }

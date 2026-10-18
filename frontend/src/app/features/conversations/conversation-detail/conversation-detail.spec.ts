@@ -18,7 +18,8 @@ describe('ConversationDetail', () => {
   const conversationId = '22222222-2222-7222-8222-222222222222';
 
   const detailUrl = `/api/tenants/${tenantId}/conversations/${conversationId}`;
-  const messagesUrl = `${detailUrl}/messages?limit=100`;
+  // The server's largest page: a first read follows the pages to the newest message.
+  const messagesUrl = `${detailUrl}/messages?limit=200`;
 
   let fixture: ComponentFixture<ConversationDetail>;
   let http: HttpTestingController;
@@ -174,7 +175,9 @@ describe('ConversationDetail', () => {
     expect(host().querySelector('script')).toBeNull();
   });
 
-  it('loads a further page and keeps the pages in one continuous order', async () => {
+  it('reads every page to the newest message, in one continuous order', async () => {
+    // The API pages forward from the first message, so the screen follows the
+    // pages itself: the newest messages are what the reader needs to see.
     await mount('conversations.view');
 
     http.expectOne(detailUrl).flush(detail, tagged(detail));
@@ -186,18 +189,15 @@ describe('ConversationDetail', () => {
     });
     await settle();
 
-    button('Load older messages')!.click();
-    await settle();
-
     // The cursor is the stored ingestion sequence, not a page number.
-    http.expectOne(`${detailUrl}/messages?limit=100&after=10`).flush({
+    http.expectOne(`${detailUrl}/messages?limit=200&after=10`).flush({
       items: [message('m2', 'AiAgent', 'Page two', 11)],
       nextCursor: null,
     });
     await settle();
 
     expect(bubbles()).toEqual(['Page one', 'Page two']);
-    expect(button('Load older messages')).toBeUndefined();
+    expect(button('Load newer messages')).toBeUndefined();
   });
 
   it('shows a conversation with no messages as empty rather than broken', async () => {

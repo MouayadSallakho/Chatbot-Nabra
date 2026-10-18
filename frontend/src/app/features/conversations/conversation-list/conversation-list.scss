@@ -1,31 +1,104 @@
-// Column template for the shared data list; the rest is the primitive's.
-.conversation-list {
-  --data-list-columns: minmax(0, 3fr) minmax(0, 1fr) minmax(0, 1.25fr) 8.5rem;
+// The list as a page (below 1280px) sits in the ordinary page frame; as a pane
+// it fills its column with a tighter gutter.
+.inbox-list {
+  inline-size: 100%;
+  max-inline-size: var(--page-max-width);
+  margin-inline: auto;
+  padding: var(--space-6) var(--page-gutter) var(--space-9);
 }
 
-// A conversation a person has taken over carries the human voice's edge as
-// well as its "Person" chip, so the exceptions stand out when the list is
-// scanned. The edge mirrors with the reading direction.
-.data-row.is-human {
-  box-shadow: inset calc(var(--direction-flip) * 2px) 0 0 0 var(--voice-human-fg);
+.inbox-list.is-pane {
+  padding: var(--space-4) var(--space-3) var(--space-6);
+
+  app-page-header {
+    --page-header-end: var(--space-3);
+    padding-inline: var(--space-2);
+  }
 }
 
-.conversation-preview {
+.conversation-rows {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.conversation-row {
+  position: relative;
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  text-decoration: none;
+  transition: background-color var(--duration-sm) var(--ease-standard);
+
+  &:hover {
+    background-color: var(--surface-hover);
+    color: var(--text-primary);
+    text-decoration: none;
+  }
+
+  &:focus-visible {
+    outline-offset: calc(-1 * var(--focus-ring-width));
+  }
+
+  // Selection is neutral (MASTER.md rule 4): the selected surface plus the 2px
+  // ink edge, never a voice colour.
+  &.is-selected {
+    background-color: var(--surface-selected);
+  }
+}
+
+// As a page the rows are a bordered list, like every other directory.
+.inbox-list:not(.is-pane) .conversation-rows {
+  gap: 0;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background-color: var(--surface-default);
+  overflow: hidden;
+
+  .conversation-row {
+    border-radius: 0;
+  }
+
+  li + li {
+    border-block-start: 1px solid var(--border-subtle);
+  }
+}
+
+.row-top,
+.row-bottom {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+  min-inline-size: 0;
+}
+
+.row-time {
+  margin-inline-start: auto;
+  color: var(--text-muted);
+  font: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.row-preview {
   display: flex;
   align-items: baseline;
   gap: var(--space-2);
   min-inline-size: 0;
 }
 
-.preview-sender {
+.row-sender {
   flex: none;
   color: var(--text-muted);
   font: var(--text-caption);
-  text-transform: uppercase;
-  letter-spacing: var(--letter-spacing-caps);
 }
 
-.preview-text {
+.row-text {
   min-inline-size: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -33,18 +106,34 @@
   font: var(--text-body-strong);
 }
 
-.conversation-agent {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: var(--space-1) var(--space-2);
+.row-assigned {
+  display: inline-flex;
+  gap: var(--space-1);
+  min-inline-size: 0;
+  color: var(--text-secondary);
+  font: var(--text-small);
+
+  bdi {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 }
 
-.assigned {
-  flex-basis: 100%;
-  color: var(--text-muted);
-  font: var(--text-small);
-  overflow-wrap: anywhere;
+// Skeleton rows have the geometry of a real row: a line of chips, the
+// preview, and a shorter third line.
+.is-skeleton {
+  pointer-events: none;
+}
+
+.row-skeleton-top {
+  block-size: 1.125rem;
+  inline-size: 55%;
+}
+
+.row-skeleton-short {
+  block-size: 0.75rem;
+  inline-size: 35%;
 }
 
 // The live indicator: a filled dot when following changes, a hollow one when
@@ -53,7 +142,7 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-  min-block-size: var(--control-height);
+  min-block-size: var(--control-height-sm);
   color: var(--text-secondary);
   font: var(--text-small);
 }
@@ -70,25 +159,10 @@
   background-color: var(--success-fg);
 }
 
-// Stacked on a phone: the message on its own line, then channel, agent and time
-// on one line beneath it -- four stacked lines per row would show three rows
-// per screen.
-@media (max-width: 47.99rem) {
-  .conversation-list .data-row {
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    align-items: baseline;
-    column-gap: var(--space-2);
-  }
-
-  .conversation-preview {
-    grid-column: 1 / -1;
-  }
-
-  .conversation-list .data-cell-label {
-    display: none;
-  }
+.refresh-failed {
+  margin-block-end: var(--space-3);
 }
 
-.refresh-failed {
-  margin-block-end: var(--space-4);
+app-pagination {
+  margin-block-start: var(--space-3);
 }

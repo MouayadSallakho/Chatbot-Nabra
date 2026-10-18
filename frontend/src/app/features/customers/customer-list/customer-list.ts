@@ -9,14 +9,26 @@ import { PageHeader } from '@app/shared/page-header/page-header';
 import { Icon } from '@app/shared/icon/icon';
 import { Pagination } from '@app/shared/pagination/pagination';
 import { initialPage, pageRecorder } from '@app/shared/pagination/page-query';
+import { ChannelBadge } from '@app/shared/channel/channel-badge';
 import { LocaleFormat } from '@app/core/i18n/locale-format';
-import { CustomerPage, CustomersApi } from '../customers-api';
+import { CustomerPage, CustomerRow, CustomersApi } from '../customers-api';
+import { conversationsPhrase, customerName, initialOf } from '../customer-words';
+
+/** One directory row, with what its template shows worked out once per read. */
+interface DirectoryRow {
+  readonly customer: CustomerRow;
+  readonly name: string;
+  readonly named: boolean;
+  readonly initial: string;
+  readonly conversations: string;
+  readonly activity: string;
+}
 
 /**
  * Everybody this workspace talks to.
  *
  * <strong>A directory, not a CRM.</strong> It answers who the workspace has
- * talked to, on which channels, and how recently — and nothing about what they
+ * talked to, on which channels, and how recently -- and nothing about what they
  * are worth. There are no stages, no tags, no scores and no notes, because none
  * of those exist.
  *
@@ -25,14 +37,15 @@ import { CustomerPage, CustomersApi } from '../customers-api';
  * names the other and confirms it, which is a decision this screen deliberately
  * does not make easier to take by accident.
  *
- * <strong>Every label is escaped.</strong> A customer's name is untrusted text
- * that may have come from a person typing anything at all. It is interpolated,
- * never bound as HTML, and there is no `innerHTML` on this page.
+ * <strong>Every label is escaped, and takes its own direction.</strong> A
+ * customer's name is untrusted text that may have come from a person typing
+ * anything at all. It is interpolated, never bound as HTML, and marked
+ * `dir="auto"` so an Arabic name reads right to left in an English list.
  */
 @Component({
   selector: 'app-customer-list',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [PageHeader, EmptyState, RouterLink, Icon, Pagination],
+  imports: [PageHeader, EmptyState, RouterLink, Icon, Pagination, ChannelBadge],
   templateUrl: './customer-list.html',
   styleUrl: './customer-list.scss',
 })
@@ -70,11 +83,27 @@ export class CustomerList {
 
   protected readonly pageSize = CustomerList.PageSize;
 
-  protected readonly skeletonRows = [0, 1, 2, 3];
+  protected readonly skeletonRows = [0, 1, 2, 3, 4];
 
   private readonly recordPage = pageRecorder();
 
-  protected readonly rows = computed(() => this.page()?.items ?? []);
+  protected readonly rows = computed<readonly DirectoryRow[]>(() =>
+    (this.page()?.items ?? []).map((customer) => {
+      const name = customerName(customer);
+
+      return {
+        customer,
+        name,
+        named: customer.displayName !== null,
+        initial: customer.displayName !== null ? initialOf(name) : '',
+        conversations: conversationsPhrase(this.locale.language, customer.conversationCount),
+        activity:
+          customer.lastActivityAt === null
+            ? $localize`:@@customers.noActivity:No activity yet`
+            : this.locale.date(customer.lastActivityAt, 'dateTime'),
+      };
+    }),
+  );
 
   protected readonly totalCount = computed(() => this.page()?.totalCount ?? 0);
 
@@ -95,20 +124,6 @@ export class CustomerList {
     this.recordPage(page);
 
     await this.refresh();
-  }
-
-  /** The last activity, or a word rather than an empty cell. */
-  protected activity(value: string | null): string {
-    return value === null ? 'No activity yet' : this.date(value);
-  }
-
-  protected date(value: string): string {
-    return this.locale.date(value, 'dateTime');
-  }
-
-  /** How to describe a count without a bare number beside a plural noun. */
-  protected conversations(count: number): string {
-    return count === 1 ? '1 conversation' : `${count} conversations`;
   }
 
   private async load(): Promise<void> {

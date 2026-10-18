@@ -1,0 +1,81 @@
+<h2 id="conversation-details-title" class="context-title">{{ detailsLabel }}</h2>
+
+<section class="context-section" aria-labelledby="context-customer">
+  <h3 id="context-customer" class="context-heading" i18n="@@conversation.customer">Customer</h3>
+  <app-channel-badge [channel]="conversation().channel" />
+  @if (whatsApp(); as facts) {
+    <!--
+      Masked by the server and never sent in full. Enough to recognise who you
+      are talking to; not a contact list, and not a phone number in a
+      screenshot. An LTR island in either language.
+    -->
+    <p class="context-value">
+      <span class="visually-hidden" i18n="@@conversation.maskedNumber">Masked number, </span
+      ><bdi dir="ltr">{{ facts.customerReference }}</bdi>
+    </p>
+  }
+</section>
+
+<section class="context-section" aria-labelledby="context-assignment">
+  @if (canAssign()) {
+    <h3 id="context-assignment" class="context-heading">
+      <label for="conversation-assignee">{{ assignedToLabel }}</label>
+    </h3>
+    <select
+      id="conversation-assignee"
+      class="select"
+      [disabled]="working()"
+      [value]="conversation().assignedTo?.userId ?? ''"
+      (change)="onChange($event)"
+      data-testid="assignee"
+    >
+      <option value="" i18n="@@conversation.nobody">Nobody</option>
+      @for (member of options(); track member.userId) {
+        <option [value]="member.userId">{{ member.email }}</option>
+      }
+    </select>
+    <p class="context-hint" i18n="@@conversation.assignHint">
+      Routing only. It gives that colleague no permission they did not already have.
+    </p>
+  } @else {
+    <h3 id="context-assignment" class="context-heading">{{ assignedToLabel }}</h3>
+    <p class="context-value">
+      @if (conversation().assignedTo; as member) {
+        <bdi dir="ltr">{{ member.email }}</bdi>
+      } @else {
+        <span i18n="@@conversation.nobody">Nobody</span>
+      }
+    </p>
+  }
+</section>
+
+<section class="context-section" aria-labelledby="context-agent">
+  <h3 id="context-agent" class="context-heading" i18n="@@conversation.agent">AI agent</h3>
+  <p class="context-value" dir="auto">{{ conversation().agentName ?? '—' }}</p>
+</section>
+
+<section class="context-section" aria-labelledby="context-facts">
+  <h3 id="context-facts" class="context-heading" i18n="@@conversation.facts">Conversation</h3>
+  <dl class="context-facts">
+    <div>
+      <dt i18n="@@conversation.started">Started</dt>
+      <dd>
+        <time [attr.datetime]="conversation().startedAt">{{ started() }}</time>
+      </dd>
+    </div>
+    <div>
+      <dt i18n="@@conversation.lastActivity">Last activity</dt>
+      <dd>
+        <time [attr.datetime]="conversation().lastActivityAt">{{ lastActivity() }}</time>
+      </dd>
+    </div>
+    <div>
+      <dt i18n="@@conversation.messageCount">Messages</dt>
+      <dd>{{ messages() }}</dd>
+    </div>
+    <div>
+      <dt i18n="@@conversation.statusLabel">Status</dt>
+      <dd>{{ status() }}</dd>
+    </div>
+  </dl>
+</section>

@@ -1,0 +1,20 @@
+<!--
+  Two panes in the document, always: the list first, then the outlet (the open
+  conversation, or the prompt to choose one). The stylesheet decides whether
+  they sit side by side or one at a time; `is-open` says which one is shown on a
+  narrow screen.
+-->
+<div
+  class="inbox"
+  [class.is-open]="selectedId() !== null"
+  [class.is-panes]="wide() && canView()"
+  data-testid="inbox"
+>
+  <div class="inbox-list-pane">
+    <app-conversation-list [selectedId]="selectedId()" [isPage]="listIsPage()" />
+  </div>
+
+  <div class="inbox-detail-pane">
+    <router-outlet />
+  </div>
+</div>

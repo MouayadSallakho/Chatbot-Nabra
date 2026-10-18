@@ -1,0 +1,47 @@
+import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { Icon } from '@app/shared/icon/icon';
+
+/**
+ * The conversation pane when nothing is open.
+ *
+ * Seen only where the list sits beside it (1280px and wider); on a narrower
+ * screen `/conversations` is the list alone. Says what belongs here and how to
+ * fill it, and nothing else: no counts, no illustration.
+ */
+@Component({
+  selector: 'app-inbox-placeholder',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [Icon],
+  template: `
+    <div class="inbox-placeholder">
+      <span class="state-icon" aria-hidden="true">
+        <app-icon name="conversations" [strokeWidth]="1.6" />
+      </span>
+      <p class="state-title" i18n="@@inbox.placeholder.title">Choose a conversation</p>
+      <p class="state-description" i18n="@@inbox.placeholder.body">
+        Its messages, who is answering and the controls to step in open here, beside the list.
+      </p>
+    </div>
+  `,
+  styles: `
+    :host {
+      display: grid;
+      block-size: 100%;
+      place-items: center;
+      background-color: var(--surface-page);
+    }
+
+    .inbox-placeholder {
+      display: grid;
+      justify-items: center;
+      gap: var(--space-3);
+      padding: var(--space-8);
+      text-align: center;
+
+      p {
+        margin: 0;
+      }
+    }
+  `,
+})
+export class InboxPlaceholder {}
