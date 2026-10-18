@@ -1,158 +1,223 @@
 // =============================================================================
-// Design tokens
+// Design tokens: "Two Voices"
 // =============================================================================
 //
 // The single source of visual truth. Every colour, space, radius, shadow, type
-// step and duration in this product resolves to something declared here.
+// step and duration in this product resolves to something declared here. The
+// direction and every decision behind these values is in docs/design/MASTER.md;
+// read it before changing a value.
 //
 // Two rules keep it that way:
 //
 //   1. Components consume semantic tokens, never raw values. A component that
-//      hard-codes #4a56e2 is invisible to theming, and will be wrong in dark
+//      hard-codes a hex value is invisible to theming, and will be wrong in dark
 //      mode the moment somebody stops thinking about it.
 //   2. Tokens are named for their ROLE, not their appearance. `--surface-raised`
 //      survives a palette change; `--grey-100` becomes a lie the first time the
 //      product is restyled.
 //
+// The concept in one line: every conversation is a duet between the AI and the
+// team. The two VOICE colours -- Lagoon for the AI, Ember for a person on the
+// team -- carry that one fact and nothing else: never decoration, never status.
+// Everything else is calm ink on porcelain, and ink is the action colour.
+//
 // Theming works by redefining the same custom properties under a different
 // selector. Components are written once and are never duplicated per theme.
+// Every foreground/background pair below is proven by contrast_check.py in both
+// themes (the table is in the Phase 36.2 report): text 4.5:1, large text and
+// the boundaries of controls 3:1.
 // -----------------------------------------------------------------------------
 
 // -----------------------------------------------------------------------------
-// Dark palette
+// Dark palette ("night shift")
 // -----------------------------------------------------------------------------
-// A mixin rather than a plain selector, because the dark values are needed in
-// two places: when dark is explicitly chosen, and when the OS asks for dark and
-// no choice has been made (the no-JavaScript path). Writing them once means the
-// two can never drift apart.
+// Designed on its own, not inverted from light. A mixin rather than a plain
+// selector, because the dark values are needed in two places: when dark is
+// explicitly chosen, and when the OS asks for dark and no choice has been made
+// (the no-JavaScript path). Writing them once means the two can never drift.
 @mixin dark-palette {
-  // Surfaces. Deliberately not pure black: #000 makes shadows invisible, causes
-  // halation against light text, and reads as "terminal" rather than "product".
-  // These are desaturated blue-greys, which also stops the accent looking alien
-  // against them.
-  --surface-page: #0c0f16;
-  --surface-default: #141924;
-  --surface-muted: #1a2130;
-  --surface-raised: #1f2735;
-  --surface-inset: #10141d;
-  --surface-hover: #1e2634;
-  --surface-selected: #1a1f3d;
+  // Surfaces: warm near-blacks, not #000. Pure black causes halation against
+  // light text, and depth here comes from borders rather than shadows.
+  --surface-page: #0f1012;
+  --surface-default: #17191c;
+  --surface-muted: #1c1e22;
+  --surface-raised: #1e2024; // overlays sit a step lighter than the page
+  --surface-inset: #0b0c0e;
+  --surface-hover: #202328;
+  --surface-selected: #23262b;
 
-  // Text. Not pure white either, for the same reason.
-  --text-primary: #e7ecf3;
-  --text-secondary: #a5b0c0;
-  --text-muted: #7b8698;
+  --text-primary: #f2f1ed;
+  --text-secondary: #b6b9bf;
+  --text-muted: #8e929a;
 
-  --border-subtle: #232b3a;
-  --border-default: #2c3546;
-  --border-strong: #3d4859;
-  // Boundary of an interactive control (inputs, checkboxes). Held to the 3:1
-  // non-text contrast requirement, which decorative borders above do not carry.
-  --border-control: #5a6880;
+  --border-subtle: #24272c;
+  --border-default: #2c3036;
+  --border-strong: #3a3f46;
+  // The boundary of an interactive control: held to the 3:1 non-text rule,
+  // which the decorative hairlines above deliberately do not carry.
+  --border-control: #6b717a;
 
-  // Accent, lightened for dark surfaces. The light-mode indigo would fail
-  // contrast here, so this is a designed value rather than the same one reused.
-  --accent: #7b87ff;
-  --accent-hover: #949dff;
-  --accent-active: #6570f0;
-  --accent-subtle: #1a1f3d;
-  --accent-subtle-border: #2e3663;
-  --accent-contrast: #0c0f16;
+  // Ink becomes porcelain: the primary action is the lightest thing on screen.
+  --action: #f2f1ed;
+  --action-hover: #ffffff;
+  --action-pressed: #d9d8d3;
+  --on-action: #0f1012;
+  --link: #f2f1ed;
+  --link-hover: #ffffff;
+  --focus-ring: #f2f1ed;
+  --selection: #3a3f46;
 
-  --success-fg: #4ed09a;
-  --success-bg: #0e2a1f;
-  --success-border: #1d4634;
+  // The two voices, lifted for a dark canvas.
+  --voice-ai-fg: #41c2b4;
+  --voice-ai-strong: #7ad9ce;
+  --voice-ai-tint: #0f2a27;
+  --voice-ai-border: #1c4a44;
+  --voice-human-fg: #ff8d57;
+  --voice-human-strong: #ffb088;
+  --voice-human-tint: #33190c;
+  --voice-human-border: #5a2c16;
 
-  --warning-fg: #e8b15c;
-  --warning-bg: #2c210e;
-  --warning-border: #4a3a18;
+  --success-fg: #6bd68a;
+  --success-bg: #10251a;
+  --success-border: #1f4a2e;
 
-  --danger-fg: #ff8b80;
-  --danger-bg: #2e1512;
-  --danger-border: #4e2723;
-  --danger-solid: #e2564a;
-  --danger-solid-hover: #ea6459;
-  --danger-contrast: #1a0a08;
+  --warning-fg: #f2c94c;
+  --warning-bg: #2a220b;
+  --warning-border: #4d3e12;
 
-  --info-fg: #6bb6f0;
-  --info-bg: #0e2233;
-  --info-border: #1c3a52;
+  --danger-fg: #ff8a80;
+  --danger-bg: #2d1513;
+  --danger-border: #57261f;
+  --danger-solid: #f07a6e;
+  --danger-solid-hover: #f5928a;
+  --danger-contrast: #0f1012;
 
-  // Shadows read poorly on dark surfaces, so dark mode leans on borders for
-  // separation and keeps shadows for the few places depth is the actual point.
-  --shadow-subtle: 0 1px 2px rgb(0 0 0 / 40%);
-  --shadow-raised: 0 4px 12px rgb(0 0 0 / 45%);
-  --shadow-overlay: 0 16px 40px rgb(0 0 0 / 60%);
+  --info-fg: #7db7ff;
+  --info-bg: #0d1f33;
+  --info-border: #1c3a5c;
 
-  --skeleton-base: #1e2634;
-  --skeleton-sheen: #2a3444;
+  // Charts: AI and people are the voices; customers are a neutral slate.
+  --chart-ai: var(--voice-ai-fg);
+  --chart-human: var(--voice-human-fg);
+  --chart-customer: #a3aab5;
+  --chart-neutral: #b6b9bf;
+  --chart-grid: #2c3036;
+  --chart-ramp-1: #0f2a27;
+  --chart-ramp-2: #155149;
+  --chart-ramp-3: #1f7c71;
+  --chart-ramp-4: #41c2b4;
+  --chart-ramp-5: #7ad9ce;
 
-  --scrim: rgb(3 5 10 / 65%);
+  // In the dark, borders do the separating; the overlay shadow only grounds.
+  --shadow-subtle: none;
+  --shadow-raised: 0 1px 2px rgb(0 0 0 / 40%), 0 12px 32px -8px rgb(0 0 0 / 55%);
+  --shadow-overlay: 0 1px 2px rgb(0 0 0 / 40%), 0 12px 32px -8px rgb(0 0 0 / 55%);
+
+  --skeleton-base: #202328;
+  --skeleton-sheen: #2a2d33;
+
+  --scrim: rgb(5 6 7 / 68%);
 
   color-scheme: dark;
 }
 
 // -----------------------------------------------------------------------------
-// Light palette, and everything that does not change between themes
+// Light palette ("porcelain"), and everything that does not change by theme
 // -----------------------------------------------------------------------------
 :root {
   // ---------------------------------------------------------------------------
   // Colour - light
   // ---------------------------------------------------------------------------
-  // Light mode is designed, not "white with black text". Hierarchy comes from a
-  // tinted page sitting behind white cards, so a surface reads as raised without
-  // needing a shadow on every panel.
-  --surface-page: #f5f7fa;
+  // A warm porcelain page behind white panels: a surface reads as raised from
+  // the tint behind it and a hairline, never from a shadow.
+  --surface-page: #f3f2ee;
   --surface-default: #ffffff;
-  --surface-muted: #eff2f6;
+  --surface-muted: #f7f6f3;
   --surface-raised: #ffffff;
-  --surface-inset: #f7f9fb;
-  --surface-hover: #eef1f6;
-  --surface-selected: #eef0fe;
+  --surface-inset: #eeede8;
+  --surface-hover: #f0efea;
+  // Selection is neutral, never a voice colour; the current navigation item
+  // adds a 2px ink edge so it still reads in greyscale.
+  --surface-selected: #e9e8e2;
 
-  --text-primary: #131822;
-  --text-secondary: #4c5666;
-  --text-muted: #646e7f;
+  --text-primary: #16181b;
+  --text-secondary: #4d525a;
+  --text-muted: #5f646d;
 
-  --border-subtle: #e9edf3;
-  --border-default: #e1e6ed;
-  --border-strong: #c7ced9;
-  --border-control: #828b9a;
+  --border-subtle: #e7e5df;
+  --border-default: #dedbd4;
+  --border-strong: #cbc8bf;
+  --border-control: #80838a; // #8b8e95 adjusted: 2.79:1 on inset
 
-  --accent: #4a56e2;
-  --accent-hover: #3d48c8;
-  --accent-active: #333da8;
-  --accent-subtle: #eef0fe;
-  --accent-subtle-border: #d5d9fb;
-  --accent-contrast: #ffffff;
+  // Ink: the action colour. Primary buttons are ink, links are ink and always
+  // underlined, the focus ring is ink. Nothing in the product is "brand blue".
+  --action: #16181b;
+  --action-hover: #2b2e33;
+  --action-pressed: #000000;
+  --on-action: #ffffff;
+  --link: #16181b;
+  --link-hover: #000000;
+  --focus-ring: #16181b;
+  --selection: #dedbd4;
 
-  --success-fg: #0e7a4d;
-  --success-bg: #e7f5ee;
-  --success-border: #b4e0cb;
+  // The two voices. `fg` is the voice itself (glyphs, bars, the mark); `strong`
+  // is its text colour on a tint; `tint` and `border` draw a chip or a bubble.
+  // Lagoon = the AI. Ember = a person on the team. Nothing else, ever.
+  --voice-ai-fg: #0e7c72;
+  --voice-ai-strong: #0a5e57;
+  --voice-ai-tint: #e2f2ef;
+  --voice-ai-border: #bfe3dd;
+  --voice-human-fg: #c2410c;
+  --voice-human-strong: #9a330a;
+  --voice-human-tint: #fbe9df;
+  --voice-human-border: #f4cdb8;
 
-  --warning-fg: #8a5300;
-  --warning-bg: #fdf3e0;
-  --warning-border: #f2d9a8;
+  // Status. Kept clear of the voices on purpose: Ember is orange, warning is a
+  // yellow amber, danger is crimson -- and every status also carries its own
+  // icon and word, every voice its glyph and word.
+  --success-fg: #2b7a30; // #2e7d32 adjusted: 4.49:1 on its bg
+  --success-bg: #e8f3e8;
+  --success-border: #c3e1c4;
 
-  --danger-fg: #b62a20;
+  --warning-fg: #8a5a00;
+  --warning-bg: #fdf3d7;
+  --warning-border: #f0d99a;
+
+  --danger-fg: #b42318;
   --danger-bg: #fdecea;
-  --danger-border: #f4c4be;
+  --danger-border: #f5c2bd;
   --danger-solid: #c0392c;
-  --danger-solid-hover: #a72f24;
+  --danger-solid-hover: #a83023;
   --danger-contrast: #ffffff;
 
-  --info-fg: #0b5fa5;
-  --info-bg: #e8f2fc;
-  --info-border: #bedbf3;
+  --info-fg: #1f5fad;
+  --info-bg: #e7f0fb;
+  --info-border: #c3d8f3;
 
-  --shadow-subtle: 0 1px 2px rgb(19 24 34 / 6%);
-  --shadow-raised: 0 4px 12px rgb(19 24 34 / 8%);
-  --shadow-overlay: 0 16px 40px rgb(19 24 34 / 16%);
+  // Charts. Never a rainbow: AI and people are the voices, customers a neutral
+  // slate, single-series charts ink or neutral, sequential ramps Lagoon only.
+  --chart-ai: var(--voice-ai-fg);
+  --chart-human: var(--voice-human-fg);
+  --chart-customer: #5b6472;
+  --chart-neutral: #4d525a;
+  --chart-grid: #e7e5df;
+  --chart-ramp-1: #e2f2ef;
+  --chart-ramp-2: #a9d9d1;
+  --chart-ramp-3: #5fb3a8;
+  --chart-ramp-4: #0e7c72;
+  --chart-ramp-5: #0a5e57;
 
-  --skeleton-base: #e6eaf0;
-  --skeleton-sheen: #f2f5f8;
+  // Elevation: hairlines everywhere, shadows only on overlays (menus, dialogs,
+  // toasts, the peeking sidebar). `--shadow-subtle` is kept as a name so older
+  // rules resolve, and resolves to nothing.
+  --shadow-subtle: none;
+  --shadow-raised: 0 1px 2px rgb(22 24 27 / 5%), 0 12px 32px -8px rgb(22 24 27 / 18%);
+  --shadow-overlay: 0 1px 2px rgb(22 24 27 / 5%), 0 12px 32px -8px rgb(22 24 27 / 18%);
 
-  --scrim: rgb(19 24 34 / 45%);
+  --skeleton-base: #ebe9e3;
+  --skeleton-sheen: #f5f4f0;
+
+  --scrim: rgb(22 24 27 / 42%);
 
   color-scheme: light;
 
@@ -160,8 +225,7 @@
   // Spacing - a 4px foundation
   // ---------------------------------------------------------------------------
   // One scale, ten steps, nothing in between. If a gap seems to want 13px the
-  // answer is 12 or 16, not a new token: consistent rhythm is most of what
-  // separates a designed interface from an assembled one.
+  // answer is 12 or 16, not a new token.
   --space-1: 0.25rem; // 4px
   --space-2: 0.5rem; // 8px
   --space-3: 0.75rem; // 12px
@@ -176,14 +240,20 @@
   // ---------------------------------------------------------------------------
   // Radius
   // ---------------------------------------------------------------------------
-  // Three working levels and nothing larger. Operational surfaces read as
-  // precise when their corners are small; 16-24px rounding everywhere is what
-  // makes an admin product look like a marketing template.
-  --radius-sm: 4px; // badges, checkboxes, compact controls
-  --radius-md: 6px; // buttons, inputs, nav items, menu items
-  --radius-lg: 8px; // cards, panels, tables, menus
-  --radius-xl: 12px; // dialogs and drawers -- the overlays
-  --radius-pill: 999px; // counts only, where the shape itself carries meaning
+  // One family, by role. The old names stay and now resolve to the new roles,
+  // so every existing rule follows without being touched.
+  --radius-badge: 6px;
+  --radius-control: 10px;
+  --radius-card: 14px;
+  --radius-overlay: 20px;
+  --radius-bubble: 18px;
+  --radius-bubble-tail: 6px; // the speaker's corner, written with logical corners
+  --radius-pill: 999px; // counts and chips only
+
+  --radius-sm: var(--radius-badge); // badges, checkboxes, inner segments
+  --radius-md: var(--radius-control); // buttons, inputs, nav and menu items
+  --radius-lg: var(--radius-card); // cards, panels, tables, menus
+  --radius-xl: var(--radius-overlay); // dialogs and drawers
 
   // ---------------------------------------------------------------------------
   // Control sizing
@@ -197,42 +267,64 @@
   --icon-size-sm: 1rem; // 16px: inside compact controls
   --icon-size: 1.125rem; // 18px: buttons, menus
   --icon-size-nav: 1.25rem; // 20px: primary navigation
+  --icon-stroke: 1.6; // matches the stroke of Instrument Sans at body sizes
 
   // ---------------------------------------------------------------------------
   // Typography
   // ---------------------------------------------------------------------------
-  // A system stack. No webfont is fetched: a CDN request is a third-party
-  // dependency on every page load, a privacy consideration, and a guaranteed
-  // flash of unstyled text. System UI fonts are also what the reader's OS
-  // already renders best.
+  // Instrument Sans (variable width and weight) for Latin, IBM Plex Sans Arabic
+  // for Arabic, both self-hosted (styles/_fonts.scss): no font service is ever
+  // contacted. Each family is followed by a metric-matched local fallback, so
+  // the swap when the real file arrives moves nothing.
+  //
+  // Order matters only for the fallbacks: every face carries a unicode-range,
+  // so Arabic characters skip both Latin faces and Latin characters inside
+  // Arabic text keep Instrument Sans.
   --font-sans:
-    system-ui, -apple-system, 'Segoe UI', roboto, 'Helvetica Neue', arial, 'Noto Sans', sans-serif;
+    'Instrument Sans', 'IBM Plex Sans Arabic', 'Instrument Sans Fallback',
+    'IBM Plex Sans Arabic Fallback', system-ui, sans-serif;
   --font-mono: ui-monospace, 'SF Mono', 'Cascadia Mono', 'Roboto Mono', menlo, consolas, monospace;
 
+  // Headings are the narrowed cut of the same variable font. `font` shorthands
+  // cannot carry a percentage width, so the title utilities apply this after.
+  --heading-stretch: 86%;
+  --letter-spacing-tight: -0.015em; // titles only, to close optical gaps at size
+  --letter-spacing-caps: 0.02em; // legacy: the system no longer sets uppercase labels
+
   // Steps are named for the job they do, so a stylesheet says what it means.
-  --text-page-title: 600 clamp(1.375rem, 1.15rem + 0.7vw, 1.75rem) / 1.25 var(--font-sans);
-  --text-section-title: 600 1.125rem / 1.35 var(--font-sans);
-  --text-card-title: 600 0.9375rem / 1.4 var(--font-sans);
-  --text-body: 400 0.875rem / 1.55 var(--font-sans);
-  --text-body-strong: 500 0.875rem / 1.55 var(--font-sans);
-  --text-small: 400 0.8125rem / 1.5 var(--font-sans);
-  --text-label: 500 0.8125rem / 1.4 var(--font-sans);
+  --text-display: 600 clamp(1.75rem, 1.35rem + 1.3vw, 2.5rem) / 1.1 var(--font-sans); // 28-40px
+  --text-page-title: 620 clamp(1.5rem, 1.3rem + 0.65vw, 1.875rem) / 1.2 var(--font-sans); // 24-30px
+  --text-section-title: 600 1.125rem / 1.35 var(--font-sans); // 18px
+  --text-card-title: 600 0.9375rem / 1.4 var(--font-sans); // 15px
+  --text-body: 400 0.875rem / 1.55 var(--font-sans); // 14px, dense admin
+  --text-body-strong: 550 0.875rem / 1.55 var(--font-sans);
+  --text-reading: 400 0.9375rem / 1.6 var(--font-sans); // 15px, transcripts and long text
+  --text-small: 400 0.8125rem / 1.5 var(--font-sans); // 13px
+  --text-label: 550 0.8125rem / 1.4 var(--font-sans);
   --text-nav: 500 0.875rem / 1.2 var(--font-sans);
   --text-table: 400 0.8125rem / 1.45 var(--font-sans); // dense data
-  --text-caption: 500 0.75rem / 1.35 var(--font-sans); // meta, column headers
-
-  --letter-spacing-tight: -0.011em; // titles only, to close optical gaps at size
-  --letter-spacing-caps: 0.04em; // the one place uppercase is used
+  --text-caption: 500 0.75rem / 1.35 var(--font-sans); // 12px: meta, column headers
+  --text-numeric: 550 0.875rem / 1.3 var(--font-sans); // paired with tabular-nums
 
   // ---------------------------------------------------------------------------
   // Motion
   // ---------------------------------------------------------------------------
-  // Short enough to read as response rather than as animation.
-  --motion-fast: 150ms; // hover, press, colour
-  --motion-normal: 200ms; // menus, popovers, the sidebar opening
-  --motion-slow: 280ms; // drawers, dialogs, the sidebar closing
-  --ease-standard: cubic-bezier(0.2, 0, 0.2, 1);
+  // Functional and quick: response, not animation. No count-ups, no stagger on
+  // every visit, no parallax.
+  --duration-xs: 100ms; // colour on press
+  --duration-sm: 150ms; // hover, small state changes
+  --duration-md: 220ms; // menus, popovers, a new message settling
+  --duration-lg: 320ms; // drawers, dialogs, the "Take over" sweep
+  --duration-xl: 450ms; // the rare large surface change
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-enter: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+  --ease-emphasized: cubic-bezier(0.05, 0.7, 0.1, 1);
+
+  // The original three names, kept so every existing rule follows the scale.
+  --motion-fast: var(--duration-sm);
+  --motion-normal: var(--duration-md);
+  --motion-slow: var(--duration-lg);
 
   // ---------------------------------------------------------------------------
   // Layout
@@ -245,28 +337,47 @@
   --drawer-width: 30rem; // contextual side panels
   --focus-ring-width: 2px;
   --focus-ring-offset: 2px;
+  --voice-track-height: 4px;
 
   // ---------------------------------------------------------------------------
   // Layers
   // ---------------------------------------------------------------------------
-  // Named, ordered, and the only z-index values in the product. A menu inside
-  // the header must sit above the peeking sidebar; a dialog above both; the
-  // toast above everything, because it may be announcing the dialog's result.
+  // Named, ordered, and the only z-index values in the product.
   --z-sticky: 10;
   --z-sidebar: 20;
   --z-dropdown: 30;
   --z-drawer: 40;
   --z-modal: 50;
   --z-toast: 60;
+  --z-skip-link: 70;
 
-  // Direction multiplier for the one transform that has to mirror under RTL.
-  // Transforms do not respond to `dir`, so the drawer takes its direction from
-  // here rather than from a hard-coded sign.
+  // Direction multiplier for the transforms that have to mirror under RTL.
+  // Transforms do not respond to `dir`, so they take their sign from here.
   --direction-flip: 1;
 }
 
 [dir='rtl'] {
   --direction-flip: -1;
+}
+
+// Arabic. Plex Sans Arabic has no width axis and Arabic has no letter case, so
+// the narrowed headings, the negative tracking and any uppercase stop here;
+// Arabic body text is a step larger with more leading, because at the same
+// size it reads smaller than Latin.
+:lang(ar) {
+  --heading-stretch: 100%;
+  --letter-spacing-tight: 0;
+  --letter-spacing-caps: 0;
+  --text-page-title: 600 clamp(1.5rem, 1.3rem + 0.65vw, 1.875rem) / 1.4 var(--font-sans);
+  --text-section-title: 600 1.125rem / 1.45 var(--font-sans);
+  --text-card-title: 600 0.9375rem / 1.5 var(--font-sans);
+  --text-body: 400 0.9375rem / 1.7 var(--font-sans);
+  --text-body-strong: 500 0.9375rem / 1.7 var(--font-sans);
+  --text-reading: 400 0.9375rem / 1.75 var(--font-sans);
+  --text-small: 400 0.875rem / 1.65 var(--font-sans);
+  --text-label: 500 0.875rem / 1.5 var(--font-sans);
+  --text-table: 400 0.875rem / 1.6 var(--font-sans);
+  --text-caption: 500 0.8125rem / 1.5 var(--font-sans);
 }
 
 // Touch: every control grows to a comfortable target and the page gutter
@@ -291,9 +402,11 @@
 // out-ranks `*`. Near zero rather than zero, so transitionend still fires.
 @media (prefers-reduced-motion: reduce) {
   :root {
-    --motion-fast: 0.01ms;
-    --motion-normal: 0.01ms;
-    --motion-slow: 0.01ms;
+    --duration-xs: 0.01ms;
+    --duration-sm: 0.01ms;
+    --duration-md: 0.01ms;
+    --duration-lg: 0.01ms;
+    --duration-xl: 0.01ms;
   }
 }
 
@@ -308,5 +421,18 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']):not([data-theme='dark']) {
     @include dark-palette;
+  }
+}
+
+// More contrast asked for: muted text becomes secondary and the hairlines that
+// are decorative by default become real boundaries. Last, and scoped to the
+// theme selectors too, so it wins over the dark palette's literal values.
+@media (prefers-contrast: more) {
+  :root,
+  :root[data-theme='light'],
+  :root[data-theme='dark'] {
+    --text-muted: var(--text-secondary);
+    --border-default: var(--border-control);
+    --border-subtle: var(--border-strong);
   }
 }

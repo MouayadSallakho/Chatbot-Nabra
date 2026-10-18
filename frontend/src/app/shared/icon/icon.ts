@@ -44,11 +44,12 @@ export class Icon {
   /**
    * Slightly heavier strokes for the small sizes.
    *
-   * A 1.5px stroke that reads as crisp at 20px turns into a grey smear at 14px,
-   * so the few places that render an icon small can ask for more weight rather
+   * The default 1.6 matches the stroke of Instrument Sans at body sizes (the
+   * "Two Voices" refresh; it was 1.5). It turns into a grey smear at 14px, so
+   * the few places that render an icon small can ask for more weight rather
    * than living with it.
    */
-  readonly strokeWidth = input(1.5);
+  readonly strokeWidth = input(1.6);
 
   protected readonly paths = computed<readonly string[]>(() => ICON_PATHS[this.name()]);
 }

@@ -79,7 +79,6 @@
   inline-size: 1.75rem;
   block-size: 1.75rem;
   flex: none;
-  color: var(--accent);
 }
 
 .brand-name {
@@ -210,18 +209,15 @@
   }
 }
 
-// The current page. Three signals, not one: a tinted fill, the accent colour,
-// and a solid marker on the start edge -- the marker is what still reads in
-// greyscale and on the collapsed rail. `aria-current="page"` announces it.
+// The current page. Three signals, not one: a neutral selected fill, ink text
+// at a heavier weight, and a 2px ink marker on the start edge -- the marker is
+// what still reads in greyscale and on the collapsed rail, and it mirrors with
+// the reading direction. `aria-current="page"` announces it.
 .nav-item.is-active {
   background-color: var(--surface-selected);
-  color: var(--accent);
+  color: var(--text-primary);
   font-weight: 600;
-  box-shadow: inset 3px 0 0 0 var(--accent);
-}
-
-[dir='rtl'] .nav-item.is-active {
-  box-shadow: inset -3px 0 0 0 var(--accent);
+  box-shadow: inset calc(var(--direction-flip) * 2px) 0 0 0 var(--action);
 }
 
 // -----------------------------------------------------------------------------

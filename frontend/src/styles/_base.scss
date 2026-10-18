@@ -31,10 +31,18 @@ body {
   background-color: var(--surface-page);
   color: var(--text-primary);
   font: var(--text-body);
+  font-optical-sizing: auto;
 
   // Kerning and ligatures on, because UI text is short and reads better for it.
   text-rendering: optimizelegibility;
   -webkit-font-smoothing: antialiased;
+}
+
+// Neutral, never a voice colour: selecting text is not something the AI or a
+// person said.
+::selection {
+  background-color: var(--selection);
+  color: var(--text-primary);
 }
 
 // Headings are reset to inherit, then given weight by the type utilities below.
@@ -60,12 +68,19 @@ ol {
   list-style: none;
 }
 
+// Links are ink and always underlined: colour alone would not tell a link from
+// text now that the action colour is the text colour. The underline sits clear
+// of descenders and thickens on hover instead of appearing.
 a {
-  color: var(--accent);
-  text-decoration: none;
+  color: var(--link);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+  transition: text-decoration-thickness var(--duration-xs) var(--ease-standard);
 
   &:hover {
-    text-decoration: underline;
+    color: var(--link-hover);
+    text-decoration-thickness: 2px;
   }
 }
 
@@ -88,16 +103,18 @@ select {
 // -----------------------------------------------------------------------------
 // Focus
 // -----------------------------------------------------------------------------
-// One focus treatment for the entire product, defined once.
+// One focus treatment for the entire product, defined once: 2px of ink with a
+// 2px gap, which shows the surface behind and so separates the ring from an
+// ink button as clearly as from a white field.
 //
 // `:focus-visible` rather than `:focus`, so a mouse user clicking a button does
-// not get a ring while a keyboard user always does. The ring is drawn with
-// `outline` on purpose: it follows border-radius, it cannot be clipped by
-// `overflow: hidden`, and it does not affect layout the way a border would.
+// not get a ring while a keyboard user always does. Drawn with `outline` on
+// purpose: it follows border-radius, survives forced-colours mode (a
+// box-shadow ring would vanish there), cannot be clipped by `overflow: hidden`
+// and does not affect layout.
 :focus-visible {
-  outline: var(--focus-ring-width) solid var(--accent);
+  outline: var(--focus-ring-width) solid var(--focus-ring);
   outline-offset: var(--focus-ring-offset);
-  border-radius: var(--radius-sm);
 }
 
 // The default ring is removed only where a component draws its own, never
@@ -113,14 +130,28 @@ select {
 // styled, and `<h1 class="text-page-title">` keeps the heading level -- which
 // screen readers use to build a document outline -- independent of its size,
 // which is a visual decision.
-.text-page-title {
-  font: var(--text-page-title);
+//
+// Titles use the narrowed cut of Instrument Sans. The width is set after the
+// `font` shorthand, which would otherwise reset it.
+.text-display {
+  font: var(--text-display);
+  font-stretch: var(--heading-stretch);
+  font-variant-numeric: tabular-nums;
   letter-spacing: var(--letter-spacing-tight);
   color: var(--text-primary);
 }
 
+.text-page-title {
+  font: var(--text-page-title);
+  font-stretch: var(--heading-stretch);
+  letter-spacing: var(--letter-spacing-tight);
+  color: var(--text-primary);
+  text-wrap: balance;
+}
+
 .text-section-title {
   font: var(--text-section-title);
+  font-stretch: var(--heading-stretch);
   letter-spacing: var(--letter-spacing-tight);
   color: var(--text-primary);
 }
@@ -132,6 +163,10 @@ select {
 
 .text-body {
   font: var(--text-body);
+}
+
+.text-reading {
+  font: var(--text-reading);
 }
 
 .text-small {
@@ -172,21 +207,62 @@ select {
   position: absolute;
   inset-block-start: var(--space-2);
   inset-inline-start: var(--space-2);
-  z-index: 100;
+  z-index: var(--z-skip-link);
   padding: var(--space-2) var(--space-4);
-  background-color: var(--surface-raised);
-  color: var(--text-primary);
-  border: 1px solid var(--border-strong);
+  background-color: var(--action);
+  color: var(--on-action);
   border-radius: var(--radius-md);
   font: var(--text-body-strong);
+  text-decoration: none;
   transform: translateY(calc(-100% - var(--space-4)));
-  transition: transform var(--motion-fast) var(--ease-standard);
+  transition: transform var(--duration-sm) var(--ease-standard);
 
   // The shadow is cast only while the link is on screen. Parked above the
   // viewport, a 40px blur still reached down into the page's top corner.
   &:focus-visible {
+    color: var(--on-action);
     box-shadow: var(--shadow-overlay);
     transform: translateY(0);
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Route crossfade
+// -----------------------------------------------------------------------------
+// The router starts a View Transition on navigation (skipped on the first
+// load). Only the content area takes part: the shell around it has no
+// transition name, so the sidebar and top bar never flicker, and the root
+// snapshot is told not to animate at all. 150ms both ways: a crossfade the
+// reader registers as continuity, short enough never to feel like waiting.
+//
+// The name sits here rather than in the shell's own stylesheet so the whole
+// mechanism reads in one place (and the shell stays inside its style budget).
+.shell-main {
+  view-transition-name: route-content;
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+}
+
+::view-transition-old(route-content) {
+  animation: route-out var(--duration-sm) var(--ease-exit) both;
+}
+
+::view-transition-new(route-content) {
+  animation: route-in var(--duration-sm) var(--ease-enter) both;
+}
+
+@keyframes route-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes route-in {
+  from {
+    opacity: 0;
   }
 }
 
@@ -205,5 +281,11 @@ select {
     animation-iteration-count: 1;
     transition-duration: 0.01ms;
     scroll-behavior: auto;
+  }
+
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none;
   }
 }

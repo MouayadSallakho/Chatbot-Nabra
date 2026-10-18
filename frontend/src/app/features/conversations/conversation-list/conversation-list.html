@@ -134,10 +134,10 @@
                   Shown only when a person has taken the conversation over. A
                   badge on every row saying "AI" would be noise on the ordinary
                   case; what a supervisor scans this list for is the exception.
-                  It is a word, not a colour.
+                  It is a word and a glyph, not a colour: the human voice chip.
                 -->
                 @if (conversation.handling === 'Human') {
-                  <span class="badge badge-accent badge-sm">Human</span>
+                  <app-voice-chip voice="human" size="sm" />
                 }
                 @if (conversation.assignedTo; as member) {
                   <span class="assigned">{{ member.email }}</span>

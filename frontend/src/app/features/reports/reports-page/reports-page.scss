@@ -51,12 +51,12 @@
   cursor: pointer;
 
   &:has(input:checked) {
-    border-color: var(--accent);
-    background: var(--accent-subtle);
+    border-color: var(--action);
+    background: var(--surface-selected);
   }
 
   &:has(input:focus-visible) {
-    outline: var(--focus-ring-width) solid var(--accent);
+    outline: var(--focus-ring-width) solid var(--focus-ring);
     outline-offset: var(--focus-ring-offset);
   }
 }

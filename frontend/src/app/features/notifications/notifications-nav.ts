@@ -45,7 +45,7 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
       }
 
       &.active {
-        border-block-end-color: var(--accent);
+        border-block-end-color: var(--action);
         color: var(--text-primary);
       }
     }

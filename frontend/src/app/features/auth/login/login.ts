@@ -13,6 +13,7 @@ import { WorkspaceContextService } from '@app/core/workspace/workspace-context-s
 import { WORKSPACE_SETUP_PATH } from '@app/core/workspace/workspace-guard';
 import { HOME_PATH } from '@app/layout/navigation';
 import { Icon } from '@app/shared/icon/icon';
+import { BrandMark } from '@app/shared/brand-mark/brand-mark';
 
 /**
  * The sign-in screen.
@@ -32,7 +33,7 @@ import { Icon } from '@app/shared/icon/icon';
 @Component({
   selector: 'app-login',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, RouterLink, Icon],
+  imports: [BrandMark, ReactiveFormsModule, RouterLink, Icon],
   templateUrl: './login.html',
   styleUrl: '../auth-page.scss',
 })

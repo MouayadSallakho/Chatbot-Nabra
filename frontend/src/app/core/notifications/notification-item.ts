@@ -136,7 +136,8 @@ import {
       inline-size: 8px;
       block-size: 8px;
       border-radius: var(--radius-pill);
-      background: var(--accent);
+      // Unread is news, not an alarm, and not a voice: ink.
+      background: var(--action);
     }
 
     .notification-body {
@@ -159,7 +160,7 @@ import {
     }
 
     .notification-action {
-      color: var(--accent);
+      color: var(--link);
       font-weight: 600;
     }
 

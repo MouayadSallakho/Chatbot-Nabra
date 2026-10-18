@@ -1,0 +1,585 @@
+<div class="lab" [attr.dir]="direction()" data-testid="design-lab">
+  <main class="lab-main page" id="main-content" tabindex="-1">
+    <header class="lab-header">
+      <div class="lab-title">
+        <app-brand-mark />
+        <div>
+          <h1 class="text-page-title">Design Lab</h1>
+          <p class="text-small text-secondary">
+            "Two Voices", the whole system on one page. Development builds only. Every name, number
+            and message here is sample content, written for this page.
+          </p>
+        </div>
+      </div>
+
+      <div class="lab-toggles">
+        <fieldset class="segmented" data-testid="lab-theme">
+          <legend class="visually-hidden">Theme</legend>
+          @for (option of themes; track option) {
+            <label class="segmented-option">
+              <input
+                type="radio"
+                name="lab-theme"
+                [checked]="theme.preference() === option"
+                (change)="selectTheme(option)"
+              />
+              {{ option === 'system' ? 'System' : option === 'light' ? 'Light' : 'Dark' }}
+            </label>
+          }
+        </fieldset>
+
+        <fieldset class="segmented" data-testid="lab-direction">
+          <legend class="visually-hidden">Reading direction</legend>
+          <label class="segmented-option">
+            <input
+              type="radio"
+              name="lab-direction"
+              [checked]="direction() === 'ltr'"
+              (change)="direction.set('ltr')"
+            />
+            Left to right
+          </label>
+          <label class="segmented-option">
+            <input
+              type="radio"
+              name="lab-direction"
+              [checked]="direction() === 'rtl'"
+              (change)="direction.set('rtl')"
+            />
+            Right to left
+          </label>
+        </fieldset>
+      </div>
+    </header>
+
+    <nav class="lab-nav" aria-label="Design Lab sections">
+      <a href="#lab-colour">Colour</a>
+      <a href="#lab-type">Type</a>
+      <a href="#lab-shape">Shape and motion</a>
+      <a href="#lab-icons">Icons</a>
+      <a href="#lab-mark">Mark</a>
+      <a href="#lab-buttons">Buttons</a>
+      <a href="#lab-forms">Forms</a>
+      <a href="#lab-content">Content</a>
+      <a href="#lab-feedback">Feedback</a>
+      <a href="#lab-voices">Voices</a>
+      <a href="#lab-transcript">Transcript</a>
+    </nav>
+
+    <!-- Colour ----------------------------------------------------------- -->
+    <section class="lab-section" id="lab-colour" aria-labelledby="lab-colour-title">
+      <h2 id="lab-colour-title" class="text-section-title">Colour</h2>
+      <p class="section-note">
+        Values are read live from the page, so they are the ones this theme actually resolved.
+        Lagoon means the AI and Ember means a person; neither is ever decoration or status.
+      </p>
+
+      @for (group of colourGroups; track group.title) {
+        <h3 class="text-card-title">{{ group.title }}</h3>
+        <ul class="swatches">
+          @for (token of group.tokens; track token) {
+            <li class="swatch">
+              <span class="swatch-chip" [style.background]="'var(' + token + ')'"></span>
+              <code dir="ltr" class="swatch-name">{{ token }}</code>
+              <code dir="ltr" class="swatch-value">{{ values()[token] }}</code>
+            </li>
+          }
+        </ul>
+      }
+
+      <h3 class="text-card-title">Voice and status, side by side</h3>
+      <p class="section-note">
+        Ember (a person) is orange, warning is a yellow amber, danger is crimson. Each carries its
+        own glyph and word, so none depends on its hue.
+      </p>
+      <div class="lab-row">
+        <app-voice-chip voice="ai" />
+        <app-voice-chip voice="human" />
+        <span class="badge badge-warning">Needs attention</span>
+        <span class="badge badge-danger">Failed</span>
+        <span class="badge badge-success">Connected</span>
+        <span class="badge badge-info">Indexing</span>
+      </div>
+    </section>
+
+    <!-- Type ------------------------------------------------------------- -->
+    <section class="lab-section" id="lab-type" aria-labelledby="lab-type-title">
+      <h2 id="lab-type-title" class="text-section-title">Type</h2>
+      <p class="section-note">
+        Instrument Sans (headings narrowed to 86%) and IBM Plex Sans Arabic, both self-hosted.
+        Figures are tabular and stay Western in both languages.
+      </p>
+
+      <div class="type-table">
+        @for (row of typeRoles; track row.role) {
+          <div class="type-row">
+            <span class="type-role text-caption">{{ row.role }}</span>
+            <p [class]="row.className" lang="en" dir="ltr">{{ row.latin }}</p>
+            <p [class]="row.className" lang="ar" dir="rtl">{{ row.arabic }}</p>
+          </div>
+        }
+      </div>
+    </section>
+
+    <!-- Shape, spacing, elevation, motion -------------------------------- -->
+    <section class="lab-section" id="lab-shape" aria-labelledby="lab-shape-title">
+      <h2 id="lab-shape-title" class="text-section-title">Shape, space, depth and motion</h2>
+
+      <h3 class="text-card-title">Radius by role</h3>
+      <ul class="radius-row">
+        @for (token of radiusTokens; track token) {
+          <li>
+            <span class="radius-box" [style.border-radius]="'var(' + token + ')'"></span>
+            <code dir="ltr">{{ token }}</code>
+            <code dir="ltr" class="swatch-value">{{ values()[token] }}</code>
+          </li>
+        }
+      </ul>
+
+      <h3 class="text-card-title">Spacing, 4px steps</h3>
+      <ul class="space-list">
+        @for (token of spaceTokens; track token) {
+          <li>
+            <code dir="ltr">{{ token }}</code>
+            <span class="space-bar" [style.inline-size]="'var(' + token + ')'"></span>
+            <code dir="ltr" class="swatch-value">{{ values()[token] }}</code>
+          </li>
+        }
+      </ul>
+
+      <h3 class="text-card-title">Elevation</h3>
+      <div class="lab-row">
+        <div class="card depth-sample">
+          <p class="text-small">A card: a hairline, no shadow.</p>
+        </div>
+        <div class="depth-sample depth-overlay">
+          <p class="text-small">An overlay: the only thing that casts a shadow.</p>
+        </div>
+      </div>
+
+      <h3 class="text-card-title">Motion</h3>
+      <ul class="space-list">
+        @for (token of motionTokens; track token) {
+          <li>
+            <code dir="ltr">{{ token }}</code>
+            <code dir="ltr" class="swatch-value">{{ values()[token] }}</code>
+          </li>
+        }
+      </ul>
+    </section>
+
+    <!-- Icons ------------------------------------------------------------ -->
+    <section class="lab-section" id="lab-icons" aria-labelledby="lab-icons-title">
+      <h2 id="lab-icons-title" class="text-section-title">Icons</h2>
+      <p class="section-note">
+        One authored 24px outline set, 1.6 stroke with round joins. Channel glyphs are generic and
+        always shown with the channel's name; no brand logo is recoloured.
+      </p>
+      <ul class="icon-sheet">
+        @for (name of iconNames; track name) {
+          <li>
+            <app-icon [name]="name" />
+            <code dir="ltr">{{ name }}</code>
+          </li>
+        }
+      </ul>
+    </section>
+
+    <!-- Mark ------------------------------------------------------------- -->
+    <section class="lab-section" id="lab-mark" aria-labelledby="lab-mark-title">
+      <h2 id="lab-mark-title" class="text-section-title">The mark</h2>
+      <p class="section-note">Two speech shapes overlapping into an "O". Never mirrored.</p>
+      <div class="lab-row mark-row">
+        <app-brand-mark style="--brand-mark-size: 16px" />
+        <app-brand-mark style="--brand-mark-size: 28px" />
+        <app-brand-mark style="--brand-mark-size: 48px" />
+        <app-brand-mark tone="mono" style="--brand-mark-size: 48px" />
+        <span class="mark-on-ink"
+          ><app-brand-mark tone="mono" style="--brand-mark-size: 28px"
+        /></span>
+      </div>
+    </section>
+
+    <!-- Buttons ---------------------------------------------------------- -->
+    <section class="lab-section" id="lab-buttons" aria-labelledby="lab-buttons-title">
+      <h2 id="lab-buttons-title" class="text-section-title">Buttons</h2>
+      <p class="section-note">Hover, press and focus are live: point at them, or press Tab.</p>
+
+      <div class="state-grid" role="group" aria-label="Button variants and states">
+        @for (
+          variant of ['primary', 'secondary', 'ghost', 'danger', 'danger-ghost'];
+          track variant
+        ) {
+          <span class="state-label text-caption">{{ variant }}</span>
+          <div class="lab-row">
+            <button type="button" [class]="'btn btn-sm btn-' + variant">Small</button>
+            <button type="button" [class]="'btn btn-' + variant">Default</button>
+            <button type="button" [class]="'btn btn-lg btn-' + variant">Large</button>
+            <button type="button" [class]="'btn btn-' + variant">
+              <app-icon name="plus" />
+              <span>With icon</span>
+            </button>
+            <button type="button" [class]="'btn btn-' + variant" disabled>Disabled</button>
+            <button type="button" [class]="'btn btn-loading btn-' + variant" aria-busy="true">
+              <span class="spinner" aria-hidden="true"></span>
+              <span>Saving</span>
+            </button>
+          </div>
+        }
+        <span class="state-label text-caption">link</span>
+        <div class="lab-row">
+          <button type="button" class="btn-link">Link button</button>
+          <a href="#lab-buttons">A link in prose</a>
+        </div>
+        <span class="state-label text-caption">icon</span>
+        <div class="lab-row">
+          <button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label="Sample: more">
+            <app-icon name="more" />
+          </button>
+          <button type="button" class="btn btn-secondary btn-icon" aria-label="Sample: add">
+            <app-icon name="plus" />
+          </button>
+          <button type="button" class="btn btn-primary btn-icon" aria-label="Sample: continue">
+            <app-icon name="arrow-end" />
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Forms ------------------------------------------------------------ -->
+    <section class="lab-section" id="lab-forms" aria-labelledby="lab-forms-title">
+      <h2 id="lab-forms-title" class="text-section-title">Form controls</h2>
+
+      <div class="form-grid">
+        <div class="field">
+          <label class="field-label" for="lab-name">Agent name</label>
+          <input id="lab-name" class="input" value="Website assistant" />
+          <p class="field-hint">Shown to customers as the sender of AI replies.</p>
+        </div>
+        <div class="field">
+          <label class="field-label" for="lab-empty">Greeting</label>
+          <input id="lab-empty" class="input" placeholder="For example: Hi, how can I help?" />
+        </div>
+        <div class="field">
+          <label class="field-label" for="lab-invalid">Workspace address</label>
+          <input
+            id="lab-invalid"
+            class="input"
+            value="My Shop"
+            aria-invalid="true"
+            aria-describedby="lab-invalid-error"
+          />
+          <p id="lab-invalid-error" class="field-error">
+            <app-icon name="critical" />
+            <span>Use lower-case letters, numbers and hyphens.</span>
+          </p>
+        </div>
+        <div class="field">
+          <label class="field-label" for="lab-disabled">Plan</label>
+          <input id="lab-disabled" class="input" value="Growth" disabled />
+        </div>
+        <div class="field">
+          <label class="field-label" for="lab-select">Channel</label>
+          <select id="lab-select" class="select">
+            <option>Website chat</option>
+            <option>WhatsApp</option>
+          </select>
+        </div>
+        <div class="field">
+          <label class="field-label" for="lab-textarea">Instructions</label>
+          <textarea id="lab-textarea" class="textarea" rows="3">
+Answer briefly. Hand over to a person for refunds.</textarea>
+        </div>
+      </div>
+
+      <div class="lab-row">
+        <label class="lab-check">
+          <input
+            type="checkbox"
+            class="switch"
+            role="switch"
+            [checked]="switchOn()"
+            (change)="switchOn.set(!switchOn())"
+          />
+          Email me daily
+        </label>
+        <label class="lab-check">
+          <input type="checkbox" class="switch" role="switch" disabled />
+          Disabled switch
+        </label>
+        <label class="lab-check"><input type="checkbox" checked /> Checked</label>
+        <label class="lab-check"><input type="checkbox" /> Unchecked</label>
+        <label class="lab-check"><input type="radio" name="lab-radio" checked /> Radio</label>
+        <label class="lab-check"><input type="radio" name="lab-radio" disabled /> Disabled</label>
+      </div>
+
+      <fieldset class="segmented">
+        <legend class="visually-hidden">Sample period</legend>
+        <label class="segmented-option"><input type="radio" name="lab-period" /> 7 days</label>
+        <label class="segmented-option"
+          ><input type="radio" name="lab-period" checked /> 30 days</label
+        >
+        <label class="segmented-option"
+          ><input type="radio" name="lab-period" disabled /> 90 days</label
+        >
+      </fieldset>
+    </section>
+
+    <!-- Content: cards, badges, tables, lists, toolbar, pager, menu ------- -->
+    <section class="lab-section" id="lab-content" aria-labelledby="lab-content-title">
+      <h2 id="lab-content-title" class="text-section-title">Content</h2>
+
+      <div class="lab-columns">
+        <article class="card">
+          <header class="card-header">
+            <h3 class="card-title">Sample card</h3>
+            <p>A grouping device, not a default wrapper.</p>
+          </header>
+          <div class="card-body">
+            <p class="text-body">Cards are white on the porcelain page, edged by a hairline.</p>
+          </div>
+          <div class="card-actions">
+            <button type="button" class="btn btn-primary">Save changes</button>
+            <button type="button" class="btn btn-secondary">Cancel</button>
+          </div>
+        </article>
+
+        <div class="lab-stack">
+          <h3 class="text-card-title">Badges</h3>
+          <div class="lab-row">
+            <span class="badge badge-neutral">Draft</span>
+            <span class="badge badge-success">Active</span>
+            <span class="badge badge-warning">Paused</span>
+            <span class="badge badge-danger">Failed</span>
+            <span class="badge badge-info">Indexing</span>
+            <span class="badge badge-plain">Website chat</span>
+            <span class="badge badge-success badge-sm">Small</span>
+            <span class="count-badge">12</span>
+          </div>
+
+          <h3 class="text-card-title">Menu</h3>
+          <app-menu label="Sample menu" triggerClass="btn btn-secondary" placement="start">
+            <span menuTrigger>Open menu</span>
+            <button type="button" class="menu-item" role="menuitem">
+              <app-icon name="refresh" />
+              <span>Refresh</span>
+            </button>
+            <button type="button" class="menu-item" role="menuitem">
+              <app-icon name="download" />
+              <span>Download</span>
+            </button>
+            <hr class="menu-separator" role="separator" />
+            <button type="button" class="menu-item menu-item-danger" role="menuitem">
+              <app-icon name="close" />
+              <span>Remove</span>
+            </button>
+          </app-menu>
+        </div>
+      </div>
+
+      <h3 class="text-card-title">Table (sample rows)</h3>
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th scope="col">Day</th>
+              <th scope="col" class="num">Started</th>
+              <th scope="col" class="num">AI replies</th>
+              <th scope="col" class="num">Replies by people</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Oct 16</td>
+              <td class="num">42</td>
+              <td class="num">118</td>
+              <td class="num">9</td>
+            </tr>
+            <tr>
+              <td>Oct 17</td>
+              <td class="num">37</td>
+              <td class="num">96</td>
+              <td class="num">14</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 class="text-card-title">Data list (sample rows)</h3>
+      <div class="data-list lab-data-list">
+        <div class="data-list-head" aria-hidden="true">
+          <span>Conversation</span>
+          <span>Handled by</span>
+          <span class="data-cell-end">Last activity</span>
+        </div>
+        <div class="data-row">
+          <span class="data-row-title">Where is my order #4821?</span>
+          <span class="data-row-meta"><app-voice-chip voice="ai" size="sm" /></span>
+          <span class="data-row-meta data-cell-end num">10:42</span>
+        </div>
+        <div class="data-row is-human">
+          <span class="data-row-title">أريد تغيير عنوان التوصيل</span>
+          <span class="data-row-meta"><app-voice-chip voice="human" size="sm" /></span>
+          <span class="data-row-meta data-cell-end num">10:47</span>
+        </div>
+      </div>
+
+      <div class="toolbar">
+        <span class="text-small text-secondary">Toolbar and pager (sample: 120 items)</span>
+      </div>
+      <app-pagination
+        [page]="samplePage()"
+        [pageSize]="20"
+        [total]="120"
+        noun="conversation"
+        label="Sample pages"
+        (pageChange)="samplePage.set($event)"
+      />
+    </section>
+
+    <!-- Feedback --------------------------------------------------------- -->
+    <section class="lab-section" id="lab-feedback" aria-labelledby="lab-feedback-title">
+      <h2 id="lab-feedback-title" class="text-section-title">Notices, dialog, toast and states</h2>
+
+      <div class="lab-stack">
+        <p class="alert alert-info">
+          <app-icon name="info" /><span>Sample: indexing runs in the background.</span>
+        </p>
+        <p class="alert alert-success">
+          <app-icon name="check" /><span>Sample: the channel is connected.</span>
+        </p>
+        <p class="alert alert-warning">
+          <app-icon name="alert" /><span>Sample: the plan's message limit is close.</span>
+        </p>
+        <p class="alert alert-danger">
+          <app-icon name="critical" /><span>Sample: the document could not be read.</span>
+        </p>
+
+        <div class="stale-notice">
+          <app-icon name="alert" />
+          <div class="conflict-body">
+            <p class="conflict-title">Sample: someone else changed this agent</p>
+            <p>Your edits are still here. Review the newer version, or keep yours.</p>
+            <div class="conflict-actions">
+              <button type="button" class="btn btn-secondary btn-sm">Show the newer version</button>
+              <button type="button" class="btn btn-ghost btn-sm">Keep my edits</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="lab-row">
+        <button type="button" class="btn btn-secondary" (click)="confirm.open()">
+          Open a dialog
+        </button>
+        <button type="button" class="btn btn-secondary" (click)="dangerConfirm.open()">
+          Open a destructive dialog
+        </button>
+        <button type="button" class="btn btn-secondary" (click)="toastSuccess()">
+          Show a success toast
+        </button>
+        <button type="button" class="btn btn-secondary" (click)="toastError()">
+          Show an error toast
+        </button>
+      </div>
+
+      <app-confirm-dialog
+        #confirm
+        heading="Sample: hand this conversation back to the AI?"
+        body="The AI answers the next customer message. You can take it over again at any time."
+        confirmLabel="Return to AI"
+      />
+      <app-confirm-dialog
+        #dangerConfirm
+        tone="danger"
+        heading="Sample: delete this document?"
+        body="Agents stop using it at once. This cannot be undone."
+        confirmLabel="Delete document"
+      />
+
+      <div class="lab-columns">
+        <div class="card lab-skeleton" aria-hidden="true">
+          <span class="skeleton skeleton-title"></span>
+          <span class="skeleton skeleton-text"></span>
+          <span class="skeleton skeleton-text"></span>
+        </div>
+        <app-empty-state
+          heading="Sample: no conversations yet"
+          description="They appear here as soon as a customer writes on a connected channel."
+        />
+        <app-empty-state
+          tone="error"
+          icon="alert"
+          heading="Sample: this list could not be loaded"
+          description="Nothing was changed. Check the connection and try again."
+        />
+      </div>
+    </section>
+
+    <!-- Voices ----------------------------------------------------------- -->
+    <section class="lab-section" id="lab-voices" aria-labelledby="lab-voices-title">
+      <h2 id="lab-voices-title" class="text-section-title">The two voices</h2>
+
+      <h3 class="text-card-title">Voice chips</h3>
+      <div class="lab-row">
+        <app-voice-chip voice="ai" />
+        <app-voice-chip voice="human" />
+        <app-voice-chip voice="ai" size="sm" />
+        <app-voice-chip voice="human" size="sm" label="Sara" />
+      </div>
+
+      <h3 class="text-card-title">The "Take over" moment</h3>
+      <p class="section-note">
+        The same chip changes voice: a 320ms sweep on the emphasized curve, instant under reduced
+        motion.
+      </p>
+      <div class="lab-row">
+        <app-voice-chip [voice]="demoVoice()" data-testid="lab-takeover-chip" />
+        <button type="button" class="btn btn-secondary btn-sm" (click)="toggleVoice()">
+          {{ demoVoice() === 'ai' ? 'Take over' : 'Return to AI' }}
+        </button>
+      </div>
+
+      <h3 class="text-card-title">Voice split (sample counts)</h3>
+      <div class="lab-columns">
+        <app-voice-split
+          [ai]="7"
+          [human]="3"
+          noun="open conversations"
+          nounOne="open conversation"
+        />
+        <app-voice-split
+          [ai]="0"
+          [human]="0"
+          noun="open conversations"
+          nounOne="open conversation"
+        />
+      </div>
+
+      <h3 class="text-card-title">Voice track (from the sample transcript below)</h3>
+      <app-voice-track [messages]="transcript" />
+    </section>
+
+    <!-- Transcript ------------------------------------------------------- -->
+    <section class="lab-section" id="lab-transcript" aria-labelledby="lab-transcript-title">
+      <h2 id="lab-transcript-title" class="text-section-title">Sample transcript</h2>
+      <p class="badge badge-neutral lab-sample-flag">Sample, not a real conversation</p>
+
+      <ol class="lab-transcript">
+        @for (row of rows; track row.id) {
+          @if (row.handoffTo; as voice) {
+            <li class="handoff-divider" [class]="'handoff-to-' + voice">
+              {{ voice === 'human' ? 'A person took over' : 'Back with the AI' }}
+            </li>
+          }
+          <li class="bubble" [class]="row.bubble">
+            <span class="bubble-speaker">{{ row.speaker }}</span>
+            <span dir="auto">{{ row.text }}</span>
+          </li>
+        }
+      </ol>
+    </section>
+  </main>
+
+  <app-toast-host />
+</div>

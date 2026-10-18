@@ -103,14 +103,14 @@
 }
 
 .handling-human {
-  color: var(--accent);
+  color: var(--voice-human-strong);
 }
 
 // A human reply sits with the agent's, because to the customer they are both
 // the business talking. The left border is what distinguishes them from each
 // other, and the sender label above says which is which.
 .message-human {
-  border-inline-start: 3px solid var(--accent);
+  border-inline-start: 2px solid var(--voice-human-fg);
   padding-inline-start: var(--space-3);
 }
 

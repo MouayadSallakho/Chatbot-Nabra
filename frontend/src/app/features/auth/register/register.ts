@@ -11,6 +11,7 @@ import {
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
 import { WORKSPACE_SETUP_PATH } from '@app/core/workspace/workspace-guard';
 import { Icon } from '@app/shared/icon/icon';
+import { BrandMark } from '@app/shared/brand-mark/brand-mark';
 
 /**
  * The minimum password length, mirroring the server's policy.
@@ -37,7 +38,7 @@ const PASSWORD_MIN_LENGTH = 12;
 @Component({
   selector: 'app-register',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, RouterLink, Icon],
+  imports: [BrandMark, ReactiveFormsModule, RouterLink, Icon],
   templateUrl: './register.html',
   styleUrl: '../auth-page.scss',
 })

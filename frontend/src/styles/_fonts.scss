@@ -1,0 +1,98 @@
+// =============================================================================
+// Fonts
+// =============================================================================
+//
+// Self-hosted, never fetched from a font service: the files live in
+// src/assets/fonts/ with their OFL texts, and because they are referenced from
+// here the build emits them as content-hashed media files, which the edge
+// caches for a year as immutable (deploy/edge: `.woff2` -> max-age=31536000).
+//
+//   Instrument Sans 5.3.0 (Fontsource build, OFL-1.1), variable wdth 75-100
+//   and wght 400-700, upright, Latin + Latin Extended: 57,332 + 18,856 bytes.
+//   IBM Plex Sans Arabic 5.3.0 (Fontsource build, OFL-1.1), 400/500/600,
+//   Arabic subset only: 42,848 + 45,296 + 45,688 bytes.
+//
+// Every face has a unicode-range, so a page only downloads the files whose
+// characters it actually renders: an English page fetches the 57 KB Latin file
+// and nothing else; the Arabic files arrive with the first Arabic character.
+//
+// No preload: Angular cannot write a hashed media name into index.html, and a
+// preload of an unhashed copy would download the same font twice.
+// -----------------------------------------------------------------------------
+
+$latin-range:
+  U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+  U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+$latin-ext-range:
+  U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329,
+  U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F,
+  U+A720-A7FF;
+$arabic-range:
+  U+0600-06FF, U+0750-077F, U+0870-088E, U+0890-0891, U+0897-08E1, U+08E3-08FF, U+200C-200E,
+  U+2010-2011, U+204F, U+2E41, U+FB50-FDFF, U+FE70-FE74, U+FE76-FEFC;
+
+@font-face {
+  font-family: 'Instrument Sans';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400 700;
+  font-stretch: 75% 100%;
+  src: url('../assets/fonts/instrument-sans/instrument-sans-latin-wdth-normal.woff2')
+    format('woff2');
+  unicode-range: $latin-range;
+}
+
+@font-face {
+  font-family: 'Instrument Sans';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400 700;
+  font-stretch: 75% 100%;
+  src: url('../assets/fonts/instrument-sans/instrument-sans-latin-ext-wdth-normal.woff2')
+    format('woff2');
+  unicode-range: $latin-ext-range;
+}
+
+@each $weight in 400, 500, 600 {
+  @font-face {
+    font-family: 'IBM Plex Sans Arabic';
+    font-style: normal;
+    font-display: swap;
+    font-weight: $weight;
+    src: url('../assets/fonts/ibm-plex-sans-arabic/ibm-plex-sans-arabic-arabic-#{$weight}-normal.woff2')
+      format('woff2');
+    unicode-range: $arabic-range;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Metric-matched fallbacks
+// -----------------------------------------------------------------------------
+// What renders during the swap period, adjusted so the real font lands on the
+// same line boxes and nearly the same line lengths: no layout shift when it
+// arrives. Measured in Chrome with canvas measureText against the shipped
+// files (Phase 36.2): Instrument Sans vs Arial on an English pangram + UI
+// words, IBM Plex Sans Arabic vs Segoe UI on an Arabic sentence.
+//
+// The Latin fallback carries the Latin ranges on purpose: Arial has Arabic
+// glyphs on Windows, and without the range Arabic text would fall into Arial
+// with Latin metrics instead of reaching the Arabic fallback below.
+@font-face {
+  font-family: 'Instrument Sans Fallback';
+  src: local('Arial'), local('Arimo'), local('Liberation Sans'), local('Helvetica');
+  size-adjust: 101.61%;
+  ascent-override: 95.46%;
+  descent-override: 24.6%;
+  line-gap-override: 0%;
+  unicode-range: $latin-range, $latin-ext-range;
+}
+
+@font-face {
+  font-family: 'IBM Plex Sans Arabic Fallback';
+  src: local('Segoe UI'), local('Tahoma'), local('Geeza Pro'), local('Noto Sans Arabic');
+  size-adjust: 90.8%;
+  ascent-override: 120.05%;
+  descent-override: 46.26%;
+  line-gap-override: 0%;
+  unicode-range: $arabic-range;
+}

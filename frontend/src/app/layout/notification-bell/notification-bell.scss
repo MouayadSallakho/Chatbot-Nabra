@@ -19,10 +19,10 @@
   block-size: 1.125rem;
   padding-inline: 0.3125rem;
   border-radius: var(--radius-pill);
-  // A count, in the accent: unread is news, not an alarm. Severity is shown on
-  // each notification, where it can be read with its words.
-  background: var(--accent);
-  color: var(--accent-contrast);
+  // A count, in ink: unread is news, not an alarm. Severity is shown on each
+  // notification, where it can be read with its words.
+  background: var(--action);
+  color: var(--on-action);
   font: 600 0.6875rem / 1 var(--font-sans);
   font-variant-numeric: tabular-nums;
   box-shadow: 0 0 0 2px var(--surface-default);
@@ -90,7 +90,7 @@
   font: var(--text-small);
 
   a {
-    color: var(--accent);
+    color: var(--link);
     font-weight: 600;
   }
 }

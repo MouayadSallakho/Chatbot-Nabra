@@ -91,7 +91,7 @@
 .usage-fill {
   display: block;
   block-size: 100%;
-  background-color: var(--accent);
+  background-color: var(--action); // a single-series meter: ink
   transition: inline-size var(--motion-fast) var(--ease-standard);
 }
 

@@ -48,7 +48,6 @@
 .brand-mark {
   inline-size: 1.75rem;
   block-size: 1.75rem;
-  color: var(--accent);
   flex: none;
 }
 
@@ -172,5 +171,6 @@
 .chat-handover {
   font: var(--text-body-strong);
   font-size: 0.8125rem;
-  color: var(--accent);
+  // A person on the team is now answering: the human voice.
+  color: var(--voice-human-strong);
 }

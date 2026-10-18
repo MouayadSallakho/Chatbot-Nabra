@@ -1,0 +1,257 @@
+// The Design Lab's own layout. Development only; everything visual it shows
+// comes from the global primitives and tokens, never from rules here.
+.lab {
+  min-block-size: 100vh;
+  background-color: var(--surface-page);
+}
+
+.lab-main {
+  display: grid;
+  gap: var(--space-8);
+  padding-block: var(--space-7) var(--space-10);
+}
+
+.lab-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.lab-title {
+  display: flex;
+  gap: var(--space-3);
+  max-inline-size: 44rem;
+
+  app-brand-mark {
+    --brand-mark-size: 2.25rem;
+    margin-block-start: var(--space-1);
+  }
+}
+
+.lab-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.lab-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  padding-block-end: var(--space-4);
+  border-block-end: 1px solid var(--border-default);
+  font: var(--text-small);
+}
+
+.lab-section {
+  display: grid;
+  gap: var(--space-4);
+  scroll-margin-block-start: var(--space-4);
+
+  // The grid gap is the rhythm here; the page-flow margins of the global
+  // layer (a title's following sibling, a section note) would double it.
+  > * {
+    margin-block: 0;
+  }
+
+  // An inline control is its own width, not the grid column's.
+  > .segmented {
+    justify-self: start;
+  }
+}
+
+.lab-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.lab-stack {
+  display: grid;
+  align-content: start;
+  gap: var(--space-3);
+}
+
+.lab-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+  gap: var(--space-5);
+  align-items: start;
+}
+
+code {
+  font: 400 0.75rem / 1.4 var(--font-mono);
+  color: var(--text-secondary);
+}
+
+.swatches {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 12rem), 1fr));
+  gap: var(--space-3);
+}
+
+.swatch {
+  display: grid;
+  gap: 2px;
+}
+
+.swatch-chip {
+  block-size: 2.75rem;
+  margin-block-end: var(--space-1);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-control);
+}
+
+.swatch-value {
+  color: var(--text-muted);
+}
+
+.type-table {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.type-row {
+  display: grid;
+  grid-template-columns: 7rem minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--space-4);
+  align-items: baseline;
+  padding-block-end: var(--space-4);
+  border-block-end: 1px solid var(--border-subtle);
+
+  @media (max-width: 767.98px) {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-2);
+  }
+}
+
+.type-role {
+  color: var(--text-muted);
+}
+
+.radius-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-5);
+
+  li {
+    display: grid;
+    gap: 2px;
+  }
+}
+
+.radius-box {
+  inline-size: 4.5rem;
+  block-size: 3rem;
+  margin-block-end: var(--space-1);
+  border: 1px solid var(--border-strong);
+  background-color: var(--surface-default);
+}
+
+.space-list {
+  display: grid;
+  gap: var(--space-2);
+
+  li {
+    display: grid;
+    grid-template-columns: 9rem auto 1fr;
+    gap: var(--space-3);
+    align-items: center;
+  }
+}
+
+.space-bar {
+  block-size: 0.75rem;
+  border-radius: 2px;
+  background-color: var(--chart-neutral);
+}
+
+.depth-sample {
+  max-inline-size: 18rem;
+  padding: var(--space-4);
+}
+
+.depth-overlay {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-overlay);
+  background-color: var(--surface-raised);
+  box-shadow: var(--shadow-overlay);
+}
+
+.icon-sheet {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(7.5rem, 1fr));
+  gap: var(--space-2);
+
+  li {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    color: var(--text-primary);
+  }
+}
+
+.mark-on-ink {
+  display: inline-flex;
+  padding: var(--space-2);
+  border-radius: var(--radius-control);
+  background-color: var(--action);
+  color: var(--on-action);
+}
+
+.state-grid {
+  display: grid;
+  grid-template-columns: 6.5rem minmax(0, 1fr);
+  gap: var(--space-3) var(--space-4);
+  align-items: center;
+
+  @media (max-width: 575.98px) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.state-label {
+  color: var(--text-muted);
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+  gap: var(--space-4);
+}
+
+.lab-check {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-block-size: 1.5rem;
+  font: var(--text-body);
+}
+
+.lab-data-list {
+  --data-list-columns: minmax(0, 3fr) minmax(0, 1.25fr) 6rem;
+}
+
+.lab-skeleton {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-5);
+}
+
+.lab-sample-flag {
+  justify-self: start;
+}
+
+.lab-transcript {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  max-inline-size: 44rem;
+  padding: var(--space-5);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-card);
+  background-color: var(--surface-muted);
+}

@@ -2,8 +2,9 @@
 // Global stylesheet
 // =============================================================================
 //
-// Three layers, in cascade order:
+// Four layers, in cascade order:
 //
+//   fonts       the self-hosted faces and their metric-matched fallbacks
 //   tokens      the values everything else resolves to
 //   base        element defaults, typography, focus, reduced motion
 //   primitives  the reusable visual vocabulary
@@ -16,6 +17,7 @@
 // becomes the place nobody dares delete from.
 // -----------------------------------------------------------------------------
 
+@use 'styles/fonts';
 @use 'styles/tokens';
 @use 'styles/base';
 @use 'styles/primitives';

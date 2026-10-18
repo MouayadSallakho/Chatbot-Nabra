@@ -58,7 +58,7 @@
   // The focus ring belongs to the label, because the input itself is visually
   // hidden. Without this, keyboard users move through an invisible control.
   &:has(input:focus-visible) {
-    outline: var(--focus-ring-width) solid var(--accent);
+    outline: var(--focus-ring-width) solid var(--focus-ring);
     outline-offset: var(--focus-ring-offset);
   }
 }
@@ -157,6 +157,10 @@
   // of days rather than as a gap in the data.
   min-block-size: 2px;
   background-color: var(--surface-inset);
+
+  // Lagoon and Ember have nearly the same lightness (1.02:1), so stacked parts
+  // are kept apart by a hairline of the surface, not by colour alone.
+  gap: 1px;
 }
 
 .chart-part {
@@ -166,15 +170,15 @@
 }
 
 .chart-customer {
-  background-color: var(--accent);
+  background-color: var(--chart-customer);
 }
 
 .chart-ai {
-  background-color: var(--success-fg);
+  background-color: var(--chart-ai);
 }
 
 .chart-human {
-  background-color: var(--warning-fg);
+  background-color: var(--chart-human);
 }
 
 .chart-legend {
@@ -199,15 +203,15 @@
 }
 
 .swatch-customer {
-  background-color: var(--accent);
+  background-color: var(--chart-customer);
 }
 
 .swatch-ai {
-  background-color: var(--success-fg);
+  background-color: var(--chart-ai);
 }
 
 .swatch-human {
-  background-color: var(--warning-fg);
+  background-color: var(--chart-human);
 }
 
 .daily-table {
@@ -257,7 +261,7 @@
 .channel-fill {
   display: block;
   block-size: 100%;
-  background-color: var(--accent);
+  background-color: var(--chart-neutral); // a single series: neutral, never a voice
 }
 
 .channel-count {

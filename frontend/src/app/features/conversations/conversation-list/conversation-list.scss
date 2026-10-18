@@ -3,14 +3,11 @@
   --data-list-columns: minmax(0, 3fr) minmax(0, 1fr) minmax(0, 1.25fr) 8.5rem;
 }
 
-// A conversation a person has taken over carries an accent edge as well as its
-// "Human" badge, so the exceptions stand out when the list is scanned.
+// A conversation a person has taken over carries the human voice's edge as
+// well as its "Person" chip, so the exceptions stand out when the list is
+// scanned. The edge mirrors with the reading direction.
 .data-row.is-human {
-  box-shadow: inset 3px 0 0 0 var(--accent);
-}
-
-[dir='rtl'] .data-row.is-human {
-  box-shadow: inset -3px 0 0 0 var(--accent);
+  box-shadow: inset calc(var(--direction-flip) * 2px) 0 0 0 var(--voice-human-fg);
 }
 
 .conversation-preview {

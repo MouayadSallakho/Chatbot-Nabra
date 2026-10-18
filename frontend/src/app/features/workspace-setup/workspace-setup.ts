@@ -9,6 +9,7 @@ import { LOGIN_PATH } from '@app/core/auth/auth-guard';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
 import { HOME_PATH } from '@app/layout/navigation';
 import { Icon } from '@app/shared/icon/icon';
+import { BrandMark } from '@app/shared/brand-mark/brand-mark';
 
 /** Mirrors the Domain's own tenant rules, for immediate feedback only. */
 const SLUG_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
@@ -37,7 +38,7 @@ const NAME_MAX = 200;
 @Component({
   selector: 'app-workspace-setup',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, Icon],
+  imports: [BrandMark, ReactiveFormsModule, Icon],
   templateUrl: './workspace-setup.html',
   styleUrl: './workspace-setup.scss',
 })

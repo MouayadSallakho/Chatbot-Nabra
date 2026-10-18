@@ -14,6 +14,7 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
 import { Icon } from '@app/shared/icon/icon';
 import { NAV_GROUPS, NAV_ITEMS, NavGroup, NavItem } from '@app/layout/navigation';
 import { PermissionService } from '@app/core/authorization/permission-service';
+import { BrandMark } from '@app/shared/brand-mark/brand-mark';
 
 /**
  * How long the pointer has to rest on the rail before it opens.
@@ -58,7 +59,7 @@ interface VisibleGroup {
 @Component({
   selector: 'app-sidebar',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, RouterLinkActive, Icon],
+  imports: [BrandMark, RouterLink, RouterLinkActive, Icon],
   templateUrl: './sidebar.html',
   styleUrl: './sidebar.scss',
 })

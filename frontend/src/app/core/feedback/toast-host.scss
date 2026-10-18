@@ -31,22 +31,22 @@
   background-color: var(--surface-raised);
   color: var(--text-primary);
   border: 1px solid var(--border-default);
-  border-inline-start: 3px solid var(--success-fg);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-overlay);
   font: var(--text-small);
   pointer-events: auto;
-  animation: toast-in var(--motion-normal) var(--ease-standard);
+  animation: toast-in var(--duration-md) var(--ease-enter);
 }
 
-// Outcome by shape and word as well as colour: a tick or a triangle.
+// Outcome by shape and word as well as colour: a tick or a triangle. No
+// coloured edge stripe: the glyph and the sentence carry the outcome.
 .toast-icon {
   flex: none;
   color: var(--success-fg);
 }
 
 .toast-error {
-  border-inline-start-color: var(--danger-fg);
+  border-color: var(--danger-border);
 
   .toast-icon {
     color: var(--danger-fg);

@@ -47,8 +47,9 @@
 }
 
 .bubble-agent {
-  background-color: var(--accent-subtle);
-  border: 1px solid var(--accent-subtle-border);
+  // The agent's reply is the AI voice.
+  background-color: var(--voice-ai-tint);
+  border: 1px solid var(--voice-ai-border);
   margin-inline-end: var(--space-6);
 }
 

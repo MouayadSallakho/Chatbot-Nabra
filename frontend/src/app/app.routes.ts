@@ -30,6 +30,31 @@ const placeholderRoutes: Routes = NAV_ITEMS.filter((item) => !item.implemented).
 }));
 
 /**
+ * The Design Lab (Phase 36.2): the whole design system on one page, for review.
+ *
+ * DEVELOPMENT ONLY, and absent from the production build -- not merely
+ * unreachable. The condition is `isDevMode()` written out as its own body:
+ * `isDevMode()` itself is a function call the bundler cannot see through, so
+ * the lazy chunk would still be emitted. The production build defines
+ * `ngDevMode` as `false`, the whole branch folds away, and with it the
+ * `import()`, so no Design Lab chunk exists to be fetched.
+ *
+ * Outside the shell and behind no guard: it reads no API and shows only
+ * sample content written in its own file.
+ */
+const designLabRoutes: Routes =
+  typeof ngDevMode === 'undefined' || ngDevMode
+    ? [
+        {
+          path: 'design-lab',
+          title: 'Design Lab',
+          loadComponent: () =>
+            import('@app/features/design-lab/design-lab').then((m) => m.DesignLab),
+        },
+      ]
+    : [];
+
+/**
  * Three tiers, and the order of the guards on each is the design.
  *
  * <strong>Anonymous.</strong> Sign-in and registration, behind `anonymousGuard`
@@ -100,6 +125,7 @@ export const routes: Routes = [
     path: 'embed',
     loadChildren: () => import('@app/features/embed/embed.routes').then((m) => m.embedRoutes),
   },
+  ...designLabRoutes,
   {
     path: WORKSPACE_SETUP_PATH,
     title: 'Choose workspace',

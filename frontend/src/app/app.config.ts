@@ -5,7 +5,12 @@ import {
   provideBrowserGlobalErrorListeners,
 } from '@angular/core';
 import { provideHttpClient, withInterceptors, withXsrfConfiguration } from '@angular/common/http';
-import { TitleStrategy, provideRouter, withComponentInputBinding } from '@angular/router';
+import {
+  TitleStrategy,
+  provideRouter,
+  withComponentInputBinding,
+  withViewTransitions,
+} from '@angular/router';
 import { AppTitleStrategy } from '@app/core/title/app-title-strategy';
 import { AuthService } from '@app/core/auth/auth-service';
 import { sessionExpiryInterceptor } from '@app/core/auth/session-expiry-interceptor';
@@ -69,6 +74,11 @@ export const appConfig: ApplicationConfig = {
       // Route `data` and path parameters arrive as component inputs. It is what
       // lets the placeholder page name its own area without reading the router.
       withComponentInputBinding(),
+      // A short crossfade of the content area between pages (styles/_base.scss
+      // draws it; only `.shell-main` takes part, so the shell never flickers).
+      // Skipped on the first load, which has nothing to fade from, and a no-op
+      // in browsers without View Transitions.
+      withViewTransitions({ skipInitialTransition: true }),
     ),
     { provide: TitleStrategy, useClass: AppTitleStrategy },
   ],

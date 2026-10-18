@@ -187,6 +187,50 @@ export const ICON_PATHS = {
   /** Continue, in the reading direction. */
   'arrow-end': ['M5 12h14', 'M13 6l6 6-6 6'],
 
+  // --- Voices --------------------------------------------------------------
+  // The two speakers of every conversation. Always drawn beside the word
+  // ("AI", "Person"), never alone. The AI is a calm bot face -- never a
+  // sparkle, which is the habitual and meaningless "AI" glyph.
+  /** The AI voice. */
+  ai: [
+    'M7 8h10a3 3 0 0 1 3 3v5a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3v-5a3 3 0 0 1 3-3z',
+    'M12 4.5V8',
+    'M9.5 13.25h.01',
+    'M14.5 13.25h.01',
+  ],
+
+  /** A person on the team. */
+  person: ['M12 11.5a3.75 3.75 0 1 0 0-7.5 3.75 3.75 0 0 0 0 7.5z', 'M5 20a7 7 0 0 1 14 0'],
+
+  // --- Channels ------------------------------------------------------------
+  // Generic glyphs, never recoloured brand logos, and always shown with the
+  // channel's name as a word.
+  /** Website chat: a browser window. */
+  website: [
+    'M3.5 6.5a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z',
+    'M3.5 9h17',
+    'M6.5 6.75h.01',
+    'M9 6.75h.01',
+  ],
+
+  /** WhatsApp, generically: a phone handset inside a speech bubble. */
+  whatsapp: [
+    'M12 3.5a8.5 8.5 0 0 0-7.3 12.85L3.5 20.5l4.3-1.15A8.5 8.5 0 1 0 12 3.5z',
+    'M9.4 8.8c.3-.35.75-.35.95 0l.75 1.4c.12.25.05.55-.15.75l-.45.45a4.6 4.6 0 0 0 2.1 2.1l.45-.45c.2-.2.5-.27.75-.15l1.4.75c.35.2.35.65 0 .95-.65.6-1.55.85-2.4.5a7.4 7.4 0 0 1-3.9-3.9c-.35-.85-.1-1.75.5-2.4z',
+  ],
+
+  /** Instagram, generically: a camera. */
+  instagram: [
+    'M4 9a2.5 2.5 0 0 1 2.5-2.5H8L9.5 4.5h5L16 6.5h1.5A2.5 2.5 0 0 1 20 9v7.5a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 16.5z',
+    'M12 16a3.25 3.25 0 1 0 0-6.5 3.25 3.25 0 0 0 0 6.5z',
+  ],
+
+  /** Messenger, generically: two overlapping speech bubbles. */
+  messenger: [
+    'M3.5 5.5a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2H8l-4.5 3.5z',
+    'M17 9h1.5a2 2 0 0 1 2 2v8.5L17 17h-4.5a2 2 0 0 1-2-2v-.5',
+  ],
+
   /** Under construction: this area is not built yet. */
   blueprint: ['M4 4h16v16H4z', 'M4 9h16', 'M9 9v11', 'M13 13h4', 'M13 16.5h4'],
 } as const;

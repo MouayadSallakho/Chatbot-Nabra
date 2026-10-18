@@ -19,6 +19,7 @@ import { PageHeader } from '@app/shared/page-header/page-header';
 import { Icon } from '@app/shared/icon/icon';
 import { Pagination } from '@app/shared/pagination/pagination';
 import { initialPage, pageRecorder } from '@app/shared/pagination/page-query';
+import { VoiceChip } from '@app/shared/voice/voice-chip';
 import { ConversationSummary, ConversationsApi } from '../conversations-api';
 
 /**
@@ -40,7 +41,7 @@ const PAGE_SIZE = 20;
 @Component({
   selector: 'app-conversation-list',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DatePipe, RouterLink, PageHeader, EmptyState, Icon, Pagination],
+  imports: [DatePipe, RouterLink, PageHeader, EmptyState, Icon, Pagination, VoiceChip],
   templateUrl: './conversation-list.html',
   styleUrl: './conversation-list.scss',
 })

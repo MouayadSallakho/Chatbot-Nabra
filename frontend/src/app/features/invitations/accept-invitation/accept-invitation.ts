@@ -23,6 +23,7 @@ import { InvitationHandoff } from '@app/core/invitations/invitation-handoff';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
 import { HOME_PATH } from '@app/layout/navigation';
 import { AcceptedInvitation, TeamApi } from '@app/features/team/team-api';
+import { BrandMark } from '@app/shared/brand-mark/brand-mark';
 
 /** What this screen is currently doing. */
 type AcceptState = 'reading' | 'needsAccount' | 'accepting' | 'accepted' | 'failed';
@@ -58,7 +59,7 @@ type AcceptState = 'reading' | 'needsAccount' | 'accepting' | 'accepted' | 'fail
 @Component({
   selector: 'app-accept-invitation',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink],
+  imports: [BrandMark, RouterLink],
   templateUrl: './accept-invitation.html',
   styleUrl: '../../auth/auth-page.scss',
 })

@@ -20,7 +20,11 @@
   }
 
   &[open] {
-    animation: confirm-in var(--motion-normal) var(--ease-standard);
+    animation: confirm-in var(--duration-lg) var(--ease-enter);
+  }
+
+  &[open]::backdrop {
+    animation: confirm-scrim-in var(--duration-md) var(--ease-standard);
   }
 }
 
@@ -52,6 +56,12 @@
 @keyframes confirm-in {
   from {
     opacity: 0;
-    transform: translateY(8px) scale(0.98);
+    transform: translateY(6px) scale(0.985);
+  }
+}
+
+@keyframes confirm-scrim-in {
+  from {
+    opacity: 0;
   }
 }

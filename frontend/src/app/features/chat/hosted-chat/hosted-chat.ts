@@ -12,6 +12,7 @@ import { ApiError, toApiError } from '@app/core/api/api-error';
 import { PublicChatRealtime } from '@app/core/realtime/public-chat-realtime';
 import { ChatHandling, ChatMessage, HostedChatApi } from '../hosted-chat-api';
 import { HostedChatSessionStore } from '../hosted-chat-session';
+import { BrandMark } from '@app/shared/brand-mark/brand-mark';
 
 /** The longest message the hosted chat accepts, matching the server's bound. */
 const MAX_MESSAGE_LENGTH = 4_000;
@@ -52,7 +53,7 @@ type ChatState = 'opening' | 'unavailable' | 'ready' | 'failed';
 @Component({
   selector: 'app-hosted-chat',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule],
+  imports: [BrandMark, ReactiveFormsModule],
   templateUrl: './hosted-chat.html',
   styleUrl: './hosted-chat.scss',
 })

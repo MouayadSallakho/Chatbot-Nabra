@@ -4,8 +4,11 @@ The permanent visual and interaction foundation for the OmniAI admin application
 Phase 10 built the shell, the token layer and the primitives. Phase 33.5 revised
 them across the whole product -- the shell, the token scale, the shared list,
 pagination, menu, dialog and notice patterns, and the error copy -- so that every
-area is learned once. Sections below describe the current state; D21 lists the
-product patterns and D22 what the backend contract does not yet support.
+area is learned once. Phase 36.2 replaced the visual foundation with the "Two
+Voices" identity (D1, D5-D10, D16-D19); its brief, palette, type and decision
+log are in `docs/design/MASTER.md`, which every UI change reads first. Sections
+below describe the current state; D21 lists the product patterns and D22 what
+the backend contract does not yet support.
 
 This document records what was decided and what was deliberately left for later.
 
@@ -13,24 +16,32 @@ This document records what was decided and what was deliberately left for later.
 
 ## D1. UI philosophy
 
-The product should read as calm, precise and unremarkable in the way good tools
-are unremarkable. Three rules follow from that, and they explain most of the
-decisions below.
+**"Two Voices."** Every OmniAI conversation is a duet between the AI and the
+team, and the interface gives each voice one colour: **Lagoon** for the AI,
+**Ember** for a person on the team. Colour is information, not decoration;
+everything else is calm ink on porcelain, comfortable for an eight-hour shift
+and premium without effects. The full brief is `docs/design/MASTER.md`.
 
-**Hierarchy comes from surface and space, not from decoration.** A tinted page
-behind white cards separates content without a shadow on every panel. Shadows
-exist but are almost invisible; they mark genuine elevation — drawers and
-overlays — rather than being sprinkled to suggest depth.
+**The voices mean one thing each.** Lagoon and Ember say who is answering --
+in a chip, a split bar, a 4px track, a handoff divider in a transcript, the
+"Take over" sweep -- and are never used for decoration or for status. Status
+keeps its own colours (green, yellow amber, crimson, blue), each with its own
+icon and word; a voice always carries its glyph and word. Nothing is shown in
+voice colours that the API cannot tell.
 
-**One accent, used sparingly.** A single indigo family carries the primary
-action, the current navigation item and links. Everything else is neutral. An
-interface where several things compete for attention has, in practice, no
-hierarchy at all.
+**Ink is the action colour.** Primary buttons are ink on light and porcelain on
+dark, links are ink and always underlined, the focus ring is ink, and selection
+is neutral. There is no brand blue or indigo anywhere.
 
-**Nothing decorative that has to be maintained.** No gradients, no
-glassmorphism, no illustrations, no animated backgrounds. These are the first
-things to look dated and the first things to slow a page down, and none of them
-help somebody configure an AI agent.
+**Hierarchy comes from surface, space and type, not decoration.** A porcelain
+page behind white panels and hairline borders; a shadow only on overlays.
+Instrument Sans, narrowed for headings, gives the type its character; tabular
+figures keep numbers calm.
+
+**Nothing decorative that has to be maintained.** No gradients, glow, glass,
+illustrations, sparkle icons or animated backgrounds. These are the first things
+to look dated, the first to slow a page down, and none of them help somebody
+answer a customer.
 
 ## D2. Angular shell architecture
 
@@ -131,13 +142,25 @@ queries would mean re-deriving what the grid already does.
    survives a palette change; `--grey-100` becomes a lie the first time the
    product is restyled.
 
-Groups: surfaces, text, borders, accent, status (success / warning / danger /
-info), shadows, skeleton, scrim, spacing, radius, typography, motion, layout.
+Groups: surfaces, text, borders (decorative hairlines and `--border-control`),
+action (`--action`, `-hover`, `-pressed`, `--on-action`, `--link`,
+`--focus-ring`, `--selection`), the voices (`--voice-ai-*`, `--voice-human-*`:
+`fg`, `strong`, `tint`, `border`), status (success / warning / danger / info),
+charts (`--chart-ai`, `--chart-human`, `--chart-customer`, `--chart-neutral`,
+`--chart-grid`, `--chart-ramp-1…5`), shadows, skeleton, scrim, spacing, radius,
+type, motion, layout, layers.
+
+The Phase 33.5 `--accent-*` family is gone. Every use was remapped by meaning in
+Phase 36.2: the primary action, counts and tab markers to ink; links to
+`--link`; selection to the neutral `--surface-selected`; anything that meant
+"the AI" or "a person" to the matching voice; charts to the chart tokens. The
+embedded widget keeps its own `--embed-accent-*`, which is the workspace's own
+colour, not the product's.
 
 Theming works by redefining the same custom properties under a different
 selector, so no component stylesheet is duplicated per theme.
 
-### Spacing — a 4px foundation
+### Spacing -- a 4px foundation
 
 `--space-1` … `--space-10` = 4, 8, 12, 16, 20, 24, 32, 40, 48, 64 px.
 
@@ -146,89 +169,127 @@ Ten steps, nothing in between. If a gap seems to want 13px the answer is 12 or
 
 ### Radius
 
-`--radius-sm` 4px (badges, checkboxes) · `--radius-md` 6px (buttons, inputs, nav
-and menu items) · `--radius-lg` 8px (cards, tables, menus) · `--radius-xl` 12px
-(dialogs and drawers) · `--radius-pill` (counts only). Small corners read as
-precise; 16-24px rounding everywhere is what makes an admin look like a template.
+By role: `--radius-badge` 6px · `--radius-control` 10px · `--radius-card` 14px ·
+`--radius-overlay` 20px (dialogs, drawers) · `--radius-bubble` 18px with a
+`--radius-bubble-tail` 6px corner on the speaker's side, written with logical
+corners so it mirrors in RTL · `--radius-pill` for counts and chips only. The
+older names still resolve: `--radius-sm` → badge, `-md` → control, `-lg` → card,
+`-xl` → overlay, so no rule had to be touched to follow the new shape.
 
 ### Control sizing
 
 `--control-height-sm` 32 · `--control-height` 36 · `--control-height-lg` 40, shared
 by buttons, inputs and selects so they align without measuring. Under
-`pointer: coarse` all three rise to 40-44px touch targets. Icon sizes:
-`--icon-size-sm` 16 · `--icon-size` 18 · `--icon-size-nav` 20.
+`pointer: coarse` they rise to 40-44px touch targets. Icon sizes:
+`--icon-size-sm` 16 · `--icon-size` 18 · `--icon-size-nav` 20; `--icon-stroke`
+1.6.
 
 ### Layers
 
 `--z-sticky` 10 · `--z-sidebar` 20 · `--z-dropdown` 30 · `--z-drawer` 40 ·
-`--z-modal` 50 · `--z-toast` 60. The only z-index values in the product.
+`--z-modal` 50 · `--z-toast` 60 · `--z-skip-link` 70. The only z-index values in
+the product.
 
 ### Shadow
 
-`--shadow-subtle` · `--shadow-raised` · `--shadow-overlay`. Redefined for dark
-mode, where shadows read poorly and borders do most of the separating.
+Hairlines everywhere; one shadow, for overlays only (menus, dialogs, toasts, the
+peeking sidebar): `--shadow-overlay` and `--shadow-raised`, both
+`0 1px 2px rgb(22 24 27 / 5%), 0 12px 32px -8px rgb(22 24 27 / 18%)` in light.
+`--shadow-subtle` resolves to `none`. In dark mode borders do the separating and
+the overlay shadow only grounds.
 
 ### Motion
 
-`--motion-fast` 150ms (hover, press) · `--motion-normal` 200ms (menus, the rail
-opening) · `--motion-slow` 280ms (drawers, dialogs, the rail closing), with
-`--ease-standard` and `--ease-exit`. Every transition and animation reads these
-tokens; under `prefers-reduced-motion` the tokens themselves collapse to ~0 (D19).
+Durations `--duration-xs` 100 · `-sm` 150 · `-md` 220 · `-lg` 320 · `-xl` 450 ms;
+easings `--ease-standard` `cubic-bezier(.2,0,0,1)`, `--ease-enter`
+`(.22,1,.36,1)`, `--ease-exit` `(.4,0,1,1)`, `--ease-emphasized`
+`(.05,.7,.1,1)`. The older `--motion-fast` / `-normal` / `-slow` names alias
+sm / md / lg. Under `prefers-reduced-motion` the duration tokens themselves
+collapse to ~0 (D19).
 
 ## D6. Typography
 
-A system font stack. **No webfont is fetched from a CDN** — that is a
-third-party dependency on every page load, a privacy consideration, and a
-guaranteed flash of unstyled text. System UI fonts are also what the reader's OS
-renders best.
+Two self-hosted families, both under the OFL, shipped as WOFF2 files with their
+licence texts in `src/assets/fonts/` and declared in `src/styles/_fonts.scss`:
 
-Type steps are named for the job they do, so a stylesheet says what it means:
-`--text-page-title`, `--text-section-title`, `--text-card-title`, `--text-body`,
-`--text-body-strong`, `--text-small`, `--text-label`, `--text-nav`.
+- **Instrument Sans** (variable `wdth` 75-100, `wght` 400-700; Latin 57 KB,
+  Latin Extended 19 KB) for Latin text. Headings use the narrowed cut
+  (`--heading-stretch: 86%`), weight 600-650 and −0.015em tracking.
+- **IBM Plex Sans Arabic** (400, 500, 600; Arabic subset only, 43-46 KB each)
+  for Arabic.
 
-Body text is 14px, which reads better than 16px in a dense admin context. The
-page title uses `clamp()` to scale between 22px and 28px with the viewport.
+**No font service is contacted, ever.** Because the stylesheet references the
+files, the build emits them as content-hashed media files, which the edge caches
+for a year as immutable. Every face carries a `unicode-range`, so an English page
+downloads only the Latin file, and Latin characters inside Arabic text keep
+Instrument Sans. `font-display: swap` with metric-matched local fallbacks
+(`size-adjust`, `ascent-override`, `descent-override`, measured against the
+shipped files) means the swap moves nothing. There is no preload: Angular cannot
+write a hashed media name into `index.html`, and an unhashed copy would download
+the font twice.
+
+Type steps are named for the job they do: `--text-display` (28-40px, overview
+numbers), `--text-page-title` (24-30px), `--text-section-title` (18px),
+`--text-card-title` (15px), `--text-body` (14px / 1.55, dense admin),
+`--text-reading` (15px / 1.6, transcripts), `--text-small` (13px),
+`--text-caption` (12px), `--text-numeric` (with `tabular-nums`), plus
+`--text-body-strong`, `--text-label`, `--text-nav`, `--text-table`. The title
+utilities set `font-stretch` after the `font` shorthand, which would reset it.
+
+Under `:lang(ar)` the width returns to 100%, tracking to 0, nothing is uppercase,
+body text is 15px / 1.7 and heading line-height at least 1.35.
 
 Headings are reset to inherit and given size by these classes, which keeps the
-heading **level** — what a screen reader builds its outline from — independent
+heading **level** -- what a screen reader builds its outline from -- independent
 of the visual size.
 
 ## D7. Light mode
 
-Not "white with black text". Hierarchy is built from a tinted page
-(`#f5f7fa`) sitting behind white cards, so a surface reads as raised without a
-shadow. Borders are light but present; text runs primary → secondary → muted;
-the current navigation item gets a tinted background, the accent colour and a
-solid edge marker.
+"Porcelain." A warm page (`#f3f2ee`) behind white panels, so a surface reads as
+raised from the tint behind it and a hairline, never from a shadow. Text runs
+ink → secondary → muted (`#16181b`, `#4d525a`, `#5f646d`). Decorative hairlines
+are light; the boundary of an interactive control is `--border-control`, held to
+3:1. The primary action is ink with white text. The current navigation item gets
+the neutral selected fill, ink text at a heavier weight and a 2px ink edge on the
+start side, which mirrors in RTL.
 
 ## D8. Dark mode
 
-Designed, not inverted. Surfaces are desaturated blue-greys, deliberately not
-pure black: `#000` makes shadows invisible, causes halation against light text,
-and reads as "terminal" rather than "product". Text is `#e7ecf3` rather than
-pure white for the same reason.
-
-The accent is a **different value**, not the same one reused — the light indigo
-would fail contrast on dark surfaces. Status colours, borders, shadows,
-skeletons and the scrim are all separately specified.
+"Night shift." Designed separately, not inverted. Surfaces are warm near-blacks
+(`#0f1012` page, `#17191c` panels, `#1e2024` overlays), deliberately not pure
+black: `#000` causes halation against light text and makes overlays float
+nowhere. Text is `#f2f1ed` rather than pure white. Ink becomes porcelain: the
+primary action is the lightest thing on screen, with dark text. The voices are
+lifted for the dark canvas (Lagoon `#41c2b4`, Ember `#ff8d57`), and status,
+borders, chart colours, skeletons and the scrim are each specified for dark.
+Borders do the separating; the one overlay shadow only grounds.
 
 ### Contrast
 
-Every foreground/background pair in both palettes was checked against WCAG
-programmatically. **40 pairs, all passing** — text at ≥ 4.5:1, control
-boundaries at ≥ 3:1.
+Every foreground/background pair is checked with `contrast_check.py` (the
+`design-system-tokens` skill) against WCAG 2 ratios -- **79 pairs, in light,
+dark, and both again under `prefers-contrast: more`: 76 pass, 3 are
+informational (decorative hairlines and the Lagoon/Ember seam), 0 fail.** Text
+is at least 4.5:1, large text and the parts of controls at least 3:1. The full
+tables are in the Phase 36.2 report.
 
-Three failures found and fixed during the phase:
+Two starting values of the direction failed and were adjusted (values, never the
+rule):
 
-- light `--text-muted` was 4.46:1 → darkened to pass at 4.80:1
-- dark `--danger-solid` gave 4.34:1 against its foreground → lightened to 5.19:1
-- a dedicated `--border-control` token was added at ≥ 3:1 for interactive
-  control boundaries, which WCAG 1.4.11 requires and decorative borders do not
+- light `--border-control` `#8b8e95` was 2.79:1 on `--surface-inset` → `#80838a`
+- light `--success-fg` `#2e7d32` was 4.49:1 on `--success-bg` → `#2b7a30`
+
+Lagoon and Ember are about 1.02-1.04:1 against each other, so wherever they
+touch (split bar, stacked chart, voice track) a hairline of the surface keeps
+them apart, and every voice is also a word.
+
+Under `prefers-contrast: more`, muted text becomes secondary and the decorative
+hairlines become real boundaries.
 
 ## D9. Light / Dark / System
 
-Exactly three modes. `system` is a choice in its own right — "keep following the
-operating system" — not the absence of one.
+Exactly three modes. `system` is a choice in its own right -- "keep following the
+operating system" -- not the absence of one.
 
 `ThemeService` holds the preference as a signal; the resolved theme is
 **derived**:
@@ -243,9 +304,11 @@ Because it is derived, an OS change while `system` is selected flows through
 automatically and an explicit choice ignores the OS just as automatically.
 Neither behaviour has its own code path, so neither can be broken independently.
 
-The resolved theme — never the preference — is written to `data-theme` on the
+The resolved theme -- never the preference -- is written to `data-theme` on the
 document element. `data-theme="system"` would force every themed rule to also
-handle the media query.
+handle the media query. The dark palette is one Sass mixin applied in two places
+(an explicit `data-theme="dark"`, and the no-JavaScript media-query path), so the
+two can never drift.
 
 **Persistence is `localStorage`, per browser.** OmniAI has authenticated users,
 but there is no server-side UI or profile preference contract to store a theme
@@ -261,17 +324,26 @@ dark-mode reader sees a white flash on every single load.
 
 It is inline because an external file is one more round trip during which the
 flash happens anyway, and it is wrapped in `try`/`catch` because `localStorage`
-**throws** rather than returning null in some privacy modes.
+**throws** rather than returning null in some privacy modes. The edge allows it
+by hash: `deploy/edge/csp-hashes.mjs` hashes the inline scripts of the built
+`index.html` at image build time, so any change to the script changes its hash
+automatically.
 
-**This duplicates three constants** from `core/theme/theme.ts` — the storage
-key, the attribute name and the preference values — because it has to run before
+**This duplicates three constants** from `core/theme/theme.ts` -- the storage
+key, the attribute name and the preference values -- because it has to run before
 the bundle exists. The duplication is unavoidable and is guarded by
 `theme-startup.spec.ts`, which pins the literals so that renaming a constant
 fails a test whose name says which file to edit.
 
+The loading state inside `<app-root>` shows the mark (the same geometry as
+`BrandMark` and `public/favicon.svg`) and "Loading OmniAI…". Its styles are
+inline but its colours are tokens: the global stylesheet is a blocking `<link>`,
+so they resolve before it paints, already in the right theme. It does not move:
+a loading state, not a splash screen.
+
 There is also a `@media (prefers-color-scheme: dark)` fallback in the token
 layer, scoped so it can never override an explicit choice. It applies only when
-the inline script did not run at all — that is, with JavaScript disabled.
+the inline script did not run at all -- that is, with JavaScript disabled.
 
 ## D11. Navigation model
 
@@ -311,9 +383,11 @@ link keeps its accessible name in every state.
 preference is this browser's (`omniai.sidebar-pinned` in `localStorage`); it is
 not sent anywhere.
 
-The current page is marked three ways: a tinted fill, the accent colour and an
-inline-start edge marker -- the marker is what still reads in greyscale and on
-the rail. `aria-current="page"` announces it.
+The current page is marked three ways: the neutral selected fill, ink text at a
+heavier weight and a 2px ink marker on the inline-start edge -- the marker is
+what still reads in greyscale and on the rail, and it mirrors in RTL through
+`--direction-flip`. `aria-current="page"` announces it. The brand row carries
+the mark (D17).
 
 ## D13. Mobile navigation
 
@@ -366,51 +440,86 @@ of a list -- through `NavigationHistory` (D21).
 
 Buttons, cards, badges, form controls, tables, lists and the empty / loading /
 error states are **CSS conventions**, not Angular components. Components are
-reserved for primitives that carry structure or behaviour: `Icon`, `PageHeader`,
-`EmptyState`, `Pagination`, `Menu`, `ConfirmDialog`.
+reserved for primitives that carry structure or behaviour: `Icon`, `BrandMark`,
+`PageHeader`, `EmptyState`, `Pagination`, `Menu`, `ConfirmDialog`, and the voice
+components below. Phase 36.2 restyled every one to "Two Voices" without changing
+a class name or DOM contract. Every state -- hover, pressed, focus, disabled,
+busy -- is drawn, with the motion tokens.
 
-- **Buttons** -- primary / secondary / ghost / danger / danger-ghost / link, in
-  sm / default / lg, plus icon-only. Loading overlays a spinner on a transparent
-  label, so a busy button keeps its width.
-- **Cards** -- border plus tinted page; `.card-header` (a sentence in it wraps
-  under the title), `.card-body`, and `.card-actions` as a card's last child is
-  its footer. Content never sits directly in a `.card` without `.card-body`.
-- **Badges** -- a dot and a word, on a 4px-radius chip. Tones: neutral, success,
-  warning, danger, info, accent; `.badge-plain` (no dot) for metadata such as a
-  channel; `.count-badge` for numbers.
-- **Forms** -- `.field` > label + control + hint + error; `.field-row` for two
-  compact fields; single-line fields capped at 40rem. The Bootstrap names some
-  screens use (`.form-control`, `.form-select`, `.form-label`, `.form-hint`,
-  `.form-error`) are aliases of the same rules -- only Bootstrap's grid is
-  loaded, so they had been rendering as browser defaults. `.switch`
-  (`role="switch"`), `.segmented` (radios), native checkboxes in the accent.
-- **Tables** -- `.table-wrap` frame with contained scroll (and the containing
-  block for a hidden caption), caption-style headers, `.numeric` end-aligned
-  tabular figures, `.actions` column.
+- **Buttons** -- primary (ink) / secondary / ghost / danger / danger-ghost / link,
+  in sm / default / lg, plus icon-only. Press is a 1px settle in 100ms; colour
+  changes take 150ms. Loading overlays a spinner on a transparent label, so a
+  busy button keeps its width.
+- **Cards** -- white on porcelain with a hairline, 14px radius, no shadow;
+  `.card-header` (a sentence in it wraps under the title), `.card-body`, and
+  `.card-actions` as a card's last child is its footer.
+- **Badges** -- status badges draw their own glyph (tick, triangle, exclamation,
+  "i") beside the word on a 6px-radius chip: neutral, success, warning, danger,
+  info. `.badge-plain` (no glyph) for metadata such as a channel; `.count-badge`
+  (ink) for numbers. `.badge-accent` is gone: what it meant ("Human") is now the
+  voice chip.
+- **Voice chips** (`app-voice-chip`) -- "AI" in Lagoon or "Person" in Ember, glyph
+  and word, md or sm; a chip that changes voice sweeps across in 320ms on the
+  emphasized curve (the "Take over" moment). Not a status badge.
+- **Forms** -- `.field` > label + control + hint + error; `.field-row`; 10px
+  controls with `--border-control` boundaries; invalid by `aria-invalid`. The
+  Bootstrap aliases (`.form-control`, `.form-select`, `.form-label`, `.form-hint`,
+  `.form-error`) are the same rules. `.switch` (`role="switch"`, ink when on, the
+  thumb mirrors in RTL), `.segmented` (radios), native checkboxes and radios in
+  ink.
+- **Tables** -- `.table-wrap` frame with contained scroll, caption-style headers,
+  `.num` end-aligned tabular figures, `.actions` column.
 - **Data list** -- `.data-list` / `.data-list-head` / `.data-row`: the pattern for
   lists whose rows are links. A table's look on a wide screen, stacked rows on a
   phone; a feature supplies only `--data-list-columns`.
 - **Toolbar, pager** -- `.toolbar` / `.toolbar-end`; `.pager` drawn by the
   `Pagination` component.
-- **Menus** -- `.menu`, `.menu-item`, `.menu-separator`, `.menu-label`.
-- **Notices** -- `.alert-*` (danger, warning, info, success) and `.stale-notice`,
-  the one treatment for "this changed somewhere else".
+- **Menus** -- `.menu`, `.menu-item`, `.menu-separator`, `.menu-label`; an
+  overlay, so it casts the shadow.
+- **Notices** -- `.alert-*` (danger, warning, info, success; the glyph comes from
+  the template) and `.stale-notice`, the one treatment for "this changed
+  somewhere else" (warning, because nothing failed).
+- **Dialog and toast** -- the dialog enters in 320ms on the enter curve with its
+  scrim fading in; toasts carry a glyph and a sentence, no coloured edge stripe.
+- **Transcript** -- `.bubble` (customer on the start side; AI and person on the
+  end side in their voice tints, the tail on the speaker's corner) and
+  `.handoff-divider`, drawn only where the replying voice really changes.
 - **Empty / error / skeleton** -- skeletons match the final geometry; the sweep
   stops under reduced motion.
+
+**Voice components** (`shared/voice/`): `VoiceChip`; `VoiceSplit` (AI vs people
+counts as one bar, a legend and one sentence for screen readers); `VoiceTrack`
+(the real sequence of reply authors in one conversation, derived from the
+messages given and nothing else; it renders nothing until somebody has replied).
+
+**Design Lab.** `/design-lab` shows the tokens, type in Latin and Arabic, every
+primitive in every state, the voice components and a sample transcript, with
+light / dark and LTR / RTL toggles. It is registered only in development builds
+and compiled out of production (the route's condition is `ngDevMode`, which the
+production build defines as `false`).
 
 ## D17. Icons
 
 **No icon package.** The set is authored in `shared/icon/icon-paths.ts` on one
-24×24 grid, outline-only, one stroke width, round caps and joins -- so an
-inconsistent icon is impossible by construction. Phase 33.5 gave every
-navigation destination its own glyph (Customers, Reports, Plan & usage, Billing,
-Roles previously reused Team, Analytics and Settings) and added the interaction
-glyphs the shared patterns need (pin, more, search, sign out, switch, chevron
-down, arrow start, refresh, download, plus).
+24×24 grid, outline-only, one stroke width (1.6 since Phase 36.2, to match
+Instrument Sans), round caps and joins -- so an inconsistent icon is impossible
+by construction. Phase 33.5 gave every navigation destination its own glyph;
+Phase 36.2 added the voice glyphs `ai` (a calm bot face -- never a sparkle) and
+`person`, and generic channel glyphs: `website`, `whatsapp` (a phone in a speech
+bubble), `instagram` (a camera), `messenger` (two bubbles). Channel glyphs are
+always shown with the channel's name; no brand logo is recoloured.
 
 Glyphs are stored as **path data** and rendered via `<path [attr.d]>`; no SVG
 source passes through `innerHTML`. Icons are `aria-hidden`; the accessible name
 belongs to the control.
+
+**The mark** (`shared/brand-mark/`) is two rounded speech shapes overlapping into
+an "O": Lagoon for the AI, Ember for a person. The Lagoon shape is pre-cut around
+the Ember one, so it needs no mask or `url(#id)`, reads at 16px, works in a
+single colour (`tone="mono"`, and in forced colours) and is never mirrored. The
+same geometry is in `public/favicon.svg` (which follows the browser's colour
+scheme), the regenerated `favicon.ico` (16, 32, 48) and the `index.html` loading
+state.
 
 ## D18. Accessibility baseline
 
@@ -422,11 +531,17 @@ Treated as a product requirement, not a pass at the end.
 - `aria-expanded` + `aria-controls` on the drawer trigger, the notification bell
   and every menu trigger; `aria-haspopup="menu"` on menu triggers
 - `inert` for the closed drawer and for content behind an open one
-- Visible `:focus-visible` rings everywhere, one treatment defined once
+- Visible `:focus-visible` rings everywhere, one treatment defined once: 2px of
+  ink with a 2px offset, drawn with `outline` so it survives forced colours
 - Escape closes the drawer; focus returns to the trigger
 - Labels never removed for assistive technology, only hidden visually
-- Status conveyed by shape and text as well as colour
-- Contrast verified numerically across both themes
+- Status conveyed by shape and text as well as colour; each voice by its glyph
+  and word as well as Lagoon or Ember
+- Voice displays hide their bars from assistive technology and say one plain
+  sentence instead
+- Contrast verified numerically across both themes and under
+  `prefers-contrast: more` (D8)
+- Targets at least 24px, 40-44px under a coarse pointer
 - `<caption>` and `scope` on the table
 
 The theme choice lives in the account menu as `menuitemradio` items with
@@ -436,17 +551,31 @@ native radios, which keep arrow-key movement and the checked state the browser's
 
 ## D19. Motion
 
-Motion explains a change -- the rail opening, a menu appearing, a drawer sliding
-in -- and nothing is animated for decoration. Transitions use transforms,
-opacity, colour and `clip-path`; no `transition: all`, no animated layout.
+Functional and quick: motion explains a change and nothing is animated for
+decoration. Transitions use transforms, opacity and colour; no
+`transition: all`, no animated layout.
 
-`prefers-reduced-motion: reduce` is honoured **at the token level**: the three
-duration tokens collapse to ~0, which reaches every component style. The earlier
-universal-selector rule stays as a fallback, but on its own it lost to any
-component rule (a component selector out-ranks `*`), so the rail and menus still
-animated. Near zero rather than zero, so `transitionend` still fires. The loading
-spinner keeps a slow fixed turn -- it is feedback, not decoration -- and the
-skeleton sweep stops.
+- Press: a 1px settle in 100ms. Hover and colour: 150ms.
+- Menus, popovers and a new transcript message settling: 220ms on the enter
+  curve.
+- Dialogs and drawers: 320ms; the dialog's scrim fades in.
+- **The "Take over" moment**: a voice chip that changes voice sweeps from Lagoon
+  to Ember (and back for "Return to AI") in 320ms on the emphasized curve.
+- **Route changes**: a 150ms crossfade of the content area through the View
+  Transitions API (`withViewTransitions({ skipInitialTransition: true })`). Only
+  `.shell-main` carries a `view-transition-name`, and the root snapshot does not
+  animate, so the sidebar and top bar never flicker; a no-op in browsers without
+  View Transitions.
+- Not in the admin: count-ups, stagger on every visit, parallax, fade-up on
+  sections, bounce.
+
+`prefers-reduced-motion: reduce` is honoured **at the token level**: every
+duration token collapses to ~0, which reaches every component style (a component
+selector out-ranks the universal fallback rule, so the token is what works).
+Near zero rather than zero, so `transitionend` still fires. View Transitions are
+switched off, the "Take over" sweep becomes instant and the skeleton sweep
+stops. The loading spinner deliberately keeps its slow 0.9s turn (Phase 33.5):
+it is essential feedback, small, and travels nowhere.
 
 ## D20. RTL readiness
 
