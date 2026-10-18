@@ -94,7 +94,7 @@
             <dt>Open conversations</dt>
             <dd class="metric-value">
               @if (dashboard(); as d) {
-                {{ d.current.openConversations | number }}
+                {{ d.current.openConversations | localNumber }}
               } @else {
                 <span class="skeleton metric-skeleton" aria-hidden="true"></span>
               }
@@ -104,7 +104,7 @@
             <dt>Handled by AI</dt>
             <dd class="metric-value">
               @if (dashboard(); as d) {
-                {{ d.current.openHandledByAi | number }}
+                {{ d.current.openHandledByAi | localNumber }}
               } @else {
                 <span class="skeleton metric-skeleton" aria-hidden="true"></span>
               }
@@ -114,7 +114,7 @@
             <dt>Handled by a person</dt>
             <dd class="metric-value">
               @if (dashboard(); as d) {
-                {{ d.current.openHandledByHuman | number }}
+                {{ d.current.openHandledByHuman | localNumber }}
               } @else {
                 <span class="skeleton metric-skeleton" aria-hidden="true"></span>
               }
@@ -135,7 +135,7 @@
             <dt>Conversations started</dt>
             <dd class="metric-value">
               @if (dashboard(); as d) {
-                {{ d.summary.conversationsStarted | number }}
+                {{ d.summary.conversationsStarted | localNumber }}
               } @else {
                 <span class="skeleton metric-skeleton" aria-hidden="true"></span>
               }
@@ -145,7 +145,7 @@
             <dt>Customer messages</dt>
             <dd class="metric-value">
               @if (dashboard(); as d) {
-                {{ d.summary.customerMessages | number }}
+                {{ d.summary.customerMessages | localNumber }}
               } @else {
                 <span class="skeleton metric-skeleton" aria-hidden="true"></span>
               }
@@ -155,7 +155,7 @@
             <dt>AI replies</dt>
             <dd class="metric-value">
               @if (dashboard(); as d) {
-                {{ d.summary.aiMessages | number }}
+                {{ d.summary.aiMessages | localNumber }}
               } @else {
                 <span class="skeleton metric-skeleton" aria-hidden="true"></span>
               }
@@ -165,7 +165,7 @@
             <dt>Replies from people</dt>
             <dd class="metric-value">
               @if (dashboard(); as d) {
-                {{ d.summary.humanMessages | number }}
+                {{ d.summary.humanMessages | localNumber }}
               } @else {
                 <span class="skeleton metric-skeleton" aria-hidden="true"></span>
               }

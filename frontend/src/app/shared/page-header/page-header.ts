@@ -31,7 +31,10 @@ import { Icon } from '@app/shared/icon/icon';
         -->
         <a class="page-header-back" [attr.href]="link" (click)="goBack($event, link)">
           <app-icon name="arrow-start" [strokeWidth]="1.75" />
-          <span><span class="visually-hidden">Back to </span>{{ backLabel() }}</span>
+          <span
+            ><span class="visually-hidden" i18n="@@pageHeader.backTo">Back to </span
+            >{{ backLabel() }}</span
+          >
         </a>
       }
 

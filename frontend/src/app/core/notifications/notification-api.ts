@@ -122,14 +122,14 @@ export function isInternalAction(path: string | null | undefined): path is strin
 export function actionLabel(category: NotificationCategory): string {
   switch (category) {
     case 'Reports':
-      return 'Open Reports';
+      return $localize`:@@notifications.action.reports:Open Reports`;
     case 'Usage':
-      return 'Open Plan & usage';
+      return $localize`:@@notifications.action.usage:Open Plan & usage`;
     case 'Billing':
-      return 'Open Billing';
+      return $localize`:@@notifications.action.billing:Open Billing`;
     case 'Knowledge':
-      return 'Open Knowledge';
+      return $localize`:@@notifications.action.knowledge:Open Knowledge`;
     case 'ChannelHealth':
-      return 'Open WhatsApp';
+      return $localize`:@@notifications.action.whatsapp:Open WhatsApp`;
   }
 }

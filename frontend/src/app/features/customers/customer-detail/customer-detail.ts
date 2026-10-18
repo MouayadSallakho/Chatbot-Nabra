@@ -18,6 +18,7 @@ import { PermissionService } from '@app/core/authorization/permission-service';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
 import { EmptyState } from '@app/shared/empty-state/empty-state';
 import { PageHeader } from '@app/shared/page-header/page-header';
+import { LocaleFormat } from '@app/core/i18n/locale-format';
 import { Customer, CustomerRow, CustomersApi } from '../customers-api';
 
 /**
@@ -47,6 +48,8 @@ import { Customer, CustomerRow, CustomersApi } from '../customers-api';
   styleUrl: './customer-detail.scss',
 })
 export class CustomerDetail implements OnInit {
+  private readonly locale = inject(LocaleFormat);
+
   private readonly api = inject(CustomersApi);
   private readonly workspace = inject(WorkspaceContextService);
   private readonly permissions = inject(PermissionService);
@@ -216,10 +219,7 @@ export class CustomerDetail implements OnInit {
   }
 
   protected date(value: string): string {
-    return new Date(value).toLocaleString(undefined, {
-      dateStyle: 'medium',
-      timeStyle: 'short',
-    });
+    return this.locale.date(value, 'dateTime');
   }
 
   protected channelLabel(channel: string): string {

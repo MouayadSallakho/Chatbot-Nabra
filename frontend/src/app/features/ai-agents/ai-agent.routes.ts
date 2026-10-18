@@ -25,12 +25,12 @@ export const aiAgentRoutes: Routes = [
     children: [
       {
         path: '',
-        title: 'AI Agents',
+        title: $localize`:@@title.aiAgents:AI Agents`,
         loadComponent: () => import('./agent-list/agent-list').then((m) => m.AgentList),
       },
       {
         path: 'new',
-        title: 'New AI agent',
+        title: $localize`:@@title.newAiAgent:New AI agent`,
         loadComponent: () => import('./agent-create/agent-create').then((m) => m.AgentCreate),
       },
       {
@@ -38,7 +38,7 @@ export const aiAgentRoutes: Routes = [
         // separating a literal segment from a parameter that would match it.
         path: ':aiAgentId',
         canDeactivate: [unsavedChangesGuard],
-        title: 'AI agent',
+        title: $localize`:@@title.aiAgent:AI agent`,
         loadComponent: () => import('./agent-editor/agent-editor').then((m) => m.AgentEditor),
       },
     ],

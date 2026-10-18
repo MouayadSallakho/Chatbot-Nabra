@@ -24,12 +24,12 @@ export const roleRoutes: Routes = [
     children: [
       {
         path: '',
-        title: 'Roles & permissions',
+        title: $localize`:@@title.rolesPermissions:Roles & permissions`,
         loadComponent: () => import('./role-list/role-list').then((m) => m.RoleList),
       },
       {
         path: 'new',
-        title: 'New role',
+        title: $localize`:@@title.newRole:New role`,
         loadComponent: () => import('./role-create/role-create').then((m) => m.RoleCreate),
       },
       {
@@ -37,7 +37,7 @@ export const roleRoutes: Routes = [
         // separating a literal segment from a parameter that would match it.
         path: ':roleId',
         canDeactivate: [unsavedChangesGuard],
-        title: 'Role',
+        title: $localize`:@@title.role:Role`,
         loadComponent: () => import('./role-editor/role-editor').then((m) => m.RoleEditor),
       },
     ],

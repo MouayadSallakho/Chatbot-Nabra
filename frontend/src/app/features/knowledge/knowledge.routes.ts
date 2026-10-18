@@ -17,18 +17,18 @@ export const knowledgeRoutes: Routes = [
     children: [
       {
         path: '',
-        title: 'Knowledge',
+        title: $localize`:@@title.knowledge:Knowledge`,
         loadComponent: () => import('./knowledge-list/knowledge-list').then((m) => m.KnowledgeList),
       },
       {
         path: 'new',
-        title: 'New knowledge document',
+        title: $localize`:@@title.newKnowledgeDocument:New knowledge document`,
         loadComponent: () =>
           import('./knowledge-create/knowledge-create').then((m) => m.KnowledgeCreate),
       },
       {
         path: 'upload',
-        title: 'Upload a knowledge file',
+        title: $localize`:@@title.uploadAKnowledgeFile:Upload a knowledge file`,
         loadComponent: () =>
           import('./knowledge-upload/knowledge-upload').then((m) => m.KnowledgeUpload),
       },
@@ -38,7 +38,7 @@ export const knowledgeRoutes: Routes = [
         // 'upload' is now a second literal that would otherwise be read as an id.
         path: ':knowledgeDocumentId',
         canDeactivate: [unsavedChangesGuard],
-        title: 'Knowledge document',
+        title: $localize`:@@title.knowledgeDocument:Knowledge document`,
         loadComponent: () =>
           import('./knowledge-editor/knowledge-editor').then((m) => m.KnowledgeEditor),
       },

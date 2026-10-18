@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
-import { ICON_PATHS, IconName } from './icon-paths';
+import { ICON_PATHS, IconName, MIRRORED_ICONS } from './icon-paths';
 
 /**
  * Draws one glyph from the product's icon set.
@@ -14,11 +14,16 @@ import { ICON_PATHS, IconName } from './icon-paths';
  * illustrates just makes a screen reader say everything twice. Where an icon is
  * the only content of a control, the accessible name belongs on the control
  * itself, which is where assistive technology looks for it.
+ *
+ * DIRECTIONAL GLYPHS MIRROR ON THEIR OWN. A name in MIRRORED_ICONS flips under
+ * `dir="rtl"` through the `--direction-flip` token, so no use site has to know
+ * which icons point somewhere.
  */
 @Component({
   selector: 'app-icon',
   changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './icon.scss',
+  host: { '[class.mirrors]': 'mirrors()' },
   template: `
     <svg
       class="icon"
@@ -52,4 +57,6 @@ export class Icon {
   readonly strokeWidth = input(1.6);
 
   protected readonly paths = computed<readonly string[]>(() => ICON_PATHS[this.name()]);
+
+  protected readonly mirrors = computed(() => MIRRORED_ICONS.has(this.name()));
 }

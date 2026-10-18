@@ -12,7 +12,7 @@ import {
 } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 import { Icon } from '@app/shared/icon/icon';
-import { NAV_GROUPS, NAV_ITEMS, NavGroup, NavItem } from '@app/layout/navigation';
+import { NAV_GROUPS, NAV_GROUP_LABELS, NAV_ITEMS, NavGroup, NavItem } from '@app/layout/navigation';
 import { PermissionService } from '@app/core/authorization/permission-service';
 import { BrandMark } from '@app/shared/brand-mark/brand-mark';
 
@@ -36,6 +36,7 @@ export const PEEK_CLOSE_DELAY_MS = 260;
 /** One sidebar section and the entries in it the reader may see. */
 interface VisibleGroup {
   readonly name: NavGroup;
+  readonly label: string;
   readonly items: readonly NavItem[];
 }
 
@@ -121,6 +122,7 @@ export class Sidebar {
 
     return NAV_GROUPS.map((name) => ({
       name,
+      label: NAV_GROUP_LABELS[name],
       items: visible.filter((item) => item.group === name),
     })).filter((group) => group.items.length > 0);
   });

@@ -13,6 +13,8 @@ import {
   DEFAULT_ANALYTICS_RANGE,
 } from '../analytics-api';
 import { ProviderUsageCard } from '../provider-usage/provider-usage';
+import { LocaleFormat, formatDate } from '@app/core/i18n/locale-format';
+import { AppLanguage } from '@app/core/i18n/language';
 import { ScrollRegion } from '@app/shared/scroll-region/scroll-region';
 
 /** One bar in the activity chart, already scaled. */
@@ -59,6 +61,8 @@ interface ActivityBar {
   styleUrl: './analytics-dashboard.scss',
 })
 export class AnalyticsDashboardPage {
+  private readonly locale = inject(LocaleFormat);
+
   private readonly api = inject(AnalyticsApi);
   private readonly workspace = inject(WorkspaceContextService);
   private readonly permissions = inject(PermissionService);
@@ -115,7 +119,7 @@ export class AnalyticsDashboardPage {
 
     return days.map((day, index) => ({
       date: day.date,
-      label: formatDay(day.date),
+      label: formatDay(day.date, this.locale.language),
       total: totals[index],
       customer: day.customerMessages,
       ai: day.aiMessages,
@@ -232,16 +236,12 @@ export class AnalyticsDashboardPage {
  * read a bare date in local time would shift every label by a day for half the
  * world.
  */
-export function formatDay(date: string): string {
+export function formatDay(date: string, language: AppLanguage = 'en'): string {
   const [year, month, day] = date.split('-').map(Number);
 
   if (!year || !month || !day) {
     return date;
   }
 
-  return new Date(Date.UTC(year, month - 1, day)).toLocaleDateString(undefined, {
-    day: 'numeric',
-    month: 'short',
-    timeZone: 'UTC',
-  });
+  return formatDate(language, new Date(Date.UTC(year, month - 1, day)), 'dayMonth', 'UTC');
 }

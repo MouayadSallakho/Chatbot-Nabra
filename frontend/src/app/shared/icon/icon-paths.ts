@@ -237,3 +237,21 @@ export const ICON_PATHS = {
 
 /** Every glyph the product can draw. */
 export type IconName = keyof typeof ICON_PATHS;
+
+/**
+ * The glyphs that point along the reading direction, and so turn round in
+ * Arabic: back and forward arrows, start and end chevrons, and leaving (the
+ * door is behind, the arrow goes the way the reader goes).
+ *
+ * Everything else never mirrors: the mark, the two voices, channel glyphs,
+ * status signs, the check, search, refresh, download, the clock-like and the
+ * symmetric ones (localisation-arabic-rtl.md, 4.3). A new directional glyph --
+ * send, reply, undo -- is added here, not flipped at its use site.
+ */
+export const MIRRORED_ICONS: ReadonlySet<IconName> = new Set<IconName>([
+  'arrow-start',
+  'arrow-end',
+  'chevron-start',
+  'chevron-end',
+  'sign-out',
+]);

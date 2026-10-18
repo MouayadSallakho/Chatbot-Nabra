@@ -1,4 +1,3 @@
-import { DatePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
@@ -10,6 +9,7 @@ import { Icon } from '@app/shared/icon/icon';
 import { PageHeader } from '@app/shared/page-header/page-header';
 import { Pagination } from '@app/shared/pagination/pagination';
 import { initialPage, pageRecorder } from '@app/shared/pagination/page-query';
+import { LocalDatePipe } from '@app/core/i18n/locale-pipes';
 import { AiAgentApi, AiAgentPage, DEFAULT_PAGE_SIZE } from '../ai-agent-api';
 
 /**
@@ -28,7 +28,7 @@ import { AiAgentApi, AiAgentPage, DEFAULT_PAGE_SIZE } from '../ai-agent-api';
 @Component({
   selector: 'app-agent-list',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, DatePipe, PageHeader, EmptyState, Icon, Pagination],
+  imports: [RouterLink, PageHeader, EmptyState, Icon, Pagination, LocalDatePipe],
   templateUrl: './agent-list.html',
   styleUrl: './agent-list.scss',
 })

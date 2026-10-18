@@ -47,7 +47,7 @@ const designLabRoutes: Routes =
     ? [
         {
           path: 'design-lab',
-          title: 'Design Lab',
+          title: $localize`:@@title.designLab:Design Lab`,
           loadComponent: () =>
             import('@app/features/design-lab/design-lab').then((m) => m.DesignLab),
         },
@@ -78,13 +78,13 @@ const designLabRoutes: Routes =
 export const routes: Routes = [
   {
     path: LOGIN_PATH,
-    title: 'Sign in',
+    title: $localize`:@@title.signIn:Sign in`,
     canActivate: [anonymousGuard],
     loadComponent: () => import('@app/features/auth/login/login').then((m) => m.Login),
   },
   {
     path: REGISTER_PATH,
-    title: 'Create account',
+    title: $localize`:@@title.createAccount:Create account`,
     canActivate: [anonymousGuard],
     loadComponent: () => import('@app/features/auth/register/register').then((m) => m.Register),
   },
@@ -94,7 +94,7 @@ export const routes: Routes = [
     // no workspace -- either guard would bounce them and lose the invitation.
     // The page itself asks them to sign in when they need to.
     path: ACCEPT_INVITATION_PATH,
-    title: 'Accept invitation',
+    title: $localize`:@@title.acceptInvitation:Accept invitation`,
     providers: [TeamApi],
     loadComponent: () =>
       import('@app/features/invitations/accept-invitation/accept-invitation').then(
@@ -111,7 +111,7 @@ export const routes: Routes = [
     // store is provided beside it for the same reason: it is the only thing in the
     // application that touches `sessionStorage`, and it belongs to this page alone.
     path: 'chat/:publicKey',
-    title: 'Chat',
+    title: $localize`:@@title.chat:Chat`,
     providers: [HostedChatApi, HostedChatSessionStore],
     loadComponent: () =>
       import('@app/features/chat/hosted-chat/hosted-chat').then((m) => m.HostedChat),
@@ -128,7 +128,7 @@ export const routes: Routes = [
   ...designLabRoutes,
   {
     path: WORKSPACE_SETUP_PATH,
-    title: 'Choose workspace',
+    title: $localize`:@@title.chooseWorkspace:Choose workspace`,
     canActivate: [authGuard],
     loadComponent: () =>
       import('@app/features/workspace-setup/workspace-setup').then((m) => m.WorkspaceSetup),
@@ -141,7 +141,7 @@ export const routes: Routes = [
       { path: '', pathMatch: 'full', redirectTo: HOME_PATH },
       {
         path: HOME_PATH,
-        title: 'Overview',
+        title: $localize`:@@title.overview:Overview`,
 
         // The overview reads the analytics dashboard, the plan's usage and the
         // subscription state, so it needs those three clients. Provided here
@@ -244,7 +244,7 @@ export const routes: Routes = [
       // the page moved.
       {
         path: '**',
-        title: 'Page not found',
+        title: $localize`:@@title.pageNotFound:Page not found`,
         loadComponent: () => import('@app/features/not-found/not-found').then((m) => m.NotFound),
       },
     ],

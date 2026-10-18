@@ -15,12 +15,12 @@ export const customersRoutes: Routes = [
     children: [
       {
         path: '',
-        title: 'Customers',
+        title: $localize`:@@title.customers:Customers`,
         loadComponent: () => import('./customer-list/customer-list').then((m) => m.CustomerList),
       },
       {
         path: ':customerId',
-        title: 'Customer',
+        title: $localize`:@@title.customer:Customer`,
         loadComponent: () =>
           import('./customer-detail/customer-detail').then((m) => m.CustomerDetail),
       },

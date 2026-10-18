@@ -5,6 +5,7 @@ import { PermissionService } from '@app/core/authorization/permission-service';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
 import { EmptyState } from '@app/shared/empty-state/empty-state';
 import { PageHeader } from '@app/shared/page-header/page-header';
+import { LocaleFormat } from '@app/core/i18n/locale-format';
 import {
   ENTITLEMENT_WORDS,
   PlanEntitlement,
@@ -72,6 +73,8 @@ const NOTES: Readonly<Record<PlanEntitlement['state'], string | null>> = {
   styleUrl: './plan-usage-page.scss',
 })
 export class PlanUsagePage {
+  private readonly locale = inject(LocaleFormat);
+
   private readonly api = inject(PlanUsageApi);
   private readonly workspace = inject(WorkspaceContextService);
   private readonly permissions = inject(PermissionService);
@@ -157,23 +160,15 @@ export class PlanUsagePage {
     const from = new Date(period.from);
     const to = new Date(new Date(period.to).getTime() - 1);
 
-    const month = new Intl.DateTimeFormat(undefined, {
-      month: 'long',
-      year: 'numeric',
-      timeZone: 'UTC',
-    });
+    const month = this.locale.date(from, 'monthYear', 'UTC');
+    const first = this.locale.date(from, 'dayMonth', 'UTC');
+    const last = this.locale.date(to, 'dayMonth', 'UTC');
 
-    const day = new Intl.DateTimeFormat(undefined, {
-      day: 'numeric',
-      month: 'short',
-      timeZone: 'UTC',
-    });
-
-    return `${month.format(from)} · ${day.format(from)} to ${day.format(to)} UTC`;
+    return `${month} · ${first} to ${last} UTC`;
   }
 
   protected count(value: number): string {
-    return new Intl.NumberFormat().format(value);
+    return this.locale.number(value);
   }
 
   private rows(): readonly UsageRow[] {

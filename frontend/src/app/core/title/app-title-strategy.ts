@@ -23,6 +23,10 @@ export class AppTitleStrategy extends TitleStrategy {
   override updateTitle(snapshot: RouterStateSnapshot): void {
     const page = this.buildTitle(snapshot);
 
-    this.title.setTitle(page ? `${page} · ${PRODUCT_NAME}` : `${PRODUCT_NAME} Admin`);
+    this.title.setTitle(
+      page
+        ? `${page} · ${PRODUCT_NAME}`
+        : $localize`:@@title.productAdmin:${PRODUCT_NAME}:product: Admin`,
+    );
   }
 }

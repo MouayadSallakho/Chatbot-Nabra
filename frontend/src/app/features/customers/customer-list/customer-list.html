@@ -125,8 +125,7 @@
         [page]="pageNumber()"
         [pageSize]="pageSize"
         [total]="totalCount()"
-        noun="customer"
-        label="Customer pages"
+        items="customers"
         [busy]="refreshing()"
         (pageChange)="go($event)"
       />

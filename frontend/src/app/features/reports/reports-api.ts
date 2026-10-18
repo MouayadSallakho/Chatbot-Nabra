@@ -1,6 +1,8 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable, map } from 'rxjs';
+import { AppLanguage } from '@app/core/i18n/language';
+import { formatDate } from '@app/core/i18n/locale-format';
 import { Versioned, withEntityTag } from '@app/core/api/versioned';
 
 /** Every report the platform can produce. The server decides which a member sees. */
@@ -249,14 +251,9 @@ export function sizeLabel(bytes: number | null): string {
 }
 
 /** A UTC date range, written out, with the last day included. */
-export function periodLabel(from: string, lastDay: string): string {
+export function periodLabel(from: string, lastDay: string, language: AppLanguage = 'en'): string {
   const format = (value: string): string =>
-    new Date(`${value}T00:00:00Z`).toLocaleDateString(undefined, {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-      timeZone: 'UTC',
-    });
+    formatDate(language, `${value}T00:00:00Z`, 'date', 'UTC');
 
   return from === lastDay ? format(from) : `${format(from)} – ${format(lastDay)}`;
 }

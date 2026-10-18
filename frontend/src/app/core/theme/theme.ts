@@ -36,9 +36,9 @@ export const THEME_ATTRIBUTE = 'data-theme';
 
 /** Human labels for the theme control. */
 export const THEME_LABELS: Readonly<Record<ThemePreference, string>> = {
-  system: 'System',
-  light: 'Light',
-  dark: 'Dark',
+  system: $localize`:@@theme.system:System`,
+  light: $localize`:@@theme.light:Light`,
+  dark: $localize`:@@theme.dark:Dark`,
 };
 
 /** Narrows an unknown stored string to a preference. */

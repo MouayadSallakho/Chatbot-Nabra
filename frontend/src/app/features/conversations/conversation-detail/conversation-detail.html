@@ -1,6 +1,11 @@
 <div class="page">
   @if (!canView()) {
-    <app-page-header backLink="/conversations" backLabel="Conversations" heading="Conversation" />
+    <app-page-header
+      backLink="/conversations"
+      backLabel="Conversations"
+      i18n-backLabel="@@back.conversations"
+      heading="Conversation"
+    />
 
     <div class="page-section">
       <div class="card">
@@ -12,7 +17,12 @@
       </div>
     </div>
   } @else if (loading()) {
-    <app-page-header backLink="/conversations" backLabel="Conversations" heading="Conversation" />
+    <app-page-header
+      backLink="/conversations"
+      backLabel="Conversations"
+      i18n-backLabel="@@back.conversations"
+      heading="Conversation"
+    />
 
     <div class="page-section" aria-busy="true">
       <p class="visually-hidden" role="status">Loading conversation…</p>
@@ -22,7 +32,12 @@
       </div>
     </div>
   } @else if (failure(); as error) {
-    <app-page-header backLink="/conversations" backLabel="Conversations" heading="Conversation" />
+    <app-page-header
+      backLink="/conversations"
+      backLabel="Conversations"
+      i18n-backLabel="@@back.conversations"
+      heading="Conversation"
+    />
 
     <div class="page-section">
       <div class="card">
@@ -44,6 +59,7 @@
     <app-page-header
       backLink="/conversations"
       backLabel="Conversations"
+      i18n-backLabel="@@back.conversations"
       heading="Conversation"
       [description]="
         current.channel === 'WebChat'
@@ -68,11 +84,11 @@
         </div>
         <div>
           <p class="text-label text-muted">Started</p>
-          <p class="text-body">{{ current.startedAt | date: 'MMM d, y, h:mm a' }}</p>
+          <p class="text-body">{{ current.startedAt | localDate: 'dateTime' }}</p>
         </div>
         <div>
           <p class="text-label text-muted">Last activity</p>
-          <p class="text-body">{{ current.lastActivityAt | date: 'MMM d, y, h:mm a' }}</p>
+          <p class="text-body">{{ current.lastActivityAt | localDate: 'dateTime' }}</p>
         </div>
         <div>
           <p class="text-label text-muted">Answered by</p>
@@ -201,7 +217,7 @@
             >
               <p class="message-meta">
                 <span class="message-sender">{{ senderName(message) }}</span>
-                <span class="text-muted">{{ message.sentAt | date: 'MMM d, y, h:mm a' }}</span>
+                <span class="text-muted">{{ message.sentAt | localDate: 'dateTime' }}</span>
 
                 @if (deliveryStatus(message.id); as delivery) {
                   <!--

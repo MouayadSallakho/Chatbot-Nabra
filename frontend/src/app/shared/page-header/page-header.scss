@@ -31,10 +31,6 @@
   }
 }
 
-[dir='rtl'] .page-header-back .icon {
-  transform: scaleX(-1);
-}
-
 .page-header-row {
   display: flex;
   flex-wrap: wrap; // actions drop below the title on a narrow screen

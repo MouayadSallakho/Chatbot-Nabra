@@ -1,6 +1,13 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, output } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { ThemeService } from '@app/core/theme/theme-service';
+import { LanguageService } from '@app/core/i18n/language-service';
+import {
+  APP_LANGUAGES,
+  AppLanguage,
+  LANGUAGE_ENDONYMS,
+  directionOf,
+} from '@app/core/i18n/language';
 import { THEME_LABELS, THEME_PREFERENCES, ThemePreference } from '@app/core/theme/theme';
 import { Icon } from '@app/shared/icon/icon';
 import { IconName } from '@app/shared/icon/icon-paths';
@@ -15,7 +22,7 @@ const THEME_ICONS: Readonly<Record<ThemePreference, IconName>> = {
 /**
  * The account menu at the end of the top bar.
  *
- * Who is signed in, which workspace they are in, their appearance preference,
+ * Who is signed in, which workspace they are in, their appearance and language,
  * and the ways out -- and nothing else. It is not a settings page: anything a
  * workspace administers lives in the sidebar, under Workspace.
  *
@@ -39,7 +46,20 @@ export class ProfileMenu {
 
   private readonly theme = inject(ThemeService);
 
+  private readonly languageService = inject(LanguageService);
+
   protected readonly preference = this.theme.preference;
+
+  /** The language this page runs in; a different choice reloads the page. */
+  protected readonly language = this.languageService.current;
+
+  protected readonly languages = APP_LANGUAGES.map((value) => ({
+    value,
+    name: LANGUAGE_ENDONYMS[value],
+    dir: directionOf(value),
+    // A one-glance script sample where the theme items have an icon.
+    glyph: value === 'ar' ? 'ع' : 'Aa',
+  }));
 
   protected readonly themes = THEME_PREFERENCES.map((value) => ({
     value,
@@ -57,10 +77,16 @@ export class ProfileMenu {
   });
 
   protected readonly label = computed(() =>
-    this.email() ? `Account menu for ${this.email()}` : 'Account menu',
+    this.email()
+      ? $localize`:@@account.menuLabelFor:Account menu for ${this.email()}:email:`
+      : $localize`:@@account.menuLabel:Account menu`,
   );
 
   protected selectTheme(preference: ThemePreference): void {
     this.theme.select(preference);
+  }
+
+  protected selectLanguage(language: AppLanguage): void {
+    this.languageService.choose(language);
   }
 }

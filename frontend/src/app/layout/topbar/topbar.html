@@ -13,7 +13,7 @@
         The button's accessible name. It stays "Navigation" in both states: the
         open/closed distinction is what aria-expanded is for.
       -->
-      <span class="visually-hidden">Navigation</span>
+      <span class="visually-hidden" i18n="@@shell.navigationButton">Navigation</span>
     </button>
   }
 
@@ -22,9 +22,11 @@
     heading -- the page's own <h1> lives in its page header.
   -->
   <p class="topbar-context">
-    <span class="visually-hidden">Workspace: </span>
+    <span class="visually-hidden" i18n="@@shell.workspacePrefix">Workspace: </span>
     @if (workspaceName()) {
-      <span class="topbar-workspace" [title]="workspaceName()">{{ workspaceName() }}</span>
+      <span class="topbar-workspace" dir="auto" [title]="workspaceName()">{{
+        workspaceName()
+      }}</span>
     } @else {
       <!-- Holds the bar's height while the workspace loads, so nothing shifts. -->
       <span class="skeleton topbar-workspace-skeleton" aria-hidden="true"></span>

@@ -67,6 +67,7 @@ Eighteen areas have their own documents:
 - [ai-runtime.md](ai-runtime.md) - the provider-independent AI text-generation contract and agent preview
 - [openai-provider.md](openai-provider.md) - the OpenAI Responses adapter behind that contract
 - [admin-design-system.md](admin-design-system.md) - the admin design system and application shell
+- [localisation-arabic-rtl.md](localisation-arabic-rtl.md) - English and Arabic, full RTL: runtime `$localize`, the pre-paint language script, formatting and RTL rules
 - [admin-ai-agent-experience.md](admin-ai-agent-experience.md) - the development workspace and the AI agent admin workflow
 - [authentication-tenant-membership.md](authentication-tenant-membership.md) - accounts, the cookie session, antiforgery, and the membership authorization boundary
 - [tenant-rbac.md](tenant-rbac.md) - tenant-scoped roles, the permission catalogue, and what a member may do inside a workspace

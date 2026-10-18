@@ -1,4 +1,3 @@
-import { DatePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
@@ -8,6 +7,7 @@ import { RoleApi, RoleSummary } from '@app/core/authorization/role-api';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
 import { EmptyState } from '@app/shared/empty-state/empty-state';
 import { Icon } from '@app/shared/icon/icon';
+import { LocalDatePipe } from '@app/core/i18n/locale-pipes';
 import { PageHeader } from '@app/shared/page-header/page-header';
 
 /**
@@ -26,7 +26,7 @@ import { PageHeader } from '@app/shared/page-header/page-header';
 @Component({
   selector: 'app-role-list',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, DatePipe, PageHeader, EmptyState, Icon],
+  imports: [RouterLink, PageHeader, EmptyState, Icon, LocalDatePipe],
   templateUrl: './role-list.html',
   styleUrl: './role-list.scss',
 })

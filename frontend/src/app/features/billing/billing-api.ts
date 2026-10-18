@@ -1,5 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
+import { AppLanguage } from '@app/core/i18n/language';
+import { currencyExponent, formatCurrency } from '@app/core/i18n/locale-format';
 import { Observable } from 'rxjs';
 
 /** How often a subscription renews. Two, and no others are sold. */
@@ -132,10 +134,10 @@ export class BillingApi {
  * The exponent comes from the browser's own currency data rather than a hard
  * coded division by a hundred, which would be wrong for JPY, KWD and others.
  */
-export function formatAmount(minorUnits: number, currency: string): string {
-  const format = new Intl.NumberFormat(undefined, { style: 'currency', currency });
-
-  const exponent = format.resolvedOptions().maximumFractionDigits ?? 2;
-
-  return format.format(minorUnits / 10 ** exponent);
+export function formatAmount(
+  minorUnits: number,
+  currency: string,
+  language: AppLanguage = 'en',
+): string {
+  return formatCurrency(language, minorUnits / 10 ** currencyExponent(currency), currency);
 }

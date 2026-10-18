@@ -2,6 +2,8 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { MEDIA_QUERY_FACTORY, MediaQueries } from '@app/core/media/media';
 import { LOCAL_STORAGE } from '@app/core/storage/local-storage';
+import { PAGE_RELOAD } from '@app/core/i18n/language-service';
+import { LANGUAGE_STORAGE_KEY } from '@app/core/i18n/language';
 import { ThemeService } from '@app/core/theme/theme-service';
 import { FakeMediaMatcher, memoryStorage } from '@app/testing/test-doubles';
 import { ProfileMenu } from './profile-menu';
@@ -61,7 +63,11 @@ describe('ProfileMenu', () => {
     await render();
     await open();
 
-    const radios = [...root().querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]')];
+    const radios = [
+      ...root().querySelectorAll<HTMLButtonElement>(
+        '[aria-labelledby="profile-theme-label"] [role="menuitemradio"]',
+      ),
+    ];
     expect(radios.map((radio) => radio.textContent?.trim())).toEqual(['System', 'Light', 'Dark']);
     expect(radios[0].getAttribute('aria-checked')).toBe('true');
 
@@ -95,5 +101,64 @@ describe('ProfileMenu', () => {
     await render('ada.owner@omniai.example', true);
     await open();
     expect(root().textContent).toContain('Switch workspace');
+  });
+
+  describe('language', () => {
+    let reloads: number;
+
+    beforeEach(() => {
+      reloads = 0;
+      TestBed.configureTestingModule({
+        providers: [{ provide: PAGE_RELOAD, useValue: () => reloads++ }],
+      });
+    });
+
+    const languageItems = (): HTMLButtonElement[] => [
+      ...root().querySelectorAll<HTMLButtonElement>(
+        '[data-testid="language-en"], [data-testid="language-ar"]',
+      ),
+    ];
+
+    it('offers each language in its own name, script and direction, beside the theme', async () => {
+      await render();
+      await open();
+
+      const group = root().querySelector('[data-testid="language-menu"]');
+      expect(group?.getAttribute('role')).toBe('group');
+      expect(languageItems().map((item) => item.getAttribute('role'))).toEqual([
+        'menuitemradio',
+        'menuitemradio',
+      ]);
+
+      const names = languageItems().map((item) => item.querySelector('span[dir]')!);
+      expect(names.map((name) => name.textContent?.trim())).toEqual(['English', 'العربية']);
+      expect(names.map((name) => [name.getAttribute('lang'), name.getAttribute('dir')])).toEqual([
+        ['en', 'ltr'],
+        ['ar', 'rtl'],
+      ]);
+      // The page runs in English, so English is the checked one.
+      expect(languageItems()[0].getAttribute('aria-checked')).toBe('true');
+      expect(languageItems()[1].getAttribute('aria-checked')).toBe('false');
+    });
+
+    it('keeps the choice in this browser and restarts the page in the new language', async () => {
+      await render();
+      await open();
+
+      languageItems()[1].click();
+
+      expect(TestBed.inject(LOCAL_STORAGE)?.getItem(LANGUAGE_STORAGE_KEY)).toBe('ar');
+      expect(reloads).toBe(1);
+    });
+
+    it('does not reload for the language the page is already in', async () => {
+      await render();
+      await open();
+
+      languageItems()[0].click();
+
+      expect(TestBed.inject(LOCAL_STORAGE)?.getItem(LANGUAGE_STORAGE_KEY)).toBe('en');
+      expect(reloads).toBe(0);
+    });
   });
 });

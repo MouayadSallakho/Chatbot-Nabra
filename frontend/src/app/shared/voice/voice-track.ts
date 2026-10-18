@@ -1,4 +1,5 @@
-import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
+import { APP_LANGUAGE } from '@app/core/i18n/language';
 import type { MessageSender } from '@app/features/conversations/conversations-api';
 import { VOICE_WORDS, replyRuns, repliesPhrase } from './voice';
 
@@ -82,13 +83,21 @@ export class VoiceTrack {
   /** True when only some of the transcript is loaded. */
   readonly partial = input(false);
 
+  private readonly language = inject(APP_LANGUAGE);
+
   protected readonly runs = computed(() => replyRuns(this.messages()));
 
   protected readonly sentence = computed(() => {
-    const parts = this.runs().map(
-      (run) => `${VOICE_WORDS[run.voice]}, ${repliesPhrase(run.replies)}`,
-    );
-    const scope = this.partial() ? 'Replies in the messages loaded so far' : 'Replies so far';
-    return `${scope}: ${parts.join(', then ')}.`;
+    const parts = this.runs().map((run) => {
+      const voice = VOICE_WORDS[run.voice];
+      const replies = repliesPhrase(run.replies, this.language);
+
+      return $localize`:@@voice.track.run:${voice}:voice:, ${replies}:replies:`;
+    });
+    const runs = parts.join($localize`:@@voice.track.then:, then `);
+
+    return this.partial()
+      ? $localize`:@@voice.track.partial:Replies in the messages loaded so far: ${runs}:runs:.`
+      : $localize`:@@voice.track.complete:Replies so far: ${runs}:runs:.`;
   });
 }

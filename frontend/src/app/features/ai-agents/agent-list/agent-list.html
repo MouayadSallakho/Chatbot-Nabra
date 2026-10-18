@@ -114,7 +114,7 @@
                   -->
                   <span class="data-cell-label">Updated&nbsp;</span>
                   <time [attr.datetime]="agent.updatedAt">{{
-                    agent.updatedAt | date: 'MMM d, y, h:mm a'
+                    agent.updatedAt | localDate: 'dateTime'
                   }}</time>
                 </span>
 
@@ -129,8 +129,7 @@
         [page]="currentPage()"
         [pageSize]="page()!.pageSize"
         [total]="page()!.totalCount"
-        noun="AI agent"
-        label="AI agent pages"
+        items="aiAgents"
         [busy]="loading()"
         (pageChange)="goTo($event)"
       />

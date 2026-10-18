@@ -1,4 +1,3 @@
-import { DatePipe } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -17,6 +16,7 @@ import { PermissionService } from '@app/core/authorization/permission-service';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
 import { EmptyState } from '@app/shared/empty-state/empty-state';
 import { PageHeader } from '@app/shared/page-header/page-header';
+import { LocalDatePipe } from '@app/core/i18n/locale-pipes';
 import { AssignableRole, Member, TeamApi } from '../team-api';
 
 /**
@@ -43,7 +43,7 @@ import { AssignableRole, Member, TeamApi } from '../team-api';
 @Component({
   selector: 'app-member-detail',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DatePipe, RouterLink, PageHeader, EmptyState],
+  imports: [RouterLink, PageHeader, EmptyState, LocalDatePipe],
   templateUrl: './member-detail.html',
   styleUrl: './member-detail.scss',
 })

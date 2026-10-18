@@ -1,6 +1,11 @@
 <div class="page">
   @if (!canView()) {
-    <app-page-header backLink="/channels" backLabel="Channels" heading="WhatsApp" />
+    <app-page-header
+      backLink="/channels"
+      backLabel="Channels"
+      i18n-backLabel="@@back.channels"
+      heading="WhatsApp"
+    />
 
     <div class="page-section">
       <div class="card">
@@ -15,6 +20,7 @@
     <app-page-header
       backLink="/channels"
       backLabel="Channels"
+      i18n-backLabel="@@back.channels"
       heading="WhatsApp"
       description="Numbers customers can message you on. Each number connects to one AI agent, and conversations arrive in the same inbox as every other channel."
     >

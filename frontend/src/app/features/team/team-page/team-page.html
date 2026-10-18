@@ -83,7 +83,7 @@
                 <span class="data-row-meta">
                   <span class="data-cell-label">Joined&nbsp;</span>
                   <time [attr.datetime]="member.joinedAt">{{
-                    member.joinedAt | date: 'mediumDate'
+                    member.joinedAt | localDate: 'date'
                   }}</time>
                 </span>
 
@@ -132,7 +132,7 @@
                   <span class="data-row-meta">
                     <span class="data-cell-label">Expires&nbsp;</span>
                     <time [attr.datetime]="invitation.expiresAt">{{
-                      invitation.expiresAt | date: 'mediumDate'
+                      invitation.expiresAt | localDate: 'date'
                     }}</time>
                   </span>
 

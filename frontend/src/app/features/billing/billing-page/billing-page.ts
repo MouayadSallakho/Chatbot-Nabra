@@ -5,6 +5,7 @@ import { PermissionService } from '@app/core/authorization/permission-service';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
 import { EmptyState } from '@app/shared/empty-state/empty-state';
 import { PageHeader } from '@app/shared/page-header/page-header';
+import { LocaleFormat } from '@app/core/i18n/locale-format';
 import {
   BillingApi,
   BillingOffer,
@@ -84,6 +85,8 @@ const STATUS_WORDS: Readonly<Record<SubscriptionStatus, { label: string; note: s
   styleUrl: './billing-page.scss',
 })
 export class BillingPage {
+  private readonly locale = inject(LocaleFormat);
+
   private readonly api = inject(BillingApi);
   private readonly workspace = inject(WorkspaceContextService);
   private readonly permissions = inject(PermissionService);
@@ -219,14 +222,14 @@ export class BillingPage {
   }
 
   protected date(value: string): string {
-    return new Intl.DateTimeFormat(undefined, { dateStyle: 'long' }).format(new Date(value));
+    return this.locale.date(value, 'longDate');
   }
 
   private row(offer: BillingOffer): OfferRow {
     return {
       id: offer.id,
       planName: offer.planName,
-      price: formatAmount(offer.amountMinorUnits, offer.currency),
+      price: formatAmount(offer.amountMinorUnits, offer.currency, this.locale.language),
       cadence: offer.interval === 'Annual' ? 'per year' : 'per month',
       trial:
         offer.trialDays && offer.trialDays > 0

@@ -10,13 +10,13 @@ import { Routes } from '@angular/router';
 export const notificationRoutes: Routes = [
   {
     path: '',
-    title: 'Notifications',
+    title: $localize`:@@title.notifications:Notifications`,
     loadComponent: () =>
       import('./notifications-page/notifications-page').then((m) => m.NotificationsPage),
   },
   {
     path: 'preferences',
-    title: 'Notification preferences',
+    title: $localize`:@@title.notificationPreferences:Notification preferences`,
     loadComponent: () =>
       import('./notification-preferences/notification-preferences').then(
         (m) => m.NotificationPreferencesPage,

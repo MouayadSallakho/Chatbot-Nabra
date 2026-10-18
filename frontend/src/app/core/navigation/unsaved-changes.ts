@@ -7,8 +7,10 @@ export interface HasUnsavedChanges {
 }
 
 /** The question asked before unsaved edits are thrown away. */
-export const UNSAVED_CHANGES_QUESTION =
-  'You have unsaved changes on this page. Leave and discard them?';
+export const UNSAVED_CHANGES_QUESTION = $localize`:@@unsaved.leaveQuestion:You have unsaved changes on this page. Leave and discard them?`;
+
+/** The question asked before a reload replaces unsaved edits with the saved version. */
+export const RELOAD_REPLACES_CHANGES_QUESTION = $localize`:@@unsaved.reloadQuestion:Reloading replaces your unsaved changes with the latest saved version. Continue?`;
 
 /**
  * Asks before leaving a screen with unsaved edits, and only then.

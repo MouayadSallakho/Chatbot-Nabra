@@ -65,7 +65,7 @@ import { ToastService } from './toast-service';
           (click)="dismiss(toast.id)"
         >
           <app-icon name="close" [strokeWidth]="1.75" />
-          <span class="visually-hidden">Dismiss</span>
+          <span class="visually-hidden" i18n="@@toast.dismiss">Dismiss</span>
         </button>
       </div>
     </ng-template>

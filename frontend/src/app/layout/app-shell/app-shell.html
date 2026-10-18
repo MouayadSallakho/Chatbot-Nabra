@@ -2,7 +2,13 @@
   First in the tab order, on every page. Without it a keyboard reader tabs
   through the whole sidebar before reaching the content, on every navigation.
 -->
-<a class="skip-link" href="#main-content" (click)="skipToContent($event)">Skip to main content</a>
+<a
+  class="skip-link"
+  href="#main-content"
+  (click)="skipToContent($event)"
+  i18n="@@shell.skipToContent"
+  >Skip to main content</a
+>
 
 <div class="shell" [class.is-drawer]="drawer()" [class.is-pinned]="pinned()">
   <app-sidebar

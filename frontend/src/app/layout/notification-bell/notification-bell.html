@@ -33,13 +33,16 @@
     data-testid="notification-panel"
   >
     <header class="panel-header">
-      <h2 id="notification-panel-heading" class="panel-title">Notifications</h2>
+      <h2 id="notification-panel-heading" class="panel-title" i18n="@@notifications.panelTitle">
+        Notifications
+      </h2>
       @if (center.unread() > 0) {
         <button
           type="button"
           class="btn btn-ghost btn-sm"
           (click)="markAllRead()"
           data-testid="mark-all-read"
+          i18n="@@notifications.markAllRead"
         >
           Mark all as read
         </button>
@@ -49,17 +52,34 @@
     <div class="panel-body">
       @if (center.failure(); as error) {
         <p class="alert alert-danger panel-alert" role="alert">
-          Notifications could not be loaded. {{ error.message }}
+          <ng-container i18n="@@notifications.loadFailed"
+            >Notifications could not be loaded.</ng-container
+          >
+          {{ error.message }}
         </p>
       } @else if (center.loading() && center.recent().length === 0) {
-        <p class="panel-empty text-small text-secondary" aria-busy="true">Loading notifications…</p>
+        <p
+          class="panel-empty text-small text-secondary"
+          aria-busy="true"
+          i18n="@@notifications.loading"
+        >
+          Loading notifications…
+        </p>
       } @else if (center.recent().length === 0) {
-        <p class="panel-empty text-small text-secondary" data-testid="notifications-empty">
+        <p
+          class="panel-empty text-small text-secondary"
+          data-testid="notifications-empty"
+          i18n="@@notifications.empty"
+        >
           You have no notifications. Operational alerts — reports, usage, billing, knowledge and
           WhatsApp delivery — will appear here.
         </p>
       } @else {
-        <ul class="panel-list" aria-label="Recent notifications">
+        <ul
+          class="panel-list"
+          aria-label="Recent notifications"
+          i18n-aria-label="@@notifications.recentLabel"
+        >
           @for (notification of center.recent(); track notification.id) {
             <li>
               <app-notification-item
@@ -74,8 +94,12 @@
     </div>
 
     <footer class="panel-footer">
-      <a routerLink="/notifications" data-testid="view-all">View all notifications</a>
-      <a routerLink="/notifications/preferences">Notification preferences</a>
+      <a routerLink="/notifications" data-testid="view-all" i18n="@@notifications.viewAll"
+        >View all notifications</a
+      >
+      <a routerLink="/notifications/preferences" i18n="@@notifications.preferencesLink"
+        >Notification preferences</a
+      >
     </footer>
   </section>
 }

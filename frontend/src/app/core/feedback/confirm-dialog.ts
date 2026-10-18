@@ -69,8 +69,8 @@ import {
 export class ConfirmDialog {
   readonly heading = input.required<string>();
   readonly body = input('');
-  readonly confirmLabel = input('Confirm');
-  readonly cancelLabel = input('Cancel');
+  readonly confirmLabel = input($localize`:@@dialog.confirm:Confirm`);
+  readonly cancelLabel = input($localize`:@@dialog.cancel:Cancel`);
 
   /** Whether the confirmed action is destructive, which changes the button. */
   readonly tone = input<'default' | 'danger'>('default');

@@ -3,6 +3,7 @@
     <app-page-header
       backLink="/channels/website-chat"
       backLabel="Website chat"
+      i18n-backLabel="@@back.websiteChat"
       heading="Website chat"
     />
 
@@ -19,6 +20,7 @@
     <app-page-header
       backLink="/channels/website-chat"
       backLabel="Website chat"
+      i18n-backLabel="@@back.websiteChat"
       heading="Website chat"
     />
 
@@ -33,6 +35,7 @@
     <app-page-header
       backLink="/channels/website-chat"
       backLabel="Website chat"
+      i18n-backLabel="@@back.websiteChat"
       heading="Website chat"
     />
 
@@ -54,6 +57,7 @@
     <app-page-header
       backLink="/channels/website-chat"
       backLabel="Website chat"
+      i18n-backLabel="@@back.websiteChat"
       [heading]="current.aiAgentName"
       description="A website chat link. Visitors who open it talk to this agent."
     >
@@ -100,11 +104,11 @@
         </div>
         <div>
           <p class="text-label text-muted">Created</p>
-          <p class="text-body">{{ current.createdAt | date: 'MMM d, y, h:mm a' }}</p>
+          <p class="text-body">{{ current.createdAt | localDate: 'dateTime' }}</p>
         </div>
         <div>
           <p class="text-label text-muted">Last changed</p>
-          <p class="text-body">{{ current.updatedAt | date: 'MMM d, y, h:mm a' }}</p>
+          <p class="text-body">{{ current.updatedAt | localDate: 'dateTime' }}</p>
         </div>
       </div>
     </div>

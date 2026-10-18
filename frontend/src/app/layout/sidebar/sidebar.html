@@ -27,7 +27,7 @@
         (click)="dismissed.emit()"
       >
         <app-icon name="close" [strokeWidth]="1.75" />
-        <span class="visually-hidden">Close navigation</span>
+        <span class="visually-hidden" i18n="@@nav.closeNavigation">Close navigation</span>
       </button>
     }
   </div>
@@ -37,11 +37,11 @@
     section's list is labelled by its heading, so a screen reader announces
     "Work, list, 3 items" rather than one undifferentiated run of links.
   -->
-  <nav class="sidebar-nav" aria-label="Primary">
+  <nav class="sidebar-nav" aria-label="Primary" i18n-aria-label="@@nav.primaryLabel">
     @for (group of groups(); track group.name) {
       <div class="nav-group">
         <p class="nav-group-label" [id]="'nav-group-' + group.name">
-          <span class="fades">{{ group.name }}</span>
+          <span class="fades">{{ group.label }}</span>
         </p>
         <ul [attr.aria-labelledby]="'nav-group-' + group.name">
           @for (item of group.items; track item.path) {
@@ -74,7 +74,11 @@
     <div class="sidebar-footer">
       <button type="button" class="nav-item pin-toggle" (click)="pinToggled.emit()">
         <app-icon [name]="pinned() ? 'chevron-start' : 'pin'" [strokeWidth]="1.6" />
-        <span class="nav-label fades">{{ pinned() ? 'Unpin sidebar' : 'Pin sidebar' }}</span>
+        @if (pinned()) {
+          <span class="nav-label fades" i18n="@@nav.unpinSidebar">Unpin sidebar</span>
+        } @else {
+          <span class="nav-label fades" i18n="@@nav.pinSidebar">Pin sidebar</span>
+        }
       </button>
     </div>
   }

@@ -2,6 +2,9 @@ import { Injectable, computed, effect, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { ApiError, toApiError } from '@app/core/api/api-error';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
+import { APP_LANGUAGE, AppLanguage } from '@app/core/i18n/language';
+import { formatNumber } from '@app/core/i18n/locale-format';
+import { pluralMessage } from '@app/core/i18n/plural';
 import { AppNotification, NotificationApi } from './notification-api';
 import { NotificationRealtime } from './notification-realtime';
 
@@ -24,6 +27,7 @@ export class NotificationCenter {
   private readonly api = inject(NotificationApi);
   private readonly realtime = inject(NotificationRealtime);
   private readonly workspace = inject(WorkspaceContextService);
+  private readonly language = inject(APP_LANGUAGE);
 
   private readonly count = signal(0);
   private readonly items = signal<readonly AppNotification[]>([]);
@@ -35,7 +39,7 @@ export class NotificationCenter {
   readonly failure = signal<ApiError | null>(null);
 
   /** What a screen reader hears when the badge changes. Polite, never assertive. */
-  readonly unreadLabel = computed(() => unreadText(this.count()));
+  readonly unreadLabel = computed(() => unreadText(this.count(), this.language));
 
   constructor() {
     effect(() => {
@@ -144,10 +148,19 @@ export class NotificationCenter {
 }
 
 /** "3 unread notifications", in words, for the bell's accessible name. */
-export function unreadText(count: number): string {
+export function unreadText(count: number, language: AppLanguage = 'en'): string {
   if (count === 0) {
-    return 'No unread notifications';
+    return $localize`:@@notifications.unread.none:No unread notifications`;
   }
 
-  return count === 1 ? '1 unread notification' : `${count} unread notifications`;
+  const n = formatNumber(language, count);
+
+  return pluralMessage(language, count, {
+    zero: $localize`:@@notifications.unread.zero:No unread notifications`,
+    one: $localize`:@@notifications.unread.one:${n}:count: unread notification`,
+    two: $localize`:@@notifications.unread.two:${n}:count: unread notifications`,
+    few: $localize`:@@notifications.unread.few:${n}:count: unread notifications`,
+    many: $localize`:@@notifications.unread.many:${n}:count: unread notifications`,
+    other: $localize`:@@notifications.unread.other:${n}:count: unread notifications`,
+  });
 }

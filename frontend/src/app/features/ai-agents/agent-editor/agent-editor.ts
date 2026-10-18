@@ -11,7 +11,11 @@ import {
 import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
-import { HasUnsavedChanges, protectUnsavedChanges } from '@app/core/navigation/unsaved-changes';
+import {
+  HasUnsavedChanges,
+  protectUnsavedChanges,
+  RELOAD_REPLACES_CHANGES_QUESTION,
+} from '@app/core/navigation/unsaved-changes';
 import { ApiError, toApiError } from '@app/core/api/api-error';
 import { ConfirmDialog } from '@app/core/feedback/confirm-dialog';
 import { ToastService } from '@app/core/feedback/toast-service';
@@ -377,9 +381,7 @@ export class AgentEditor implements OnInit, HasUnsavedChanges {
    * missed), but it cannot be driven from a unit test.
    */
   protected confirmReplace(): boolean {
-    return globalThis.confirm(
-      'Reloading replaces your unsaved changes with the latest saved version. Continue?',
-    );
+    return globalThis.confirm(RELOAD_REPLACES_CHANGES_QUESTION);
   }
 
   /**

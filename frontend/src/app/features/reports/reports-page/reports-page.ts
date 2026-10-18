@@ -31,6 +31,7 @@ import {
   sizeLabel,
 } from '../reports-api';
 import { ReportsNav } from '../reports-nav/reports-nav';
+import { LocaleFormat } from '@app/core/i18n/locale-format';
 import { ScrollRegion } from '@app/shared/scroll-region/scroll-region';
 
 /**
@@ -58,6 +59,8 @@ import { ScrollRegion } from '@app/shared/scroll-region/scroll-region';
   styleUrl: './reports-page.scss',
 })
 export class ReportsPage {
+  private readonly locale = inject(LocaleFormat);
+
   private readonly api = inject(ReportsApi);
   private readonly workspace = inject(WorkspaceContextService);
   private readonly permissions = inject(PermissionService);
@@ -213,7 +216,7 @@ export class ReportsPage {
   }
 
   protected period(execution: ReportExecution): string {
-    return periodLabel(execution.periodFrom, execution.periodLastDay);
+    return periodLabel(execution.periodFrom, execution.periodLastDay, this.locale.language);
   }
 
   protected requester(execution: ReportExecution): string {
@@ -225,7 +228,7 @@ export class ReportsPage {
   }
 
   protected when(value: string): string {
-    return new Date(value).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+    return this.locale.date(value, 'dateTime');
   }
 
   protected statusLabel(execution: ReportExecution): string {

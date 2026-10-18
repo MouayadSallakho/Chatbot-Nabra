@@ -1,5 +1,11 @@
-import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
+import { LocaleFormat } from '@app/core/i18n/locale-format';
+import { LocalNumberPipe } from '@app/core/i18n/locale-pipes';
+import { pluralMessage } from '@app/core/i18n/plural';
 import { VoiceChip } from './voice-chip';
+
+/** What a split bar counts. */
+export type VoiceSplitSubject = 'conversations' | 'openConversations';
 
 /**
  * AI against people, as one bar: how many of something each voice has.
@@ -20,7 +26,7 @@ import { VoiceChip } from './voice-chip';
 @Component({
   selector: 'app-voice-split',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [VoiceChip],
+  imports: [VoiceChip, LocalNumberPipe],
   template: `
     <div class="voice-split-bar" aria-hidden="true" [class.is-empty]="total() === 0">
       @if (ai() > 0) {
@@ -34,11 +40,11 @@ import { VoiceChip } from './voice-chip';
     <ul class="voice-split-legend" aria-hidden="true">
       <li>
         <app-voice-chip voice="ai" size="sm" />
-        <span class="voice-split-count">{{ ai() }}</span>
+        <span class="voice-split-count">{{ ai() | localNumber }}</span>
       </li>
       <li>
         <app-voice-chip voice="human" size="sm" />
-        <span class="voice-split-count">{{ human() }}</span>
+        <span class="voice-split-count">{{ human() | localNumber }}</span>
       </li>
     </ul>
 
@@ -113,13 +119,12 @@ export class VoiceSplit {
   readonly human = input.required<number>();
 
   /**
-   * What is being counted, in the plural, for the sentence: "open
-   * conversations", "replies".
+   * What is being counted, which chooses the screen-reader sentence. Whole
+   * sentences per subject, because in Arabic the noun changes with the count.
    */
-  readonly noun = input('conversations');
+  readonly subject = input<VoiceSplitSubject>('conversations');
 
-  /** The same noun in the singular, for a total of exactly one. */
-  readonly nounOne = input('conversation');
+  private readonly format = inject(LocaleFormat);
 
   protected readonly total = computed(() => this.ai() + this.human());
 
@@ -128,10 +133,39 @@ export class VoiceSplit {
     const human = this.human();
     const total = ai + human;
 
+    const n = this.format.number(total);
+    const a = this.format.number(ai);
+    const h = this.format.number(human);
+    const open = this.subject() === 'openConversations';
+
+    // Nothing at all is its own sentence in both languages; English has no
+    // plural category of its own for zero.
     if (total === 0) {
-      return `No ${this.noun()} yet, with the AI or with people.`;
+      return open
+        ? $localize`:@@voice.split.open.zero:No open conversations yet, with the AI or with people.`
+        : $localize`:@@voice.split.all.zero:No conversations yet, with the AI or with people.`;
     }
-    const noun = total === 1 ? this.nounOne() : this.noun();
-    return `${total} ${noun}: ${ai} with the AI, ${human} with people on the team.`;
+
+    return pluralMessage(
+      this.format.language,
+      total,
+      open
+        ? {
+            zero: $localize`:@@voice.split.open.zero:No open conversations yet, with the AI or with people.`,
+            one: $localize`:@@voice.split.open.one:${n}:total: open conversation: ${a}:ai: with the AI, ${h}:human: with people on the team.`,
+            two: $localize`:@@voice.split.open.two:${n}:total: open conversations: ${a}:ai: with the AI, ${h}:human: with people on the team.`,
+            few: $localize`:@@voice.split.open.few:${n}:total: open conversations: ${a}:ai: with the AI, ${h}:human: with people on the team.`,
+            many: $localize`:@@voice.split.open.many:${n}:total: open conversations: ${a}:ai: with the AI, ${h}:human: with people on the team.`,
+            other: $localize`:@@voice.split.open.other:${n}:total: open conversations: ${a}:ai: with the AI, ${h}:human: with people on the team.`,
+          }
+        : {
+            zero: $localize`:@@voice.split.all.zero:No conversations yet, with the AI or with people.`,
+            one: $localize`:@@voice.split.all.one:${n}:total: conversation: ${a}:ai: with the AI, ${h}:human: with people on the team.`,
+            two: $localize`:@@voice.split.all.two:${n}:total: conversations: ${a}:ai: with the AI, ${h}:human: with people on the team.`,
+            few: $localize`:@@voice.split.all.few:${n}:total: conversations: ${a}:ai: with the AI, ${h}:human: with people on the team.`,
+            many: $localize`:@@voice.split.all.many:${n}:total: conversations: ${a}:ai: with the AI, ${h}:human: with people on the team.`,
+            other: $localize`:@@voice.split.all.other:${n}:total: conversations: ${a}:ai: with the AI, ${h}:human: with people on the team.`,
+          },
+    );
   });
 }

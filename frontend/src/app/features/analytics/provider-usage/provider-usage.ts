@@ -1,5 +1,6 @@
-import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input, inject } from '@angular/core';
 import { AnalyticsAiUsage, AnalyticsModelUsage, AnalyticsRatedCost } from '../analytics-api';
+import { LocaleFormat } from '@app/core/i18n/locale-format';
 import { ScrollRegion } from '@app/shared/scroll-region/scroll-region';
 
 /**
@@ -33,6 +34,8 @@ import { ScrollRegion } from '@app/shared/scroll-region/scroll-region';
   styleUrl: './provider-usage.scss',
 })
 export class ProviderUsageCard {
+  private readonly locale = inject(LocaleFormat);
+
   /** Null when this workspace has never called a provider. */
   readonly usage = input<AnalyticsAiUsage | null>(null);
 
@@ -67,12 +70,10 @@ export class ProviderUsageCard {
     }
 
     try {
-      return new Intl.NumberFormat(undefined, {
-        style: 'currency',
-        currency,
+      return this.locale.currency(amount, currency, {
         minimumFractionDigits: 2,
         maximumFractionDigits: 6,
-      }).format(amount);
+      });
     } catch {
       // An unrecognised currency code must not blank the card. The number and
       // the code are still the truth.
@@ -82,7 +83,7 @@ export class ProviderUsageCard {
 
   /** A count, grouped for reading. */
   protected tokens(count: number): string {
-    return new Intl.NumberFormat().format(count);
+    return this.locale.number(count);
   }
 
   /** The words a reader sees for each kind of provider operation. */

@@ -32,6 +32,7 @@
     <app-page-header
       backLink="/knowledge"
       backLabel="Knowledge"
+      i18n-backLabel="@@back.knowledge"
       [heading]="doc.title"
       description=""
     >
@@ -82,13 +83,13 @@
             <span>
               Updated
               <time [attr.datetime]="doc.updatedAt">{{
-                doc.updatedAt | date: 'MMM d, y, h:mm a'
+                doc.updatedAt | localDate: 'dateTime'
               }}</time>
             </span>
             <span>
               @if (doc.indexedAt; as indexed) {
                 Indexed
-                <time [attr.datetime]="indexed">{{ indexed | date: 'MMM d, y, h:mm a' }}</time>
+                <time [attr.datetime]="indexed">{{ indexed | localDate: 'dateTime' }}</time>
               } @else {
                 Never indexed
               }
@@ -266,7 +267,7 @@
                 <dt class="text-caption text-muted">Text read</dt>
                 <dd class="text-small">
                   <time [attr.datetime]="file.extractedAt">
-                    {{ file.extractedAt | date: 'MMM d, y, h:mm a' }}
+                    {{ file.extractedAt | localDate: 'dateTime' }}
                   </time>
                 </dd>
               </div>

@@ -15,7 +15,7 @@ export const billingRoutes: Routes = [
     children: [
       {
         path: '',
-        title: 'Billing',
+        title: $localize`:@@title.billing:Billing`,
         loadComponent: () => import('./billing-page/billing-page').then((m) => m.BillingPage),
       },
     ],

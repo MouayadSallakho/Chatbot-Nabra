@@ -1,6 +1,11 @@
 <div class="page">
   @if (!canView()) {
-    <app-page-header backLink="/channels" backLabel="Channels" heading="Website chat" />
+    <app-page-header
+      backLink="/channels"
+      backLabel="Channels"
+      i18n-backLabel="@@back.channels"
+      heading="Website chat"
+    />
 
     <div class="page-section">
       <div class="card">
@@ -15,6 +20,7 @@
     <app-page-header
       backLink="/channels"
       backLabel="Channels"
+      i18n-backLabel="@@back.channels"
       heading="Website chat"
       description="A chat page you can link to from your own site. Each link connects visitors to one AI agent."
     >

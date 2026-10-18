@@ -2,16 +2,27 @@
   <span menuTrigger class="avatar" aria-hidden="true">{{ initials() }}</span>
 
   <div class="identity" role="presentation">
-    <span class="identity-email" [title]="email()">{{ email() }}</span>
+    <!--
+      The lines follow the page's direction (so they align with the menu), and
+      the values inside are isolated: an address is left-to-right in either
+      language, a workspace name is whatever its owner typed.
+    -->
+    <span class="identity-email" [title]="email()"
+      ><bdi dir="ltr">{{ email() }}</bdi></span
+    >
     @if (workspaceName()) {
-      <span class="identity-workspace" [title]="workspaceName()">{{ workspaceName() }}</span>
+      <span class="identity-workspace" [title]="workspaceName()"
+        ><bdi>{{ workspaceName() }}</bdi></span
+      >
     }
   </div>
 
   <hr class="menu-separator" role="separator" />
 
   <div role="group" aria-labelledby="profile-theme-label">
-    <p id="profile-theme-label" class="menu-label" role="presentation">Theme</p>
+    <p id="profile-theme-label" class="menu-label" role="presentation" i18n="@@account.theme">
+      Theme
+    </p>
     @for (option of themes; track option.value) {
       <button
         type="button"
@@ -31,15 +42,47 @@
 
   <hr class="menu-separator" role="separator" />
 
+  <!--
+    Language. Each name is written in its own language and marked with its own
+    `lang` and `dir`, so somebody who cannot read the current interface still
+    finds theirs, and a screen reader pronounces it correctly. Choosing the other
+    one reloads the page in it (LanguageService).
+  -->
+  <div role="group" aria-labelledby="profile-language-label" data-testid="language-menu">
+    <p id="profile-language-label" class="menu-label" role="presentation" i18n="@@account.language">
+      Language
+    </p>
+    @for (option of languages; track option.value) {
+      <button
+        type="button"
+        class="menu-item"
+        role="menuitemradio"
+        [attr.data-testid]="'language-' + option.value"
+        [attr.aria-checked]="language === option.value"
+        (click)="selectLanguage(option.value)"
+      >
+        <span class="language-glyph" aria-hidden="true" [attr.lang]="option.value">{{
+          option.glyph
+        }}</span>
+        <span [attr.lang]="option.value" [attr.dir]="option.dir">{{ option.name }}</span>
+        @if (language === option.value) {
+          <app-icon class="menu-check" name="check" [strokeWidth]="2" />
+        }
+      </button>
+    }
+  </div>
+
+  <hr class="menu-separator" role="separator" />
+
   <a class="menu-item" role="menuitem" routerLink="/notifications/preferences">
     <app-icon name="bell" [strokeWidth]="1.75" />
-    <span>Notification preferences</span>
+    <span i18n="@@account.notificationPreferences">Notification preferences</span>
   </a>
 
   @if (canSwitchWorkspace()) {
     <button type="button" class="menu-item" role="menuitem" (click)="workspaceSwitched.emit()">
       <app-icon name="switch" [strokeWidth]="1.75" />
-      <span>Switch workspace</span>
+      <span i18n="@@account.switchWorkspace">Switch workspace</span>
     </button>
   }
 
@@ -47,6 +90,6 @@
 
   <button type="button" class="menu-item" role="menuitem" (click)="signedOut.emit()">
     <app-icon name="sign-out" [strokeWidth]="1.75" />
-    <span>Sign out</span>
+    <span i18n="@@account.signOut">Sign out</span>
   </button>
 </app-menu>

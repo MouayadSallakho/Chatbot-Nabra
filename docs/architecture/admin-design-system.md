@@ -345,6 +345,12 @@ There is also a `@media (prefers-color-scheme: dark)` fallback in the token
 layer, scoped so it can never override an explicit choice. It applies only when
 the inline script did not run at all -- that is, with JavaScript disabled.
 
+From Phase 36.3b the same script (still one script, so still one hash) also sets
+`lang` and `dir` on `<html>`: the stored language, else the browser's, with the
+hosted chat and widget always following the visitor. The loading status is
+written in both languages and CSS shows the one matching `html[lang]`. See
+[localisation-arabic-rtl.md](localisation-arabic-rtl.md), 3.5 and 11.1.
+
 ## D11. Navigation model
 
 `NAV_ITEMS` in `layout/navigation.ts` is the single source of truth. The sidebar
@@ -650,7 +656,7 @@ Not built, and deliberately so.
 
 | Deferred | Note |
 | --- | --- |
-| Localisation and RTL | Layout is RTL-ready (logical properties, `--direction-flip`); no translations, no `dir` switching. Unicode content (Arabic names, accented Latin) renders and wraps correctly |
+| Localisation and RTL | No longer deferred: English and Arabic with full RTL from Phase 36.3b. The shell, shared components and shared strings are translated; page bodies follow in their own phases. See [localisation-arabic-rtl.md](localisation-arabic-rtl.md) |
 | Server-persisted preferences | Theme and pin live in `localStorage`; see D22 |
 | Scroll position restoration | The shell scrolls an inner element and resets it on navigation; the page, not the scroll offset, is what Back restores |
 | ESLint | The project has no lint script or ESLint config, and none was added |

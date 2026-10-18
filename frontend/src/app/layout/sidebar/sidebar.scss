@@ -41,11 +41,11 @@
   transition-duration: var(--motion-normal);
 }
 
-[dir='rtl'] .sidebar.is-rail {
+:host-context([dir='rtl']) .sidebar.is-rail {
   clip-path: inset(0 0 0 var(--rail-clip));
 }
 
-[dir='rtl'] .sidebar.is-rail.is-expanded {
+:host-context([dir='rtl']) .sidebar.is-rail.is-expanded {
   clip-path: inset(0 0 0 -3rem);
 }
 

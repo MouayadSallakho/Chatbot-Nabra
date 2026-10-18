@@ -15,7 +15,7 @@ export const analyticsRoutes: Routes = [
     children: [
       {
         path: '',
-        title: 'Analytics',
+        title: $localize`:@@title.analytics:Analytics`,
         loadComponent: () =>
           import('./analytics-dashboard/analytics-dashboard').then((m) => m.AnalyticsDashboardPage),
       },

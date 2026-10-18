@@ -1,4 +1,3 @@
-import { DatePipe } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -12,7 +11,11 @@ import {
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
-import { HasUnsavedChanges, protectUnsavedChanges } from '@app/core/navigation/unsaved-changes';
+import {
+  HasUnsavedChanges,
+  protectUnsavedChanges,
+  RELOAD_REPLACES_CHANGES_QUESTION,
+} from '@app/core/navigation/unsaved-changes';
 import { ApiError, toApiError } from '@app/core/api/api-error';
 import { ToastService } from '@app/core/feedback/toast-service';
 import { PermissionService } from '@app/core/authorization/permission-service';
@@ -29,6 +32,7 @@ import {
   UPLOADED_DOCUMENT_STATE,
 } from '../knowledge-limits';
 import { KnowledgeApi, KnowledgeDocument, KnowledgeFileType } from '../knowledge-api';
+import { LocalDatePipe } from '@app/core/i18n/locale-pipes';
 import { describeBytes } from '../knowledge-upload/knowledge-upload';
 
 /** Which action ran into a version that is no longer current. */
@@ -66,7 +70,15 @@ type ConflictSource = 'content' | 'index' | 'availability' | 'source';
 @Component({
   selector: 'app-knowledge-editor',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, RouterLink, DatePipe, PageHeader, EmptyState, Icon, ConfirmDialog],
+  imports: [
+    ReactiveFormsModule,
+    RouterLink,
+    PageHeader,
+    EmptyState,
+    Icon,
+    ConfirmDialog,
+    LocalDatePipe,
+  ],
   templateUrl: './knowledge-editor.html',
   styleUrl: './knowledge-editor.scss',
 })
@@ -532,9 +544,7 @@ export class KnowledgeEditor implements OnInit, HasUnsavedChanges {
 
   /** Deliberately overridable in tests -- the browser's own confirm cannot be driven from one. */
   protected confirmReplace(): boolean {
-    return globalThis.confirm(
-      'Reloading replaces your unsaved changes with the latest saved version. Continue?',
-    );
+    return globalThis.confirm(RELOAD_REPLACES_CHANGES_QUESTION);
   }
 
   /**

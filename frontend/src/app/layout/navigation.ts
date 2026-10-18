@@ -52,6 +52,21 @@ export const NAV_GROUPS = ['Work', 'AI', 'Channels', 'Insights', 'Workspace'] as
 export type NavGroup = (typeof NAV_GROUPS)[number];
 
 /**
+ * What each section heading says.
+ *
+ * Kept apart from NAV_GROUPS on purpose: the group names are identifiers (types,
+ * element ids, the order of the sidebar) and must not change with the language,
+ * while these are words, and must.
+ */
+export const NAV_GROUP_LABELS: Readonly<Record<NavGroup, string>> = {
+  Work: $localize`:@@nav.group.work:Work`,
+  AI: $localize`:@@nav.group.ai:AI`,
+  Channels: $localize`:@@nav.group.channels:Channels`,
+  Insights: $localize`:@@nav.group.insights:Insights`,
+  Workspace: $localize`:@@nav.group.workspace:Workspace`,
+};
+
+/**
  * The primary navigation.
  *
  * A single exported constant rather than a list written into the sidebar
@@ -66,13 +81,19 @@ export type NavGroup = (typeof NAV_GROUPS)[number];
  * the sidebar render them under one heading without re-sorting.
  */
 export const NAV_ITEMS: readonly NavItem[] = [
-  { label: 'Overview', path: 'overview', icon: 'overview', implemented: true, group: 'Work' },
+  {
+    label: $localize`:@@nav.overview:Overview`,
+    path: 'overview',
+    icon: 'overview',
+    implemented: true,
+    group: 'Work',
+  },
   {
     // Real from Phase 15: these are the conversations customers have actually
     // had, not a placeholder. Read-only -- replying, assigning and handing off do
     // not exist yet, and the screen says so rather than showing controls that
     // would fail.
-    label: 'Conversations',
+    label: $localize`:@@nav.conversations:Conversations`,
     group: 'Work',
     path: 'conversations',
     icon: 'conversations',
@@ -87,7 +108,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
     // administrative view of the customer base, and a transcript is what
     // somebody said in confidence. customers.view is deliberately not
     // conversations.view.
-    label: 'Customers',
+    label: $localize`:@@nav.customers:Customers`,
     group: 'Work',
     path: 'customers',
     icon: 'customers',
@@ -95,7 +116,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
     permissions: ['customers.view'],
   },
   {
-    label: 'AI Agents',
+    label: $localize`:@@nav.aiAgents:AI Agents`,
     group: 'AI',
     path: 'ai-agents',
     icon: 'agents',
@@ -115,7 +136,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
     // Real from Phase 17: written documents an agent can actually answer from,
     // not a placeholder. File upload, crawling and connectors are still absent,
     // and the screens say so rather than showing controls that would fail.
-    label: 'Knowledge',
+    label: $localize`:@@nav.knowledge:Knowledge`,
     group: 'AI',
     path: 'knowledge',
     icon: 'knowledge',
@@ -130,7 +151,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
     //
     // Either channel permission opens it: somebody who administers WhatsApp and
     // not website chat still needs a way in.
-    label: 'Channels',
+    label: $localize`:@@nav.channels:Channels`,
     group: 'Channels',
     path: 'channels',
     icon: 'channels',
@@ -146,7 +167,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
     // Real from Phase 22: counts drawn from the conversations, messages and
     // turns the platform already stores. One permission, because there is
     // nothing here to configure.
-    label: 'Analytics',
+    label: $localize`:@@nav.analytics:Analytics`,
     group: 'Insights',
     path: 'analytics',
     icon: 'analytics',
@@ -157,7 +178,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
     // Real from Phase 31: the same numbers as Analytics, exported as files and
     // generated on a schedule. Its own permission, because being trusted to read
     // a dashboard is not being trusted to write the workspace's data to a file.
-    label: 'Reports',
+    label: $localize`:@@nav.reports:Reports`,
     group: 'Insights',
     path: 'reports',
     icon: 'reports',
@@ -168,7 +189,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
     // Beside Roles rather than inside it: a role is a definition of what may be
     // done, and a team is the people who may do it. They are administered by
     // different permissions and, in a real workspace, often by different people.
-    label: 'Team',
+    label: $localize`:@@nav.team:Team`,
     group: 'Workspace',
     path: 'team',
     icon: 'team',
@@ -183,7 +204,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
     // inside it. There are no other settings yet, so a Settings hub would be a
     // page with one link on it -- a dead step that exists only to be completed.
     // When a second settings area arrives, this becomes a child of one.
-    label: 'Roles & permissions',
+    label: $localize`:@@nav.roles:Roles & permissions`,
     group: 'Workspace',
     path: 'roles',
     icon: 'roles',
@@ -194,7 +215,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
     // Beside Analytics, behind the same permission. It answers a different
     // question -- what this workspace may hold, rather than what it did -- and
     // there is nothing to configure here, so one read permission is enough.
-    label: 'Plan & usage',
+    label: $localize`:@@nav.planUsage:Plan & usage`,
     group: 'Workspace',
     path: 'plan-usage',
     icon: 'usage',
@@ -206,7 +227,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
     // people: one wants to know what the workspace may hold, the other what it
     // costs -- and billing.view is deliberately not analytics.view, because
     // being trusted with conversation counts is not being trusted with money.
-    label: 'Billing',
+    label: $localize`:@@nav.billing:Billing`,
     group: 'Workspace',
     path: 'billing',
     icon: 'billing',

@@ -1,4 +1,4 @@
-import { DatePipe, LowerCasePipe } from '@angular/common';
+import { LowerCasePipe } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -18,6 +18,7 @@ import { EmptyState } from '@app/shared/empty-state/empty-state';
 import { PageHeader } from '@app/shared/page-header/page-header';
 import { ConfirmDialog } from '@app/core/feedback/confirm-dialog';
 import { WebChatAdminApi, WebChatEndpoint, hostedChatUrl } from '../../website-chat-api';
+import { LocalDatePipe } from '@app/core/i18n/locale-pipes';
 import { WebsiteChatWidget } from '../website-chat-widget/website-chat-widget';
 
 /**
@@ -33,13 +34,13 @@ import { WebsiteChatWidget } from '../website-chat-widget/website-chat-widget';
   selector: 'app-website-chat-detail',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    DatePipe,
     LowerCasePipe,
     RouterLink,
     PageHeader,
     EmptyState,
     WebsiteChatWidget,
     ConfirmDialog,
+    LocalDatePipe,
   ],
   templateUrl: './website-chat-detail.html',
   styleUrl: './website-chat-detail.scss',

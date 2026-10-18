@@ -1,4 +1,3 @@
-import { DatePipe } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -20,6 +19,7 @@ import { WorkspaceContextService } from '@app/core/workspace/workspace-context-s
 import { EmptyState } from '@app/shared/empty-state/empty-state';
 import { Icon } from '@app/shared/icon/icon';
 import { PageHeader } from '@app/shared/page-header/page-header';
+import { LocalDatePipe } from '@app/core/i18n/locale-pipes';
 import { Invitation, MemberSummary, TeamApi } from '../team-api';
 
 /**
@@ -38,7 +38,7 @@ import { Invitation, MemberSummary, TeamApi } from '../team-api';
 @Component({
   selector: 'app-team-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DatePipe, RouterLink, PageHeader, EmptyState, Icon, ConfirmDialog],
+  imports: [RouterLink, PageHeader, EmptyState, Icon, ConfirmDialog, LocalDatePipe],
   templateUrl: './team-page.html',
   styleUrl: './team-page.scss',
 })

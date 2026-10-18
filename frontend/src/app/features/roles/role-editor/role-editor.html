@@ -1,6 +1,11 @@
 <div class="page">
   @if (!canView()) {
-    <app-page-header backLink="/roles" backLabel="Roles & permissions" heading="Role" />
+    <app-page-header
+      backLink="/roles"
+      backLabel="Roles & permissions"
+      i18n-backLabel="@@back.roles"
+      heading="Role"
+    />
 
     <div class="page-section">
       <div class="card">
@@ -12,7 +17,12 @@
       </div>
     </div>
   } @else if (loading()) {
-    <app-page-header backLink="/roles" backLabel="Roles & permissions" heading="Role" />
+    <app-page-header
+      backLink="/roles"
+      backLabel="Roles & permissions"
+      i18n-backLabel="@@back.roles"
+      heading="Role"
+    />
 
     <div class="page-section" aria-busy="true">
       <p class="visually-hidden" role="status">Loading role…</p>
@@ -22,7 +32,12 @@
       </div>
     </div>
   } @else if (failure(); as error) {
-    <app-page-header backLink="/roles" backLabel="Roles & permissions" heading="Role" />
+    <app-page-header
+      backLink="/roles"
+      backLabel="Roles & permissions"
+      i18n-backLabel="@@back.roles"
+      heading="Role"
+    />
 
     <div class="page-section">
       <div class="card">
@@ -40,6 +55,7 @@
     <app-page-header
       backLink="/roles"
       backLabel="Roles & permissions"
+      i18n-backLabel="@@back.roles"
       [heading]="current.name"
       [description]="
         current.isSystem

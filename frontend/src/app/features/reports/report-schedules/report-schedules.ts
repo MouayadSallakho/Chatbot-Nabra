@@ -26,6 +26,7 @@ import {
   formatLabel,
 } from '../reports-api';
 import { ReportsNav } from '../reports-nav/reports-nav';
+import { LocaleFormat } from '@app/core/i18n/locale-format';
 import { ScrollRegion } from '@app/shared/scroll-region/scroll-region';
 
 /**
@@ -48,6 +49,8 @@ import { ScrollRegion } from '@app/shared/scroll-region/scroll-region';
   styleUrl: './report-schedules.scss',
 })
 export class ReportSchedules {
+  private readonly locale = inject(LocaleFormat);
+
   private readonly api = inject(ReportsApi);
   private readonly workspace = inject(WorkspaceContextService);
   private readonly permissions = inject(PermissionService);
@@ -283,11 +286,7 @@ export class ReportSchedules {
   }
 
   protected when(value: string): string {
-    return new Date(value).toLocaleString(undefined, {
-      dateStyle: 'medium',
-      timeStyle: 'short',
-      timeZone: 'UTC',
-    });
+    return this.locale.date(value, 'dateTime', 'UTC');
   }
 
   protected frequencyLabel(schedule: ReportSchedule): string {

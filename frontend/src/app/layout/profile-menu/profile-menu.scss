@@ -35,7 +35,7 @@
   background-color: var(--surface-selected);
   color: var(--text-primary);
   font: 600 0.75rem / 1 var(--font-sans);
-  letter-spacing: 0.02em;
+  letter-spacing: 0.02em; // rtl-lint-ignore: initials come from the address, always Latin
   transition: border-color var(--motion-fast) var(--ease-standard);
 }
 
@@ -67,4 +67,15 @@
 .menu-check {
   margin-inline-start: auto;
   color: var(--text-primary);
+}
+
+// Stands where the theme items have an icon: a sample of each script, so the
+// two groups line up and the language list scans at a glance.
+.language-glyph {
+  display: inline-grid;
+  place-items: center;
+  inline-size: 1.25em;
+  block-size: 1.25em;
+  font: 600 0.75rem / 1 var(--font-sans);
+  color: var(--text-secondary);
 }

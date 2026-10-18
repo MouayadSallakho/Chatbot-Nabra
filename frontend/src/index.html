@@ -14,41 +14,92 @@
     <link rel="icon" type="image/svg+xml" href="favicon.svg" />
     <link rel="icon" href="favicon.ico" sizes="16x16 32x32 48x48" />
     <!--
-      Theme resolution, before first paint.
+      Theme and language resolution, before first paint.
 
       This runs synchronously in <head>, ahead of any stylesheet being applied to
-      a rendered frame, so the correct palette is in place the moment the page is
-      painted. Without it the browser paints the light default, Angular boots,
-      and a dark-mode user sees a white flash on every single load -- the kind of
-      detail that separates a product from a project.
+      a rendered frame, so the correct palette, language and direction are in
+      place the moment the page is painted. Without it the browser paints the
+      light, left-to-right default, Angular boots, and a dark-mode reader sees a
+      white flash -- and an Arabic reader sees the whole layout jump from one
+      side to the other -- on every single load.
+
+      Language: `lang` and `dir` on <html>. They also choose the fonts, because
+      every face carries a unicode-range and the Arabic type roles hang off
+      :lang(ar). The customer-facing pages (/chat/ and /embed/) follow the
+      visitor's own browser and never read a choice an admin stored in the same
+      browser. Elsewhere an explicit choice wins, then the browser's first
+      Arabic or English preference, then English. main.ts reads `lang` to decide
+      which catalogue to load.
 
       It is inline for the same reason: an external file is one more round trip
-      during which that flash happens anyway.
+      during which that flash happens anyway. It is ONE script on purpose: the
+      edge allows inline code by hash (deploy/edge/csp-hashes.mjs), and one
+      script is one hash to keep right.
 
-      COUPLED TO ThemeService. The storage key, the attribute name and the two
-      attribute values are duplicated here from src/app/core/theme/theme.ts. That
-      duplication is deliberate and unavoidable -- this has to run before the
-      bundle exists -- and it is asserted by a unit test that reads this file, so
-      the two cannot drift apart silently.
+      COUPLED TO ThemeService and LanguageService. The storage keys, the
+      attribute name, the stored values and the public-page paths are duplicated
+      here from src/app/core/theme/theme.ts and src/app/core/i18n/language.ts.
+      That duplication is deliberate and unavoidable -- this has to run before
+      the bundle exists -- and theme-startup.spec.ts runs this very script
+      against fake browsers, so the two cannot drift apart silently.
 
-      Wrapped in try/catch because localStorage throws outright, rather than
-      returning null, in some privacy modes. A failure here must degrade to the
-      light default, never to a blank page.
+      Two guarded halves because localStorage throws outright, rather than
+      returning null, in some privacy modes. A failure must degrade to the
+      light, English default, never to a blank page, and a failure in one half
+      must not cost the other.
     -->
     <script>
       (function () {
+        var root = document.documentElement;
         try {
           var stored = localStorage.getItem('omniai.theme');
           var dark =
             stored === 'dark' ||
             ((stored === 'system' || stored === null) &&
               window.matchMedia('(prefers-color-scheme: dark)').matches);
-          document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+          root.setAttribute('data-theme', dark ? 'dark' : 'light');
         } catch (_) {
-          document.documentElement.setAttribute('data-theme', 'light');
+          root.setAttribute('data-theme', 'light');
         }
+        var lang = 'en';
+        try {
+          var chosen = null;
+          if (!/^\/(chat|embed)\//.test(location.pathname)) {
+            try {
+              chosen = localStorage.getItem('omniai.lang');
+            } catch (_) {
+              chosen = null;
+            }
+          }
+          if (chosen === 'en' || chosen === 'ar') {
+            lang = chosen;
+          } else {
+            var wanted = navigator.languages || [navigator.language];
+            for (var i = 0; i < wanted.length; i++) {
+              var tag = String(wanted[i]).toLowerCase();
+              if (tag === 'ar' || tag.indexOf('ar-') === 0) {
+                lang = 'ar';
+                break;
+              }
+              if (tag === 'en' || tag.indexOf('en-') === 0) {
+                break;
+              }
+            }
+          }
+        } catch (_) {
+          lang = 'en';
+        }
+        root.setAttribute('lang', lang);
+        root.setAttribute('dir', lang === 'ar' ? 'rtl' : 'ltr');
       })();
     </script>
+    <!-- The boot status (in <body>) carries both languages; show the page's one. -->
+    <style>
+      html:not([lang='ar']) [data-boot-lang='ar'],
+      html[lang='ar'] [data-boot-lang='en'] {
+        display: none;
+      }
+    </style>
   </head>
   <body>
     <!--
@@ -70,6 +121,11 @@
 
       aria-live and role="status" so a screen reader is told something is
       happening rather than meeting silence.
+
+      The status is written in both languages, each marked with its own `lang`,
+      and the rule in <head> shows only the one that matches <html lang>. The
+      head script cannot reach the body (it does not exist yet) and nothing here
+      writes markup from script, so the choice is made by CSS alone.
     -->
     <app-root>
       <div
@@ -104,7 +160,8 @@
           aria-live="polite"
           style="margin: 0; color: var(--text-muted, #5f646d); font-size: 0.875rem"
         >
-          Loading OmniAI…
+          <span data-boot-lang="en" lang="en">Loading OmniAI…</span>
+          <span data-boot-lang="ar" lang="ar">جارٍ تحميل <bdi>OmniAI</bdi>…</span>
         </p>
       </div>
     </app-root>

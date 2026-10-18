@@ -1,4 +1,3 @@
-import { DecimalPipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
@@ -14,6 +13,8 @@ import {
 } from '@app/features/plan-usage/plan-usage-api';
 import { Icon } from '@app/shared/icon/icon';
 import { IconName } from '@app/shared/icon/icon-paths';
+import { LocalNumberPipe } from '@app/core/i18n/locale-pipes';
+import { LocaleFormat } from '@app/core/i18n/locale-format';
 import { PageHeader } from '@app/shared/page-header/page-header';
 
 /** Something the reader should look at, and where to go to do it. */
@@ -53,11 +54,13 @@ interface Shortcut {
 @Component({
   selector: 'app-overview',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, PageHeader, Icon, DecimalPipe],
+  imports: [RouterLink, PageHeader, Icon, LocalNumberPipe],
   templateUrl: './overview.html',
   styleUrl: './overview.scss',
 })
 export class Overview {
+  private readonly locale = inject(LocaleFormat);
+
   private readonly analytics = inject(AnalyticsApi);
   private readonly planUsage = inject(PlanUsageApi);
   private readonly billing = inject(BillingApi);
@@ -115,7 +118,7 @@ export class Overview {
       }
 
       const name = ENTITLEMENT_WORDS[entitlement.entitlement]?.label ?? entitlement.entitlement;
-      const used = `${entitlement.used.toLocaleString()} of ${(entitlement.limit ?? 0).toLocaleString()} used`;
+      const used = `${this.locale.number(entitlement.used)} of ${this.locale.number(entitlement.limit ?? 0)} used`;
 
       items.push({
         id: `limit-${entitlement.entitlement}`,
@@ -139,7 +142,7 @@ export class Overview {
       items.push({
         id: 'ai-failed',
         tone: 'warning',
-        title: `${failedReplies.toLocaleString()} AI ${failedReplies === 1 ? 'reply' : 'replies'} failed`,
+        title: `${this.locale.number(failedReplies)} AI ${failedReplies === 1 ? 'reply' : 'replies'} failed`,
         detail: 'In the last 7 days. The customer received no AI answer to those messages.',
         link: '/analytics',
         action: 'View analytics',
@@ -150,7 +153,7 @@ export class Overview {
       items.push({
         id: 'whatsapp-failed',
         tone: 'warning',
-        title: `${failedDeliveries.toLocaleString()} WhatsApp ${failedDeliveries === 1 ? 'message was' : 'messages were'} not delivered`,
+        title: `${this.locale.number(failedDeliveries)} WhatsApp ${failedDeliveries === 1 ? 'message was' : 'messages were'} not delivered`,
         detail: 'In the last 7 days.',
         link: '/analytics',
         action: 'View analytics',
@@ -161,7 +164,7 @@ export class Overview {
       items.push({
         id: 'notifications',
         tone: 'info',
-        title: `${unread.toLocaleString()} unread ${unread === 1 ? 'notification' : 'notifications'}`,
+        title: `${this.locale.number(unread)} unread ${unread === 1 ? 'notification' : 'notifications'}`,
         detail: 'Reports, usage, billing, knowledge and delivery alerts.',
         link: '/notifications',
         action: 'Open notifications',

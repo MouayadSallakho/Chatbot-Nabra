@@ -24,12 +24,12 @@ export const channelRoutes: Routes = [
     children: [
       {
         path: '',
-        title: 'Channels',
+        title: $localize`:@@title.channels:Channels`,
         loadComponent: () => import('./channels-page/channels-page').then((m) => m.ChannelsPage),
       },
       {
         path: 'website-chat',
-        title: 'Website chat',
+        title: $localize`:@@title.websiteChat:Website chat`,
         loadComponent: () =>
           import('./website-chat/website-chat-page/website-chat-page').then(
             (m) => m.WebsiteChatPage,
@@ -38,7 +38,7 @@ export const channelRoutes: Routes = [
       {
         // After the literal segment, so it cannot swallow it.
         path: 'website-chat/:webChatEndpointId',
-        title: 'Website chat link',
+        title: $localize`:@@title.websiteChatLink:Website chat link`,
         loadComponent: () =>
           import('./website-chat/website-chat-detail/website-chat-detail').then(
             (m) => m.WebsiteChatDetail,
@@ -46,14 +46,14 @@ export const channelRoutes: Routes = [
       },
       {
         path: 'whatsapp',
-        title: 'WhatsApp',
+        title: $localize`:@@title.whatsApp:WhatsApp`,
         loadComponent: () =>
           import('./whatsapp/whatsapp-page/whatsapp-page').then((m) => m.WhatsAppPage),
       },
       {
         // After the literal segment, so it cannot swallow it.
         path: 'whatsapp/:connectionId',
-        title: 'WhatsApp number',
+        title: $localize`:@@title.whatsAppNumber:WhatsApp number`,
         loadComponent: () =>
           import('./whatsapp/whatsapp-detail/whatsapp-detail').then((m) => m.WhatsAppDetail),
       },

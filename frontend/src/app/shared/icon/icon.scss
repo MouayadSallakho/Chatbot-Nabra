@@ -12,3 +12,10 @@
   inline-size: 1.25em;
   block-size: 1.25em;
 }
+
+// A directional glyph turns round in a right-to-left page. `--direction-flip`
+// is inherited from <html dir>, so this needs no `:host-context` and works in
+// every encapsulated parent.
+:host(.mirrors) .icon {
+  transform: scaleX(var(--direction-flip, 1));
+}

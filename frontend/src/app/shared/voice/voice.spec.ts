@@ -99,12 +99,7 @@ describe('VoiceChip', () => {
 describe('VoiceSplit', () => {
   @Component({
     imports: [VoiceSplit],
-    template: `<app-voice-split
-      [ai]="ai()"
-      [human]="human()"
-      noun="open conversations"
-      nounOne="open conversation"
-    />`,
+    template: `<app-voice-split [ai]="ai()" [human]="human()" subject="openConversations" />`,
   })
   class Host {
     readonly ai = signal(3);

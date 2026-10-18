@@ -1,7 +1,9 @@
-import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input, output } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { Icon } from '@app/shared/icon/icon';
 import { IconName } from '@app/shared/icon/icon-paths';
+import { APP_LANGUAGE, AppLanguage } from '@app/core/i18n/language';
+import { formatDate, formatRelative } from '@app/core/i18n/locale-format';
 import {
   AppNotification,
   NotificationSeverity,
@@ -38,15 +40,16 @@ import {
 
       <div class="notification-content">
         <p class="notification-heading">
-          <span class="visually-hidden"
-            >{{ severityWord() }}{{ unread() ? ', unread' : '' }}:
-          </span>
-          <span class="notification-title" [id]="titleId()">{{ notification().title }}</span>
+          <span class="visually-hidden">{{ severityLabel() }} </span>
+          <!-- Written by the server, in English today: isolated so it lays out in either page. -->
+          <span class="notification-title" dir="auto" [id]="titleId()">{{
+            notification().title
+          }}</span>
           @if (unread()) {
             <span class="notification-dot" aria-hidden="true"></span>
           }
         </p>
-        <p class="notification-body">{{ notification().body }}</p>
+        <p class="notification-body" dir="auto">{{ notification().body }}</p>
 
         <div class="notification-meta">
           <time
@@ -74,7 +77,8 @@ import {
               data-testid="mark-read"
             >
               <app-icon name="check" [strokeWidth]="2" />
-              Mark as read<span class="visually-hidden">: {{ notification().title }}</span>
+              <ng-container i18n="@@notifications.markRead">Mark as read</ng-container
+              ><span class="visually-hidden">: {{ notification().title }}</span>
             </button>
           }
         </div>
@@ -193,16 +197,35 @@ export class NotificationItem {
 
   protected readonly icon = computed<IconName>(() => severityIcon(this.notification().severity));
 
-  protected readonly severityWord = computed(() => this.notification().severity);
+  private readonly language = inject(APP_LANGUAGE);
+
+  /** "Warning, unread:" for a screen reader, ahead of the title. */
+  protected readonly severityLabel = computed(() => {
+    const word = severityWord(this.notification().severity);
+
+    return this.unread()
+      ? $localize`:@@notifications.severity.unread:${word}:severity:, unread:`
+      : $localize`:@@notifications.severity.read:${word}:severity::`;
+  });
 
   protected readonly absolute = computed(() =>
-    new Date(this.notification().createdAt).toLocaleString('en', {
-      dateStyle: 'medium',
-      timeStyle: 'short',
-    }),
+    formatDate(this.language, this.notification().createdAt, 'dateTime'),
   );
 
-  protected readonly relative = computed(() => relativeTime(this.notification().createdAt));
+  protected readonly relative = computed(() =>
+    relativeTime(this.notification().createdAt, Date.now(), this.language),
+  );
+}
+
+function severityWord(severity: NotificationSeverity): string {
+  switch (severity) {
+    case 'Critical':
+      return $localize`:@@notifications.severity.critical:Critical`;
+    case 'Warning':
+      return $localize`:@@notifications.severity.warning:Warning`;
+    default:
+      return $localize`:@@notifications.severity.information:Information`;
+  }
 }
 
 function severityIcon(severity: NotificationSeverity): IconName {
@@ -217,31 +240,34 @@ function severityIcon(severity: NotificationSeverity): IconName {
 }
 
 /** "just now", "5 minutes ago", "3 days ago" — and a date beyond a week. */
-export function relativeTime(iso: string, now: number = Date.now()): string {
+export function relativeTime(
+  iso: string,
+  now: number = Date.now(),
+  language: AppLanguage = 'en',
+): string {
   const seconds = Math.round((new Date(iso).getTime() - now) / 1000);
-  const format = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
 
   if (Math.abs(seconds) < 45) {
-    return 'just now';
+    return $localize`:@@time.justNow:just now`;
   }
 
   const minutes = Math.round(seconds / 60);
 
   if (Math.abs(minutes) < 60) {
-    return format.format(minutes, 'minute');
+    return formatRelative(language, minutes, 'minute');
   }
 
   const hours = Math.round(minutes / 60);
 
   if (Math.abs(hours) < 24) {
-    return format.format(hours, 'hour');
+    return formatRelative(language, hours, 'hour');
   }
 
   const days = Math.round(hours / 24);
 
   if (Math.abs(days) < 7) {
-    return format.format(days, 'day');
+    return formatRelative(language, days, 'day');
   }
 
-  return new Date(iso).toLocaleDateString('en', { dateStyle: 'medium' });
+  return formatDate(language, iso, 'date');
 }

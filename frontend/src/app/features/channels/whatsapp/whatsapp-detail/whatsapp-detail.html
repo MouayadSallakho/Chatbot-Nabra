@@ -1,6 +1,11 @@
 <div class="page">
   @if (!canView()) {
-    <app-page-header backLink="/channels/whatsapp" backLabel="WhatsApp" heading="WhatsApp number" />
+    <app-page-header
+      backLink="/channels/whatsapp"
+      backLabel="WhatsApp"
+      i18n-backLabel="@@back.whatsapp"
+      heading="WhatsApp number"
+    />
 
     <div class="page-section">
       <div class="card">
@@ -12,7 +17,12 @@
       </div>
     </div>
   } @else if (loading()) {
-    <app-page-header backLink="/channels/whatsapp" backLabel="WhatsApp" heading="WhatsApp number" />
+    <app-page-header
+      backLink="/channels/whatsapp"
+      backLabel="WhatsApp"
+      i18n-backLabel="@@back.whatsapp"
+      heading="WhatsApp number"
+    />
 
     <div class="page-section" aria-busy="true">
       <p class="visually-hidden" role="status">Loading this connection…</p>
@@ -22,7 +32,12 @@
       </div>
     </div>
   } @else if (failure(); as error) {
-    <app-page-header backLink="/channels/whatsapp" backLabel="WhatsApp" heading="WhatsApp number" />
+    <app-page-header
+      backLink="/channels/whatsapp"
+      backLabel="WhatsApp"
+      i18n-backLabel="@@back.whatsapp"
+      heading="WhatsApp number"
+    />
 
     <div class="page-section">
       <div class="card">
@@ -42,6 +57,7 @@
     <app-page-header
       backLink="/channels/whatsapp"
       backLabel="WhatsApp"
+      i18n-backLabel="@@back.whatsapp"
       [heading]="current.displayPhoneNumber || current.phoneNumberId"
       description="One WhatsApp number, one AI agent. Conversations on it appear in the shared inbox."
     >

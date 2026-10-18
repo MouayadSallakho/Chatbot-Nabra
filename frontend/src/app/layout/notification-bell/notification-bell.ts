@@ -57,7 +57,8 @@ export class NotificationBell {
   });
 
   protected readonly name = computed(
-    () => `Notifications, ${this.center.unreadLabel().toLowerCase()}`,
+    () =>
+      $localize`:@@notifications.bellName:Notifications, ${this.center.unreadLabel().toLowerCase()}:unread:`,
   );
 
   constructor() {

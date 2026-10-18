@@ -21,7 +21,7 @@ import { EmbedSessionStore } from './embed-session';
 export const embedRoutes: Routes = [
   {
     path: ':publicKey',
-    title: 'Chat',
+    title: $localize`:@@title.chat:Chat`,
     providers: [EmbedChatApi, EmbedSessionStore, EmbedBridge],
     loadComponent: () => import('./embed-chat/embed-chat').then((m) => m.EmbedChat),
   },

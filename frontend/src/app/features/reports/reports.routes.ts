@@ -15,12 +15,12 @@ export const reportsRoutes: Routes = [
     children: [
       {
         path: '',
-        title: 'Reports',
+        title: $localize`:@@title.reports:Reports`,
         loadComponent: () => import('./reports-page/reports-page').then((m) => m.ReportsPage),
       },
       {
         path: 'schedules',
-        title: 'Report schedules',
+        title: $localize`:@@title.reportSchedules:Report schedules`,
         loadComponent: () =>
           import('./report-schedules/report-schedules').then((m) => m.ReportSchedules),
       },

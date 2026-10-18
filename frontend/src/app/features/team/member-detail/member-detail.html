@@ -1,6 +1,11 @@
 <div class="page">
   @if (!canView()) {
-    <app-page-header backLink="/team" backLabel="Team" heading="Team member" />
+    <app-page-header
+      backLink="/team"
+      backLabel="Team"
+      i18n-backLabel="@@back.team"
+      heading="Team member"
+    />
 
     <div class="page-section">
       <div class="card">
@@ -12,7 +17,12 @@
       </div>
     </div>
   } @else if (loading()) {
-    <app-page-header backLink="/team" backLabel="Team" heading="Team member" />
+    <app-page-header
+      backLink="/team"
+      backLabel="Team"
+      i18n-backLabel="@@back.team"
+      heading="Team member"
+    />
 
     <div class="page-section" aria-busy="true">
       <p class="visually-hidden" role="status">Loading member…</p>
@@ -24,7 +34,12 @@
       </div>
     </div>
   } @else if (failure(); as error) {
-    <app-page-header backLink="/team" backLabel="Team" heading="Team member" />
+    <app-page-header
+      backLink="/team"
+      backLabel="Team"
+      i18n-backLabel="@@back.team"
+      heading="Team member"
+    />
 
     <div class="page-section">
       <div class="card">
@@ -42,6 +57,7 @@
     <app-page-header
       backLink="/team"
       backLabel="Team"
+      i18n-backLabel="@@back.team"
       [heading]="current.email"
       [description]="
         current.isOwner
@@ -78,11 +94,11 @@
       <div class="card member-facts">
         <div>
           <p class="text-label text-muted">Joined</p>
-          <p class="text-body">{{ current.joinedAt | date: 'MMM d, y, h:mm a' }}</p>
+          <p class="text-body">{{ current.joinedAt | localDate: 'dateTime' }}</p>
         </div>
         <div>
           <p class="text-label text-muted">Access last changed</p>
-          <p class="text-body">{{ current.accessUpdatedAt | date: 'MMM d, y, h:mm a' }}</p>
+          <p class="text-body">{{ current.accessUpdatedAt | localDate: 'dateTime' }}</p>
         </div>
       </div>
     </div>

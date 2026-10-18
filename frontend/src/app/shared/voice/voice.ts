@@ -1,6 +1,9 @@
 // Type-only, and the one place shared/ looks into a feature: the sender values
 // are the API's contract, and a copy here could drift from it silently.
 import type { MessageSender } from '@app/features/conversations/conversations-api';
+import type { AppLanguage } from '@app/core/i18n/language';
+import { formatNumber } from '@app/core/i18n/locale-format';
+import { pluralMessage } from '@app/core/i18n/plural';
 
 /**
  * The two voices of every conversation: the AI, and a person on the team.
@@ -13,7 +16,10 @@ import type { MessageSender } from '@app/features/conversations/conversations-ap
 export type Voice = 'ai' | 'human';
 
 /** The word each voice is always shown with, so colour is never the only signal. */
-export const VOICE_WORDS: Readonly<Record<Voice, string>> = { ai: 'AI', human: 'Person' };
+export const VOICE_WORDS: Readonly<Record<Voice, string>> = {
+  ai: $localize`:@@voice.ai:AI`,
+  human: $localize`:@@voice.person:Person`,
+};
 
 /**
  * Which voice wrote a message, or null when nobody on the business side did.
@@ -67,6 +73,15 @@ export function replyRuns(messages: readonly { readonly sender: MessageSender }[
 }
 
 /** "1 reply", "3 replies". */
-export function repliesPhrase(count: number): string {
-  return `${count} ${count === 1 ? 'reply' : 'replies'}`;
+export function repliesPhrase(count: number, language: AppLanguage = 'en'): string {
+  const n = formatNumber(language, count);
+
+  return pluralMessage(language, count, {
+    zero: $localize`:@@voice.replies.zero:${n}:count: replies`,
+    one: $localize`:@@voice.replies.one:${n}:count: reply`,
+    two: $localize`:@@voice.replies.two:${n}:count: replies`,
+    few: $localize`:@@voice.replies.few:${n}:count: replies`,
+    many: $localize`:@@voice.replies.many:${n}:count: replies`,
+    other: $localize`:@@voice.replies.other:${n}:count: replies`,
+  });
 }

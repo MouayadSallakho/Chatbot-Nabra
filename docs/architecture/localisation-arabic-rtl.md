@@ -326,6 +326,10 @@ export function bootstrap(lang: AppLanguage): Promise<ApplicationRef> {
 
 ### 3.5 The pre-paint `lang`/`dir` script and its CSP hash
 
+> **As built (36.3b): one script, not two.** The phase brief required extending the existing
+> theme script rather than adding a second; the language half below lives inside it, with its own
+> `try`/`catch`. See 11.1.
+
 A second inline script in `<head>`, after the theme script, with the same constraints as D10
 (synchronous, ES5, `try`/`catch`, coupled to the TS constants and asserted by a spec that reads
 `index.html`):
@@ -416,6 +420,10 @@ That is `npm run i18n:extract` in `frontend/package.json` (36.3b), with
 
 ### 3.9 The untranslated-ID check
 
+> **As built (36.3b):** the errors below run as a spec inside `npm run test:ci`
+> (`src/locale/i18n-catalogue.spec.ts`, file reads only); `npm run i18n:check` re-extracts, fails
+> on a stale `messages.json` and prints the warnings. See 11.4.
+
 `npm run i18n:check` runs a dependency-free Node script (`frontend/scripts/i18n-check.mjs`)
 that compares `messages.json` with `messages.ar.json`. Errors (exit 1):
 - an ID in the source and missing from Arabic, or an Arabic value that is empty;
@@ -437,6 +445,10 @@ It runs in the verification ladder of every phase from 36.3b on, next to
 script becomes a blocking step.
 
 ### 3.10 Plurals and counts
+
+> **As built (36.3b):** the shared pager owns the counted phrase per item kind
+> (`items="customers"`), chosen in TS with `pluralMessage` and six messages per kind; no template
+> ICU was needed yet. The Arabic table below is what ships. See 11.3.
 
 - Templates use ICU. A shared pager that shows no noun needs no plural
   (`21–40 of 57` and `21–40 من 57`). A list that names its noun passes its own message, because
@@ -467,6 +479,10 @@ script becomes a blocking step.
   `one`/`other` wording), so Arabic can translate each.
 
 ### 3.11 Unit tests in both languages
+
+> **As built (36.3b): no second test configuration.** The Arabic renders live in the normal run
+> (`core/i18n/arabic-render.spec.ts`), which loads the catalogue, resets the module registry, and
+> imports what it renders dynamically; it resets the registry again on the way out. See 11.5.
 
 - English: the 65 files and 801 tests keep their wording. The unit-test builder initialises "the
   application's polyfills and the Angular TestBed … before" any setup file (its schema), so adding
@@ -777,3 +793,88 @@ Punctuation in Arabic copy: ، ؛ ؟ and «» for quoted names.
 | 4 | **A member with no saved choice follows the browser's language** (first Arabic or English entry of `navigator.languages`, English as the fallback); an explicit choice always wins. Public surfaces always follow the visitor | 3.4, 3.5 |
 | 5 | **Charts mirror in Arabic**: time runs right to left, bars grow from inline-start, legends follow the inline order; digits stay Western | 4.4 |
 | 6 | **Voice chips**: AI is **الذكاء الاصطناعي**, Person is **الفريق** | section 6 |
+
+## 11. As built in Phase 36.3b (where it differs from, or proves, the plan)
+
+Status: **implemented** for the shell, the shared components and every shared string. Page bodies
+are translated in their own phases (rule 11 of the phase brief).
+
+### 11.1 Startup
+
+- `main.ts` loads `src/locale/messages.ar.json` and `@angular/common/locales/ar` only when
+  `<html lang="ar">`, then imports `app/bootstrap.ts`, which provides `APP_LANGUAGE` and
+  `LOCALE_ID`. `core/i18n/main-startup.spec.ts` fails on any static import from the app.
+- **One inline script** (the brief overrode 3.5): the theme script in `index.html` now also sets
+  `lang` and `dir`, in a second guarded half, so the edge still allows exactly one inline-script
+  hash. `theme-startup.spec.ts` reads the real `index.html`, asserts there is one inline script,
+  and runs it against fake browsers for every theme and language branch.
+- The boot status carries both languages; one inline `<style>` rule shows the matching one.
+- **JSON chunking proved:** the Arabic catalogue is emitted as its own content-hashed `.js` chunk
+  (3.6 spike). Measured cold start through the production edge, `/sign-in`, cache disabled:
+  English 171 kB of JavaScript transferred (34 files), Arabic 180 kB (36 files); the catalogue is
+  about 8 kB compressed, well under the 30 kB split threshold.
+- **Budget caveat:** because the application is imported dynamically, Angular's `initial` budget
+  now measures only `main` and the polyfills (274 kB raw against 454 kB before); the application
+  itself loads one step later as a lazy chunk. The startup set is unchanged in substance but is no
+  longer what the 500 kB budget guards. Budgets were not changed; adding a budget for the
+  startup chunk is a follow-up for the owner to decide.
+
+### 11.2 Formatting
+
+`core/i18n/locale-format.ts` (functions and the `LocaleFormat` service) and the pure pipes
+`localDate` / `localNumber` replaced every `DatePipe`, `DecimalPipe`, `Intl.*` and `toLocale*`
+call in the application (24 template pipe uses in 10 templates, and about 20 TS calls in 12 files). Named styles: `date`, `longDate`,
+`dateTime`, `dayMonth`, `dayMonthTime`, `monthYear`, `time`. English uses the plain `en` tag
+(it previously followed the browser's region on some screens); Arabic uses `ar` with
+`numberingSystem: 'latn'` and `calendar: 'gregory'`. Currency always comes from the data;
+`currencyExponent` replaces the browser lookup in billing.
+
+### 11.3 Plurals
+
+The shared pager takes `items="customers" | "conversations" | …` and owns six whole phrases per
+kind (`pager.<kind>.<category>`), picked with `pluralMessage`; the range is a `<bdi dir="ltr">`.
+The Arabic `zero`, `one` and `two` forms drop the numeral (عميل واحد، عميلَين), which the guard
+allows for those three categories only. The voice split bar takes `subject` instead of a free
+English noun. English zero is handled explicitly where a "none" sentence exists (English has no
+`zero` plural category).
+
+### 11.4 The guard
+
+- `src/locale/i18n-catalogue.spec.ts` (inside `npm run test:ci`): every `@@id` used in
+  `src/app` has non-empty Arabic; no stale Arabic IDs; every `i18n` attribute and `$localize` has
+  a custom ID; placeholders kept; six categories in any plural ICU; no markup added.
+- `npm run i18n:check` (`frontend/scripts/i18n-check.mjs`): re-extracts into
+  `node_modules/.cache/omniai-i18n`, fails on a stale `messages.json` or a missing translation,
+  and warns on English left behind, ASCII punctuation after Arabic, and checked glossary terms
+  (`src/locale/GLOSSARY.md`, with a Match column of stems).
+- `npm run i18n:extract` regenerates and formats `messages.json`. Format first, then extract:
+  Prettier's line breaks change the whitespace inside a message.
+
+### 11.5 Tests
+
+The unit-test runner shares one module graph across spec files, so the Arabic renders
+(`core/i18n/arabic-render.spec.ts`) call `vi.resetModules()` before and after, and import what
+they render dynamically; without the second reset, later English specs received modules
+evaluated in Arabic. No `test:ci:ar` configuration was needed. The suite ran out of memory in
+three workers on two runs while two dev servers and Chrome were open (V8 "Zone Allocation
+failed"); with one dev server stopped it passed twice in a row.
+
+### 11.6 RTL fixes the pass found
+
+- Component styles that wrote `[dir='rtl'] .x` never matched under emulated encapsulation (the
+  attribute selector is scoped too). The sidebar rail's clip and the page header's back arrow
+  were silently LTR in Arabic. The sidebar now uses `:host-context([dir='rtl'])`; icon mirroring
+  moved into `app-icon` (`MIRRORED_ICONS`, `scaleX(var(--direction-flip))`).
+- The toast's four-value physical padding became `padding-block` / `padding-inline`.
+- Identity lines in the account menu follow the page direction with the values isolated in
+  `<bdi>`, so they align with the menu instead of the left edge.
+
+### 11.7 Spikes from 3.13
+
+| Spike | Result |
+|---|---|
+| Dotted custom IDs (`@@nav.overview`) | Work; extracted verbatim |
+| JSON catalogue as a hashed chunk | Works (11.1) |
+| Nested ICU IDs | Not exercised: no template ICU was needed in this phase |
+| `$localize` in tests through the build polyfills | Works; the English suite needed no copy changes |
+| Duplicate custom IDs | Extraction warns when the same ID has different whitespace; give each wrapped use its own ID |

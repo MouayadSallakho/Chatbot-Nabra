@@ -20,13 +20,13 @@ export const conversationRoutes: Routes = [
     children: [
       {
         path: '',
-        title: 'Conversations',
+        title: $localize`:@@title.conversations:Conversations`,
         loadComponent: () =>
           import('./conversation-list/conversation-list').then((m) => m.ConversationList),
       },
       {
         path: ':conversationId',
-        title: 'Conversation',
+        title: $localize`:@@title.conversation:Conversation`,
         loadComponent: () =>
           import('./conversation-detail/conversation-detail').then((m) => m.ConversationDetail),
       },

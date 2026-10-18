@@ -108,7 +108,7 @@
                 <span class="data-row-meta">
                   <span class="data-cell-label">Indexed&nbsp;</span>
                   @if (document.indexedAt; as indexed) {
-                    <time [attr.datetime]="indexed">{{ indexed | date: 'MMM d, y, h:mm a' }}</time>
+                    <time [attr.datetime]="indexed">{{ indexed | localDate: 'dateTime' }}</time>
                   } @else {
                     <span>Never</span>
                   }
@@ -117,7 +117,7 @@
                 <span class="data-row-meta">
                   <span class="data-cell-label">Updated&nbsp;</span>
                   <time [attr.datetime]="document.updatedAt">{{
-                    document.updatedAt | date: 'MMM d, y, h:mm a'
+                    document.updatedAt | localDate: 'dateTime'
                   }}</time>
                 </span>
 
@@ -132,8 +132,7 @@
         [page]="currentPage()"
         [pageSize]="page()!.pageSize"
         [total]="page()!.totalCount"
-        noun="document"
-        label="Knowledge pages"
+        items="documents"
         [busy]="loading()"
         (pageChange)="goTo($event)"
       />

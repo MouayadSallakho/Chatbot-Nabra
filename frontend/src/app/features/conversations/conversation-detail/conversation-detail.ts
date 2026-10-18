@@ -1,4 +1,3 @@
-import { DatePipe } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -23,6 +22,7 @@ import { WorkspaceContextService } from '@app/core/workspace/workspace-context-s
 import { WhatsAppApi, WhatsAppConversationFacts } from '@app/features/channels/whatsapp-api';
 import { EmptyState } from '@app/shared/empty-state/empty-state';
 import { PageHeader } from '@app/shared/page-header/page-header';
+import { LocalDatePipe } from '@app/core/i18n/locale-pipes';
 import {
   ConversationDetail as Conversation,
   ConversationsApi,
@@ -60,7 +60,7 @@ const MAX_REPLY_LENGTH = 32_000;
 @Component({
   selector: 'app-conversation-detail',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DatePipe, ReactiveFormsModule, RouterLink, PageHeader, EmptyState],
+  imports: [ReactiveFormsModule, RouterLink, PageHeader, EmptyState, LocalDatePipe],
   templateUrl: './conversation-detail.html',
   styleUrl: './conversation-detail.scss',
 })

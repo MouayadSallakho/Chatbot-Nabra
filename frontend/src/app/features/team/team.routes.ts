@@ -22,12 +22,12 @@ export const teamRoutes: Routes = [
     children: [
       {
         path: '',
-        title: 'Team',
+        title: $localize`:@@title.team:Team`,
         loadComponent: () => import('./team-page/team-page').then((m) => m.TeamPage),
       },
       {
         path: 'invite',
-        title: 'Invite member',
+        title: $localize`:@@title.inviteMember:Invite member`,
         loadComponent: () => import('./invite-member/invite-member').then((m) => m.InviteMember),
       },
       {
@@ -35,7 +35,7 @@ export const teamRoutes: Routes = [
         // separating a literal segment from a parameter that would match it.
         path: ':userId',
         canDeactivate: [unsavedChangesGuard],
-        title: 'Team member',
+        title: $localize`:@@title.teamMember:Team member`,
         loadComponent: () => import('./member-detail/member-detail').then((m) => m.MemberDetail),
       },
     ],

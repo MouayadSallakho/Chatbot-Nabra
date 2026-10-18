@@ -9,6 +9,7 @@ import { PageHeader } from '@app/shared/page-header/page-header';
 import { Icon } from '@app/shared/icon/icon';
 import { Pagination } from '@app/shared/pagination/pagination';
 import { initialPage, pageRecorder } from '@app/shared/pagination/page-query';
+import { LocaleFormat } from '@app/core/i18n/locale-format';
 import { CustomerPage, CustomersApi } from '../customers-api';
 
 /**
@@ -36,6 +37,8 @@ import { CustomerPage, CustomersApi } from '../customers-api';
   styleUrl: './customer-list.scss',
 })
 export class CustomerList {
+  private readonly locale = inject(LocaleFormat);
+
   private readonly api = inject(CustomersApi);
   private readonly workspace = inject(WorkspaceContextService);
   private readonly permissions = inject(PermissionService);
@@ -100,10 +103,7 @@ export class CustomerList {
   }
 
   protected date(value: string): string {
-    return new Date(value).toLocaleString(undefined, {
-      dateStyle: 'medium',
-      timeStyle: 'short',
-    });
+    return this.locale.date(value, 'dateTime');
   }
 
   /** How to describe a count without a bare number beside a plural noun. */

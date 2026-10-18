@@ -84,34 +84,27 @@ export interface ApiError {
 
 /** Copy for the failures the server cannot usefully describe to a reader. */
 const MESSAGES: Readonly<Record<ApiErrorKind, string>> = {
-  validation: 'Some of the details were rejected. Check the highlighted fields and try again.',
-  unauthenticated: 'Your session has ended. Sign in again to continue.',
-  forbidden:
-    'You do not have permission to do this. Ask somebody who administers this ' +
-    'workspace if you need it.',
-  notFound: 'That item no longer exists in this workspace.',
-  conflict: 'That action is not available for this item right now.',
-  gone: 'This invitation is no longer available. Ask whoever invited you for a new one.',
-  stale:
-    'This item was updated somewhere else since you opened it. Review the latest version, ' +
-    'then save again.',
-  preconditionRequired:
-    'This page needs the latest version of the item before it can save. Reload it and try again.',
-  tooLarge: 'That file is too large for this platform to accept.',
-  unsupportedMedia: 'That file is not one of the formats this platform can read.',
-  unprocessable: 'No usable text could be read from that file.',
-  invalidResponse: 'The AI service returned an answer that could not be used. Try again.',
+  validation: $localize`:@@apiError.validation:Some of the details were rejected. Check the highlighted fields and try again.`,
+  unauthenticated: $localize`:@@apiError.unauthenticated:Your session has ended. Sign in again to continue.`,
+  forbidden: $localize`:@@apiError.forbidden:You do not have permission to do this. Ask somebody who administers this workspace if you need it.`,
+  notFound: $localize`:@@apiError.notFound:That item no longer exists in this workspace.`,
+  conflict: $localize`:@@apiError.conflict:That action is not available for this item right now.`,
+  gone: $localize`:@@apiError.gone:This invitation is no longer available. Ask whoever invited you for a new one.`,
+  stale: $localize`:@@apiError.stale:This item was updated somewhere else since you opened it. Review the latest version, then save again.`,
+  preconditionRequired: $localize`:@@apiError.preconditionRequired:This page needs the latest version of the item before it can save. Reload it and try again.`,
+  tooLarge: $localize`:@@apiError.tooLarge:That file is too large for this platform to accept.`,
+  unsupportedMedia: $localize`:@@apiError.unsupportedMedia:That file is not one of the formats this platform can read.`,
+  unprocessable: $localize`:@@apiError.unprocessable:No usable text could be read from that file.`,
+  invalidResponse: $localize`:@@apiError.invalidResponse:The AI service returned an answer that could not be used. Try again.`,
   // Deliberately not "preview": from Phase 17 this same status also answers a
   // knowledge index, and a sentence naming one capability is simply wrong on
   // the other screen. The hosted chat overrides it entirely, because none of
   // this is a customer's business.
-  providerUnavailable:
-    'This needs an AI provider, and none is configured on this deployment. Nothing was ' +
-    'sent and nothing was changed.',
-  providerTimeout: 'The AI service took too long to respond. Try again.',
-  rateLimited: 'Too many requests were made just now. Wait a moment and try again.',
-  offline: 'OmniAI could not be reached. Check your connection, then try again.',
-  unknown: 'Something went wrong. Try again, and contact an administrator if it continues.',
+  providerUnavailable: $localize`:@@apiError.providerUnavailable:This needs an AI provider, and none is configured on this deployment. Nothing was sent and nothing was changed.`,
+  providerTimeout: $localize`:@@apiError.providerTimeout:The AI service took too long to respond. Try again.`,
+  rateLimited: $localize`:@@apiError.rateLimited:Too many requests were made just now. Wait a moment and try again.`,
+  offline: $localize`:@@apiError.offline:OmniAI could not be reached. Check your connection, then try again.`,
+  unknown: $localize`:@@apiError.unknown:Something went wrong. Try again, and contact an administrator if it continues.`,
 };
 
 /**
@@ -189,13 +182,10 @@ export function toApiError(failure: unknown): ApiError {
 const AI_OPERATION = /\/(preview|index|search|messages)(\?|$)/;
 
 /** A 503 from anything that is not an AI operation. */
-const TEMPORARILY_UNAVAILABLE =
-  'This service is temporarily unavailable. Nothing was changed. Try again in a moment.';
+const TEMPORARILY_UNAVAILABLE = $localize`:@@apiError.temporarilyUnavailable:This service is temporarily unavailable. Nothing was changed. Try again in a moment.`;
 
 /** What a reader is told when the page's antiforgery token was out of date. */
-const ANTIFORGERY_MESSAGE =
-  "This page's security check had expired. Nothing was changed. The check has been renewed, " +
-  'so try again.';
+const ANTIFORGERY_MESSAGE = $localize`:@@apiError.antiforgery:This page's security check had expired. Nothing was changed. The check has been renewed, so try again.`;
 
 /**
  * The largest `Retry-After` this client will repeat to a reader.

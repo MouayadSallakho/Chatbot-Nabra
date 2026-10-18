@@ -14,7 +14,7 @@ export const planUsageRoutes: Routes = [
     children: [
       {
         path: '',
-        title: 'Plan & usage',
+        title: $localize`:@@title.planUsage:Plan & usage`,
         loadComponent: () =>
           import('./plan-usage-page/plan-usage-page').then((m) => m.PlanUsagePage),
       },

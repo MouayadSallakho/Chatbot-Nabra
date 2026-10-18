@@ -7,7 +7,9 @@ import {
   signal,
 } from '@angular/core';
 import { ThemeService } from '@app/core/theme/theme-service';
-import { THEME_PREFERENCES, ThemePreference } from '@app/core/theme/theme';
+import { THEME_LABELS, THEME_PREFERENCES, ThemePreference } from '@app/core/theme/theme';
+import { APP_LANGUAGE, directionOf } from '@app/core/i18n/language';
+import { LocalDatePipe } from '@app/core/i18n/locale-pipes';
 import { ConfirmDialog } from '@app/core/feedback/confirm-dialog';
 import { ToastHost } from '@app/core/feedback/toast-host';
 import { ToastService } from '@app/core/feedback/toast-service';
@@ -39,7 +41,7 @@ interface SampleMessage {
 
 const COLOUR_GROUPS: readonly TokenGroup[] = [
   {
-    title: 'Surfaces',
+    title: $localize`:@@lab.colour.surfaces:Surfaces`,
     tokens: [
       '--surface-page',
       '--surface-default',
@@ -50,13 +52,16 @@ const COLOUR_GROUPS: readonly TokenGroup[] = [
       '--surface-selected',
     ],
   },
-  { title: 'Text', tokens: ['--text-primary', '--text-secondary', '--text-muted'] },
   {
-    title: 'Borders',
+    title: $localize`:@@lab.colour.text:Text`,
+    tokens: ['--text-primary', '--text-secondary', '--text-muted'],
+  },
+  {
+    title: $localize`:@@lab.colour.borders:Borders`,
     tokens: ['--border-subtle', '--border-default', '--border-strong', '--border-control'],
   },
   {
-    title: 'Action (ink)',
+    title: $localize`:@@lab.colour.action:Action (ink)`,
     tokens: [
       '--action',
       '--action-hover',
@@ -68,11 +73,11 @@ const COLOUR_GROUPS: readonly TokenGroup[] = [
     ],
   },
   {
-    title: 'Voice: the AI (Lagoon)',
+    title: $localize`:@@lab.colour.voiceAi:Voice: the AI (Lagoon)`,
     tokens: ['--voice-ai-fg', '--voice-ai-strong', '--voice-ai-tint', '--voice-ai-border'],
   },
   {
-    title: 'Voice: a person (Ember)',
+    title: $localize`:@@lab.colour.voiceHuman:Voice: a person (Ember)`,
     tokens: [
       '--voice-human-fg',
       '--voice-human-strong',
@@ -81,7 +86,7 @@ const COLOUR_GROUPS: readonly TokenGroup[] = [
     ],
   },
   {
-    title: 'Status',
+    title: $localize`:@@lab.colour.status:Status`,
     tokens: [
       '--success-fg',
       '--success-bg',
@@ -95,7 +100,7 @@ const COLOUR_GROUPS: readonly TokenGroup[] = [
     ],
   },
   {
-    title: 'Charts',
+    title: $localize`:@@lab.colour.charts:Charts`,
     tokens: [
       '--chart-ai',
       '--chart-human',
@@ -135,31 +140,31 @@ const MOTION_TOKENS = [
 /** Type roles, each with a Latin and an Arabic sample. */
 const TYPE_ROLES = [
   {
-    role: 'Display',
+    role: $localize`:@@lab.type.display:Display`,
     className: 'text-display',
     latin: '1,284',
     arabic: '1,284',
   },
   {
-    role: 'Page title',
+    role: $localize`:@@lab.type.pageTitle:Page title`,
     className: 'text-page-title',
     latin: 'Conversations',
     arabic: 'المحادثات',
   },
   {
-    role: 'Section title',
+    role: $localize`:@@lab.type.sectionTitle:Section title`,
     className: 'text-section-title',
     latin: 'Who is answering now',
     arabic: 'من يرد الآن',
   },
   {
-    role: 'Card title',
+    role: $localize`:@@lab.type.cardTitle:Card title`,
     className: 'text-card-title',
     latin: 'Website assistant',
     arabic: 'مساعد الموقع',
   },
   {
-    role: 'Body',
+    role: $localize`:@@lab.type.body:Body`,
     className: 'text-body',
     latin:
       'The AI answers customers at once, and a person on the team takes the conversation over whenever it needs one.',
@@ -167,25 +172,25 @@ const TYPE_ROLES = [
       'يرد الذكاء الاصطناعي على العملاء فورًا، ويتولى أحد أفراد الفريق المحادثة متى احتاجت إلى إنسان.',
   },
   {
-    role: 'Reading',
+    role: $localize`:@@lab.type.reading:Reading`,
     className: 'text-reading',
     latin: 'Thanks for waiting. I have checked your order and it left our warehouse this morning.',
     arabic: 'شكرًا لانتظارك. راجعت طلبك، وقد غادر مستودعنا صباح اليوم.',
   },
   {
-    role: 'Small',
+    role: $localize`:@@lab.type.small:Small`,
     className: 'text-small',
     latin: 'Last activity 5 minutes ago',
     arabic: 'آخر نشاط قبل 5 دقائق',
   },
   {
-    role: 'Caption',
+    role: $localize`:@@lab.type.caption:Caption`,
     className: 'text-caption',
     latin: 'Sales assistant · WhatsApp',
     arabic: 'مساعد المبيعات · واتساب',
   },
   {
-    role: 'Numeric',
+    role: $localize`:@@lab.type.numeric:Numeric`,
     className: 'text-numeric',
     latin: '12,480 · 3,912 · 87',
     arabic: '12,480 · 3,912 · 87',
@@ -194,32 +199,42 @@ const TYPE_ROLES = [
 
 /** Invented for this page. Never shown outside the Design Lab. */
 const SAMPLE_TRANSCRIPT: readonly SampleMessage[] = [
-  { id: 1, sender: 'Customer', speaker: 'Customer', text: 'Hi, where is my order #4821?' },
+  {
+    id: 1,
+    sender: 'Customer',
+    speaker: $localize`:@@lab.transcript.customer:Customer`,
+    text: 'Hi, where is my order #4821?',
+  },
   {
     id: 2,
     sender: 'AiAgent',
-    speaker: 'AI',
+    speaker: $localize`:@@voice.ai:AI`,
     text: 'It left our warehouse this morning and should arrive tomorrow.',
   },
   {
     id: 3,
     sender: 'Customer',
-    speaker: 'Customer',
+    speaker: $localize`:@@lab.transcript.customer:Customer`,
     text: 'أريد تغيير عنوان التوصيل، من فضلك.',
   },
   {
     id: 4,
     sender: 'AiAgent',
-    speaker: 'AI',
+    speaker: $localize`:@@voice.ai:AI`,
     text: 'I cannot change an address myself. Let me bring in someone from the team.',
   },
   {
     id: 5,
     sender: 'HumanAgent',
-    speaker: 'Sara (team)',
+    speaker: $localize`:@@lab.transcript.sara:Sara (team)`,
     text: 'Hello, this is Sara. I have updated the address; the courier has it now.',
   },
-  { id: 6, sender: 'Customer', speaker: 'Customer', text: 'Perfect, thank you!' },
+  {
+    id: 6,
+    sender: 'Customer',
+    speaker: $localize`:@@lab.transcript.customer:Customer`,
+    text: 'Perfect, thank you!',
+  },
 ];
 
 /** A transcript line with what the template draws for it, worked out once. */
@@ -274,6 +289,7 @@ const SAMPLE_ROWS: readonly SampleRow[] = SAMPLE_TRANSCRIPT.map((message, index)
     ConfirmDialog,
     EmptyState,
     Icon,
+    LocalDatePipe,
     Menu,
     Pagination,
     ToastHost,
@@ -300,7 +316,13 @@ export class DesignLab {
   protected readonly iconNames = Object.keys(ICON_PATHS) as IconName[];
 
   /** The direction the lab is shown in, applied to the lab's own root only. */
-  protected readonly direction = signal<'ltr' | 'rtl'>('ltr');
+  protected readonly themeLabels = THEME_LABELS;
+
+  /** The preview's reading direction; starts as the page's own. */
+  protected readonly direction = signal<'ltr' | 'rtl'>(directionOf(inject(APP_LANGUAGE)));
+
+  /** Two sample days for the sample table, formatted like every real date. */
+  protected readonly sampleDays = ['2026-10-16T12:00:00Z', '2026-10-17T12:00:00Z'] as const;
 
   /** The voice of the "Take over" demonstration chip. */
   protected readonly demoVoice = signal<Voice>('ai');
@@ -343,10 +365,12 @@ export class DesignLab {
   }
 
   protected toastSuccess(): void {
-    this.toasts.success('Sample: settings saved.');
+    this.toasts.success($localize`:@@lab.toast.success:Sample: settings saved.`);
   }
 
   protected toastError(): void {
-    this.toasts.error('Sample: the change could not be saved. Nothing was lost; try again.');
+    this.toasts.error(
+      $localize`:@@lab.toast.error:Sample: the change could not be saved. Nothing was lost; try again.`,
+    );
   }
 }
