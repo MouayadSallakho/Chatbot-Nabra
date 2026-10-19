@@ -6,6 +6,8 @@ import { ApiError, toApiError } from '@app/core/api/api-error';
 import { ToastService } from '@app/core/feedback/toast-service';
 import { PermissionService } from '@app/core/authorization/permission-service';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
+import { LocalNumberPipe } from '@app/core/i18n/locale-pipes';
+import { EmptyState } from '@app/shared/empty-state/empty-state';
 import { Icon } from '@app/shared/icon/icon';
 import { PageHeader } from '@app/shared/page-header/page-header';
 import { CREATED_DOCUMENT_STATE, KNOWLEDGE_LIMITS } from '../knowledge-limits';
@@ -26,7 +28,7 @@ import { KnowledgeApi } from '../knowledge-api';
 @Component({
   selector: 'app-knowledge-create',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, RouterLink, PageHeader, Icon],
+  imports: [ReactiveFormsModule, RouterLink, PageHeader, EmptyState, Icon, LocalNumberPipe],
   templateUrl: './knowledge-create.html',
   styleUrl: './knowledge-create.scss',
 })
@@ -82,6 +84,13 @@ export class KnowledgeCreate {
     return control.invalid && (control.touched || this.submitAttempted());
   }
 
+  /** Takes the reader to the first field that needs attention. */
+  private focusFirstInvalid(): void {
+    const id = this.form.controls.title.invalid ? 'knowledge-title' : 'knowledge-content';
+
+    globalThis.document?.getElementById(id)?.focus();
+  }
+
   protected async create(): Promise<void> {
     this.submitAttempted.set(true);
 
@@ -89,6 +98,7 @@ export class KnowledgeCreate {
     // response writes a second document.
     if (this.form.invalid || this.submitting()) {
       this.form.markAllAsTouched();
+      this.focusFirstInvalid();
 
       return;
     }
@@ -110,7 +120,9 @@ export class KnowledgeCreate {
         }),
       );
 
-      this.toasts.success(`${created.value.title} saved. It still needs indexing.`);
+      this.toasts.success(
+        $localize`:@@knowledge.toast.savedNeedsIndex:“${created.value.title}:title:” saved. It still needs an index.`,
+      );
 
       // Handed to the editor through navigation state so it can open on
       // canonical server state without a second request. If the handoff is ever

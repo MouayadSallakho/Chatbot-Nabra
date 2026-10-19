@@ -2,6 +2,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   OnInit,
+  ElementRef,
   computed,
   inject,
   input,
@@ -31,9 +32,24 @@ import {
   KNOWLEDGE_LIMITS,
   UPLOADED_DOCUMENT_STATE,
 } from '../knowledge-limits';
-import { KnowledgeApi, KnowledgeDocument, KnowledgeFileType } from '../knowledge-api';
-import { LocalDatePipe } from '@app/core/i18n/locale-pipes';
-import { describeBytes } from '../knowledge-upload/knowledge-upload';
+import { KnowledgeApi, KnowledgeDocument } from '../knowledge-api';
+import { LocalDatePipe, LocalNumberPipe } from '@app/core/i18n/locale-pipes';
+import { LocaleFormat } from '@app/core/i18n/locale-format';
+import {
+  claimedFileType,
+  fileRefusal,
+  fileSize,
+  maxSizeLabel,
+  uploadFailure,
+} from '../knowledge-file';
+import {
+  KnowledgeDisplayState,
+  acceptedFormats,
+  characterCount,
+  knowledgeStateTone,
+  knowledgeStateWord,
+  knowledgeTypeWord,
+} from '../knowledge-words';
 
 /** Which action ran into a version that is no longer current. */
 type ConflictSource = 'content' | 'index' | 'availability' | 'source';
@@ -66,6 +82,12 @@ type ConflictSource = 'content' | 'index' | 'availability' | 'source';
  * reporting it afterwards. Replacing is offered only where there is a source to
  * replace: a written document is edited by typing, and uploading over one would
  * silently discard what somebody wrote.
+ *
+ * <strong>Layout (Phase 36.8)</strong>: the document on the main side; its
+ * state, indexing, availability and source file beside it from 80rem. The
+ * state is the API's (`Indexed`, `Needs index`, `Disabled`); "Indexing failed"
+ * is shown only after an index request that really failed here, because the
+ * API keeps no failed state on a document.
  */
 @Component({
   selector: 'app-knowledge-editor',
@@ -78,6 +100,7 @@ type ConflictSource = 'content' | 'index' | 'availability' | 'source';
     Icon,
     ConfirmDialog,
     LocalDatePipe,
+    LocalNumberPipe,
   ],
   templateUrl: './knowledge-editor.html',
   styleUrl: './knowledge-editor.scss',
@@ -90,6 +113,15 @@ export class KnowledgeEditor implements OnInit, HasUnsavedChanges {
   private readonly permissions = inject(PermissionService);
   private readonly toasts = inject(ToastService);
   private readonly router = inject(Router);
+  private readonly format = inject(LocaleFormat);
+
+  private readonly replaceInput = viewChild<ElementRef<HTMLInputElement>>('replaceInput');
+
+  protected readonly stateWord = knowledgeStateWord;
+  protected readonly stateTone = knowledgeStateTone;
+  protected readonly typeWord = knowledgeTypeWord;
+  protected readonly formats = acceptedFormats();
+  protected readonly maxSize = maxSizeLabel(this.format.language);
 
   /** Bound from the route through `withComponentInputBinding`. */
   readonly knowledgeDocumentId = input.required<string>();
@@ -128,6 +160,9 @@ export class KnowledgeEditor implements OnInit, HasUnsavedChanges {
 
   /** A reason the chosen replacement was refused before it was ever sent. */
   protected readonly replacementRefusal = signal<string | null>(null);
+
+  /** An index request failed while the reader was here (not a refusal before sending). */
+  protected readonly indexFailedNow = signal(false);
 
   /** What the last index attempt actually did, for an honest report. */
   protected readonly lastIndex = signal<{ chunks: number; calls: number; current: boolean } | null>(
@@ -195,11 +230,52 @@ export class KnowledgeEditor implements OnInit, HasUnsavedChanges {
   /** Where this text came from, or null when somebody typed it. */
   protected readonly source = computed(() => this.document()?.source ?? null);
 
-  /** The source file size, in the words a person uses for it. */
+  /** The source file size, in the reader's words. */
   protected readonly sourceSize = computed(() => {
     const source = this.source();
 
-    return source ? describeBytes(source.byteLength) : '';
+    return source ? fileSize(source.byteLength, this.format.language) : '';
+  });
+
+  /** The state the page shows: the API's, or "Failed" right after a failed index here. */
+  protected readonly displayState = computed<KnowledgeDisplayState | null>(() => {
+    const doc = this.document();
+
+    if (!doc) {
+      return null;
+    }
+
+    return this.indexFailedNow() && doc.readiness === 'NeedsIndex' ? 'Failed' : doc.readiness;
+  });
+
+  /** How much text the saved document holds. */
+  protected readonly savedSize = computed(() => {
+    const length = this.document()?.content.length ?? 0;
+
+    return characterCount(this.format.language, length, this.format.number(length));
+  });
+
+  /** The replacement's claimed format and size, for its card. */
+  protected readonly replacementFacts = computed(() => {
+    const file = this.replacement();
+
+    if (!file) {
+      return null;
+    }
+
+    const type = claimedFileType(file.name);
+
+    return {
+      type: type ? knowledgeTypeWord(type) : null,
+      size: fileSize(file.size, this.format.language),
+    };
+  });
+
+  /** A failed replacement, in the reader's language. */
+  protected readonly replaceFailureMessage = computed(() => {
+    const error = this.replaceFailure();
+
+    return error ? uploadFailure(error, this.format.language) : null;
   });
 
   /** Whether pressing Replace would do anything. */
@@ -297,9 +373,10 @@ export class KnowledgeEditor implements OnInit, HasUnsavedChanges {
 
       this.toasts.success(
         previous !== this.document()?.content
-          ? 'Saved. The content changed, so this document needs indexing again.'
-          : 'Saved.',
+          ? $localize`:@@knowledge.toast.savedReindex:Saved. The content changed, so this document needs an index again.`
+          : $localize`:@@knowledge.toast.saved:Saved.`,
       );
+      this.indexFailedNow.set(false);
     } catch (error) {
       this.handleFailure(error, 'content');
     } finally {
@@ -336,7 +413,7 @@ export class KnowledgeEditor implements OnInit, HasUnsavedChanges {
       this.indexFailure.set({
         kind: 'validation',
         status: 0,
-        message: 'Save your changes first — indexing works from the saved version.',
+        message: $localize`:@@knowledge.index.saveFirst:Save your changes first: indexing works from the saved version.`,
       });
 
       return;
@@ -344,6 +421,7 @@ export class KnowledgeEditor implements OnInit, HasUnsavedChanges {
 
     this.indexing.set(true);
     this.indexFailure.set(null);
+    this.indexFailedNow.set(false);
     this.conflict.set(null);
     this.lastIndex.set(null);
 
@@ -364,11 +442,15 @@ export class KnowledgeEditor implements OnInit, HasUnsavedChanges {
 
       this.toasts.success(
         result.value.alreadyCurrent
-          ? 'Already up to date. Nothing was sent to the AI provider.'
-          : `Indexed into ${result.value.chunkCount} pieces.`,
+          ? $localize`:@@knowledge.toast.alreadyIndexed:Already up to date. Nothing was sent to the AI provider.`
+          : $localize`:@@knowledge.toast.indexed:Indexed. Agents that use this document can answer from it.`,
       );
     } catch (error) {
       this.handleFailure(error, 'index');
+
+      if (this.conflict() === null) {
+        this.indexFailedNow.set(true);
+      }
     } finally {
       this.indexing.set(false);
     }
@@ -404,8 +486,8 @@ export class KnowledgeEditor implements OnInit, HasUnsavedChanges {
 
       this.toasts.success(
         enabled
-          ? 'Back in use. Agents assigned this document can draw on it again.'
-          : 'Taken out of use. No agent will draw on it until you switch it back on.',
+          ? $localize`:@@knowledge.toast.enabled:Back in use. Agents it is selected for can answer from it again.`
+          : $localize`:@@knowledge.toast.disabled:Taken out of use. No agent answers from it until you put it back.`,
       );
     } catch (error) {
       this.handleFailure(error, 'availability');
@@ -415,20 +497,6 @@ export class KnowledgeEditor implements OnInit, HasUnsavedChanges {
   }
 
   // ------------------------------------------------------------------- source
-
-  /** The words a reader sees for each format. */
-  protected formatName(fileType: KnowledgeFileType): string {
-    switch (fileType) {
-      case 'Pdf':
-        return 'PDF';
-      case 'Docx':
-        return 'Word document';
-      case 'Text':
-        return 'Text file';
-      default:
-        return 'CSV';
-    }
-  }
 
   /**
    * Takes the replacement file, and says straight away if it is hopeless.
@@ -444,21 +512,26 @@ export class KnowledgeEditor implements OnInit, HasUnsavedChanges {
     this.replacementRefusal.set(null);
     this.replacement.set(file);
 
-    if (!file) {
-      return;
+    if (file) {
+      this.replacementRefusal.set(fileRefusal(file, this.format.language));
     }
+  }
 
-    if (file.size === 0) {
-      this.replacementRefusal.set('That file is empty. Choose a file with something in it.');
+  /** Opens the picker for a replacement file: a real button, so keyboards reach it. */
+  protected chooseReplacementFile(): void {
+    this.replaceInput()?.nativeElement.click();
+  }
 
-      return;
-    }
+  /** Forgets the chosen replacement. */
+  protected clearReplacement(): void {
+    this.replacement.set(null);
+    this.replacementRefusal.set(null);
+    this.replaceFailure.set(null);
 
-    if (file.size > KNOWLEDGE_FILE_LIMITS.maxBytes) {
-      this.replacementRefusal.set(
-        `That file is ${describeBytes(file.size)}, and uploads must be ` +
-          `${KNOWLEDGE_FILE_LIMITS.maxMegabytes} MB or smaller.`,
-      );
+    const input = this.replaceInput()?.nativeElement;
+
+    if (input) {
+      input.value = '';
     }
   }
 
@@ -480,8 +553,7 @@ export class KnowledgeEditor implements OnInit, HasUnsavedChanges {
       this.replaceFailure.set({
         kind: 'validation',
         status: 0,
-        message:
-          'Save or discard your changes first — replacing the file replaces the whole document.',
+        message: $localize`:@@knowledge.replace.saveFirst:Save or discard your changes first: replacing the file replaces the whole document.`,
       });
 
       return;
@@ -506,13 +578,14 @@ export class KnowledgeEditor implements OnInit, HasUnsavedChanges {
         ),
       );
 
-      this.replacement.set(null);
+      this.clearReplacement();
 
       this.toasts.success(
         previous !== this.document()?.content
-          ? 'File replaced. The text changed, so this document needs indexing again.'
-          : 'That file produced exactly the same text, so nothing changed.',
+          ? $localize`:@@knowledge.toast.replaced:File replaced. The text changed, so this document needs an index again.`
+          : $localize`:@@knowledge.toast.replacedSame:That file gave exactly the same text, so nothing changed.`,
       );
+      this.indexFailedNow.set(false);
     } catch (error) {
       this.handleFailure(error, 'source');
     } finally {

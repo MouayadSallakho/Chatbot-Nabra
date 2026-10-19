@@ -1,43 +1,23 @@
-// A single-column form, capped narrower than a full page: a text field that runs
-// the width of a 1600px layout is measurably harder to read back.
-//
-// The content field is taller than the agent editor's instructions field, and
-// deliberately so -- a knowledge document is prose somebody writes and rereads,
-// not a short set of directives.
-.page-narrow {
-  max-inline-size: 46rem;
+// The form and its help column share the authoring frame (`_authoring.scss`);
+// this page needs a narrower aside.
+@media (min-width: 64rem) {
+  .knowledge-create-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(16rem, 22rem);
+  }
 }
 
-.create-form .card-body {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-6);
-}
-
-.content-input {
+.knowledge-content {
   min-block-size: 22rem;
-  font: var(--text-body);
-  line-height: 1.6;
 }
 
-.counter {
-  display: block;
-  margin-block-start: var(--space-1);
-}
+.knowledge-help {
+  font: var(--text-small);
 
-// Approaching the limit is worth noticing before the field stops accepting
-// input. The number itself carries the message, so this only reinforces it.
-.counter-low {
-  color: var(--warning-fg);
-  font-weight: 500;
-}
+  ul {
+    margin-block-end: var(--space-4);
+  }
 
-.create-actions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: var(--space-2);
-  padding: var(--space-4) var(--space-5);
-  border-block-start: 1px solid var(--border-subtle);
-  background-color: var(--surface-inset);
+  p {
+    margin: 0;
+  }
 }

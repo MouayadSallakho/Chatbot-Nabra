@@ -8,6 +8,8 @@ import { WorkspaceContextService } from '@app/core/workspace/workspace-context-s
 import { memoryStorage, permissionApiGranting } from '@app/testing/test-doubles';
 import { PermissionApi } from '@app/core/authorization/permission-api';
 import { KnowledgeApi } from '@app/features/knowledge/knowledge-api';
+import type { WebChatWidget } from '@app/features/channels/website-chat-api';
+import { AgentChannelMap, AgentChannels } from '../agent-channels';
 import { AiAgent, AiAgentApi } from '../ai-agent-api';
 import { AgentEditor } from './agent-editor';
 
@@ -38,6 +40,26 @@ describe('AgentEditor', () => {
   let fixture: ComponentFixture<AgentEditor>;
   let http: HttpTestingController;
 
+  /**
+   * What the stand-in for `AgentChannels` answers: which channels use this
+   * agent and the website widget's look. Through DI, never a module mock.
+   */
+  let channelMap: AgentChannelMap;
+  let widget: WebChatWidget | null;
+
+  const channelsDouble = {
+    provide: AgentChannels,
+    useValue: {
+      load: () => Promise.resolve(channelMap),
+      widgetFor: () => Promise.resolve(widget),
+    },
+  };
+
+  beforeEach(() => {
+    channelMap = { byAgent: new Map(), visible: true, incomplete: false };
+    widget = null;
+  });
+
   /** Mounts the editor and answers its initial read with `agent` at `etag`. */
   async function mount(agent: AiAgent = draft, etag = '"v1"'): Promise<void> {
     TestBed.configureTestingModule({
@@ -51,6 +73,7 @@ describe('AgentEditor', () => {
         provideHttpClient(),
         provideHttpClientTesting(),
         AiAgentApi,
+        channelsDouble,
         // The editor hosts the knowledge section from Phase 17, which reads what
         // this agent may draw on. A real client over the testing backend, not a
         // double: the point of these tests is the editor as it actually renders.
@@ -140,8 +163,8 @@ describe('AgentEditor', () => {
    * lifecycle actions the card actually offers.
    */
   function lifecycleButton(text: string): HTMLButtonElement | undefined {
-    return [...host().querySelectorAll<HTMLButtonElement>('.lifecycle button')].find((button) =>
-      button.textContent?.includes(text),
+    return [...host().querySelectorAll<HTMLButtonElement>('.behaviour-actions button')].find(
+      (button) => button.textContent?.includes(text),
     );
   }
 
@@ -170,6 +193,7 @@ describe('AgentEditor', () => {
           provideHttpClient(),
           provideHttpClientTesting(),
           AiAgentApi,
+          channelsDouble,
           { provide: LOCAL_STORAGE, useValue: memoryStorage() },
           { provide: TenantApi, useValue: { get: () => undefined, create: () => undefined } },
         ],
@@ -192,6 +216,120 @@ describe('AgentEditor', () => {
 
       expect(host().textContent).toContain('Could not load this agent');
       expect(query('#agent-name')).toBeNull();
+      // Still exactly one page heading, so focus and the page title have a home.
+      expect(host().querySelectorAll('h1')).toHaveLength(1);
+    });
+  });
+
+  it('asks nothing of the server for somebody who may not see agents', async () => {
+    TestBed.configureTestingModule({
+      imports: [AgentEditor],
+      providers: [
+        { provide: PermissionApi, useValue: permissionApiGranting('knowledge.view') },
+        provideRouter([]),
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        AiAgentApi,
+        channelsDouble,
+        KnowledgeApi,
+        { provide: LOCAL_STORAGE, useValue: memoryStorage() },
+        { provide: TenantApi, useValue: { get: () => undefined, create: () => undefined } },
+      ],
+    });
+
+    await TestBed.inject(WorkspaceContextService).adopt({
+      id: tenantId,
+      name: 'Acme',
+      slug: 'acme',
+      status: 'Active',
+    });
+    http = TestBed.inject(HttpTestingController);
+
+    fixture = TestBed.createComponent(AgentEditor);
+    fixture.componentRef.setInput('aiAgentId', agentId);
+    await settle();
+
+    http.expectNone(agentUrl);
+    expect(query('[data-testid="agent-denied"]')).not.toBeNull();
+    expect(host().querySelectorAll('h1')).toHaveLength(1);
+  });
+
+  describe('the sections and the customer view', () => {
+    it('lays the form out in four numbered sections, in order', async () => {
+      await mount();
+
+      const headings = [...host().querySelectorAll('.authoring-main .form-section-title')].map(
+        (heading) => heading.textContent?.trim(),
+      );
+
+      expect(headings).toEqual(['Identity', 'Instructions', 'Behaviour', 'Knowledge']);
+    });
+
+    it("keeps instructions in the writer's direction", async () => {
+      await mount();
+
+      expect(instructionsBox().getAttribute('dir')).toBe('auto');
+      expect(nameBox().getAttribute('dir')).toBe('auto');
+    });
+
+    it('says where the agent answers, linking each channel', async () => {
+      channelMap = {
+        byAgent: new Map([
+          [
+            agentId,
+            [
+              {
+                channel: 'WebChat',
+                id: 'w1',
+                status: 'Active',
+                link: ['/channels/website-chat', 'w1'],
+              },
+            ],
+          ],
+        ]),
+        visible: true,
+        incomplete: false,
+      };
+      await mount();
+
+      const link = query<HTMLAnchorElement>('[data-testid="agent-channels"] a');
+
+      expect(link?.textContent).toContain('Website chat');
+      expect(link?.getAttribute('href')).toBe('/channels/website-chat/w1');
+    });
+
+    it("draws the preview in the website widget's real accent and greeting", async () => {
+      widget = {
+        greeting: 'Hello from Acme.',
+        accentColor: '#0e7c72',
+        launcherPosition: 'Right',
+        theme: 'System',
+      };
+      await mount();
+
+      const frame = query<HTMLElement>('.customer-view')!;
+
+      expect(frame.style.getPropertyValue('--cv-accent')).toBe('#0e7c72');
+      expect(query('[data-testid="preview-greeting"]')?.textContent).toContain('Hello from Acme.');
+      expect(query('[data-testid="preview-look"]')?.textContent).toContain("website chat's colour");
+      expect(query('.cv-title')?.textContent).toContain('Sales Assistant');
+    });
+
+    it('says it shows the default look when no website chat uses the agent', async () => {
+      await mount();
+
+      expect(query('[data-testid="preview-look"]')?.textContent).toContain('default colour');
+      expect(query('[data-testid="preview-greeting"]')).toBeNull();
+    });
+
+    it('tells the preview about any unsaved edit, name or instructions', async () => {
+      await mount();
+
+      expect(query('[data-testid="preview-unsaved"]')).toBeNull();
+
+      await type(nameBox(), 'Sales Assistant 2');
+
+      expect(query('[data-testid="preview-unsaved"]')).not.toBeNull();
     });
   });
 
@@ -308,7 +446,8 @@ describe('AgentEditor', () => {
       activate.flush({ ...draft, status: 'Active' }, { headers: { ETag: '"v2"' } });
       await settle();
 
-      expect(host().textContent).toContain('Active');
+      expect(query('[data-testid="agent-status"]')?.textContent?.trim()).toBe('Active');
+      expect(query('.lifecycle-step[aria-current="step"]')?.textContent?.trim()).toBe('Active');
       expect(lifecycleButton('Disable agent')).toBeDefined();
     });
 
@@ -350,7 +489,7 @@ describe('AgentEditor', () => {
       disable.flush({ ...draft, status: 'Disabled' }, { headers: { ETag: '"v2"' } });
       await settle();
 
-      expect(host().textContent).toContain('Disabled');
+      expect(query('[data-testid="agent-status"]')?.textContent?.trim()).toBe('Disabled');
     });
 
     it('explains a lifecycle refusal as a state problem, not a stale version', async () => {

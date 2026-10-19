@@ -1,4 +1,12 @@
 // Column template for the shared data list; everything else is the primitive's.
 .knowledge-list {
-  --data-list-columns: minmax(0, 2fr) 8rem 6rem minmax(0, 1fr) minmax(0, 1fr) 1.5rem;
+  --data-list-columns: minmax(0, 2.4fr) minmax(6.5rem, 0.8fr) minmax(7.5rem, 0.8fr)
+    minmax(8.5rem, 1fr) minmax(0, 1fr) 1.5rem;
+}
+
+.knowledge-state {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px; // token-lint-ignore: badge and its date read as one fact
 }

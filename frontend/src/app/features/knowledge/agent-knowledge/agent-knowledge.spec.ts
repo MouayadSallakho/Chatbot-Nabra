@@ -42,11 +42,12 @@ describe('AgentKnowledgeSection', () => {
   async function mount(
     documents: readonly AgentKnowledgeOption[] = [readyDocument, unindexed],
     etag: string | null = '"agent-v1"',
+    permissions: readonly string[] = ['*'],
   ): Promise<void> {
     TestBed.configureTestingModule({
       imports: [AgentKnowledgeSection],
       providers: [
-        { provide: PermissionApi, useValue: permissionApiGranting('*') },
+        { provide: PermissionApi, useValue: permissionApiGranting(...permissions) },
         provideRouter([]),
         provideHttpClient(),
         provideHttpClientTesting(),
@@ -88,16 +89,19 @@ describe('AgentKnowledgeSection', () => {
   const query = <T extends HTMLElement>(selector: string): T | null =>
     host().querySelector<T>(selector);
 
-  const checkboxes = (): HTMLInputElement[] => [
-    ...host().querySelectorAll<HTMLInputElement>('.knowledge-option input'),
-  ];
+  /** The titles in one of the two lists, in order. */
+  const titles = (list: 'selected' | 'available'): string[] =>
+    [...host().querySelectorAll(`[data-testid="assignment-${list}"] .chooser-title`)].map(
+      (title) => title.textContent?.trim() ?? '',
+    );
 
-  async function tick(index: number): Promise<void> {
-    const box = checkboxes()[index];
+  /** The Add or Remove button for one document. */
+  const moveButton = (option: AgentKnowledgeOption): HTMLButtonElement | null =>
+    query<HTMLButtonElement>(`[data-move="${option.knowledgeDocumentId}"]`);
 
-    box.checked = !box.checked;
-    box.dispatchEvent(new Event('change'));
-
+  /** Moves a document to the other list, the way a reader would. */
+  async function move(option: AgentKnowledgeOption): Promise<void> {
+    moveButton(option)!.click();
     await settle();
   }
 
@@ -111,8 +115,9 @@ describe('AgentKnowledgeSection', () => {
       // Knowledge is not shared automatically. An agent begins with nothing.
       await mount();
 
-      expect(checkboxes()).toHaveLength(2);
-      expect(checkboxes().every((box) => !box.checked)).toBe(true);
+      expect(titles('available')).toEqual(['Returns policy', 'Delivery times']);
+      expect(titles('selected')).toEqual([]);
+      expect(host().textContent).toContain('Nothing selected');
     });
 
     it('shows each document real state, never a flattering one', async () => {
@@ -120,7 +125,7 @@ describe('AgentKnowledgeSection', () => {
       // their agent knows something it does not.
       await mount();
 
-      expect(host().textContent).toContain('Ready');
+      expect(host().textContent).toContain('Indexed');
       expect(host().textContent).toContain('Needs index');
     });
 
@@ -130,9 +135,11 @@ describe('AgentKnowledgeSection', () => {
         { ...unindexed, isAssigned: true },
       ]);
 
-      expect(query('[data-testid="assignment-summary"]')?.textContent).toContain('2 assigned');
-      expect(query('[data-testid="assignment-summary"]')?.textContent).toContain('1 ready');
-      expect(host().textContent).toContain('will not be used yet');
+      expect(query('[data-testid="assignment-summary"]')?.textContent).toContain('Selected: 2');
+      expect(query('[data-testid="assignment-summary"]')?.textContent).toContain(
+        'Ready to answer from: 1',
+      );
+      expect(host().textContent).toContain('not used yet');
     });
 
     it('points somewhere useful when the workspace has no documents', async () => {
@@ -142,11 +149,55 @@ describe('AgentKnowledgeSection', () => {
     });
   });
 
+  describe('moving between the lists', () => {
+    it('names each button after its document, starting with the visible word', async () => {
+      await mount();
+
+      expect(moveButton(readyDocument)?.getAttribute('aria-label')).toBe('Add “Returns policy”');
+    });
+
+    it('keeps the reader on the list they were working through, and says what moved', async () => {
+      await mount();
+
+      moveButton(readyDocument)!.focus();
+      await move(readyDocument);
+
+      expect(titles('selected')).toEqual(['Returns policy']);
+      // Focus lands on the document that took its place in the list it left.
+      expect(document.activeElement).toBe(moveButton(unindexed));
+      expect(query('[data-testid="assignment-announcement"]')?.textContent).toContain(
+        'Added “Returns policy” to this agent. Not saved yet.',
+      );
+      expect(query('[data-testid="assignment-unsaved"]')).not.toBeNull();
+    });
+
+    it('moves focus to the list heading when the list it left is empty', async () => {
+      await mount([{ ...readyDocument, isAssigned: true }]);
+
+      await move(readyDocument);
+
+      expect(document.activeElement?.id).toBe('knowledge-selected-heading');
+      expect(titles('available')).toEqual(['Returns policy']);
+    });
+
+    it('shows both lists to somebody who may only read, with nothing to press', async () => {
+      await mount([{ ...readyDocument, isAssigned: true }, unindexed], '"agent-v1"', [
+        'knowledge.view',
+        'ai-agents.view',
+      ]);
+
+      expect(titles('selected')).toEqual(['Returns policy']);
+      expect(titles('available')).toEqual(['Delivery times']);
+      expect(host().querySelectorAll('[data-move]')).toHaveLength(0);
+      expect(query('[data-testid="save-assignment"]')).toBeNull();
+    });
+  });
+
   describe('saving', () => {
     it('sends the agent version and the whole selection', async () => {
       await mount();
 
-      await tick(0);
+      await move(readyDocument);
 
       saveButton().click();
 
@@ -176,7 +227,7 @@ describe('AgentKnowledgeSection', () => {
 
       fixture.componentInstance.versionChanged.subscribe((etag) => versions.push(etag));
 
-      await tick(0);
+      await move(readyDocument);
 
       saveButton().click();
 
@@ -206,7 +257,7 @@ describe('AgentKnowledgeSection', () => {
     it('cannot write while the agent version is unknown', async () => {
       await mount([readyDocument, unindexed], null);
 
-      await tick(0);
+      await move(readyDocument);
 
       expect(saveButton().disabled).toBe(true);
     });
@@ -216,7 +267,7 @@ describe('AgentKnowledgeSection', () => {
     async function conflict(): Promise<void> {
       await mount();
 
-      await tick(0);
+      await move(readyDocument);
 
       saveButton().click();
 
@@ -235,7 +286,7 @@ describe('AgentKnowledgeSection', () => {
       // they were in the middle of making.
       await conflict();
 
-      expect(checkboxes()[0].checked).toBe(true);
+      expect(titles('selected')).toEqual(['Returns policy']);
       expect(query('[data-testid="assignment-stale"]')).not.toBeNull();
       expect(host().textContent).toContain('exactly as you left it');
     });
@@ -266,8 +317,8 @@ describe('AgentKnowledgeSection', () => {
 
       await settle();
 
-      expect(checkboxes()[0].checked).toBe(false);
-      expect(checkboxes()[1].checked).toBe(true);
+      expect(titles('selected')).toEqual(['Delivery times']);
+      expect(titles('available')).toEqual(['Returns policy']);
     });
   });
 
@@ -314,6 +365,7 @@ describe('AgentKnowledgeSection', () => {
 
       expect(query('[data-testid="retrieval-hits"]')?.textContent).toContain('30 days');
       expect(query('[data-testid="retrieval-hits"]')?.textContent).toContain('82% match');
+      expect(query('[data-testid="retrieval-hits"]')?.textContent).toContain('Rank 1');
     });
 
     it('says plainly when nothing was retrieved', async () => {

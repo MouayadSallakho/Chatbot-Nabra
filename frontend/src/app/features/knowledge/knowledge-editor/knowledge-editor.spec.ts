@@ -164,13 +164,13 @@ describe('KnowledgeEditor', () => {
     it('says plainly when a document is not answering anything yet', async () => {
       await mount();
 
-      expect(host().textContent).toContain('not answering anything yet');
+      expect(host().textContent).toContain('Not answering anything yet');
     });
 
     it('says plainly when a document is switched off', async () => {
       await mount({ ...ready, isEnabled: false, readiness: 'Disabled' });
 
-      expect(host().textContent).toContain('switched off');
+      expect(host().textContent).toContain('Out of use');
     });
   });
 
@@ -226,7 +226,7 @@ describe('KnowledgeEditor', () => {
 
       await type(contentBox(), 'Something else entirely.');
 
-      expect(host().textContent).toContain('needs indexing again');
+      expect(host().textContent).toContain('needs an index again');
     });
   });
 
@@ -248,8 +248,8 @@ describe('KnowledgeEditor', () => {
 
       await settle();
 
-      expect(query('[data-testid="readiness"]')?.textContent).toContain('Ready');
-      expect(query('[data-testid="index-result"]')?.textContent).toContain('3 pieces');
+      expect(query('[data-testid="readiness"]')?.textContent).toContain('Indexed');
+      expect(query('[data-testid="index-result"]')?.textContent).toContain('Passages: 3');
     });
 
     it('reports honestly when nothing needed doing', async () => {
@@ -304,8 +304,24 @@ describe('KnowledgeEditor', () => {
       await settle();
 
       expect(query('[data-testid="index-error"]')).not.toBeNull();
-      expect(query('[data-testid="readiness"]')?.textContent).toContain('Needs index');
+      // The attempt that failed here is said as such; the API keeps no failed
+      // state, so this lasts only while the reader is on the page.
+      expect(query('[data-testid="readiness"]')?.textContent).toContain('Indexing failed');
+      expect(query('[data-testid="state-sentence"]')?.textContent).toContain(
+        'still answers nothing',
+      );
       expect(contentBox().value).toBe(needsIndex.content);
+    });
+
+    it('does not call a refusal before sending a failed index', async () => {
+      await mount();
+
+      await type(contentBox(), 'Not saved yet.');
+
+      query<HTMLButtonElement>('[data-testid="index-button"]')!.click();
+      await settle();
+
+      expect(query('[data-testid="readiness"]')?.textContent).toContain('Needs index');
     });
   });
 
@@ -361,8 +377,8 @@ describe('KnowledgeEditor', () => {
       await conflict();
 
       expect(contentBox().value).toBe('My unsaved work.');
-      expect(host().textContent).toContain('updated elsewhere');
-      expect(host().textContent).toContain('Nothing you have typed has been lost');
+      expect(host().textContent).toContain('updated somewhere else');
+      expect(host().textContent).toContain('Nothing you typed was lost');
     });
 
     it('retries nothing on its own', async () => {
@@ -408,7 +424,7 @@ describe('KnowledgeEditor', () => {
       await settle();
 
       expect(contentBox().value).toBe("Somebody else's version.");
-      expect(host().textContent).not.toContain('updated elsewhere');
+      expect(host().textContent).not.toContain('updated somewhere else');
 
       // The new tag is in use, and the stale one is gone for good.
       await type(contentBox(), 'Now editing the latest.');
@@ -434,7 +450,7 @@ describe('KnowledgeEditor', () => {
       await settle();
 
       expect(contentBox().value).toBe('My unsaved work.');
-      expect(host().textContent).toContain('updated elsewhere');
+      expect(host().textContent).toContain('updated somewhere else');
     });
   });
 
@@ -451,7 +467,7 @@ describe('KnowledgeEditor', () => {
 
       expect(query('[data-testid="source-name"]')?.textContent).toContain('returns-policy.pdf');
       expect(query('[data-testid="source-format"]')?.textContent).toContain('PDF');
-      expect(host().textContent).toContain('47 KB');
+      expect(host().textContent).toContain('46.9 kB');
     });
 
     it('says the file itself was not kept', async () => {
@@ -463,7 +479,7 @@ describe('KnowledgeEditor', () => {
     it('warns that replacing invalidates the current index', async () => {
       await mount({ ...fromFile, readiness: 'Ready', indexedAt: '2026-09-01T10:00:00+00:00' });
 
-      expect(host().textContent).toContain('the current index stops describing it');
+      expect(host().textContent).toContain('so it will need an index again');
     });
 
     it('sends the replacement as multipart with If-Match', async () => {
@@ -538,7 +554,7 @@ describe('KnowledgeEditor', () => {
         'No extractable text was found',
       );
       expect(query('[data-testid="replace-error"]')?.textContent).toContain(
-        'still holds the text it had before',
+        'keeps the text it had',
       );
     });
 
@@ -555,7 +571,7 @@ describe('KnowledgeEditor', () => {
 
       await settle();
 
-      expect(host().textContent).toContain('updated elsewhere');
+      expect(host().textContent).toContain('updated somewhere else');
       expect(host().textContent).toContain('file replacement');
       expect(contentBox().value).toBe(needsIndex.content);
 

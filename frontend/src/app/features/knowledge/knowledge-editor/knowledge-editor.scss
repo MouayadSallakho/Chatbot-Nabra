@@ -1,148 +1,44 @@
-.editor-body {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-6);
-}
-
+// The frame, sections, facts, file card and state edge are global
+// (`_authoring.scss`); this file only lays out what is particular here.
 .editor-skeleton {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
 }
 
-.content-input {
+.knowledge-content {
   min-block-size: 24rem;
-  font: var(--text-body);
-  line-height: 1.6;
-
-  // A read-only field still shows its text -- somebody with view access came
-  // here to read it -- but should not look editable.
-  &[readonly] {
-    background-color: var(--surface-inset);
-    color: var(--text-secondary);
-  }
 }
 
-.counter {
-  display: block;
-  margin-block-start: var(--space-1);
-}
-
-.counter-low {
-  color: var(--warning-fg);
-  font-weight: 500;
-}
-
-// The state banner. A left border rather than a filled background: the page has
-// several cards, and tinting a whole one would read as an error even when the
-// state is perfectly healthy.
-.state-card {
-  border-inline-start: 3px solid var(--border-default);
-}
-
-.state-ready {
-  border-inline-start-color: var(--success-fg);
-}
-
-.state-needs-index {
-  border-inline-start-color: var(--warning-fg);
-}
-
-.state-disabled {
-  border-inline-start-color: var(--text-muted);
-}
-
-.state-body {
+.indexing-body {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
-  align-items: flex-start;
-}
+  gap: var(--space-3);
 
-.state-explanation {
-  margin: 0;
-  max-inline-size: 60ch;
-}
-
-.state-times {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-1) var(--space-4);
-  margin: 0;
-}
-
-.dirty-note {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-2);
-  margin: 0;
-  color: var(--warning-fg);
-}
-
-.card-actions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: var(--space-2);
-  padding: var(--space-4) var(--space-5);
-  border-block-start: 1px solid var(--border-subtle);
-  background-color: var(--surface-inset);
-}
-
-// --------------------------------------------------------------- source file
-
-.source-body {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-5);
-}
-
-// Four short facts. They wrap onto as many rows as the width allows rather than
-// being forced into a table, which at 390px would scroll sideways.
-.source-facts {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
-  gap: var(--space-4);
-  margin: 0;
-
-  dt {
-    margin-block-end: var(--space-1);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-  }
-
-  dd {
+  > p {
     margin: 0;
-    // Filenames are reader-supplied and can be long without a space in them.
-    overflow-wrap: anywhere;
   }
 }
 
-// A file input renders its own button, which no stylesheet can fully reach. The
-// padding is reduced so the native control does not sit crushed against the
-// border it shares with text inputs.
-.file-input {
-  padding-block: var(--space-2);
-  line-height: 1.4;
+.indexing-actions {
+  justify-content: flex-start;
 }
 
-.chosen-file {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  margin-block-start: var(--space-2);
-
-  span {
-    overflow-wrap: anywhere;
-  }
+.facts-wide {
+  grid-column: 1 / -1;
 }
 
-// The same treatment the unsaved-changes note gets: this is a consequence worth
-// noticing before the button beneath it is pressed.
+// A consequence worth noticing before the button beneath it is pressed.
 .replace-warning {
   display: flex;
   align-items: flex-start;
   gap: var(--space-2);
-  margin: 0;
   color: var(--warning-fg);
+
+  app-icon {
+    flex: none;
+    inline-size: 1rem;
+    block-size: 1rem;
+    margin-block-start: 2px; // token-lint-ignore: optical alignment with the first line of text
+  }
 }

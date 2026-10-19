@@ -1,7 +1,10 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  ElementRef,
+  Injector,
   OnInit,
+  afterNextRender,
   computed,
   inject,
   input,
@@ -14,7 +17,10 @@ import { firstValueFrom } from 'rxjs';
 import { ApiError, toApiError } from '@app/core/api/api-error';
 import { PermissionService } from '@app/core/authorization/permission-service';
 import { ToastService } from '@app/core/feedback/toast-service';
+import { LocaleFormat } from '@app/core/i18n/locale-format';
+import { LocalNumberPipe } from '@app/core/i18n/locale-pipes';
 import { Icon } from '@app/shared/icon/icon';
+import { knowledgeStateTone, knowledgeStateWord } from '../knowledge-words';
 import { KNOWLEDGE_LIMITS } from '../knowledge-limits';
 import { AgentKnowledgeOption, KnowledgeApi, KnowledgeSearchHit } from '../knowledge-api';
 
@@ -35,11 +41,18 @@ import { AgentKnowledgeOption, KnowledgeApi, KnowledgeSearchHit } from '../knowl
  * <strong>The retrieval tester runs the same code path a live turn runs.</strong>
  * A tester with its own query would tell somebody what a different system would
  * have found.
+ *
+ * <strong>Two lists, "Selected" and "Available"</strong> (Phase 36.8), instead
+ * of one column of checkboxes: what the agent may use is read at a glance, and
+ * each document moves with one labelled button ("Add", "Remove"). After a move
+ * focus stays in the list it left, on the next document (or the list's
+ * heading when it empties), and the move is announced, so a keyboard or screen
+ * reader user keeps their place. Nothing is saved until Save, exactly as before.
  */
 @Component({
   selector: 'app-agent-knowledge',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, RouterLink, Icon],
+  imports: [ReactiveFormsModule, RouterLink, Icon, LocalNumberPipe],
   templateUrl: './agent-knowledge.html',
   styleUrl: './agent-knowledge.scss',
 })
@@ -47,6 +60,9 @@ export class AgentKnowledgeSection implements OnInit {
   private readonly api = inject(KnowledgeApi);
   private readonly permissions = inject(PermissionService);
   private readonly toasts = inject(ToastService);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly injector = inject(Injector);
+  private readonly format = inject(LocaleFormat);
 
   readonly tenantId = input.required<string>();
   readonly aiAgentId = input.required<string>();
@@ -59,10 +75,19 @@ export class AgentKnowledgeSection implements OnInit {
    */
   readonly agentETag = input<string | null>(null);
 
+  /** The section's number in the editor's form, when it has one. */
+  readonly sectionIndex = input<string | null>(null);
+
   /** Raised with the agent's new version whenever a save advances it. */
   readonly versionChanged = output<string>();
 
   protected readonly limits = KNOWLEDGE_LIMITS;
+
+  protected readonly stateWord = knowledgeStateWord;
+  protected readonly stateTone = knowledgeStateTone;
+
+  /** The last move, said politely to assistive technology. */
+  protected readonly announcement = signal('');
 
   protected readonly loading = signal(true);
   protected readonly loadFailure = signal<ApiError | null>(null);
@@ -136,6 +161,16 @@ export class AgentKnowledgeSection implements OnInit {
 
   protected readonly assignedCount = computed(() => this.selected().size);
 
+  /** The documents this agent may draw on, as currently chosen (not yet saved). */
+  protected readonly selectedOptions = computed(() =>
+    this.options().filter((option) => this.selected().has(option.knowledgeDocumentId)),
+  );
+
+  /** Everything else in the workspace. */
+  protected readonly availableOptions = computed(() =>
+    this.options().filter((option) => !this.selected().has(option.knowledgeDocumentId)),
+  );
+
   ngOnInit(): void {
     void this.load();
   }
@@ -181,6 +216,63 @@ export class AgentKnowledgeSection implements OnInit {
     return this.selected().has(documentId);
   }
 
+  /**
+   * Moves one document between the lists, keeping the reader's place.
+   *
+   * Focus goes to the document that now sits where this one was in the list
+   * it left (or the one before it, or that list's heading when it is empty),
+   * so pressing the same key again works through a list.
+   */
+  protected move(option: AgentKnowledgeOption, add: boolean): void {
+    if (!this.canEdit()) {
+      return;
+    }
+
+    const from = add ? this.availableOptions() : this.selectedOptions();
+    const index = from.findIndex((item) => item.knowledgeDocumentId === option.knowledgeDocumentId);
+
+    this.toggle(option.knowledgeDocumentId, add);
+    this.announcement.set(
+      add
+        ? $localize`:@@knowledge.assign.added:Added “${option.title}:title:” to this agent. Not saved yet.`
+        : $localize`:@@knowledge.assign.removed:Removed “${option.title}:title:” from this agent. Not saved yet.`,
+    );
+
+    const list = add ? 'available' : 'selected';
+    const remaining = add ? this.availableOptions() : this.selectedOptions();
+    const next = remaining[Math.min(index, remaining.length - 1)];
+
+    afterNextRender(
+      () => {
+        const root = this.host.nativeElement;
+        const target = next
+          ? root.querySelector<HTMLElement>(`[data-move="${next.knowledgeDocumentId}"]`)
+          : root.querySelector<HTMLElement>(`#knowledge-${list}-heading`);
+
+        target?.focus();
+      },
+      { injector: this.injector },
+    );
+  }
+
+  /** Button names that start with the visible word, then say which document. */
+  protected addLabel(title: string): string {
+    return $localize`:@@knowledge.assign.addLabel:Add “${title}:title:”`;
+  }
+
+  protected removeLabel(title: string): string {
+    return $localize`:@@knowledge.assign.removeLabel:Remove “${title}:title:”`;
+  }
+
+  /** "Rank 1 · 87% match · passage 2", in the reader's language. */
+  protected hitFacts(hit: KnowledgeSearchHit): string {
+    const percent = this.format.percent(Math.max(0, Math.min(1, hit.similarity)));
+    const rank = this.format.number(hit.rank);
+    const passage = this.format.number(hit.ordinal + 1);
+
+    return $localize`:@@knowledge.retrieval.facts:Rank ${rank}:rank: · ${percent}:percent: match · passage ${passage}:passage:`;
+  }
+
   protected async save(): Promise<void> {
     const etag = this.agentETag();
 
@@ -208,7 +300,7 @@ export class AgentKnowledgeSection implements OnInit {
       // its own next save would be refused against a tag it no longer owns.
       this.versionChanged.emit(replaced.etag);
 
-      this.toasts.success('Knowledge assignment saved.');
+      this.toasts.success($localize`:@@knowledge.assign.saved:Knowledge saved for this agent.`);
     } catch (error) {
       const failure = toApiError(error);
 
@@ -259,23 +351,6 @@ export class AgentKnowledgeSection implements OnInit {
       this.searchFailure.set(toApiError(error));
     } finally {
       this.searching.set(false);
-    }
-  }
-
-  /** Similarity as a whole percentage, which is all a person needs from it. */
-  protected percent(similarity: number): number {
-    return Math.round(Math.max(0, Math.min(1, similarity)) * 100);
-  }
-
-  /** The words a reader sees for each state. */
-  protected label(readiness: string): string {
-    switch (readiness) {
-      case 'Ready':
-        return 'Ready';
-      case 'Disabled':
-        return 'Disabled';
-      default:
-        return 'Needs index';
     }
   }
 

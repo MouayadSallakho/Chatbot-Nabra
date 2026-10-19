@@ -10,6 +10,13 @@ import { PageHeader } from '@app/shared/page-header/page-header';
 import { Pagination } from '@app/shared/pagination/pagination';
 import { initialPage, pageRecorder } from '@app/shared/pagination/page-query';
 import { LocalDatePipe } from '@app/core/i18n/locale-pipes';
+import { LocaleFormat } from '@app/core/i18n/locale-format';
+import {
+  characterCount,
+  knowledgeStateTone,
+  knowledgeStateWord,
+  knowledgeTypeWord,
+} from '../knowledge-words';
 import { DEFAULT_PAGE_SIZE, KnowledgeApi, KnowledgeDocumentPage } from '../knowledge-api';
 
 /**
@@ -19,10 +26,13 @@ import { DEFAULT_PAGE_SIZE, KnowledgeApi, KnowledgeDocumentPage } from '../knowl
  * here: the request is cheap, and a cache would have to be invalidated by every
  * mutation on every other screen.
  *
- * The list shows title, state, size and when each document last changed and was
- * last indexed. Not the content, which the list endpoint does not return -- a
- * workspace with two hundred long documents would otherwise move megabytes to
- * render a column of titles.
+ * A tidy library (Phase 36.8): each row says what the document is (written,
+ * or read from a PDF, Word, text or CSV file), how much text it holds, its
+ * indexing state in exactly the API's words, and when it last changed. Not the
+ * content, which the list endpoint does not return -- a workspace with two
+ * hundred long documents would otherwise move megabytes to render a column of
+ * titles. The size is the text's length in characters, because that is what
+ * the list publishes; the source file's bytes are only on the document.
  */
 @Component({
   selector: 'app-knowledge-list',
@@ -35,6 +45,11 @@ export class KnowledgeList {
   private readonly api = inject(KnowledgeApi);
   private readonly workspace = inject(WorkspaceContextService);
   private readonly permissions = inject(PermissionService);
+  private readonly format = inject(LocaleFormat);
+
+  protected readonly stateWord = knowledgeStateWord;
+  protected readonly stateTone = knowledgeStateTone;
+  protected readonly typeWord = knowledgeTypeWord;
 
   /** Whether this list is the reader's to see at all. */
   protected readonly canView = computed(() => this.permissions.has('knowledge.view'));
@@ -89,7 +104,11 @@ export class KnowledgeList {
     const tenantId = this.workspace.tenantId();
 
     if (!tenantId) {
-      this.failure.set({ kind: 'unknown', status: 0, message: 'No workspace is selected.' });
+      this.failure.set({
+        kind: 'unknown',
+        status: 0,
+        message: $localize`:@@analytics.noWorkspace:No workspace is selected.`,
+      });
       this.loading.set(false);
 
       return;
@@ -128,36 +147,8 @@ export class KnowledgeList {
     await this.load();
   }
 
-  /**
-   * Where a document's text came from, in one word.
-   *
-   * Only the format, never the filename: a filename can itself say something
-   * about a business that a list of two hundred rows is not the place for.
-   */
-  protected origin(fileType: string | null): string {
-    switch (fileType) {
-      case 'Pdf':
-        return 'PDF';
-      case 'Docx':
-        return 'Word';
-      case 'Text':
-        return 'Text file';
-      case 'Csv':
-        return 'CSV';
-      default:
-        return 'Written';
-    }
-  }
-
-  /** The words a reader sees for each state. */
-  protected label(readiness: string): string {
-    switch (readiness) {
-      case 'Ready':
-        return 'Ready';
-      case 'Disabled':
-        return 'Disabled';
-      default:
-        return 'Needs index';
-    }
+  /** "1,199 characters", with the right plural form for the reader's language. */
+  protected size(contentLength: number): string {
+    return characterCount(this.format.language, contentLength, this.format.number(contentLength));
   }
 }

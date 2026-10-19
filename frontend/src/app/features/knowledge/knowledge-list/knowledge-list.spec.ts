@@ -104,8 +104,32 @@ describe('KnowledgeList', () => {
 
     expect(host().textContent).toContain('Returns policy');
     expect(host().textContent).toContain('Delivery times');
-    expect(host().textContent).toContain('Ready');
-    expect(host().textContent).toContain('Needs index');
+
+    // Exactly the API's states, each with its own badge.
+    const badges = [...host().querySelectorAll('.knowledge-state .badge')];
+
+    expect(badges.map((badge) => badge.textContent?.trim())).toEqual(['Indexed', 'Needs index']);
+    expect(badges[0].classList).toContain('badge-success');
+    expect(badges[1].classList).toContain('badge-warning');
+  });
+
+  it("says each document's size in characters, with the right plural", async () => {
+    await mount();
+
+    flush([ready, { ...unindexed, contentLength: 1 }]);
+    await settle();
+
+    expect(host().textContent).toContain('240 characters');
+    expect(host().textContent).toContain('1 character');
+  });
+
+  it('keeps a title in its own direction', async () => {
+    await mount();
+
+    flush([{ ...ready, title: 'سياسة الإرجاع' }]);
+    await settle();
+
+    expect(host().querySelector('.knowledge-title')?.getAttribute('dir')).toBe('auto');
   });
 
   it('tells a written document apart from an uploaded one', async () => {
@@ -132,13 +156,16 @@ describe('KnowledgeList', () => {
     expect(host().textContent).not.toContain('.docx');
   });
 
-  it('says when a document has never been indexed rather than leaving the cell blank', async () => {
+  it('dates the index under the state only when there is one', async () => {
     await mount();
 
-    flush([unindexed]);
+    flush([ready, unindexed]);
     await settle();
 
-    expect(host().textContent).toContain('Never');
+    const states = [...host().querySelectorAll('.knowledge-state')];
+
+    expect(states[0].querySelector('time')?.getAttribute('datetime')).toBe(ready.indexedAt);
+    expect(states[1].querySelector('time')).toBeNull();
   });
 
   it('explains an empty workspace rather than saying "no data"', async () => {

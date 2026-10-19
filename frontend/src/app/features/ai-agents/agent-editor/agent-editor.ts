@@ -25,9 +25,14 @@ import { EmptyState } from '@app/shared/empty-state/empty-state';
 import { Icon } from '@app/shared/icon/icon';
 import { PageHeader } from '@app/shared/page-header/page-header';
 import { AgentKnowledgeSection } from '@app/features/knowledge/agent-knowledge/agent-knowledge';
+import { LocalNumberPipe } from '@app/core/i18n/locale-pipes';
+import { ChannelBadge } from '@app/shared/channel/channel-badge';
+import type { WebChatWidget } from '@app/features/channels/website-chat-api';
+import { AgentChannels, AgentChannelUse, channelStatusNote } from '../agent-channels';
+import { agentStatusSentence, agentStatusTone, agentStatusWord } from '../agent-words';
 import { AgentPreview } from './agent-preview';
 import { AGENT_LIMITS, CREATED_AGENT_STATE } from '../ai-agent-limits';
-import { AiAgent, AiAgentApi } from '../ai-agent-api';
+import { AiAgent, AiAgentApi, AiAgentStatus } from '../ai-agent-api';
 import { Versioned } from '@app/core/api/versioned';
 
 /** Which save ran into a stale version. */
@@ -54,6 +59,13 @@ type ConflictSource = 'name' | 'instructions' | 'lifecycle';
  * discard their work. Silently replacing the editor with server state would
  * destroy the thing they were in the middle of writing, which is precisely the
  * loss the precondition exists to prevent.
+ *
+ * <strong>Layout (Phase 36.8)</strong>: four numbered sections (identity,
+ * instructions, behaviour, knowledge), each saved on its own exactly as
+ * before, and beside them from 80rem a customer view of the chat: the preview,
+ * in the website widget's real colours when a website chat uses this agent.
+ * The behaviour section says where customers meet the agent, from the channel
+ * lists the reader may see.
  */
 @Component({
   selector: 'app-agent-editor',
@@ -67,6 +79,8 @@ type ConflictSource = 'name' | 'instructions' | 'lifecycle';
     ConfirmDialog,
     AgentPreview,
     AgentKnowledgeSection,
+    LocalNumberPipe,
+    ChannelBadge,
   ],
   templateUrl: './agent-editor.html',
   styleUrl: './agent-editor.scss',
@@ -77,11 +91,43 @@ export class AgentEditor implements OnInit, HasUnsavedChanges {
   private readonly permissions = inject(PermissionService);
   private readonly toasts = inject(ToastService);
   private readonly router = inject(Router);
+  private readonly channelLookup = inject(AgentChannels);
 
   /** Bound from the route through `withComponentInputBinding`. */
   readonly aiAgentId = input.required<string>();
 
   protected readonly limits = AGENT_LIMITS;
+
+  protected readonly statusWord = agentStatusWord;
+  protected readonly statusTone = agentStatusTone;
+  protected readonly statusSentence = agentStatusSentence;
+  protected readonly channelNote = channelStatusNote;
+  protected readonly lifecycleLabel = $localize`:@@agents.lifecycle.label:Lifecycle`;
+
+  /** The lifecycle, in order: a draft is activated once, then on and off. */
+  protected readonly lifecycleSteps = signal<readonly AiAgentStatus[]>([
+    'Draft',
+    'Active',
+    'Disabled',
+  ]);
+
+  /** Placeholder sections, so the loading state has the editor's shape. */
+  protected readonly skeletonSections = [0, 1, 2];
+
+  /** Whether the reader may see any channel list. */
+  protected readonly canSeeChannels = computed(
+    () => this.permissions.has('website-chat.view') || this.permissions.has('whatsapp.view'),
+  );
+
+  /** The channels that use this agent; null while they are being read. */
+  protected readonly channelUses = signal<readonly AgentChannelUse[] | null>(null);
+  protected readonly channelsIncomplete = signal(false);
+
+  /** The website widget's appearance for this agent, if a website chat uses it. */
+  protected readonly widget = signal<WebChatWidget | null>(null);
+
+  /** Whether the widget lookup has finished, so the preview can say which look it shows. */
+  protected readonly widgetKnown = signal(false);
 
   protected readonly loading = signal(true);
   protected readonly loadFailure = signal<ApiError | null>(null);
@@ -141,6 +187,8 @@ export class AgentEditor implements OnInit, HasUnsavedChanges {
     return this.dirty();
   }
 
+  protected readonly nameLength = computed(() => this.nameValue().length);
+
   protected readonly instructionsRemaining = computed(
     () => AGENT_LIMITS.instructionsMax - this.instructionsValue().length,
   );
@@ -154,6 +202,15 @@ export class AgentEditor implements OnInit, HasUnsavedChanges {
    * hiding the text they came to read would be worse than showing it plainly.
    */
   protected readonly canEdit = computed(() => this.permissions.has('ai-agents.edit'));
+
+  /**
+   * Whether this agent is the reader's to see at all.
+   *
+   * Checked before asking, like the list: a read certain to be refused would
+   * only put a 403 in the console and an error on screen for what is simply a
+   * permission the reader does not hold.
+   */
+  protected readonly canView = computed(() => this.permissions.has('ai-agents.view'));
 
   /** Whether the reader may put this agent in or out of service. */
   protected readonly canChangeLifecycle = computed(() =>
@@ -201,6 +258,15 @@ export class AgentEditor implements OnInit, HasUnsavedChanges {
    * early throws rather than returning undefined.
    */
   ngOnInit(): void {
+    if (!this.canView()) {
+      this.loading.set(false);
+
+      return;
+    }
+
+    // Where the agent answers, read beside it and never in its way.
+    void this.loadChannels();
+
     if (this.handedOver) {
       // Already have the representation and its tag, so nothing is re-read.
       this.adopt(this.handedOver);
@@ -210,6 +276,37 @@ export class AgentEditor implements OnInit, HasUnsavedChanges {
     }
 
     void this.load();
+  }
+
+  /**
+   * Reads which channels use this agent, then the website widget's look.
+   *
+   * Neither can block or fail the editor: an unreadable list is said in a
+   * sentence, and a missing widget means the preview shows the default look and
+   * says so.
+   */
+  private async loadChannels(): Promise<void> {
+    const tenantId = this.tenantId();
+
+    if (!this.canSeeChannels() || !tenantId) {
+      this.widgetKnown.set(true);
+
+      return;
+    }
+
+    try {
+      const map = await this.channelLookup.load(tenantId);
+      const uses = map.byAgent.get(this.aiAgentId()) ?? [];
+
+      this.channelUses.set(uses);
+      this.channelsIncomplete.set(map.incomplete);
+      this.widget.set(await this.channelLookup.widgetFor(tenantId, uses));
+    } catch {
+      this.channelUses.set([]);
+      this.channelsIncomplete.set(true);
+    } finally {
+      this.widgetKnown.set(true);
+    }
   }
 
   /** Reads the agent and the version it is at. */
@@ -254,7 +351,7 @@ export class AgentEditor implements OnInit, HasUnsavedChanges {
         ),
       );
 
-      this.toasts.success('Name saved.');
+      this.toasts.success($localize`:@@agents.toast.nameSaved:Name saved.`);
     } catch (error) {
       this.handleMutationFailure(error, 'name');
     } finally {
@@ -295,7 +392,7 @@ export class AgentEditor implements OnInit, HasUnsavedChanges {
         ),
       );
 
-      this.toasts.success('Instructions saved.');
+      this.toasts.success($localize`:@@agents.toast.instructionsSaved:Instructions saved.`);
     } catch (error) {
       this.handleMutationFailure(error, 'instructions');
     } finally {
@@ -313,7 +410,7 @@ export class AgentEditor implements OnInit, HasUnsavedChanges {
   protected async activate(): Promise<void> {
     await this.changeLifecycle(
       () => this.api.activate(this.tenantId(), this.aiAgentId(), this.etag() as string),
-      'Agent activated.',
+      $localize`:@@agents.toast.activated:Agent activated. It now answers on the channels that use it.`,
     );
   }
 
@@ -325,7 +422,7 @@ export class AgentEditor implements OnInit, HasUnsavedChanges {
   protected async disable(): Promise<void> {
     await this.changeLifecycle(
       () => this.api.disable(this.tenantId(), this.aiAgentId(), this.etag() as string),
-      'Agent disabled.',
+      $localize`:@@agents.toast.disabled:Agent disabled. It answers nobody until you activate it again.`,
     );
   }
 

@@ -1,100 +1,207 @@
-<div class="page page-narrow">
+<div class="page">
   <app-page-header
     backLink="/knowledge"
     backLabel="Knowledge"
     i18n-backLabel="@@back.knowledge"
-    heading="New knowledge document"
-    description="Write something your agents should know. Saving costs nothing — indexing it, which is what makes it answerable, is a separate step on the next screen."
+    heading="Write a knowledge document"
+    i18n-heading="@@knowledge.create.heading"
+    description="Write something your agents should know. Saving costs nothing; indexing it, which is what makes it answerable, is a separate step on the next screen."
+    i18n-description="@@knowledge.create.description"
   />
 
   @if (!allowed()) {
     <div class="page-section">
       <div class="card">
-        <div class="card-body">
-          <p class="text-body-strong">You cannot write knowledge</p>
-          <p class="text-small text-secondary">
-            Writing a knowledge document needs a permission your roles do not include. Ask somebody
-            who administers this workspace if you need it.
-          </p>
-          <p><a class="btn btn-secondary btn-sm" routerLink="/knowledge">Back to knowledge</a></p>
-        </div>
+        <app-empty-state
+          icon="knowledge"
+          heading="You cannot write knowledge"
+          i18n-heading="@@knowledge.create.denied.heading"
+          description="Writing a knowledge document needs a permission your roles do not include. Ask somebody who administers this workspace if you need it."
+          i18n-description="@@knowledge.create.denied.body"
+        >
+          <a
+            stateActions
+            class="btn btn-secondary btn-sm"
+            routerLink="/knowledge"
+            i18n="@@knowledge.backToKnowledge"
+            >Back to knowledge</a
+          >
+        </app-empty-state>
       </div>
     </div>
   } @else {
-    <div class="page-section">
-      <form class="card create-form" [formGroup]="form" (ngSubmit)="create()" novalidate>
-        <div class="card-body">
-          <div class="field">
-            <label class="field-label field-required" for="knowledge-title">Title</label>
-            <input
-              id="knowledge-title"
-              class="input"
-              type="text"
-              formControlName="title"
-              autocomplete="off"
-              [attr.maxlength]="limits.titleMax"
-              [attr.aria-invalid]="showError('title') ? 'true' : null"
-              aria-describedby="knowledge-title-hint"
-              [attr.aria-errormessage]="showError('title') ? 'knowledge-title-error' : null"
-            />
-            <p class="field-hint" id="knowledge-title-hint">
-              How you and your agents will recognise this document. {{ titleLength() }} of
-              {{ limits.titleMax }} characters used.
-            </p>
-            @if (showError('title')) {
-              <p class="field-error" id="knowledge-title-error" role="alert">
-                <app-icon name="alert" [strokeWidth]="1.75" />
-                <span>A title is required.</span>
+    <div class="page-section authoring knowledge-create-layout">
+      <form
+        class="authoring-main"
+        [formGroup]="form"
+        (ngSubmit)="create()"
+        novalidate
+        data-testid="create-document-form"
+      >
+        <section class="card form-section" aria-labelledby="knowledge-create-title-heading">
+          <div class="card-header">
+            <span class="form-section-index" aria-hidden="true">1</span>
+            <div>
+              <h2
+                id="knowledge-create-title-heading"
+                class="form-section-title"
+                i18n="@@knowledge.section.title"
+              >
+                Title
+              </h2>
+              <p class="form-section-lede" i18n="@@knowledge.create.title.lede">
+                How you will find this document in the library and in an agent's knowledge.
               </p>
-            }
-          </div>
-
-          <div class="field">
-            <label class="field-label field-required" for="knowledge-content">Content</label>
-            <textarea
-              id="knowledge-content"
-              class="textarea content-input"
-              formControlName="content"
-              rows="16"
-              [attr.maxlength]="limits.contentMax"
-              [attr.aria-invalid]="showError('content') ? 'true' : null"
-              aria-describedby="knowledge-content-hint"
-              [attr.aria-errormessage]="showError('content') ? 'knowledge-content-error' : null"
-            ></textarea>
-            <p class="field-hint" id="knowledge-content-hint">
-              Plain text. Blank lines separate paragraphs, and indexing respects them. Keep it to
-              information that changes rarely — prices and order statuses belong in a live system,
-              not here.
-              <span class="counter" [class.counter-low]="contentRemaining() < 2000">
-                {{ contentRemaining() }} of {{ limits.contentMax }} characters remaining.
-              </span>
-            </p>
-            @if (showError('content')) {
-              <p class="field-error" id="knowledge-content-error" role="alert">
-                <app-icon name="alert" [strokeWidth]="1.75" />
-                <span>Some content is required.</span>
-              </p>
-            }
-          </div>
-
-          @if (failure(); as error) {
-            <div class="alert alert-danger" role="alert">
-              <app-icon name="alert" [strokeWidth]="1.75" />
-              <span>{{ error.message }}</span>
             </div>
-          }
-        </div>
+          </div>
+          <div class="card-body">
+            <div class="field">
+              <label
+                class="field-label field-required"
+                for="knowledge-title"
+                i18n="@@knowledge.field.title"
+                >Title</label
+              >
+              <input
+                id="knowledge-title"
+                class="input"
+                type="text"
+                dir="auto"
+                formControlName="title"
+                autocomplete="off"
+                [attr.maxlength]="limits.titleMax"
+                [attr.aria-invalid]="showError('title') ? 'true' : null"
+                aria-describedby="knowledge-title-hint"
+                [attr.aria-errormessage]="showError('title') ? 'knowledge-title-error' : null"
+              />
+              <p class="field-hint" id="knowledge-title-hint">
+                <span class="counter" i18n="@@knowledge.counter.title"
+                  >Characters used: {{ titleLength() | localNumber }} of
+                  {{ limits.titleMax | localNumber }}</span
+                >
+              </p>
+              @if (showError('title')) {
+                <p class="field-error" id="knowledge-title-error" role="alert">
+                  <app-icon name="alert" [strokeWidth]="1.75" />
+                  <span i18n="@@knowledge.error.titleRequired">A title is required.</span>
+                </p>
+              }
+            </div>
+          </div>
+        </section>
 
-        <div class="create-actions">
-          <a class="btn btn-secondary" routerLink="/knowledge">Cancel</a>
-          <button type="submit" class="btn btn-primary" [disabled]="submitting()">
+        <section class="card form-section" aria-labelledby="knowledge-create-content-heading">
+          <div class="card-header">
+            <span class="form-section-index" aria-hidden="true">2</span>
+            <div>
+              <h2
+                id="knowledge-create-content-heading"
+                class="form-section-title"
+                i18n="@@knowledge.section.content"
+              >
+                Content
+              </h2>
+              <p class="form-section-lede" i18n="@@knowledge.content.lede">
+                Plain text, in any language. Blank lines separate paragraphs, and indexing keeps
+                them together.
+              </p>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="field">
+              <label
+                class="field-label field-required"
+                for="knowledge-content"
+                i18n="@@knowledge.field.content"
+                >Content</label
+              >
+              <textarea
+                id="knowledge-content"
+                class="textarea long-text knowledge-content"
+                dir="auto"
+                formControlName="content"
+                rows="16"
+                [attr.maxlength]="limits.contentMax"
+                [attr.aria-invalid]="showError('content') ? 'true' : null"
+                aria-describedby="knowledge-content-hint"
+                [attr.aria-errormessage]="showError('content') ? 'knowledge-content-error' : null"
+              ></textarea>
+              <p class="field-hint" id="knowledge-content-hint">
+                <span
+                  class="counter"
+                  [class.counter-low]="contentRemaining() < 2000"
+                  i18n="@@knowledge.counter.content"
+                  >Characters left: {{ contentRemaining() | localNumber }} of
+                  {{ limits.contentMax | localNumber }}</span
+                >
+              </p>
+              @if (showError('content')) {
+                <p class="field-error" id="knowledge-content-error" role="alert">
+                  <app-icon name="alert" [strokeWidth]="1.75" />
+                  <span i18n="@@knowledge.error.contentRequired">Some content is required.</span>
+                </p>
+              }
+            </div>
+          </div>
+        </section>
+
+        @if (failure(); as error) {
+          <div class="alert alert-danger" role="alert" data-testid="create-error">
+            <app-icon name="alert" [strokeWidth]="1.75" />
+            <span>{{ error.message }}</span>
+          </div>
+        }
+
+        <div class="section-actions">
+          <a class="btn btn-secondary" routerLink="/knowledge" i18n="@@knowledge.cancel">Cancel</a>
+          <button
+            type="submit"
+            class="btn btn-primary"
+            [class.btn-loading]="submitting()"
+            [disabled]="submitting()"
+            data-testid="create-document"
+          >
             @if (submitting()) {
               <span class="spinner" aria-hidden="true"></span>
+              <span class="btn-label" i18n="@@knowledge.saving">Saving…</span>
+            } @else {
+              <span class="btn-label" i18n="@@knowledge.saveDocument">Save document</span>
             }
-            <span class="btn-label">{{ submitting() ? 'Saving…' : 'Save document' }}</span>
           </button>
         </div>
       </form>
+
+      <aside class="authoring-aside" aria-labelledby="knowledge-create-help-heading">
+        <section class="card">
+          <div class="card-header">
+            <h2
+              id="knowledge-create-help-heading"
+              class="card-title"
+              i18n="@@knowledge.create.help.heading"
+            >
+              What belongs here
+            </h2>
+          </div>
+          <div class="card-body knowledge-help">
+            <ul class="help-list">
+              <li i18n="@@knowledge.create.help.stable">
+                Information that changes rarely: policies, opening hours, how a service works.
+              </li>
+              <li i18n="@@knowledge.create.help.live">
+                Not prices or order statuses: those belong in a live system.
+              </li>
+              <li i18n="@@knowledge.create.help.index">
+                After saving, index the document and select it for an agent.
+              </li>
+            </ul>
+            <p>
+              <a routerLink="/knowledge/upload" i18n="@@knowledge.create.uploadInstead"
+                >Have it in a file? Upload it instead</a
+              >
+            </p>
+          </div>
+        </section>
+      </aside>
     </div>
   }
 </div>

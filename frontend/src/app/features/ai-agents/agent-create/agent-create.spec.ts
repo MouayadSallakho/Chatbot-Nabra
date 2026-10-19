@@ -97,6 +97,8 @@ describe('AgentCreate', () => {
 
     expect(host().textContent).toContain('An agent name is required.');
     expect(host().textContent).toContain('Instructions are required.');
+    // The reader is taken to the first field that needs them.
+    expect(document.activeElement?.id).toBe('agent-name');
     http.verify();
   });
 
@@ -203,7 +205,7 @@ describe('AgentCreate', () => {
     await mount();
     await fill('Sales Assistant', 'abc');
 
-    expect(host().textContent).toContain('19997 of 20000 characters remaining');
+    expect(host().textContent).toContain('Characters left: 19,997 of 20,000');
     // Never described as a model or token limit, because it is neither.
     expect(host().textContent).not.toContain('token');
     expect(host().textContent).not.toContain('context');

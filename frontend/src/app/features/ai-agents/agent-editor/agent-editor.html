@@ -1,19 +1,102 @@
 <div class="page">
-  @if (loading()) {
-    <p class="text-body text-secondary" role="status">Loading agent…</p>
+  @if (!canView()) {
+    <!--
+      The permission-denied state, before any request: what is true and what to
+      do, with no status code and no permission name.
+    -->
+    <app-page-header
+      backLink="/ai-agents"
+      backLabel="AI agents"
+      i18n-backLabel="@@back.aiAgents"
+      heading="AI agent"
+      i18n-heading="@@agents.editor.genericHeading"
+      description=""
+    />
+    <div class="page-section">
+      <div class="card">
+        <app-empty-state
+          icon="agents"
+          heading="You do not have access to AI agents"
+          i18n-heading="@@agents.denied.heading"
+          description="Seeing this workspace's AI agents needs a permission your roles do not include. Ask somebody who administers this workspace if you need it."
+          i18n-description="@@agents.denied.body"
+          data-testid="agent-denied"
+        />
+      </div>
+    </div>
+  } @else if (loading()) {
+    <!--
+      The page keeps its heading while it loads, so there is always exactly one
+      h1 and focus has somewhere to land. The skeleton has the editor's shape.
+    -->
+    <app-page-header
+      backLink="/ai-agents"
+      backLabel="AI agents"
+      i18n-backLabel="@@back.aiAgents"
+      heading="AI agent"
+      i18n-heading="@@agents.editor.genericHeading"
+      description=""
+    />
+    <div class="page-section authoring" aria-busy="true">
+      <p class="visually-hidden" role="status" i18n="@@agents.editor.loading">Loading agent…</p>
+      <div class="authoring-main" aria-hidden="true">
+        @for (block of skeletonSections; track block) {
+          <div class="card">
+            <div class="card-body editor-skeleton">
+              <span class="skeleton skeleton-title"></span>
+              <span class="skeleton skeleton-text"></span>
+              <span class="skeleton skeleton-bar"></span>
+            </div>
+          </div>
+        }
+      </div>
+      <div class="authoring-aside" aria-hidden="true">
+        <div class="card">
+          <div class="card-body editor-skeleton">
+            <span class="skeleton skeleton-bar"></span>
+            <span class="skeleton skeleton-bubble"></span>
+            <span class="skeleton skeleton-bubble skeleton-bubble-end"></span>
+          </div>
+        </div>
+      </div>
+    </div>
   } @else if (loadFailure(); as error) {
-    <div class="card">
-      <app-empty-state
-        icon="alert"
-        tone="error"
-        heading="Could not load this agent"
-        [description]="error.message"
-      >
-        <button stateActions type="button" class="btn btn-secondary btn-sm" (click)="load()">
-          Try again
-        </button>
-        <a stateActions class="btn btn-ghost btn-sm" routerLink="/ai-agents">Back to agents</a>
-      </app-empty-state>
+    <app-page-header
+      backLink="/ai-agents"
+      backLabel="AI agents"
+      i18n-backLabel="@@back.aiAgents"
+      heading="AI agent"
+      i18n-heading="@@agents.editor.genericHeading"
+      description=""
+    />
+    <div class="page-section">
+      <div class="card">
+        <app-empty-state
+          icon="alert"
+          tone="error"
+          heading="Could not load this agent"
+          i18n-heading="@@agents.editor.loadFailed"
+          [description]="error.message"
+          data-testid="agent-load-failed"
+        >
+          <button
+            stateActions
+            type="button"
+            class="btn btn-secondary btn-sm"
+            (click)="load()"
+            i18n="@@agents.tryAgain"
+          >
+            Try again
+          </button>
+          <a
+            stateActions
+            class="btn btn-ghost btn-sm"
+            routerLink="/ai-agents"
+            i18n="@@agents.backToAgents"
+            >Back to AI agents</a
+          >
+        </app-empty-state>
+      </div>
     </div>
   } @else if (agent(); as current) {
     <app-page-header
@@ -21,37 +104,40 @@
       backLabel="AI agents"
       i18n-backLabel="@@back.aiAgents"
       [heading]="current.name"
-      description="Configure how this agent replies, then test it before putting it in service."
+      [description]="statusSentence(current.status)"
     >
-      <span
-        pageStatus
-        class="badge"
-        [class.badge-success]="current.status === 'Active'"
-        [class.badge-neutral]="current.status !== 'Active'"
-      >
-        {{ current.status }}
-      </span>
+      <span pageStatus [class]="'badge ' + statusTone(current.status)" data-testid="agent-status">{{
+        statusWord(current.status)
+      }}</span>
     </app-page-header>
 
     @if (conflict(); as source) {
       <!--
         The stale-version state. It says what happened in plain words, confirms
         the reader's work is still there, and offers exactly one action. There is
-        no automatic retry and no automatic merge -- both would decide something
-        only the reader can decide.
+        no automatic retry and no automatic merge.
       -->
-      <div class="stale-notice" role="alert">
+      <div class="stale-notice" role="alert" data-testid="agent-stale">
         <app-icon name="alert" [strokeWidth]="1.75" />
         <div class="conflict-body">
-          <p class="conflict-title">This agent was updated somewhere else.</p>
+          <p class="conflict-title" i18n="@@agents.stale.title">
+            This agent was updated somewhere else.
+          </p>
           <p>
-            Your unsaved changes have not been overwritten and are still shown below. Reload the
-            latest saved version before saving again.
+            <span i18n="@@agents.stale.body"
+              >Your unsaved changes have not been overwritten and are still shown below. Reload the
+              latest saved version before saving again.</span
+            >
             @if (source === 'lifecycle') {
-              The status change was not applied.
+              <span i18n="@@agents.stale.lifecycle">The status change was not applied.</span>
             }
           </p>
-          <button type="button" class="btn btn-secondary btn-sm" (click)="reloadLatest()">
+          <button
+            type="button"
+            class="btn btn-secondary btn-sm"
+            (click)="reloadLatest()"
+            i18n="@@agents.stale.reload"
+          >
             Reload latest version
           </button>
         </div>
@@ -61,31 +147,45 @@
     @if (!canEdit()) {
       <!--
         One explanation for the whole editor, rather than a note beside every
-        control. The fields stay readable because somebody with view access came
-        here to read them; what changes is that nothing can be saved.
+        control. The fields stay readable; what changes is that nothing can be
+        saved.
       -->
       <div class="page-section">
-        <p class="alert alert-info" role="status">
-          You can read this agent's configuration but not change it. Editing needs a permission your
-          roles do not include.
+        <p class="alert alert-info" role="status" data-testid="agent-read-only">
+          <app-icon name="info" [strokeWidth]="1.75" />
+          <span i18n="@@agents.readOnly"
+            >You can read this agent's configuration but not change it. Editing needs a permission
+            your roles do not include.</span
+          >
         </p>
       </div>
     }
 
-    <div class="editor">
-      <div class="editor-main">
-        <!-- ------------------------------------------------------ identity -->
-        <section class="card" aria-labelledby="general-heading">
+    <div class="page-section authoring">
+      <div class="authoring-main">
+        <!-- ------------------------------------------------------ 1. identity -->
+        <section class="card form-section" aria-labelledby="identity-heading">
           <div class="card-header">
-            <h2 id="general-heading" class="text-card-title">General</h2>
+            <span class="form-section-index" aria-hidden="true">1</span>
+            <div>
+              <h2 id="identity-heading" class="form-section-title" i18n="@@agents.section.identity">
+                Identity
+              </h2>
+              <p class="form-section-lede" i18n="@@agents.identity.lede">
+                What your team calls this agent. Customers see it as the chat's title.
+              </p>
+            </div>
           </div>
           <div class="card-body">
             <div class="field">
-              <label class="field-label field-required" for="agent-name">Agent name</label>
+              <label class="field-label field-required" for="agent-name" i18n="@@agents.field.name"
+                >Agent name</label
+              >
               <input
                 id="agent-name"
                 class="input"
                 type="text"
+                dir="auto"
                 [formControl]="name"
                 [attr.readonly]="canEdit() ? null : ''"
                 autocomplete="off"
@@ -94,7 +194,10 @@
                 aria-describedby="agent-name-hint"
               />
               <p class="field-hint" id="agent-name-hint">
-                How you will recognise this agent. Customers never see it.
+                <span class="counter" i18n="@@agents.counter.name"
+                  >Characters used: {{ nameLength() | localNumber }} of
+                  {{ limits.nameMax | localNumber }}</span
+                >
               </p>
               @if (nameFailure(); as error) {
                 <p class="field-error" role="alert">
@@ -104,55 +207,88 @@
               }
             </div>
 
-            <div class="section-actions">
-              @if (nameChanged()) {
-                <span class="unsaved text-small" aria-live="polite">Unsaved changes</span>
-                <button type="button" class="btn btn-ghost btn-sm" (click)="resetName()">
-                  Discard
-                </button>
-              }
-              <button
-                type="button"
-                class="btn btn-primary btn-sm"
-                (click)="saveName()"
-                [disabled]="!nameChanged() || name.invalid || savingName() || cannotSave()"
-              >
-                @if (savingName()) {
-                  <span class="spinner" aria-hidden="true"></span>
+            @if (canEdit()) {
+              <div class="section-actions">
+                @if (nameChanged()) {
+                  <span class="unsaved-note" aria-live="polite" data-testid="name-unsaved">
+                    <app-icon name="alert" [strokeWidth]="1.75" />
+                    <span i18n="@@agents.unsaved">Unsaved changes</span>
+                  </span>
+                  <button
+                    type="button"
+                    class="btn btn-ghost btn-sm"
+                    (click)="resetName()"
+                    i18n="@@agents.discard"
+                  >
+                    Discard
+                  </button>
                 }
-                <span class="btn-label">{{ savingName() ? 'Saving…' : 'Save name' }}</span>
-              </button>
-            </div>
+                <button
+                  type="button"
+                  class="btn btn-primary btn-sm"
+                  [class.btn-loading]="savingName()"
+                  (click)="saveName()"
+                  [disabled]="!nameChanged() || name.invalid || savingName() || cannotSave()"
+                  data-testid="save-name"
+                >
+                  @if (savingName()) {
+                    <span class="spinner" aria-hidden="true"></span>
+                    <span class="btn-label" i18n="@@agents.saving">Saving…</span>
+                  } @else {
+                    <span class="btn-label" i18n="@@agents.saveName">Save name</span>
+                  }
+                </button>
+              </div>
+            }
           </div>
         </section>
 
-        <!-- -------------------------------------------------- instructions -->
-        <section class="card" aria-labelledby="instructions-heading">
+        <!-- -------------------------------------------------- 2. instructions -->
+        <section class="card form-section" aria-labelledby="instructions-heading">
           <div class="card-header">
-            <h2 id="instructions-heading" class="text-card-title">Instructions</h2>
+            <span class="form-section-index" aria-hidden="true">2</span>
+            <div>
+              <h2
+                id="instructions-heading"
+                class="form-section-title"
+                i18n="@@agents.section.instructions"
+              >
+                Instructions
+              </h2>
+              <p class="form-section-lede" i18n="@@agents.instructions.lede">
+                How this agent should reply, in your own words. Write in any language; line breaks
+                are kept.
+              </p>
+            </div>
           </div>
           <div class="card-body">
             <div class="field">
-              <label class="field-label field-required" for="agent-instructions">
-                How this agent should reply
-              </label>
+              <label
+                class="field-label field-required"
+                for="agent-instructions"
+                i18n="@@agents.field.instructions"
+                >How this agent should reply</label
+              >
               <textarea
                 id="agent-instructions"
-                class="textarea instructions-input"
+                class="textarea long-text"
+                dir="auto"
                 [formControl]="instructions"
                 [attr.readonly]="canEdit() ? null : ''"
                 rows="14"
                 [attr.maxlength]="limits.instructionsMax"
                 [attr.aria-invalid]="instructions.invalid ? 'true' : null"
-                aria-describedby="agent-instructions-hint"
+                aria-describedby="agent-instructions-guidance agent-instructions-hint"
+                data-testid="instructions"
               ></textarea>
               <p class="field-hint" id="agent-instructions-hint">
-                Instructions control this agent's business behaviour — its tone, what it may
-                promise, and when it should hand over to a person. Line breaks are preserved.
-                <span class="counter" [class.counter-low]="instructionsRemaining() < 500">
-                  {{ instructionsRemaining() }} of {{ limits.instructionsMax }} characters
-                  remaining.
-                </span>
+                <span
+                  class="counter"
+                  [class.counter-low]="instructionsRemaining() < 500"
+                  i18n="@@agents.counter.instructions"
+                  >Characters left: {{ instructionsRemaining() | localNumber }} of
+                  {{ limits.instructionsMax | localNumber }}</span
+                >
               </p>
               @if (instructionsFailure(); as error) {
                 <p class="field-error" role="alert">
@@ -162,153 +298,245 @@
               }
             </div>
 
-            <div class="section-actions">
-              @if (instructionsChanged()) {
-                <span class="unsaved text-small" aria-live="polite">Unsaved changes</span>
-                <button type="button" class="btn btn-ghost btn-sm" (click)="resetInstructions()">
-                  Discard
-                </button>
-              }
-              <button
-                type="button"
-                class="btn btn-primary btn-sm"
-                (click)="saveInstructions()"
-                [disabled]="
-                  !instructionsChanged() ||
-                  instructions.invalid ||
-                  savingInstructions() ||
-                  cannotSave()
-                "
-              >
-                @if (savingInstructions()) {
-                  <span class="spinner" aria-hidden="true"></span>
-                }
-                <span class="btn-label">
-                  {{ savingInstructions() ? 'Saving…' : 'Save instructions' }}
-                </span>
-              </button>
+            <div class="guidance" id="agent-instructions-guidance">
+              <span i18n="@@agents.guidance.title">Good instructions usually say:</span>
+              <ul>
+                <li i18n="@@agents.guidance.tone">the tone to use, and in which languages;</li>
+                <li i18n="@@agents.guidance.scope">what it may answer, promise or refuse;</li>
+                <li i18n="@@agents.guidance.handoff">when to hand the conversation to a person.</li>
+              </ul>
             </div>
-          </div>
-        </section>
-      </div>
 
-      <div class="editor-side">
-        <!-- ----------------------------------------------------- lifecycle -->
-        <section class="card" aria-labelledby="status-heading">
-          <div class="card-header">
-            <h2 id="status-heading" class="text-card-title">Status</h2>
-          </div>
-          <div class="card-body lifecycle">
-            <p class="text-small text-secondary">
-              @if (current.status === 'Draft') {
-                This agent is a draft. It is not in service, and activating it makes it available to
-                answer.
-              } @else if (current.status === 'Active') {
-                This agent is in service. Disabling it takes it out of service; its configuration is
-                kept.
-              } @else {
-                This agent is out of service. Activating it puts it back into service.
-              }
-            </p>
-
-            @if (lifecycleFailure(); as error) {
-              <div class="alert alert-danger" role="alert">
-                <app-icon name="alert" [strokeWidth]="1.75" />
-                <span>{{ error.message }}</span>
-              </div>
-            }
-
-            <!--
-              Only the transitions the agent's current state actually allows. A
-              draft cannot be disabled, so no disable control is offered for one:
-              showing an action that is guaranteed to be refused invites a click
-              and teaches the reader that this product's buttons do not work.
-            -->
-            @if (!canChangeLifecycle()) {
-              <p class="text-small text-muted">
-                Putting this agent in or out of service needs a permission your roles do not
-                include.
-              </p>
-            }
-
-            <div class="section-actions">
-              @if (!canChangeLifecycle()) {
-                <!-- No control at all. A disabled primary button with no reason
-                     beside it reads as a fault rather than a rule. -->
-              } @else if (current.status === 'Active') {
-                <button
-                  type="button"
-                  class="btn btn-danger btn-sm"
-                  (click)="requestDisable()"
-                  [disabled]="changingLifecycle() || cannotSave()"
-                >
-                  <span class="btn-label">Disable agent</span>
-                </button>
-              } @else {
+            @if (canEdit()) {
+              <div class="section-actions">
+                @if (instructionsChanged()) {
+                  <span class="unsaved-note" aria-live="polite" data-testid="instructions-unsaved">
+                    <app-icon name="alert" [strokeWidth]="1.75" />
+                    <span i18n="@@agents.unsaved">Unsaved changes</span>
+                  </span>
+                  <button
+                    type="button"
+                    class="btn btn-ghost btn-sm"
+                    (click)="resetInstructions()"
+                    i18n="@@agents.discard"
+                  >
+                    Discard
+                  </button>
+                }
                 <button
                   type="button"
                   class="btn btn-primary btn-sm"
-                  (click)="activate()"
-                  [disabled]="changingLifecycle() || cannotSave()"
+                  [class.btn-loading]="savingInstructions()"
+                  (click)="saveInstructions()"
+                  [disabled]="
+                    !instructionsChanged() ||
+                    instructions.invalid ||
+                    savingInstructions() ||
+                    cannotSave()
+                  "
+                  data-testid="save-instructions"
                 >
-                  @if (changingLifecycle()) {
+                  @if (savingInstructions()) {
                     <span class="spinner" aria-hidden="true"></span>
+                    <span class="btn-label" i18n="@@agents.saving">Saving…</span>
+                  } @else {
+                    <span class="btn-label" i18n="@@agents.saveInstructions"
+                      >Save instructions</span
+                    >
                   }
-                  <span class="btn-label">
-                    {{ changingLifecycle() ? 'Working…' : 'Activate agent' }}
-                  </span>
                 </button>
+              </div>
+            }
+          </div>
+        </section>
+
+        <!-- ----------------------------------------------------- 3. behaviour -->
+        <section class="card form-section" aria-labelledby="behaviour-heading">
+          <div class="card-header">
+            <span class="form-section-index" aria-hidden="true">3</span>
+            <div>
+              <h2
+                id="behaviour-heading"
+                class="form-section-title"
+                i18n="@@agents.section.behaviour"
+              >
+                Behaviour
+              </h2>
+              <p class="form-section-lede" i18n="@@agents.behaviour.lede">
+                Whether this agent is in service, and where customers meet it.
+              </p>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="behaviour-block">
+              <h3 class="text-label" i18n="@@agents.behaviour.status">Status</h3>
+              <!--
+                The real lifecycle: a draft is activated once; an active agent can
+                be disabled and activated again. The current step is marked in
+                words for assistive technology (aria-current) and by an outline.
+              -->
+              <ol class="lifecycle-path" [attr.aria-label]="lifecycleLabel">
+                @for (step of lifecycleSteps(); track step) {
+                  <li
+                    class="lifecycle-step"
+                    [attr.aria-current]="step === current.status ? 'step' : null"
+                  >
+                    <span [class]="'badge ' + statusTone(step)">{{ statusWord(step) }}</span>
+                  </li>
+                }
+              </ol>
+              <p class="text-small text-secondary" data-testid="lifecycle-sentence">
+                {{ statusSentence(current.status) }}
+              </p>
+
+              @if (lifecycleFailure(); as error) {
+                <div class="alert alert-danger" role="alert" data-testid="lifecycle-error">
+                  <app-icon name="alert" [strokeWidth]="1.75" />
+                  <span>{{ error.message }}</span>
+                </div>
+              }
+
+              <!--
+                Only the transitions the agent's current state allows. A draft
+                cannot be disabled, so no disable control is offered for one.
+              -->
+              @if (!canChangeLifecycle()) {
+                <p class="text-small text-muted" i18n="@@agents.lifecycle.denied">
+                  Putting this agent in or out of service needs a permission your roles do not
+                  include.
+                </p>
+              } @else {
+                <div class="section-actions behaviour-actions">
+                  @if (current.status === 'Active') {
+                    <button
+                      type="button"
+                      class="btn btn-danger btn-sm"
+                      (click)="requestDisable()"
+                      [disabled]="changingLifecycle() || cannotSave()"
+                      data-testid="disable-agent"
+                    >
+                      <span i18n="@@agents.disable">Disable agent</span>
+                    </button>
+                  } @else {
+                    <button
+                      type="button"
+                      class="btn btn-primary btn-sm"
+                      [class.btn-loading]="changingLifecycle()"
+                      (click)="activate()"
+                      [disabled]="changingLifecycle() || cannotSave()"
+                      data-testid="activate-agent"
+                    >
+                      @if (changingLifecycle()) {
+                        <span class="spinner" aria-hidden="true"></span>
+                        <span class="btn-label" i18n="@@agents.working">Working…</span>
+                      } @else {
+                        <span class="btn-label" i18n="@@agents.activate">Activate agent</span>
+                      }
+                    </button>
+                  }
+                </div>
+              }
+            </div>
+
+            <div class="behaviour-block">
+              <h3 class="text-label" i18n="@@agents.behaviour.channels">Where it answers</h3>
+              @if (!canSeeChannels()) {
+                <p class="text-small text-muted" i18n="@@agents.channels.hidden">
+                  Seeing which channels use this agent needs a channel permission your roles do not
+                  include.
+                </p>
+              } @else if (channelUses(); as uses) {
+                @if (uses.length > 0) {
+                  <ul class="behaviour-channels" data-testid="agent-channels">
+                    @for (use of uses; track use.id) {
+                      <li>
+                        <a [routerLink]="use.link" class="behaviour-channel">
+                          <app-channel-badge [channel]="use.channel" />
+                          @if (channelNote(use.status); as note) {
+                            <span class="text-small text-muted">({{ note }})</span>
+                          }
+                        </a>
+                      </li>
+                    }
+                  </ul>
+                } @else if (channelsIncomplete()) {
+                  <p class="text-small text-muted" i18n="@@agents.channels.failed">
+                    The channels could not be checked just now.
+                  </p>
+                } @else {
+                  <p class="text-small text-secondary" i18n="@@agents.channels.noneLong">
+                    No channel uses this agent yet. Connect it on a website chat or a WhatsApp
+                    number in Channels.
+                  </p>
+                }
+              } @else {
+                <p class="text-small text-muted" role="status" i18n="@@agents.channels.loading">
+                  Checking channels…
+                </p>
               }
             </div>
           </div>
         </section>
 
+        <!-- ----------------------------------------------------- 4. knowledge -->
         <!--
           Which knowledge this agent may draw on. It writes against the agent's
           own entity tag, so a successful save advances the version this editor
-          is holding -- which is why it reports the new one back rather than
-          leaving the editor to discover it on its next refused save.
+          is holding -- which is why it reports the new one back.
         -->
         <app-agent-knowledge
           [tenantId]="tenantId()"
           [aiAgentId]="aiAgentId()"
           [agentETag]="etag()"
+          sectionIndex="4"
           (versionChanged)="adoptVersion($event)"
         />
-
-        <!--
-          The preview panel is the one place a request reaches a paid third
-          party, so it has a permission of its own. Without it the panel is
-          replaced by an explanation rather than shown disabled: a text box that
-          refuses to send is more confusing than no text box.
-        -->
-        @if (canPreview()) {
-          <app-agent-preview
-            [tenantId]="tenantId()"
-            [aiAgentId]="aiAgentId()"
-            [unsavedInstructions]="instructionsChanged()"
-          />
-        } @else {
-          <section class="card" aria-labelledby="preview-unavailable-heading">
-            <div class="card-header">
-              <h2 id="preview-unavailable-heading" class="text-card-title">Preview</h2>
-            </div>
-            <div class="card-body">
-              <p class="text-small text-secondary">
-                Trying this agent out needs a permission your roles do not include. Ask somebody who
-                administers this workspace if you need it.
-              </p>
-            </div>
-          </section>
-        }
       </div>
+
+      <!-- ------------------------------------------------------ live preview -->
+      <!--
+        Beside the form from 80rem and after it below that. The preview is the
+        one place a request reaches a paid third party, so it has a permission
+        of its own; without it, an explanation rather than a disabled box.
+      -->
+      <aside class="authoring-aside" aria-labelledby="preview-heading">
+        <div class="authoring-aside-sticky">
+          @if (canPreview()) {
+            <app-agent-preview
+              [tenantId]="tenantId()"
+              [aiAgentId]="aiAgentId()"
+              [agentName]="current.name"
+              [widget]="widget()"
+              [widgetKnown]="widgetKnown()"
+              [unsavedChanges]="dirty()"
+            />
+          } @else {
+            <div class="card">
+              <div class="card-header">
+                <h2 id="preview-heading" class="card-title" i18n="@@agents.preview.heading">
+                  Customer view
+                </h2>
+              </div>
+              <div class="card-body">
+                <p class="text-small text-secondary" i18n="@@agents.preview.denied">
+                  Trying this agent out needs a permission your roles do not include. Ask somebody
+                  who administers this workspace if you need it.
+                </p>
+              </div>
+            </div>
+          }
+        </div>
+      </aside>
     </div>
 
     <app-confirm-dialog
       #confirmDisable
       heading="Disable this agent?"
-      body="It will stop answering until you activate it again. Its name and instructions are kept."
+      i18n-heading="@@agents.disable.confirm.heading"
+      body="It stops answering customers until you activate it again. Its name, instructions and knowledge are kept."
+      i18n-body="@@agents.disable.confirm.body"
       confirmLabel="Disable agent"
+      i18n-confirmLabel="@@agents.disable"
       tone="danger"
       (confirmed)="disable()"
     />

@@ -243,6 +243,13 @@ export const ICON_PATHS = {
 
   /** A schedule: a calendar page with two rings. */
   calendar: ['M4 6h16v14H4z', 'M4 10h16', 'M8 3v4', 'M16 3v4'],
+
+  // --- Knowledge files (Phase 36.8) ---------------------------------------------
+  /** A file: a page with a folded corner and two lines of text. Never mirrors. */
+  file: ['M14 3H6v18h12V7z', 'M14 3v4h4', 'M9 12.5h6', 'M9 16h6'],
+
+  /** Upload: an arrow rising out of a tray. */
+  upload: ['M12 15V4', 'M7 9l5-5 5 5', 'M5 20h14'],
 } as const;
 
 /** Every glyph the product can draw. */

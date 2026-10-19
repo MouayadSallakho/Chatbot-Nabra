@@ -1,6 +1,9 @@
 import { Routes } from '@angular/router';
 import { unsavedChangesGuard } from '@app/core/navigation/unsaved-changes';
+import { WebChatAdminApi } from '@app/features/channels/website-chat-api';
+import { WhatsAppApi } from '@app/features/channels/whatsapp-api';
 import { KnowledgeApi } from '@app/features/knowledge/knowledge-api';
+import { AgentChannels } from './agent-channels';
 import { AiAgentApi } from './ai-agent-api';
 
 /**
@@ -17,11 +20,16 @@ import { AiAgentApi } from './ai-agent-api';
  * the knowledge one. Two instances rather than a shared singleton: it holds no
  * state, and moving it to the root injector would pull it into the initial
  * bundle for everybody who never opens either area.
+ *
+ * <strong>The two channel clients are here for one read each</strong> (Phase
+ * 36.8): the list and the editor say which channels use an agent, and the
+ * preview wears the website chat's real accent. Both are stateless and scoped
+ * the same way.
  */
 export const aiAgentRoutes: Routes = [
   {
     path: '',
-    providers: [AiAgentApi, KnowledgeApi],
+    providers: [AiAgentApi, KnowledgeApi, WebChatAdminApi, WhatsAppApi, AgentChannels],
     children: [
       {
         path: '',

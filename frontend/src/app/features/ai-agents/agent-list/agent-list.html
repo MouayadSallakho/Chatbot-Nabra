@@ -1,12 +1,14 @@
 <div class="page">
   <app-page-header
     heading="AI Agents"
-    description="An AI agent answers on your behalf. Its instructions describe how it should reply, and its status controls whether it is in service."
+    i18n-heading="@@agents.heading"
+    description="An AI agent answers customers for you. Its instructions describe how it replies, and its status decides whether it is in service."
+    i18n-description="@@agents.description"
   >
     @if (hasAgents() && canCreate()) {
-      <a pageActions class="btn btn-primary" routerLink="/ai-agents/new">
+      <a pageActions class="btn btn-primary" routerLink="/ai-agents/new" data-testid="new-agent">
         <app-icon name="plus" [strokeWidth]="2" />
-        <span>New AI agent</span>
+        <span i18n="@@agents.new">New AI agent</span>
       </a>
     }
   </app-page-header>
@@ -22,17 +24,19 @@
         <app-empty-state
           icon="agents"
           heading="You do not have access to AI agents"
+          i18n-heading="@@agents.denied.heading"
           description="Seeing this workspace's AI agents needs a permission your roles do not include. Ask somebody who administers this workspace if you need it."
+          i18n-description="@@agents.denied.body"
+          data-testid="agents-denied"
         />
       </div>
     } @else if (loading() && !page()) {
       <!--
         A skeleton shaped like the rows that are coming, so the layout does not
-        jump when they arrive. `aria-busy` plus a hidden label is what makes the
-        wait perceivable to a screen reader, which sees nothing at all otherwise.
+        jump when they arrive.
       -->
       <div class="data-list agent-list" aria-busy="true">
-        <p class="visually-hidden" role="status">Loading AI agents…</p>
+        <p class="visually-hidden" role="status" i18n="@@agents.loading">Loading AI agents…</p>
         @for (row of skeletonRows; track row) {
           <div class="data-row data-row-skeleton" aria-hidden="true">
             <span class="skeleton skeleton-title"></span>
@@ -47,9 +51,16 @@
           icon="alert"
           tone="error"
           heading="Could not load AI agents"
+          i18n-heading="@@agents.loadFailed"
           [description]="error.message"
         >
-          <button stateActions type="button" class="btn btn-secondary btn-sm" (click)="load()">
+          <button
+            stateActions
+            type="button"
+            class="btn btn-secondary btn-sm"
+            (click)="load()"
+            i18n="@@agents.tryAgain"
+          >
             Try again
           </button>
         </app-empty-state>
@@ -63,57 +74,101 @@
         <app-empty-state
           icon="agents"
           heading="No AI agents yet"
-          description="An AI agent replies to customers using instructions you write. Create one to describe how it should behave, then preview its answers before putting it in service."
+          i18n-heading="@@agents.empty.heading"
+          description="An AI agent replies to customers using instructions you write. Create one, preview its answers, then put it in service."
+          i18n-description="@@agents.empty.body"
+          data-testid="agents-empty"
         >
           @if (canCreate()) {
-            <a stateActions class="btn btn-primary btn-sm" routerLink="/ai-agents/new">
+            <a
+              stateActions
+              class="btn btn-primary btn-sm"
+              routerLink="/ai-agents/new"
+              i18n="@@agents.empty.create"
+            >
               Create your first AI agent
             </a>
           }
         </app-empty-state>
       </div>
     } @else {
-      <div class="data-list agent-list" [attr.aria-busy]="loading()">
+      <div
+        class="data-list agent-list"
+        [class.agent-list-channels]="canSeeChannels()"
+        [attr.aria-busy]="loading()"
+      >
         <!--
-          Column labels for the desktop grid. Hidden from assistive technology
-          because each row already names its own values -- announcing the headings
-          as loose text would just add noise before the list.
+          Column labels for the wide grid. Hidden from assistive technology
+          because each row names its own values.
         -->
         <div class="data-list-head" aria-hidden="true">
-          <span>Name</span>
-          <span>Status</span>
-          <span>Last updated</span>
+          <span i18n="@@agents.column.name">Name</span>
+          <span i18n="@@agents.column.status">Status</span>
+          @if (canSeeChannels()) {
+            <span i18n="@@agents.column.channels">Channels</span>
+          }
+          <span i18n="@@agents.column.updated">Last updated</span>
         </div>
 
-        <ul>
+        <ul data-testid="agents">
           @for (agent of page()!.items; track agent.id) {
             <li>
               <!--
-                The whole row is one link. A row with a separate "open" button
-                would give a keyboard reader two stops for one destination, and a
-                pointer user a small target inside a large one.
+                The whole row is one link: one stop per destination for a
+                keyboard, one large target for a pointer.
               -->
-              <a class="data-row" [routerLink]="['/ai-agents', agent.id]">
-                <span class="data-row-title">{{ agent.name }}</span>
+              <a
+                class="data-row"
+                [routerLink]="['/ai-agents', agent.id]"
+                [attr.data-testid]="'agent-' + agent.id"
+              >
+                <span class="data-row-title" dir="auto">{{ agent.name }}</span>
 
                 <span class="agent-status">
-                  <span
-                    class="badge"
-                    [class.badge-success]="agent.status === 'Active'"
-                    [class.badge-neutral]="agent.status !== 'Active'"
-                  >
-                    {{ agent.status }}
-                  </span>
+                  <span class="badge" [class]="statusTone(agent.status)">{{
+                    statusWord(agent.status)
+                  }}</span>
                 </span>
+
+                @if (!canSeeChannels()) {
+                  <!-- No channel this reader may see: no column at all. -->
+                } @else if (channels(); as map) {
+                  @if (map.visible) {
+                    <span class="agent-channels data-row-meta">
+                      <span class="data-cell-label" i18n="@@agents.cell.channels">Channels:</span>
+                      @for (use of map.byAgent.get(agent.id) ?? []; track use.id) {
+                        <span class="agent-channel">
+                          <app-channel-badge [channel]="use.channel" />
+                          @if (channelNote(use.status); as note) {
+                            <span class="text-small text-muted">({{ note }})</span>
+                          }
+                        </span>
+                      } @empty {
+                        @if (map.incomplete) {
+                          <span class="text-small text-muted" i18n="@@agents.channels.notChecked"
+                            >Not checked</span
+                          >
+                        } @else {
+                          <span class="text-small text-muted" i18n="@@agents.channels.none"
+                            >Not on a channel</span
+                          >
+                        }
+                      }
+                    </span>
+                  }
+                } @else {
+                  <span class="agent-channels" aria-hidden="true">
+                    <span class="skeleton skeleton-text"></span>
+                  </span>
+                }
 
                 <span class="data-row-meta">
                   <!--
-                    A real space, not a CSS margin: Angular strips whitespace between
-                    elements, and a purely visual gap would still be announced as
-                    "UpdatedSep 5" by a screen reader.
+                    A real space, not a CSS margin: a purely visual gap would be
+                    announced as one run-on word.
                   -->
-                  <span class="data-cell-label">Updated&nbsp;</span>
-                  <time [attr.datetime]="agent.updatedAt">{{
+                  <span class="data-cell-label" i18n="@@agents.cell.updated">Updated:</span
+                  >&nbsp;<time [attr.datetime]="agent.updatedAt">{{
                     agent.updatedAt | localDate: 'dateTime'
                   }}</time>
                 </span>

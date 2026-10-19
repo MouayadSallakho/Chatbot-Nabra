@@ -7,6 +7,7 @@ import { TenantApi } from '@app/core/api/tenant-api';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
 import { memoryStorage, permissionApiGranting } from '@app/testing/test-doubles';
 import { PermissionApi } from '@app/core/authorization/permission-api';
+import { AgentChannelMap, AgentChannelUse, AgentChannels } from '../agent-channels';
 import { AiAgentApi, AiAgentSummary } from '../ai-agent-api';
 import { AgentList } from './agent-list';
 
@@ -29,14 +30,32 @@ describe('AgentList', () => {
   let fixture: ComponentFixture<AgentList>;
   let http: HttpTestingController;
 
-  async function mount(): Promise<void> {
+  /**
+   * Which channels use which agent, as the stand-in for `AgentChannels` answers.
+   * Provided through DI (never a module mock): the join itself is tested in
+   * agent-words.spec.ts.
+   */
+  let channelMap: AgentChannelMap;
+
+  function useOf(channel: AgentChannelUse['channel'], status = 'Active'): AgentChannelUse {
+    return { channel, id: crypto.randomUUID(), status, link: ['/channels'] };
+  }
+
+  async function mount(permissions: string | string[] = '*'): Promise<void> {
     TestBed.configureTestingModule({
       imports: [AgentList],
       providers: [
         // Selecting a workspace asks what the reader may do there. Without a
         // double the request would be left open and every case in this file
         // would fail on verify() for a reason unrelated to what it asserts.
-        { provide: PermissionApi, useValue: permissionApiGranting('*') },
+        {
+          provide: PermissionApi,
+          useValue: permissionApiGranting(...([] as string[]).concat(permissions)),
+        },
+        {
+          provide: AgentChannels,
+          useValue: { load: () => Promise.resolve(channelMap), widgetFor: () => null },
+        },
         provideRouter([]),
         provideHttpClient(),
         provideHttpClientTesting(),
@@ -77,6 +96,10 @@ describe('AgentList', () => {
   const rows = (): HTMLAnchorElement[] => [
     ...host().querySelectorAll<HTMLAnchorElement>('.agent-list a.data-row'),
   ];
+
+  beforeEach(() => {
+    channelMap = { byAgent: new Map(), visible: true, incomplete: false };
+  });
 
   afterEach(() => http.verify());
 
@@ -153,6 +176,68 @@ describe('AgentList', () => {
 
     expect(badge?.textContent?.trim()).toBe('Active');
     expect(badge?.classList.contains('badge-success')).toBe(true);
+  });
+
+  it('marks a draft with its own marker, so it differs from Disabled beyond the word', async () => {
+    await mount();
+
+    expectList().flush({
+      items: [summary({ status: 'Draft' }), summary({ status: 'Disabled' })],
+      page: 1,
+      pageSize: 20,
+      totalCount: 2,
+    });
+    await settle();
+
+    const badges = [...host().querySelectorAll('.agent-status .badge')];
+
+    expect(badges[0].textContent?.trim()).toBe('Draft');
+    expect(badges[0].classList).toContain('badge-draft');
+    expect(badges[1].classList).not.toContain('badge-draft');
+  });
+
+  describe('channels', () => {
+    it('names the channels that use each agent, with a channel that is not on said so', async () => {
+      const agent = summary({ status: 'Active' });
+
+      channelMap = {
+        byAgent: new Map([[agent.id, [useOf('WebChat'), useOf('WhatsApp', 'Draft')]]]),
+        visible: true,
+        incomplete: false,
+      };
+      await mount();
+
+      expectList().flush({ items: [agent, summary()], page: 1, pageSize: 20, totalCount: 2 });
+      await settle();
+
+      const cells = [...host().querySelectorAll('.agent-channels')];
+
+      expect(cells[0].textContent).toContain('Website chat');
+      expect(cells[0].textContent).toContain('WhatsApp');
+      expect(cells[0].textContent).toContain('(Draft)');
+      expect(cells[1].textContent).toContain('Not on a channel');
+    });
+
+    it('says "Not checked" when a channel list could not be read', async () => {
+      channelMap = { byAgent: new Map(), visible: true, incomplete: true };
+      await mount();
+
+      expectList().flush({ items: [summary()], page: 1, pageSize: 20, totalCount: 1 });
+      await settle();
+
+      expect(host().querySelector('.agent-channels')?.textContent).toContain('Not checked');
+      expect(host().textContent).not.toContain('Not on a channel');
+    });
+
+    it('leaves the column out for somebody who may see no channel', async () => {
+      await mount(['ai-agents.view']);
+
+      expectList().flush({ items: [summary()], page: 1, pageSize: 20, totalCount: 1 });
+      await settle();
+
+      expect(host().querySelector('.agent-channels')).toBeNull();
+      expect(host().querySelector('.data-list-head')?.textContent).not.toContain('Channels');
+    });
   });
 
   it('links each row to that agent', async () => {

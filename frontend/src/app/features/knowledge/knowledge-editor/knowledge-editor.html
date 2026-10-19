@@ -1,30 +1,70 @@
 <div class="page">
   @if (loading()) {
-    <div class="page-section" aria-busy="true">
-      <p class="visually-hidden" role="status">Loading document…</p>
-      <div class="card">
-        <div class="card-body editor-skeleton" aria-hidden="true">
-          <span class="skeleton skeleton-title"></span>
-          <span class="skeleton skeleton-text"></span>
-          <span class="skeleton skeleton-text"></span>
+    <!-- The heading stays while it loads: one h1, and somewhere for focus to land. -->
+    <app-page-header
+      backLink="/knowledge"
+      backLabel="Knowledge"
+      i18n-backLabel="@@back.knowledge"
+      heading="Knowledge document"
+      i18n-heading="@@knowledge.editor.genericHeading"
+      description=""
+    />
+    <div class="page-section authoring" aria-busy="true">
+      <p class="visually-hidden" role="status" i18n="@@knowledge.editor.loading">
+        Loading document…
+      </p>
+      <div class="authoring-main" aria-hidden="true">
+        <div class="card">
+          <div class="card-body editor-skeleton">
+            <span class="skeleton skeleton-title"></span>
+            <span class="skeleton skeleton-text"></span>
+            <span class="skeleton skeleton-bar"></span>
+          </div>
+        </div>
+      </div>
+      <div class="authoring-aside" aria-hidden="true">
+        <div class="card">
+          <div class="card-body editor-skeleton">
+            <span class="skeleton skeleton-text"></span>
+            <span class="skeleton skeleton-text"></span>
+          </div>
         </div>
       </div>
     </div>
   } @else if (loadFailure(); as error) {
+    <app-page-header
+      backLink="/knowledge"
+      backLabel="Knowledge"
+      i18n-backLabel="@@back.knowledge"
+      heading="Knowledge document"
+      i18n-heading="@@knowledge.editor.genericHeading"
+      description=""
+    />
     <div class="page-section">
       <div class="card">
         <app-empty-state
           icon="alert"
           tone="error"
           heading="Could not load this document"
+          i18n-heading="@@knowledge.editor.loadFailed"
           [description]="error.message"
         >
-          <button stateActions type="button" class="btn btn-secondary btn-sm" (click)="load()">
+          <button
+            stateActions
+            type="button"
+            class="btn btn-secondary btn-sm"
+            (click)="load()"
+            i18n="@@knowledge.tryAgain"
+          >
             Try again
           </button>
-          <a stateActions class="btn btn-secondary btn-sm" routerLink="/knowledge">
-            Back to knowledge
-          </a>
+          <a
+            stateActions
+            class="btn btn-ghost btn-sm"
+            routerLink="/knowledge"
+            i18n="@@knowledge.backToKnowledge"
+            >Back to knowledge</a
+          >
         </app-empty-state>
       </div>
     </div>
@@ -34,459 +74,554 @@
       backLabel="Knowledge"
       i18n-backLabel="@@back.knowledge"
       [heading]="doc.title"
-      description=""
+      [description]="typeWord(doc.source?.fileType ?? null) + ' · ' + savedSize()"
     >
+      <span pageStatus [class]="'badge ' + stateTone(displayState() ?? doc.readiness)">{{
+        stateWord(displayState() ?? doc.readiness)
+      }}</span>
     </app-page-header>
-
-    <!--
-      The state banner. It is the first thing on the page because it answers the
-      question somebody opens this screen with: is this document actually
-      answering anything?
-    -->
-    <div class="page-section">
-      <div
-        class="card state-card"
-        [class.state-ready]="doc.readiness === 'Ready'"
-        [class.state-needs-index]="doc.readiness === 'NeedsIndex'"
-        [class.state-disabled]="doc.readiness === 'Disabled'"
-      >
-        <div class="card-body state-body">
-          <span
-            class="badge"
-            [class.badge-success]="doc.readiness === 'Ready'"
-            [class.badge-warning]="doc.readiness === 'NeedsIndex'"
-            [class.badge-neutral]="doc.readiness === 'Disabled'"
-            data-testid="readiness"
-          >
-            {{
-              doc.readiness === 'Ready'
-                ? 'Ready'
-                : doc.readiness === 'Disabled'
-                  ? 'Disabled'
-                  : 'Needs index'
-            }}
-          </span>
-
-          <p class="text-small text-secondary state-explanation">
-            @if (doc.readiness === 'Ready') {
-              This document is indexed and in use. Agents it is assigned to can answer from it.
-            } @else if (doc.readiness === 'Disabled') {
-              This document is switched off. No agent will draw on it, whatever it is assigned to.
-              Its text and its index are kept.
-            } @else {
-              This document is not answering anything yet. Index it to make its current text
-              searchable.
-            }
-          </p>
-
-          <p class="text-small text-muted state-times">
-            <span>
-              Updated
-              <time [attr.datetime]="doc.updatedAt">{{
-                doc.updatedAt | localDate: 'dateTime'
-              }}</time>
-            </span>
-            <span>
-              @if (doc.indexedAt; as indexed) {
-                Indexed
-                <time [attr.datetime]="indexed">{{ indexed | localDate: 'dateTime' }}</time>
-              } @else {
-                Never indexed
-              }
-            </span>
-          </p>
-        </div>
-      </div>
-    </div>
 
     @if (conflict(); as source) {
       <!--
-        The stale-version banner. The reader's text is untouched and nothing is
-        retried; reloading is offered as a deliberate choice, and warns first if
-        it would discard work.
+        The stale-version notice. The reader's text is untouched and nothing is
+        retried; reloading is a deliberate choice, and warns first if it would
+        discard work.
       -->
-      <div class="page-section">
-        <div class="alert alert-warning" role="alert">
-          <app-icon name="alert" [strokeWidth]="1.75" />
-          <div>
-            <p class="text-body-strong">This document was updated elsewhere</p>
-            <p class="text-small">
-              Somebody else changed it since you opened this page, so your
-              {{
-                source === 'content'
-                  ? 'save'
-                  : source === 'index'
-                    ? 'indexing request'
-                    : source === 'source'
-                      ? 'file replacement'
-                      : 'change'
-              }}
-              was refused. Nothing you have typed has been lost or overwritten. Reload to see the
-              latest version — you will be asked first if that would replace unsaved changes.
-            </p>
-            <button type="button" class="btn btn-secondary btn-sm" (click)="reloadLatest()">
-              Reload latest
-            </button>
-          </div>
+      <div class="stale-notice" role="alert" data-testid="knowledge-stale">
+        <app-icon name="alert" [strokeWidth]="1.75" />
+        <div class="conflict-body">
+          <p class="conflict-title" i18n="@@knowledge.stale.title">
+            This document was updated somewhere else.
+          </p>
+          <p>
+            @switch (source) {
+              @case ('content') {
+                <span i18n="@@knowledge.stale.content">Your save was refused.</span>
+              }
+              @case ('index') {
+                <span i18n="@@knowledge.stale.index">Your index request was refused.</span>
+              }
+              @case ('source') {
+                <span i18n="@@knowledge.stale.source">Your file replacement was refused.</span>
+              }
+              @default {
+                <span i18n="@@knowledge.stale.change">Your change was refused.</span>
+              }
+            }
+            {{ ' ' }}
+            <span i18n="@@knowledge.stale.body"
+              >Nothing you typed was lost or overwritten. Reload to see the latest version; you will
+              be asked first if that would replace unsaved changes.</span
+            >
+          </p>
+          <button
+            type="button"
+            class="btn btn-secondary btn-sm"
+            (click)="reloadLatest()"
+            i18n="@@knowledge.stale.reload"
+          >
+            Reload latest
+          </button>
         </div>
       </div>
     }
 
-    <!-- The document itself. -->
-    <div class="page-section">
-      <form class="card" [formGroup]="form" (ngSubmit)="save()" novalidate>
-        <div class="card-header">
-          <h2 class="card-title">Document</h2>
-          @if (!canManage()) {
-            <p class="text-small text-muted">You can read this document but not change it.</p>
-          }
-        </div>
-
-        <div class="card-body editor-body">
-          <div class="field">
-            <label class="field-label field-required" for="knowledge-title">Title</label>
-            <input
-              id="knowledge-title"
-              class="input"
-              type="text"
-              formControlName="title"
-              autocomplete="off"
-              [attr.maxlength]="limits.titleMax"
-              [readonly]="!canManage()"
-            />
-            <p class="field-hint">
-              Renaming a document does not affect its index — only the content does.
-            </p>
-          </div>
-
-          <div class="field">
-            <label class="field-label field-required" for="knowledge-content">Content</label>
-            <!--
-              Plain text, bound through interpolation into a form control. Nothing
-              here renders markup: a knowledge document is tenant-authored and
-              untrusted, and innerHTML would turn a document into a script.
-            -->
-            <textarea
-              id="knowledge-content"
-              class="textarea content-input"
-              formControlName="content"
-              rows="18"
-              [attr.maxlength]="limits.contentMax"
-              [readonly]="!canManage()"
-              aria-describedby="knowledge-content-hint"
-              data-testid="content"
-            ></textarea>
-            <p class="field-hint" id="knowledge-content-hint">
-              Blank lines separate paragraphs, and indexing respects them.
-              <span class="counter" [class.counter-low]="contentRemaining() < 2000">
-                {{ contentRemaining() }} of {{ limits.contentMax }} characters remaining.
-              </span>
-            </p>
-          </div>
-
-          @if (contentChanged()) {
-            <p class="text-small text-secondary dirty-note" role="status">
-              <app-icon name="alert" [strokeWidth]="1.75" />
-              <span>
-                Unsaved changes to the content. Saving them will mean this document needs indexing
-                again.
-              </span>
-            </p>
-          }
-
-          @if (saveFailure(); as error) {
-            <div class="alert alert-danger" role="alert">
-              <app-icon name="alert" [strokeWidth]="1.75" />
-              <span>{{ error.message }}</span>
-            </div>
-          }
-        </div>
-
-        @if (canManage()) {
-          <div class="card-actions">
-            <button
-              type="button"
-              class="btn btn-secondary"
-              (click)="reset()"
-              [disabled]="!dirty() || saving()"
-            >
-              Discard changes
-            </button>
-            <button
-              type="submit"
-              class="btn btn-primary"
-              [disabled]="!dirty() || saving() || cannotWrite()"
-            >
-              @if (saving()) {
-                <span class="spinner" aria-hidden="true"></span>
-              }
-              <span class="btn-label">{{ saving() ? 'Saving…' : 'Save document' }}</span>
-            </button>
-          </div>
-        }
-      </form>
-    </div>
-
-    <!--
-      Where this document came from, and how to give it a new file. Present only
-      for a document that was uploaded: a written one has no file to describe and
-      no file to replace.
-    -->
-    @if (source(); as file) {
+    @if (!canManage()) {
       <div class="page-section">
-        <div class="card">
+        <p class="alert alert-info" role="status" data-testid="knowledge-read-only">
+          <app-icon name="info" [strokeWidth]="1.75" />
+          <span i18n="@@knowledge.readOnly"
+            >You can read this document but not change it. Changing knowledge needs a permission
+            your roles do not include.</span
+          >
+        </p>
+      </div>
+    }
+
+    <div class="page-section authoring">
+      <!-- ------------------------------------------------------ the document -->
+      <form
+        class="authoring-main"
+        [formGroup]="form"
+        (ngSubmit)="save()"
+        novalidate
+        data-testid="document-form"
+      >
+        <section class="card form-section" aria-labelledby="document-heading">
           <div class="card-header">
-            <h2 class="card-title">Source file</h2>
-            <p class="text-small text-muted">
-              This document was read out of a file. The file itself was not kept — only the text
-              below and this description of where it came from.
-            </p>
+            <div>
+              <h2
+                id="document-heading"
+                class="form-section-title"
+                i18n="@@knowledge.section.document"
+              >
+                Document
+              </h2>
+              <p class="form-section-lede" i18n="@@knowledge.document.lede">
+                Plain text, in any language. Renaming does not affect the index; changing the
+                content does.
+              </p>
+            </div>
           </div>
 
-          <div class="card-body source-body">
-            <dl class="source-facts">
-              <div>
-                <dt class="text-caption text-muted">File</dt>
-                <!--
-                  The filename is tenant-supplied text. Interpolated, never
-                  rendered as markup, and never used as a path by anything.
-                -->
-                <dd class="text-small" data-testid="source-name">{{ file.fileName }}</dd>
+          <div class="card-body">
+            <div class="field">
+              <label
+                class="field-label field-required"
+                for="knowledge-title"
+                i18n="@@knowledge.field.title"
+                >Title</label
+              >
+              <input
+                id="knowledge-title"
+                class="input"
+                type="text"
+                dir="auto"
+                formControlName="title"
+                autocomplete="off"
+                [attr.maxlength]="limits.titleMax"
+                [readonly]="!canManage()"
+              />
+            </div>
+
+            <div class="field">
+              <label
+                class="field-label field-required"
+                for="knowledge-content"
+                i18n="@@knowledge.field.content"
+                >Content</label
+              >
+              <!--
+                Plain text in a form control. Nothing renders markup: a knowledge
+                document is tenant-authored and untrusted.
+              -->
+              <textarea
+                id="knowledge-content"
+                class="textarea long-text knowledge-content"
+                dir="auto"
+                formControlName="content"
+                rows="18"
+                [attr.maxlength]="limits.contentMax"
+                [readonly]="!canManage()"
+                aria-describedby="knowledge-content-hint"
+                data-testid="content"
+              ></textarea>
+              <p class="field-hint" id="knowledge-content-hint">
+                <span
+                  class="counter"
+                  [class.counter-low]="contentRemaining() < 2000"
+                  i18n="@@knowledge.counter.content"
+                  >Characters left: {{ contentRemaining() | localNumber }} of
+                  {{ limits.contentMax | localNumber }}</span
+                >
+              </p>
+            </div>
+
+            @if (saveFailure(); as error) {
+              <div class="alert alert-danger" role="alert">
+                <app-icon name="alert" [strokeWidth]="1.75" />
+                <span>{{ error.message }}</span>
               </div>
+            }
+
+            @if (canManage()) {
+              <div class="section-actions">
+                @if (dirty()) {
+                  <span class="unsaved-note" aria-live="polite" data-testid="document-unsaved">
+                    <app-icon name="alert" [strokeWidth]="1.75" />
+                    @if (contentChanged()) {
+                      <span i18n="@@knowledge.unsaved.content"
+                        >Unsaved changes. Saving the content means it needs an index again.</span
+                      >
+                    } @else {
+                      <span i18n="@@knowledge.unsaved">Unsaved changes</span>
+                    }
+                  </span>
+                }
+                <button
+                  type="button"
+                  class="btn btn-ghost btn-sm"
+                  (click)="reset()"
+                  [disabled]="!dirty() || saving()"
+                  i18n="@@knowledge.discardChanges"
+                >
+                  Discard changes
+                </button>
+                <button
+                  type="submit"
+                  class="btn btn-primary btn-sm"
+                  [class.btn-loading]="saving()"
+                  [disabled]="!dirty() || saving() || cannotWrite()"
+                  data-testid="save-document"
+                >
+                  @if (saving()) {
+                    <span class="spinner" aria-hidden="true"></span>
+                    <span class="btn-label" i18n="@@knowledge.saving">Saving…</span>
+                  } @else {
+                    <span class="btn-label" i18n="@@knowledge.saveDocument">Save document</span>
+                  }
+                </button>
+              </div>
+            }
+          </div>
+        </section>
+      </form>
+
+      <aside class="authoring-aside">
+        <!-- ------------------------------------------- state and indexing -->
+        <!--
+          First beside the text because it answers the question somebody opens
+          this page with: is this document answering anything?
+        -->
+        <section class="card" aria-labelledby="indexing-heading">
+          <div class="card-header">
+            <h2 id="indexing-heading" class="card-title" i18n="@@knowledge.indexing.heading">
+              Indexing
+            </h2>
+          </div>
+          <div class="card-body indexing-body">
+            <p class="indexing-state">
+              <span
+                [class]="'badge ' + stateTone(displayState() ?? doc.readiness)"
+                data-testid="readiness"
+                >{{ stateWord(displayState() ?? doc.readiness) }}</span
+              >
+            </p>
+            <p class="text-small text-secondary" data-testid="state-sentence">
+              @switch (displayState()) {
+                @case ('Ready') {
+                  <span i18n="@@knowledge.state.ready.sentence"
+                    >Indexed and in use. Agents it is selected for can answer from it.</span
+                  >
+                }
+                @case ('Disabled') {
+                  <span i18n="@@knowledge.state.disabled.sentence"
+                    >Out of use. No agent answers from it, whoever it is selected for. Its text and
+                    index are kept.</span
+                  >
+                }
+                @case ('Failed') {
+                  <span i18n="@@knowledge.state.failed.sentence"
+                    >The last index request failed, so this document still answers nothing.</span
+                  >
+                }
+                @default {
+                  <span i18n="@@knowledge.state.needsIndex.sentence"
+                    >Not answering anything yet. Index it to make its saved text searchable.</span
+                  >
+                }
+              }
+            </p>
+
+            <dl class="facts">
               <div>
-                <dt class="text-caption text-muted">Format</dt>
-                <dd class="text-small" data-testid="source-format">
-                  {{ formatName(file.fileType) }}
+                <dt i18n="@@knowledge.facts.changed">Last change</dt>
+                <dd>
+                  <time [attr.datetime]="doc.updatedAt">{{
+                    doc.updatedAt | localDate: 'dateTime'
+                  }}</time>
                 </dd>
               </div>
               <div>
-                <dt class="text-caption text-muted">Size</dt>
-                <dd class="text-small">{{ sourceSize() }}</dd>
-              </div>
-              <div>
-                <dt class="text-caption text-muted">Text read</dt>
-                <dd class="text-small">
-                  <time [attr.datetime]="file.extractedAt">
-                    {{ file.extractedAt | localDate: 'dateTime' }}
-                  </time>
+                <dt i18n="@@knowledge.facts.indexed">Last indexed</dt>
+                <dd>
+                  @if (doc.indexedAt; as indexed) {
+                    <time [attr.datetime]="indexed">{{ indexed | localDate: 'dateTime' }}</time>
+                  } @else {
+                    <span i18n="@@knowledge.facts.never">Never</span>
+                  }
                 </dd>
               </div>
             </dl>
 
+            @if (lastIndex(); as result) {
+              <p class="text-small text-secondary" role="status" data-testid="index-result">
+                @if (result.current) {
+                  <span i18n="@@knowledge.index.alreadyCurrent"
+                    >Already up to date. No request was sent to the AI provider.</span
+                  >
+                } @else {
+                  <span i18n="@@knowledge.index.result"
+                    >Indexed. Passages: {{ result.chunks | localNumber }}. Provider requests:
+                    {{ result.calls | localNumber }}.</span
+                  >
+                }
+              </p>
+            } @else if (!indexWouldWork()) {
+              <p class="text-small text-secondary" i18n="@@knowledge.index.nothingToDo">
+                The saved text is already indexed. Indexing it again would send nothing and change
+                nothing.
+              </p>
+            }
+
+            @if (indexFailure(); as error) {
+              <div class="alert alert-danger" role="alert" data-testid="index-error">
+                <app-icon name="alert" [strokeWidth]="1.75" />
+                <span>{{ error.message }}</span>
+              </div>
+            }
+
+            <p class="text-small text-muted" i18n="@@knowledge.index.cost">
+              Indexing uses the AI provider and costs money, so it happens only when you ask.
+              Indexing unchanged text costs nothing.
+            </p>
+
             @if (canManage()) {
-              <div class="field replace-field">
-                <label class="field-label" for="knowledge-replacement">Replace file</label>
+              <div class="section-actions indexing-actions">
+                <button
+                  type="button"
+                  class="btn btn-primary btn-sm"
+                  [class.btn-loading]="indexing()"
+                  (click)="index()"
+                  [disabled]="indexing() || cannotWrite()"
+                  data-testid="index-button"
+                >
+                  @if (indexing()) {
+                    <span class="spinner" aria-hidden="true"></span>
+                    <span class="btn-label" i18n="@@knowledge.index.running">Indexing…</span>
+                  } @else if (doc.indexedAt) {
+                    <span class="btn-label" i18n="@@knowledge.index.again">Index again</span>
+                  } @else {
+                    <span class="btn-label" i18n="@@knowledge.index.run">Index document</span>
+                  }
+                </button>
+              </div>
+            }
+          </div>
+        </section>
+
+        <!-- ------------------------------------------------- availability -->
+        <section class="card" aria-labelledby="availability-heading">
+          <div class="card-header">
+            <h2
+              id="availability-heading"
+              class="card-title"
+              i18n="@@knowledge.availability.heading"
+            >
+              Availability
+            </h2>
+          </div>
+          <div class="card-body indexing-body">
+            <p class="text-small text-secondary" i18n="@@knowledge.availability.lede">
+              Taking a document out of use stops every agent answering from it at once. Its text and
+              index are kept, so putting it back costs nothing.
+            </p>
+
+            @if (availabilityFailure(); as error) {
+              <div class="alert alert-danger" role="alert">
+                <app-icon name="alert" [strokeWidth]="1.75" />
+                <span>{{ error.message }}</span>
+              </div>
+            }
+
+            @if (canManage()) {
+              <div class="section-actions indexing-actions">
+                @if (doc.isEnabled) {
+                  <button
+                    type="button"
+                    class="btn btn-secondary btn-sm"
+                    (click)="setAvailability(false)"
+                    [disabled]="changingAvailability() || cannotWrite()"
+                    data-testid="disable-button"
+                    i18n="@@knowledge.availability.disable"
+                  >
+                    Take out of use
+                  </button>
+                } @else {
+                  <button
+                    type="button"
+                    class="btn btn-primary btn-sm"
+                    (click)="setAvailability(true)"
+                    [disabled]="changingAvailability() || cannotWrite()"
+                    data-testid="enable-button"
+                    i18n="@@knowledge.availability.enable"
+                  >
+                    Put back in use
+                  </button>
+                }
+              </div>
+            }
+          </div>
+        </section>
+
+        <!-- -------------------------------------------------- source file -->
+        <!--
+          Only for a document read out of a file: a written one has no file to
+          describe and none to replace.
+        -->
+        @if (source(); as file) {
+          <section class="card" aria-labelledby="source-heading">
+            <div class="card-header">
+              <h2 id="source-heading" class="card-title" i18n="@@knowledge.source.heading">
+                Source file
+              </h2>
+            </div>
+            <div class="card-body indexing-body">
+              <p class="text-small text-muted" i18n="@@knowledge.source.lede">
+                The text was read out of this file. The file itself was not kept.
+              </p>
+              <dl class="facts">
+                <div class="facts-wide">
+                  <dt i18n="@@knowledge.source.file">File</dt>
+                  <!-- Tenant-supplied text: interpolated, never markup or a path. -->
+                  <dd dir="auto" data-testid="source-name">{{ file.fileName }}</dd>
+                </div>
+                <div>
+                  <dt i18n="@@knowledge.source.format">Format</dt>
+                  <dd data-testid="source-format">{{ typeWord(file.fileType) }}</dd>
+                </div>
+                <div>
+                  <dt i18n="@@knowledge.source.size">Size</dt>
+                  <dd>{{ sourceSize() }}</dd>
+                </div>
+                <div class="facts-wide">
+                  <dt i18n="@@knowledge.source.read">Text read</dt>
+                  <dd>
+                    <time [attr.datetime]="file.extractedAt">{{
+                      file.extractedAt | localDate: 'dateTime'
+                    }}</time>
+                  </dd>
+                </div>
+              </dl>
+
+              @if (canManage()) {
                 <input
+                  #replaceInput
                   id="knowledge-replacement"
-                  class="input file-input"
+                  class="visually-hidden"
                   type="file"
+                  tabindex="-1"
+                  aria-hidden="true"
                   [attr.accept]="fileLimits.accept"
                   (change)="chooseReplacement($event)"
                   [disabled]="replacing() || cannotWrite()"
-                  aria-describedby="knowledge-replacement-hint"
-                  [attr.aria-invalid]="replacementRefusal() ? 'true' : null"
-                  [attr.aria-errormessage]="
-                    replacementRefusal() ? 'knowledge-replacement-error' : null
-                  "
                   data-testid="replace-input"
                 />
-                <p class="field-hint" id="knowledge-replacement-hint">
-                  PDF, Word (.docx), plain text or CSV, up to {{ fileLimits.maxMegabytes }} MB.
-                  Uploading a new file replaces this whole document.
-                </p>
 
                 @if (replacement(); as chosen) {
-                  <p class="chosen-file text-small text-secondary" role="status">
-                    <app-icon name="knowledge" [strokeWidth]="1.75" />
-                    <span data-testid="replacement-name">{{ chosen.name }}</span>
-                  </p>
+                  <div class="file-card" role="status">
+                    <app-icon class="file-card-glyph" name="file" [strokeWidth]="1.6" />
+                    <div class="file-card-body">
+                      <span class="file-card-name" dir="auto" data-testid="replacement-name">{{
+                        chosen.name
+                      }}</span>
+                      @if (replacementFacts(); as facts) {
+                        <span class="file-card-meta">
+                          @if (facts.type) {
+                            <span>{{ facts.type }}</span> ·
+                          }
+                          <span>{{ facts.size }}</span>
+                        </span>
+                      }
+                    </div>
+                    <!-- erp-lint-ignore: destructive-confirm -- forgets a file chosen but not yet sent; the document is untouched -->
+                    <button
+                      type="button"
+                      class="btn btn-ghost btn-sm"
+                      (click)="clearReplacement()"
+                      [disabled]="replacing()"
+                    >
+                      <app-icon name="close" [strokeWidth]="1.75" />
+                      <span i18n="@@knowledge.upload.remove">Remove</span>
+                    </button>
+                  </div>
                 }
 
                 @if (replacementRefusal(); as reason) {
-                  <p
-                    class="field-error"
-                    id="knowledge-replacement-error"
-                    role="alert"
-                    data-testid="replacement-refusal"
-                  >
+                  <p class="field-error" role="alert" data-testid="replacement-refusal">
                     <app-icon name="alert" [strokeWidth]="1.75" />
                     <span>{{ reason }}</span>
                   </p>
                 }
-              </div>
 
-              <!--
-                Said before the button is pressed, not reported afterwards. The
-                index describes the old text, and replacing the file makes that
-                index wrong.
-              -->
-              <p class="text-small text-secondary replace-warning">
-                <app-icon name="alert" [strokeWidth]="1.75" />
-                <span>
+                <!--
+                  Said before the button is pressed, not reported afterwards: the
+                  new text replaces the old, so the index stops describing it.
+                -->
+                <p class="text-small replace-warning">
+                  <app-icon name="alert" [strokeWidth]="1.75" />
                   @if (doc.indexedAt) {
-                    Replacing the file replaces this document's text, so the current index stops
-                    describing it and you will need to index it again.
+                    <span i18n="@@knowledge.replace.warningIndexed"
+                      >A new file replaces this document's whole text, so it will need an index
+                      again.</span
+                    >
                   } @else {
-                    Replacing the file replaces this document's text. It still needs indexing
-                    afterwards.
+                    <span i18n="@@knowledge.replace.warning"
+                      >A new file replaces this document's whole text. It still needs an index
+                      afterwards.</span
+                    >
                   }
-                </span>
-              </p>
-            }
+                </p>
+                <p class="text-small text-muted" id="replace-limits">
+                  <span i18n="@@knowledge.upload.limits"
+                    >{{ formats }}, up to {{ maxSize }}. One file at a time.</span
+                  >
+                </p>
+              }
 
-            @if (replaceFailure(); as error) {
-              <div class="alert alert-danger" role="alert" data-testid="replace-error">
-                <app-icon name="alert" [strokeWidth]="1.75" />
-                <div>
-                  <span>{{ error.message }}</span>
-                  @if (error.kind === 'unprocessable') {
-                    <p class="text-small">
-                      Nothing was changed — this document still holds the text it had before.
-                    </p>
-                  }
+              @if (replaceFailureMessage(); as message) {
+                <div class="alert alert-danger" role="alert" data-testid="replace-error">
+                  <app-icon name="alert" [strokeWidth]="1.75" />
+                  <div>
+                    <span>{{ message }}</span>
+                    @if (replaceFailure()?.kind === 'unprocessable') {
+                      <p class="text-small" i18n="@@knowledge.replace.nothingChanged">
+                        Nothing was changed: this document keeps the text it had.
+                      </p>
+                    }
+                  </div>
                 </div>
-              </div>
-            }
-          </div>
-
-          @if (canManage()) {
-            <div class="card-actions">
-              <button
-                type="button"
-                class="btn btn-secondary"
-                (click)="replaceSource()"
-                [disabled]="!canReplace()"
-                data-testid="replace-button"
-              >
-                @if (replacing()) {
-                  <span class="spinner" aria-hidden="true"></span>
-                }
-                <span class="btn-label">{{
-                  replacing() ? 'Reading the new file…' : 'Replace file'
-                }}</span>
-              </button>
-            </div>
-          }
-        </div>
-      </div>
-    }
-
-    <!-- Indexing: the one control on this page that costs money. -->
-    <div class="page-section">
-      <div class="card">
-        <div class="card-header">
-          <h2 class="card-title">Indexing</h2>
-          <p class="text-small text-muted">
-            Indexing turns this document into searchable pieces using the AI provider. It costs
-            money, so it only ever happens when you ask for it — and re-indexing text that has not
-            changed costs nothing at all.
-          </p>
-        </div>
-
-        <div class="card-body">
-          @if (lastIndex(); as result) {
-            <p class="text-small text-secondary" role="status" data-testid="index-result">
-              @if (result.current) {
-                Already up to date. No request was sent to the AI provider.
-              } @else {
-                Indexed into {{ result.chunks }}
-                {{ result.chunks === 1 ? 'piece' : 'pieces' }} using {{ result.calls }} provider
-                {{ result.calls === 1 ? 'request' : 'requests' }}.
               }
-            </p>
-          } @else if (!indexWouldWork()) {
-            <p class="text-small text-secondary">
-              The saved text is already indexed. Re-indexing it would send nothing and change
-              nothing.
-            </p>
-          }
 
-          @if (indexFailure(); as error) {
-            <div class="alert alert-danger" role="alert" data-testid="index-error">
-              <app-icon name="alert" [strokeWidth]="1.75" />
-              <span>{{ error.message }}</span>
-            </div>
-          }
-        </div>
-
-        @if (canManage()) {
-          <div class="card-actions">
-            <button
-              type="button"
-              class="btn btn-primary"
-              (click)="index()"
-              [disabled]="indexing() || cannotWrite()"
-              data-testid="index-button"
-            >
-              @if (indexing()) {
-                <span class="spinner" aria-hidden="true"></span>
+              @if (canManage()) {
+                <div class="section-actions indexing-actions">
+                  <button
+                    type="button"
+                    class="btn btn-secondary btn-sm"
+                    (click)="chooseReplacementFile()"
+                    [disabled]="replacing() || cannotWrite()"
+                    aria-describedby="replace-limits"
+                    data-testid="choose-replacement"
+                  >
+                    <app-icon name="file" [strokeWidth]="1.75" />
+                    <span i18n="@@knowledge.replace.choose">Choose a new file</span>
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-primary btn-sm"
+                    [class.btn-loading]="replacing()"
+                    (click)="replaceSource()"
+                    [disabled]="!canReplace()"
+                    data-testid="replace-button"
+                  >
+                    @if (replacing()) {
+                      <span class="spinner" aria-hidden="true"></span>
+                      <span class="btn-label" i18n="@@knowledge.replace.running"
+                        >Reading the new file…</span
+                      >
+                    } @else {
+                      <span class="btn-label" i18n="@@knowledge.replace.run">Replace file</span>
+                    }
+                  </button>
+                </div>
               }
-              <span class="btn-label">
-                {{
-                  indexing() ? 'Indexing…' : doc.indexedAt ? 'Reindex knowledge' : 'Index knowledge'
-                }}
-              </span>
-            </button>
-          </div>
-        }
-      </div>
-    </div>
-
-    <!-- Availability. -->
-    <div class="page-section">
-      <div class="card">
-        <div class="card-header">
-          <h2 class="card-title">Availability</h2>
-          <p class="text-small text-muted">
-            Switching a document off stops every agent drawing on it immediately. The text and the
-            index are kept, so switching it back on costs nothing.
-          </p>
-        </div>
-
-        @if (availabilityFailure(); as error) {
-          <div class="card-body">
-            <div class="alert alert-danger" role="alert">
-              <app-icon name="alert" [strokeWidth]="1.75" />
-              <span>{{ error.message }}</span>
             </div>
-          </div>
+          </section>
         }
-
-        @if (canManage()) {
-          <div class="card-actions">
-            @if (doc.isEnabled) {
-              <button
-                type="button"
-                class="btn btn-secondary"
-                (click)="setAvailability(false)"
-                [disabled]="changingAvailability() || cannotWrite()"
-                data-testid="disable-button"
-              >
-                Take out of use
-              </button>
-            } @else {
-              <button
-                type="button"
-                class="btn btn-primary"
-                (click)="setAvailability(true)"
-                [disabled]="changingAvailability() || cannotWrite()"
-                data-testid="enable-button"
-              >
-                Put back in use
-              </button>
-            }
-          </div>
-        }
-      </div>
+      </aside>
     </div>
   }
 
   <app-confirm-dialog
     #disableDialog
     heading="Take this document out of use?"
-    body="AI agents stop drawing on it in their answers until it is put back in use. The document and its content are kept."
+    i18n-heading="@@knowledge.disable.confirm.heading"
+    body="AI agents stop answering from it until it is put back in use. The document and its index are kept."
+    i18n-body="@@knowledge.disable.confirm.body"
     confirmLabel="Take out of use"
+    i18n-confirmLabel="@@knowledge.disable.confirm.action"
     cancelLabel="Keep in use"
+    i18n-cancelLabel="@@knowledge.disable.confirm.cancel"
     tone="danger"
   />
 </div>

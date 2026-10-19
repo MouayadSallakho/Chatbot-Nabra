@@ -9,7 +9,7 @@ import { memoryStorage, permissionApiGranting } from '@app/testing/test-doubles'
 import { PermissionApi } from '@app/core/authorization/permission-api';
 import { KnowledgeApi } from '../knowledge-api';
 import { KNOWLEDGE_FILE_LIMITS } from '../knowledge-limits';
-import { KnowledgeUpload, describeBytes } from './knowledge-upload';
+import { KnowledgeUpload } from './knowledge-upload';
 
 /**
  * The knowledge upload page.
@@ -112,7 +112,7 @@ describe('KnowledgeUpload', () => {
     it('says the file itself is not stored', async () => {
       await mount();
 
-      expect(host().textContent).toContain('The file itself is not stored');
+      expect(host().textContent).toContain('The file is not kept');
     });
 
     it('says indexing is a separate step', async () => {
@@ -121,10 +121,10 @@ describe('KnowledgeUpload', () => {
       expect(host().textContent).toContain('Indexing is a separate step');
     });
 
-    it('says scanned PDFs are not supported', async () => {
+    it('says scanned PDFs are not read', async () => {
       await mount();
 
-      expect(host().textContent).toContain('Scanned PDFs are not supported');
+      expect(host().textContent).toContain('Scanned PDFs are not read');
     });
 
     it('refuses the page to somebody who may not manage knowledge', async () => {
@@ -148,7 +148,8 @@ describe('KnowledgeUpload', () => {
       await choose(pdf('returns.pdf', 2_048));
 
       expect(query('[data-testid="chosen-file"]')?.textContent).toContain('returns.pdf');
-      expect(query('[data-testid="chosen-file"]')?.textContent).toContain('2 KB');
+      expect(query('[data-testid="chosen-file"]')?.textContent).toContain('2 kB');
+      expect(query('[data-testid="chosen-file"]')?.textContent).toContain('PDF');
     });
 
     it('refuses a file past the limit without sending it', async () => {
@@ -177,8 +178,86 @@ describe('KnowledgeUpload', () => {
 
       await choose(new File([new Uint8Array(16)], 'slides.pptx'));
 
-      expect(query('[data-testid="local-refusal"]')?.textContent).toContain('PDF, Word document');
+      expect(query('[data-testid="local-refusal"]')?.textContent).toContain('PDF, Word (.docx)');
       http.expectNone(filesUrl);
+    });
+  });
+
+  describe('the drop zone', () => {
+    /** A drag event carrying files, as far as the component reads one. */
+    function drag(type: string, files: File[]): Event {
+      const event = new Event(type, { bubbles: true, cancelable: true });
+
+      Object.defineProperty(event, 'dataTransfer', {
+        value: {
+          types: ['Files'],
+          files: { length: files.length, item: (index: number) => files[index] ?? null },
+          dropEffect: 'none',
+        },
+      });
+
+      return event;
+    }
+
+    const zone = (): HTMLElement => query<HTMLElement>('[data-testid="drop-zone"]')!;
+
+    it('offers a real button that opens the file picker', async () => {
+      await mount();
+
+      const input = query<HTMLInputElement>('[data-testid="file-input"]')!;
+      const opened = vi.fn();
+
+      input.addEventListener('click', opened);
+      query<HTMLButtonElement>('[data-testid="choose-file"]')!.click();
+
+      expect(opened).toHaveBeenCalledTimes(1);
+      // The native input is not a second tab stop.
+      expect(input.tabIndex).toBe(-1);
+    });
+
+    it('takes a dropped file through the same checks as a chosen one', async () => {
+      await mount();
+
+      zone().dispatchEvent(drag('dragenter', [pdf()]));
+      await settle();
+
+      expect(zone().classList).toContain('is-dragging');
+
+      const dropped = drag('drop', [pdf('policy.pdf')]);
+
+      zone().dispatchEvent(dropped);
+      await settle();
+
+      expect(dropped.defaultPrevented).toBe(true);
+      expect(zone().classList).not.toContain('is-dragging');
+      expect(query('[data-testid="chosen-file-name"]')?.textContent).toContain('policy.pdf');
+      expect(uploadButton().disabled).toBe(false);
+    });
+
+    it('refuses a dropped file it cannot read, and takes only the first of several', async () => {
+      await mount();
+
+      zone().dispatchEvent(
+        drag('drop', [new File([new Uint8Array(4)], 'photo.png'), pdf('second.pdf')]),
+      );
+      await settle();
+
+      expect(query('[data-testid="local-refusal"]')).not.toBeNull();
+      expect(host().textContent).toContain('Only the first file was taken');
+      http.expectNone(filesUrl);
+    });
+
+    it('removes the chosen file and puts focus back on the choose button', async () => {
+      await mount();
+
+      await choose(pdf());
+
+      query<HTMLButtonElement>('[data-testid="remove-file"]')!.click();
+      await settle();
+
+      expect(query('[data-testid="chosen-file"]')).toBeNull();
+      expect(document.activeElement).toBe(query('[data-testid="choose-file"]'));
+      expect(uploadButton().disabled).toBe(true);
     });
   });
 
@@ -278,7 +357,7 @@ describe('KnowledgeUpload', () => {
       );
     });
 
-    it('reports an unsupported format in the server words', async () => {
+    it('reports an unsupported format with the formats it accepts', async () => {
       await mount();
 
       await choose(pdf('actually-a-zip.pdf'));
@@ -295,11 +374,11 @@ describe('KnowledgeUpload', () => {
       await settle();
 
       expect(query('[data-testid="upload-error"]')?.textContent).toContain(
-        'not a PDF, Word document or CSV',
+        'not a PDF, Word (.docx), plain text or CSV file',
       );
     });
 
-    it('reports an oversized file the server refused in the server words', async () => {
+    it('reports an oversized file the server refused with the real limit', async () => {
       await mount();
 
       await choose(pdf());
@@ -315,7 +394,7 @@ describe('KnowledgeUpload', () => {
 
       await settle();
 
-      expect(query('[data-testid="upload-error"]')?.textContent).toContain('10 MB or smaller');
+      expect(query('[data-testid="upload-error"]')?.textContent).toContain('larger than 10 MB');
     });
 
     it('does not send a second request while the first is in flight', async () => {
@@ -333,13 +412,5 @@ describe('KnowledgeUpload', () => {
 
       await settle();
     });
-  });
-});
-
-describe('describeBytes', () => {
-  it('reads sizes in the unit a person would use', () => {
-    expect(describeBytes(512)).toBe('512 bytes');
-    expect(describeBytes(2_048)).toBe('2 KB');
-    expect(describeBytes(1_572_864)).toBe('1.5 MB');
   });
 });

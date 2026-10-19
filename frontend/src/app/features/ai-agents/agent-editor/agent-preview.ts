@@ -1,8 +1,10 @@
-import { ChangeDetectionStrategy, Component, inject, input, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
 import { ApiError, toApiError } from '@app/core/api/api-error';
 import { Icon } from '@app/shared/icon/icon';
+import type { WebChatWidget } from '@app/features/channels/website-chat-api';
+import { readableForeground } from '@app/features/embed/accent-color';
 import { AGENT_LIMITS } from '../ai-agent-limits';
 import { AiAgentApi } from '../ai-agent-api';
 
@@ -31,6 +33,14 @@ interface Exchange {
  * decides whether a draft is ready, and how they check one they have taken out
  * of service to repair. Status governs whether an agent serves customers, not
  * whether its owner may test it.
+ *
+ * <strong>It looks like the chat customers see</strong> (Phase 36.8): the
+ * widget's header with the agent's name and the honesty line, the AI's
+ * bubbles in the accent's tint, the customer's neutral, the composer at the
+ * bottom. The accent and greeting are the workspace's real widget settings
+ * when a website chat uses this agent; otherwise the widget's default colour,
+ * and the panel says which. The words a customer would see are in the reader's
+ * language here; the widget itself follows the visitor's.
  */
 @Component({
   selector: 'app-agent-preview',
@@ -45,10 +55,33 @@ export class AgentPreview {
   readonly tenantId = input.required<string>();
   readonly aiAgentId = input.required<string>();
 
-  /** Whether the agent has unsaved instruction edits, so the panel can say so. */
-  readonly unsavedInstructions = input(false);
+  /** The agent's saved name: the widget's title. */
+  readonly agentName = input.required<string>();
+
+  /** The website widget's appearance for this agent, or null for the default look. */
+  readonly widget = input<WebChatWidget | null>(null);
+
+  /** Whether the widget lookup has finished (so the note does not flicker). */
+  readonly widgetKnown = input(false);
+
+  /** Whether the editor holds unsaved edits, so the panel can say the preview ignores them. */
+  readonly unsavedChanges = input(false);
+
+  /** The widget's own default accent, used until (or unless) the workspace's is known. */
+  private static readonly DEFAULT_ACCENT = '#2563eb'; // token-lint-ignore: the widget's own default (embed-chat.scss)
+
+  protected readonly accent = computed(
+    () => this.widget()?.accentColor ?? AgentPreview.DEFAULT_ACCENT,
+  );
+
+  protected readonly onAccent = computed(() => readableForeground(this.accent()));
+
+  protected readonly greeting = computed(() => this.widget()?.greeting ?? null);
 
   protected readonly limits = AGENT_LIMITS;
+
+  protected readonly frameLabel = $localize`:@@agents.preview.frameLabel:Chat preview, as customers see it`;
+  protected readonly transcriptLabel = $localize`:@@agents.preview.transcriptLabel:Preview conversation`;
 
   /**
    * One control, but inside a group.
@@ -99,6 +132,21 @@ export class AgentPreview {
     } finally {
       this.generating.set(false);
     }
+  }
+
+  /**
+   * Enter sends and Shift+Enter starts a new line, as in the widget. A key
+   * held for an IME composition is left alone.
+   */
+  protected onEnter(event: Event): void {
+    const key = event as KeyboardEvent;
+
+    if (key.shiftKey || key.isComposing) {
+      return;
+    }
+
+    key.preventDefault();
+    void this.send();
   }
 
   /** Clears this tab's transcript. Nothing server-side is affected. */

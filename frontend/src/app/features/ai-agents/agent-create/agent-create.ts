@@ -6,6 +6,8 @@ import { ApiError, toApiError } from '@app/core/api/api-error';
 import { ToastService } from '@app/core/feedback/toast-service';
 import { PermissionService } from '@app/core/authorization/permission-service';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
+import { LocalNumberPipe } from '@app/core/i18n/locale-pipes';
+import { EmptyState } from '@app/shared/empty-state/empty-state';
 import { Icon } from '@app/shared/icon/icon';
 import { PageHeader } from '@app/shared/page-header/page-header';
 import { AGENT_LIMITS, CREATED_AGENT_STATE } from '../ai-agent-limits';
@@ -26,11 +28,16 @@ import { AiAgentApi } from '../ai-agent-api';
  * Domain, and a rejected value is reported in the backend's own words. Copying
  * the whole rule set into TypeScript would create a second authority that drifts
  * from the first.
+ *
+ * <strong>Guided, not a wizard</strong> (Phase 36.8): two numbered sections on
+ * one page and, beside them, the real lifecycle a new agent follows (draft,
+ * preview, knowledge, activate). Two fields do not need steps; they need the
+ * reader to know nothing goes into service on Create.
  */
 @Component({
   selector: 'app-agent-create',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, RouterLink, PageHeader, Icon],
+  imports: [ReactiveFormsModule, RouterLink, PageHeader, EmptyState, Icon, LocalNumberPipe],
   templateUrl: './agent-create.html',
   styleUrl: './agent-create.scss',
 })
@@ -50,6 +57,8 @@ export class AgentCreate {
   private readonly toasts = inject(ToastService);
 
   protected readonly limits = AGENT_LIMITS;
+
+  protected readonly lifecycleLabel = $localize`:@@agents.lifecycle.label:Lifecycle`;
 
   protected readonly submitting = signal(false);
   protected readonly failure = signal<ApiError | null>(null);
@@ -87,6 +96,16 @@ export class AgentCreate {
     return control.invalid && (control.touched || this.submitAttempted());
   }
 
+  /**
+   * Takes the reader to the first field that needs attention, so the error they
+   * are told about is where they are (the button is often far below it).
+   */
+  private focusFirstInvalid(): void {
+    const id = this.form.controls.name.invalid ? 'agent-name' : 'agent-instructions';
+
+    globalThis.document?.getElementById(id)?.focus();
+  }
+
   protected async create(): Promise<void> {
     this.submitAttempted.set(true);
 
@@ -94,6 +113,7 @@ export class AgentCreate {
     // response creates a second agent.
     if (this.form.invalid || this.submitting()) {
       this.form.markAllAsTouched();
+      this.focusFirstInvalid();
 
       return;
     }
@@ -115,7 +135,9 @@ export class AgentCreate {
         }),
       );
 
-      this.toasts.success(`${created.value.name} created.`);
+      this.toasts.success(
+        $localize`:@@agents.toast.created:${created.value.name}:name: created as a draft.`,
+      );
 
       // The created representation and its entity tag are handed to the editor
       // through navigation state, so it can open on canonical server state

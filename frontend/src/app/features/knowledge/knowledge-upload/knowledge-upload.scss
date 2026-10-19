@@ -1,62 +1,18 @@
-// The same narrow column as the written-document form: one field per line, and
-// a measure short enough that the explanatory list is actually read.
-.page-narrow {
-  max-inline-size: 46rem;
+// The drop zone and the file card are global (`_authoring.scss`); this page
+// only sets its column widths and the progress line.
+@media (min-width: 64rem) {
+  .upload-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(16rem, 22rem);
+  }
 }
 
-.upload-form .card-body {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-6);
+.file-card.is-refused {
+  border-color: var(--danger-border);
 }
 
-// A file input renders its own button, which no stylesheet can fully reach. The
-// padding is reduced so the native control does not sit crushed against the
-// border it shares with text inputs.
-.file-input {
-  padding-block: var(--space-2);
-  line-height: 1.4;
-}
-
-.chosen-file,
 .upload-progress {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  margin-block-start: var(--space-2);
-}
-
-// The filename comes from a file the reader chose, so it is interpolated and
-// never rendered as markup. Long names wrap rather than widening the card.
-.chosen-file span {
-  overflow-wrap: anywhere;
-}
-
-.upload-notes {
-  padding: var(--space-4);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  background-color: var(--surface-inset);
-
-  h2 {
-    margin: 0 0 var(--space-2);
-  }
-
-  ul {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
-    margin: 0;
-    padding-inline-start: var(--space-5);
-  }
-}
-
-.upload-actions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: var(--space-2);
-  padding: var(--space-4) var(--space-5);
-  border-block-start: 1px solid var(--border-subtle);
-  background-color: var(--surface-inset);
+  margin: 0;
 }

@@ -1,68 +1,52 @@
-// Two columns on wide screens, one on narrow. CSS Grid rather than the Bootstrap
-// grid: this is a page-level split between "the thing" and "tools for the
-// thing", not a proportional twelve-column layout, and the breakpoint it wants
-// is where a 14-row textarea and a preview panel can both stay usable.
-.editor {
-  display: grid;
-  gap: var(--space-6);
-  margin-block-start: var(--space-6);
-}
-
-.editor-main,
-.editor-side {
+// The frame, sections, counters and preview are global (`_authoring.scss`);
+// this file only lays out what is particular to the agent editor.
+.editor-skeleton {
   display: flex;
   flex-direction: column;
-  gap: var(--space-6);
-  min-inline-size: 0;
+  gap: var(--space-3);
 }
 
-@media (min-width: 1200px) {
-  .editor {
-    // The editor gets the larger share: instructions are the work, and the
-    // preview is how you check it.
-    grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
-    align-items: start;
+.behaviour-block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+
+  & + & {
+    padding-block-start: var(--space-5);
+    border-block-start: 1px solid var(--border-subtle);
+  }
+
+  h3,
+  p {
+    margin: 0;
   }
 }
 
-.card-body {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-5);
+.behaviour-actions {
+  justify-content: flex-start;
 }
 
-.instructions-input {
-  min-block-size: 18rem;
-  font: var(--text-body);
-  line-height: 1.6;
-}
-
-.counter {
-  display: block;
-  margin-block-start: var(--space-1);
-}
-
-.counter-low {
-  color: var(--warning-fg);
-  font-weight: 500;
-}
-
-.section-actions {
+.behaviour-channels {
   display: flex;
   flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+// A link to the channel's own page; the badge names it, the underline says it
+// can be followed.
+.behaviour-channel {
+  display: inline-flex;
   align-items: center;
-  justify-content: flex-end;
-  gap: var(--space-2);
-}
+  gap: var(--space-1);
+  min-block-size: 1.5rem;
+  color: var(--text-primary);
+  text-decoration: underline;
+  text-underline-offset: 3px;
 
-// Announced as well as shown, so a save button that is suddenly enabled is not
-// the only clue that something is unsaved.
-.unsaved {
-  margin-inline-end: auto;
-  color: var(--warning-fg);
-  font-weight: 500;
-}
-
-.lifecycle .section-actions {
-  justify-content: flex-start;
+  &:hover {
+    text-decoration-thickness: 2px;
+  }
 }

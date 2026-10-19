@@ -1,4 +1,26 @@
-// Column template for the shared data list; everything else is the primitive's.
+// Column templates for the shared data list; everything else is the primitive's.
 .agent-list {
-  --data-list-columns: minmax(0, 2fr) 9rem minmax(0, 1fr) 1.5rem;
+  --data-list-columns: minmax(0, 2fr) 8rem minmax(0, 1fr) 1.5rem;
+}
+
+.agent-list-channels {
+  --data-list-columns: minmax(0, 2fr) 8rem minmax(0, 1.6fr) minmax(0, 1fr) 1.5rem;
+}
+
+.agent-channels {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-3);
+  min-inline-size: 0;
+}
+
+.agent-channel {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.agent-channels .skeleton-text {
+  inline-size: 6rem;
 }

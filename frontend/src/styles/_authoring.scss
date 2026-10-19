@@ -1,0 +1,586 @@
+// =============================================================================
+// Authoring: the AI agent and knowledge editors (Phase 36.8)
+// =============================================================================
+//
+// Shared by the agent list, create and editor pages, the knowledge pages and
+// the assignment section, so no component stylesheet carries a second copy.
+// Semantic tokens only; logical properties only.
+// -----------------------------------------------------------------------------
+
+// A Draft badge: the neutral badge with a hollow ring instead of a filled dot,
+// so Draft and Disabled differ by marker as well as by word.
+.badge-draft::before {
+  background-color: transparent;
+  box-shadow: inset 0 0 0 1.5px currentcolor;
+  inline-size: 0.5rem;
+  block-size: 0.5rem;
+}
+
+// -----------------------------------------------------------------------------
+// The authoring frame: the form, and from 80rem a tools column beside it
+// -----------------------------------------------------------------------------
+.authoring {
+  display: grid;
+  gap: var(--space-6);
+  align-items: start;
+}
+
+.authoring-main,
+.authoring-aside {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  min-inline-size: 0;
+}
+
+@media (min-width: 80rem) {
+  .authoring {
+    grid-template-columns: minmax(0, 1fr) minmax(22rem, 27rem);
+  }
+}
+
+// The preview stays in view while the form scrolls (main is the scroller), on
+// screens tall enough to hold all of it: its column runs the full height of the
+// form so it has room to travel, and the transcript gives up height first, so
+// the composer is never pushed below the fold. On a short screen it scrolls
+// with the page, whole.
+@media (min-width: 80rem) and (min-height: 46rem) {
+  .authoring-aside:has(> .authoring-aside-sticky) {
+    align-self: stretch;
+  }
+
+  .authoring-aside-sticky {
+    position: sticky;
+    inset-block-start: var(--space-4);
+
+    .customer-view {
+      grid-template-rows: auto minmax(10rem, 1fr) auto;
+    }
+
+    .cv-transcript {
+      max-block-size: max(10rem, calc(100dvh - 36rem));
+    }
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Numbered form sections
+// -----------------------------------------------------------------------------
+.form-section > .card-header {
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: var(--space-3);
+
+  > div {
+    flex: 1;
+    min-inline-size: 0;
+  }
+}
+
+// The section's number: the order to fill the form in, not decoration. Hidden
+// from assistive technology, which reads the headings in the same order.
+.form-section-index {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  inline-size: 1.5rem;
+  block-size: 1.5rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  color: var(--text-secondary);
+  font: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+.form-section-title {
+  margin: 0;
+  font: var(--text-card-title);
+}
+
+.form-section-lede {
+  margin: var(--space-1) 0 0;
+  color: var(--text-secondary);
+  font: var(--text-small);
+}
+
+.form-section > .card-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.section-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+// Said in words, beside the save button, whenever something is not saved yet.
+.unsaved-note {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-inline-end: auto;
+  color: var(--warning-fg);
+  font: var(--text-small);
+  font-weight: 550;
+
+  .icon {
+    inline-size: 1rem;
+    block-size: 1rem;
+  }
+}
+
+// Long text fields (instructions, knowledge content).
+.long-text {
+  min-block-size: 18rem;
+  font: var(--text-reading);
+}
+
+.long-text[readonly] {
+  background-color: var(--surface-inset);
+  color: var(--text-secondary);
+}
+
+.counter {
+  display: block;
+  margin-block-start: var(--space-1);
+  font-variant-numeric: tabular-nums;
+}
+
+.counter-low {
+  color: var(--warning-fg);
+  font-weight: 550;
+}
+
+// Guidance beside a long field: what good input covers. Plain help, no data.
+.guidance {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border-inline-start: 2px solid var(--border-strong);
+  background-color: var(--surface-muted);
+  border-start-end-radius: var(--radius-md);
+  border-end-end-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font: var(--text-small);
+
+  ul {
+    margin: var(--space-1) 0 0;
+    padding-inline-start: var(--space-5);
+    list-style: disc;
+  }
+}
+
+// Help lists in the side columns keep their bullets and numbers (the base layer
+// resets lists for navigation).
+.help-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding-inline-start: var(--space-5);
+  color: var(--text-secondary);
+  font: var(--text-small);
+  list-style: disc;
+
+  strong {
+    color: var(--text-primary);
+    font-weight: 550;
+  }
+}
+
+ol.help-list {
+  list-style: decimal;
+}
+
+// -----------------------------------------------------------------------------
+// The lifecycle path: Draft, then Active, which can be Disabled and back
+// -----------------------------------------------------------------------------
+.lifecycle-path {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lifecycle-step {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-muted);
+  font: var(--text-small);
+
+  // A short rule between steps, in reading order.
+  & + &::before {
+    content: '';
+    inline-size: 0.875rem;
+    block-size: 1px;
+    background-color: var(--border-strong);
+  }
+}
+
+.lifecycle-step[aria-current='step'] {
+  color: var(--text-primary);
+  font-weight: 550;
+
+  .badge {
+    outline: 1.5px solid var(--text-primary);
+    outline-offset: 1px;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// The customer view: the agent preview, drawn as the website widget
+// -----------------------------------------------------------------------------
+// The widget direction (MASTER section 2, widget notes): the workspace's own
+// accent on the header and the send button, the AI's bubble in the accent's
+// tint, the customer's bubble neutral, and the honesty line under the name.
+// `--cv-accent` and `--cv-on-accent` are set by the component from the real
+// widget configuration, with a foreground computed to be readable on it.
+.customer-view {
+  --cv-accent: #2563eb; // token-lint-ignore: the widget default accent, until the workspace colour arrives
+  --cv-on-accent: #ffffff; // token-lint-ignore: paired with the default accent above (5.16:1)
+
+  display: grid;
+  grid-template-rows: auto minmax(14rem, 1fr) auto;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background-color: var(--surface-page);
+  overflow: hidden;
+}
+
+.cv-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background-color: var(--cv-accent);
+  color: var(--cv-on-accent);
+}
+
+.cv-title {
+  margin: 0;
+  font: var(--text-card-title);
+  overflow-wrap: anywhere;
+}
+
+.cv-subtitle {
+  margin: 0;
+  font: var(--text-small);
+}
+
+.cv-transcript {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  max-block-size: 28rem;
+  margin: 0;
+  padding: var(--space-4);
+  overflow-y: auto;
+  list-style: none;
+}
+
+.cv-greeting {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background-color: var(--surface-muted);
+  color: var(--text-secondary);
+  font: var(--text-small);
+  white-space: pre-wrap;
+}
+
+.cv-bubble {
+  display: flex;
+  flex-direction: column;
+  gap: 2px; // token-lint-ignore: sender label sits tight on its message
+  max-inline-size: 85%;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-bubble);
+  background-color: var(--surface-default);
+  font: var(--text-reading);
+  overflow-wrap: anywhere;
+  animation: bubble-settle var(--duration-md) var(--ease-enter);
+}
+
+.cv-text {
+  white-space: pre-wrap;
+}
+
+.cv-sender {
+  color: var(--text-secondary);
+  font: var(--text-caption);
+}
+
+// The customer writes from the end side, as in the widget.
+.cv-bubble-customer {
+  align-self: flex-end;
+  border-end-end-radius: var(--radius-bubble-tail);
+}
+
+.cv-bubble-ai {
+  align-self: flex-start;
+  border-color: color-mix(in srgb, var(--cv-accent) 38%, var(--surface-default));
+  border-end-start-radius: var(--radius-bubble-tail);
+  background-color: color-mix(in srgb, var(--cv-accent) 11%, var(--surface-default));
+}
+
+.cv-status {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-muted);
+  font: var(--text-small);
+}
+
+.cv-composer {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-block-start: 1px solid var(--border-subtle);
+  background-color: var(--surface-default);
+}
+
+.cv-input {
+  flex: 1;
+  min-inline-size: 0;
+  min-block-size: 2.75rem;
+  resize: vertical;
+}
+
+.cv-send {
+  flex: none;
+  min-block-size: var(--control-height);
+  padding-inline: var(--space-4);
+  border: 0;
+  border-radius: var(--radius-md);
+  background-color: var(--cv-accent);
+  color: var(--cv-on-accent);
+  font: var(--text-body-strong);
+  cursor: pointer;
+
+  &:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+}
+
+.cv-notes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--text-secondary);
+  font: var(--text-small);
+}
+
+@media (forced-colors: active) {
+  .cv-header,
+  .cv-send {
+    border: 1px solid CanvasText;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Drop zone (file upload) and the chosen-file card
+// -----------------------------------------------------------------------------
+// Dropping a file is a shortcut; the button inside is the path for keyboards,
+// screen readers and phones, and both lead to the same checks.
+.drop-zone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-7) var(--space-5);
+  border: 1.5px dashed var(--border-control);
+  border-radius: var(--radius-lg);
+  background-color: var(--surface-muted);
+  text-align: center;
+  transition:
+    background-color var(--duration-sm) var(--ease-standard),
+    border-color var(--duration-sm) var(--ease-standard);
+}
+
+.drop-zone.is-dragging {
+  border-style: solid;
+  border-color: var(--text-primary);
+  background-color: var(--surface-selected);
+}
+
+.drop-zone[aria-disabled='true'] {
+  opacity: 0.6;
+}
+
+.drop-zone .drop-zone-glyph {
+  color: var(--text-muted);
+
+  .icon {
+    inline-size: 2rem;
+    block-size: 2rem;
+  }
+}
+
+.drop-zone-title {
+  margin: 0;
+  font: var(--text-body-strong);
+}
+
+.drop-zone-limits {
+  margin: 0;
+  color: var(--text-secondary);
+  font: var(--text-small);
+}
+
+.file-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background-color: var(--surface-default);
+}
+
+.file-card .file-card-glyph {
+  color: var(--text-muted);
+
+  .icon {
+    inline-size: 1.25rem;
+    block-size: 1.25rem;
+  }
+}
+
+.file-card-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-inline-size: 0;
+}
+
+.file-card-name {
+  font: var(--text-body-strong);
+  overflow-wrap: anywhere;
+}
+
+.file-card-meta {
+  color: var(--text-secondary);
+  font: var(--text-small);
+}
+
+// -----------------------------------------------------------------------------
+// Chooser: "selected" and "available" lists (agent knowledge)
+// -----------------------------------------------------------------------------
+.chooser {
+  display: grid;
+  gap: var(--space-4);
+  container-type: inline-size;
+}
+
+@container (min-width: 40rem) {
+  .chooser-lists {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.chooser-lists {
+  display: grid;
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.chooser-list {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background-color: var(--surface-default);
+  overflow: hidden;
+}
+
+.chooser-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-block-end: 1px solid var(--border-default);
+  background-color: var(--surface-muted);
+  font: var(--text-label);
+}
+
+.chooser-count {
+  color: var(--text-secondary);
+  font: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+.chooser-items {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+// Title on top, its state under it, and the move button beside both: long
+// titles keep the whole width of the list instead of a narrow column.
+.chooser-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-1) var(--space-3);
+  padding: var(--space-2) var(--space-3);
+
+  & + & {
+    border-block-start: 1px solid var(--border-subtle);
+  }
+
+  > .badge {
+    justify-self: start;
+    grid-column: 1;
+  }
+
+  > .btn {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
+}
+
+.chooser-title {
+  min-inline-size: 0;
+  font: var(--text-small);
+  overflow-wrap: anywhere;
+}
+
+.chooser-empty {
+  margin: 0;
+  padding: var(--space-4) var(--space-3);
+  color: var(--text-secondary);
+  font: var(--text-small);
+}
+
+// Short facts in a wrapping grid (source file, timestamps).
+.facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: var(--space-3) var(--space-4);
+  margin: 0;
+
+  dt {
+    margin-block-end: 2px; // token-lint-ignore: a term sits tight on its value
+    color: var(--text-muted);
+    font: var(--text-caption);
+  }
+
+  dd {
+    margin: 0;
+    font: var(--text-small);
+    overflow-wrap: anywhere;
+  }
+}

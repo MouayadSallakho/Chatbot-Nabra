@@ -1,160 +1,318 @@
-<div class="page page-narrow">
+<div class="page">
   <app-page-header
     backLink="/knowledge"
     backLabel="Knowledge"
     i18n-backLabel="@@back.knowledge"
     heading="Upload a file"
-    description="Reads the text out of a business file and saves it as a knowledge document. Uploading costs nothing — indexing it, which is what makes it answerable, is a separate step on the next screen."
+    i18n-heading="@@knowledge.upload.heading"
+    description="Nabra reads the text out of a business file and saves it as a knowledge document. Uploading costs nothing; indexing it, which makes it answerable, is a separate step on the next screen."
+    i18n-description="@@knowledge.upload.description"
   />
 
   @if (!allowed()) {
     <div class="page-section">
       <div class="card">
-        <div class="card-body">
-          <p class="text-body-strong">You cannot add knowledge</p>
-          <p class="text-small text-secondary">
-            Uploading a knowledge file needs a permission your roles do not include. Ask somebody
-            who administers this workspace if you need it.
-          </p>
-          <p><a class="btn btn-secondary btn-sm" routerLink="/knowledge">Back to knowledge</a></p>
-        </div>
+        <app-empty-state
+          icon="knowledge"
+          heading="You cannot add knowledge"
+          i18n-heading="@@knowledge.upload.denied.heading"
+          description="Uploading a knowledge file needs a permission your roles do not include. Ask somebody who administers this workspace if you need it."
+          i18n-description="@@knowledge.upload.denied.body"
+        >
+          <a
+            stateActions
+            class="btn btn-secondary btn-sm"
+            routerLink="/knowledge"
+            i18n="@@knowledge.backToKnowledge"
+            >Back to knowledge</a
+          >
+        </app-empty-state>
       </div>
     </div>
   } @else {
-    <div class="page-section">
-      <form class="card upload-form" [formGroup]="form" (ngSubmit)="upload()" novalidate>
-        <div class="card-body">
-          <div class="field">
-            <label class="field-label field-required" for="knowledge-file">File</label>
+    <div class="page-section authoring upload-layout">
+      <form
+        class="authoring-main"
+        [formGroup]="form"
+        (ngSubmit)="upload()"
+        novalidate
+        data-testid="upload-form"
+      >
+        <section class="card form-section" aria-labelledby="upload-file-heading">
+          <div class="card-header">
+            <span class="form-section-index" aria-hidden="true">1</span>
+            <div>
+              <h2
+                id="upload-file-heading"
+                class="form-section-title"
+                i18n="@@knowledge.upload.fileSection"
+              >
+                File
+              </h2>
+              <p class="form-section-lede" id="upload-limits">
+                <span i18n="@@knowledge.upload.limits"
+                  >{{ formats }}, up to {{ maxSize }}. One file at a time.</span
+                >
+              </p>
+            </div>
+          </div>
+
+          <div class="card-body">
             <!--
-              The browser's own input. It is focusable, labelled and announced
-              without any help, and it is the only path to a chosen file here —
-              there is no second drag-and-drop code path to keep in step with it.
+              The native input: the picker is what it is for. Hidden and out of
+              the tab order, because the button below is the one control a
+              keyboard or screen reader needs.
             -->
             <input
+              #fileInput
               id="knowledge-file"
-              class="input file-input"
+              class="visually-hidden"
               type="file"
+              tabindex="-1"
+              aria-hidden="true"
               [attr.accept]="fileLimits.accept"
               (change)="choose($event)"
               [disabled]="uploading()"
-              aria-describedby="knowledge-file-hint"
-              [attr.aria-invalid]="localRefusal() ? 'true' : null"
-              [attr.aria-errormessage]="localRefusal() ? 'knowledge-file-error' : null"
               data-testid="file-input"
             />
-            <p class="field-hint" id="knowledge-file-hint">
-              PDF, Word (.docx), plain text or CSV, up to {{ fileLimits.maxMegabytes }} MB.
-            </p>
+
+            <!--
+              The drop zone. Dropping is a pointer shortcut only; the button is
+              the path for everybody, and both run the same checks.
+            -->
+            <div
+              class="drop-zone"
+              [class.is-dragging]="dragging()"
+              [attr.aria-disabled]="uploading() ? 'true' : null"
+              (dragenter)="dragEnter($event)"
+              (dragover)="dragOver($event)"
+              (dragleave)="dragLeave()"
+              (drop)="drop($event)"
+              data-testid="drop-zone"
+            >
+              <app-icon class="drop-zone-glyph" name="upload" [strokeWidth]="1.6" />
+              <p class="drop-zone-title">
+                @if (dragging()) {
+                  <span i18n="@@knowledge.upload.dropNow">Drop the file to choose it</span>
+                } @else {
+                  <span i18n="@@knowledge.upload.dropHere">Drag a file here, or</span>
+                }
+              </p>
+              <button
+                #chooseButton
+                type="button"
+                class="btn btn-secondary"
+                (click)="openPicker()"
+                [disabled]="uploading()"
+                aria-describedby="upload-limits"
+                data-testid="choose-file"
+              >
+                <app-icon name="file" [strokeWidth]="1.75" />
+                @if (chosen()) {
+                  <span i18n="@@knowledge.upload.chooseAnother">Choose another file</span>
+                } @else {
+                  <span i18n="@@knowledge.upload.choose">Choose a file</span>
+                }
+              </button>
+              <p class="drop-zone-limits" aria-hidden="true">
+                <span i18n="@@knowledge.upload.limits"
+                  >{{ formats }}, up to {{ maxSize }}. One file at a time.</span
+                >
+              </p>
+            </div>
 
             @if (chosen(); as file) {
-              <p class="chosen-file text-small text-secondary" role="status">
-                <app-icon name="knowledge" [strokeWidth]="1.75" />
-                <span data-testid="chosen-file">{{ file.name }} — {{ chosenSize() }}</span>
+              <div
+                class="file-card"
+                role="status"
+                [class.is-refused]="localRefusal()"
+                data-testid="chosen-file"
+              >
+                <app-icon class="file-card-glyph" name="file" [strokeWidth]="1.6" />
+                <div class="file-card-body">
+                  <span class="file-card-name" dir="auto" data-testid="chosen-file-name">{{
+                    file.name
+                  }}</span>
+                  <span class="file-card-meta">
+                    @if (chosenType(); as type) {
+                      <span>{{ type }}</span> ·
+                    }
+                    <span>{{ chosenSize() }}</span>
+                  </span>
+                </div>
+                <!-- erp-lint-ignore: destructive-confirm -- forgets a file chosen but not yet uploaded; nothing was saved -->
+                <button
+                  type="button"
+                  class="btn btn-ghost btn-sm"
+                  (click)="removeChosen()"
+                  [disabled]="uploading()"
+                  data-testid="remove-file"
+                >
+                  <app-icon name="close" [strokeWidth]="1.75" />
+                  <span i18n="@@knowledge.upload.remove">Remove</span>
+                </button>
+              </div>
+            }
+
+            @if (extraFiles()) {
+              <p
+                class="text-small text-secondary"
+                role="status"
+                i18n="@@knowledge.upload.oneAtATime"
+              >
+                Only the first file was taken. Upload the others one at a time.
               </p>
             }
 
             @if (localRefusal(); as reason) {
-              <p
-                class="field-error"
-                id="knowledge-file-error"
-                role="alert"
-                data-testid="local-refusal"
-              >
+              <p class="field-error" role="alert" data-testid="local-refusal">
                 <app-icon name="alert" [strokeWidth]="1.75" />
                 <span>{{ reason }}</span>
               </p>
             }
           </div>
+        </section>
 
-          <div class="field">
-            <label class="field-label" for="knowledge-upload-title">Title</label>
-            <input
-              id="knowledge-upload-title"
-              class="input"
-              type="text"
-              formControlName="title"
-              autocomplete="off"
-              [attr.maxlength]="limits.titleMax"
-              aria-describedby="knowledge-upload-title-hint"
-            />
-            <p class="field-hint" id="knowledge-upload-title-hint">
-              Optional. Left blank, the file's own name is used without its extension.
-            </p>
-          </div>
-
-          <!--
-            What uploading does and does not do. Written out rather than implied,
-            because both surprises are expensive: an agent that answers nothing
-            because the document was never indexed, and a file somebody expected
-            this platform to keep.
-          -->
-          <div class="upload-notes">
-            <h2 class="text-body-strong">What happens when you upload</h2>
-            <ul class="text-small text-secondary">
-              <li>
-                The text is read out of the file and saved as a document you can edit like any
-                other.
-              </li>
-              <li>
-                <strong>The file itself is not stored.</strong> It is read once, during the upload,
-                and discarded — there is nothing to download afterwards, so keep your own copy.
-              </li>
-              <li>
-                <strong>Indexing is a separate step.</strong> The document arrives needing an index,
-                and nothing is sent to the AI provider until you ask for it on the next screen.
-              </li>
-              <li>
-                <strong>Scanned PDFs are not supported.</strong> A PDF has to contain real text.
-                Pages that are pictures of text need OCR, which this platform does not do yet.
-              </li>
-              <li>
-                Spreadsheets, presentations, images and archives are not supported. Save a
-                spreadsheet as CSV if you need its contents here.
-              </li>
-            </ul>
-          </div>
-
-          @if (uploading()) {
-            <p class="text-small text-secondary upload-progress" role="status">
-              <span class="spinner" aria-hidden="true"></span>
-              <span>Uploading and reading the text out of this file…</span>
-            </p>
-          }
-
-          @if (failure(); as error) {
-            <div class="alert alert-danger" role="alert" data-testid="upload-error">
-              <app-icon name="alert" [strokeWidth]="1.75" />
-              <div>
-                <span>{{ error.message }}</span>
-                @if (error.kind === 'unprocessable') {
-                  <!--
-                    Said separately from the server sentence because it is about
-                    the workspace rather than the file: a refused upload creates
-                    nothing, so there is no half-made document to go and tidy up.
-                  -->
-                  <p class="text-small">Nothing was saved — no document was created.</p>
-                }
-              </div>
+        <section class="card form-section" aria-labelledby="upload-title-heading">
+          <div class="card-header">
+            <span class="form-section-index" aria-hidden="true">2</span>
+            <div>
+              <h2
+                id="upload-title-heading"
+                class="form-section-title"
+                i18n="@@knowledge.section.title"
+              >
+                Title
+              </h2>
+              <p class="form-section-lede" i18n="@@knowledge.upload.title.lede">
+                Optional. Left blank, the file's name is used without its extension.
+              </p>
             </div>
-          }
-        </div>
+          </div>
+          <div class="card-body">
+            <div class="field">
+              <label class="field-label" for="knowledge-upload-title" i18n="@@knowledge.field.title"
+                >Title</label
+              >
+              <input
+                id="knowledge-upload-title"
+                class="input"
+                type="text"
+                dir="auto"
+                formControlName="title"
+                autocomplete="off"
+                [attr.maxlength]="limits.titleMax"
+              />
+            </div>
+          </div>
+        </section>
 
-        <div class="upload-actions">
-          <a class="btn btn-secondary" routerLink="/knowledge">Cancel</a>
+        @if (uploading()) {
+          <p class="text-small text-secondary upload-progress" role="status">
+            <span class="spinner" aria-hidden="true"></span>
+            <span i18n="@@knowledge.upload.progress"
+              >Uploading and reading the text out of this file…</span
+            >
+          </p>
+        }
+
+        @if (failureMessage(); as message) {
+          <div class="alert alert-danger" role="alert" data-testid="upload-error">
+            <app-icon name="alert" [strokeWidth]="1.75" />
+            <div>
+              <span>{{ message }}</span>
+              @if (failure()?.kind === 'unprocessable') {
+                <!--
+                  Said separately because it is about the workspace rather than
+                  the file: a refused upload creates nothing.
+                -->
+                <p class="text-small" i18n="@@knowledge.upload.nothingSaved">
+                  Nothing was saved: no document was created.
+                </p>
+              }
+            </div>
+          </div>
+        }
+
+        <div class="section-actions">
+          <a class="btn btn-secondary" routerLink="/knowledge" i18n="@@knowledge.cancel">Cancel</a>
           <button
             type="submit"
             class="btn btn-primary"
+            [class.btn-loading]="uploading()"
             [disabled]="!canUpload()"
             data-testid="upload-button"
           >
             @if (uploading()) {
               <span class="spinner" aria-hidden="true"></span>
+              <span class="btn-label" i18n="@@knowledge.upload.uploading">Uploading…</span>
+            } @else {
+              <span class="btn-label" i18n="@@knowledge.upload">Upload file</span>
             }
-            <span class="btn-label">{{ uploading() ? 'Uploading…' : 'Upload file' }}</span>
           </button>
         </div>
       </form>
+
+      <!--
+        What uploading does and does not do. Written out rather than implied,
+        because both surprises are expensive: an agent that answers nothing
+        because the document was never indexed, and a file somebody expected
+        this platform to keep.
+      -->
+      <aside class="authoring-aside" aria-labelledby="upload-notes-heading">
+        <section class="card">
+          <div class="card-header">
+            <h2
+              id="upload-notes-heading"
+              class="card-title"
+              i18n="@@knowledge.upload.notes.heading"
+            >
+              What happens when you upload
+            </h2>
+          </div>
+          <div class="card-body">
+            <ul class="help-list">
+              <li i18n="@@knowledge.upload.notes.text">
+                The text is read out of the file and saved as a document you can edit like any
+                other.
+              </li>
+              <li>
+                <strong i18n="@@knowledge.upload.notes.notStored.title"
+                  >The file is not kept.</strong
+                >
+                {{ ' ' }}
+                <span i18n="@@knowledge.upload.notes.notStored.body"
+                  >It is read once and discarded, so there is nothing to download later. Keep your
+                  own copy.</span
+                >
+              </li>
+              <li>
+                <strong i18n="@@knowledge.upload.notes.index.title"
+                  >Indexing is a separate step.</strong
+                >
+                {{ ' ' }}
+                <span i18n="@@knowledge.upload.notes.index.body"
+                  >Nothing is sent to the AI provider until you index the document on the next
+                  screen.</span
+                >
+              </li>
+              <li>
+                <strong i18n="@@knowledge.upload.notes.scanned.title"
+                  >Scanned PDFs are not read.</strong
+                >
+                {{ ' ' }}
+                <span i18n="@@knowledge.upload.notes.scanned.body"
+                  >A PDF has to contain real text; pictures of text are not recognised.</span
+                >
+              </li>
+              <li i18n="@@knowledge.upload.notes.other">
+                Spreadsheets, presentations, images and archives are not read. Save a spreadsheet as
+                CSV to use its contents.
+              </li>
+            </ul>
+          </div>
+        </section>
+      </aside>
     </div>
   }
 </div>

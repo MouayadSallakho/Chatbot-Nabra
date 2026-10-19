@@ -1,34 +1,45 @@
 <div class="page">
   <app-page-header
     heading="Knowledge"
-    description="Knowledge is written business information your AI agents can draw on — opening hours, a returns policy, how a service works. A document answers questions only once it has been indexed and assigned to an agent."
+    i18n-heading="@@knowledge.heading"
+    description="Business information your AI agents can answer from: opening hours, a returns policy, how a service works. A document answers questions once it is indexed and selected for an agent."
+    i18n-description="@@knowledge.description"
   >
-    <!-- One block per projected link: see the empty state below for why. -->
+    <!-- One block per projected link: content projection needs a single root. -->
     @if (hasDocuments() && canManage()) {
-      <a pageActions class="btn btn-secondary" routerLink="/knowledge/upload">Upload file</a>
+      <a
+        pageActions
+        class="btn btn-secondary"
+        routerLink="/knowledge/upload"
+        data-testid="upload-file"
+      >
+        <app-icon name="upload" [strokeWidth]="1.75" />
+        <span i18n="@@knowledge.upload">Upload file</span>
+      </a>
     }
     @if (hasDocuments() && canManage()) {
-      <a pageActions class="btn btn-primary" routerLink="/knowledge/new">New document</a>
+      <a pageActions class="btn btn-primary" routerLink="/knowledge/new" data-testid="new-document">
+        <app-icon name="plus" [strokeWidth]="2" />
+        <span i18n="@@knowledge.new">New document</span>
+      </a>
     }
   </app-page-header>
 
   <div class="page-section">
     @if (!canView()) {
-      <!--
-        The permission-denied state. It says what is true and what to do about
-        it, and deliberately does not say "403", does not name a permission code,
-        and does not imply the account is broken.
-      -->
       <div class="card">
         <app-empty-state
           icon="knowledge"
           heading="You do not have access to knowledge"
+          i18n-heading="@@knowledge.denied.heading"
           description="Seeing this workspace's knowledge needs a permission your roles do not include. Ask somebody who administers this workspace if you need it."
+          i18n-description="@@knowledge.denied.body"
+          data-testid="knowledge-denied"
         />
       </div>
     } @else if (loading() && !page()) {
       <div class="data-list knowledge-list" aria-busy="true">
-        <p class="visually-hidden" role="status">Loading knowledge…</p>
+        <p class="visually-hidden" role="status" i18n="@@knowledge.loading">Loading knowledge…</p>
         @for (row of skeletonRows; track row) {
           <div class="data-row data-row-skeleton" aria-hidden="true">
             <span class="skeleton skeleton-title"></span>
@@ -43,9 +54,16 @@
           icon="alert"
           tone="error"
           heading="Could not load knowledge"
+          i18n-heading="@@knowledge.loadFailed"
           [description]="error.message"
         >
-          <button stateActions type="button" class="btn btn-secondary btn-sm" (click)="load()">
+          <button
+            stateActions
+            type="button"
+            class="btn btn-secondary btn-sm"
+            (click)="load()"
+            i18n="@@knowledge.tryAgain"
+          >
             Try again
           </button>
         </app-empty-state>
@@ -55,19 +73,28 @@
         <app-empty-state
           icon="knowledge"
           heading="No knowledge yet"
-          description="Write down something your agents should know — a returns policy, delivery times, what a plan includes — or upload it as a PDF, Word document, text file or CSV. Index it, assign it to an agent, and the agent can answer from it."
+          i18n-heading="@@knowledge.empty.heading"
+          description="Write down something your agents should know, such as a returns policy or delivery times, or upload it as a PDF, Word document, text file or CSV. Index it, select it for an agent, and the agent can answer from it."
+          i18n-description="@@knowledge.empty.body"
+          data-testid="knowledge-empty"
         >
-          <!--
-            Two blocks rather than one holding both links: content projection
-            only reaches a slot when the block around it has a single root node.
-          -->
           @if (canManage()) {
-            <a stateActions class="btn btn-primary btn-sm" routerLink="/knowledge/new">
+            <a
+              stateActions
+              class="btn btn-primary btn-sm"
+              routerLink="/knowledge/new"
+              i18n="@@knowledge.empty.write"
+            >
               Write your first document
             </a>
           }
           @if (canManage()) {
-            <a stateActions class="btn btn-secondary btn-sm" routerLink="/knowledge/upload">
+            <a
+              stateActions
+              class="btn btn-secondary btn-sm"
+              routerLink="/knowledge/upload"
+              i18n="@@knowledge.empty.upload"
+            >
               Upload a file
             </a>
           }
@@ -76,47 +103,52 @@
     } @else {
       <div class="data-list knowledge-list" [attr.aria-busy]="loading()">
         <div class="data-list-head" aria-hidden="true">
-          <span>Title</span>
-          <span>State</span>
-          <span>Source</span>
-          <span>Last indexed</span>
-          <span>Last updated</span>
+          <span i18n="@@knowledge.column.document">Document</span>
+          <span i18n="@@knowledge.column.type">Type</span>
+          <span class="data-cell-end" i18n="@@knowledge.column.size">Size</span>
+          <span i18n="@@knowledge.column.state">Indexing</span>
+          <span i18n="@@knowledge.column.changed">Last change</span>
         </div>
 
-        <ul>
+        <ul data-testid="documents">
           @for (document of page()!.items; track document.id) {
             <li>
-              <a class="data-row" [routerLink]="['/knowledge', document.id]">
-                <span class="data-row-title">{{ document.title }}</span>
+              <a
+                class="data-row"
+                [routerLink]="['/knowledge', document.id]"
+                [attr.data-testid]="'document-' + document.id"
+              >
+                <span class="data-row-title knowledge-title" dir="auto">{{ document.title }}</span>
+
+                <span class="data-row-meta">
+                  <span class="data-cell-label" i18n="@@knowledge.cell.type">Type:</span>&nbsp;<span
+                    class="knowledge-type"
+                    >{{ typeWord(document.sourceFileType) }}</span
+                  >
+                </span>
+
+                <span class="data-row-meta data-cell-end num">
+                  <span class="data-cell-label" i18n="@@knowledge.cell.size">Size:</span
+                  >&nbsp;<span>{{ size(document.contentLength) }}</span>
+                </span>
 
                 <span class="knowledge-state">
-                  <span
-                    class="badge"
-                    [class.badge-success]="document.readiness === 'Ready'"
-                    [class.badge-warning]="document.readiness === 'NeedsIndex'"
-                    [class.badge-neutral]="document.readiness === 'Disabled'"
-                  >
-                    {{ label(document.readiness) }}
-                  </span>
-                </span>
-
-                <span class="data-row-meta">
-                  <span class="data-cell-label">Source&nbsp;</span>
-                  <span>{{ origin(document.sourceFileType) }}</span>
-                </span>
-
-                <span class="data-row-meta">
-                  <span class="data-cell-label">Indexed&nbsp;</span>
+                  <span [class]="'badge ' + stateTone(document.readiness)">{{
+                    stateWord(document.readiness)
+                  }}</span>
                   @if (document.indexedAt; as indexed) {
-                    <time [attr.datetime]="indexed">{{ indexed | localDate: 'dateTime' }}</time>
-                  } @else {
-                    <span>Never</span>
+                    <span class="text-small text-muted">
+                      <span i18n="@@knowledge.cell.indexedOn">Indexed</span>&nbsp;<time
+                        [attr.datetime]="indexed"
+                        >{{ indexed | localDate: 'date' }}</time
+                      >
+                    </span>
                   }
                 </span>
 
                 <span class="data-row-meta">
-                  <span class="data-cell-label">Updated&nbsp;</span>
-                  <time [attr.datetime]="document.updatedAt">{{
+                  <span class="data-cell-label" i18n="@@knowledge.cell.changed">Changed:</span
+                  >&nbsp;<time [attr.datetime]="document.updatedAt">{{
                     document.updatedAt | localDate: 'dateTime'
                   }}</time>
                 </span>
