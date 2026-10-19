@@ -1,6 +1,8 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { PublicChatRealtime } from '@app/core/realtime/public-chat-realtime';
+import { FakePublicChatRealtime } from '@app/testing/test-doubles';
 import { EmbedBridge } from '../embed-bridge';
 import { EmbedChatApi } from '../embed-chat-api';
 import { EmbedSessionStore } from '../embed-session';
@@ -64,6 +66,7 @@ describe('EmbedChat', () => {
         EmbedChatApi,
         EmbedSessionStore,
         EmbedBridge,
+        { provide: PublicChatRealtime, useClass: FakePublicChatRealtime },
       ],
     });
 
@@ -90,8 +93,10 @@ describe('EmbedChat', () => {
 
   const host = (): HTMLElement => fixture.nativeElement as HTMLElement;
   const text = (): string => host().textContent ?? '';
-  const launcher = (): HTMLButtonElement | null => host().querySelector('.embed-launcher');
-  const composer = (): HTMLTextAreaElement | null => host().querySelector('#embed-message');
+  const launcher = (): HTMLButtonElement | null =>
+    host().querySelector('[data-testid="chat-launcher"]');
+  const composer = (): HTMLTextAreaElement | null =>
+    host().querySelector('[data-testid="chat-input"]');
 
   const button = (label: string): HTMLButtonElement | undefined =>
     [...host().querySelectorAll('button')].find((candidate) =>
@@ -203,11 +208,11 @@ describe('EmbedChat', () => {
     // sandbox against what the composer actually needs.
     await open();
 
-    const composerForm = host().querySelector('form.embed-composer')!;
     const send = button('Send')!;
 
     expect(send.getAttribute('type')).toBe('button');
-    expect(composerForm.getAttribute('ng-reflect-ng-submit')).toBeNull();
+    // No form at all: nothing in the panel could ever be submitted.
+    expect(host().querySelector('form')).toBeNull();
   });
 
   it('creates no conversation on load, and none on opening the panel', async () => {
@@ -305,8 +310,8 @@ describe('EmbedChat', () => {
     });
     await settle();
 
-    expect(host().querySelector('.embed-transcript img')).toBeNull();
-    expect(host().querySelector('.embed-transcript b')).toBeNull();
+    expect(host().querySelector('[data-testid="chat-transcript"] img')).toBeNull();
+    expect(host().querySelector('[data-testid="chat-transcript"] b')).toBeNull();
     expect(text()).toContain('<img src=x onerror="alert(1)">');
     expect(text()).toContain('<b>bold</b>');
   });
@@ -314,10 +319,10 @@ describe('EmbedChat', () => {
   it('shows the greeting as the workspace text it is, not as something the AI said', async () => {
     await open({ greeting: 'Hi — ask us anything.' });
 
-    const greeting = host().querySelector('.embed-greeting');
+    const greeting = host().querySelector('[data-testid="chat-greeting"]');
 
     expect(greeting?.textContent).toContain('Hi — ask us anything.');
-    expect(host().querySelector('.embed-bubble')).toBeNull();
+    expect(host().querySelector('[data-testid="chat-message"]')).toBeNull();
   });
 
   it('resumes the conversation it remembers, credential and all', async () => {
@@ -449,5 +454,109 @@ describe('EmbedChat', () => {
     expect(document.documentElement.style.backgroundColor).toBe('transparent');
     expect(document.documentElement.style.colorScheme).toBe('normal');
     expect(document.body.style.backgroundColor).toBe('transparent');
+  });
+
+  // ---- Phase 36.9: keyboard, names and the accent ---------------------------
+
+  it('names the launcher by who answers, and moves focus in and back out', async () => {
+    await mount();
+
+    http.expectOne(configUrl).flush(config());
+    await settle();
+
+    expect(launcher()!.getAttribute('aria-label')).toBe('Chat with Concierge');
+
+    launcher()!.click();
+    await settle();
+
+    // Opening puts the cursor in the message box.
+    expect(document.activeElement).toBe(composer());
+
+    // Escape closes, tells the page, and returns focus to the launcher.
+    host().dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    await settle();
+
+    expect(composer()).toBeNull();
+    expect(parent.postMessage).toHaveBeenCalledWith({ type: 'omniai:v1:close' }, parentOrigin);
+    expect(document.activeElement).toBe(launcher());
+  });
+
+  it('checks the accent before painting with it', async () => {
+    await mount();
+
+    // A value that could not have come from the server never reaches a style.
+    http.expectOne(configUrl).flush(config({ accentColor: 'red;background:url(x)' }));
+    await settle();
+
+    const style = host().style;
+
+    expect(style.getPropertyValue('--chat-accent')).toBe('#2563eb');
+    expect(style.getPropertyValue('--chat-on-accent')).toBe('#ffffff');
+    expect(style.cssText).not.toContain('url(');
+  });
+
+  it('starts listening before the first turn is attempted', async () => {
+    await open();
+    await type('Hello');
+
+    button('Send')!.click();
+    await settle();
+
+    const realtime = TestBed.inject(PublicChatRealtime) as unknown as FakePublicChatRealtime;
+
+    http
+      .expectOne(`${configUrl}/conversations`)
+      .flush({ conversationId, agentName: 'Concierge', credential });
+    await settle();
+
+    expect(realtime.listens.length).toBe(1);
+
+    http.expectOne(messagesUrl).flush({
+      customerMessage: message('c1', 'Customer', 'Hello'),
+      reply: message('a1', 'AiAgent', 'Hi'),
+      handling: 'Ai',
+    });
+    await settle();
+  });
+
+  it('retires a failure notice once a person has answered over realtime', async () => {
+    await open();
+    await type('Hello');
+
+    button('Send')!.click();
+    await settle();
+
+    http
+      .expectOne(`${configUrl}/conversations`)
+      .flush({ conversationId, agentName: 'Concierge', credential });
+    await settle();
+
+    // The AI turn fails honestly; the page re-reads what was stored.
+    http.expectOne(messagesUrl).flush({}, { status: 503, statusText: 'Service Unavailable' });
+    await settle();
+    http.expectOne(messagesUrl).flush({
+      items: [message('c1', 'Customer', 'Hello')],
+      nextCursor: null,
+      handling: 'Ai',
+    });
+    await settle();
+
+    expect(host().querySelector('[data-testid="chat-error"]')).not.toBeNull();
+
+    // A colleague takes over and replies: realtime says something changed.
+    const realtime = TestBed.inject(PublicChatRealtime) as unknown as FakePublicChatRealtime;
+
+    realtime.listens.at(-1)!.onChanged();
+    await settle();
+    http.expectOne(messagesUrl).flush({
+      items: [message('c1', 'Customer', 'Hello'), message('h1', 'HumanAgent', 'I can help.')],
+      nextCursor: null,
+      handling: 'Human',
+    });
+    await settle();
+
+    expect(host().querySelector('[data-testid="chat-error"]')).toBeNull();
+    expect(text()).toContain('A support team member will reply here.');
+    expect(text()).toContain('A person from the support team joined');
   });
 });

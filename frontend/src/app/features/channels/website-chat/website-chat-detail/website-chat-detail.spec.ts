@@ -240,4 +240,35 @@ describe('WebsiteChatDetail', () => {
 
     expect(text()).toContain('do not have access to website chat');
   });
+
+  it('marks where the link stands in its lifecycle, and says what that means', async () => {
+    await mount('website-chat.view');
+
+    http.expectOne(url).flush(endpoint('Draft'), { headers: { ETag: '"v1"' } });
+    await settle();
+    await flushWidget();
+
+    const current = host().querySelector('.lifecycle-step[aria-current="step"]');
+
+    expect(current?.textContent?.trim()).toBe('Draft');
+    expect(text()).toContain('Not published yet.');
+  });
+
+  it('asks before leaving with unsaved widget settings', async () => {
+    await mount('website-chat.view', 'website-chat.manage');
+
+    http.expectOne(url).flush(endpoint('Active'), { headers: { ETag: '"v1"' } });
+    await settle();
+    await flushWidget();
+
+    expect(fixture.componentInstance.hasUnsavedChanges()).toBe(false);
+
+    const greeting = host().querySelector<HTMLTextAreaElement>('#widget-greeting')!;
+
+    greeting.value = 'Hello';
+    greeting.dispatchEvent(new Event('input'));
+    await settle();
+
+    expect(fixture.componentInstance.hasUnsavedChanges()).toBe(true);
+  });
 });

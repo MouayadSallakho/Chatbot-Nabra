@@ -11,9 +11,13 @@ import { firstValueFrom } from 'rxjs';
 import { ApiError, toApiError } from '@app/core/api/api-error';
 import { PermissionService } from '@app/core/authorization/permission-service';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
+import { LocalDatePipe } from '@app/core/i18n/locale-pipes';
 import { AiAgentApi, AiAgentSummary } from '@app/features/ai-agents/ai-agent-api';
+import { agentStatusWord } from '@app/features/ai-agents/agent-words';
 import { EmptyState } from '@app/shared/empty-state/empty-state';
+import { Icon } from '@app/shared/icon/icon';
 import { PageHeader } from '@app/shared/page-header/page-header';
+import { channelStatusTone, channelStatusWord } from '../../channel-words';
 import { WebChatAdminApi, WebChatEndpoint } from '../../website-chat-api';
 
 /**
@@ -23,11 +27,15 @@ import { WebChatAdminApi, WebChatEndpoint } from '../../website-chat-api';
  * created switched off, so a mistyped agent selection is never live the moment
  * it is saved. Activation happens on the endpoint's own screen, behind a
  * conditional write.
+ *
+ * <strong>Each row says where it stands</strong> (Phase 36.9): the agent, the
+ * link's status with its marker, a warning when a published link's agent cannot
+ * answer, and the link's own address as an isolated left-to-right fragment.
  */
 @Component({
   selector: 'app-website-chat-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, PageHeader, EmptyState],
+  imports: [RouterLink, PageHeader, EmptyState, Icon, LocalDatePipe],
   templateUrl: './website-chat-page.html',
   styleUrl: './website-chat-page.scss',
 })
@@ -44,6 +52,11 @@ export class WebsiteChatPage implements OnInit {
   protected readonly creating = signal(false);
   protected readonly createFailure = signal<ApiError | null>(null);
   protected readonly selectedAgentId = signal<string>('');
+
+  protected readonly statusWord = channelStatusWord;
+  protected readonly statusTone = channelStatusTone;
+  protected readonly agentStatusWord = agentStatusWord;
+  protected readonly skeletonRows = [0, 1, 2];
 
   protected readonly canView = computed(() => this.permissions.has('website-chat.view'));
   protected readonly canManage = computed(() => this.permissions.has('website-chat.manage'));

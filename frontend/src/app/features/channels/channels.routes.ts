@@ -1,4 +1,5 @@
 import { Routes } from '@angular/router';
+import { unsavedChangesGuard } from '@app/core/navigation/unsaved-changes';
 import { AiAgentApi } from '@app/features/ai-agents/ai-agent-api';
 import { WebChatAdminApi } from './website-chat-api';
 import { WhatsAppApi } from './whatsapp-api';
@@ -39,6 +40,7 @@ export const channelRoutes: Routes = [
         // After the literal segment, so it cannot swallow it.
         path: 'website-chat/:webChatEndpointId',
         title: $localize`:@@title.websiteChatLink:Website chat link`,
+        canDeactivate: [unsavedChangesGuard],
         loadComponent: () =>
           import('./website-chat/website-chat-detail/website-chat-detail').then(
             (m) => m.WebsiteChatDetail,

@@ -1,0 +1,259 @@
+// The visitor's chat panel: header, scrolling transcript, notices, composer.
+// The page around it gives it its height. Semantic tokens and logical
+// properties only; the workspace accent arrives as `--chat-accent` and
+// `--chat-on-accent`, already checked by accent-color.ts.
+
+:host {
+  // Nabra's own look (the hosted page): neutral header, ink Send, Lagoon tint.
+  --_head-bg: var(--surface-default);
+  --_head-fg: var(--text-primary);
+  --_send-bg: var(--action);
+  --_send-fg: var(--on-action);
+  --_ai-bg: var(--voice-ai-tint);
+  --_ai-border: var(--voice-ai-border);
+
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  min-block-size: 0;
+  overflow: hidden;
+  background-color: var(--surface-page);
+  color: var(--text-primary);
+  font: var(--text-body);
+}
+
+// The widget: the workspace's colour on the header and Send, its tint on the AI.
+:host(.is-widget) {
+  --_head-bg: var(--chat-accent);
+  --_head-fg: var(--chat-on-accent);
+  --_send-bg: var(--chat-accent);
+  --_send-fg: var(--chat-on-accent);
+  --_ai-bg: color-mix(in srgb, var(--chat-accent) 12%, var(--surface-default));
+  --_ai-border: color-mix(in srgb, var(--chat-accent) 40%, var(--surface-default));
+}
+
+// -----------------------------------------------------------------------------
+// Header
+// -----------------------------------------------------------------------------
+.chat-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding-block: var(--space-3);
+  padding-inline: var(--space-4) var(--space-3);
+  border-block-end: 1px solid var(--border-subtle);
+  background-color: var(--_head-bg);
+  color: var(--_head-fg);
+}
+
+:host(.is-widget) .chat-head {
+  border-block-end-color: transparent;
+}
+
+.chat-head-text {
+  flex: 1;
+  min-inline-size: 0;
+}
+
+.chat-title {
+  margin: 0;
+  overflow: hidden;
+  font: var(--text-card-title);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-honesty {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin: 0;
+  font: var(--text-small);
+}
+
+// Muted on Nabra's own header; on an accent it keeps the checked label colour.
+:host(.is-page) .chat-honesty {
+  color: var(--text-secondary);
+}
+
+.chat-honesty-glyph {
+  color: var(--voice-ai-fg);
+}
+
+:host(.is-widget) .chat-honesty-glyph {
+  color: inherit;
+}
+
+// Header buttons take the header's own foreground, so they read on any accent;
+// the focus ring does too. No tint behind the label: a 12% wash of white over
+// the default blue already drops a white label to 4.2:1, so the boundary is a
+// line in the label's own colour and hover thickens it.
+.chat-head-button {
+  display: inline-grid;
+  place-items: center;
+  min-block-size: 2rem;
+  min-inline-size: 2rem;
+  padding-inline: var(--space-3);
+  border: 1px solid currentcolor;
+  border-radius: var(--radius-md);
+  background-color: transparent;
+  color: inherit;
+  font: var(--text-label);
+  white-space: nowrap;
+  cursor: pointer;
+
+  &:hover {
+    box-shadow: inset 0 0 0 1px currentcolor;
+  }
+
+  &:focus-visible {
+    outline: 2px solid currentcolor;
+    outline-offset: 2px;
+  }
+}
+
+.chat-head-icon {
+  padding: 0;
+  border-color: transparent;
+}
+
+// -----------------------------------------------------------------------------
+// Transcript and states
+// -----------------------------------------------------------------------------
+.chat-scroll {
+  display: flex;
+  flex-direction: column;
+  min-block-size: 0;
+  padding: var(--space-4);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+// A chat reads from the bottom: a short conversation sits by the composer, not
+// at the top of an empty panel. An auto margin rather than flex-end, which
+// would make the top of a long transcript unreachable.
+.chat-scroll > :first-child {
+  margin-block-start: auto;
+}
+
+.chat-state {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-2);
+  margin: auto;
+  max-inline-size: 22rem;
+  color: var(--text-secondary);
+  text-align: center;
+
+  p {
+    margin: 0;
+  }
+}
+
+p.chat-state {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.chat-state-title {
+  color: var(--text-primary);
+  font: var(--text-body-strong);
+}
+
+// -----------------------------------------------------------------------------
+// Notices and composer
+// -----------------------------------------------------------------------------
+.chat-foot {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3) var(--space-3);
+  padding-block-end: max(var(--space-3), env(safe-area-inset-bottom));
+  border-block-start: 1px solid var(--border-subtle);
+  background-color: var(--surface-default);
+}
+
+// The handoff notice: the person glyph and the sentence, never colour alone.
+.chat-notice {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  color: var(--voice-human-strong);
+  font: var(--text-label);
+}
+
+.chat-notice-glyph {
+  color: var(--voice-human-fg);
+}
+
+.chat-alert {
+  margin: 0;
+}
+
+.chat-composer {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-2);
+}
+
+// 16px so a phone does not zoom the page when the box is focused.
+.chat-input {
+  flex: 1;
+  min-inline-size: 0;
+  min-block-size: 2.75rem;
+  max-block-size: 8rem;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius-md);
+  background-color: var(--surface-inset);
+  color: var(--text-primary);
+  font: var(--text-reading);
+  font-size: 1rem;
+  resize: none;
+  field-sizing: content;
+
+  &::placeholder {
+    color: var(--text-muted);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 1px;
+  }
+}
+
+.chat-send {
+  flex: none;
+  min-block-size: 2.75rem;
+  padding-inline: var(--space-4);
+  border: 0;
+  border-radius: var(--radius-md);
+  background-color: var(--_send-bg);
+  color: var(--_send-fg);
+  font: var(--text-body-strong);
+  cursor: pointer;
+
+  &:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+  }
+}
+
+@media (pointer: coarse) {
+  .chat-head-button {
+    min-block-size: 2.75rem;
+    min-inline-size: 2.75rem;
+  }
+}
+
+@media (forced-colors: active) {
+  .chat-head,
+  .chat-send {
+    border: 1px solid CanvasText;
+  }
+}

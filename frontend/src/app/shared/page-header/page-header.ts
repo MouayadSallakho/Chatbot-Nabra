@@ -42,9 +42,21 @@ import { Icon } from '@app/shared/icon/icon';
         <div class="page-header-text">
           <div class="page-header-title">
             @if (level() === 1) {
-              <h1 class="text-page-title" [attr.dir]="headingDir()">{{ heading() }}</h1>
+              <h1 class="text-page-title">
+                @if (headingDir()) {
+                  <bdi>{{ heading() }}</bdi>
+                } @else {
+                  {{ heading() }}
+                }
+              </h1>
             } @else {
-              <h2 class="text-page-title" [attr.dir]="headingDir()">{{ heading() }}</h2>
+              <h2 class="text-page-title">
+                @if (headingDir()) {
+                  <bdi>{{ heading() }}</bdi>
+                } @else {
+                  {{ heading() }}
+                }
+              </h2>
             }
             <ng-content select="[pageStatus]" />
           </div>
@@ -82,9 +94,13 @@ export class PageHeader {
   readonly level = input<1 | 2>(1);
 
   /**
-   * `auto` when the heading is somebody's own text -- a customer's name -- so an
-   * Arabic name reads right to left on an English page and the other way
-   * round. Left unset for headings the product writes, which follow the page.
+   * `auto` when the heading is somebody's own text -- a customer's name, an
+   * agent's name, a phone number -- so an Arabic name reads right to left on an
+   * English page and the other way round. The text is isolated in a `<bdi>`
+   * while the heading keeps the page's direction, so it still lines up with the
+   * page (Phase 36.9: a `dir` on the heading itself put an English name on the
+   * left of an Arabic page, and a phone number read "0001 000 50 966+").
+   * Left unset for headings the product writes, which follow the page.
    */
   readonly headingDir = input<'auto' | null>(null);
 

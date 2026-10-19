@@ -16,8 +16,11 @@ import { ToastService } from '@app/core/feedback/toast-service';
 import { PermissionService } from '@app/core/authorization/permission-service';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
 import { AiAgentApi, AiAgentSummary } from '@app/features/ai-agents/ai-agent-api';
+import { agentStatusWord } from '@app/features/ai-agents/agent-words';
 import { EmptyState } from '@app/shared/empty-state/empty-state';
+import { Icon } from '@app/shared/icon/icon';
 import { PageHeader } from '@app/shared/page-header/page-header';
+import { channelStatusTone, channelStatusWord } from '../../channel-words';
 import { WhatsAppApi, WhatsAppConnection } from '../../whatsapp-api';
 
 /**
@@ -28,11 +31,15 @@ import { WhatsAppApi, WhatsAppConnection } from '../../whatsapp-api';
  * entered on its own screen, and only then can it be activated. A number that
  * went live the moment it was typed would receive customer messages it had no
  * credential to answer.
+ *
+ * <strong>Each number shows where it stands</strong> (Phase 36.9): its status
+ * with its marker, and whether an access token is stored (never the token,
+ * which no screen can read back).
  */
 @Component({
   selector: 'app-whatsapp-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, PageHeader, EmptyState],
+  imports: [RouterLink, PageHeader, EmptyState, Icon],
   templateUrl: './whatsapp-page.html',
   styleUrl: './whatsapp-page.scss',
 })
@@ -56,6 +63,11 @@ export class WhatsAppPage implements OnInit {
   protected readonly wabaId = signal('');
   protected readonly phoneNumberId = signal('');
   protected readonly displayPhoneNumber = signal('');
+
+  protected readonly statusWord = channelStatusWord;
+  protected readonly statusTone = channelStatusTone;
+  protected readonly agentStatusWord = agentStatusWord;
+  protected readonly skeletonRows = [0, 1];
 
   protected readonly canView = computed(() => this.permissions.has('whatsapp.view'));
   protected readonly canManage = computed(() => this.permissions.has('whatsapp.manage'));
@@ -128,7 +140,7 @@ export class WhatsAppPage implements OnInit {
       await this.load();
 
       this.toasts.success(
-        'Number connected. It stays switched off until you add its access token.',
+        $localize`:@@whatsapp.create.done:Number connected. It stays switched off until you add its access token.`,
       );
       // The button that held focus is disabled again by the cleared form; the
       // list the new number joined is where the reader's attention belongs.

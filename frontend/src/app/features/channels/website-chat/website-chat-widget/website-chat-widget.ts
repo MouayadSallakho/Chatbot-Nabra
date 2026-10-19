@@ -8,17 +8,29 @@ import {
   output,
   signal,
 } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, map } from 'rxjs';
 import { ApiError, toApiError } from '@app/core/api/api-error';
 import { PermissionService } from '@app/core/authorization/permission-service';
+import { APP_LANGUAGE } from '@app/core/i18n/language';
+import { formatNumber } from '@app/core/i18n/locale-format';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
 import {
   WebChatAdminApi,
   WebChatWidgetConfiguration,
 } from '@app/features/channels/website-chat-api';
-import { checkOrigin } from '../allowed-origin';
+import {
+  BOUNDARY_CONTRAST,
+  DEFAULT_ACCENT,
+  checkAccent,
+  isAccent,
+} from '@app/features/embed/accent-color';
+import { ChatLauncher } from '@app/shared/chat/chat-launcher';
+import { ChatPanel } from '@app/shared/chat/chat-panel';
+import { Icon } from '@app/shared/icon/icon';
 import { ScrollRegion } from '@app/shared/scroll-region/scroll-region';
+import { checkOrigin } from '../allowed-origin';
 
 /** The server's bound on a greeting, so the box can say so before sending. */
 const MAX_GREETING_LENGTH = 300;
@@ -45,11 +57,20 @@ const ACCENT_PATTERN = /^#[0-9a-fA-F]{6}$/;
  * automatically and nothing is discarded: replaying an allowlist against state
  * nobody has seen is exactly the lost update the precondition exists to prevent,
  * and here it could put a removed website back.
+ *
+ * <strong>What visitors will see, while it is chosen</strong> (Phase 36.9). The
+ * preview beside the appearance form is the real widget, the same launcher and
+ * panel components the iframe runs, drawn from the values on the form before
+ * they are saved. The accent is checked by the widget's own rules
+ * (`accent-color.ts`), and the result is said in words: the label's contrast,
+ * and whether the launcher stands out on a white and on a dark page. Nothing
+ * here refuses a colour, because the rules make any colour legible; the screen
+ * says what they did.
  */
 @Component({
   selector: 'app-website-chat-widget',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, ScrollRegion],
+  imports: [ReactiveFormsModule, ScrollRegion, ChatPanel, ChatLauncher, Icon],
   templateUrl: './website-chat-widget.html',
   styleUrl: './website-chat-widget.scss',
 })
@@ -57,9 +78,13 @@ export class WebsiteChatWidget implements OnInit {
   private readonly api = inject(WebChatAdminApi);
   private readonly workspace = inject(WorkspaceContextService);
   private readonly permissions = inject(PermissionService);
+  private readonly language = inject(APP_LANGUAGE);
 
   /** The endpoint being configured. */
   readonly webChatEndpointId = input.required<string>();
+
+  /** The agent's name: the widget's title in the preview. */
+  readonly agentName = input('');
 
   /** Raised after a successful save, so the page's facts can be re-read. */
   readonly saved = output<void>();
@@ -102,13 +127,57 @@ export class WebsiteChatWidget implements OnInit {
       nonNullable: true,
       validators: [Validators.maxLength(MAX_GREETING_LENGTH)],
     }),
-    accentColor: new FormControl('#2563eb', {
+    accentColor: new FormControl(DEFAULT_ACCENT, {
       nonNullable: true,
       validators: [Validators.required, Validators.pattern(ACCENT_PATTERN)],
     }),
     launcherPosition: new FormControl<'Left' | 'Right'>('Right', { nonNullable: true }),
     theme: new FormControl<'System' | 'Light' | 'Dark'>('System', { nonNullable: true }),
   });
+
+  /** The form as signals, for the preview: it changes as the reader types. */
+  private readonly values = toSignal(
+    this.form.valueChanges.pipe(map(() => this.form.getRawValue())),
+    {
+      initialValue: this.form.getRawValue(),
+    },
+  );
+
+  /** The accent as the widget would apply it: checked, with its label colour. */
+  protected readonly accent = computed(() => checkAccent(this.values().accentColor));
+
+  /** Whether the colour box holds something the server will accept. */
+  protected readonly accentInvalid = computed(() => !isAccent(this.values().accentColor));
+
+  protected readonly previewGreeting = computed(() => {
+    const greeting = this.values().greeting.trim();
+
+    return greeting.length > 0 ? greeting : null;
+  });
+
+  protected readonly previewSide = computed(() => this.values().launcherPosition);
+  protected readonly previewTheme = computed(() => this.values().theme);
+
+  protected readonly launcherLabel = computed(() =>
+    this.agentName()
+      ? $localize`:@@visitor.launcher.named:Chat with ${this.agentName()}:agent:`
+      : $localize`:@@visitor.launcher:Open chat`,
+  );
+
+  /** A contrast ratio as people write it: one decimal, Western digits. */
+  protected ratio(value: number): string {
+    return `${formatNumber(this.language, Math.floor(value * 10) / 10, {
+      minimumFractionDigits: 1,
+      maximumFractionDigits: 1,
+    })}:1`;
+  }
+
+  protected readonly boundary = BOUNDARY_CONTRAST;
+
+  /** The Remove button's name, so a list of identical "Remove" buttons is told apart. */
+  protected removeLabel(origin: string): string {
+    return $localize`:@@widget.origins.removeLabel:Remove ${origin}:origin:`;
+  }
 
   /** One new website at a time, so each is checked as it is added. */
   protected readonly originForm = new FormGroup({
@@ -129,16 +198,29 @@ export class WebsiteChatWidget implements OnInit {
    * `412` and the reader decides.
    */
   refresh(): void {
-    if (
-      this.form.dirty ||
-      this.origins().length !== (this.configuration()?.allowedOrigins.length ?? 0)
-    ) {
+    if (this.hasUnsavedChanges()) {
       this.stale.set(true);
 
       return;
     }
 
     void this.load();
+  }
+
+  /**
+   * Whether anything on this section differs from what the server holds: the
+   * appearance form, or the list of websites (compared as lists, so removing a
+   * website and adding it back is not a change).
+   */
+  hasUnsavedChanges(): boolean {
+    const saved = this.configuration()?.allowedOrigins ?? [];
+    const current = this.origins();
+
+    return (
+      this.form.dirty ||
+      current.length !== saved.length ||
+      current.some((origin, index) => origin !== saved[index])
+    );
   }
 
   protected async load(): Promise<void> {
@@ -187,7 +269,9 @@ export class WebsiteChatWidget implements OnInit {
     }
 
     if (this.origins().includes(checked.origin)) {
-      this.originProblem.set('That website is already on the list.');
+      this.originProblem.set(
+        $localize`:@@widget.origins.duplicate:That website is already on the list.`,
+      );
 
       return;
     }

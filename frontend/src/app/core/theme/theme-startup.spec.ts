@@ -159,5 +159,27 @@ describe('startup contract with src/index.html', () => {
         })['dir'],
       ).toBe('rtl');
     });
+
+    it('lets the hosted chat and the widget follow the visitor light or dark, never a stored admin theme', () => {
+      const stored = { [THEME_STORAGE_KEY]: 'dark' };
+
+      expect(startPage({ path: '/chat/abc', stored, prefersDark: false })[THEME_ATTRIBUTE]).toBe(
+        'light',
+      );
+      expect(startPage({ path: '/embed/abc', stored, prefersDark: false })[THEME_ATTRIBUTE]).toBe(
+        'light',
+      );
+      expect(
+        startPage({
+          path: '/embed/abc',
+          stored: { [THEME_STORAGE_KEY]: 'light' },
+          prefersDark: true,
+        })[THEME_ATTRIBUTE],
+      ).toBe('dark');
+      // An admin page still honours the stored choice.
+      expect(startPage({ path: '/overview', stored, prefersDark: false })[THEME_ATTRIBUTE]).toBe(
+        'dark',
+      );
+    });
   });
 });

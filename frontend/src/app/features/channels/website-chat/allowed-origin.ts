@@ -43,18 +43,18 @@ export function checkOrigin(candidate: string): OriginCheck {
   const trimmed = candidate.trim();
 
   if (trimmed.length === 0) {
-    return { problem: 'Enter a website address.' };
+    return { problem: $localize`:@@origin.problem.empty:Enter a website address.` };
   }
 
   if (trimmed.length > MAX_LENGTH) {
-    return { problem: `A website address may be at most ${MAX_LENGTH} characters.` };
+    return {
+      problem: $localize`:@@origin.problem.tooLong:A website address may be at most ${MAX_LENGTH}:max: characters.`,
+    };
   }
 
   if (trimmed.includes('*')) {
     return {
-      problem:
-        'Wildcards are not accepted. Add each website separately, including every subdomain ' +
-        'the widget runs on.',
+      problem: $localize`:@@origin.problem.wildcard:Wildcards are not accepted. Add each website separately, including every subdomain the widget runs on.`,
     };
   }
 
@@ -63,31 +63,45 @@ export function checkOrigin(candidate: string): OriginCheck {
   try {
     parsed = new URL(trimmed);
   } catch {
-    return { problem: 'Enter a full address, including https://.' };
+    return {
+      problem: $localize`:@@origin.problem.notFull:Enter a full address, including https://.`,
+    };
   }
 
   if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
-    return { problem: 'Only http and https addresses can be used.' };
+    return {
+      problem: $localize`:@@origin.problem.scheme:Only http and https addresses can be used.`,
+    };
   }
 
   if (parsed.username.length > 0 || parsed.password.length > 0) {
-    return { problem: 'Remove the username and password from the address.' };
+    return {
+      problem: $localize`:@@origin.problem.credentials:Remove the username and password from the address.`,
+    };
   }
 
   if (parsed.pathname !== '' && parsed.pathname !== '/') {
-    return { problem: 'Remove the path — name the site itself, not a page on it.' };
+    return {
+      problem: $localize`:@@origin.problem.path:Remove the path: name the site itself, not a page on it.`,
+    };
   }
 
   if (parsed.search.length > 0 || parsed.hash.length > 0) {
-    return { problem: 'Remove the query string and fragment from the address.' };
+    return {
+      problem: $localize`:@@origin.problem.query:Remove the query string and fragment from the address.`,
+    };
   }
 
   if (parsed.hostname.length === 0) {
-    return { problem: 'Enter a full address, including https://.' };
+    return {
+      problem: $localize`:@@origin.problem.notFull:Enter a full address, including https://.`,
+    };
   }
 
   if (parsed.protocol === 'http:' && !isLoopback(parsed.hostname)) {
-    return { problem: 'Use https. Plain http is only accepted for localhost.' };
+    return {
+      problem: $localize`:@@origin.problem.http:Use https. Plain http is only accepted for localhost.`,
+    };
   }
 
   // `URL.origin` is already the canonical form: lower-cased scheme and host, the

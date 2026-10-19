@@ -49,6 +49,25 @@ export class AuthService {
   readonly isAuthenticated = computed(() => this.state() === 'authenticated');
 
   /**
+   * Prepares a visitors' page (the hosted chat, the widget): the anti-forgery
+   * token their writes need, and nothing about a session (Phase 36.9).
+   *
+   * A visitor has no account, so asking `/me` could only ever answer 401, and
+   * on a customer's website that 401 sat in the website's console on every
+   * page view.
+   */
+  async prepareVisitor(): Promise<void> {
+    try {
+      await firstValueFrom(this.api.csrf());
+    } catch {
+      // As in restore(): a write will say what is wrong, if anything is.
+    }
+
+    this.account.set(null);
+    this.state.set('anonymous');
+  }
+
+  /**
    * Asks the server who this browser is, once, at startup.
    *
    * <strong>The antiforgery token is obtained first, and a failure there is not

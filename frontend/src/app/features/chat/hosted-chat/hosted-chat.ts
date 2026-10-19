@@ -1,18 +1,23 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  Injector,
   OnInit,
+  afterNextRender,
   computed,
   inject,
   signal,
+  viewChild,
 } from '@angular/core';
-import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
 import { ApiError, toApiError } from '@app/core/api/api-error';
+import { APP_LANGUAGE } from '@app/core/i18n/language';
 import { PublicChatRealtime } from '@app/core/realtime/public-chat-realtime';
+import { BrandMark } from '@app/shared/brand-mark/brand-mark';
+import { ChatPanel } from '@app/shared/chat/chat-panel';
+import { visitorFailure } from '@app/shared/chat/visitor-copy';
 import { ChatHandling, ChatMessage, HostedChatApi } from '../hosted-chat-api';
 import { HostedChatSessionStore } from '../hosted-chat-session';
-import { BrandMark } from '@app/shared/brand-mark/brand-mark';
 
 /** The longest message the hosted chat accepts, matching the server's bound. */
 const MAX_MESSAGE_LENGTH = 4_000;
@@ -49,11 +54,16 @@ type ChatState = 'opening' | 'unavailable' | 'ready' | 'failed';
  * what happened and decides whether to try again, which sends a new message with
  * a new idempotency key. That holds for a rate limit too: being told to wait is
  * not licence to poll.
+ *
+ * <strong>The same chat as the widget</strong> (Phase 36.9): one shared panel,
+ * full height, with Nabra's mark in the header. The page knows no accent colour
+ * (its public read returns only the agent's name and availability), so it wears
+ * Nabra's own look rather than a guess at the workspace's.
  */
 @Component({
   selector: 'app-hosted-chat',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [BrandMark, ReactiveFormsModule],
+  imports: [BrandMark, ChatPanel],
   templateUrl: './hosted-chat.html',
   styleUrl: './hosted-chat.scss',
 })
@@ -61,12 +71,16 @@ export class HostedChat implements OnInit {
   private readonly api = inject(HostedChatApi);
   private readonly store = inject(HostedChatSessionStore);
   private readonly realtime = inject(PublicChatRealtime);
+  private readonly injector = inject(Injector);
+  private readonly language = inject(APP_LANGUAGE);
+  private readonly panel = viewChild(ChatPanel);
 
   protected readonly state = signal<ChatState>('opening');
   protected readonly agentName = signal('');
   protected readonly messages = signal<readonly ChatMessage[]>([]);
   protected readonly sending = signal(false);
   protected readonly sendFailure = signal<ApiError | null>(null);
+  protected readonly draft = signal('');
 
   /**
    * Who is answering, as the server last told this page.
@@ -92,21 +106,6 @@ export class HostedChat implements OnInit {
    * visitor has said anything.
    */
   protected readonly hasConversation = computed(() => this.conversation() !== null);
-
-  /**
-   * The composer.
-   *
-   * A `FormGroup` rather than a lone control because `(ngSubmit)` is contributed
-   * by a form directive: a bare `<form>` with only a `formControl` inside it
-   * never binds one, and the Send button would submit nothing. Pressing Enter and
-   * clicking Send then go through exactly the same path.
-   */
-  protected readonly form = new FormGroup({
-    message: new FormControl('', {
-      nonNullable: true,
-      validators: [Validators.required, Validators.maxLength(MAX_MESSAGE_LENGTH)],
-    }),
-  });
 
   protected readonly maxLength = MAX_MESSAGE_LENGTH;
 
@@ -153,7 +152,7 @@ export class HostedChat implements OnInit {
     } catch (error) {
       const failure = toApiError(error);
 
-      this.openFailure.set(this.explain(failure));
+      this.openFailure.set(visitorFailure(failure, 'hosted', this.language));
 
       // A chat that is switched off is not an error page: the visitor followed a
       // real link and is told the chat is closed, without being told why.
@@ -214,7 +213,7 @@ export class HostedChat implements OnInit {
   private async watch(conversationId: string): Promise<void> {
     await this.realtime.listen(
       () => this.api.realtimeTicket(conversationId),
-      () => void this.refreshTranscript(),
+      () => void this.onConversationChanged(),
     );
   }
 
@@ -231,9 +230,9 @@ export class HostedChat implements OnInit {
    */
   protected async send(): Promise<void> {
     const publicKey = this.publicKey();
-    const text = this.form.controls.message.value.trim();
+    const text = this.draft().trim();
 
-    if (!publicKey || !text || this.sending() || this.form.invalid) {
+    if (!publicKey || !text || this.sending() || text.length > MAX_MESSAGE_LENGTH) {
       return;
     }
 
@@ -267,9 +266,9 @@ export class HostedChat implements OnInit {
           : [...current, turn.customerMessage, turn.reply],
       );
 
-      this.form.controls.message.setValue('');
+      this.draft.set('');
     } catch (error) {
-      this.sendFailure.set(this.explain(toApiError(error)));
+      this.sendFailure.set(visitorFailure(toApiError(error), 'hosted', this.language));
 
       // The message stays in the box. The server may have stored what was sent,
       // but this visitor has no reply -- clearing their words as well would leave
@@ -301,8 +300,12 @@ export class HostedChat implements OnInit {
 
     this.conversation.set(null);
     this.messages.set([]);
+    this.handling.set('Ai');
     this.sendFailure.set(null);
-    this.form.controls.message.setValue('');
+    this.draft.set('');
+    void this.realtime.stop();
+
+    afterNextRender(() => this.panel()?.focusComposer(), { injector: this.injector });
   }
 
   /**
@@ -331,94 +334,19 @@ export class HostedChat implements OnInit {
   }
 
   /**
-   * Says what happened in words a customer can act on.
-   *
-   * <strong>The shared copy is written for administrators, and here that is
-   * wrong.</strong> "This needs an AI provider, and none is configured on this
-   * deployment" is a sentence about this platform's deployment: it tells somebody
-   * who came to ask about a delivery that a *provider* is not *configured*, which
-   * is meaningless to them and is internal operational detail they have no
-   * business being given. A customer needs to know that the answer did not
-   * arrive, that what they wrote was not lost, and that trying again is worth it.
-   *
-   * <strong>It also deliberately does not distinguish the causes.</strong> An
-   * unconfigured provider, a provider that timed out, a provider that answered
-   * with rubbish and a protection store this deployment cannot reach are one
-   * thing to a visitor — no answer right now — and telling them which would be
-   * reporting on the business's infrastructure to the public. The real status is
-   * in the response and in the logs, where operators look.
+   * A live notice that the conversation changed: re-read it, and once the
+   * business has answered (a person, or the AI on a later turn), retire the
+   * failure notice of an earlier send. It described a reply that did not come,
+   * and one now has.
    */
-  private explain(failure: ApiError): ApiError {
-    switch (failure.kind) {
-      // A 503 must not claim the message was received (Phase 34). It answers both
-      // "the AI step could not run" (message stored) and "the chat could not take
-      // the message at all" -- an unreachable protection store, a withdrawn chat,
-      // an unavailable database -- where nothing was stored. The page re-reads the
-      // transcript afterwards, so a visitor can see which; the sentence stays true
-      // in both cases and still names no cause.
-      case 'providerUnavailable':
-        return {
-          ...failure,
-          message:
-            'Sorry — no answer came back just now. You can try sending it again in a moment.',
-        };
+  private async onConversationChanged(): Promise<void> {
+    await this.refreshTranscript();
 
-      // A timeout or an unusable answer happens after the message was stored.
-      case 'providerTimeout':
-      case 'invalidResponse':
-        return {
-          ...failure,
-          message:
-            'Sorry — no answer came back just now. Your message was received, so you can ' +
-            'try sending it again in a moment.',
-        };
+    const last = this.messages().at(-1);
 
-      // Its own copy, because the advice is genuinely different: nothing failed
-      // and nothing was lost, there has simply been too much traffic from here.
-      // It says nothing about quotas, budgets, workspaces or how the limit is
-      // counted -- a visitor learns that they should wait, and no more.
-      case 'rateLimited':
-        return {
-          ...failure,
-          message:
-            'You are sending messages too quickly. ' + this.waitAdvice(failure.retryAfterSeconds),
-        };
-
-      // The shared copy says "no longer exists in this workspace", which tells a
-      // visitor about a workspace they have never heard of. What they need is
-      // that the link itself is the problem.
-      case 'notFound':
-        return {
-          ...failure,
-          message:
-            'This chat link is not valid. Check the link you were given, or contact the ' +
-            'business another way.',
-        };
-
-      default:
-        return failure;
+    if (last && last.sender !== 'Customer') {
+      this.sendFailure.set(null);
     }
-  }
-
-  /**
-   * How long to wait, in words rather than a countdown.
-   *
-   * Rounded up to whole minutes past a minute, because "wait 97 seconds" invites
-   * somebody to sit and count. With no usable `Retry-After` it says the honest
-   * vague thing instead of inventing a number.
-   */
-  private waitAdvice(seconds: number | undefined): string {
-    if (seconds === undefined || seconds <= 0) {
-      return 'Please wait a moment and try again.';
-    }
-
-    if (seconds <= 90) {
-      return `Please wait about ${seconds} seconds and try again.`;
-    }
-
-    const minutes = Math.ceil(seconds / 60);
-
-    return `Please wait about ${minutes} minutes and try again.`;
   }
 
   /**

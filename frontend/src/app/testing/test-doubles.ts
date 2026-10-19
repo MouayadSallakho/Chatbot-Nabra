@@ -1,3 +1,4 @@
+import { signal } from '@angular/core';
 import { Observable, of } from 'rxjs';
 import { PermissionDefinition } from '@app/core/authorization/permission-codes';
 import { MediaQueryFactory } from '@app/core/media/media';
@@ -361,4 +362,26 @@ export function answerConfirmation(root: HTMLElement, accept = true): void {
 
   // Cancel is first in the markup, the confirming action last.
   (accept ? buttons[buttons.length - 1] : buttons[0]).click();
+}
+
+/**
+ * The visitors' realtime service, without a socket (Phase 36.9).
+ *
+ * The real one loads the SignalR client on first use, which a unit test has no
+ * reason to wait for: it counts who asked to listen and when, and connects to
+ * nothing. Provided through DI, never `vi.mock` (the runner shares workers
+ * between spec files, Phase 36.7).
+ */
+export class FakePublicChatRealtime {
+  readonly live = signal(false);
+  readonly listens: Array<{ onChanged: () => void }> = [];
+  stops = 0;
+
+  async listen(_mintTicket: unknown, onChanged: () => void): Promise<void> {
+    this.listens.push({ onChanged });
+  }
+
+  async stop(): Promise<void> {
+    this.stops += 1;
+  }
 }

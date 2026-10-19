@@ -1,10 +1,5 @@
 import { DestroyRef, Injectable, NgZone, inject, signal } from '@angular/core';
-import {
-  HubConnection,
-  HubConnectionBuilder,
-  HubConnectionState,
-  LogLevel,
-} from '@microsoft/signalr';
+import type { HubConnection } from '@microsoft/signalr';
 import { Observable } from 'rxjs';
 
 /** The one event the platform pushes. */
@@ -43,6 +38,10 @@ export type MintRealtimeTicket = () => Observable<{ readonly ticket: string }>;
  * expiry and whether the website is still approved. A widget on a site that was
  * removed from the allowlist a second ago can still be told something changed,
  * and still cannot read what.
+ *
+ * <strong>The realtime client loads on first use</strong> (Phase 36.9). Nobody
+ * listens before a conversation exists, so a visitor who opens the page or the
+ * widget and never sends anything never downloads it.
  */
 @Injectable({ providedIn: 'root' })
 export class PublicChatRealtime {
@@ -50,6 +49,9 @@ export class PublicChatRealtime {
   private readonly destroyRef = inject(DestroyRef);
 
   private connection: HubConnection | null = null;
+
+  /** Bumped by every listen and stop, so a slow load cannot revive a stopped listener. */
+  private generation = 0;
 
   /** Whether updates are arriving. False means the visitor may need to reload. */
   readonly live = signal(false);
@@ -68,6 +70,8 @@ export class PublicChatRealtime {
   async listen(mintTicket: MintRealtimeTicket, onChanged: () => void): Promise<void> {
     await this.stop();
 
+    const generation = this.generation;
+
     // Built inside the try for the same reason the admin one is: `withUrl`
     // resolves against the document and throws where there is none, and a
     // widget must not be taken down by the absence of a feature it can live
@@ -75,7 +79,14 @@ export class PublicChatRealtime {
     let connection: HubConnection;
 
     try {
-      connection = new HubConnectionBuilder()
+      const signalr = await import('@microsoft/signalr');
+
+      if (generation !== this.generation) {
+        // Stopped, or asked to listen elsewhere, while the client was loading.
+        return;
+      }
+
+      connection = new signalr.HubConnectionBuilder()
         .withUrl(PUBLIC_HUB, {
           // Called again on every reconnect, so the ticket presented is always
           // a current one rather than the one this page started with.
@@ -86,7 +97,7 @@ export class PublicChatRealtime {
           },
         })
         .withAutomaticReconnect()
-        .configureLogging(LogLevel.Warning)
+        .configureLogging(signalr.LogLevel.Warning)
         .build();
     } catch {
       this.live.set(false);
@@ -117,10 +128,11 @@ export class PublicChatRealtime {
   async stop(): Promise<void> {
     const connection = this.connection;
 
+    this.generation += 1;
     this.connection = null;
     this.live.set(false);
 
-    if (connection && connection.state !== HubConnectionState.Disconnected) {
+    if (connection && String(connection.state) !== 'Disconnected') {
       try {
         await connection.stop();
       } catch {

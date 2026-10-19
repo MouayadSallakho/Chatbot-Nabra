@@ -1,0 +1,143 @@
+// The visitor's transcript. Colours come from the panel around it: `--_ai-bg`
+// and `--_ai-border` are the workspace accent's tint in the widget and the
+// AI voice (Lagoon) on the hosted page. Logical properties only.
+
+:host {
+  display: block;
+}
+
+.chat-log {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chat-greeting,
+.chat-empty {
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font: var(--text-small);
+  white-space: pre-wrap;
+}
+
+.chat-greeting {
+  background-color: var(--surface-muted);
+}
+
+.chat-empty {
+  text-align: center;
+}
+
+// A bubble, with the speaker's "tail" corner written logically so it mirrors.
+.chat-msg {
+  display: flex;
+  flex-direction: column;
+  gap: 2px; // token-lint-ignore: the sender line sits tight on its message
+  max-inline-size: 85%;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-bubble);
+  background-color: var(--surface-default);
+  color: var(--text-primary);
+  font: var(--text-reading);
+  overflow-wrap: anywhere;
+}
+
+// The visitor's own words: on the end side, neutral.
+.chat-msg-mine {
+  align-self: flex-end;
+  border-color: transparent;
+  border-end-end-radius: var(--radius-bubble-tail);
+  background-color: var(--surface-selected);
+}
+
+.chat-msg-ai,
+.chat-msg-person {
+  align-self: flex-start;
+  border-end-start-radius: var(--radius-bubble-tail);
+}
+
+.chat-msg-ai {
+  border-color: var(--_ai-border, var(--voice-ai-border));
+  background-color: var(--_ai-bg, var(--voice-ai-tint));
+}
+
+.chat-text {
+  white-space: pre-wrap;
+}
+
+.chat-sender {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--text-secondary);
+  font: var(--text-caption);
+}
+
+// A person: the glyph and the word, in the voice that means a person.
+.chat-sender-glyph {
+  color: var(--voice-human-fg);
+}
+
+.chat-msg-person .chat-sender {
+  color: var(--voice-human-strong);
+}
+
+// -----------------------------------------------------------------------------
+// Typing: three dots and the sentence, for the AI only
+// -----------------------------------------------------------------------------
+.chat-typing {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--space-3) 0 0;
+  color: var(--text-secondary);
+  font: var(--text-small);
+}
+
+.chat-dots {
+  display: inline-flex;
+  gap: 3px; // token-lint-ignore: the dots read as one mark
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--_ai-border, var(--voice-ai-border));
+  border-radius: var(--radius-bubble);
+  border-end-start-radius: var(--radius-bubble-tail);
+  background-color: var(--_ai-bg, var(--voice-ai-tint));
+
+  span {
+    inline-size: 6px;
+    block-size: 6px;
+    border-radius: 50%;
+    background-color: var(--text-secondary);
+    // A status, removed the moment the reply arrives (never decorative over 5 s),
+    // and stopped under reduced motion below.
+    // motion-audit-ignore: infinite-animation
+    animation: chat-dot 1.2s ease-in-out infinite;
+  }
+
+  span:nth-child(2) {
+    animation-delay: 0.15s;
+  }
+
+  span:nth-child(3) {
+    animation-delay: 0.3s;
+  }
+}
+
+// Opacity only: a pulse in place, nothing travels. Still under reduced motion,
+// where the sentence beside it says the same thing.
+@keyframes chat-dot {
+  50% {
+    opacity: 0.25;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-dots span {
+    animation: none;
+  }
+}

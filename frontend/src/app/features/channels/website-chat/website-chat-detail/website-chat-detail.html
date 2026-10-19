@@ -5,6 +5,7 @@
       backLabel="Website chat"
       i18n-backLabel="@@back.websiteChat"
       heading="Website chat"
+      i18n-heading="@@websiteChat.heading"
     />
 
     <div class="page-section">
@@ -12,7 +13,9 @@
         <app-empty-state
           icon="channels"
           heading="You do not have access to website chat"
-          description="Seeing how this workspace's website chat is set up needs a permission your roles do not include."
+          i18n-heading="@@websiteChat.noAccess.heading"
+          description="Seeing how this workspace's website chat is set up needs a permission your roles do not include. Ask somebody who administers this workspace if you need it."
+          i18n-description="@@websiteChat.noAccess.body"
         />
       </div>
     </div>
@@ -22,12 +25,16 @@
       backLabel="Website chat"
       i18n-backLabel="@@back.websiteChat"
       heading="Website chat"
+      i18n-heading="@@websiteChat.heading"
     />
 
     <div class="page-section" aria-busy="true">
-      <p class="visually-hidden" role="status">Loading chat link…</p>
-      <div class="card card-body">
+      <p class="visually-hidden" role="status" i18n="@@websiteChat.detail.loading">
+        Loading chat link…
+      </p>
+      <div class="card card-body status-card">
         <span class="skeleton skeleton-title"></span>
+        <span class="skeleton skeleton-text"></span>
         <span class="skeleton skeleton-text"></span>
       </div>
     </div>
@@ -37,20 +44,47 @@
       backLabel="Website chat"
       i18n-backLabel="@@back.websiteChat"
       heading="Website chat"
+      i18n-heading="@@websiteChat.heading"
     />
 
     <div class="page-section">
       <div class="card">
-        <app-empty-state
-          icon="alert"
-          tone="error"
-          [heading]="error.kind === 'notFound' ? 'Chat link not found' : 'Could not load chat link'"
-          [description]="error.message"
-        >
-          <a stateActions class="btn btn-secondary btn-sm" routerLink="/channels/website-chat">
-            Back to website chat
-          </a>
-        </app-empty-state>
+        @if (error.kind === 'notFound') {
+          <app-empty-state
+            icon="alert"
+            tone="error"
+            heading="Chat link not found"
+            i18n-heading="@@websiteChat.detail.notFound"
+            [description]="error.message"
+          >
+            <a
+              stateActions
+              class="btn btn-secondary btn-sm"
+              routerLink="/channels/website-chat"
+              i18n="@@websiteChat.detail.backToList"
+            >
+              Back to website chat
+            </a>
+          </app-empty-state>
+        } @else {
+          <app-empty-state
+            icon="alert"
+            tone="error"
+            heading="Could not load chat link"
+            i18n-heading="@@websiteChat.detail.loadFailed"
+            [description]="error.message"
+          >
+            <button
+              stateActions
+              type="button"
+              class="btn btn-secondary btn-sm"
+              (click)="load()"
+              i18n="@@websiteChat.tryAgain"
+            >
+              Try again
+            </button>
+          </app-empty-state>
+        }
       </div>
     </div>
   } @else if (endpoint(); as current) {
@@ -59,9 +93,10 @@
       backLabel="Website chat"
       i18n-backLabel="@@back.websiteChat"
       [heading]="current.aiAgentName"
-      description="A website chat link. Visitors who open it talk to this agent."
-    >
-    </app-page-header>
+      headingDir="auto"
+      description="A website chat link. Visitors who open it, or the widget on your website, talk to this agent."
+      i18n-description="@@websiteChat.detail.lede"
+    />
 
     <!--
       The stale-write banner. Deliberately not an error beside a button: this
@@ -71,12 +106,19 @@
     @if (stale()) {
       <div class="page-section">
         <div class="stale-notice" role="alert">
-          <p class="conflict-title">This chat link was updated elsewhere.</p>
-          <p class="text-small text-secondary">
+          <p class="conflict-title" i18n="@@websiteChat.detail.stale.title">
+            This chat link was updated elsewhere.
+          </p>
+          <p class="text-small text-secondary" i18n="@@websiteChat.detail.stale.body">
             Nothing was changed. Reload to see how it stands now, then try again.
           </p>
           <div class="conflict-actions">
-            <button type="button" class="btn btn-primary btn-sm" (click)="load()">
+            <button
+              type="button"
+              class="btn btn-primary btn-sm"
+              (click)="load()"
+              i18n="@@websiteChat.detail.stale.reload"
+            >
               Reload latest
             </button>
           </div>
@@ -84,40 +126,122 @@
       </div>
     }
 
-    <div class="page-section">
-      <div class="card card-body facts">
-        <div>
-          <p class="text-label text-muted">Status</p>
-          <p class="text-body">
-            <span
-              class="badge"
-              [class.badge-success]="isActive()"
-              [class.badge-neutral]="!isActive()"
+    <!-- ----------------------------------------------------------- status -->
+    <section class="page-section" aria-labelledby="link-status-heading">
+      <div class="card card-body status-card" data-testid="link-status">
+        <div class="status-main">
+          <h2 id="link-status-heading" class="card-title" i18n="@@websiteChat.detail.status">
+            Status
+          </h2>
+          <ol class="lifecycle-path" [attr.aria-label]="lifecycleLabel">
+            @for (step of lifecycle; track step) {
+              <li
+                class="lifecycle-step"
+                [attr.aria-current]="step === current.status ? 'step' : null"
+              >
+                <span class="badge" [class]="statusTone(step)">{{ statusWord(step) }}</span>
+              </li>
+            }
+          </ol>
+          <p class="text-body" data-testid="link-status-sentence">{{ statusSentence() }}</p>
+
+          <p class="text-small text-secondary">
+            @if (canViewAgents()) {
+              <span i18n="@@websiteChat.detail.answeredByLink"
+                >Answered by
+                <a [routerLink]="['/ai-agents', current.aiAgentId]" dir="auto">{{
+                  current.aiAgentName
+                }}</a></span
+              >
+            } @else {
+              <span i18n="@@websiteChat.detail.answeredBy"
+                >Answered by <bdi>{{ current.aiAgentName }}</bdi></span
+              >
+            }
+            <span class="agent-status" i18n="@@websiteChat.detail.agentStatus"
+              >Agent status: {{ agentStatusWord(current.aiAgentStatus) }}</span
             >
-              {{ current.status }}
-            </span>
           </p>
         </div>
-        <div>
-          <p class="text-label text-muted">Agent status</p>
-          <p class="text-body">{{ current.aiAgentStatus }}</p>
-        </div>
-        <div>
-          <p class="text-label text-muted">Created</p>
-          <p class="text-body">{{ current.createdAt | localDate: 'dateTime' }}</p>
-        </div>
-        <div>
-          <p class="text-label text-muted">Last changed</p>
-          <p class="text-body">{{ current.updatedAt | localDate: 'dateTime' }}</p>
-        </div>
-      </div>
-    </div>
 
-    <div class="page-section">
-      <h2 class="text-section-title">Chat link</h2>
-      <p class="text-small text-secondary section-note">
-        Send this to visitors, or link to it from your own website. It is not a secret — anybody who
-        opens it can talk to this agent, and it gives them nothing else.
+        @if (agentNotActive()) {
+          <p class="alert alert-warning" role="status" data-testid="agent-not-active">
+            <app-icon name="alert" [strokeWidth]="1.75" />
+            <span i18n="@@websiteChat.detail.agentNotActive"
+              >This agent is not active. Only an active agent answers visitors, so the chat says it
+              is unavailable until the agent is activated.</span
+            >
+          </p>
+        }
+
+        @if (saveFailure(); as error) {
+          <p class="alert alert-danger" role="alert">
+            <app-icon name="alert" [strokeWidth]="1.75" />
+            <span>{{ error.message }}</span>
+          </p>
+        }
+
+        @if (canManage()) {
+          <div class="form-actions">
+            @if (isActive()) {
+              <button
+                type="button"
+                class="btn btn-secondary"
+                [disabled]="saving()"
+                (click)="setStatus(false)"
+                data-testid="disable-chat"
+              >
+                @if (saving()) {
+                  <span i18n="@@websiteChat.detail.saving">Saving…</span>
+                } @else {
+                  <span i18n="@@websiteChat.detail.disable">Disable chat</span>
+                }
+              </button>
+              <p class="text-small text-muted" i18n="@@websiteChat.detail.disable.hint">
+                Disabling stops new conversations and new replies. Transcripts people already have
+                stay readable to them.
+              </p>
+            } @else {
+              <button
+                type="button"
+                class="btn btn-primary"
+                [disabled]="saving()"
+                (click)="setStatus(true)"
+                data-testid="publish-chat"
+              >
+                @if (saving()) {
+                  <span i18n="@@websiteChat.detail.saving">Saving…</span>
+                } @else {
+                  <span i18n="@@websiteChat.detail.publish">Publish chat</span>
+                }
+              </button>
+              <p class="text-small text-muted" i18n="@@websiteChat.detail.publish.hint">
+                Publishing lets anybody with the link, or on a website you allow, start talking.
+              </p>
+            }
+          </div>
+        }
+
+        <p class="status-meta text-small text-muted">
+          <span i18n="@@websiteChat.detail.created"
+            >Created {{ current.createdAt | localDate: 'dateTime' }}</span
+          >
+          <span aria-hidden="true">·</span>
+          <span i18n="@@websiteChat.detail.changed"
+            >Last changed {{ current.updatedAt | localDate: 'dateTime' }}</span
+          >
+        </p>
+      </div>
+    </section>
+
+    <!-- -------------------------------------------------------- chat link -->
+    <section class="page-section" aria-labelledby="chat-link-heading">
+      <h2 id="chat-link-heading" class="text-section-title" i18n="@@websiteChat.detail.link">
+        Chat page
+      </h2>
+      <p class="text-small text-secondary section-note" i18n="@@websiteChat.detail.link.lede">
+        A page of its own for this chat. Send it to visitors, or link to it from your website. It is
+        not a secret: anybody who opens it can talk to this agent, and it gives them nothing else.
       </p>
 
       <div class="card card-body link-card">
@@ -126,80 +250,58 @@
           refused by permission or by an insecure context, and somebody who
           cannot copy must still be able to select it by hand.
         -->
-        <p class="chat-link">{{ chatUrl() }}</p>
+        <p class="chat-link" data-testid="chat-link">
+          <bdi dir="ltr">{{ chatUrl() }}</bdi>
+        </p>
 
         <div class="link-actions">
-          <button type="button" class="btn btn-secondary btn-sm" (click)="copy()">
+          <button
+            type="button"
+            class="btn btn-secondary btn-sm"
+            (click)="copy()"
+            i18n="@@websiteChat.detail.copy"
+          >
             Copy chat link
           </button>
+          <a
+            class="btn btn-ghost btn-sm"
+            [href]="chatUrl()"
+            target="_blank"
+            rel="noopener noreferrer"
+            i18n="@@websiteChat.detail.openPage"
+            >Open the chat page</a
+          >
 
           @if (copied()) {
-            <span class="text-small text-muted" role="status">Copied.</span>
+            <span class="text-small text-muted" role="status" i18n="@@websiteChat.copied"
+              >Copied.</span
+            >
           }
         </div>
       </div>
-    </div>
+    </section>
 
     <!--
       Installing the widget on a website, and how it looks there. Its own
-      component with its own read and its own conditional write: four forms and
-      a security allowlist do not belong in the page that publishes the link.
+      component with its own read and its own conditional write.
     -->
-    <app-website-chat-widget [webChatEndpointId]="webChatEndpointId()" (saved)="load()" />
-
-    @if (canManage()) {
-      <div class="page-section">
-        <h2 class="text-section-title">Availability</h2>
-
-        @if (agentNotActive()) {
-          <p class="alert alert-warning" role="status">
-            This agent is {{ current.aiAgentStatus | lowercase }}. Only an active agent answers
-            visitors, so the chat page will say it is unavailable until the agent is activated.
-          </p>
-        }
-
-        @if (saveFailure(); as error) {
-          <p class="alert alert-danger" role="alert">{{ error.message }}</p>
-        }
-
-        <div class="form-actions">
-          @if (isActive()) {
-            <button
-              type="button"
-              class="btn btn-secondary"
-              [disabled]="saving()"
-              (click)="setStatus(false)"
-            >
-              {{ saving() ? 'Saving…' : 'Disable chat' }}
-            </button>
-            <p class="text-small text-muted">
-              Disabling stops new conversations and new replies. Transcripts people already have
-              stay readable to them.
-            </p>
-          } @else {
-            <button
-              type="button"
-              class="btn btn-primary"
-              [disabled]="saving()"
-              (click)="setStatus(true)"
-            >
-              {{ saving() ? 'Saving…' : 'Publish chat' }}
-            </button>
-            <p class="text-small text-muted">
-              Publishing lets anybody with the link start talking.
-            </p>
-          }
-        </div>
-      </div>
-    }
+    <app-website-chat-widget
+      [webChatEndpointId]="webChatEndpointId()"
+      [agentName]="current.aiAgentName"
+      (saved)="load()"
+    />
   }
 
   <app-confirm-dialog
     #disableDialog
     heading="Disable this website chat?"
+    i18n-heading="@@websiteChat.disableDialog.heading"
     body="Visitors who open this chat link, or the widget on your website, can no longer start a conversation until it is published again. Existing conversations are kept."
+    i18n-body="@@websiteChat.disableDialog.body"
     confirmLabel="Disable chat"
+    i18n-confirmLabel="@@websiteChat.detail.disable"
     cancelLabel="Keep it published"
+    i18n-cancelLabel="@@websiteChat.disableDialog.cancel"
     tone="danger"
   />
 </div>

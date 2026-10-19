@@ -5,6 +5,7 @@
       backLabel="Channels"
       i18n-backLabel="@@back.channels"
       heading="WhatsApp"
+      i18n-heading="@@whatsapp.heading"
     />
 
     <div class="page-section">
@@ -12,7 +13,9 @@
         <app-empty-state
           icon="channels"
           heading="You do not have access to WhatsApp"
+          i18n-heading="@@whatsapp.noAccess.heading"
           description="Seeing how this workspace's WhatsApp numbers are set up needs a permission your roles do not include. Ask somebody who administers this workspace if you need it."
+          i18n-description="@@whatsapp.noAccess.body"
         />
       </div>
     </div>
@@ -22,130 +25,201 @@
       backLabel="Channels"
       i18n-backLabel="@@back.channels"
       heading="WhatsApp"
+      i18n-heading="@@whatsapp.heading"
       description="Numbers customers can message you on. Each number connects to one AI agent, and conversations arrive in the same inbox as every other channel."
-    >
-    </app-page-header>
+      i18n-description="@@whatsapp.lede"
+    />
 
-    @if (loading()) {
-      <div class="page-section" aria-busy="true">
-        <p class="visually-hidden" role="status">Loading WhatsApp numbers…</p>
-        <div class="card card-body">
-          <span class="skeleton skeleton-title"></span>
-          <span class="skeleton skeleton-text"></span>
+    <div class="page-section">
+      <h2
+        id="connected-numbers"
+        class="text-section-title"
+        tabindex="-1"
+        i18n="@@whatsapp.numbers.heading"
+      >
+        Connected numbers
+      </h2>
+
+      @if (loading()) {
+        <div class="data-list connection-list" aria-busy="true">
+          <p class="visually-hidden" role="status" i18n="@@whatsapp.loading">
+            Loading WhatsApp numbers…
+          </p>
+          @for (row of skeletonRows; track row) {
+            <div class="data-row data-row-skeleton" aria-hidden="true">
+              <span class="skeleton skeleton-title"></span>
+              <span class="skeleton skeleton-text"></span>
+            </div>
+          }
         </div>
-      </div>
-    } @else if (failure(); as error) {
-      <div class="page-section">
+      } @else if (failure(); as error) {
         <div class="card">
           <app-empty-state
             icon="alert"
             tone="error"
             heading="Could not load WhatsApp numbers"
+            i18n-heading="@@whatsapp.loadFailed"
             [description]="error.message"
           >
-            <button stateActions type="button" class="btn btn-secondary btn-sm" (click)="load()">
+            <button
+              stateActions
+              type="button"
+              class="btn btn-secondary btn-sm"
+              (click)="load()"
+              i18n="@@whatsapp.tryAgain"
+            >
               Try again
             </button>
           </app-empty-state>
         </div>
-      </div>
-    } @else {
-      <div class="page-section">
-        <h2 id="connected-numbers" class="text-section-title" tabindex="-1">Connected numbers</h2>
-
-        @if (connections().length === 0) {
-          <div class="card">
-            <app-empty-state
-              icon="channels"
-              heading="No numbers connected yet"
-              description="Connect one below to let customers reach an AI agent on WhatsApp."
-            />
+      } @else if (connections().length === 0) {
+        <div class="card">
+          <app-empty-state
+            icon="channels"
+            heading="No numbers connected yet"
+            i18n-heading="@@whatsapp.empty.heading"
+            description="Connect one below to let customers reach an AI agent on WhatsApp."
+            i18n-description="@@whatsapp.empty.body"
+          />
+        </div>
+      } @else {
+        <div class="data-list connection-list">
+          <div class="data-list-head" aria-hidden="true">
+            <span i18n="@@whatsapp.column.number">Number</span>
+            <span i18n="@@whatsapp.column.agent">AI agent</span>
+            <span i18n="@@whatsapp.column.status">Status</span>
+            <span i18n="@@whatsapp.column.token">Access token</span>
+            <span></span>
           </div>
-        } @else {
-          <ul class="connection-list">
+
+          <ul data-testid="connections">
             @for (connection of connections(); track connection.id) {
               <li>
-                <a class="connection" [routerLink]="['/channels/whatsapp', connection.id]">
-                  <span class="connection-name">
+                <a
+                  class="data-row"
+                  [routerLink]="['/channels/whatsapp', connection.id]"
+                  [attr.data-testid]="'connection-' + connection.id"
+                >
+                  <bdi class="data-row-title connection-number" dir="ltr">
                     {{ connection.displayPhoneNumber || connection.phoneNumberId }}
+                  </bdi>
+
+                  <span class="data-row-meta">
+                    <span class="data-cell-label" i18n="@@whatsapp.cell.agent">AI agent:</span>
+                    @if (connection.aiAgentName) {
+                      <bdi>{{ connection.aiAgentName }}</bdi>
+                    } @else {
+                      <span i18n="@@whatsapp.agentRemoved">Agent removed</span>
+                    }
                   </span>
 
-                  <span class="text-small text-secondary connection-agent">
-                    {{ connection.aiAgentName || 'Agent removed' }}
+                  <span>
+                    <span class="badge" [class]="statusTone(connection.status)">{{
+                      statusWord(connection.status)
+                    }}</span>
                   </span>
 
-                  <span
-                    class="badge"
-                    [class.badge-success]="connection.status === 'Active'"
-                    [class.badge-neutral]="connection.status !== 'Active'"
-                  >
-                    {{ connection.status }}
+                  <span>
+                    @if (connection.hasCredential) {
+                      <span class="badge badge-success" i18n="@@whatsapp.token.stored"
+                        >Token stored</span
+                      >
+                    } @else {
+                      <span class="badge badge-warning" i18n="@@whatsapp.token.missing"
+                        >No access token</span
+                      >
+                    }
                   </span>
 
-                  @if (!connection.hasCredential) {
-                    <span class="badge badge-warning">No access token</span>
-                  }
-
-                  <span class="connection-chevron" aria-hidden="true">›</span>
+                  <app-icon class="data-row-chevron" name="chevron-end" />
                 </a>
               </li>
             }
           </ul>
-        }
-      </div>
+        </div>
+      }
+    </div>
 
-      @if (canManage()) {
-        <div class="page-section">
-          <h2 class="text-section-title">Connect a number</h2>
-          <p class="text-small text-secondary section-note">
-            A new connection is created switched off. Add its access token on the connection's own
-            page, then put it into service — so a mistyped number is never live the moment it is
-            saved.
-          </p>
+    @if (canManage() && !loading() && !failure()) {
+      <div class="page-section">
+        <section class="card form-section" aria-labelledby="connect-heading">
+          <div class="card-header">
+            <div>
+              <h2 id="connect-heading" class="form-section-title" i18n="@@whatsapp.create.heading">
+                Connect a number
+              </h2>
+              <p class="form-section-lede" i18n="@@whatsapp.create.lede">
+                A new connection is created switched off. Add its access token on the connection's
+                own page, then put it into service, so a mistyped number is never live the moment it
+                is saved.
+              </p>
+            </div>
+          </div>
 
-          <div class="card card-body create">
-            <label class="field">
-              <span class="text-label">AI agent</span>
+          <div class="card-body create">
+            <ol class="connect-steps text-small text-secondary">
+              <li class="connect-step is-current" i18n="@@whatsapp.create.step1">
+                Connect the number
+              </li>
+              <li class="connect-step" i18n="@@whatsapp.create.step2">Add its access token</li>
+              <li class="connect-step" i18n="@@whatsapp.create.step3">Put it into service</li>
+            </ol>
+
+            <div class="field">
+              <label class="field-label" for="connect-agent" i18n="@@whatsapp.field.agent"
+                >AI agent</label
+              >
               <select
-                class="form-select"
+                id="connect-agent"
+                class="select"
                 [value]="agentId()"
                 (change)="agentId.set($any($event.target).value)"
               >
-                <option value="">Choose an agent…</option>
+                <option value="" i18n="@@whatsapp.field.agent.choose">Choose an agent…</option>
                 @for (agent of agentOptions(); track agent.id) {
-                  <option [value]="agent.id">{{ agent.name }} — {{ agent.status }}</option>
+                  <option [value]="agent.id">
+                    {{ agent.name }} — {{ agentStatusWord(agent.status) }}
+                  </option>
                 }
               </select>
-            </label>
+            </div>
 
-            <label class="field">
-              <span class="text-label">WhatsApp Business Account ID</span>
+            <div class="field">
+              <label class="field-label" for="connect-waba" i18n="@@whatsapp.field.waba"
+                >WhatsApp Business Account ID</label
+              >
               <input
-                class="form-control"
+                id="connect-waba"
+                class="input"
                 type="text"
                 inputmode="numeric"
+                dir="ltr"
                 autocomplete="off"
                 [value]="wabaId()"
                 (input)="wabaId.set($any($event.target).value)"
                 [attr.aria-invalid]="notDigits(wabaId())"
                 [attr.aria-describedby]="notDigits(wabaId()) ? 'waba-hint waba-error' : 'waba-hint'"
               />
-              <span id="waba-hint" class="text-small text-muted">
+              <p id="waba-hint" class="field-hint" i18n="@@whatsapp.field.waba.hint">
                 Digits only, from your Meta app's WhatsApp settings.
-              </span>
+              </p>
               @if (notDigits(wabaId())) {
-                <span id="waba-error" class="form-error">
-                  Use digits only — no spaces, letters or symbols.
-                </span>
+                <p id="waba-error" class="field-error" i18n="@@whatsapp.field.digitsOnlyError">
+                  Use digits only: no spaces, letters or symbols.
+                </p>
               }
-            </label>
+            </div>
 
-            <label class="field">
-              <span class="text-label">Phone number ID</span>
+            <div class="field">
+              <label class="field-label" for="connect-phone-id" i18n="@@whatsapp.field.phoneId"
+                >Phone number ID</label
+              >
               <input
-                class="form-control"
+                id="connect-phone-id"
+                class="input"
                 type="text"
                 inputmode="numeric"
+                dir="ltr"
                 autocomplete="off"
                 [value]="phoneNumberId()"
                 (input)="phoneNumberId.set($any($event.target).value)"
@@ -154,36 +228,41 @@
                   notDigits(phoneNumberId()) ? 'phone-id-hint phone-id-error' : 'phone-id-hint'
                 "
               />
-              <span id="phone-id-hint" class="text-small text-muted">
+              <p id="phone-id-hint" class="field-hint" i18n="@@whatsapp.field.phoneId.hint">
                 Digits only. This is the identifier Meta sends with every message, not the phone
-                number itself — it is how an incoming message is matched to this workspace.
-              </span>
+                number itself: it is how an incoming message is matched to this workspace.
+              </p>
               @if (notDigits(phoneNumberId())) {
-                <span id="phone-id-error" class="form-error">
-                  Use digits only — no spaces, letters or symbols.
-                </span>
+                <p id="phone-id-error" class="field-error" i18n="@@whatsapp.field.digitsOnlyError">
+                  Use digits only: no spaces, letters or symbols.
+                </p>
               }
-            </label>
+            </div>
 
-            <label class="field">
-              <span class="text-label"
-                >Display number <span class="text-muted">(optional)</span></span
+            <div class="field">
+              <label class="field-label" for="connect-display" i18n="@@whatsapp.field.display"
+                >Display number (optional)</label
               >
               <input
-                class="form-control"
+                id="connect-display"
+                class="input"
                 type="text"
+                dir="ltr"
                 autocomplete="off"
                 [value]="displayPhoneNumber()"
                 (input)="displayPhoneNumber.set($any($event.target).value)"
                 aria-describedby="display-hint"
               />
-              <span id="display-hint" class="text-small text-muted">
+              <p id="display-hint" class="field-hint" i18n="@@whatsapp.field.display.hint">
                 Shown here so you can tell two numbers apart. It is never used for routing.
-              </span>
-            </label>
+              </p>
+            </div>
 
             @if (createFailure(); as error) {
-              <p class="alert alert-danger" role="alert">{{ error.message }}</p>
+              <p class="alert alert-danger" role="alert">
+                <app-icon name="alert" [strokeWidth]="1.75" />
+                <span>{{ error.message }}</span>
+              </p>
             }
 
             <div class="form-actions">
@@ -193,12 +272,16 @@
                 [disabled]="!ready() || creating()"
                 (click)="create()"
               >
-                {{ creating() ? 'Connecting…' : 'Connect number' }}
+                @if (creating()) {
+                  <span i18n="@@whatsapp.create.connecting">Connecting…</span>
+                } @else {
+                  <span i18n="@@whatsapp.create.submit">Connect number</span>
+                }
               </button>
             </div>
           </div>
-        </div>
-      }
+        </section>
+      </div>
     }
   }
 </div>

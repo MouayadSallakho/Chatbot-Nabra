@@ -1,51 +1,125 @@
-// The widget configuration sections of the chat link screen. Layout only: every
-// colour, space and radius resolves through the shared tokens.
+// The widget sections of the chat link screen. The numbered sections and the
+// form-and-preview frame are the shared authoring layer (`_authoring.scss`);
+// this adds the colour checks, the preview stage and the lists.
 
 .section-note {
-  margin-block-end: var(--space-3);
+  margin-block-end: var(--space-4);
   max-inline-size: 70ch;
 }
 
-// -----------------------------------------------------------------------------
-// Install
-// -----------------------------------------------------------------------------
-.install {
+.skeleton-card {
   display: grid;
   gap: var(--space-3);
 }
 
-// The snippet is a single long line. It scrolls inside its own box rather than
-// wrapping, because a wrapped script tag invites somebody to copy it by hand and
-// get it wrong.
-.snippet {
+// -----------------------------------------------------------------------------
+// Appearance: the accent and its checks
+// -----------------------------------------------------------------------------
+.accent {
+  display: grid;
+  gap: var(--space-2);
+  min-inline-size: 0;
   margin: 0;
-  padding: var(--space-3);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
-  background-color: var(--surface-inset);
-  overflow-x: auto;
-  font: var(--text-small);
+  padding: 0;
+  border: 0;
+}
+
+.accent-field {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.accent-swatch {
+  inline-size: 3rem;
+  block-size: var(--control-height);
+  padding: 2px; // token-lint-ignore: the native swatch's own inset
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius-md);
+  background-color: var(--surface-default);
+  cursor: pointer;
+}
+
+.accent-hex {
+  inline-size: 8rem;
   font-family: var(--font-mono);
 }
 
-.install-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  flex-wrap: wrap;
+// Each check: a glyph and a sentence. A pass is a tick; anything to know is an
+// information mark. The sentence carries the meaning, never the colour.
+.checks {
+  display: grid;
+  gap: var(--space-1);
+  margin: var(--space-1) 0 0;
+  padding: 0;
+  list-style: none;
+  color: var(--text-secondary);
+  font: var(--text-small);
 }
 
-// -----------------------------------------------------------------------------
-// Allowed origins
-// -----------------------------------------------------------------------------
-.origins {
+.check {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+
+  app-icon {
+    margin-block-start: 1px;
+    color: var(--info-fg);
+  }
+
+  &.is-pass app-icon {
+    color: var(--success-fg);
+  }
+}
+
+.check-ratio {
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.appearance-row {
   display: grid;
   gap: var(--space-4);
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
 }
 
+// -----------------------------------------------------------------------------
+// The preview stage: the open panel, and the closed launcher in its corner
+// -----------------------------------------------------------------------------
+.widget-preview .card-body {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.preview-stage {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background-color: var(--surface-inset);
+}
+
+.preview-panel {
+  block-size: 26rem;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+}
+
+// The loader's closed frame: 84px, with the 56px launcher 16px from its corner.
+.preview-closed {
+  position: relative;
+  block-size: 84px; // token-lint-ignore: the loader's closed frame size (Widget/v1.js)
+}
+
+// -----------------------------------------------------------------------------
+// Allowed websites
+// -----------------------------------------------------------------------------
 .origin-list {
   display: grid;
   gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
 .origin-row {
@@ -53,13 +127,16 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
-  padding: var(--space-2) var(--space-3);
+  padding-block: var(--space-1);
+  padding-inline: var(--space-3) var(--space-1);
   border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   background-color: var(--surface-muted);
 }
 
 .origin-value {
+  min-inline-size: 0;
+  font: var(--text-small);
   font-family: var(--font-mono);
   overflow-wrap: anywhere;
 }
@@ -69,51 +146,64 @@
   align-items: flex-start;
   gap: var(--space-3);
   flex-wrap: wrap;
+
+  // Line the button up with the input, not with the label above it.
+  .btn {
+    margin-block-start: 1.75rem;
+  }
 }
 
 .origin-field {
-  flex: 1 1 22rem;
+  flex: 1 1 18rem;
   min-inline-size: 0;
 }
 
 // -----------------------------------------------------------------------------
-// Appearance
+// Saving, installing, security
 // -----------------------------------------------------------------------------
-.appearance-row {
-  display: grid;
-  gap: var(--space-4);
-  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
-}
-
-.accent-field {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-}
-
-.accent-swatch {
-  inline-size: 3rem;
-  block-size: 2.25rem;
-  padding: 0;
-  border: 1px solid var(--border-control);
-  border-radius: var(--radius-sm);
-  background-color: transparent;
-  cursor: pointer;
-}
-
-// -----------------------------------------------------------------------------
-// Security and saving
-// -----------------------------------------------------------------------------
-.security {
+.save-section {
   display: grid;
   gap: var(--space-2);
-  max-inline-size: 80ch;
 }
 
-.save-row {
+.save-note {
+  margin: 0;
+  text-align: end;
+}
+
+// The snippet is a single long line. It scrolls inside its own box rather than
+// wrapping, because a wrapped script tag invites a hand copy that gets it wrong.
+.snippet {
+  margin: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background-color: var(--surface-inset);
+  overflow-x: auto;
+  font: var(--text-small);
+  font-family: var(--font-mono);
+  text-align: start;
+}
+
+// An address inside a sentence has no spaces to break at.
+.form-section p code {
+  overflow-wrap: anywhere;
+}
+
+.install-actions {
   display: flex;
   align-items: center;
   gap: var(--space-3);
   flex-wrap: wrap;
-  margin-block-end: var(--space-2);
+}
+
+.security {
+  display: grid;
+  gap: var(--space-2);
+  max-inline-size: 80ch;
+  margin: 0;
+  padding-inline-start: var(--space-5);
+  color: var(--text-secondary);
+  font: var(--text-small);
+  list-style: disc;
 }

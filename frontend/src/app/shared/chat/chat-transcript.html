@@ -1,0 +1,67 @@
+<ol class="chat-log" [attr.aria-label]="label" aria-live="polite" data-testid="chat-transcript">
+  @if (greeting(); as text) {
+    <!--
+      The workspace's greeting. Not a bubble and not attributed to the agent:
+      nothing generated it, it is not in the transcript the server holds, and
+      presenting it as something the AI said would pass a fixed string off as an
+      answer.
+    -->
+    <li class="chat-greeting" dir="auto" data-testid="chat-greeting">{{ text }}</li>
+  } @else if (showEmpty() && rows().length === 0 && !typing()) {
+    <li class="chat-empty" data-testid="chat-empty" i18n="@@visitor.transcript.empty">
+      Ask anything to start the conversation.
+    </li>
+  }
+
+  @for (row of rows(); track row.message.id) {
+    @if (row.handoff === 'toPerson') {
+      <li class="handoff-divider handoff-to-human" data-testid="chat-handoff-divider">
+        <span i18n="@@visitor.handoff.joined">A person from the support team joined</span>
+      </li>
+    } @else if (row.handoff === 'toAi') {
+      <li class="handoff-divider handoff-to-ai" data-testid="chat-handoff-divider">
+        <span i18n="@@visitor.handoff.backToAi"
+          ><bdi>{{ agentName() }}</bdi> is answering again</span
+        >
+      </li>
+    }
+
+    @switch (row.message.sender) {
+      @case ('Customer') {
+        <li class="chat-msg chat-msg-mine" data-testid="chat-message" data-sender="Customer">
+          <span class="visually-hidden" i18n="@@visitor.sender.you">You:</span>
+          <span class="chat-text" dir="auto">{{ row.message.text }}</span>
+        </li>
+      }
+      @case ('HumanAgent') {
+        <li class="chat-msg chat-msg-person" data-testid="chat-message" data-sender="HumanAgent">
+          <span class="chat-sender">
+            <app-icon class="chat-sender-glyph" name="person" [strokeWidth]="1.8" />
+            <span i18n="@@visitor.sender.support">Support</span>
+          </span>
+          <span class="chat-text" dir="auto">{{ row.message.text }}</span>
+        </li>
+      }
+      @default {
+        <li class="chat-msg chat-msg-ai" data-testid="chat-message" data-sender="AiAgent">
+          <span class="chat-sender" dir="auto">{{ agentName() }}</span>
+          <span class="chat-text" dir="auto">{{ row.message.text }}</span>
+        </li>
+      }
+    }
+  }
+</ol>
+
+@if (typing()) {
+  <!--
+    For the AI only: the reply is being generated now. A person's reply gets no
+    indicator, because nobody may be at their desk and a fake "typing" to a
+    waiting customer would be a promise the platform cannot keep.
+  -->
+  <p class="chat-typing" role="status" data-testid="chat-typing">
+    <span class="chat-dots" aria-hidden="true"><span></span><span></span><span></span></span>
+    <span i18n="@@visitor.typing"
+      ><bdi>{{ agentName() }}</bdi> is typing…</span
+    >
+  </p>
+}

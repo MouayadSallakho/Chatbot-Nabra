@@ -1,4 +1,3 @@
-import { LowerCasePipe } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -19,6 +18,16 @@ import { PageHeader } from '@app/shared/page-header/page-header';
 import { ConfirmDialog } from '@app/core/feedback/confirm-dialog';
 import { WebChatAdminApi, WebChatEndpoint, hostedChatUrl } from '../../website-chat-api';
 import { LocalDatePipe } from '@app/core/i18n/locale-pipes';
+import { HasUnsavedChanges, protectUnsavedChanges } from '@app/core/navigation/unsaved-changes';
+import { agentStatusWord } from '@app/features/ai-agents/agent-words';
+import { Icon } from '@app/shared/icon/icon';
+import {
+  CHANNEL_LIFECYCLE,
+  LIFECYCLE_LABEL,
+  channelStatusTone,
+  channelStatusWord,
+  webChatStatusSentence,
+} from '../../channel-words';
 import { WebsiteChatWidget } from '../website-chat-widget/website-chat-widget';
 
 /**
@@ -34,8 +43,8 @@ import { WebsiteChatWidget } from '../website-chat-widget/website-chat-widget';
   selector: 'app-website-chat-detail',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    LowerCasePipe,
     RouterLink,
+    Icon,
     PageHeader,
     EmptyState,
     WebsiteChatWidget,
@@ -45,7 +54,7 @@ import { WebsiteChatWidget } from '../website-chat-widget/website-chat-widget';
   templateUrl: './website-chat-detail.html',
   styleUrl: './website-chat-detail.scss',
 })
-export class WebsiteChatDetail implements OnInit {
+export class WebsiteChatDetail implements OnInit, HasUnsavedChanges {
   private readonly disableDialog = viewChild.required<ConfirmDialog>('disableDialog');
 
   private readonly api = inject(WebChatAdminApi);
@@ -77,6 +86,17 @@ export class WebsiteChatDetail implements OnInit {
 
   protected readonly canView = computed(() => this.permissions.has('website-chat.view'));
   protected readonly canManage = computed(() => this.permissions.has('website-chat.manage'));
+  protected readonly canViewAgents = computed(() => this.permissions.has('ai-agents.view'));
+
+  protected readonly lifecycle = CHANNEL_LIFECYCLE;
+  protected readonly lifecycleLabel = LIFECYCLE_LABEL;
+  protected readonly statusWord = channelStatusWord;
+  protected readonly statusTone = channelStatusTone;
+  protected readonly agentStatusWord = agentStatusWord;
+
+  protected readonly statusSentence = computed(() =>
+    webChatStatusSentence(this.endpoint()?.status ?? 'Draft'),
+  );
 
   protected readonly isActive = computed(() => this.endpoint()?.status === 'Active');
 
@@ -97,8 +117,17 @@ export class WebsiteChatDetail implements OnInit {
    */
   protected readonly agentNotActive = computed(() => this.endpoint()?.aiAgentStatus !== 'Active');
 
+  constructor() {
+    protectUnsavedChanges(() => this.hasUnsavedChanges());
+  }
+
   ngOnInit(): void {
     void this.load();
+  }
+
+  /** The widget settings are the only edits this page holds. */
+  hasUnsavedChanges(): boolean {
+    return this.widgetSection()?.hasUnsavedChanges() ?? false;
   }
 
   protected async load(): Promise<void> {

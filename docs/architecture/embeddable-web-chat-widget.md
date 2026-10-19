@@ -71,12 +71,12 @@ content-derived strong ETag and `public, max-age=3600`.
 
 ### The iframe attributes
 
-| Attribute | Value | Why |
-| --- | --- | --- |
-| `sandbox` | `allow-scripts allow-same-origin` | Scripts, so the widget runs. Same-origin, so it stays on the OmniAI origin and can use its own API and storage. It grants the iframe nothing over the host page — they are different origins regardless. |
-| `allow` | *(empty)* | Camera, microphone and geolocation are denied by default cross-origin; saying so explicitly means a future default cannot quietly grant one. |
-| `referrerpolicy` | `strict-origin` | The host page's path can carry an order number, a search term or a customer identifier. None of that is OmniAI's business. |
-| `title` | `Chat` | A frame announced as "iframe" is a frame a screen-reader user has no reason to enter. |
+| Attribute        | Value                             | Why                                                                                                                                                                                                      |
+| ---------------- | --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `sandbox`        | `allow-scripts allow-same-origin` | Scripts, so the widget runs. Same-origin, so it stays on the OmniAI origin and can use its own API and storage. It grants the iframe nothing over the host page — they are different origins regardless. |
+| `allow`          | _(empty)_                         | Camera, microphone and geolocation are denied by default cross-origin; saying so explicitly means a future default cannot quietly grant one.                                                             |
+| `referrerpolicy` | `strict-origin`                   | The host page's path can carry an order number, a search term or a customer identifier. None of that is OmniAI's business.                                                                               |
+| `title`          | `Chat`                            | A frame announced as "iframe" is a frame a screen-reader user has no reason to enter.                                                                                                                    |
 
 Everything else is withheld: no forms, no popups, no top-level navigation, no
 downloads, no pointer lock. A widget that could navigate the host page away would
@@ -202,12 +202,12 @@ for an embedded session, the `WebChatOrigin` it was opened on. The aggregate
 refuses to exist in any other combination, and a check constraint says the same
 thing in the database.
 
-| | Hosted (`/chat/:key`) | Embedded (`/embed/:key` in an iframe) |
-| --- | --- | --- |
-| Credential carried in | `HttpOnly` cookie, per-conversation path | `X-OmniAI-Embed-Session` header |
-| Readable by script | No | Yes, inside the OmniAI iframe only |
-| CSRF defence | Antiforgery token | Non-ambient credential + a header that forces a preflight this API never answers |
-| Third-party cookies | Not applicable (first-party) | **Never used** |
+|                       | Hosted (`/chat/:key`)                    | Embedded (`/embed/:key` in an iframe)                                            |
+| --------------------- | ---------------------------------------- | -------------------------------------------------------------------------------- |
+| Credential carried in | `HttpOnly` cookie, per-conversation path | `X-OmniAI-Embed-Session` header                                                  |
+| Readable by script    | No                                       | Yes, inside the OmniAI iframe only                                               |
+| CSRF defence          | Antiforgery token                        | Non-ambient credential + a header that forces a preflight this API never answers |
+| Third-party cookies   | Not applicable (first-party)             | **Never used**                                                                   |
 
 `PublicWebChatAccess.AuthoriseAsync` takes the mode and checks it **before** the
 credential is compared:
@@ -248,12 +248,12 @@ OmniAI iframe, where it is same-origin. So:
 
 Unchanged from Phase 16 and re-asserted for the new transport:
 
-| Event | Conversations created |
-| --- | --- |
-| Customer's page loads, loader runs | 0 |
-| Iframe loads, handshake completes, config read | 0 |
-| Visitor opens the widget | 0 |
-| Visitor sends their first real message | 1 |
+| Event                                          | Conversations created |
+| ---------------------------------------------- | --------------------- |
+| Customer's page loads, loader runs             | 0                     |
+| Iframe loads, handshake completes, config read | 0                     |
+| Visitor opens the widget                       | 0                     |
+| Visitor sends their first real message         | 1                     |
 
 `GET /api/public/embed/{publicKey}` creates nothing at all. On a busy website the
 alternative would leave one empty conversation per page view in somebody's
@@ -294,17 +294,30 @@ resume after a reload.
 `WebChatWidgetSettings` is a greeting, an accent colour, a launcher position and a
 theme. That is the entire surface a tenant controls.
 
-| Setting | Type | Notes |
-| --- | --- | --- |
-| Greeting | plain text, ≤ 300 chars, optional | Line feeds allowed, other control characters refused. Rendered as the workspace's own words — **not** as an AI message, not in the transcript the server holds. |
-| Accent | `#rrggbb` | Expanded and lower-cased. Reaches the browser as a CSS custom property value; six hex digits cannot introduce a declaration. |
-| Launcher position | `Left` \| `Right` | |
-| Theme | `System` \| `Light` \| `Dark` | `System` means the *visitor's* OS setting, read inside the iframe. |
+| Setting           | Type                              | Notes                                                                                                                                                           |
+| ----------------- | --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Greeting          | plain text, ≤ 300 chars, optional | Line feeds allowed, other control characters refused. Rendered as the workspace's own words — **not** as an AI message, not in the transcript the server holds. |
+| Accent            | `#rrggbb`                         | Expanded and lower-cased. Reaches the browser as a CSS custom property value; six hex digits cannot introduce a declaration.                                    |
+| Launcher position | `Left` \| `Right`                 |                                                                                                                                                                 |
+| Theme             | `System` \| `Light` \| `Dark`     | `System` means the _visitor's_ OS setting, read inside the iframe.                                                                                              |
 
 The readable foreground on the accent is **computed**, not configured: WCAG
 relative luminance, best of near-black and white. Asking a workspace to also pick
 a legible foreground would be asking them to do the contrast arithmetic, and the
 answer would be wrong often enough to matter.
+
+**Phase 36.9 (frontend only).** The rules live in `frontend/src/app/features/embed/accent-color.ts`
+and run before anything is painted: a value that is not `#rrggbb` is replaced by the default;
+where neither near-black nor white reaches 4.5:1 (a band of mid-tones such as `#2e8b57`, which
+had a 4.25:1 white label before), the label is black; a launcher under 3:1 on a white page gets
+a 1px edge in its label colour. The settings screen shows these checks with their ratios and a
+live preview drawn by the widget's own components. Nothing is refused: the server still stores
+any `#rrggbb`.
+
+The frame's geometry, the launcher footprint (a 56px circle 16px inside the 84px closed frame)
+and the bridge messages are unchanged. The widget document no longer asks `/api/auth/me` (it
+only fetches the anti-forgery token), loads no forms module, and loads the realtime client
+only once a conversation exists.
 
 There is deliberately no custom CSS, no custom HTML, no custom JavaScript, no font
 URL and no logo upload.
@@ -350,7 +363,7 @@ The public key appears in the customer's own HTML. Telling these cases apart wou
 let anybody holding one enumerate the websites a workspace has authorised — which
 is precisely the list needed to attack it.
 
-The one thing that is *not* flattened into 404 is an endpoint that exists and has
+The one thing that is _not_ flattened into 404 is an endpoint that exists and has
 approved this website but is not currently serving: that returns a configuration
 with `isAvailable: false`, so the widget renders nothing rather than a launcher
 that would refuse every click.
@@ -374,14 +387,14 @@ The only symptom was that it worked.
 So in **Development** the key is necessary but not sufficient. `OMNIAI_LIVE_OPENAI`
 must also be exactly `1`:
 
-| Environment | `OPENAI_API_KEY` | `OMNIAI_LIVE_OPENAI` | Composed |
-| --- | --- | --- | --- |
-| Development | absent | any | unconfigured, both providers |
-| Development | present | absent | **unconfigured, both providers** |
-| Development | present | `0`, `true`, `yes`, `01`, `1 `, empty | **unconfigured, both providers** |
-| Development | present | `1` | live adapters |
-| Production | present | *not consulted* | live adapters |
-| Production | absent | *not consulted* | unconfigured, both providers |
+| Environment | `OPENAI_API_KEY` | `OMNIAI_LIVE_OPENAI`                  | Composed                         |
+| ----------- | ---------------- | ------------------------------------- | -------------------------------- |
+| Development | absent           | any                                   | unconfigured, both providers     |
+| Development | present          | absent                                | **unconfigured, both providers** |
+| Development | present          | `0`, `true`, `yes`, `01`, `1 `, empty | **unconfigured, both providers** |
+| Development | present          | `1`                                   | live adapters                    |
+| Production  | present          | _not consulted_                       | live adapters                    |
+| Production  | absent           | _not consulted_                       | unconfigured, both providers     |
 
 Three things about the shape of that table are deliberate.
 

@@ -1,39 +1,201 @@
 <div class="page">
   @if (!canView()) {
-    <app-page-header heading="Channels" />
+    <app-page-header heading="Channels" i18n-heading="@@channels.heading" />
 
     <div class="page-section">
       <div class="card">
         <app-empty-state
           icon="channels"
           heading="You do not have access to channels"
+          i18n-heading="@@channels.noAccess.heading"
           description="Seeing how this workspace is reachable needs a permission your roles do not include. Ask somebody who administers this workspace if you need it."
+          i18n-description="@@channels.noAccess.body"
         />
       </div>
     </div>
   } @else {
     <app-page-header
       heading="Channels"
-      description="Where customers can reach this workspace. Each channel connects an AI agent to somewhere people already are."
+      i18n-heading="@@channels.heading"
+      description="Where customers can reach this workspace. Each channel connects an AI agent to somewhere people already are, and every conversation arrives in the same inbox."
+      i18n-description="@@channels.lede"
     />
 
-    <div class="page-section">
-      <ul class="channel-list">
-        @for (channel of channels; track channel.name) {
-          <li class="card card-body channel">
-            <div class="channel-text">
-              <p class="channel-name">{{ channel.name }}</p>
-              <p class="text-small text-secondary">{{ channel.description }}</p>
-            </div>
+    <section class="page-section" aria-labelledby="channels-built">
+      <h2 id="channels-built" class="text-section-title" i18n="@@channels.built.heading">
+        Connect a channel
+      </h2>
 
-            @if (channel.available && channel.path) {
-              <a class="btn btn-secondary btn-sm" [routerLink]="channel.path">Set up</a>
-            } @else {
-              <span class="badge badge-neutral">Not built yet</span>
+      <ul class="channel-grid">
+        <!-- ------------------------------------------------------ website chat -->
+        <li class="card channel" data-testid="channel-website-chat">
+          <div class="channel-head">
+            <span class="channel-glyph" aria-hidden="true"><app-icon name="website" /></span>
+            <div>
+              <h3 class="card-title">{{ words.WebChat }}</h3>
+              <p class="text-small text-secondary" i18n="@@channels.webChat.description">
+                A chat on your own website, as a widget in the corner of every page or as a page of
+                its own you can link to.
+              </p>
+            </div>
+          </div>
+
+          @switch (webChatState().kind) {
+            @case ('hidden') {
+              <p class="channel-note text-small text-muted" i18n="@@channels.webChat.noAccess">
+                You do not have access to website chat.
+              </p>
             }
-          </li>
-        }
+            @case ('loading') {
+              <div class="channel-facts" aria-busy="true">
+                <span class="skeleton skeleton-text"></span>
+                <span class="skeleton skeleton-text"></span>
+              </div>
+            }
+            @case ('failed') {
+              <div class="channel-note">
+                <span class="badge badge-neutral" i18n="@@channels.notChecked">Not checked</span>
+                <span class="text-small text-secondary" i18n="@@channels.webChat.failed"
+                  >Website chat could not be read just now.</span
+                >
+                <button
+                  type="button"
+                  class="btn btn-ghost btn-sm"
+                  (click)="loadWebChat()"
+                  i18n="@@channels.tryAgain"
+                >
+                  Try again
+                </button>
+              </div>
+            }
+            @case ('ready') {
+              @if (webChatFacts(); as facts) {
+                <dl class="channel-facts" data-testid="channel-website-chat-facts">
+                  <div>
+                    <dt i18n="@@channels.webChat.links">Chat links</dt>
+                    <dd>{{ facts.links | localNumber }}</dd>
+                  </div>
+                  <div>
+                    <dt i18n="@@channels.webChat.published">Published</dt>
+                    <dd>{{ facts.published | localNumber }}</dd>
+                  </div>
+                </dl>
+              }
+            }
+          }
+
+          @if (webChatState().kind !== 'hidden') {
+            <div class="channel-actions">
+              <a class="btn btn-secondary btn-sm" routerLink="/channels/website-chat">
+                <span i18n="@@channels.webChat.open">Open website chat</span>
+                <app-icon name="arrow-end" />
+              </a>
+            </div>
+          }
+        </li>
+
+        <!-- ---------------------------------------------------------- WhatsApp -->
+        <li class="card channel" data-testid="channel-whatsapp">
+          <div class="channel-head">
+            <span class="channel-glyph" aria-hidden="true"><app-icon name="whatsapp" /></span>
+            <div>
+              <h3 class="card-title">{{ words.WhatsApp }}</h3>
+              <p class="text-small text-secondary" i18n="@@channels.whatsapp.description">
+                A WhatsApp Business number customers can message, connected through your own Meta
+                app.
+              </p>
+            </div>
+          </div>
+
+          @switch (whatsAppState().kind) {
+            @case ('hidden') {
+              <p class="channel-note text-small text-muted" i18n="@@channels.whatsapp.noAccess">
+                You do not have access to WhatsApp.
+              </p>
+            }
+            @case ('loading') {
+              <div class="channel-facts" aria-busy="true">
+                <span class="skeleton skeleton-text"></span>
+                <span class="skeleton skeleton-text"></span>
+              </div>
+            }
+            @case ('failed') {
+              <div class="channel-note">
+                <span class="badge badge-neutral" i18n="@@channels.notChecked">Not checked</span>
+                <span class="text-small text-secondary" i18n="@@channels.whatsapp.failed"
+                  >WhatsApp numbers could not be read just now.</span
+                >
+                <button
+                  type="button"
+                  class="btn btn-ghost btn-sm"
+                  (click)="loadWhatsApp()"
+                  i18n="@@channels.tryAgain"
+                >
+                  Try again
+                </button>
+              </div>
+            }
+            @case ('ready') {
+              @if (whatsAppFacts(); as facts) {
+                <dl class="channel-facts" data-testid="channel-whatsapp-facts">
+                  <div>
+                    <dt i18n="@@channels.whatsapp.numbers">Numbers</dt>
+                    <dd>{{ facts.numbers | localNumber }}</dd>
+                  </div>
+                  <div>
+                    <dt i18n="@@channels.whatsapp.inService">In service</dt>
+                    <dd>{{ facts.inService | localNumber }}</dd>
+                  </div>
+                </dl>
+                @if (facts.withoutToken > 0) {
+                  <p class="channel-note">
+                    <span class="badge badge-warning" i18n="@@channels.whatsapp.withoutToken"
+                      >Without an access token: {{ facts.withoutToken | localNumber }}</span
+                    >
+                  </p>
+                }
+              }
+            }
+          }
+
+          @if (whatsAppState().kind !== 'hidden') {
+            <div class="channel-actions">
+              <a class="btn btn-secondary btn-sm" routerLink="/channels/whatsapp">
+                <span i18n="@@channels.whatsapp.open">Open WhatsApp</span>
+                <app-icon name="arrow-end" />
+              </a>
+            </div>
+          }
+        </li>
       </ul>
-    </div>
+    </section>
+
+    <!-- ----------------------------------------------------- not built yet -->
+    <section class="page-section" aria-labelledby="channels-later">
+      <h2 id="channels-later" class="text-section-title" i18n="@@channels.later.heading">
+        Not available yet
+      </h2>
+      <p class="text-small text-secondary section-note" i18n="@@channels.later.lede">
+        Nabra cannot connect these yet. There is nothing to set up, and no conversations from them
+        reach your inbox.
+      </p>
+
+      <ul class="later-list">
+        <li class="later" data-testid="channel-instagram">
+          <span class="channel-glyph is-quiet" aria-hidden="true"
+            ><app-icon name="instagram"
+          /></span>
+          <span class="later-name">{{ words.Instagram }}</span>
+          <span class="badge badge-neutral" i18n="@@channels.notAvailable">Not available yet</span>
+        </li>
+        <li class="later" data-testid="channel-messenger">
+          <span class="channel-glyph is-quiet" aria-hidden="true"
+            ><app-icon name="messenger"
+          /></span>
+          <span class="later-name">{{ words.Messenger }}</span>
+          <span class="badge badge-neutral" i18n="@@channels.notAvailable">Not available yet</span>
+        </li>
+      </ul>
+    </section>
   }
 </div>

@@ -1,4 +1,5 @@
 import {
+  DOCUMENT,
   ApplicationConfig,
   inject,
   provideAppInitializer,
@@ -16,6 +17,7 @@ import { onRouteViewTransition } from '@app/core/navigation/route-transition';
 import { AuthService } from '@app/core/auth/auth-service';
 import { sessionExpiryInterceptor } from '@app/core/auth/session-expiry-interceptor';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
+import { PUBLIC_SURFACE_PATH } from '@app/core/i18n/language';
 import { routes } from './app.routes';
 
 export const appConfig: ApplicationConfig = {
@@ -59,8 +61,21 @@ export const appConfig: ApplicationConfig = {
     // initializer costs two requests before first paint; the markup in
     // index.html covers that moment with a real loading state rather than a
     // blank page.
+    //
+    // <strong>Not on the visitors' pages</strong> (Phase 36.9). The hosted chat
+    // and the widget have no session to restore and no link into the admin, so
+    // they get only the anti-forgery token their writes need. On a customer's
+    // website the /me question was a 401 in that website's console on every
+    // page view.
     provideAppInitializer(async () => {
       const auth = inject(AuthService);
+
+      if (PUBLIC_SURFACE_PATH.test(inject(DOCUMENT).location.pathname)) {
+        await auth.prepareVisitor();
+
+        return;
+      }
+
       const workspace = inject(WorkspaceContextService);
 
       if ((await auth.restore()) === 'authenticated') {

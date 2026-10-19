@@ -15,6 +15,9 @@ describe('WhatsAppDetail', () => {
   const tenantId = 'aaaaaaaa-aaaa-7aaa-8aaa-aaaaaaaaaaaa';
   const connectionId = 'bbbbbbbb-bbbb-7bbb-8bbb-bbbbbbbbbbbb';
   const agentId = 'cccccccc-cccc-7ccc-8ccc-cccccccccccc';
+
+  /** Agents listed before the connection's own, for the selection test. */
+  let agentsBefore: Array<{ id: string; name: string; status: string }> = [];
   const url = `/api/tenants/${tenantId}/whatsapp/connections/${connectionId}`;
 
   /** Invented, like every identifier in these suites. */
@@ -76,7 +79,10 @@ describe('WhatsAppDetail', () => {
     if (permissions.includes('whatsapp.manage')) {
       http
         .expectOne((request) => request.url.includes('/ai-agents'))
-        .flush({ items: [{ id: agentId, name: 'Concierge', status: 'Active' }], total: 1 });
+        .flush({
+          items: agentsBefore.concat([{ id: agentId, name: 'Concierge', status: 'Active' }]),
+          total: 1 + agentsBefore.length,
+        });
 
       await settle();
     }
@@ -241,5 +247,30 @@ describe('WhatsAppDetail', () => {
     await settle();
 
     expect(text()).toContain('You do not have access to WhatsApp');
+  });
+
+  it('marks where the number stands in its lifecycle, and says what that means', async () => {
+    await mount('Disabled', true, 'whatsapp.view');
+
+    const current = host().querySelector('.lifecycle-step[aria-current="step"]');
+
+    expect(current?.textContent?.trim()).toBe('Disabled');
+    expect(host().querySelectorAll('.lifecycle-step').length).toBe(3);
+    expect(text()).toContain('Out of service. Messages are not answered');
+  });
+
+  it('shows the agent that really answers the number, even though the agents arrive later', async () => {
+    // The connection's agent is not the first in the list: before the fix the
+    // browser showed the first option instead.
+    agentsBefore = [
+      { id: 'dddddddd-dddd-7ddd-8ddd-dddddddddddd', name: 'Returns Desk', status: 'Active' },
+    ];
+    await mount('Draft', true, 'whatsapp.view', 'whatsapp.manage');
+    agentsBefore = [];
+
+    const select = host().querySelector<HTMLSelectElement>('#detail-agent')!;
+
+    expect(select.value).toBe(agentId);
+    expect(select.selectedOptions[0]?.textContent).toContain('Concierge');
   });
 });

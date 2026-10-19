@@ -2,18 +2,24 @@ import {
   ChangeDetectionStrategy,
   Component,
   ElementRef,
+  Injector,
   OnInit,
+  afterNextRender,
   computed,
   effect,
   inject,
   signal,
+  viewChild,
 } from '@angular/core';
-import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
 import { ApiError, toApiError } from '@app/core/api/api-error';
+import { APP_LANGUAGE } from '@app/core/i18n/language';
 import { PublicChatRealtime } from '@app/core/realtime/public-chat-realtime';
 import { ChatHandling, ChatMessage } from '@app/features/chat/hosted-chat-api';
-import { readableForeground } from '../accent-color';
+import { ChatLauncher } from '@app/shared/chat/chat-launcher';
+import { ChatPanel } from '@app/shared/chat/chat-panel';
+import { visitorFailure } from '@app/shared/chat/visitor-copy';
+import { DEFAULT_ACCENT, applyAccent } from '../accent-color';
 import { EmbedBridge } from '../embed-bridge';
 import { EmbedChatApi, EmbeddedChatConfig } from '../embed-chat-api';
 import { EmbedSessionStore } from '../embed-session';
@@ -25,14 +31,16 @@ const MAX_MESSAGE_LENGTH = 4_000;
 type EmbedState = 'connecting' | 'notEmbedded' | 'unavailable' | 'ready' | 'failed';
 
 /**
- * The chat widget, as it runs inside the OmniAI iframe on a customer's website.
+ * The chat widget, as it runs inside the Nabra iframe on a customer's website.
  *
  * <strong>Everything a visitor sees or types is in this document, not the host
- * page.</strong> The website embeds an iframe on the OmniAI origin and gets a
+ * page.</strong> The website embeds an iframe on the Nabra origin and gets a
  * launcher-sized box back. It cannot read this DOM, cannot style it, cannot read
  * the transcript, and cannot reach the credential. What it can do is learn which
  * corner to place the box in and whether to make it bigger — see
- * {@link EmbedBridge}.
+ * {@link EmbedBridge}. The frame's geometry (84px closed, the loader's panel size
+ * open) and the bridge messages are the loader's contract and are unchanged by
+ * the Phase 36.9 redesign: the launcher and the panel are drawn to fit them.
  *
  * <strong>It does not know where it is until the page tells it.</strong> The
  * first thing that happens is the handshake, because the server will not answer
@@ -41,27 +49,31 @@ type EmbedState = 'connecting' | 'notEmbedded' | 'unavailable' | 'ready' | 'fail
  *
  * <strong>Loading the page creates nothing. Opening the widget creates
  * nothing.</strong> A conversation row exists when a visitor sends a first
- * message, and not before — otherwise every page view on a busy website would
- * leave an empty conversation in somebody's workspace.
+ * message, and not before.
  *
- * <strong>Every message is rendered as text.</strong> Interpolation escapes, and
- * nothing here uses `innerHTML`. The same holds for the greeting: it is a plain
- * sentence a workspace typed, shown as a sentence.
+ * <strong>Every message is rendered as text</strong> (see {@link ChatPanel}), and
+ * the only thing a workspace configures that reaches CSS is a colour, checked by
+ * `accent-color.ts` and applied as a custom property value.
  *
  * <strong>Nothing retries by itself.</strong> A failed turn costs the workspace
  * money and may already have been half-answered; the visitor is told what
  * happened and decides.
+ *
+ * <strong>Light to load.</strong> No forms module (the composer is a textarea
+ * bound to a signal) and no realtime library until there is a conversation to
+ * listen to: a visitor who never opens the chat downloads neither.
  */
 @Component({
   selector: 'app-embed-chat',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule],
+  imports: [ChatLauncher, ChatPanel],
   templateUrl: './embed-chat.html',
   styleUrl: './embed-chat.scss',
   host: {
     '[class.embed-left]': 'position() === "Left"',
     '[class.embed-open]': 'panelOpen()',
     '[class.embed-compact]': 'bridge.compact()',
+    '(keydown.escape)': 'onEscape()',
   },
 })
 export class EmbedChat implements OnInit {
@@ -69,6 +81,8 @@ export class EmbedChat implements OnInit {
   private readonly store = inject(EmbedSessionStore);
   private readonly realtime = inject(PublicChatRealtime);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly injector = inject(Injector);
+  private readonly language = inject(APP_LANGUAGE);
 
   /** Read by a host binding, so it cannot be private. */
   protected readonly bridge = inject(EmbedBridge);
@@ -76,12 +90,13 @@ export class EmbedChat implements OnInit {
   protected readonly state = signal<EmbedState>('connecting');
   protected readonly agentName = signal('');
   protected readonly greeting = signal<string | null>(null);
-  protected readonly accent = signal('#2563eb');
+  protected readonly accent = signal(DEFAULT_ACCENT);
   protected readonly position = signal<'Left' | 'Right'>('Right');
   protected readonly theme = signal<'System' | 'Light' | 'Dark'>('System');
   protected readonly panelOpen = signal(false);
   protected readonly messages = signal<readonly ChatMessage[]>([]);
   protected readonly sending = signal(false);
+  protected readonly draft = signal('');
 
   /**
    * Who is answering, as the server last told this widget.
@@ -101,46 +116,39 @@ export class EmbedChat implements OnInit {
 
   private readonly publicKey = signal<string | null>(null);
 
+  private readonly panel = viewChild(ChatPanel);
+  private readonly launcher = viewChild(ChatLauncher);
+
   protected readonly maxLength = MAX_MESSAGE_LENGTH;
 
   protected readonly hasConversation = computed(() => this.conversation() !== null);
 
   protected readonly canSend = computed(() => this.state() === 'ready' && !this.sending());
 
-  protected readonly form = new FormGroup({
-    message: new FormControl('', {
-      nonNullable: true,
-      validators: [Validators.required, Validators.maxLength(MAX_MESSAGE_LENGTH)],
-    }),
-  });
+  /** The launcher's name: what it opens and who answers. */
+  protected readonly launcherLabel = computed(() =>
+    this.agentName()
+      ? $localize`:@@visitor.launcher.named:Chat with ${this.agentName()}:agent:`
+      : $localize`:@@visitor.launcher:Open chat`,
+  );
 
   constructor() {
-    /**
-     * The one thing a workspace configures that reaches CSS, and it reaches it as
-     * a value rather than as text.
-     *
-     * `setProperty` with an already-validated `#rrggbb` cannot introduce a
-     * declaration of its own, and the server has refused anything that is not one.
-     * A tenant chooses a colour; a tenant does not choose CSS.
-     */
+    // The one thing a workspace configures that reaches CSS, and it reaches it
+    // as a checked value: anything but `#rrggbb` becomes the default before it
+    // is used, and the label colour is chosen to reach 4.5:1 on it.
     effect(() => {
-      const colour = this.accent();
-      const style = this.host.nativeElement.style;
-
-      style.setProperty('--embed-accent', colour);
-      style.setProperty('--embed-accent-contrast', readableForeground(colour));
+      applyAccent(this.host.nativeElement, this.accent());
     });
 
     /**
      * The theme the workspace chose, expressed the way the rest of the product
      * already expresses one.
      *
-     * `data-theme` on the root element is what the token layer reads, so a
-     * configured Light or Dark widget resolves every surface, border and text
-     * colour through the same palette as the admin application. "System" removes
-     * the attribute rather than picking a side, which hands the decision back to
-     * `prefers-color-scheme` — and inside an iframe that is the *visitor's* OS
-     * setting, not the embedding website's stylesheet.
+     * `data-theme` on the root element is what the token layer reads. "System"
+     * removes the attribute, which hands the decision to `prefers-color-scheme`
+     * — and inside an iframe that is the *visitor's* OS setting, not the
+     * embedding website's stylesheet. (The pre-paint script already leaves
+     * public pages to the visitor's setting, never an admin's stored choice.)
      */
     effect(() => {
       const chosen = this.theme();
@@ -220,16 +228,27 @@ export class EmbedChat implements OnInit {
     }
   }
 
-  /** Shows the panel. Creates nothing — the first message does that. */
+  /** Shows the panel and puts the cursor in the message box. Creates nothing. */
   protected openPanel(): void {
     this.panelOpen.set(true);
     this.bridge.open();
+
+    afterNextRender(() => this.panel()?.focusComposer(), { injector: this.injector });
   }
 
-  /** Hides the panel, keeping the conversation exactly where it was. */
+  /** Hides the panel, keeping the conversation exactly where it was, and returns focus to the launcher. */
   protected closePanel(): void {
     this.panelOpen.set(false);
     this.bridge.close();
+
+    afterNextRender(() => this.launcher()?.focus(), { injector: this.injector });
+  }
+
+  /** Escape closes an open panel, as it closes any other overlay. */
+  protected onEscape(): void {
+    if (this.panelOpen()) {
+      this.closePanel();
+    }
   }
 
   /**
@@ -239,9 +258,9 @@ export class EmbedChat implements OnInit {
   protected async send(): Promise<void> {
     const publicKey = this.publicKey();
     const origin = this.parentOrigin();
-    const text = this.form.controls.message.value.trim();
+    const text = this.draft().trim();
 
-    if (!publicKey || !origin || !text || this.sending() || this.form.invalid) {
+    if (!publicKey || !origin || !text || this.sending() || text.length > MAX_MESSAGE_LENGTH) {
       return;
     }
 
@@ -256,14 +275,10 @@ export class EmbedChat implements OnInit {
       const conversation = await this.ensureConversation(publicKey, origin);
 
       // Listening starts as soon as there is something to listen to, and before
-      // the turn is attempted.
-      //
-      // Doing it after a successful send looks equivalent and is not: a first
-      // turn that fails -- a provider outage, a rate limit, a lost response --
-      // would leave the widget with a conversation and no subscription, so a
-      // colleague taking it over and replying would reach a visitor who never
-      // hears about it. That is exactly the case where live updates matter
-      // most, because the AI just failed to answer.
+      // the turn is attempted. Doing it after a successful send would leave a
+      // widget whose first turn failed with no subscription, so a colleague
+      // taking it over and replying would reach a visitor who never hears about
+      // it -- exactly the case where live updates matter most.
       await this.watch(conversation.id, origin, conversation.credential);
 
       const turn = await firstValueFrom(
@@ -280,9 +295,9 @@ export class EmbedChat implements OnInit {
           ? [...current, turn.customerMessage]
           : [...current, turn.customerMessage, turn.reply],
       );
-      this.form.controls.message.setValue('');
+      this.draft.set('');
     } catch (error) {
-      this.sendFailure.set(this.explain(toApiError(error)));
+      this.sendFailure.set(visitorFailure(toApiError(error), 'embed', this.language));
 
       // The message stays in the box. The server may have stored what was sent,
       // but this visitor has no reply -- clearing their words too would leave
@@ -309,17 +324,14 @@ export class EmbedChat implements OnInit {
 
     this.conversation.set(null);
     this.messages.set([]);
+    this.handling.set('Ai');
     this.sendFailure.set(null);
-    this.form.controls.message.setValue('');
+    this.draft.set('');
+    void this.realtime.stop();
+
+    afterNextRender(() => this.panel()?.focusComposer(), { injector: this.injector });
   }
 
-  /**
-   * Puts the visitor back into the conversation they were already having.
-   *
-   * A stale entry is forgotten rather than reported: the session may have
-   * expired, or the website's approval may have been withdrawn since. Either way
-   * the right outcome is a fresh empty widget.
-   */
   /**
    * Starts listening for replies to this conversation.
    *
@@ -335,10 +347,17 @@ export class EmbedChat implements OnInit {
   private async watch(conversationId: string, origin: string, credential: string): Promise<void> {
     await this.realtime.listen(
       () => this.api.realtimeTicket(conversationId, origin, credential),
-      () => void this.refreshTranscript(),
+      () => void this.onConversationChanged(),
     );
   }
 
+  /**
+   * Puts the visitor back into the conversation they were already having.
+   *
+   * A stale entry is forgotten rather than reported: the session may have
+   * expired, or the website's approval may have been withdrawn since. Either way
+   * the right outcome is a fresh empty widget.
+   */
   private async resume(publicKey: string, origin: string): Promise<void> {
     const remembered = this.store.read(publicKey);
 
@@ -408,10 +427,9 @@ export class EmbedChat implements OnInit {
    * has to be an inline style because the token layer sets the property under a
    * more specific selector.
    *
-   * The cost is that native scrollbars and form controls inside the widget stop
-   * following the visitor's dark mode. Every surface the widget draws is painted
-   * from tokens and is unaffected; a scrollbar that is light on a dark panel is a
-   * smaller wrong than a black box on a customer's website.
+   * The cost is that native scrollbars inside the widget stop following the
+   * visitor's dark mode. Every surface the widget draws is painted from tokens
+   * and is unaffected (the panel paints its own background).
    *
    * Applied only once the widget knows it is embedded. Opened directly, this is
    * an ordinary page and keeps the ordinary page background.
@@ -432,7 +450,23 @@ export class EmbedChat implements OnInit {
     this.theme.set(config.theme === 'Light' || config.theme === 'Dark' ? config.theme : 'System');
   }
 
-  /** Re-reads the transcript after a failure, so what the server stored is shown. */
+  /**
+   * A live notice that the conversation changed: re-read it, and once the
+   * business has answered (a person, or the AI on a later turn), retire the
+   * failure notice of an earlier send. It described a reply that did not come,
+   * and one now has.
+   */
+  private async onConversationChanged(): Promise<void> {
+    await this.refreshTranscript();
+
+    const last = this.messages().at(-1);
+
+    if (last && last.sender !== 'Customer') {
+      this.sendFailure.set(null);
+    }
+  }
+
+  /** Re-reads the transcript after a failure or a notification, so what the server stored is shown. */
   private async refreshTranscript(): Promise<void> {
     const conversation = this.conversation();
     const origin = this.parentOrigin();
@@ -455,69 +489,6 @@ export class EmbedChat implements OnInit {
       // Leave what is on screen. A failed refresh must not also erase the
       // conversation the visitor can see.
     }
-  }
-
-  /**
-   * Says what happened in words a customer can act on.
-   *
-   * The same reasoning as the hosted page: the shared copy is written for
-   * administrators, and a visitor who came to ask about a delivery has no use for
-   * a sentence about providers being configured. The causes are deliberately not
-   * distinguished — to a visitor they are one thing, no answer right now, and
-   * saying which would report on the business's infrastructure to the public.
-   */
-  private explain(failure: ApiError): ApiError {
-    switch (failure.kind) {
-      // As on the hosted page (Phase 34): a 503 may mean nothing was stored, so it
-      // must not say the message was received.
-      case 'providerUnavailable':
-        return {
-          ...failure,
-          message:
-            'Sorry — no answer came back just now. You can try sending it again in a moment.',
-        };
-
-      // A timeout or an unusable answer happens after the message was stored.
-      case 'providerTimeout':
-      case 'invalidResponse':
-        return {
-          ...failure,
-          message:
-            'Sorry — no answer came back just now. Your message was received, so you can ' +
-            'try sending it again in a moment.',
-        };
-
-      case 'rateLimited':
-        return {
-          ...failure,
-          message:
-            'You are sending messages too quickly. ' + this.waitAdvice(failure.retryAfterSeconds),
-        };
-
-      // Not-found here means the conversation is gone, or this website is no
-      // longer approved. Both leave the visitor in the same position.
-      case 'notFound':
-        return {
-          ...failure,
-          message: 'This chat is no longer available. Please reload the page and try again.',
-        };
-
-      default:
-        return failure;
-    }
-  }
-
-  /** How long to wait, in words rather than a countdown. */
-  private waitAdvice(seconds: number | undefined): string {
-    if (seconds === undefined || seconds <= 0) {
-      return 'Please wait a moment and try again.';
-    }
-
-    if (seconds <= 90) {
-      return `Please wait about ${seconds} seconds and try again.`;
-    }
-
-    return `Please wait about ${Math.ceil(seconds / 60)} minutes and try again.`;
   }
 
   /**

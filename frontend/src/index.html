@@ -28,8 +28,8 @@
       Language: `lang` and `dir` on <html>. They also choose the fonts, because
       every face carries a unicode-range and the Arabic type roles hang off
       :lang(ar). The customer-facing pages (/chat/ and /embed/) follow the
-      visitor's own browser and never read a choice an admin stored in the same
-      browser. Elsewhere an explicit choice wins, then the browser's first
+      visitor's own browser -- language and light or dark alike -- and never
+      read a choice an admin stored in the same browser. Elsewhere an explicit choice wins, then the browser's first
       Arabic or English preference, then English. main.ts reads `lang` to decide
       which catalogue to load.
 
@@ -53,8 +53,9 @@
     <script>
       (function () {
         var root = document.documentElement;
+        var visitor = /^\/(chat|embed)\//.test(location.pathname);
         try {
-          var stored = localStorage.getItem('omniai.theme');
+          var stored = visitor ? null : localStorage.getItem('omniai.theme');
           var dark =
             stored === 'dark' ||
             ((stored === 'system' || stored === null) &&
@@ -66,7 +67,7 @@
         var lang = 'en';
         try {
           var chosen = null;
-          if (!/^\/(chat|embed)\//.test(location.pathname)) {
+          if (!visitor) {
             try {
               chosen = localStorage.getItem('omniai.lang');
             } catch (_) {

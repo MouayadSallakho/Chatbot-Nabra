@@ -5,6 +5,7 @@
       backLabel="WhatsApp"
       i18n-backLabel="@@back.whatsapp"
       heading="WhatsApp number"
+      i18n-heading="@@whatsapp.detail.heading"
     />
 
     <div class="page-section">
@@ -12,7 +13,9 @@
         <app-empty-state
           icon="channels"
           heading="You do not have access to WhatsApp"
+          i18n-heading="@@whatsapp.noAccess.heading"
           description="Seeing how this workspace's WhatsApp numbers are set up needs a permission your roles do not include. Ask somebody who administers this workspace if you need it."
+          i18n-description="@@whatsapp.noAccess.body"
         />
       </div>
     </div>
@@ -22,12 +25,16 @@
       backLabel="WhatsApp"
       i18n-backLabel="@@back.whatsapp"
       heading="WhatsApp number"
+      i18n-heading="@@whatsapp.detail.heading"
     />
 
     <div class="page-section" aria-busy="true">
-      <p class="visually-hidden" role="status">Loading this connection…</p>
-      <div class="card card-body">
+      <p class="visually-hidden" role="status" i18n="@@whatsapp.detail.loading">
+        Loading this connection…
+      </p>
+      <div class="card card-body status-card">
         <span class="skeleton skeleton-title"></span>
+        <span class="skeleton skeleton-text"></span>
         <span class="skeleton skeleton-text"></span>
       </div>
     </div>
@@ -37,6 +44,7 @@
       backLabel="WhatsApp"
       i18n-backLabel="@@back.whatsapp"
       heading="WhatsApp number"
+      i18n-heading="@@whatsapp.detail.heading"
     />
 
     <div class="page-section">
@@ -45,9 +53,16 @@
           icon="alert"
           tone="error"
           heading="Could not load this connection"
+          i18n-heading="@@whatsapp.detail.loadFailed"
           [description]="error.message"
         >
-          <button stateActions type="button" class="btn btn-secondary btn-sm" (click)="load()">
+          <button
+            stateActions
+            type="button"
+            class="btn btn-secondary btn-sm"
+            (click)="load()"
+            i18n="@@whatsapp.tryAgain"
+          >
             Try again
           </button>
         </app-empty-state>
@@ -59,43 +74,80 @@
       backLabel="WhatsApp"
       i18n-backLabel="@@back.whatsapp"
       [heading]="current.displayPhoneNumber || current.phoneNumberId"
+      headingDir="auto"
       description="One WhatsApp number, one AI agent. Conversations on it appear in the shared inbox."
-    >
-    </app-page-header>
+      i18n-description="@@whatsapp.detail.lede"
+    />
 
-    <div class="page-section">
-      <div class="card card-body status-card">
+    <!-- ----------------------------------------------------------- status -->
+    <section class="page-section" aria-labelledby="number-status-heading">
+      <div class="card card-body status-card" data-testid="number-status">
+        <h2 id="number-status-heading" class="card-title" i18n="@@whatsapp.detail.status">
+          Status
+        </h2>
+        <ol class="lifecycle-path" [attr.aria-label]="lifecycleLabel">
+          @for (step of lifecycle; track step) {
+            <li
+              class="lifecycle-step"
+              [attr.aria-current]="step === current.status ? 'step' : null"
+            >
+              <span class="badge" [class]="statusTone(step)">{{ statusWord(step) }}</span>
+            </li>
+          }
+        </ol>
+        <p class="text-body" data-testid="number-status-sentence">{{ statusSentence() }}</p>
+
         <div class="status-row">
-          <span
-            class="badge"
-            [class.badge-success]="isActive()"
-            [class.badge-neutral]="!isActive()"
-            >{{ current.status }}</span
-          >
-
           <span
             class="badge"
             [class.badge-success]="hasCredential()"
             [class.badge-warning]="!hasCredential()"
+            data-testid="credential-status"
           >
-            Access token: {{ hasCredential() ? 'configured' : 'not configured' }}
+            @if (hasCredential()) {
+              <span i18n="@@whatsapp.detail.token.configured">Access token: configured</span>
+            } @else {
+              <span i18n="@@whatsapp.detail.token.notConfigured">Access token: not configured</span>
+            }
           </span>
 
-          <span class="text-small text-secondary">
-            Answered by {{ current.aiAgentName || 'an agent that no longer exists' }}
-          </span>
+          @if (current.aiAgentName) {
+            <span class="text-small text-secondary" i18n="@@whatsapp.detail.answeredBy"
+              >Answered by <bdi>{{ current.aiAgentName }}</bdi></span
+            >
+          } @else {
+            <span class="text-small text-secondary" i18n="@@whatsapp.detail.agentGone"
+              >Answered by an agent that no longer exists</span
+            >
+          }
         </div>
 
         @if (stale()) {
-          <p class="alert alert-warning" role="alert">
-            This connection was updated somewhere else while you were editing. Your changes are
-            still here — reload to see the current settings, then save again if you still want them.
-            <button type="button" class="btn btn-secondary btn-sm" (click)="load()">Reload</button>
-          </p>
+          <div class="alert alert-warning" role="alert">
+            <app-icon name="alert" [strokeWidth]="1.75" />
+            <div class="alert-body">
+              <p i18n="@@whatsapp.detail.stale">
+                This connection was updated somewhere else while you were editing. Your changes are
+                still here: reload to see the current settings, then save again if you still want
+                them.
+              </p>
+              <button
+                type="button"
+                class="btn btn-secondary btn-sm"
+                (click)="load()"
+                i18n="@@whatsapp.reload"
+              >
+                Reload
+              </button>
+            </div>
+          </div>
         }
 
         @if (saveFailure(); as error) {
-          <p class="alert alert-danger" role="alert">{{ error.message }}</p>
+          <p class="alert alert-danger" role="alert">
+            <app-icon name="alert" [strokeWidth]="1.75" />
+            <span>{{ error.message }}</span>
+          </p>
         }
 
         @if (canManage()) {
@@ -106,6 +158,7 @@
                 class="btn btn-secondary"
                 [disabled]="saving()"
                 (click)="setStatus(false)"
+                i18n="@@whatsapp.detail.takeOutButton"
               >
                 Take out of service
               </button>
@@ -115,6 +168,7 @@
                 class="btn btn-primary"
                 [disabled]="saving() || !hasCredential()"
                 (click)="setStatus(true)"
+                i18n="@@whatsapp.detail.putInto"
               >
                 Put into service
               </button>
@@ -122,28 +176,51 @@
           </div>
 
           @if (!hasCredential()) {
-            <p class="text-small text-muted">
+            <p class="text-small text-muted" i18n="@@whatsapp.detail.needsToken">
               Add an access token before putting this number into service. Without one it could
               receive messages and never answer them.
             </p>
           }
         }
       </div>
-    </div>
+    </section>
 
-    <div class="page-section">
-      <h2 class="text-section-title">Access token</h2>
-      <p class="text-small text-secondary section-note">
-        Stored encrypted and never shown again — not here, and not by any part of this application.
-        If you lose it, enter a new one.
+    <!-- ----------------------------------------------------- access token -->
+    <section class="page-section" aria-labelledby="token-heading">
+      <h2 id="token-heading" class="text-section-title" i18n="@@whatsapp.detail.token">
+        Access token
+      </h2>
+      <p class="text-small text-secondary section-note" i18n="@@whatsapp.detail.token.lede">
+        Stored encrypted and never shown again: not here, and not by any part of Nabra. If you lose
+        it, enter a new one.
       </p>
 
       <div class="card card-body form">
-        <label class="field">
-          <span class="text-label">New access token</span>
+        <!-- What is known about the token: whether one is stored. Nothing else. -->
+        <p class="credential" [class.is-stored]="hasCredential()">
+          @if (hasCredential()) {
+            <app-icon name="check" [strokeWidth]="2" />
+            <span i18n="@@whatsapp.detail.token.storedSentence"
+              >A token is stored, encrypted. It cannot be displayed; entering a new one replaces
+              it.</span
+            >
+          } @else {
+            <app-icon name="alert" [strokeWidth]="1.75" />
+            <span i18n="@@whatsapp.detail.token.missingSentence"
+              >No token is stored yet, so this number cannot answer anybody.</span
+            >
+          }
+        </p>
+
+        <div class="field">
+          <label class="field-label" for="token-input" i18n="@@whatsapp.detail.token.field"
+            >New access token</label
+          >
           <input
-            class="form-control"
+            id="token-input"
+            class="input"
             type="password"
+            dir="ltr"
             autocomplete="off"
             spellcheck="false"
             [value]="accessToken()"
@@ -151,25 +228,43 @@
             (input)="accessToken.set($any($event.target).value)"
             aria-describedby="token-hint"
           />
-          <span id="token-hint" class="text-small text-muted">
+          <p id="token-hint" class="field-hint" i18n="@@whatsapp.detail.token.hint">
             From your Meta app. Entering a new one replaces whatever is stored.
-          </span>
-        </label>
+          </p>
+        </div>
 
         @if (credentialStale()) {
-          <p class="alert alert-warning" role="alert">
-            This connection was updated somewhere else. Reload, then enter the token again.
-            <button type="button" class="btn btn-secondary btn-sm" (click)="load()">Reload</button>
-          </p>
+          <div class="alert alert-warning" role="alert">
+            <app-icon name="alert" [strokeWidth]="1.75" />
+            <div class="alert-body">
+              <p i18n="@@whatsapp.detail.token.stale">
+                This connection was updated somewhere else. Reload, then enter the token again.
+              </p>
+              <button
+                type="button"
+                class="btn btn-secondary btn-sm"
+                (click)="load()"
+                i18n="@@whatsapp.reload"
+              >
+                Reload
+              </button>
+            </div>
+          </div>
         }
 
         @if (credentialFailure(); as error) {
-          <p class="alert alert-danger" role="alert">{{ error.message }}</p>
+          <p class="alert alert-danger" role="alert">
+            <app-icon name="alert" [strokeWidth]="1.75" />
+            <span>{{ error.message }}</span>
+          </p>
         }
 
         @if (credentialSaved()) {
           <p class="alert alert-success" role="status">
-            Saved. The token is stored encrypted and cannot be displayed again.
+            <app-icon name="check" [strokeWidth]="2" />
+            <span i18n="@@whatsapp.detail.token.saved"
+              >Saved. The token is stored encrypted and cannot be displayed again.</span
+            >
           </p>
         }
 
@@ -181,41 +276,63 @@
               [disabled]="accessToken().trim() === '' || credentialSaving()"
               (click)="storeCredential()"
             >
-              {{ credentialSaving() ? 'Saving…' : 'Save access token' }}
+              @if (credentialSaving()) {
+                <span i18n="@@whatsapp.saving">Saving…</span>
+              } @else {
+                <span i18n="@@whatsapp.detail.token.save">Save access token</span>
+              }
             </button>
           </div>
         }
       </div>
-    </div>
+    </section>
 
-    <div class="page-section">
-      <h2 class="text-section-title">Settings</h2>
-      <p class="text-small text-secondary section-note">
+    <!-- --------------------------------------------------------- settings -->
+    <section class="page-section" aria-labelledby="settings-heading">
+      <h2 id="settings-heading" class="text-section-title" i18n="@@whatsapp.detail.settings">
+        Settings
+      </h2>
+      <p class="text-small text-secondary section-note" i18n="@@whatsapp.detail.settings.lede">
         Take the number out of service before changing these: editing them while messages are
         arriving would reroute a conversation mid-sentence.
       </p>
 
       <div class="card card-body form">
-        <label class="field">
-          <span class="text-label">AI agent</span>
+        <div class="field">
+          <label class="field-label" for="detail-agent" i18n="@@whatsapp.field.agent"
+            >AI agent</label
+          >
           <select
-            class="form-select"
+            id="detail-agent"
+            class="select"
             [value]="agentId()"
             [disabled]="!canManage() || isActive()"
             (change)="agentId.set($any($event.target).value)"
           >
+            <!--
+              Each option says whether it is the saved agent. A [value] on the
+              select alone is applied before the agent list arrives, and the
+              browser then shows the first option: a number answered by one
+              agent appeared to be answered by another (found in Phase 36.9).
+            -->
             @for (agent of agentOptions(); track agent.id) {
-              <option [value]="agent.id">{{ agent.name }} — {{ agent.status }}</option>
+              <option [value]="agent.id" [selected]="agent.id === agentId()">
+                {{ agent.name }} — {{ agentStatusWord(agent.status) }}
+              </option>
             }
           </select>
-        </label>
+        </div>
 
-        <label class="field">
-          <span class="text-label">WhatsApp Business Account ID</span>
+        <div class="field">
+          <label class="field-label" for="detail-waba" i18n="@@whatsapp.field.waba"
+            >WhatsApp Business Account ID</label
+          >
           <input
-            class="form-control"
+            id="detail-waba"
+            class="input"
             type="text"
             inputmode="numeric"
+            dir="ltr"
             autocomplete="off"
             [value]="wabaId()"
             [disabled]="!canManage() || isActive()"
@@ -224,16 +341,20 @@
             [attr.aria-describedby]="idProblem(wabaId()) ? 'detail-waba-error' : null"
           />
           @if (idProblem(wabaId()); as problem) {
-            <span id="detail-waba-error" class="form-error">{{ problem }}</span>
+            <p id="detail-waba-error" class="field-error">{{ problem }}</p>
           }
-        </label>
+        </div>
 
-        <label class="field">
-          <span class="text-label">Phone number ID</span>
+        <div class="field">
+          <label class="field-label" for="detail-phone-id" i18n="@@whatsapp.field.phoneId"
+            >Phone number ID</label
+          >
           <input
-            class="form-control"
+            id="detail-phone-id"
+            class="input"
             type="text"
             inputmode="numeric"
+            dir="ltr"
             autocomplete="off"
             [value]="phoneNumberId()"
             [disabled]="!canManage() || isActive()"
@@ -242,24 +363,31 @@
             [attr.aria-describedby]="idProblem(phoneNumberId()) ? 'detail-phone-id-error' : null"
           />
           @if (idProblem(phoneNumberId()); as problem) {
-            <span id="detail-phone-id-error" class="form-error">{{ problem }}</span>
+            <p id="detail-phone-id-error" class="field-error">{{ problem }}</p>
           }
-        </label>
+        </div>
 
-        <label class="field">
-          <span class="text-label">Display number <span class="text-muted">(optional)</span></span>
+        <div class="field">
+          <label class="field-label" for="detail-display" i18n="@@whatsapp.field.display"
+            >Display number (optional)</label
+          >
           <input
-            class="form-control"
+            id="detail-display"
+            class="input"
             type="text"
+            dir="ltr"
             autocomplete="off"
             [value]="displayPhoneNumber()"
             [disabled]="!canManage() || isActive()"
             (input)="displayPhoneNumber.set($any($event.target).value)"
           />
-        </label>
+        </div>
 
         @if (saved()) {
-          <p class="alert alert-success" role="status">Saved.</p>
+          <p class="alert alert-success" role="status">
+            <app-icon name="check" [strokeWidth]="2" />
+            <span i18n="@@whatsapp.saved">Saved.</span>
+          </p>
         }
 
         @if (canManage()) {
@@ -270,36 +398,49 @@
               [disabled]="!ready() || saving() || isActive()"
               (click)="save()"
             >
-              {{ saving() ? 'Saving…' : 'Save settings' }}
+              @if (saving()) {
+                <span i18n="@@whatsapp.saving">Saving…</span>
+              } @else {
+                <span i18n="@@whatsapp.detail.settings.save">Save settings</span>
+              }
             </button>
           </div>
         }
       </div>
-    </div>
+    </section>
 
-    <div class="page-section">
-      <h2 class="text-section-title">Webhook</h2>
-      <p class="text-small text-secondary section-note">
+    <!-- ---------------------------------------------------------- webhook -->
+    <section class="page-section" aria-labelledby="webhook-heading">
+      <h2 id="webhook-heading" class="text-section-title" i18n="@@whatsapp.detail.webhook">
+        Webhook
+      </h2>
+      <p class="text-small text-secondary section-note" i18n="@@whatsapp.detail.webhook.lede">
         Point your Meta app's WhatsApp webhook at this address. It is a public route, defended by
-        the signature Meta sends with every request — it is not a secret and grants nothing.
+        the signature Meta sends with every request: it is not a secret and grants nothing.
       </p>
 
       <div class="card card-body">
-        <code class="webhook">{{ webhookUrl() }}</code>
-        <p class="text-small text-muted">
+        <code class="webhook"
+          ><bdi dir="ltr">{{ webhookUrl() }}</bdi></code
+        >
+        <p class="text-small text-muted" i18n="@@whatsapp.detail.webhook.secrets">
           The app secret and the verify token are configured on the server by whoever runs this
           deployment. They are the same for every workspace and are never entered here.
         </p>
       </div>
-    </div>
+    </section>
   }
 
   <app-confirm-dialog
     #disableDialog
     heading="Take this WhatsApp number out of service?"
+    i18n-heading="@@whatsapp.disableDialog.heading"
     body="Messages sent to this number stop being answered by its AI agent until it is put back into service. Nothing is deleted."
+    i18n-body="@@whatsapp.disableDialog.body"
     confirmLabel="Take out of service"
+    i18n-confirmLabel="@@whatsapp.detail.takeOut"
     cancelLabel="Keep in service"
+    i18n-cancelLabel="@@whatsapp.disableDialog.cancel"
     tone="danger"
   />
 </div>

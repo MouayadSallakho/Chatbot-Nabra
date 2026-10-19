@@ -2,6 +2,10 @@
 .form {
   display: grid;
   gap: var(--space-4);
+
+  p {
+    margin: 0;
+  }
 }
 
 .status-row {
@@ -13,11 +17,30 @@
 
 .section-note {
   margin-block-end: var(--space-3);
+  max-inline-size: 70ch;
 }
 
-.field {
+.form {
+  max-inline-size: 44rem;
+}
+
+// Whether a token is stored, as a glyph and a sentence. Never the token.
+.credential {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  color: var(--warning-fg);
+  font: var(--text-body-strong);
+
+  &.is-stored {
+    color: var(--success-fg);
+  }
+}
+
+.alert-body {
   display: grid;
   gap: var(--space-2);
+  justify-items: start;
 }
 
 .form-actions {

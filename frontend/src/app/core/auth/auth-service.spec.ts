@@ -125,6 +125,20 @@ describe('AuthService', () => {
     });
   });
 
+  describe('preparing a page for visitors', () => {
+    it('obtains the antiforgery token and never asks who is signed in', async () => {
+      // The hosted chat's writes need the token; a visitor has no session, so
+      // /me could only answer 401 into a customer's website console.
+      const preparing = auth.prepareVisitor();
+
+      await answerToken();
+      await preparing;
+
+      http.expectNone('/api/auth/me');
+      expect(auth.isAuthenticated()).toBe(false);
+    });
+  });
+
   describe('signing in', () => {
     it('sends the credentials once and adopts the session', async () => {
       const signingIn = auth.login({ email: account.email, password });

@@ -13,9 +13,18 @@ import { ApiError, toApiError } from '@app/core/api/api-error';
 import { PermissionService } from '@app/core/authorization/permission-service';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
 import { AiAgentApi, AiAgentSummary } from '@app/features/ai-agents/ai-agent-api';
+import { agentStatusWord } from '@app/features/ai-agents/agent-words';
 import { EmptyState } from '@app/shared/empty-state/empty-state';
+import { Icon } from '@app/shared/icon/icon';
 import { PageHeader } from '@app/shared/page-header/page-header';
 import { ConfirmDialog } from '@app/core/feedback/confirm-dialog';
+import {
+  CHANNEL_LIFECYCLE,
+  LIFECYCLE_LABEL,
+  channelStatusTone,
+  channelStatusWord,
+  whatsAppStatusSentence,
+} from '../../channel-words';
 import { WhatsAppApi, WhatsAppConnection } from '../../whatsapp-api';
 
 /**
@@ -29,11 +38,16 @@ import { WhatsAppApi, WhatsAppConnection } from '../../whatsapp-api';
  * <strong>A stale save keeps what somebody typed.</strong> Losing a 412 race
  * means the connection moved underneath the screen, not that the edits were
  * wrong — so the form keeps them and the reader is asked to re-read and decide.
+ *
+ * <strong>Where it stands, first</strong> (Phase 36.9): the lifecycle with the
+ * current step marked, what it means for customers, whether a token is stored,
+ * and the one action that changes it. Taking a number out of service is
+ * confirmed exactly as before.
  */
 @Component({
   selector: 'app-whatsapp-detail',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [PageHeader, EmptyState, ConfirmDialog],
+  imports: [PageHeader, EmptyState, ConfirmDialog, Icon],
   templateUrl: './whatsapp-detail.html',
   styleUrl: './whatsapp-detail.scss',
 })
@@ -84,6 +98,16 @@ export class WhatsAppDetail implements OnInit {
   protected readonly canManage = computed(() => this.permissions.has('whatsapp.manage'));
 
   protected readonly isActive = computed(() => this.connection()?.status === 'Active');
+
+  protected readonly lifecycle = CHANNEL_LIFECYCLE;
+  protected readonly lifecycleLabel = LIFECYCLE_LABEL;
+  protected readonly statusWord = channelStatusWord;
+  protected readonly statusTone = channelStatusTone;
+  protected readonly agentStatusWord = agentStatusWord;
+
+  protected readonly statusSentence = computed(() =>
+    whatsAppStatusSentence(this.connection()?.status ?? 'Draft'),
+  );
 
   protected readonly hasCredential = computed(() => this.connection()?.hasCredential === true);
 
@@ -274,10 +298,12 @@ export class WhatsAppDetail implements OnInit {
    */
   protected idProblem(value: string): string | null {
     if (value.trim().length === 0) {
-      return 'Required. Use the digits from your Meta app.';
+      return $localize`:@@whatsapp.field.required:Required. Use the digits from your Meta app.`;
     }
 
-    return this.digits(value) ? null : 'Use digits only — no spaces, letters or symbols.';
+    return this.digits(value)
+      ? null
+      : $localize`:@@whatsapp.field.digitsOnly:Use digits only: no spaces, letters or symbols.`;
   }
 
   /**

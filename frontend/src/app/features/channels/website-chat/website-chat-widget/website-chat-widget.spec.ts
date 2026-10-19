@@ -341,4 +341,93 @@ describe('WebsiteChatWidget', () => {
     expect(text()).toContain('not a limit on how much anybody can send');
     expect(text()).toContain('does not use third-party cookies');
   });
+
+  // ---- Phase 36.9: the preview and the colour checks ----------------------
+
+  async function setAccent(value: string): Promise<void> {
+    const box = host().querySelector<HTMLInputElement>('[data-testid="accent-hex"]')!;
+
+    box.value = value;
+    box.dispatchEvent(new Event('input'));
+    await settle();
+  }
+
+  it('draws the preview with the real widget parts, from the form before it is saved', async () => {
+    await mount('website-chat.view', 'website-chat.manage');
+    fixture.componentRef.setInput('agentName', 'Concierge');
+
+    http.expectOne(url).flush(
+      configuration({
+        widget: {
+          greeting: 'Hello there',
+          accentColor: '#2563eb',
+          launcherPosition: 'Left',
+          theme: 'Dark',
+        },
+      }),
+      {
+        headers: { ETag: '"v1"' },
+      },
+    );
+    await settle();
+
+    const preview = host().querySelector<HTMLElement>('[data-testid="widget-preview"]')!;
+    const stage = preview.querySelector<HTMLElement>('.preview-stage')!;
+
+    // The same components the iframe runs, inert, with no heading of their own.
+    expect(preview.querySelector('app-chat-panel')).not.toBeNull();
+    expect(preview.querySelector('app-chat-launcher.is-left')).not.toBeNull();
+    expect(preview.querySelector('h1')).toBeNull();
+    expect(stage.hasAttribute('inert')).toBe(true);
+    expect(preview.textContent).toContain('Concierge');
+    expect(preview.textContent).toContain('Hello there');
+    expect(preview.textContent).toContain('Visitors always see it dark');
+
+    // Typing a colour repaints the preview before anything is saved.
+    await setAccent('#ffe066');
+
+    expect(stage.style.getPropertyValue('--chat-accent')).toBe('#ffe066');
+    expect(stage.style.getPropertyValue('--chat-on-accent')).toBe('#111827');
+    expect(stage.style.getPropertyValue('--chat-accent-edge')).toBe('#111827');
+  });
+
+  it('checks a colour before it is used, and says what the rules did, in words', async () => {
+    await mount('website-chat.view', 'website-chat.manage');
+
+    http.expectOne(url).flush(configuration(), { headers: { ETag: '"v1"' } });
+    await settle();
+
+    const checks = (): string =>
+      host().querySelector('[data-testid="accent-checks"]')?.textContent ?? '';
+
+    expect(checks()).toContain('Text on the colour');
+    expect(checks()).toContain('readable');
+    expect(checks()).toContain('easy to see');
+
+    // A pale yellow: readable label, but a launcher that needs an outline on white.
+    await setAccent('#ffe066');
+
+    expect(checks()).toContain('gets an outline');
+
+    // Something that is not a colour cannot be saved, and says how to write one.
+    await setAccent('#12');
+
+    expect(text()).toContain('six digits or letters');
+    expect(button('Save widget settings')!.disabled).toBe(true);
+  });
+
+  it('knows when it holds unsaved changes, and says so beside Save', async () => {
+    await mount('website-chat.view', 'website-chat.manage');
+
+    http.expectOne(url).flush(configuration(), { headers: { ETag: '"v1"' } });
+    await settle();
+
+    expect(fixture.componentInstance.hasUnsavedChanges()).toBe(false);
+    expect(host().querySelector('[data-testid="widget-unsaved"]')).toBeNull();
+
+    await addOrigin('https://shop.example.com');
+
+    expect(fixture.componentInstance.hasUnsavedChanges()).toBe(true);
+    expect(host().querySelector('[data-testid="widget-unsaved"]')).not.toBeNull();
+  });
 });

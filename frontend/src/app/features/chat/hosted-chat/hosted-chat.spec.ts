@@ -1,6 +1,8 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { PublicChatRealtime } from '@app/core/realtime/public-chat-realtime';
+import { FakePublicChatRealtime } from '@app/testing/test-doubles';
 import { HostedChatApi } from '../hosted-chat-api';
 import { HostedChatSessionStore } from '../hosted-chat-session';
 import { HostedChat } from './hosted-chat';
@@ -41,6 +43,7 @@ describe('HostedChat', () => {
         provideHttpClientTesting(),
         HostedChatApi,
         HostedChatSessionStore,
+        { provide: PublicChatRealtime, useClass: FakePublicChatRealtime },
       ],
     });
 
@@ -88,9 +91,10 @@ describe('HostedChat', () => {
     host().querySelector('textarea') as HTMLTextAreaElement;
 
   const sendButton = (): HTMLButtonElement =>
-    host().querySelector('button[type="submit"]') as HTMLButtonElement;
+    host().querySelector('[data-testid="chat-send"]') as HTMLButtonElement;
 
-  const restartButton = (): HTMLButtonElement | null => host().querySelector('.chat-restart');
+  const restartButton = (): HTMLButtonElement | null =>
+    host().querySelector('[data-testid="chat-new"]');
 
   const alertText = (): string => host().querySelector('[role="alert"]')?.textContent ?? '';
 
@@ -832,14 +836,38 @@ describe('HostedChat', () => {
     expect(host().querySelector('textarea')).toBeNull();
   });
 
-  it('labels the composer and offers a submit button', async () => {
+  it('labels the composer and sends from an ordinary button, as the widget does', async () => {
+    // One composer for the hosted page and the widget (Phase 36.9): the widget's
+    // sandbox withholds allow-forms, so neither submits a form.
     await open();
 
-    const label = host().querySelector('label[for="chat-message"]');
+    const label = host().querySelector(`label[for="${composer().id}"]`);
 
     expect(label?.textContent?.trim()).toBe('Your message');
-    expect(composer().id).toBe('chat-message');
-    expect(sendButton().type).toBe('submit');
+    expect(sendButton().type).toBe('button');
+
+    // The keys are said, not only known: Enter sends, Shift+Enter adds a line.
+    const keys = host().querySelector(`#${composer().getAttribute('aria-describedby')}`);
+
+    expect(keys?.textContent).toContain('Enter sends');
+  });
+
+  it('sends on Enter and keeps Shift+Enter for a new line', async () => {
+    await open();
+
+    type('First line');
+    composer().dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', shiftKey: true }));
+    await settle();
+
+    http.expectNone(startUrl);
+
+    composer().dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+    await settle();
+
+    http.expectOne(startUrl).flush({ conversationId, agentName: 'Concierge' });
+    await settle();
+
+    expect(http.expectOne(messagesUrl).request.body.text).toBe('First line');
   });
 
   it('announces the transcript and its status messages', async () => {

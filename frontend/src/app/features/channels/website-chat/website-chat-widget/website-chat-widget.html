@@ -1,14 +1,26 @@
 @if (loading()) {
   <div class="page-section" aria-busy="true">
-    <p class="visually-hidden" role="status">Loading widget settings…</p>
-    <div class="card card-body">
+    <p class="visually-hidden" role="status" i18n="@@widget.loading">Loading widget settings…</p>
+    <div class="card card-body skeleton-card">
       <span class="skeleton skeleton-title"></span>
+      <span class="skeleton skeleton-text"></span>
       <span class="skeleton skeleton-text"></span>
     </div>
   </div>
 } @else if (failure(); as error) {
   <div class="page-section">
-    <p class="alert alert-danger" role="alert">{{ error.message }}</p>
+    <p class="alert alert-danger" role="alert">
+      <app-icon name="alert" [strokeWidth]="1.75" />
+      <span>{{ error.message }}</span>
+      <button
+        type="button"
+        class="btn btn-secondary btn-sm"
+        (click)="load()"
+        i18n="@@websiteChat.tryAgain"
+      >
+        Try again
+      </button>
+    </p>
   </div>
 } @else if (configuration(); as current) {
   <!--
@@ -19,246 +31,504 @@
   @if (stale()) {
     <div class="page-section">
       <div class="stale-notice" role="alert">
-        <p class="text-body-strong">This chat link was changed somewhere else.</p>
-        <p class="text-small text-secondary">
+        <p class="text-body-strong" i18n="@@widget.stale.title">
+          This chat link was changed somewhere else.
+        </p>
+        <p class="text-small text-secondary" i18n="@@widget.stale.body">
           Nothing was saved, and what you have typed here is untouched. Reloading replaces it with
           the current settings.
         </p>
-        <button type="button" class="btn btn-secondary btn-sm" (click)="load()">
+        <button
+          type="button"
+          class="btn btn-secondary btn-sm"
+          (click)="load()"
+          i18n="@@widget.stale.reload"
+        >
           Reload and discard my changes
         </button>
       </div>
     </div>
   }
 
-  <!-- ------------------------------------------------------------- install -->
   <div class="page-section">
-    <h2 class="text-section-title">Install on your website</h2>
-    <p class="text-small text-secondary section-note">
-      Paste this just before the closing <code>&lt;/body&gt;</code> tag of every page the chat
-      should appear on. It adds one small script, which loads the chat in a frame of its own — your
-      page's styles and scripts cannot reach inside it, and it cannot reach into your page.
+    <h2 class="text-section-title" i18n="@@widget.heading">Website widget</h2>
+    <p class="text-small text-secondary section-note" i18n="@@widget.lede">
+      The same chat as a launcher in the corner of your own website. Choose how it looks, say which
+      websites may show it, then paste one line into your pages.
     </p>
 
-    <div class="card card-body install">
-      <pre
-        class="snippet"
-        appScrollRegion="Installation snippet"
-      ><code>{{ current.installSnippet }}</code></pre>
+    <!-- ------------------------------------------------------- 1. appearance -->
+    <div class="authoring">
+      <div class="authoring-main">
+        <section class="card form-section" aria-labelledby="appearance-heading" [formGroup]="form">
+          <div class="card-header">
+            <span class="form-section-index" aria-hidden="true">1</span>
+            <div>
+              <h3 id="appearance-heading" class="form-section-title" i18n="@@widget.appearance">
+                Appearance
+              </h3>
+              <p class="form-section-lede" i18n="@@widget.appearance.lede">
+                A greeting, a colour and a corner. Custom styles, fonts, images and scripts are
+                deliberately not offered: the widget runs on your visitors' devices, and what runs
+                there is not something a settings page should change.
+              </p>
+            </div>
+          </div>
 
-      <div class="install-actions">
-        <button type="button" class="btn btn-secondary btn-sm" (click)="copy('snippet')">
-          Copy snippet
-        </button>
+          <div class="card-body">
+            <div class="field">
+              <label class="field-label" for="widget-greeting" i18n="@@widget.greeting"
+                >Greeting</label
+              >
+              <textarea
+                id="widget-greeting"
+                class="textarea"
+                rows="2"
+                dir="auto"
+                formControlName="greeting"
+                [attr.maxlength]="maxGreetingLength"
+                aria-describedby="widget-greeting-hint"
+                placeholder="Hi, ask us anything."
+                i18n-placeholder="@@widget.greeting.placeholder"
+              ></textarea>
+              <p id="widget-greeting-hint" class="field-hint" i18n="@@widget.greeting.hint">
+                Shown at the top of the chat before anybody types, as your words rather than as
+                something the AI said. Up to {{ maxGreetingLength }} characters; it may be left
+                empty.
+              </p>
+            </div>
 
-        @if (copied() === 'snippet') {
-          <span class="text-small text-muted" role="status">Copied.</span>
-        }
-      </div>
-
-      <p class="text-small text-secondary">
-        If your site sends a Content-Security-Policy, allow
-        <code>{{ current.loaderUrl }}</code> in <code>script-src</code> and this address in
-        <code>frame-src</code>.
-      </p>
-
-      <div class="install-actions">
-        <button type="button" class="btn btn-ghost btn-sm" (click)="copy('loader')">
-          Copy loader address
-        </button>
-
-        @if (copied() === 'loader') {
-          <span class="text-small text-muted" role="status">Copied.</span>
-        }
-      </div>
-    </div>
-  </div>
-
-  <!-- ----------------------------------------------------- allowed origins -->
-  <div class="page-section">
-    <h2 class="text-section-title">Websites allowed to embed this chat</h2>
-    <p class="text-small text-secondary section-note">
-      The widget runs only on the websites listed here. The address is the one the visitor's browser
-      reports, not one the page can claim, so a copy of your snippet pasted onto somebody else's
-      site does nothing.
-    </p>
-
-    @if (noOrigins()) {
-      <p class="alert alert-info" role="status">
-        No website is listed yet, so the widget will not appear anywhere. Add the address of the
-        site you pasted the snippet into.
-      </p>
-    }
-
-    <div class="card card-body origins">
-      @if (origins().length > 0) {
-        <ul class="origin-list">
-          @for (origin of origins(); track origin) {
-            <li class="origin-row">
-              <span class="origin-value">{{ origin }}</span>
-
-              @if (canManage()) {
-                <button
-                  type="button"
-                  class="btn btn-ghost btn-sm"
-                  [attr.aria-label]="'Remove ' + origin"
-                  (click)="removeOrigin(origin)"
+            <!-- The accent, and what the widget's rules make of it. -->
+            <fieldset class="accent">
+              <legend class="field-label" i18n="@@widget.accent">Accent colour</legend>
+              <div class="accent-field">
+                <input
+                  id="widget-accent-picker"
+                  class="accent-swatch"
+                  type="color"
+                  formControlName="accentColor"
+                  aria-label="Pick a colour"
+                  i18n-aria-label="@@widget.accent.picker"
+                />
+                <label class="visually-hidden" for="widget-accent" i18n="@@widget.accent.hex"
+                  >Colour code</label
                 >
-                  Remove
-                </button>
+                <input
+                  id="widget-accent"
+                  class="input accent-hex"
+                  type="text"
+                  dir="ltr"
+                  spellcheck="false"
+                  autocomplete="off"
+                  maxlength="7"
+                  formControlName="accentColor"
+                  [attr.aria-invalid]="accentInvalid()"
+                  [attr.aria-describedby]="
+                    accentInvalid()
+                      ? 'widget-accent-hint widget-accent-error'
+                      : 'widget-accent-hint'
+                  "
+                  data-testid="accent-hex"
+                />
+              </div>
+              <p id="widget-accent-hint" class="field-hint" i18n="@@widget.accent.hint">
+                The launcher, the header and Send use it, and the AI's replies a light tint of it.
+                The text on top is chosen so it can always be read.
+              </p>
+              @if (accentInvalid()) {
+                <p
+                  id="widget-accent-error"
+                  class="field-error"
+                  role="alert"
+                  i18n="@@widget.accent.error"
+                >
+                  Write the colour as # and six digits or letters from a to f, for example #2563eb.
+                </p>
               }
-            </li>
-          }
-        </ul>
-      }
 
-      @if (canManage()) {
-        <form class="origin-form" [formGroup]="originForm" (ngSubmit)="addOrigin()">
-          <div class="field origin-field">
-            <label class="field-label" for="widget-origin">Website address</label>
-            <input
-              id="widget-origin"
-              class="input"
-              type="url"
-              inputmode="url"
-              autocomplete="off"
-              placeholder="https://www.example.com"
-              formControlName="origin"
-            />
-            <p class="field-hint">
-              The scheme and domain only — no path, and no wildcards. Add each subdomain you use. Up
-              to {{ maxOrigins() }} websites.
-            </p>
+              <ul class="checks" data-testid="accent-checks">
+                <li class="check is-pass">
+                  <app-icon name="check" [strokeWidth]="2" />
+                  <span i18n="@@widget.check.label"
+                    >Text on the colour:
+                    <bdi dir="ltr" class="check-ratio">{{ ratio(accent().labelContrast) }}</bdi
+                    >, readable</span
+                  >
+                </li>
+                <li class="check" [class.is-pass]="accent().onLightPage >= boundary">
+                  <app-icon
+                    [name]="accent().onLightPage >= boundary ? 'check' : 'info'"
+                    [strokeWidth]="2"
+                  />
+                  @if (accent().onLightPage >= boundary) {
+                    <span i18n="@@widget.check.lightVisible"
+                      >Launcher on a white page:
+                      <bdi dir="ltr" class="check-ratio">{{ ratio(accent().onLightPage) }}</bdi
+                      >, easy to see</span
+                    >
+                  } @else {
+                    <span i18n="@@widget.check.lightOutlined"
+                      >Launcher on a white page:
+                      <bdi dir="ltr" class="check-ratio">{{ ratio(accent().onLightPage) }}</bdi
+                      >, faint, so the launcher gets an outline in its text colour</span
+                    >
+                  }
+                </li>
+                <li class="check" [class.is-pass]="accent().onDarkPage >= boundary">
+                  <app-icon
+                    [name]="accent().onDarkPage >= boundary ? 'check' : 'info'"
+                    [strokeWidth]="2"
+                  />
+                  @if (accent().onDarkPage >= boundary) {
+                    <span i18n="@@widget.check.darkVisible"
+                      >Launcher on a dark page:
+                      <bdi dir="ltr" class="check-ratio">{{ ratio(accent().onDarkPage) }}</bdi
+                      >, easy to see</span
+                    >
+                  } @else {
+                    <span i18n="@@widget.check.darkFaint"
+                      >Launcher on a dark page:
+                      <bdi dir="ltr" class="check-ratio">{{ ratio(accent().onDarkPage) }}</bdi
+                      >, faint; if your website is dark, a lighter colour will stand out more</span
+                    >
+                  }
+                </li>
+              </ul>
+            </fieldset>
 
-            @if (originProblem(); as problem) {
-              <p class="field-error" role="alert">{{ problem }}</p>
-            }
+            <div class="appearance-row">
+              <div class="field">
+                <label class="field-label" for="widget-position" i18n="@@widget.position"
+                  >Launcher position</label
+                >
+                <select id="widget-position" class="select" formControlName="launcherPosition">
+                  <option value="Right" i18n="@@widget.position.right">Bottom right</option>
+                  <option value="Left" i18n="@@widget.position.left">Bottom left</option>
+                </select>
+              </div>
+
+              <div class="field">
+                <label class="field-label" for="widget-theme" i18n="@@widget.theme">Theme</label>
+                <select id="widget-theme" class="select" formControlName="theme">
+                  <option value="System" i18n="@@widget.theme.system">
+                    Match the visitor's device
+                  </option>
+                  <option value="Light" i18n="@@widget.theme.light">Light</option>
+                  <option value="Dark" i18n="@@widget.theme.dark">Dark</option>
+                </select>
+              </div>
+            </div>
           </div>
+        </section>
+      </div>
 
-          <button type="submit" class="btn btn-secondary" [disabled]="originsFull()">Add</button>
-        </form>
-
-        @if (originsFull()) {
-          <p class="text-small text-muted" role="status">
-            This chat link already lists the maximum of {{ maxOrigins() }} websites. Remove one to
-            add another.
-          </p>
-        }
-      }
+      <!--
+        The preview: the real launcher and panel components the widget runs,
+        drawn from the form before it is saved. Inert and hidden from assistive
+        technology, because nothing in it does anything; the checks beside the
+        colour say in words what it shows.
+      -->
+      <aside class="authoring-aside" aria-labelledby="widget-preview-heading">
+        <div class="authoring-aside-sticky">
+          <section class="card widget-preview" data-testid="widget-preview">
+            <div class="card-header">
+              <div>
+                <h3 id="widget-preview-heading" class="card-title" i18n="@@widget.preview">
+                  Preview
+                </h3>
+                <p class="form-section-lede" i18n="@@widget.preview.lede">
+                  The widget itself, drawn with what is on this form, before you save. Nothing can
+                  be sent from it.
+                </p>
+              </div>
+            </div>
+            <div class="card-body">
+              <div
+                class="preview-stage"
+                [class.is-left]="previewSide() === 'Left'"
+                [style.--chat-accent]="accent().accent"
+                [style.--chat-on-accent]="accent().foreground"
+                [style.--chat-accent-edge]="accent().edge"
+                inert
+                aria-hidden="true"
+              >
+                <app-chat-panel
+                  class="preview-panel"
+                  variant="widget"
+                  [preview]="true"
+                  [titleIsHeading]="false"
+                  [closable]="true"
+                  [canSend]="true"
+                  [agentName]="agentName()"
+                  [greeting]="previewGreeting()"
+                />
+                <div class="preview-closed">
+                  <app-chat-launcher
+                    [label]="launcherLabel()"
+                    [side]="previewSide()"
+                    [preview]="true"
+                  />
+                </div>
+              </div>
+              <p class="text-small text-secondary" data-testid="preview-theme-note">
+                @switch (previewTheme()) {
+                  @case ('Light') {
+                    <span i18n="@@widget.preview.theme.light"
+                      >Visitors always see it light. Shown here in your own Nabra theme.</span
+                    >
+                  }
+                  @case ('Dark') {
+                    <span i18n="@@widget.preview.theme.dark"
+                      >Visitors always see it dark. Shown here in your own Nabra theme.</span
+                    >
+                  }
+                  @default {
+                    <span i18n="@@widget.preview.theme.system"
+                      >Visitors see it light or dark, as their device is set. Shown here in your own
+                      Nabra theme.</span
+                    >
+                  }
+                }
+              </p>
+            </div>
+          </section>
+        </div>
+      </aside>
     </div>
   </div>
 
-  <!-- ---------------------------------------------------------- appearance -->
+  <!-- ----------------------------------------------------- 2. allowed origins -->
   <div class="page-section">
-    <h2 class="text-section-title">Appearance</h2>
-    <p class="text-small text-secondary section-note">
-      A greeting, a colour and a corner. Custom styles, fonts, images and scripts are deliberately
-      not offered: the widget runs on your visitors' machines, and what runs there is not something
-      a settings page should be able to change.
-    </p>
-
-    <div class="card card-body" [formGroup]="form">
-      <div class="field">
-        <label class="field-label" for="widget-greeting">Greeting</label>
-        <textarea
-          id="widget-greeting"
-          class="textarea"
-          rows="2"
-          formControlName="greeting"
-          [attr.maxlength]="maxGreetingLength"
-          placeholder="Hi — ask us anything."
-        ></textarea>
-        <p class="field-hint">
-          Shown at the top of the chat before anybody types. It is plain text you wrote, shown as
-          your words rather than as something the AI said. Up to {{ maxGreetingLength }}
-          characters, and it may be left empty.
-        </p>
-      </div>
-
-      <div class="appearance-row">
-        <div class="field">
-          <label class="field-label" for="widget-accent">Accent colour</label>
-          <div class="accent-field">
-            <input
-              id="widget-accent"
-              class="accent-swatch"
-              type="color"
-              formControlName="accentColor"
-            />
-            <span class="text-small text-muted">{{ form.controls.accentColor.value }}</span>
-          </div>
-          <p class="field-hint">
-            Used for the launcher, the header and the visitor's own messages. The text on top is
-            chosen automatically so it stays readable.
+    <section class="card form-section" aria-labelledby="origins-heading">
+      <div class="card-header">
+        <span class="form-section-index" aria-hidden="true">2</span>
+        <div>
+          <h3 id="origins-heading" class="form-section-title" i18n="@@widget.origins">
+            Websites allowed to show this chat
+          </h3>
+          <p class="form-section-lede" i18n="@@widget.origins.lede">
+            The widget runs only on the websites listed here. The address is the one the visitor's
+            browser reports, not one the page can claim, so a copy of your snippet pasted onto
+            somebody else's site does nothing.
           </p>
         </div>
+      </div>
 
-        <div class="field">
-          <label class="field-label" for="widget-position">Launcher position</label>
-          <select id="widget-position" class="select" formControlName="launcherPosition">
-            <option value="Right">Bottom right</option>
-            <option value="Left">Bottom left</option>
-          </select>
-        </div>
+      <div class="card-body">
+        @if (noOrigins()) {
+          <p class="alert alert-info" role="status">
+            <app-icon name="info" [strokeWidth]="1.75" />
+            <span i18n="@@widget.origins.none"
+              >No website is listed yet, so the widget will not appear anywhere. Add the address of
+              the site you paste the snippet into.</span
+            >
+          </p>
+        }
 
-        <div class="field">
-          <label class="field-label" for="widget-theme">Theme</label>
-          <select id="widget-theme" class="select" formControlName="theme">
-            <option value="System">Match the visitor's device</option>
-            <option value="Light">Light</option>
-            <option value="Dark">Dark</option>
-          </select>
+        @if (origins().length > 0) {
+          <ul class="origin-list" data-testid="origins">
+            @for (origin of origins(); track origin) {
+              <li class="origin-row">
+                <bdi class="origin-value" dir="ltr">{{ origin }}</bdi>
+
+                @if (canManage()) {
+                  <button
+                    type="button"
+                    class="btn btn-ghost btn-sm"
+                    [attr.aria-label]="removeLabel(origin)"
+                    (click)="removeOrigin(origin)"
+                    i18n="@@widget.origins.remove"
+                  >
+                    Remove
+                  </button>
+                }
+              </li>
+            }
+          </ul>
+        }
+
+        @if (canManage()) {
+          <form class="origin-form" [formGroup]="originForm" (ngSubmit)="addOrigin()">
+            <div class="field origin-field">
+              <label class="field-label" for="widget-origin" i18n="@@widget.origins.address"
+                >Website address</label
+              >
+              <input
+                id="widget-origin"
+                class="input"
+                type="url"
+                inputmode="url"
+                dir="ltr"
+                autocomplete="off"
+                placeholder="https://www.example.com"
+                formControlName="origin"
+                aria-describedby="widget-origin-hint"
+                [attr.aria-invalid]="originProblem() !== null"
+              />
+              <p id="widget-origin-hint" class="field-hint" i18n="@@widget.origins.hint">
+                The scheme and domain only: no path, and no wildcards. Add each subdomain you use.
+                Up to {{ maxOrigins() }} websites.
+              </p>
+
+              @if (originProblem(); as problem) {
+                <p class="field-error" role="alert">{{ problem }}</p>
+              }
+            </div>
+
+            <button
+              type="submit"
+              class="btn btn-secondary"
+              [disabled]="originsFull()"
+              i18n="@@widget.origins.add"
+            >
+              Add
+            </button>
+          </form>
+
+          @if (originsFull()) {
+            <p class="text-small text-muted" role="status" i18n="@@widget.origins.full">
+              This chat link already lists the maximum of {{ maxOrigins() }} websites. Remove one to
+              add another.
+            </p>
+          }
+        }
+      </div>
+    </section>
+  </div>
+
+  @if (canManage()) {
+    <div class="page-section save-section">
+      @if (saveFailure(); as error) {
+        <p class="alert alert-danger" role="alert">
+          <app-icon name="alert" [strokeWidth]="1.75" />
+          <span>{{ error.message }}</span>
+        </p>
+      }
+
+      <div class="section-actions">
+        @if (hasUnsavedChanges()) {
+          <span class="unsaved-note" data-testid="widget-unsaved">
+            <app-icon name="alert" [strokeWidth]="1.75" />
+            <span i18n="@@widget.unsaved">Unsaved changes</span>
+          </span>
+        }
+        @if (savedAt()) {
+          <span class="text-small text-muted" role="status" i18n="@@widget.saved">Saved.</span>
+        }
+        <button
+          type="button"
+          class="btn btn-primary"
+          [disabled]="saving() || form.invalid"
+          (click)="save()"
+          data-testid="widget-save"
+        >
+          @if (saving()) {
+            <span i18n="@@widget.saving">Saving…</span>
+          } @else {
+            <span i18n="@@widget.save">Save widget settings</span>
+          }
+        </button>
+      </div>
+
+      <p class="text-small text-muted save-note" i18n="@@widget.save.note">
+        Saving applies the appearance and replaces the whole list of websites with what is shown
+        above.
+      </p>
+    </div>
+  }
+
+  <!-- ------------------------------------------------------------ 3. install -->
+  <div class="page-section">
+    <section class="card form-section" aria-labelledby="install-heading">
+      <div class="card-header">
+        <span class="form-section-index" aria-hidden="true">3</span>
+        <div>
+          <h3 id="install-heading" class="form-section-title" i18n="@@widget.install">
+            Install on your website
+          </h3>
+          <p class="form-section-lede" i18n="@@widget.install.lede">
+            Paste this just before the closing &lt;/body&gt; tag of every page the chat should
+            appear on. It adds one small script, which loads the chat in a frame of its own: your
+            page's styles and scripts cannot reach inside it, and it cannot reach into your page.
+          </p>
         </div>
       </div>
-    </div>
+
+      <div class="card-body">
+        <pre
+          class="snippet"
+          dir="ltr"
+          appScrollRegion="Installation snippet"
+          i18n-appScrollRegion="@@widget.install.snippetLabel"
+        ><code>{{ current.installSnippet }}</code></pre>
+
+        <div class="install-actions">
+          <button
+            type="button"
+            class="btn btn-secondary btn-sm"
+            (click)="copy('snippet')"
+            i18n="@@widget.install.copy"
+          >
+            Copy snippet
+          </button>
+
+          @if (copied() === 'snippet') {
+            <span class="text-small text-muted" role="status" i18n="@@websiteChat.copied"
+              >Copied.</span
+            >
+          }
+        </div>
+
+        <p class="text-small text-secondary" i18n="@@widget.install.csp">
+          If your site sends a Content-Security-Policy, allow
+          <code dir="ltr">{{ current.loaderUrl }}</code> in <code>script-src</code> and this address
+          in <code>frame-src</code>.
+        </p>
+
+        <div class="install-actions">
+          <button
+            type="button"
+            class="btn btn-ghost btn-sm"
+            (click)="copy('loader')"
+            i18n="@@widget.install.copyLoader"
+          >
+            Copy loader address
+          </button>
+
+          @if (copied() === 'loader') {
+            <span class="text-small text-muted" role="status" i18n="@@websiteChat.copied"
+              >Copied.</span
+            >
+          }
+        </div>
+      </div>
+    </section>
   </div>
 
   <!-- ------------------------------------------------------------ security -->
   <div class="page-section">
-    <h2 class="text-section-title">Security</h2>
+    <h2 class="text-section-title" i18n="@@widget.security">How the widget keeps visitors safe</h2>
 
-    <div class="card card-body security">
-      <p class="text-small text-secondary" i18n="@@websiteChat.security.frame">
+    <ul class="security">
+      <li i18n="@@websiteChat.security.frame">
         The chat runs in a frame served by Nabra, so the site it is embedded in cannot read the
         conversation, cannot read the visitor's session, and cannot style or script anything inside
         it. Nothing about your workspace, your agent or your knowledge is sent to the page.
-      </p>
-      <p class="text-small text-secondary">
+      </li>
+      <li i18n="@@widget.security.cookies">
         The widget does not use third-party cookies, so it keeps working in browsers that block
         them.
-      </p>
-      <p class="text-small text-secondary">
-        Removing a website takes effect at once — conversations already open on it stop being
+      </li>
+      <li i18n="@@widget.security.removal">
+        Removing a website takes effect at once: conversations already open on it stop being
         answered, because every message is checked against this list again rather than trusting the
         session that was opened earlier.
-      </p>
-      <p class="text-small text-secondary">
+      </li>
+      <li i18n="@@widget.security.limits">
         This list controls where the chat may be embedded. It is not a limit on how much anybody can
         send: the rate limits and abuse protection apply to every conversation regardless of which
         website it started on.
-      </p>
-    </div>
+      </li>
+    </ul>
   </div>
-
-  @if (canManage()) {
-    <div class="page-section">
-      @if (saveFailure(); as error) {
-        <p class="alert alert-danger" role="alert">{{ error.message }}</p>
-      }
-
-      <div class="save-row">
-        <button type="button" class="btn btn-primary" [disabled]="saving()" (click)="save()">
-          {{ saving() ? 'Saving…' : 'Save widget settings' }}
-        </button>
-
-        @if (savedAt()) {
-          <span class="text-small text-muted" role="status">Saved.</span>
-        }
-      </div>
-
-      <p class="text-small text-muted">
-        Saving replaces the whole list of websites with what is shown above.
-      </p>
-    </div>
-  }
 }
