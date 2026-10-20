@@ -49,6 +49,14 @@
   }
 }
 
+// On a page that is not Arabic, its one Arabic word ("العربية") is drawn with
+// the system's Arabic font through the metric-matched local fallback, so an
+// English entry page downloads no Arabic font file (45 kB for one word, Phase
+// 36.12). Arabic pages keep IBM Plex Sans Arabic.
+:host-context(html:not([lang='ar'])) .entry-language .segmented-option:lang(ar) {
+  font-family: 'IBM Plex Sans Arabic Fallback', system-ui, sans-serif;
+}
+
 .entry-main {
   grid-area: main;
   display: flex;

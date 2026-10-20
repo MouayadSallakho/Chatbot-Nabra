@@ -1,7 +1,7 @@
 import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { of, throwError } from 'rxjs';
+import { NEVER, of, throwError } from 'rxjs';
 import { PermissionService } from '@app/core/authorization/permission-service';
 import { NotificationCenter } from '@app/core/notifications/notification-center';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
@@ -97,6 +97,8 @@ describe('Overview', () => {
     [...host().querySelectorAll('.attention-title')].map(
       (element) => element.textContent?.trim() ?? '',
     );
+  const more = (): HTMLButtonElement =>
+    host().querySelector<HTMLButtonElement>('[data-testid="attention-more"]')!;
   const tones = (): string[] =>
     [...host().querySelectorAll('.attention-tone')].map(
       (element) => element.textContent?.trim() ?? '',
@@ -104,7 +106,7 @@ describe('Overview', () => {
 
   async function render(options: {
     granted?: readonly string[];
-    dashboard?: AnalyticsDashboard | 'fail';
+    dashboard?: AnalyticsDashboard | 'fail' | 'never';
     plan?: PlanUsage | 'fail';
     billing?: WorkspaceBilling;
     unread?: number;
@@ -126,7 +128,9 @@ describe('Overview', () => {
             dashboard: () =>
               options.dashboard === 'fail'
                 ? throwError(() => new Error('down'))
-                : of(options.dashboard ?? dashboard()),
+                : options.dashboard === 'never'
+                  ? NEVER
+                  : of(options.dashboard ?? dashboard()),
           },
         },
         {
@@ -164,7 +168,7 @@ describe('Overview', () => {
     );
   });
 
-  it('lists limits that are running out, the reached one first, each with a meter, and ignores unlimited ones', async () => {
+  it('lists limits that are running out, the reached one first, each with its figure, and ignores unlimited ones', async () => {
     await render({ plan: PLAN_WITH_WARNING });
 
     // Plan & usage's own words: the limit's name and the server's state.
@@ -173,13 +177,11 @@ describe('Overview', () => {
     // Severity is a word as well as a colour and a glyph.
     expect(tones()).toEqual(['Critical', 'Warning']);
 
-    const meters = [...host().querySelectorAll('[role="meter"]')];
+    const figures = [...host().querySelectorAll('.attention-figure')].map((figure) =>
+      figure.textContent?.trim(),
+    );
 
-    expect(meters.map((meter) => meter.getAttribute('aria-valuetext'))).toEqual([
-      '10 of 10. Limit reached',
-      '4 of 5. Approaching the limit',
-    ]);
-    expect(meters[0].getAttribute('aria-valuemax')).toBe('10');
+    expect(figures).toEqual(['10 of 10', '4 of 5']);
     expect(text()).toContain('New ones are refused until the plan allows more.');
     expect(text()).toContain('Nothing is refused yet. Only reaching the limit stops new ones.');
     expect(text()).not.toContain('Knowledge documents');
@@ -193,19 +195,77 @@ describe('Overview', () => {
     });
 
     expect(titles()[0]).toBe('Subscription suspended');
+
+    // Three rows, then the rest on request.
+    more().click();
+    fixture.detectChanges();
+
     expect(titles().at(-1)).toBe('3 unread notifications');
   });
 
-  it('gives every card exactly one action', async () => {
+  it('makes every row one way on: a link, or "Try again" in place', async () => {
+    await render({
+      plan: PLAN_WITH_WARNING,
+      unread: 3,
+      dashboard: dashboard({ failed: 2 }),
+    });
+    more().click();
+    fixture.detectChanges();
+
+    const rows = [...host().querySelectorAll('.attention-row')];
+
+    expect(rows.length).toBe(4);
+
+    for (const row of rows) {
+      expect(row.querySelectorAll('a, button').length).toBe(1);
+    }
+  });
+
+  it('shows three items and "+N more", reveals the rest on request, and folds them again', async () => {
     await render({
       plan: PLAN_WITH_WARNING,
       unread: 3,
       dashboard: dashboard({ failed: 2 }),
     });
 
-    for (const card of host().querySelectorAll('.attention-card')) {
-      expect(card.querySelectorAll('.attention-action a, .attention-action button').length).toBe(1);
-    }
+    expect(titles()).toEqual([
+      'Members: Limit reached',
+      'AI agents: Approaching the limit',
+      '2 AI replies failed',
+    ]);
+    expect(more().textContent?.trim()).toBe('+1 more');
+    expect(more().getAttribute('aria-expanded')).toBe('false');
+    expect(more().getAttribute('aria-controls')).toBe('attention-list');
+
+    more().click();
+    fixture.detectChanges();
+
+    expect(titles().length).toBe(4);
+    expect(more().textContent?.trim()).toBe('Show fewer');
+    expect(more().getAttribute('aria-expanded')).toBe('true');
+
+    more().click();
+    fixture.detectChanges();
+
+    expect(titles().length).toBe(3);
+  });
+
+  it('offers no "more" when three or fewer items need attention', async () => {
+    await render({ plan: PLAN_WITH_WARNING, unread: 3 });
+
+    expect(titles().length).toBe(3);
+    expect(host().querySelector('[data-testid="attention-more"]')).toBeNull();
+  });
+
+  it('holds the same panel, with three placeholder rows, while the sources answer', async () => {
+    await render({ dashboard: 'never' });
+
+    const panel = host().querySelector('[data-testid="attention-panel"]');
+
+    expect(panel?.getAttribute('aria-busy')).toBe('true');
+    expect(panel?.querySelectorAll('.attention-row').length).toBe(3);
+    expect(panel?.querySelector('.attention-footer')).not.toBeNull();
+    expect(text()).toContain('Checking what needs attention…');
   });
 
   it('reports failed AI replies and undelivered WhatsApp messages from the server counts', async () => {
@@ -234,7 +294,7 @@ describe('Overview', () => {
 
     expect(titles()).toEqual(['AI provider operations: Limit reached']);
     expect(text()).toContain('do not run until the month resets');
-    expect(host().querySelector('[role="meter"]')?.className).toContain('exhausted');
+    expect(host().querySelector('.attention-figure')?.textContent?.trim()).toBe('500 of 500');
   });
 
   it('says a source that did not answer was not checked, and offers to try again', async () => {

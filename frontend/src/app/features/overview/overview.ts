@@ -1,3 +1,4 @@
+import { NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
@@ -21,12 +22,14 @@ import {
   quotaState,
 } from '@app/features/plan-usage/plan-words';
 import { ColumnChart } from '@app/shared/charts/column-chart';
-import { Meter, MeterState } from '@app/shared/charts/meter';
+import { MeterState } from '@app/shared/charts/meter';
 import { Sparkline } from '@app/shared/charts/sparkline';
 import { Icon } from '@app/shared/icon/icon';
 import { IconName } from '@app/shared/icon/icon-paths';
 import { LocalNumberPipe } from '@app/core/i18n/locale-pipes';
-import { LocaleFormat } from '@app/core/i18n/locale-format';
+import { formatNumber, LocaleFormat } from '@app/core/i18n/locale-format';
+import { AppLanguage } from '@app/core/i18n/language';
+import { pluralMessage } from '@app/core/i18n/plural';
 import { PageHeader } from '@app/shared/page-header/page-header';
 import { VoiceSplit } from '@app/shared/voice/voice-split';
 
@@ -69,11 +72,32 @@ const TONE_WORDS: Readonly<Record<AttentionTone, string>> = {
   unavailable: $localize`:@@overview.tone.unavailable:Not checked`,
 };
 
-const TONE_ICONS: Readonly<Record<AttentionTone, IconName>> = {
-  critical: 'critical',
-  warning: 'alert',
-  info: 'info',
-  unavailable: 'refresh',
+/**
+ * How many items "Needs attention" shows before "+N more". The panel's height
+ * is fixed to this many rows in every state, so the page never moves while it
+ * loads (Phase 36.12, revision 1).
+ */
+const ATTENTION_ROWS = 3;
+
+/** "+2 more": a sentence per plural category, so Arabic agrees with the count. */
+function moreLabel(count: number, language: AppLanguage): string {
+  const n = formatNumber(language, count);
+
+  return pluralMessage(language, count, {
+    zero: $localize`:@@overview.attention.more.zero:No more`,
+    one: $localize`:@@overview.attention.more.one:+${n}:count: more`,
+    two: $localize`:@@overview.attention.more.two:+${n}:count: more`,
+    few: $localize`:@@overview.attention.more.few:+${n}:count: more`,
+    many: $localize`:@@overview.attention.more.many:+${n}:count: more`,
+    other: $localize`:@@overview.attention.more.other:+${n}:count: more`,
+  });
+}
+
+const TONE_BADGES: Readonly<Record<AttentionTone, string>> = {
+  critical: 'badge-danger',
+  warning: 'badge-warning',
+  info: 'badge-info',
+  unavailable: 'badge-neutral',
 };
 
 /**
@@ -81,7 +105,8 @@ const TONE_ICONS: Readonly<Record<AttentionTone, IconName>> = {
  *
  * It answers three questions at a glance, in this order, then offers a way on:
  *
- * 1. **What needs me?** Prioritised cards, each with one action: a
+ * 1. **What needs me?** A compact, prioritised list (three rows, then "+N
+ *    more"), each row one action: a
  *    subscription in arrears, a limit running out, AI replies that failed,
  *    WhatsApp messages that were not delivered, unread notifications -- and a
  *    source that could not be checked, said as such rather than as "all clear".
@@ -100,6 +125,7 @@ const TONE_ICONS: Readonly<Record<AttentionTone, IconName>> = {
   selector: 'app-overview',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    NgTemplateOutlet,
     RouterLink,
     PageHeader,
     Icon,
@@ -107,7 +133,6 @@ const TONE_ICONS: Readonly<Record<AttentionTone, IconName>> = {
     VoiceSplit,
     ColumnChart,
     Sparkline,
-    Meter,
   ],
   templateUrl: './overview.html',
   styleUrl: './overview.scss',
@@ -150,7 +175,7 @@ export class Overview {
   private readonly billingFailed = signal(false);
 
   protected readonly toneWords = TONE_WORDS;
-  protected readonly toneIcons = TONE_ICONS;
+  protected readonly toneBadges = TONE_BADGES;
 
   /** What needs looking at, most serious first. */
   protected readonly attention = computed<readonly AttentionItem[]>(() => {
@@ -284,6 +309,22 @@ export class Overview {
 
     return items.sort((a, b) => rank[a.tone] - rank[b.tone]);
   });
+
+  /** The reader asked to see every item, not only the first three. */
+  protected readonly expanded = signal(false);
+
+  /** The most serious three, or all of them once the reader asks. */
+  protected readonly visibleAttention = computed(() =>
+    this.expanded() ? this.attention() : this.attention().slice(0, ATTENTION_ROWS),
+  );
+
+  protected readonly hiddenAttention = computed(() =>
+    Math.max(0, this.attention().length - ATTENTION_ROWS),
+  );
+
+  protected readonly moreLabel = computed(() =>
+    moreLabel(this.hiddenAttention(), this.locale.language),
+  );
 
   protected readonly series = senderSeries();
 

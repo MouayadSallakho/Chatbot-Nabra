@@ -137,4 +137,26 @@ describe('ConversationTranscript', () => {
     expect(divider?.textContent).toContain('A person took over');
     expect(divider?.classList.contains('handoff-to-human')).toBe(true);
   });
+
+  it('is a named region the keyboard can reach while it scrolls by itself, and nothing extra otherwise', async () => {
+    await mount([message(1), message(2, 'AiAgent')]);
+
+    // Part of the page (it does not scroll by itself): no extra tab stop.
+    expect(host().hasAttribute('tabindex')).toBe(false);
+    expect(host().hasAttribute('role')).toBe(false);
+    expect(host().hasAttribute('aria-labelledby')).toBe(false);
+
+    fixture.componentRef.setInput('scrollRegion', true);
+    await settle();
+
+    expect(host().getAttribute('tabindex')).toBe('0');
+    expect(host().getAttribute('role')).toBe('region');
+
+    const heading = host().querySelector('h2');
+    const labelledBy = host().getAttribute('aria-labelledby');
+
+    expect(labelledBy).toBeTruthy();
+    expect(heading?.id).toBe(labelledBy);
+    expect(heading?.textContent?.trim()).toBe('Messages');
+  });
 });

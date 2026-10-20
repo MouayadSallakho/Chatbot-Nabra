@@ -13,69 +13,98 @@
       </h2>
     </div>
 
-    @if (loading()) {
-      <div class="attention-grid" aria-busy="true">
+    <!--
+      One panel of the same height in every state (loading, nothing, a few,
+      many): three one-line rows and a footer row, so "Right now" and
+      everything below it never move while the sources answer. Only the
+      reader's own "+N more" makes it taller.
+    -->
+    <div
+      class="card attention-panel"
+      [class.is-expanded]="expanded()"
+      [attr.aria-busy]="loading()"
+      data-testid="attention-panel"
+    >
+      @if (loading()) {
         <p class="visually-hidden" role="status" i18n="@@overview.attention.loading">
           Checking what needs attention…
         </p>
-        <div class="card attention-card" aria-hidden="true">
-          <span class="skeleton skeleton-text attention-skeleton"></span>
-          <span class="skeleton skeleton-text"></span>
+        <ul class="attention-list" aria-hidden="true">
+          @for (row of [0, 1, 2]; track row) {
+            <li class="attention-row attention-placeholder">
+              <span class="skeleton skeleton-text attention-skeleton"></span>
+            </li>
+          }
+        </ul>
+      } @else if (attention().length === 0) {
+        <div
+          class="attention-row attention-placeholder attention-clear"
+          data-testid="attention-clear"
+        >
+          <span class="badge badge-success" aria-hidden="true"></span>
+          <p i18n="@@overview.attention.clear">Nothing needs you right now.</p>
         </div>
-      </div>
-    } @else if (attention().length === 0) {
-      <div class="card attention-clear" data-testid="attention-clear">
-        <span class="attention-icon tone-clear" aria-hidden="true">
-          <app-icon name="check" [strokeWidth]="2" />
-        </span>
-        <p i18n="@@overview.attention.clear">Nothing needs you right now.</p>
-      </div>
-    } @else {
-      <ul class="attention-grid" data-testid="attention">
-        @for (item of attention(); track item.id) {
-          <li
-            class="card attention-card"
-            [class]="'card attention-card is-' + item.tone"
-            [attr.data-testid]="'attention-' + item.id"
-          >
-            <!--
-              Severity is carried by the icon's shape and by its word as well
-              as by colour: a stop sign, a triangle, a circled i, a refresh.
-            -->
-            <p class="attention-tone">
-              <span [class]="'attention-icon tone-' + item.tone" aria-hidden="true">
-                <app-icon [name]="toneIcons[item.tone]" [strokeWidth]="1.75" />
-              </span>
-              <span>{{ toneWords[item.tone] }}</span>
-            </p>
-            <p class="attention-title">{{ item.title }}</p>
-            @if (item.meter; as meter) {
-              <div class="attention-meter">
-                <app-meter
-                  [value]="meter.value"
-                  [max]="meter.max"
-                  [state]="meter.state"
-                  [label]="meter.label"
-                  [valueText]="meter.valueText"
-                />
-                <p class="attention-meter-text">{{ meter.text }}</p>
-              </div>
-            }
-            <p class="attention-detail">{{ item.detail }}</p>
-            <div class="attention-action">
+      } @else {
+        <ul class="attention-list" id="attention-list" data-testid="attention">
+          @for (item of visibleAttention(); track item.id) {
+            <li
+              [class]="'attention-row is-' + item.tone"
+              [attr.data-testid]="'attention-' + item.id"
+            >
+              <ng-template #rowContent>
+                <!--
+                  Severity is the product's status badge: its glyph's shape and
+                  its word as well as its colour (a stop, a triangle, an "i", a
+                  dot). On a phone the word is spoken, the glyph is seen.
+                -->
+                <span [class]="'badge attention-tone ' + toneBadges[item.tone]">
+                  <span class="visually-hidden-below-md">{{ toneWords[item.tone] }}</span>
+                </span>
+                <span class="attention-title">{{ item.title }}</span>
+                @if (item.meter; as meter) {
+                  <span class="attention-figure visually-hidden-below-md">{{ meter.text }}</span>
+                }
+                <span class="attention-detail visually-hidden-below-lg">{{ item.detail }}</span>
+                <!-- "Try again" stays visible: the only sign the row is a button. -->
+                <span class="attention-action" [class.visually-hidden-below-md]="!!item.link">{{
+                  item.action
+                }}</span>
+              </ng-template>
+
               @if (item.link; as link) {
-                <a class="btn btn-secondary btn-sm" [routerLink]="link">{{ item.action }}</a>
+                <a class="attention-target" [routerLink]="link">
+                  <ng-container [ngTemplateOutlet]="rowContent" />
+                  <app-icon class="attention-arrow" name="chevron-end" [strokeWidth]="1.75" />
+                </a>
               } @else {
-                <button type="button" class="btn btn-secondary btn-sm" (click)="retry()">
-                  <app-icon name="refresh" [strokeWidth]="1.75" />
-                  <span>{{ item.action }}</span>
+                <button type="button" class="attention-target" (click)="retry()">
+                  <ng-container [ngTemplateOutlet]="rowContent" />
                 </button>
               }
-            </div>
-          </li>
+            </li>
+          }
+        </ul>
+      }
+
+      <div class="attention-footer">
+        @if (!loading() && hiddenAttention() > 0) {
+          <button
+            type="button"
+            class="btn btn-ghost btn-sm"
+            aria-controls="attention-list"
+            [attr.aria-expanded]="expanded()"
+            (click)="expanded.set(!expanded())"
+            data-testid="attention-more"
+          >
+            @if (expanded()) {
+              <span i18n="@@overview.attention.fewer">Show fewer</span>
+            } @else {
+              {{ moreLabel() }}
+            }
+          </button>
         }
-      </ul>
-    }
+      </div>
+    </div>
   </section>
 
   @if (canSeeNumbers()) {

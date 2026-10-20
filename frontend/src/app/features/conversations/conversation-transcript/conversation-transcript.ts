@@ -38,6 +38,8 @@ export const TRANSCRIPT_STEP = 50;
 /** How close to the end still counts as "reading the newest messages", in px. */
 const AT_END_SLACK = 48;
 
+let nextId = 0;
+
 /**
  * One conversation's messages, as a reader works through them.
  *
@@ -64,6 +66,14 @@ const AT_END_SLACK = 48;
   selector: 'app-conversation-transcript',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [Icon],
+  // While the transcript scrolls by itself it is a named region a keyboard can
+  // reach: focus it, then the arrow keys, Page Up/Down, Home and End scroll it,
+  // whether or not it holds a link or a button (WCAG 2.1.1; Phase 36.12).
+  host: {
+    '[attr.tabindex]': 'scrollRegion() ? 0 : null',
+    '[attr.role]': "scrollRegion() ? 'region' : null",
+    '[attr.aria-labelledby]': 'scrollRegion() ? headingId : null',
+  },
   templateUrl: './conversation-transcript.html',
   styleUrl: './conversation-transcript.scss',
 })
@@ -78,6 +88,12 @@ export class ConversationTranscript {
   readonly handling = input.required<ConversationHandling>();
   readonly agentName = input<string | null>(null);
   readonly whatsApp = input<WhatsAppConversationFacts | null>(null);
+
+  /** True when the conversation fills the screen and this transcript is its own scroll region. */
+  readonly scrollRegion = input(false);
+
+  /** The visually hidden "Messages" heading, which names the region. */
+  protected readonly headingId = `transcript-heading-${++nextId}`;
 
   /** How many messages arrived below the reader's view since they last reached the end. */
   readonly unseenChange = output<number>();

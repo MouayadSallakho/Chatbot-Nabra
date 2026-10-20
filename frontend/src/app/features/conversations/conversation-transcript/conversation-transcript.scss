@@ -21,6 +21,12 @@
   overscroll-behavior: contain;
 }
 
+// The region takes keyboard focus (it scrolls with the arrow keys): the
+// product's ring, drawn inside so the panes beside it never cut it off.
+:host(:focus-visible) {
+  outline-offset: calc(-1 * var(--focus-ring-width));
+}
+
 // A reading column, centred in a wide pane: on a 1920px screen the customer
 // and the business stay within one glance of each other.
 .transcript {

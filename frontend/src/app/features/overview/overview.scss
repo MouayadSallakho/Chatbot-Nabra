@@ -1,108 +1,121 @@
 // -----------------------------------------------------------------------------
-// Needs attention: one card per thing, most serious first, one action each.
+// Needs attention: a compact list, one line per item, most serious first. The
+// panel is three rows and a footer high in every state (loading, nothing, a
+// few, many), so nothing below it moves while the sources answer; only the
+// reader's own "+N more" makes it taller (Phase 36.12, revision 1).
 // -----------------------------------------------------------------------------
-.attention-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 19rem), 1fr));
-  gap: var(--space-3);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.attention-card {
+.attention-panel {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
-  padding: var(--space-4) var(--space-5);
+  // Three 3rem rows and a 2.75rem footer; border-box, so the card's 1px border
+  // on both sides is inside the height.
+  block-size: calc(11.75rem + 2px);
 
-  // The most serious cards carry their status colour on the inline-start edge
-  // too, beside the icon and the word.
+  &.is-expanded {
+    block-size: auto;
+  }
+}
+
+// The most serious rows carry their status colour on the inline-start edge
+// too, beside the icon and the word; the others keep the same indent.
+.attention-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  block-size: 3rem;
+  border-inline-start: 3px solid transparent;
+
+  & + & {
+    border-block-start: 1px solid var(--border-subtle);
+  }
+
   &.is-critical {
-    border-inline-start: 3px solid var(--danger-fg);
+    border-inline-start-color: var(--danger-fg);
   }
 
   &.is-warning {
-    border-inline-start: 3px solid var(--warning-fg);
+    border-inline-start-color: var(--warning-fg);
   }
 }
 
-.attention-tone {
+.attention-target {
   display: flex;
+  flex: 1;
   align-items: center;
-  gap: var(--space-2);
-  font: var(--text-caption);
-  color: var(--text-secondary);
-}
+  gap: var(--space-3);
+  min-inline-size: 0;
+  block-size: 100%;
+  padding-inline: var(--space-4);
+  border: 0;
+  background: none;
+  color: var(--text-primary);
+  text-align: start;
+  text-decoration: none;
+  cursor: pointer;
 
-.attention-icon {
-  display: inline-grid;
-  place-items: center;
-  inline-size: 1.75rem;
-  block-size: 1.75rem;
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-control);
-  background-color: var(--surface-muted);
-  color: var(--text-secondary);
+  &:hover {
+    background-color: var(--surface-hover);
+    text-decoration: none;
+  }
 
-  .icon {
-    inline-size: 1.125rem;
-    block-size: 1.125rem;
+  // Inside the row, so the ring is never cut by the panel's edge.
+  &:focus-visible {
+    outline-offset: calc(-1 * var(--focus-ring-width) - 2px);
   }
 }
 
-.tone-critical {
-  border-color: var(--danger-border);
-  background-color: var(--danger-bg);
-  color: var(--danger-fg);
+.attention-tone,
+.attention-figure,
+.attention-action,
+.attention-arrow {
+  flex: none;
 }
 
-.tone-warning {
-  border-color: var(--warning-border);
-  background-color: var(--warning-bg);
-  color: var(--warning-fg);
-}
-
-.tone-info {
-  border-color: var(--info-border);
-  background-color: var(--info-bg);
-  color: var(--info-fg);
-}
-
-.tone-clear {
-  border-color: var(--success-border);
-  background-color: var(--success-bg);
-  color: var(--success-fg);
+.attention-title,
+.attention-detail {
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .attention-title {
+  flex: 1 1 auto;
   font: var(--text-body-strong);
-  color: var(--text-primary);
-  overflow-wrap: anywhere;
 }
 
+.attention-figure,
 .attention-detail,
-.attention-meter-text {
+.attention-clear {
   font: var(--text-small);
   color: var(--text-secondary);
 }
 
-.attention-meter {
-  display: grid;
-  gap: var(--space-1);
+.attention-detail {
+  flex: 1 1 0;
 }
 
 .attention-action {
-  margin-block-start: auto;
-  padding-block-start: var(--space-2);
+  font: var(--text-label);
+  color: var(--link);
 }
 
-.attention-clear {
+.attention-arrow {
+  inline-size: var(--icon-size);
+  block-size: var(--icon-size);
+  color: var(--text-secondary);
+}
+
+.attention-footer {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-4) var(--space-5);
-  color: var(--text-secondary);
+  block-size: 2.75rem;
+  margin-block-start: auto;
+  padding-inline: var(--space-2);
+}
+
+.attention-placeholder {
+  padding-inline: var(--space-4);
 }
 
 .attention-skeleton {
@@ -208,12 +221,8 @@
 }
 
 // Loading states hold the loaded geometry (measured in Phase 36.11 at 390 to
-// 1440px), so nothing below them moves when the figures arrive. How many items
-// need attention cannot be known before the reads answer: one card is held.
-.attention-card[aria-hidden='true'] {
-  min-block-size: 11.75rem;
-}
-
+// 1440px), so nothing below them moves when the figures arrive. "Needs
+// attention" needs no rule here: its panel has one height in every state.
 .now-card[aria-busy='true'] {
   min-block-size: 11.75rem;
 }
