@@ -109,8 +109,6 @@
   --chart-ramp-5: #7ad9ce;
 
   // In the dark, borders do the separating; the overlay shadow only grounds.
-  --shadow-subtle: none;
-  --shadow-raised: 0 1px 2px rgb(0 0 0 / 40%), 0 12px 32px -8px rgb(0 0 0 / 55%);
   --shadow-overlay: 0 1px 2px rgb(0 0 0 / 40%), 0 12px 32px -8px rgb(0 0 0 / 55%);
 
   --skeleton-base: #202328;
@@ -208,10 +206,7 @@
   --chart-ramp-5: #0a5e57;
 
   // Elevation: hairlines everywhere, shadows only on overlays (menus, dialogs,
-  // toasts, the peeking sidebar). `--shadow-subtle` is kept as a name so older
-  // rules resolve, and resolves to nothing.
-  --shadow-subtle: none;
-  --shadow-raised: 0 1px 2px rgb(22 24 27 / 5%), 0 12px 32px -8px rgb(22 24 27 / 18%);
+  // toasts, the peeking sidebar).
   --shadow-overlay: 0 1px 2px rgb(22 24 27 / 5%), 0 12px 32px -8px rgb(22 24 27 / 18%);
 
   --skeleton-base: #ebe9e3;
@@ -237,23 +232,22 @@
   --space-9: 3rem; // 48px
   --space-10: 4rem; // 64px
 
+  // The one gap below the scale, and not a step of it: a hairline between
+  // things that read as one (a label tight on its value, the rows of a list, the
+  // segments of a bar). When 4px feels loose, the answer is still 4px.
+  --gap-hairline: 0.125rem; // 2px
+
   // ---------------------------------------------------------------------------
   // Radius
   // ---------------------------------------------------------------------------
-  // One family, by role. The old names stay and now resolve to the new roles,
-  // so every existing rule follows without being touched.
-  --radius-badge: 6px;
-  --radius-control: 10px;
-  --radius-card: 14px;
-  --radius-overlay: 20px;
+  // One family, by role: every rule names the job, not a size.
+  --radius-badge: 6px; // badges, checkboxes, inner segments
+  --radius-control: 10px; // buttons, inputs, nav and menu items
+  --radius-card: 14px; // cards, panels, tables, menus
+  --radius-overlay: 20px; // dialogs and drawers
   --radius-bubble: 18px;
   --radius-bubble-tail: 6px; // the speaker's corner, written with logical corners
   --radius-pill: 999px; // counts and chips only
-
-  --radius-sm: var(--radius-badge); // badges, checkboxes, inner segments
-  --radius-md: var(--radius-control); // buttons, inputs, nav and menu items
-  --radius-lg: var(--radius-card); // cards, panels, tables, menus
-  --radius-xl: var(--radius-overlay); // dialogs and drawers
 
   // ---------------------------------------------------------------------------
   // Control sizing
@@ -267,7 +261,6 @@
   --icon-size-sm: 1rem; // 16px: inside compact controls
   --icon-size: 1.125rem; // 18px: buttons, menus
   --icon-size-nav: 1.25rem; // 20px: primary navigation
-  --icon-stroke: 1.6; // matches the stroke of Instrument Sans at body sizes
 
   // ---------------------------------------------------------------------------
   // Typography
@@ -289,7 +282,6 @@
   // cannot carry a percentage width, so the title utilities apply this after.
   --heading-stretch: 86%;
   --letter-spacing-tight: -0.015em; // titles only, to close optical gaps at size
-  --letter-spacing-caps: 0.02em; // legacy: the system no longer sets uppercase labels
 
   // Steps are named for the job they do, so a stylesheet says what it means.
   --text-display: 600 clamp(1.75rem, 1.35rem + 1.3vw, 2.5rem) / 1.1 var(--font-sans); // 28-40px
@@ -312,8 +304,8 @@
   // Functional and quick: response, not animation. No count-ups, no stagger on
   // every visit, no parallax.
   --duration-xs: 100ms; // colour on press
-  --duration-sm: 150ms; // hover, small state changes
-  --duration-md: 220ms; // menus, popovers, a new message settling
+  --duration-sm: 150ms; // hover, small state changes, and anything frequent: menus, toasts, a new message settling
+  --duration-md: 220ms; // things that happen a few times a session: the widget opening, the dialog scrim
   --duration-lg: 320ms; // drawers, dialogs, the "Take over" sweep
   --duration-xl: 450ms; // the rare large surface change
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
@@ -334,7 +326,6 @@
   --topbar-height: 3.5rem; // 56px
   --page-max-width: 100rem; // 1600px: wide desktops get room, text stays readable
   --page-gutter: var(--space-6);
-  --drawer-width: 30rem; // contextual side panels
   --focus-ring-width: 2px;
   --focus-ring-offset: 2px;
   --voice-track-height: 4px;
@@ -342,12 +333,12 @@
   // ---------------------------------------------------------------------------
   // Layers
   // ---------------------------------------------------------------------------
-  // Named, ordered, and the only z-index values in the product.
+  // Named, ordered, and the only z-index values in the product. Dialogs need
+  // none: they open in the browser's top layer (`<dialog>` with showModal).
   --z-sticky: 10;
   --z-sidebar: 20;
   --z-dropdown: 30;
   --z-drawer: 40;
-  --z-modal: 50;
   --z-toast: 60;
   --z-skip-link: 70;
 
@@ -367,7 +358,6 @@
 :lang(ar) {
   --heading-stretch: 100%;
   --letter-spacing-tight: 0;
-  --letter-spacing-caps: 0;
   --text-page-title: 600 clamp(1.5rem, 1.3rem + 0.65vw, 1.875rem) / 1.4 var(--font-sans);
   --text-section-title: 600 1.125rem / 1.45 var(--font-sans);
   --text-card-title: 600 0.9375rem / 1.5 var(--font-sans);

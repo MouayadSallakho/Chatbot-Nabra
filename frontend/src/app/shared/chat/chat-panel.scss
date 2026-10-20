@@ -94,7 +94,7 @@
   min-inline-size: 2rem;
   padding-inline: var(--space-3);
   border: 1px solid currentcolor;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-control);
   background-color: transparent;
   color: inherit;
   font: var(--text-label);
@@ -204,7 +204,7 @@ p.chat-state {
   max-block-size: 8rem;
   padding: var(--space-2) var(--space-3);
   border: 1px solid var(--border-control);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-control);
   background-color: var(--surface-inset);
   color: var(--text-primary);
   font: var(--text-reading);
@@ -227,7 +227,7 @@ p.chat-state {
   min-block-size: 2.75rem;
   padding-inline: var(--space-4);
   border: 0;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-control);
   background-color: var(--_send-bg);
   color: var(--_send-fg);
   font: var(--text-body-strong);

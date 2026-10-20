@@ -41,9 +41,8 @@
 
 // The preview stays in view while the form scrolls (main is the scroller), on
 // screens tall enough to hold all of it: its column runs the full height of the
-// form so it has room to travel, and the transcript gives up height first, so
-// the composer is never pushed below the fold. On a short screen it scrolls
-// with the page, whole.
+// form so it has room to travel. On a short screen it scrolls with the page,
+// whole.
 @media (min-width: 80rem) and (min-height: 46rem) {
   .authoring-aside:has(> .authoring-aside-sticky) {
     align-self: stretch;
@@ -53,12 +52,9 @@
     position: sticky;
     inset-block-start: var(--space-4);
 
-    .customer-view {
-      grid-template-rows: auto minmax(10rem, 1fr) auto;
-    }
-
-    .cv-transcript {
-      max-block-size: max(10rem, calc(100dvh - 36rem));
+    // The chat gives up height first, so the composer is never pushed below the fold.
+    .agent-chat {
+      block-size: clamp(20rem, calc(100dvh - 24rem), 40rem);
     }
   }
 }
@@ -162,8 +158,8 @@
   padding: var(--space-3) var(--space-4);
   border-inline-start: 2px solid var(--border-strong);
   background-color: var(--surface-muted);
-  border-start-end-radius: var(--radius-md);
-  border-end-end-radius: var(--radius-md);
+  border-start-end-radius: var(--radius-control);
+  border-end-end-radius: var(--radius-control);
   color: var(--text-secondary);
   font: var(--text-small);
 
@@ -236,158 +232,19 @@ ol.help-list {
 }
 
 // -----------------------------------------------------------------------------
-// The customer view: the agent preview, drawn as the website widget
+// The agent preview's chat
 // -----------------------------------------------------------------------------
-// The widget direction (MASTER section 2, widget notes): the workspace's own
-// accent on the header and the send button, the AI's bubble in the accent's
-// tint, the customer's bubble neutral, and the honesty line under the name.
-// `--cv-accent` and `--cv-on-accent` are set by the component from the real
-// widget configuration, with a foreground computed to be readable on it.
-.customer-view {
-  --cv-accent: #2563eb; // token-lint-ignore: the widget default accent, until the workspace colour arrives
-  --cv-on-accent: #ffffff; // token-lint-ignore: paired with the default accent above (5.16:1)
-
-  display: grid;
-  grid-template-rows: auto minmax(14rem, 1fr) auto;
+// The shared ChatPanel (shared/chat) in its widget look, so the preview is the
+// chat customers use; the workspace accent arrives as `--chat-accent` from the
+// component, already checked. Here it gets only a frame and a height.
+.agent-chat-stage {
   border: 1px solid var(--border-default);
-  border-radius: var(--radius-lg);
-  background-color: var(--surface-page);
+  border-radius: var(--radius-card);
   overflow: hidden;
 }
 
-.cv-header {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
-  background-color: var(--cv-accent);
-  color: var(--cv-on-accent);
-}
-
-.cv-title {
-  margin: 0;
-  font: var(--text-card-title);
-  overflow-wrap: anywhere;
-}
-
-.cv-subtitle {
-  margin: 0;
-  font: var(--text-small);
-}
-
-.cv-transcript {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  max-block-size: 28rem;
-  margin: 0;
-  padding: var(--space-4);
-  overflow-y: auto;
-  list-style: none;
-}
-
-.cv-greeting {
-  padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-md);
-  background-color: var(--surface-muted);
-  color: var(--text-secondary);
-  font: var(--text-small);
-  white-space: pre-wrap;
-}
-
-.cv-bubble {
-  display: flex;
-  flex-direction: column;
-  gap: 2px; // token-lint-ignore: sender label sits tight on its message
-  max-inline-size: 85%;
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-bubble);
-  background-color: var(--surface-default);
-  font: var(--text-reading);
-  overflow-wrap: anywhere;
-  animation: bubble-settle var(--duration-md) var(--ease-enter);
-}
-
-.cv-text {
-  white-space: pre-wrap;
-}
-
-.cv-sender {
-  color: var(--text-secondary);
-  font: var(--text-caption);
-}
-
-// The customer writes from the end side, as in the widget.
-.cv-bubble-customer {
-  align-self: flex-end;
-  border-end-end-radius: var(--radius-bubble-tail);
-}
-
-.cv-bubble-ai {
-  align-self: flex-start;
-  border-color: color-mix(in srgb, var(--cv-accent) 38%, var(--surface-default));
-  border-end-start-radius: var(--radius-bubble-tail);
-  background-color: color-mix(in srgb, var(--cv-accent) 11%, var(--surface-default));
-}
-
-.cv-status {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  color: var(--text-muted);
-  font: var(--text-small);
-}
-
-.cv-composer {
-  display: flex;
-  align-items: flex-end;
-  gap: var(--space-2);
-  padding: var(--space-3);
-  border-block-start: 1px solid var(--border-subtle);
-  background-color: var(--surface-default);
-}
-
-.cv-input {
-  flex: 1;
-  min-inline-size: 0;
-  min-block-size: 2.75rem;
-  resize: vertical;
-}
-
-.cv-send {
-  flex: none;
-  min-block-size: var(--control-height);
-  padding-inline: var(--space-4);
-  border: 0;
-  border-radius: var(--radius-md);
-  background-color: var(--cv-accent);
-  color: var(--cv-on-accent);
-  font: var(--text-body-strong);
-  cursor: pointer;
-
-  &:disabled {
-    opacity: 0.55;
-    cursor: not-allowed;
-  }
-}
-
-.cv-notes {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  color: var(--text-secondary);
-  font: var(--text-small);
-}
-
-@media (forced-colors: active) {
-  .cv-header,
-  .cv-send {
-    border: 1px solid CanvasText;
-  }
+.agent-chat {
+  block-size: clamp(24rem, 60dvh, 34rem);
 }
 
 // -----------------------------------------------------------------------------
@@ -402,7 +259,7 @@ ol.help-list {
   gap: var(--space-3);
   padding: var(--space-7) var(--space-5);
   border: 1.5px dashed var(--border-control);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-card);
   background-color: var(--surface-muted);
   text-align: center;
   transition:
@@ -446,7 +303,7 @@ ol.help-list {
   gap: var(--space-3);
   padding: var(--space-3) var(--space-4);
   border: 1px solid var(--border-default);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-control);
   background-color: var(--surface-default);
 }
 
@@ -499,7 +356,7 @@ ol.help-list {
 
 .chooser-list {
   border: 1px solid var(--border-default);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-control);
   background-color: var(--surface-default);
   overflow: hidden;
 }

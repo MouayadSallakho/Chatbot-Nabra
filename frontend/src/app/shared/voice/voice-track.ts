@@ -46,7 +46,7 @@ import { VOICE_WORDS, replyRuns, repliesPhrase } from './voice';
 
     .voice-track {
       display: flex;
-      gap: 2px;
+      gap: var(--gap-hairline);
       block-size: var(--voice-track-height);
       overflow: hidden;
       border-radius: var(--radius-pill);

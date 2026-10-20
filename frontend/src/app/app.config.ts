@@ -18,6 +18,10 @@ import { AuthService } from '@app/core/auth/auth-service';
 import { sessionExpiryInterceptor } from '@app/core/auth/session-expiry-interceptor';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
 import { PUBLIC_SURFACE_PATH } from '@app/core/i18n/language';
+import { warmRoute } from '@app/core/navigation/route-warmup';
+import { readsAhead } from '@app/core/auth/session-probe';
+import { LOGIN_PATH, REGISTER_PATH } from '@app/core/auth/auth-guard';
+import { ACCEPT_INVITATION_PATH } from '@app/core/invitations/invitation-handoff';
 import { routes } from './app.routes';
 
 export const appConfig: ApplicationConfig = {
@@ -78,11 +82,24 @@ export const appConfig: ApplicationConfig = {
 
       const workspace = inject(WorkspaceContextService);
 
+      // A browser that holds a workspace selection was signed in, so the
+      // workspace reads and the page's code are started now, alongside the
+      // session check, instead of one after another once it has answered
+      // (Phase 36.11). Nothing started here is used unless the session is
+      // confirmed.
+      const path = inject(DOCUMENT).location.pathname;
+      const prefetch = readsAhead(path, [LOGIN_PATH, REGISTER_PATH, ACCEPT_INVITATION_PATH])
+        ? workspace.prefetch()
+        : null;
+
+      if (prefetch) {
+        warmRoute(routes, path);
+      }
+
       if ((await auth.restore()) === 'authenticated') {
-        // Only worth asking once there is somebody to ask about. A failure here
-        // is not fatal: the workspace guard retries, and the workspace screen
-        // explains an unreachable backend.
-        await workspace.load();
+        // A failure here is not fatal: the workspace guard retries, and the
+        // workspace screen explains an unreachable backend.
+        await workspace.load(prefetch);
       }
     }),
     provideRouter(

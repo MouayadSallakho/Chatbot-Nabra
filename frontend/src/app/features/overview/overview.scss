@@ -41,7 +41,7 @@
   inline-size: 1.75rem;
   block-size: 1.75rem;
   border: 1px solid var(--border-default);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-control);
   background-color: var(--surface-muted);
   color: var(--text-secondary);
 
@@ -181,7 +181,7 @@
   min-block-size: 3rem;
   padding: var(--space-3) var(--space-4);
   border: 1px solid var(--border-default);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-card);
   background-color: var(--surface-default);
   color: var(--text-primary);
   font: var(--text-body-strong);
@@ -205,4 +205,49 @@
 
 .shortcut-arrow {
   margin-inline-start: auto;
+}
+
+// Loading states hold the loaded geometry (measured in Phase 36.11 at 390 to
+// 1440px), so nothing below them moves when the figures arrive. How many items
+// need attention cannot be known before the reads answer: one card is held.
+.attention-card[aria-hidden='true'] {
+  min-block-size: 11.75rem;
+}
+
+.now-card[aria-busy='true'] {
+  min-block-size: 11.75rem;
+}
+
+.figures[aria-busy='true'] .figure {
+  min-block-size: 7.875rem;
+}
+
+.week-chart[aria-hidden='true'] {
+  min-block-size: 21.125rem;
+}
+
+@media (max-width: 47.99rem) {
+  .now-card[aria-busy='true'] {
+    min-block-size: 12.5rem;
+  }
+
+  .figures[aria-busy='true'] .figure {
+    min-block-size: 9rem;
+  }
+
+  .week-chart[aria-hidden='true'] {
+    min-block-size: 26rem;
+  }
+}
+
+@media (min-width: 48rem) and (max-width: 63.99rem) {
+  .week-chart[aria-hidden='true'] {
+    min-block-size: 22.375rem;
+  }
+}
+
+@media (min-width: 80rem) {
+  .now-card[aria-busy='true'] {
+    min-block-size: 13.25rem;
+  }
 }

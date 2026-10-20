@@ -58,7 +58,7 @@ export type VoiceSplitSubject = 'conversations' | 'openConversations';
 
     .voice-split-bar {
       display: flex;
-      gap: 2px;
+      gap: var(--gap-hairline);
       block-size: 0.5rem;
       overflow: hidden;
       border-radius: var(--radius-pill);

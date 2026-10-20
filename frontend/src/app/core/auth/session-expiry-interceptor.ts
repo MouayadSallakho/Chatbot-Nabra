@@ -5,6 +5,7 @@ import { catchError, throwError } from 'rxjs';
 import { AuthService } from './auth-service';
 import { LOGIN_PATH } from './auth-guard';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
+import { SESSION_PROBE } from './session-probe';
 
 /**
  * The routes whose own 401 is an answer rather than an expired session.
@@ -88,7 +89,9 @@ export const sessionExpiryInterceptor: HttpInterceptorFn = (request, next) => {
       if (
         failure instanceof HttpErrorResponse &&
         failure.status === 401 &&
-        !OWN_401_IS_MEANINGFUL.some((route) => request.url.startsWith(route))
+        !OWN_401_IS_MEANINGFUL.some((route) => request.url.startsWith(route)) &&
+        // A read sent before the session was confirmed: `/me` speaks for it.
+        !request.context.get(SESSION_PROBE)
       ) {
         auth.markSignedOut();
 

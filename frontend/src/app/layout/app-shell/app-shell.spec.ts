@@ -128,6 +128,20 @@ describe('AppShell', () => {
 
       expect(query('nav[aria-label="Primary"]')).not.toBeNull();
       expect(query('main#main-content')).not.toBeNull();
+      expect(query('[role="banner"]')).not.toBeNull();
+    });
+
+    it('leaves no shell text outside a landmark', async () => {
+      // A reader moving by landmark reaches the product name with the
+      // navigation, and the workspace with the banner (Phase 36.11).
+      await render('/overview');
+
+      expect(query('.brand-name')?.closest('nav')).not.toBeNull();
+      expect(
+        query('[data-testid="workspace-name"], [data-testid="workspace-switch"]')?.closest(
+          '[role="banner"]',
+        ),
+      ).not.toBeNull();
     });
 
     it('puts a skip link ahead of the navigation, pointing at the main region', async () => {

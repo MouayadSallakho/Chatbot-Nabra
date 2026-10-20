@@ -59,7 +59,7 @@
 .identity-lines {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--gap-hairline);
   min-inline-size: 0;
 }
 

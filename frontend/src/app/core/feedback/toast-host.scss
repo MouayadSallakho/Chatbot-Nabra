@@ -32,11 +32,11 @@
   background-color: var(--surface-raised);
   color: var(--text-primary);
   border: 1px solid var(--border-default);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-card);
   box-shadow: var(--shadow-overlay);
   font: var(--text-small);
   pointer-events: auto;
-  animation: toast-in var(--duration-md) var(--ease-enter);
+  animation: toast-in var(--duration-sm) var(--ease-enter);
 }
 
 // Outcome by shape and word as well as colour: a tick or a triangle. No

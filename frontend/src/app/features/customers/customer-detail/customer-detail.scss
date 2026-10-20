@@ -23,7 +23,7 @@
 
   div {
     display: grid;
-    gap: 2px;
+    gap: var(--gap-hairline);
     min-inline-size: 0;
   }
 
@@ -53,9 +53,12 @@
   }
 }
 
+// One explicit column: an implicit one grows to the widest card's min-content
+// (a text field's intrinsic width), which ran 22px past a 320px screen.
 .customer-main,
 .customer-side {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-5);
   min-inline-size: 0;
 }
@@ -138,6 +141,12 @@
   inline-size: 100%;
 }
 
+// A long label wraps rather than pushing a 320px screen sideways.
+.customer-merge .btn {
+  max-inline-size: 100%;
+  white-space: normal;
+}
+
 .form-problem {
   color: var(--danger-fg);
 }
@@ -169,7 +178,7 @@
   gap: var(--space-1) var(--space-3);
   padding: var(--space-3);
   border: 1px solid var(--border-default);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-control);
   cursor: pointer;
 
   &:hover {
@@ -186,7 +195,7 @@
 
 .candidate-details {
   display: grid;
-  gap: 2px;
+  gap: var(--gap-hairline);
   min-inline-size: 0;
 }
 
@@ -205,7 +214,7 @@
   inline-size: 100%;
   padding: var(--space-4);
   border: 1px solid var(--warning-border);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-card);
   background: var(--warning-bg);
   color: var(--text-primary);
 
@@ -231,5 +240,5 @@
 
 .customer-skeleton-card {
   block-size: 12rem;
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-card);
 }

@@ -11,7 +11,7 @@ import {
   output,
   viewChild,
 } from '@angular/core';
-import type { ApiError } from '@app/core/api/api-error';
+import type { ApiError, ApiErrorKind } from '@app/core/api/api-error';
 import type { ChatHandling, ChatMessage } from '@app/features/chat/hosted-chat-api';
 import { Icon } from '@app/shared/icon/icon';
 import { ChatTranscript } from './chat-transcript';
@@ -72,6 +72,14 @@ export class ChatPanel {
   readonly sending = input(false);
   readonly failure = input<ApiError | null>(null);
 
+  /**
+   * Failures said as information rather than as an error. Empty for visitors,
+   * for whom any missing answer is a failure; the agent preview in the editor
+   * names the unconfigured provider here, because to an administrator that is
+   * a fact about the deployment.
+   */
+  readonly infoKinds = input<readonly ApiErrorKind[]>([]);
+
   /** Why the chat could not be opened, on the hosted page. */
   readonly openFailure = input<string | null>(null);
 
@@ -99,6 +107,15 @@ export class ChatPanel {
     input: `chat-input-${nextPanel}`,
     keys: `chat-keys-${nextPanel}`,
   };
+
+  /** The alert's tone: a wait is a warning, a fact is information, the rest is an error. */
+  protected alertTone(error: ApiError): 'warning' | 'info' | 'danger' {
+    if (error.kind === 'rateLimited') {
+      return 'warning';
+    }
+
+    return this.infoKinds().includes(error.kind) ? 'info' : 'danger';
+  }
 
   protected readonly closeLabel = $localize`:@@visitor.close:Close chat`;
   protected readonly defaultTitle = $localize`:@@visitor.defaultTitle:Chat`;

@@ -307,19 +307,19 @@ describe('AgentEditor', () => {
       };
       await mount();
 
-      const frame = query<HTMLElement>('.customer-view')!;
+      const frame = query<HTMLElement>('[data-testid="preview-frame"]')!;
 
-      expect(frame.style.getPropertyValue('--cv-accent')).toBe('#0e7c72');
-      expect(query('[data-testid="preview-greeting"]')?.textContent).toContain('Hello from Acme.');
+      expect(frame.style.getPropertyValue('--chat-accent')).toBe('#0e7c72');
+      expect(query('[data-testid="chat-greeting"]')?.textContent).toContain('Hello from Acme.');
       expect(query('[data-testid="preview-look"]')?.textContent).toContain("website chat's colour");
-      expect(query('.cv-title')?.textContent).toContain('Sales Assistant');
+      expect(query('[data-testid="chat-title"]')?.textContent).toContain('Sales Assistant');
     });
 
     it('says it shows the default look when no website chat uses the agent', async () => {
       await mount();
 
       expect(query('[data-testid="preview-look"]')?.textContent).toContain('default colour');
-      expect(query('[data-testid="preview-greeting"]')).toBeNull();
+      expect(query('[data-testid="chat-greeting"]')).toBeNull();
     });
 
     it('tells the preview about any unsaved edit, name or instructions', async () => {

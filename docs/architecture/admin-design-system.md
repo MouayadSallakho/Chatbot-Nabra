@@ -6,9 +6,10 @@ them across the whole product -- the shell, the token scale, the shared list,
 pagination, menu, dialog and notice patterns, and the error copy -- so that every
 area is learned once. Phase 36.2 replaced the visual foundation with the "Two
 Voices" identity (D1, D5-D10, D16-D19); its brief, palette, type and decision
-log are in `docs/design/MASTER.md`, which every UI change reads first. Sections
-below describe the current state; D21 lists the product patterns and D22 what
-the backend contract does not yet support.
+log are in `docs/design/MASTER.md`, which every UI change reads first. Phase
+36.11 closed the redesign with a polish pass (D25). Sections below describe the
+current state; D21 lists the product patterns and D22 what the backend contract
+does not yet support.
 
 This document records what was decided and what was deliberately left for later.
 
@@ -156,8 +157,9 @@ The Phase 33.5 `--accent-*` family is gone. Every use was remapped by meaning in
 Phase 36.2: the primary action, counts and tab markers to ink; links to
 `--link`; selection to the neutral `--surface-selected`; anything that meant
 "the AI" or "a person" to the matching voice; charts to the chart tokens. The
-embedded widget keeps its own `--embed-accent-*`, which is the workspace's own
-colour, not the product's.
+embedded widget, the hosted chat and the agent preview take the workspace's own
+colour as `--chat-accent` / `--chat-on-accent` (checked by `accent-color.ts`),
+never the product's.
 
 Theming works by redefining the same custom properties under a different
 selector, so no component stylesheet is duplicated per theme.
@@ -167,38 +169,44 @@ selector, so no component stylesheet is duplicated per theme.
 `--space-1` … `--space-10` = 4, 8, 12, 16, 20, 24, 32, 40, 48, 64 px.
 
 Ten steps, nothing in between. If a gap seems to want 13px the answer is 12 or
-16, not a new token.
+16, not a new token. Beside the scale, not on it: `--gap-hairline` (2px), the
+gap between things that read as one -- a label tight on its value, the rows of a
+list, the segments of a bar (Phase 36.11). When 4px feels loose, the answer is
+still 4px.
 
 ### Radius
 
 By role: `--radius-badge` 6px · `--radius-control` 10px · `--radius-card` 14px ·
 `--radius-overlay` 20px (dialogs, drawers) · `--radius-bubble` 18px with a
 `--radius-bubble-tail` 6px corner on the speaker's side, written with logical
-corners so it mirrors in RTL · `--radius-pill` for counts and chips only. The
-older names still resolve: `--radius-sm` → badge, `-md` → control, `-lg` → card,
-`-xl` → overlay, so no rule had to be touched to follow the new shape.
+corners so it mirrors in RTL · `--radius-pill` for counts and chips only. Every
+rule names the role; the older size names (`--radius-sm` … `-xl`) were retired
+in Phase 36.11, each use moved to the role it already resolved to.
 
 ### Control sizing
 
 `--control-height-sm` 32 · `--control-height` 36 · `--control-height-lg` 40, shared
 by buttons, inputs and selects so they align without measuring. Under
 `pointer: coarse` they rise to 40-44px touch targets. Icon sizes:
-`--icon-size-sm` 16 · `--icon-size` 18 · `--icon-size-nav` 20; `--icon-stroke`
-1.6.
+`--icon-size-sm` 16 · `--icon-size` 18 · `--icon-size-nav` 20. Each icon passes
+its stroke where it is used.
 
 ### Layers
 
 `--z-sticky` 10 · `--z-sidebar` 20 · `--z-dropdown` 30 · `--z-drawer` 40 ·
-`--z-modal` 50 · `--z-toast` 60 · `--z-skip-link` 70. The only z-index values in
-the product.
+`--z-toast` 60 · `--z-skip-link` 70. The only z-index values in the product.
+Dialogs need none: they open in the browser's top layer (`<dialog>` with
+`showModal`).
 
 ### Shadow
 
 Hairlines everywhere; one shadow, for overlays only (menus, dialogs, toasts, the
-peeking sidebar): `--shadow-overlay` and `--shadow-raised`, both
+peeking sidebar): `--shadow-overlay`,
 `0 1px 2px rgb(22 24 27 / 5%), 0 12px 32px -8px rgb(22 24 27 / 18%)` in light.
-`--shadow-subtle` resolves to `none`. In dark mode borders do the separating and
-the overlay shadow only grounds.
+Cards cast none. In dark mode borders do the separating and the overlay shadow
+only grounds. (`--shadow-raised` and `--shadow-subtle`, unused, were removed in
+Phase 36.11, with `--icon-stroke`, `--letter-spacing-caps`, `--drawer-width` and
+`--z-modal`.)
 
 ### Motion
 
@@ -621,9 +629,13 @@ Functional and quick: motion explains a change and nothing is animated for
 decoration. Transitions use transforms, opacity and colour; no
 `transition: all`, no animated layout.
 
+- **Frequent actions stay within 150ms** (Phase 36.11): anything a reader does
+  many times an hour -- hover, press, a switch, a menu or the bell's panel
+  opening, the command palette, a toast after a save, a new transcript message
+  settling, the rail peeking open (100ms in, 150ms back) and its labels.
 - Press: a 1px settle in 100ms. Hover and colour: 150ms.
-- Menus, popovers and a new transcript message settling: 220ms on the enter
-  curve.
+- Rarer moments keep their length: the widget opening and the dialog scrim
+  (220ms), dialogs and the phone navigation drawer (320ms).
 - Dialogs and drawers: 320ms; the dialog's scrim fades in.
 - **The "Take over" moment**: a voice chip that changes voice sweeps from Lagoon
   to Ember (and back for "Return to AI") in 320ms on the emphasized curve.
@@ -638,9 +650,9 @@ decoration. Transitions use transforms, opacity and colour; no
   finishes. Instant rather than `skipTransition()`: skipping rejects the
   transition's `ready` promise, which the router logs as a console error in
   development on every page of a list.
-- **Command palette:** the dialog enters in 220ms on the enter curve (fade, 8px
+- **Command palette:** the dialog enters in 150ms on the enter curve (fade, 8px
   of travel, scale from 0.98) over a fading scrim, and leaves at once. The
-  bell's panel enters like a menu (220ms).
+  bell's panel enters like a menu (150ms).
 - **The entry pages' signature** (Phase 36.5, D24): the mark's Ember shape
   settles into the room the Lagoon shape keeps for it, translate only, 600ms on
   the emphasized curve after 150ms, once per page load, none under reduced
@@ -781,13 +793,45 @@ still arrive in English and render with `dir="auto"` (D22).
 **Not found** is a calm state: the path that matched nothing as an LTR island,
 without its query or fragment, and one primary way back.
 
+## D25. Polish and the final state (Phase 36.11)
+
+- **One customer chat.** The website widget, the hosted chat page, the widget
+  preview in the website chat settings and the agent editor's "Customer view"
+  all draw `shared/chat/` (`ChatPanel`, `ChatTranscript`). The editor's preview
+  feeds the panel its own single-turn exchanges; its failures go through the
+  panel too, and `infoKinds` lets it say an unconfigured provider as
+  information, which a visitor is still told as a failure. The `.customer-view`
+  layer is gone.
+- **One set of limit words.** Overview's attention cards name limits, states,
+  figures and consequences with Plan & usage's own words (`plan-words.ts`), and
+  its meter takes the same four states.
+- **Landmarks.** The whole sidebar is the `navigation` landmark (the product name
+  and the pin toggle with the links); the top bar is the `banner`
+  (`role="banner"`, because the bell's panel has a `<header>` of its own). No
+  shell text sits outside a landmark.
+- **The account button's name begins with the initials it shows** ("AO: Account
+  menu for …"), so speech input can reach it by what it reads (WCAG 2.5.3).
+- **Loading states hold the loaded geometry.** Overview's attention, "now",
+  figures and the 30-day chart keep their loaded size while their reads are on
+  their way (measured from 390 to 1920px; the chart card used to be absent).
+  Only the number of attention items cannot be known ahead: one card is held.
+- **Startup reads in parallel.** The antiforgery token and the session are asked
+  for together; a browser that holds a workspace selection also reads the
+  workspace list and its permissions alongside the session check, as probes a
+  401 cannot act on (`core/auth/session-probe.ts`), and starts the deep-linked
+  page's lazy code (`core/navigation/route-warmup.ts`). A conversation reads its
+  facts and its first transcript page together.
+- **Reflow.** Grids that hold cards declare their column (`minmax(0, 1fr)`): an
+  implicit one grows to a text field's intrinsic width and pushes a 320px screen
+  sideways.
+
 ## Deferred
 
 Not built, and deliberately so.
 
 | Deferred | Note |
 | --- | --- |
-| Localisation and RTL | No longer deferred: English and Arabic with full RTL from Phase 36.3b. The shell, shared components and shared strings are translated; page bodies follow in their own phases. See [localisation-arabic-rtl.md](localisation-arabic-rtl.md) |
+| Localisation and RTL | No longer deferred: English and Arabic with full RTL from Phase 36.3b, every screen translated by Phase 36.10 and read through in 36.11. See [localisation-arabic-rtl.md](localisation-arabic-rtl.md) |
 | Server-persisted preferences | Theme and pin live in `localStorage`; see D22 |
 | Scroll position restoration | The shell scrolls an inner element and resets it on navigation; the page, not the scroll offset, is what Back restores |
 | ESLint | The project has no lint script or ESLint config, and none was added |

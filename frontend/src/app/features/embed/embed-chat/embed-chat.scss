@@ -13,7 +13,7 @@
   position: absolute;
   inset: 0;
   border: 1px solid var(--border-default);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-card);
   transform-origin: bottom right;
   // motion-audit-ignore: no-reduced-motion -- the duration token collapses to
   // 0.01 ms under prefers-reduced-motion at the source (styles/_tokens.scss).

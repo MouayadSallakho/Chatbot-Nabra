@@ -93,9 +93,11 @@ code {
   gap: var(--space-3);
 }
 
-.swatch {
+// A label tight on its value: the colour swatches and the radius samples.
+.swatch,
+.radius-row li {
   display: grid;
-  gap: 2px;
+  gap: var(--gap-hairline);
 }
 
 .swatch-chip {
@@ -136,11 +138,6 @@ code {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-5);
-
-  li {
-    display: grid;
-    gap: 2px;
-  }
 }
 
 .radius-box {

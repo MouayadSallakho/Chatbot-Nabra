@@ -1,6 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
+import { probeContext } from '@app/core/auth/session-probe';
 
 /** The tenant representation the backend publishes. Four fields, no more. */
 export interface Tenant {
@@ -56,7 +57,7 @@ export class TenantApi {
    * takes no argument, because who is asking is the session rather than a
    * parameter -- there is no shape of call here that asks about somebody else.
    */
-  listMine(): Observable<readonly Tenant[]> {
-    return this.http.get<readonly Tenant[]>('/api/me/tenants');
+  listMine(options: { probe?: boolean } = {}): Observable<readonly Tenant[]> {
+    return this.http.get<readonly Tenant[]>('/api/me/tenants', probeContext(!!options.probe));
   }
 }

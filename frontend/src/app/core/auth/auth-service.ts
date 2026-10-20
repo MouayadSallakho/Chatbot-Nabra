@@ -70,22 +70,20 @@ export class AuthService {
   /**
    * Asks the server who this browser is, once, at startup.
    *
-   * <strong>The antiforgery token is obtained first, and a failure there is not
-   * fatal.</strong> Without it the first sign-in attempt would be rejected and
-   * the reader would have to try twice for no visible reason. If the backend is
-   * unreachable, both calls fail and the application settles on `anonymous` —
-   * which shows the sign-in screen, where the next failure can be reported in
-   * terms somebody can act on. Settling on `unknown` instead would leave the
-   * loading state on screen forever.
+   * <strong>The antiforgery token and the session are asked for together</strong>
+   * (Phase 36.11; one after the other before). `/me` is a read and needs no
+   * token. The token is still awaited before this returns, so the first sign-in
+   * attempt is never rejected for want of one. A failure there is not fatal: if
+   * the backend is unreachable, both calls fail and the application settles on
+   * `anonymous` -- which shows the sign-in screen, where the next failure can be
+   * reported in terms somebody can act on. Settling on `unknown` instead would
+   * leave the loading state on screen forever.
    */
   async restore(): Promise<AuthStatus> {
-    try {
-      await firstValueFrom(this.api.csrf());
-    } catch {
-      // Nothing to report yet. A backend that cannot issue a token also cannot
-      // answer /me, so the next call produces the state and the screen after it
-      // produces the message.
-    }
+    // Nothing to report if it fails. A backend that cannot issue a token also
+    // cannot answer /me, so that call produces the state and the screen after it
+    // produces the message.
+    const token = firstValueFrom(this.api.csrf()).catch(() => undefined);
 
     try {
       this.account.set(await firstValueFrom(this.api.me()));
@@ -98,6 +96,8 @@ export class AuthService {
       this.account.set(null);
       this.state.set('anonymous');
     }
+
+    await token;
 
     return this.state();
   }

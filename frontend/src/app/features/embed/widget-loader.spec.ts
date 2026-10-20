@@ -86,6 +86,11 @@ describe('widget loader v1', () => {
     vi.useRealTimers();
     retireFrames();
 
+    // `run` shadows the getter with an own property of this document; removing
+    // it gives the prototype's back. The runner shares one document between
+    // specs in a worker, so a script left here would outlive this file.
+    delete (document as unknown as Record<string, unknown>)['currentScript'];
+
     if (realCurrentScript) {
       Object.defineProperty(Document.prototype, 'currentScript', realCurrentScript);
     }

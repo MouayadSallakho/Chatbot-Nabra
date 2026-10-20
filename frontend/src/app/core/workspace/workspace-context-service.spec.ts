@@ -5,6 +5,7 @@ import { LOCAL_STORAGE } from '@app/core/storage/local-storage';
 import { Tenant } from '@app/core/api/tenant-api';
 import { memoryStorage, permissionApiGranting } from '@app/testing/test-doubles';
 import { PermissionApi } from '@app/core/authorization/permission-api';
+import { SESSION_PROBE } from '@app/core/auth/session-probe';
 import { WORKSPACE_STORAGE_KEY, WorkspaceContextService } from './workspace-context-service';
 
 /**
@@ -231,6 +232,64 @@ describe('WorkspaceContextService', () => {
 
       expect(workspace.isReady()).toBe(false);
       expect(workspace.tenantId()).toBeNull();
+    });
+  });
+
+  describe('reading ahead at startup (Phase 36.11)', () => {
+    it('sends nothing when this browser holds no selection', async () => {
+      const workspace = await create();
+
+      expect(workspace.prefetch()).toBeNull();
+      // verify() in afterEach proves no request went out.
+    });
+
+    it('reads the list and the permissions as probes, and the load uses both', async () => {
+      const workspace = await create({ [WORKSPACE_STORAGE_KEY]: rival.id });
+      const permissions = TestBed.inject(PermissionApi);
+      const mine = vi.spyOn(permissions, 'mine');
+
+      const prefetch = workspace.prefetch();
+      const list = http.expectOne('/api/me/tenants');
+
+      // Both are out before the session is confirmed, and marked as probes so a
+      // 401 there cannot sign anybody out on its own.
+      expect(list.request.context.get(SESSION_PROBE)).toBe(true);
+      expect(mine).toHaveBeenCalledWith(rival.id, { probe: true });
+
+      list.flush([acme, rival]);
+
+      expect(await workspace.load(prefetch)).toBe('ready');
+      expect(workspace.tenant()).toEqual(rival);
+      // Neither was read a second time.
+      expect(mine).toHaveBeenCalledTimes(1);
+    });
+
+    it('reads the list again when the probe failed', async () => {
+      const workspace = await create({ [WORKSPACE_STORAGE_KEY]: rival.id });
+      const prefetch = workspace.prefetch();
+
+      http.expectOne('/api/me/tenants').flush(null, { status: 503, statusText: 'Unavailable' });
+
+      const loading = workspace.load(prefetch);
+
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      respondWith([acme, rival]);
+
+      expect(await loading).toBe('ready');
+    });
+
+    it('reads the permissions afresh when the selection changed on the way', async () => {
+      // The remembered id is no longer this account's: the early permissions
+      // were read for a workspace that will not be selected.
+      const workspace = await create({ [WORKSPACE_STORAGE_KEY]: rival.id });
+      const mine = vi.spyOn(TestBed.inject(PermissionApi), 'mine');
+      const prefetch = workspace.prefetch();
+
+      http.expectOne('/api/me/tenants').flush([acme]);
+
+      expect(await workspace.load(prefetch)).toBe('ready');
+      expect(workspace.tenant()).toEqual(acme);
+      expect(mine).toHaveBeenLastCalledWith(acme.id);
     });
   });
 

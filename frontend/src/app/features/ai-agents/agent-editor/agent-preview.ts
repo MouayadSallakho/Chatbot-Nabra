@@ -1,12 +1,19 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
-import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
-import { ApiError, toApiError } from '@app/core/api/api-error';
+import { ApiError, ApiErrorKind, toApiError } from '@app/core/api/api-error';
 import { Icon } from '@app/shared/icon/icon';
+import { ChatPanel } from '@app/shared/chat/chat-panel';
+import type { ChatMessage } from '@app/features/chat/hosted-chat-api';
 import type { WebChatWidget } from '@app/features/channels/website-chat-api';
-import { readableForeground } from '@app/features/embed/accent-color';
+import { DEFAULT_ACCENT, checkAccent } from '@app/features/embed/accent-color';
 import { AGENT_LIMITS } from '../ai-agent-limits';
 import { AiAgentApi } from '../ai-agent-api';
+
+/**
+ * The panel's name. The editor's card for a reader without the preview
+ * permission uses it too, so both say the same thing in one message.
+ */
+export const PREVIEW_HEADING = $localize`:@@agents.preview.heading:Customer view`;
 
 /** One exchange in the current preview session. */
 interface Exchange {
@@ -34,18 +41,19 @@ interface Exchange {
  * of service to repair. Status governs whether an agent serves customers, not
  * whether its owner may test it.
  *
- * <strong>It looks like the chat customers see</strong> (Phase 36.8): the
- * widget's header with the agent's name and the honesty line, the AI's
- * bubbles in the accent's tint, the customer's neutral, the composer at the
- * bottom. The accent and greeting are the workspace's real widget settings
- * when a website chat uses this agent; otherwise the widget's default colour,
- * and the panel says which. The words a customer would see are in the reader's
- * language here; the widget itself follows the visitor's.
+ * <strong>It is the chat customers see</strong> (Phase 36.11): the shared
+ * `ChatPanel` the website widget and the hosted page use, in its widget look,
+ * so the three cannot drift apart. The accent and greeting are the workspace's
+ * real widget settings when a website chat uses this agent; otherwise the
+ * widget's default colour, and the panel says which. The accent is checked by
+ * the widget's own rules (`accent-color.ts`) before anything is painted with
+ * it. The words a customer would see are in the reader's language here; the
+ * widget itself follows the visitor's.
  */
 @Component({
   selector: 'app-agent-preview',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, Icon],
+  imports: [ChatPanel, Icon],
   templateUrl: './agent-preview.html',
   styleUrl: './agent-preview.scss',
 })
@@ -67,50 +75,50 @@ export class AgentPreview {
   /** Whether the editor holds unsaved edits, so the panel can say the preview ignores them. */
   readonly unsavedChanges = input(false);
 
-  /** The widget's own default accent, used until (or unless) the workspace's is known. */
-  private static readonly DEFAULT_ACCENT = '#2563eb'; // token-lint-ignore: the widget's own default (embed-chat.scss)
-
-  protected readonly accent = computed(
-    () => this.widget()?.accentColor ?? AgentPreview.DEFAULT_ACCENT,
+  /** The accent as the widget would paint it: checked, with its label colour. */
+  protected readonly accent = computed(() =>
+    checkAccent(this.widget()?.accentColor ?? DEFAULT_ACCENT),
   );
-
-  protected readonly onAccent = computed(() => readableForeground(this.accent()));
 
   protected readonly greeting = computed(() => this.widget()?.greeting ?? null);
 
   protected readonly limits = AGENT_LIMITS;
 
+  protected readonly heading = PREVIEW_HEADING;
   protected readonly frameLabel = $localize`:@@agents.preview.frameLabel:Chat preview, as customers see it`;
-  protected readonly transcriptLabel = $localize`:@@agents.preview.transcriptLabel:Preview conversation`;
 
   /**
-   * One control, but inside a group.
-   *
-   * The group is what supplies `ngSubmit` on the surrounding `<form>`. A bare
-   * `[formControl]` does not: the event would be bound as a DOM listener for a
-   * custom event that never fires, the button would appear to do nothing, and
-   * the browser would perform a native form submission instead -- reloading the
-   * page. Found by a test that clicked Send and saw no request.
+   * An unconfigured provider is a fact about this deployment, not something
+   * the reader did wrong, so it is said as information. A visitor is told the
+   * same thing as a failure, because to them the answer did not arrive.
    */
-  protected readonly form = new FormGroup({
-    message: new FormControl('', {
-      nonNullable: true,
-      validators: [Validators.required, Validators.maxLength(AGENT_LIMITS.previewMessageMax)],
-    }),
-  });
+  protected readonly infoKinds: readonly ApiErrorKind[] = ['providerUnavailable'];
 
-  protected get message(): FormControl<string> {
-    return this.form.controls.message;
-  }
+  /** What is in the box. Cleared once a reply arrives, kept after a failure. */
+  protected readonly draft = signal('');
 
   protected readonly generating = signal(false);
   protected readonly failure = signal<ApiError | null>(null);
   protected readonly exchanges = signal<readonly Exchange[]>([]);
 
-  protected async send(): Promise<void> {
-    const text = this.message.value.trim();
+  /** Send is offered for a message with words in it, one at a time. */
+  protected readonly canSend = computed(() => !this.generating() && this.draft().trim().length > 0);
 
-    if (text.length === 0 || this.generating()) {
+  /**
+   * This tab's exchanges as the transcript draws them. The ids exist only for
+   * the list; nothing here came from, or goes to, a stored conversation.
+   */
+  protected readonly messages = computed<readonly ChatMessage[]>(() =>
+    this.exchanges().flatMap((exchange, index) => [
+      { id: `preview-${index}-q`, sender: 'Customer', text: exchange.message, sentAt: '' },
+      { id: `preview-${index}-a`, sender: 'AiAgent', text: exchange.reply, sentAt: '' },
+    ]),
+  );
+
+  protected async send(): Promise<void> {
+    const text = this.draft().trim();
+
+    if (text.length === 0 || text.length > AGENT_LIMITS.previewMessageMax || this.generating()) {
       return;
     }
 
@@ -123,7 +131,7 @@ export class AgentPreview {
       );
 
       this.exchanges.update((current) => [...current, { message: text, reply: preview.reply }]);
-      this.message.setValue('');
+      this.draft.set('');
     } catch (error) {
       // Never retried automatically. A timeout in particular may mean the
       // provider is still working and still being billed, so a second request
@@ -132,21 +140,6 @@ export class AgentPreview {
     } finally {
       this.generating.set(false);
     }
-  }
-
-  /**
-   * Enter sends and Shift+Enter starts a new line, as in the widget. A key
-   * held for an IME composition is left alone.
-   */
-  protected onEnter(event: Event): void {
-    const key = event as KeyboardEvent;
-
-    if (key.shiftKey || key.isComposing) {
-      return;
-    }
-
-    key.preventDefault();
-    void this.send();
   }
 
   /** Clears this tab's transcript. Nothing server-side is affected. */

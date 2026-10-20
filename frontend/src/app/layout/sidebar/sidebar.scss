@@ -27,18 +27,19 @@
   inset-inline-start: 0;
   z-index: var(--z-sidebar);
   clip-path: inset(0 var(--rail-clip) 0 0);
-  // Closing is a little slower than opening, on purpose: it reads as the panel
-  // settling back rather than being snatched away.
+  // The rail peeks open under the pointer many times an hour, so both ways stay
+  // within 150ms (Phase 36.11). Closing is still a little slower than opening,
+  // on purpose: it reads as the panel settling back rather than being snatched.
   transition:
-    clip-path var(--motion-slow) var(--ease-standard),
-    box-shadow var(--motion-slow) var(--ease-standard);
+    clip-path var(--duration-sm) var(--ease-standard),
+    box-shadow var(--duration-sm) var(--ease-standard);
 }
 
 .sidebar.is-rail.is-expanded {
   // Negative on the open edge so the overlay's shadow is not clipped away.
   clip-path: inset(0 -3rem 0 0);
   box-shadow: var(--shadow-overlay);
-  transition-duration: var(--motion-normal);
+  transition-duration: var(--duration-xs);
 }
 
 :host-context([dir='rtl']) .sidebar.is-rail {
@@ -55,7 +56,7 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  transition: opacity var(--motion-normal) var(--ease-standard);
+  transition: opacity var(--duration-sm) var(--ease-standard);
 }
 
 .sidebar:not(.is-expanded) .fades {
@@ -138,7 +139,7 @@
     inline-size: 1.25rem;
     border-block-start: 1px solid var(--border-default);
     opacity: 0;
-    transition: opacity var(--motion-normal) var(--ease-standard);
+    transition: opacity var(--duration-sm) var(--ease-standard);
   }
 }
 
@@ -149,7 +150,7 @@
 .nav-group ul {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--gap-hairline);
 }
 
 // A nav item: the icon sits on the rail's centre line in every state, so the
@@ -163,7 +164,7 @@
   min-block-size: 2.25rem;
   padding-inline: 0.625rem;
   border: 0;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-control);
   background: none;
   color: var(--text-secondary);
   font: var(--text-nav);
@@ -196,10 +197,11 @@
 // fills sit inside the rail instead of running off under the clip. The width
 // snaps back only after the collapse has finished, so it never shows.
 .sidebar.is-rail .nav-item {
+  // motion-audit-ignore: layout-property, the width is a 0s snap after the collapse, never animated
   transition:
     background-color var(--motion-fast) var(--ease-standard),
     color var(--motion-fast) var(--ease-standard),
-    inline-size 0s linear var(--motion-slow);
+    inline-size 0s linear var(--duration-sm);
 }
 
 .sidebar.is-rail:not(.is-expanded) .nav-item {
@@ -252,8 +254,8 @@
   border-inline-end: none;
   // The edge that faces the page is rounded like every other overlay; the edge
   // against the screen stays square. Logical corners, so it mirrors in Arabic.
-  border-start-end-radius: var(--radius-xl);
-  border-end-end-radius: var(--radius-xl);
+  border-start-end-radius: var(--radius-overlay);
+  border-end-end-radius: var(--radius-overlay);
   overflow: hidden;
 
   .sidebar-brand {

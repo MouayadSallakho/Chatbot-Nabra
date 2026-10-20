@@ -101,7 +101,7 @@
 }
 
 .chart-surface {
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-badge);
   touch-action: pan-y;
 
   &:focus-visible {
@@ -184,7 +184,7 @@
   inline-size: 12.25rem;
   padding: var(--space-2) var(--space-3);
   border: 1px solid var(--border-default);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-control);
   background-color: var(--surface-raised);
   box-shadow: var(--shadow-overlay);
   pointer-events: none;
@@ -379,7 +379,7 @@
   margin: 0;
   overflow: hidden;
   border: 1px solid var(--border-default);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-card);
   background-color: var(--surface-default);
 
   @media (min-width: 48rem) {

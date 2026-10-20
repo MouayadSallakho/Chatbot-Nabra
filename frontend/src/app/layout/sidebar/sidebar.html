@@ -1,5 +1,13 @@
-<div
+<!--
+  The whole sidebar is the navigation landmark (Phase 36.11): the product's
+  name and the pin toggle belong to it, and a reader moving by landmark used to
+  skip the name entirely. `aria-label` distinguishes it from any other
+  navigation landmark.
+-->
+<nav
   class="sidebar"
+  aria-label="Primary"
+  i18n-aria-label="@@nav.primaryLabel"
   [class.is-rail]="rail()"
   [class.is-expanded]="expanded()"
   [class.is-drawer]="drawer()"
@@ -33,11 +41,10 @@
   </div>
 
   <!--
-    `aria-label` distinguishes this from any other navigation landmark. Each
-    section's list is labelled by its heading, so a screen reader announces
+    Each section's list is labelled by its heading, so a screen reader announces
     "Work, list, 3 items" rather than one undifferentiated run of links.
   -->
-  <nav class="sidebar-nav" aria-label="Primary" i18n-aria-label="@@nav.primaryLabel">
+  <div class="sidebar-nav">
     @for (group of groups(); track group.name) {
       <div class="nav-group">
         <p class="nav-group-label" [id]="'nav-group-' + group.name">
@@ -67,7 +74,7 @@
         </ul>
       </div>
     }
-  </nav>
+  </div>
 
   <!-- Pinning is a desktop choice. In drawer mode the sidebar is already an overlay. -->
   @if (!drawer()) {
@@ -82,4 +89,4 @@
       </button>
     </div>
   }
-</div>
+</nav>

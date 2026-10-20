@@ -76,9 +76,13 @@ export class ProfileMenu {
     return letters.toUpperCase() || '?';
   });
 
+  /**
+   * The trigger's name starts with the initials it shows (WCAG 2.5.3, Phase
+   * 36.11): somebody using speech input reads "AO" on the button and says it.
+   */
   protected readonly label = computed(() =>
     this.email()
-      ? $localize`:@@account.menuLabelFor:Account menu for ${this.email()}:email:`
+      ? $localize`:@@account.menuLabelFor:${this.initials()}:initials:: Account menu for ${this.email()}:email:`
       : $localize`:@@account.menuLabel:Account menu`,
   );
 

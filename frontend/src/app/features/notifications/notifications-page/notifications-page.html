@@ -27,9 +27,7 @@
     @if (loading()) {
       <!-- The shape of a page of notifications, so nothing jumps when they arrive. -->
       <div class="card notification-history" aria-busy="true">
-        <p class="visually-hidden" role="status" i18n="@@notifications.loading">
-          Loading notifications…
-        </p>
+        <p class="visually-hidden" role="status">{{ loadingLabel }}</p>
         @for (row of [0, 1, 2]; track row) {
           <div class="card-body admin-skeleton" aria-hidden="true">
             <span class="skeleton skeleton-title"></span>

@@ -144,6 +144,32 @@ describe('ChatPanel', () => {
     expect(host().querySelector('h1')).toBeNull();
   });
 
+  it('says a missing answer as an error to a visitor, and as information only where asked', () => {
+    const failure = {
+      kind: 'providerUnavailable',
+      status: 503,
+      message: 'Sorry, no answer came back just now.',
+    };
+
+    mount({ failure });
+
+    const alert = (): Element => host().querySelector('[data-testid="chat-error"]')!;
+
+    expect(alert().classList).toContain('alert-danger');
+
+    fixture.componentRef.setInput('infoKinds', ['providerUnavailable']);
+    fixture.detectChanges();
+
+    expect(alert().classList).toContain('alert-info');
+    expect(alert().classList).not.toContain('alert-danger');
+
+    // A wait is a warning whatever the host asked.
+    fixture.componentRef.setInput('failure', { ...failure, kind: 'rateLimited', status: 429 });
+    fixture.detectChanges();
+
+    expect(alert().classList).toContain('alert-warning');
+  });
+
   it('renders markup a visitor typed as text', () => {
     mount({ messages: [message('1', 'Customer', '<img src=x onerror=alert(1)><b>bold</b>')] });
 

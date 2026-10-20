@@ -1,4 +1,9 @@
-<div class="topbar">
+<!--
+  The banner landmark (Phase 36.11): which workspace every screen is about, and
+  the actions that go with every screen. A role rather than <header>, because
+  the notification panel inside it has a header of its own.
+-->
+<div class="topbar" role="banner">
   @if (drawer()) {
     <button
       #menuButton

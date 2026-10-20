@@ -5,6 +5,19 @@ import { Tenant, TenantApi } from '@app/core/api/tenant-api';
 import { toApiError } from '@app/core/api/api-error';
 import { PermissionService } from '@app/core/authorization/permission-service';
 
+/**
+ * The workspace reads started at startup, alongside the session check.
+ *
+ * Both are probes (`session-probe.ts`): if the session has ended they fail
+ * quietly and are never used, because `load` only runs for a signed-in reader.
+ */
+export interface WorkspacePrefetch {
+  /** The selection this browser held when the reads were sent. */
+  readonly tenantId: string;
+  readonly workspaces: Promise<readonly Tenant[]>;
+  readonly permissions: Promise<readonly string[]>;
+}
+
 /** Where the selected workspace id is remembered. */
 export const WORKSPACE_STORAGE_KEY = 'omniai.workspace-tenant-id';
 
@@ -88,13 +101,17 @@ export class WorkspaceContextService {
    *   backend that is not running says nothing about which workspaces exist, and
    *   discarding a valid preference every time it restarts would be its own bug.
    */
-  async load(): Promise<WorkspaceStatus> {
+  async load(prefetch: WorkspacePrefetch | null = null): Promise<WorkspaceStatus> {
     this.state.set('loading');
 
     let workspaces: readonly Tenant[];
 
     try {
-      workspaces = await firstValueFrom(this.tenants.listMine());
+      // The startup read when there is one; a failed probe is simply read again,
+      // so a hiccup while the session was being checked costs nothing more.
+      const read = (): Promise<readonly Tenant[]> => firstValueFrom(this.tenants.listMine());
+
+      workspaces = await (prefetch ? prefetch.workspaces.catch(read) : read());
     } catch (failure) {
       // 401 is handled by the session interceptor, which signs the reader out.
       // Everything else -- offline, 500, a proxy in the way -- leaves the
@@ -131,9 +148,44 @@ export class WorkspaceContextService {
 
     this.state.set(this.selectedId() === null ? 'none' : 'ready');
 
-    await this.resolvePermissions();
+    // The early permissions belong to the selection they were read for; any
+    // other outcome (a choice made above, a dropped id) reads afresh.
+    await this.resolvePermissions(
+      prefetch && prefetch.tenantId === this.selectedId() ? prefetch.permissions : undefined,
+    );
 
     return this.state();
+  }
+
+  /**
+   * Starts the reads `load` will need, before the session is confirmed
+   * (Phase 36.11).
+   *
+   * Only when this browser already holds a selection, which it keeps only while
+   * somebody is signed in: the list of workspaces and that workspace's
+   * permissions are then read at the same time as `/api/auth/me`, instead of one
+   * after the other once it has answered. A deep link into the inbox used to wait
+   * for four requests in a row before the page could even be chosen. Returns
+   * null, and sends nothing, when there is no selection to go on.
+   */
+  prefetch(): WorkspacePrefetch | null {
+    const tenantId = this.selectedId();
+
+    if (tenantId === null) {
+      return null;
+    }
+
+    const prefetch: WorkspacePrefetch = {
+      tenantId,
+      workspaces: firstValueFrom(this.tenants.listMine({ probe: true })),
+      permissions: firstValueFrom(this.permissions.probe(tenantId)),
+    };
+
+    // A probe nobody ends up using must not surface as an unhandled rejection.
+    prefetch.workspaces.catch(() => undefined);
+    prefetch.permissions.catch(() => undefined);
+
+    return prefetch;
   }
 
   /**
@@ -199,7 +251,7 @@ export class WorkspaceContextService {
    * admin that offers no actions, which is recoverable by reloading, rather than
    * one that offers all of them and collects refusals.
    */
-  private async resolvePermissions(): Promise<void> {
+  private async resolvePermissions(pending?: Promise<readonly string[]>): Promise<void> {
     const selected = this.selectedId();
 
     if (selected === null) {
@@ -208,7 +260,7 @@ export class WorkspaceContextService {
       return;
     }
 
-    await this.permissions.load(selected);
+    await this.permissions.load(selected, pending);
   }
 
   private rememberSelection(tenantId: string): void {

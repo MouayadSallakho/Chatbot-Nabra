@@ -72,9 +72,31 @@ describe('AuthService', () => {
   });
 
   describe('restoring at startup', () => {
-    it('obtains an antiforgery token before asking who is signed in', async () => {
-      // Without it the first sign-in attempt would be rejected and the reader
-      // would have to try twice for no visible reason.
+    it('asks for the token and the session together, and settles only once the token is in', async () => {
+      // Together since Phase 36.11: /me is a read and needs no token, and a
+      // deep link used to wait for one round trip after the other. The token is
+      // still awaited, or the first sign-in attempt would be rejected and the
+      // reader would have to try twice for no visible reason.
+      let settled = false;
+      const restoring = auth.restore().then((status) => {
+        settled = true;
+
+        return status;
+      });
+
+      const token = http.expectOne('/api/auth/csrf');
+
+      http.expectOne('/api/auth/me').flush(account);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(settled).toBe(false);
+
+      token.flush(null, { status: 204, statusText: 'No Content' });
+
+      expect(await restoring).toBe('authenticated');
+    });
+
+    it('restores in either order of answers', async () => {
       const restoring = auth.restore();
 
       await answerStartup({ status: 200, body: account });

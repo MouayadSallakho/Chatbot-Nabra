@@ -23,8 +23,17 @@ const SOURCE = 'src/locale/messages.json';
 const ARABIC = 'src/locale/messages.ar.json';
 const GLOSSARY = 'src/locale/GLOSSARY.md';
 
-/** Messages whose English is a name and stays as it is in Arabic. */
-const SAME_IN_BOTH = new Set(['title.productAdmin', 'notifications.severity.read']);
+/**
+ * Messages that stay as they are in Arabic: a name (a product or file format
+ * included), or only the arrangement of two parts translated elsewhere
+ * ("{$name}: {$state}").
+ */
+const SAME_IN_BOTH = new Set([
+  'title.productAdmin',
+  'notifications.severity.read',
+  'overview.attention.limit',
+  'reports.format.xlsx',
+]);
 
 const read = (path) => JSON.parse(readFileSync(path, 'utf8')).translations;
 

@@ -55,6 +55,8 @@ export class NotificationsPage {
   private readonly locale = inject(LocaleFormat);
 
   protected readonly loading = signal(true);
+  /** The bell's words for the same wait, one message in both places. */
+  protected readonly loadingLabel = $localize`:@@notifications.loading:Loading notifications…`;
   protected readonly failure = signal<ApiError | null>(null);
   protected readonly items = signal<readonly AppNotification[]>([]);
   /** 1-based, mirrored in `?page=`. */

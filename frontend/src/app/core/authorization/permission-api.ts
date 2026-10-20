@@ -1,6 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
+import { probeContext } from '@app/core/auth/session-probe';
 import { PermissionDefinition } from './permission-codes';
 
 /**
@@ -24,8 +25,11 @@ export class PermissionApi {
    * to the workspace — the same answer every other tenant-scoped route gives a
    * non-member.
    */
-  mine(tenantId: string): Observable<readonly string[]> {
-    return this.http.get<readonly string[]>(`/api/me/tenants/${tenantId}/permissions`);
+  mine(tenantId: string, options: { probe?: boolean } = {}): Observable<readonly string[]> {
+    return this.http.get<readonly string[]>(
+      `/api/me/tenants/${tenantId}/permissions`,
+      probeContext(!!options.probe),
+    );
   }
 
   /**

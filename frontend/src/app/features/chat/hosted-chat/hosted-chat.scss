@@ -27,7 +27,7 @@
   @media (min-width: 640px) {
     block-size: min(48rem, calc(100dvh - var(--space-6) * 2));
     border: 1px solid var(--border-default);
-    border-radius: var(--radius-lg);
+    border-radius: var(--radius-card);
   }
 }
 

@@ -5,8 +5,8 @@
 > Read it before any UI work. Change it only by adding a row to the decisions log (section 12).
 > Page-level exceptions live in `docs/design/pages/<page>.md` and must name the rule they override.
 
-- Status: approved direction, implemented at the foundation (Phase 36.2)
-- Last updated: 2026-10-20 (Phase 36.10: team, roles, plan & usage, billing and notifications)
+- Status: approved direction, implemented across every screen (Phases 36.2 to 36.10) and polished (36.11)
+- Last updated: 2026-10-20 (Phase 36.11: polish, Arabic completeness, motion, accessibility, performance)
 - Started from: the "Two Voices" direction approved for the Phase 36 redesign (reference
   `OmniAI-UI-Pack/reference/omniai-directions.html`, "Two Voices" tab)
 - Implementation: `frontend/src/styles/_tokens.scss` (values), `_fonts.scss`, `_base.scss`,
@@ -115,7 +115,10 @@ the separating.
 
 Contrast evidence (WCAG 2 ratios, `contrast_check.py`, 2026-10-18; 79 pairs in each of light,
 dark, light + `prefers-contrast: more`, dark + more; 76 pass, 3 informational, 0 fail; full
-tables in the Phase 36.2 report):
+tables in the Phase 36.2 report). Refreshed in Phase 36.11 for the whole system: 123 pairs
+from every phase in each of the four modes, 113 pass, 10 informational, 0 fail; tightest text
+4.52:1 (the AI voice as text on the page, light), tightest UI part 3.08:1 (a chosen candidate's
+edge, dark):
 
 | Pair                              | Light       | Dark        | Needs |
 | --------------------------------- | ----------- | ----------- | ----- |
@@ -170,7 +173,8 @@ so the swap shifts nothing.
 ## 5. Layout, spacing and density
 
 - Spacing: 4 px scale, `--space-1…10` = 4, 8, 12, 16, 20, 24, 32, 40, 48, 64. Nothing in
-  between.
+  between. Beside the scale, `--gap-hairline` (2 px) for things that read as one: a label tight
+  on its value, list rows, bar segments.
 - Density: admin compact-comfortable. Controls 32 / 36 / 40 px (`--control-height-sm`, default,
   `-lg`), raised to 40-44 px under `pointer: coarse`. Targets never under 24 px.
 - Page frame: content capped at 1600 px; gutter 24 px, 16 px under 576 px.
@@ -196,11 +200,13 @@ so the swap shifts nothing.
 - Durations: xs 100, sm 150, md 220, lg 320, xl 450 ms (`--duration-*`).
 - Easing: standard `cubic-bezier(.2,0,0,1)`, enter `(.22,1,.36,1)`, exit `(.4,0,1,1)`,
   emphasized `(.05,.7,.1,1)`.
-- Where: press 100 ms (1 px settle); hover and colour 150 ms; menus and a new message settling
-  220 ms; dialogs and drawers 320 ms; the "Take over" sweep 320 ms emphasized; route changes a
+- Frequent actions never take longer than 150 ms (Phase 36.11): hover, press, switches, menus
+  and the bell's panel, the command palette, toasts, a new message settling, the rail peeking
+  open (100 ms in, 150 ms back).
+- Where: press 100 ms (1 px settle); hover and colour 150 ms; the widget opening 220 ms;
+  dialogs and the phone navigation drawer 320 ms; the "Take over" sweep 320 ms emphasized; route changes a
   150 ms crossfade of the content area only, through View Transitions, skipped on first load and
-  instant for a query-only change (a list's next page); the command palette 220 ms on the enter
-  curve; on the entry pages (sign-in, registration, invitation, workspace), the one signature:
+  instant for a query-only change (a list's next page); on the entry pages (sign-in, registration, invitation, workspace), the one signature:
   the mark's Ember shape settles into place, 600 ms emphasized after 150 ms, once per page load,
   none under reduced motion.
 - Not in the admin: count-ups, stagger on every visit, parallax, fade-up on sections, bounce.
@@ -327,3 +333,10 @@ used for warnings, or amber that reads orange.
 | 2026-10-20 | Billing: the subscription status as a word with its own marker (ring awaiting payment, "i" trial, tick active, triangle payment failed, octagon suspended, dot ended); while a payment has failed, the grace deadline in words with the days left; whenever the fallback applies, "In effect now" beside "Subscribed plan (not in effect)"; a renewal date only while the subscription keeps its plan. Actions unchanged; the page changes only on the provider's confirmation, never on the browser coming back                                               | PastDue grants the plan deliberately (B12); the reader must see which plan is really in effect                                                 | 36.10                                                                                            |
 | 2026-10-20 | Notifications: titles and bodies translated on the client by kind (a report's name is kept as the server wrote it; an unknown kind keeps the server's words). Unread is a dot, a heavier title, an ink edge on the reading start and the word "Unread"; the history groups a page by day (Today, Yesterday, the date) and gives each row its time of day; email preferences keep every category off by default and gained the unsaved-changes guard                                                                                                            | Read and unread told apart by more than weight; the server writes English only                                                                 | 36.10                                                                                            |
 | 2026-10-20 | Shared admin rules live in `_admin.scss` (facts strip, permission areas, impact hints, role options, quotas, subscription callouts, folded history); `quota-row` and `subscription-summary` are presentational, so the Design Lab shows every quota and subscription state as labelled sample (`#lab-admin`)                                                                                                                                                                                                                                                   | The local deployment runs an unlimited plan and takes no payments; sample states exist only in the Lab                                         | 36.10                                                                                            |
+| 2026-10-20 | One customer chat everywhere: the agent editor's "Customer view" is now the shared `ChatPanel` (widget look, the workspace's checked accent, its greeting, the honesty line), fed with the preview's own single-turn exchanges. An unconfigured provider is said there as information (`infoKinds`); visitors are still told a missing answer as a failure. The `.customer-view` layer is removed                                                                                                                                                              |
+| 2026-10-20 | One set of limit words: Overview's attention cards use Plan & usage's names, state words ("Members: Limit reached", "AI agents: Approaching the limit"), figures, consequences and meter states                                                                                                                                                                                                                                                                                                                                                                |
+| 2026-10-20 | Tokens: `--gap-hairline` (2 px) replaces eleven raw 2 px gaps; the radius size names are retired for the role names; unused `--shadow-raised`, `--shadow-subtle`, `--icon-stroke`, `--letter-spacing-caps`, `--drawer-width` and `--z-modal` are removed. `token_lint` 0 warnings                                                                                                                                                                                                                                                                              |
+| 2026-10-20 | Motion: every frequent action within 150 ms (menus, the bell's panel, the palette, toasts, a new message, the switch, the rail at 100/150 ms); `motion_audit` clean, its three remaining patterns annotated with the reason                                                                                                                                                                                                                                                                                                                                    |
+| 2026-10-20 | Landmarks: the whole sidebar is the navigation landmark and the top bar the banner, so the product name and the workspace are reached by landmark. The account button's name begins with its initials (WCAG 2.5.3)                                                                                                                                                                                                                                                                                                                                             |
+| 2026-10-20 | Loading states hold the loaded geometry: Overview's attention card, "now" card, figures and the 30-day chart card keep their loaded size while their reads are on the way; the number of attention items cannot be known ahead, so one card is held                                                                                                                                                                                                                                                                                                            |
+| 2026-10-20 | Arabic: a native-quality read-through of all 2,028 messages (113 corrected): «فهرِس», «موظف دعم» for a human role (وكيل is only an AI agent), «التثبيت» for a deployment (النشر is Publish), «بالتوقيت العالمي» for UTC, «معلّق» for Suspended, «يحتاج إلى صلاحية», counted nouns correct for every number, and one way of addressing the reader                                                                                                                                                                                                               |

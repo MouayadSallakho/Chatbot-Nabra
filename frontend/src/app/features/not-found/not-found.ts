@@ -61,8 +61,8 @@ import { PageHeader } from '@app/shared/page-header/page-header';
     }
 
     .not-found-address code {
-      padding: 2px var(--space-2);
-      border-radius: var(--radius-sm);
+      padding: var(--gap-hairline) var(--space-2);
+      border-radius: var(--radius-badge);
       background-color: var(--surface-inset);
       color: var(--text-secondary);
       font: var(--text-small);

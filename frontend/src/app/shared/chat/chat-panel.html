@@ -126,8 +126,9 @@
       -->
       <p
         class="alert chat-alert"
-        [class.alert-warning]="error.kind === 'rateLimited'"
-        [class.alert-danger]="error.kind !== 'rateLimited'"
+        [class.alert-warning]="alertTone(error) === 'warning'"
+        [class.alert-info]="alertTone(error) === 'info'"
+        [class.alert-danger]="alertTone(error) === 'danger'"
         role="alert"
         data-testid="chat-error"
       >

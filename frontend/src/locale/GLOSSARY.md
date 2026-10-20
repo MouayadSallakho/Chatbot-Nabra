@@ -71,3 +71,7 @@ their noun (an agent is مفعّل, a channel is مفعّلة), so they are sepa
 | Language             | اللغة                        |                       | no      |                                                          |
 | WhatsApp             | واتساب                       | واتساب                | yes     | Meta's Arabic form; Instagram إنستجرام, Messenger ماسنجر |
 | Nabra                | نبرة                         | نبرة                  | yes     | the product's name; "OmniAI" is a code name, never copy  |
+| Deployment           | التثبيت                      |                       | no      | not النشر, which is Publish (Phase 36.11)                |
+| UTC                  | بالتوقيت العالمي             |                       | no      | in dates and periods, one form everywhere (36.11)        |
+| Suspended            | معلّق                        |                       | no      | a subscription; يُعلَّق, not موقوف (Phase 36.11)         |
+| Support person       | موظف دعم                     |                       | no      | a human role; وكيل is only ever an AI agent (36.11)      |

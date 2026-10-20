@@ -336,6 +336,15 @@ export class ConversationDetail {
     id: string,
     options: { replaceTranscript: boolean },
   ): Promise<void> {
+    // The first transcript page does not depend on the conversation's facts, so
+    // on a first read the two are asked for together rather than one after the
+    // other (Phase 36.11). If the facts fail, that failure is the one reported.
+    const firstPage = options.replaceTranscript
+      ? firstValueFrom(this.api.messages(tenantId, id, null, MESSAGE_PAGE))
+      : null;
+
+    firstPage?.catch(() => undefined);
+
     const detail: Versioned<Conversation> = await firstValueFrom(this.api.get(tenantId, id));
 
     if (id !== this.conversationId()) {
@@ -350,9 +359,10 @@ export class ConversationDetail {
       let after: number | null = null;
 
       for (let pages = 0; pages < MAX_FIRST_READ_PAGES; pages++) {
-        const page: TranscriptPage = await firstValueFrom(
-          this.api.messages(tenantId, id, after, MESSAGE_PAGE),
-        );
+        const page: TranscriptPage =
+          pages === 0 && firstPage
+            ? await firstPage
+            : await firstValueFrom(this.api.messages(tenantId, id, after, MESSAGE_PAGE));
 
         all = mergeMessages(all, page.items);
         after = page.nextCursor;

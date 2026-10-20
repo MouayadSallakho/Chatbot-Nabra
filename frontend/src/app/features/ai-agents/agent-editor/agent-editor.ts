@@ -30,7 +30,7 @@ import { ChannelBadge } from '@app/shared/channel/channel-badge';
 import type { WebChatWidget } from '@app/features/channels/website-chat-api';
 import { AgentChannels, AgentChannelUse, channelStatusNote } from '../agent-channels';
 import { agentStatusSentence, agentStatusTone, agentStatusWord } from '../agent-words';
-import { AgentPreview } from './agent-preview';
+import { AgentPreview, PREVIEW_HEADING } from './agent-preview';
 import { AGENT_LIMITS, CREATED_AGENT_STATE } from '../ai-agent-limits';
 import { AiAgent, AiAgentApi, AiAgentStatus } from '../ai-agent-api';
 import { Versioned } from '@app/core/api/versioned';
@@ -97,6 +97,7 @@ export class AgentEditor implements OnInit, HasUnsavedChanges {
   readonly aiAgentId = input.required<string>();
 
   protected readonly limits = AGENT_LIMITS;
+  protected readonly previewHeading = PREVIEW_HEADING;
 
   protected readonly statusWord = agentStatusWord;
   protected readonly statusTone = agentStatusTone;

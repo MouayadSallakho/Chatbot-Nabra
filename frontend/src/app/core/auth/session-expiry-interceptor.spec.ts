@@ -9,6 +9,7 @@ import { memoryStorage, permissionApiGranting } from '@app/testing/test-doubles'
 import { PermissionApi } from '@app/core/authorization/permission-api';
 import { AuthService } from './auth-service';
 import { sessionExpiryInterceptor } from './session-expiry-interceptor';
+import { probeContext } from './session-probe';
 
 /**
  * What happens when a session dies underneath a signed-in application.
@@ -106,6 +107,21 @@ describe('sessionExpiryInterceptor', () => {
     await request('/api/auth/me', 401);
 
     expect(navigatedTo).toEqual([]);
+  });
+
+  it('leaves a read sent before the session was confirmed alone', async () => {
+    // Startup reads the workspace list beside /me (Phase 36.11). If the session
+    // has ended, /me says so; the early read's 401 must not sign out, forget the
+    // selection or navigate on its own.
+    const pending = firstValueFrom(client.get('/api/me/tenants', probeContext(true))).catch(
+      (error: unknown) => error,
+    );
+
+    http.expectOne('/api/me/tenants').flush(null, { status: 401, statusText: 'Unauthorized' });
+    await pending;
+
+    expect(navigatedTo).toEqual([]);
+    expect(storage.getItem(WORKSPACE_STORAGE_KEY)).toBe('a-workspace-id');
   });
 
   it('ignores every other failure', async () => {

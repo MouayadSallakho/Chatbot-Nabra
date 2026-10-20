@@ -47,7 +47,10 @@ describe('ProfileMenu', () => {
   it('names the trigger after the account, with initials drawn from the address', async () => {
     await render();
 
-    expect(trigger().getAttribute('aria-label')).toBe('Account menu for ada.owner@omniai.example');
+    // The visible initials begin the name, so "AO" can be spoken to reach it.
+    expect(trigger().getAttribute('aria-label')).toBe(
+      'AO: Account menu for ada.owner@omniai.example',
+    );
     expect(root().querySelector('.avatar')?.textContent?.trim()).toBe('AO');
   });
 

@@ -1,5 +1,5 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
-import { firstValueFrom } from 'rxjs';
+import { Observable, firstValueFrom } from 'rxjs';
 import { PermissionCode } from './permission-codes';
 import { PermissionApi } from './permission-api';
 
@@ -63,9 +63,10 @@ export class PermissionService {
    * resolves. Neither is reported here, because neither has a useful thing to say
    * on this screen.
    */
-  async load(tenantId: string): Promise<void> {
+  async load(tenantId: string, pending?: Promise<readonly string[]>): Promise<void> {
     try {
-      const codes = await firstValueFrom(this.api.mine(tenantId));
+      // `pending` is the same read, already sent at startup for this workspace.
+      const codes = await (pending ?? firstValueFrom(this.api.mine(tenantId)));
 
       this.held.set(new Set(codes));
     } catch {
@@ -73,6 +74,11 @@ export class PermissionService {
     } finally {
       this.loadedFor.set(tenantId);
     }
+  }
+
+  /** The same read as `load`, sent as a startup probe (`WorkspaceContextService.prefetch`). */
+  probe(tenantId: string): Observable<readonly string[]> {
+    return this.api.mine(tenantId, { probe: true });
   }
 
   /**

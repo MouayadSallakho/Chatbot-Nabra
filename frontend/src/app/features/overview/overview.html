@@ -56,7 +56,7 @@
                   [max]="meter.max"
                   [state]="meter.state"
                   [label]="meter.label"
-                  [valueText]="meter.text"
+                  [valueText]="meter.valueText"
                 />
                 <p class="attention-meter-text">{{ meter.text }}</p>
               </div>
@@ -170,6 +170,11 @@
                 [tableExtras]="tableExtras"
                 [plotHeight]="140"
               />
+            </div>
+          } @else {
+            <!-- The chart's place, held at its loaded size while the figures arrive. -->
+            <div class="card card-body week-chart" aria-hidden="true">
+              <span class="skeleton skeleton-text"></span>
             </div>
           }
         </section>

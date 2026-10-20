@@ -46,7 +46,7 @@
   gap: var(--space-4);
   padding: var(--space-4);
   border: 1px solid var(--border-default);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-card);
 
   @media (max-width: 33.75rem) {
     flex-direction: column;

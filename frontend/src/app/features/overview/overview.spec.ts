@@ -61,9 +61,30 @@ function dashboard(
 
 const PLAN_WITH_WARNING = {
   entitlements: [
-    { entitlement: 'aiAgents', used: 4, limit: 5, unlimited: false, state: 'Warning' },
-    { entitlement: 'members', used: 10, limit: 10, unlimited: false, state: 'Exhausted' },
-    { entitlement: 'knowledgeDocuments', used: 3, limit: null, unlimited: true, state: 'Normal' },
+    {
+      entitlement: 'aiAgents',
+      used: 4,
+      limit: 5,
+      unlimited: false,
+      state: 'Warning',
+      period: null,
+    },
+    {
+      entitlement: 'members',
+      used: 10,
+      limit: 10,
+      unlimited: false,
+      state: 'Exhausted',
+      period: null,
+    },
+    {
+      entitlement: 'knowledgeDocuments',
+      used: 3,
+      limit: null,
+      unlimited: true,
+      state: 'Normal',
+      period: null,
+    },
   ],
 } as unknown as PlanUsage;
 
@@ -146,7 +167,8 @@ describe('Overview', () => {
   it('lists limits that are running out, the reached one first, each with a meter, and ignores unlimited ones', async () => {
     await render({ plan: PLAN_WITH_WARNING });
 
-    expect(titles()).toEqual(['Members: limit reached', 'AI agents: near the limit']);
+    // Plan & usage's own words: the limit's name and the server's state.
+    expect(titles()).toEqual(['Members: Limit reached', 'AI agents: Approaching the limit']);
 
     // Severity is a word as well as a colour and a glyph.
     expect(tones()).toEqual(['Critical', 'Warning']);
@@ -154,10 +176,12 @@ describe('Overview', () => {
     const meters = [...host().querySelectorAll('[role="meter"]')];
 
     expect(meters.map((meter) => meter.getAttribute('aria-valuetext'))).toEqual([
-      '10 of 10 used',
-      '4 of 5 used',
+      '10 of 10. Limit reached',
+      '4 of 5. Approaching the limit',
     ]);
     expect(meters[0].getAttribute('aria-valuemax')).toBe('10');
+    expect(text()).toContain('New ones are refused until the plan allows more.');
+    expect(text()).toContain('Nothing is refused yet. Only reaching the limit stops new ones.');
     expect(text()).not.toContain('Knowledge documents');
   });
 
@@ -190,6 +214,27 @@ describe('Overview', () => {
     expect(titles()).toContain('1 AI reply failed');
     expect(titles()).toContain('2 WhatsApp messages were not delivered');
     expect(text()).toContain('Out of 25 attempts in the last 7 days.');
+  });
+
+  it('says a monthly limit that ran out stops AI work until the month resets', async () => {
+    await render({
+      plan: {
+        entitlements: [
+          {
+            entitlement: 'monthlyProviderOperations',
+            used: 500,
+            limit: 500,
+            unlimited: false,
+            state: 'Exhausted',
+            period: { from: '2026-10-01T00:00:00Z', to: '2026-11-01T00:00:00Z' },
+          },
+        ],
+      } as unknown as PlanUsage,
+    });
+
+    expect(titles()).toEqual(['AI provider operations: Limit reached']);
+    expect(text()).toContain('do not run until the month resets');
+    expect(host().querySelector('[role="meter"]')?.className).toContain('exhausted');
   });
 
   it('says a source that did not answer was not checked, and offers to try again', async () => {

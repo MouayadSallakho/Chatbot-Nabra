@@ -94,6 +94,15 @@ export class AnalyticsDashboardPage {
   /** Whether these numbers are the reader's to see at all. */
   protected readonly canView = computed(() => this.permissions.has('analytics.view'));
 
+  /**
+   * Column names shared with the channel chart's labels and the sender series,
+   * written once so each is one message in both languages.
+   */
+  protected readonly columns = {
+    conversations: $localize`:@@analytics.table.conversations:Conversations`,
+    customers: $localize`:@@analytics.series.customers:Customers`,
+  };
+
   protected readonly ranges = ANALYTICS_RANGES.map((option) => ({
     value: option.value,
     label: rangeWord(option.value),

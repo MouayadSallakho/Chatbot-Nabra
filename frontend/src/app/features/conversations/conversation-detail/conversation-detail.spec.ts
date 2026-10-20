@@ -217,6 +217,11 @@ describe('ConversationDetail', () => {
   it('explains a conversation that is not there', async () => {
     await mount('conversations.view');
 
+    // The first transcript page was asked for at the same time, and is refused
+    // too; the conversation's own failure is the one the reader is told.
+    http
+      .expectOne(messagesUrl)
+      .flush({ title: 'Forbidden' }, { status: 403, statusText: 'Forbidden' });
     http
       .expectOne(detailUrl)
       .flush(
@@ -226,6 +231,21 @@ describe('ConversationDetail', () => {
     await settle();
 
     expect(text()).toContain('Conversation not found');
+  });
+
+  it('asks for the conversation and its first transcript page together', async () => {
+    await mount('conversations.view');
+
+    // Both are out before either has answered: the page no longer waits for the
+    // conversation's facts before asking for its messages.
+    const facts = http.expectOne(detailUrl);
+    const firstPage = http.expectOne(messagesUrl);
+
+    firstPage.flush({ items: [message('m1', 'Customer', 'Hello', 1)], nextCursor: null });
+    facts.flush(detail, tagged(detail));
+    await settle();
+
+    expect(text()).toContain('Hello');
   });
 
   it('refreshes by hand rather than polling', async () => {

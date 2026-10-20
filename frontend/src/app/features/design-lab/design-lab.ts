@@ -268,7 +268,7 @@ const SAMPLE_TRANSCRIPT: readonly SampleMessage[] = [
     id: 1,
     sender: 'Customer',
     speaker: $localize`:@@lab.transcript.customer:Customer`,
-    text: 'Hi, where is my order #4821?',
+    text: 'Hi, where is my order #4821?', // token-lint-ignore: an order number, not a colour
   },
   {
     id: 2,

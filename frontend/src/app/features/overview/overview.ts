@@ -14,11 +14,12 @@ import {
   unreadTitle,
 } from '@app/features/analytics/analytics-words';
 import { BillingApi, WorkspaceBilling } from '@app/features/billing/billing-api';
+import { PlanUsage, PlanUsageApi } from '@app/features/plan-usage/plan-usage-api';
 import {
-  PlanEntitlementName,
-  PlanUsage,
-  PlanUsageApi,
-} from '@app/features/plan-usage/plan-usage-api';
+  entitlementLabel,
+  quotaConsequence,
+  quotaState,
+} from '@app/features/plan-usage/plan-words';
 import { ColumnChart } from '@app/shared/charts/column-chart';
 import { Meter, MeterState } from '@app/shared/charts/meter';
 import { Sparkline } from '@app/shared/charts/sparkline';
@@ -50,6 +51,7 @@ export interface AttentionItem {
     readonly state: MeterState;
     readonly label: string;
     readonly text: string;
+    readonly valueText: string;
   };
 }
 
@@ -59,16 +61,6 @@ interface Shortcut {
   readonly link: string;
   readonly icon: IconName;
 }
-
-/** The plan's limits, named as the reader says them. Unknown names are shown as sent. */
-const ENTITLEMENT_NAMES: Readonly<Record<PlanEntitlementName, string>> = {
-  members: $localize`:@@overview.limit.members:Members`,
-  aiAgents: $localize`:@@overview.limit.aiAgents:AI agents`,
-  knowledgeDocuments: $localize`:@@overview.limit.knowledgeDocuments:Knowledge documents`,
-  webChatEndpoints: $localize`:@@overview.limit.webChat:Website chat`,
-  whatsAppConnections: $localize`:@@overview.limit.whatsApp:WhatsApp connections`,
-  monthlyProviderOperations: $localize`:@@overview.limit.providerOperations:AI provider operations this month`,
-};
 
 const TONE_WORDS: Readonly<Record<AttentionTone, string>> = {
   critical: $localize`:@@overview.tone.critical:Critical`,
@@ -191,29 +183,29 @@ export class Overview {
         continue;
       }
 
-      const name = ENTITLEMENT_NAMES[entitlement.entitlement] ?? entitlement.entitlement;
+      // Plan & usage's own words (Phase 36.11): the limit's name, the server's
+      // state as a word, the same figure and the same consequence, so a limit
+      // is called one thing on both pages.
+      const name = entitlementLabel(entitlement.entitlement);
+      const state = quotaState(entitlement.state);
       const used = this.locale.number(entitlement.used);
       const limit = this.locale.number(entitlement.limit);
-      const usedText = $localize`:@@overview.limit.used:${used}:used: of ${limit}:limit: used`;
-      const exhausted = entitlement.state === 'Exhausted';
+      const figure = $localize`:@@plan.figure.limited:${used}:used: of ${limit}:limit:`;
 
       items.push({
         id: `limit-${entitlement.entitlement}`,
         tone: entitlement.state === 'Warning' ? 'warning' : 'critical',
-        title: exhausted
-          ? $localize`:@@overview.attention.limitReached:${name}:name:: limit reached`
-          : $localize`:@@overview.attention.limitNear:${name}:name:: near the limit`,
-        detail: exhausted
-          ? $localize`:@@overview.attention.limitReached.detail:New ones are refused until the plan allows more.`
-          : $localize`:@@overview.attention.limitNear.detail:The plan still allows more, but not many.`,
+        title: $localize`:@@overview.attention.limit:${name}:name:: ${state.word}:state:`,
+        detail: quotaConsequence(entitlement.state, Boolean(entitlement.period)) ?? '',
         link: '/plan-usage',
         action: $localize`:@@overview.action.planUsage:View plan & usage`,
         meter: {
           value: entitlement.used,
           max: entitlement.limit,
-          state: entitlement.state === 'Warning' ? 'warning' : 'critical',
+          state: state.meter,
           label: name,
-          text: usedText,
+          text: figure,
+          valueText: `${figure}. ${state.word}`,
         },
       });
     }

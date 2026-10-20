@@ -81,7 +81,7 @@ app-page-header + * > .page-section:first-child {
   padding-inline: var(--space-4);
   padding-block: 0;
   border: 1px solid transparent;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-control);
   font: var(--text-body-strong);
   text-decoration: none;
   white-space: nowrap;
@@ -296,7 +296,7 @@ app-page-header + * > .page-section:first-child {
   // not decoration, so it keeps turning slowly under reduced motion too (this
   // class out-ranks the global reduced-motion rule on purpose). It is small and
   // travels nowhere, which is not the motion that reduced-motion protects from.
-  animation: spin 0.9s linear infinite;
+  animation: spin 0.9s linear infinite; // motion-audit-ignore: infinite-animation, feedback that ends with the work (the element is removed)
 }
 
 @keyframes spin {
@@ -313,8 +313,7 @@ app-page-header + * > .page-section:first-child {
 .card {
   background-color: var(--surface-default);
   border: 1px solid var(--border-default);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-subtle);
+  border-radius: var(--radius-card);
 }
 
 .card-body {
@@ -358,8 +357,8 @@ app-page-header + * > .page-section:first-child {
   padding: var(--space-4) var(--space-5);
   border-block-start: 1px solid var(--border-subtle);
   background-color: var(--surface-muted);
-  border-end-start-radius: var(--radius-lg);
-  border-end-end-radius: var(--radius-lg);
+  border-end-start-radius: var(--radius-card);
+  border-end-end-radius: var(--radius-card);
 }
 
 .card-footer {
@@ -405,7 +404,7 @@ app-page-header + * > .page-section:first-child {
   min-block-size: 1.375rem;
   padding-inline: 0.4375rem var(--space-2);
   border: 1px solid transparent;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-badge);
   font: var(--text-caption);
   white-space: nowrap;
   vertical-align: middle;
@@ -631,7 +630,7 @@ app-page-header + * > .page-section:first-child {
   background-color: var(--surface-default);
   color: var(--text-primary);
   border: 1px solid var(--border-control);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-control);
   transition:
     border-color var(--duration-sm) var(--ease-standard),
     background-color var(--duration-sm) var(--ease-standard);
@@ -749,7 +748,7 @@ label:has(> input[type='checkbox'], > input[type='radio']) {
     border-radius: var(--radius-pill);
     background-color: var(--text-secondary);
     transition:
-      transform var(--duration-md) var(--ease-standard),
+      transform var(--duration-sm) var(--ease-standard),
       background-color var(--duration-sm) var(--ease-standard);
   }
 
@@ -778,11 +777,11 @@ label:has(> input[type='checkbox'], > input[type='radio']) {
 .segmented {
   display: inline-flex;
   flex-wrap: wrap;
-  gap: 2px;
+  gap: var(--gap-hairline);
   margin: 0;
-  padding: 3px;
+  padding: 3px; // token-lint-ignore: inset so a segment's radius nests inside the control's
   border: 1px solid var(--border-default);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-control);
   background-color: var(--surface-inset);
 }
 
@@ -793,7 +792,7 @@ label:has(> input[type='checkbox'], > input[type='radio']) {
   gap: var(--space-2);
   min-block-size: calc(var(--control-height-sm) - 8px);
   padding-inline: var(--space-3);
-  border-radius: calc(var(--radius-md) - 3px);
+  border-radius: calc(var(--radius-control) - 3px);
   color: var(--text-secondary);
   font: var(--text-label);
   cursor: pointer;
@@ -868,7 +867,7 @@ button.segmented-option {
   inline-size: 100%;
   overflow-x: auto;
   border: 1px solid var(--border-default);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-card);
   background-color: var(--surface-default);
 }
 
@@ -938,7 +937,7 @@ button.segmented-option {
 // feature supplies only its column template, via --data-list-columns.
 .data-list {
   border: 1px solid var(--border-default);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-card);
   background-color: var(--surface-default);
   overflow: hidden;
 
@@ -1109,12 +1108,12 @@ a.data-row:hover .data-row-chevron {
   max-inline-size: min(20rem, calc(100vw - 2 * var(--space-4)));
   padding: var(--space-1);
   border: 1px solid var(--border-default);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-card);
   background-color: var(--surface-raised);
   box-shadow: var(--shadow-overlay);
   text-align: start;
   transform-origin: top;
-  animation: menu-in var(--duration-md) var(--ease-enter);
+  animation: menu-in var(--duration-sm) var(--ease-enter);
 }
 
 .menu-item {
@@ -1125,7 +1124,7 @@ a.data-row:hover .data-row-chevron {
   min-block-size: var(--control-height-sm);
   padding: var(--space-1) var(--space-3);
   border: 0;
-  border-radius: calc(var(--radius-lg) - var(--space-1));
+  border-radius: calc(var(--radius-card) - var(--space-1));
   background: none;
   color: var(--text-primary);
   font: var(--text-body);
@@ -1213,7 +1212,7 @@ a.data-row:hover .data-row-chevron {
   padding-inline: 0.375rem;
   border: 1px solid var(--border-default);
   border-block-end-width: 2px;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-badge);
   background: var(--surface-muted);
   color: var(--text-secondary);
   font: 500 0.6875rem / 1 var(--font-sans);
@@ -1247,12 +1246,12 @@ a.data-row:hover .data-row-chevron {
   color: var(--text-primary);
   font: var(--text-reading);
   overflow-wrap: anywhere;
-  animation: bubble-settle var(--duration-md) var(--ease-enter);
+  animation: bubble-settle var(--duration-sm) var(--ease-enter);
 }
 
 .bubble-speaker {
   display: block;
-  margin-block-end: 2px;
+  margin-block-end: var(--gap-hairline);
   color: var(--text-secondary);
   font: var(--text-caption);
 }
@@ -1347,7 +1346,7 @@ a.data-row:hover .data-row-chevron {
   place-items: center;
   inline-size: 2.75rem;
   block-size: 2.75rem;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-control);
   background-color: var(--surface-muted);
   color: var(--text-secondary);
   border: 1px solid var(--border-default);
@@ -1392,7 +1391,7 @@ a.data-row:hover .data-row-chevron {
   gap: var(--space-3);
   padding: var(--space-3) var(--space-4);
   border: 1px solid transparent;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-control);
   font: var(--text-small);
 
   .icon {
@@ -1438,7 +1437,7 @@ a.data-row:hover .data-row-chevron {
   margin-block-end: var(--space-5);
   padding: var(--space-4) var(--space-5);
   border: 1px solid var(--warning-border);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-card);
   background-color: var(--warning-bg);
   color: var(--text-primary);
   font: var(--text-small);
@@ -1487,8 +1486,8 @@ a.data-row:hover .data-row-chevron {
     var(--skeleton-base) 100%
   );
   background-size: 200% 100%;
-  border-radius: var(--radius-sm);
-  animation: skeleton-sweep 1.6s var(--ease-standard) infinite;
+  border-radius: var(--radius-badge);
+  animation: skeleton-sweep 1.6s var(--ease-standard) infinite; // motion-audit-ignore: infinite-animation, removed with the loading state; none under reduced motion (below)
 
   @media (prefers-reduced-motion: reduce) {
     animation: none;
