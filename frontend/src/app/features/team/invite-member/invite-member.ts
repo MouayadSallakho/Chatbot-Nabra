@@ -15,9 +15,13 @@ import { ApiError, toApiError } from '@app/core/api/api-error';
 import { ACCEPT_INVITATION_PATH } from '@app/core/invitations/invitation-handoff';
 import { PermissionService } from '@app/core/authorization/permission-service';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
+import { LocaleFormat } from '@app/core/i18n/locale-format';
 import { EmptyState } from '@app/shared/empty-state/empty-state';
+import { Icon } from '@app/shared/icon/icon';
 import { PageHeader } from '@app/shared/page-header/page-header';
+import { permissionCount } from '@app/features/roles/permission-words';
 import { AssignableRole, TeamApi } from '../team-api';
+import { roleList, rolesSelected } from '../team-words';
 
 /**
  * Inviting somebody to the workspace.
@@ -39,7 +43,7 @@ import { AssignableRole, TeamApi } from '../team-api';
 @Component({
   selector: 'app-invite-member',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, RouterLink, PageHeader, EmptyState],
+  imports: [ReactiveFormsModule, RouterLink, PageHeader, EmptyState, Icon],
   templateUrl: './invite-member.html',
   styleUrl: './invite-member.scss',
 })
@@ -49,6 +53,7 @@ export class InviteMember {
   private readonly permissions = inject(PermissionService);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly injector = inject(Injector);
+  private readonly locale = inject(LocaleFormat);
 
   protected readonly loading = signal(true);
   protected readonly loadFailure = signal<ApiError | null>(null);
@@ -62,8 +67,15 @@ export class InviteMember {
    * Held in a signal on this component, which means it is discarded the moment
    * the reader leaves. Nothing writes it anywhere that survives that.
    */
-  protected readonly created = signal<{ email: string; link: string } | null>(null);
+  protected readonly created = signal<{
+    email: string;
+    link: string;
+    roles: string;
+  } | null>(null);
   protected readonly copied = signal(false);
+
+  /** Set when the clipboard refused; the link is on screen to select by hand. */
+  protected readonly copyFailed = signal(false);
 
   private readonly selected = signal<ReadonlySet<string>>(new Set());
   private readonly submitAttempted = signal(false);
@@ -72,6 +84,18 @@ export class InviteMember {
   protected readonly canAssign = computed(() => this.permissions.has('members.roles.manage'));
 
   protected readonly selectedCount = computed(() => this.selected().size);
+
+  protected readonly selectedText = computed(() =>
+    rolesSelected(this.selected().size, this.locale.language),
+  );
+
+  protected roleCount(role: AssignableRole): string {
+    return permissionCount(role.permissionCount, this.locale.language);
+  }
+
+  protected onToggle(roleId: string, event: Event): void {
+    this.toggle(roleId, (event.target as HTMLInputElement).checked);
+  }
 
   protected readonly form = new FormGroup({
     email: new FormControl('', {
@@ -111,8 +135,8 @@ export class InviteMember {
   /** Says what is wrong: an empty field and a malformed address are different mistakes. */
   protected emailErrorText(): string {
     return this.form.controls.email.hasError('required')
-      ? 'Enter the email address to invite.'
-      : 'Enter a complete email address, such as name@example.com.';
+      ? $localize`:@@team.invite.email.required:Enter the email address to invite.`
+      : $localize`:@@team.invite.email.invalid:Enter a complete email address, such as name@example.com.`;
   }
 
   protected async load(): Promise<void> {
@@ -172,6 +196,7 @@ export class InviteMember {
       // header, which a query string is.
       this.created.set({
         email: invitation.invitation.email,
+        roles: roleList(invitation.invitation.roles, this.locale.language),
         link:
           `${window.location.origin}/${ACCEPT_INVITATION_PATH}` +
           `#token=${encodeURIComponent(invitation.token)}`,
@@ -205,8 +230,10 @@ export class InviteMember {
       await navigator.clipboard.writeText(invitation.link);
 
       this.copied.set(true);
+      this.copyFailed.set(false);
     } catch {
       this.copied.set(false);
+      this.copyFailed.set(true);
     }
   }
 
@@ -214,6 +241,7 @@ export class InviteMember {
   protected inviteAnother(): void {
     this.created.set(null);
     this.copied.set(false);
+    this.copyFailed.set(false);
     this.submitAttempted.set(false);
     this.selected.set(new Set());
     this.form.reset();

@@ -8,6 +8,8 @@ import { WorkspaceContextService } from '@app/core/workspace/workspace-context-s
 import { EmptyState } from '@app/shared/empty-state/empty-state';
 import { Icon } from '@app/shared/icon/icon';
 import { LocalDatePipe } from '@app/core/i18n/locale-pipes';
+import { LocaleFormat } from '@app/core/i18n/locale-format';
+import { permissionCount, roleDisplayName } from '../permission-words';
 import { PageHeader } from '@app/shared/page-header/page-header';
 
 /**
@@ -34,6 +36,7 @@ export class RoleList {
   private readonly api = inject(RoleApi);
   private readonly workspace = inject(WorkspaceContextService);
   private readonly permissions = inject(PermissionService);
+  private readonly locale = inject(LocaleFormat);
 
   protected readonly loading = signal(true);
   protected readonly failure = signal<ApiError | null>(null);
@@ -58,6 +61,19 @@ export class RoleList {
 
   constructor() {
     void this.load();
+  }
+
+  protected readonly roleName = roleDisplayName;
+
+  /** "10 permissions"; the protected role says it holds every one. */
+  protected countText(role: RoleSummary): string {
+    if (role.isSystem) {
+      const all = this.locale.number(role.permissionCount);
+
+      return $localize`:@@roles.list.allPermissions:All ${all}:count: permissions`;
+    }
+
+    return permissionCount(role.permissionCount, this.locale.language);
   }
 
   protected async load(): Promise<void> {

@@ -1,31 +1,37 @@
 <div class="page">
   <app-page-header
     heading="Roles & permissions"
-    description="A role is a named set of things its holders may do in this workspace. Members get their permissions from the roles they hold."
+    i18n-heading="@@roles.heading"
+    description="A role is a named set of things its holders may do in this workspace. Members get their access from the roles they hold."
+    i18n-description="@@roles.description"
   >
     @if (canCreate() && !loading()) {
-      <a pageActions class="btn btn-primary" routerLink="/roles/new">Create role</a>
+      <a pageActions class="btn btn-primary" routerLink="/roles/new" data-testid="create-role">
+        <app-icon name="plus" [strokeWidth]="2" />
+        <span i18n="@@roles.create.action">Create role</span>
+      </a>
     }
   </app-page-header>
 
   <div class="page-section">
     @if (!canView()) {
       <!--
-        The permission-denied state. It says what is true and what to do about
-        it, and does not say "403", does not imply the account is broken, and
-        does not name the permission code -- which is machine vocabulary an
-        operator cannot act on.
+        What is true and what to do about it: no "403", no permission code, and
+        nothing implying the account is broken.
       -->
       <div class="card">
         <app-empty-state
           icon="roles"
           heading="You do not have access to roles"
+          i18n-heading="@@roles.noAccess.heading"
           description="Viewing and managing this workspace's roles needs a permission your roles do not include. Ask somebody who administers this workspace if you need it."
+          i18n-description="@@roles.noAccess.body"
+          data-testid="roles-denied"
         />
       </div>
     } @else if (loading()) {
       <div class="data-list role-list" aria-busy="true">
-        <p class="visually-hidden" role="status">Loading roles…</p>
+        <p class="visually-hidden" role="status" i18n="@@roles.loading">Loading roles…</p>
         @for (row of skeletonRows; track row) {
           <div class="data-row data-row-skeleton" aria-hidden="true">
             <span class="skeleton skeleton-title"></span>
@@ -40,9 +46,16 @@
           icon="alert"
           tone="error"
           heading="Could not load roles"
+          i18n-heading="@@roles.loadFailed"
           [description]="error.message"
         >
-          <button stateActions type="button" class="btn btn-secondary btn-sm" (click)="load()">
+          <button
+            stateActions
+            type="button"
+            class="btn btn-secondary btn-sm"
+            (click)="load()"
+            i18n="@@roles.tryAgain"
+          >
             Try again
           </button>
         </app-empty-state>
@@ -50,47 +63,40 @@
     } @else {
       <div class="data-list role-list">
         <div class="data-list-head" aria-hidden="true">
-          <span>Role</span>
-          <span>Permissions</span>
-          <span>Last updated</span>
+          <span i18n="@@roles.column.role">Role</span>
+          <span i18n="@@roles.column.permissions">Permissions</span>
+          <span i18n="@@roles.column.updated">Last changed</span>
         </div>
 
-        <ul>
+        <ul data-testid="roles">
           @for (role of roles(); track role.id) {
             <li>
-              <!--
-                The whole row is one link, matching the agent list. A row with a
-                separate "open" button would give a keyboard reader two stops for
-                one destination.
-              -->
-              <a class="data-row" [routerLink]="['/roles', role.id]">
-                <span class="data-row-title">
-                  <span>{{ role.name }}</span>
+              <!-- The whole row is one link: one stop per destination. -->
+              <a
+                class="data-row"
+                [routerLink]="['/roles', role.id]"
+                [attr.data-testid]="'role-' + role.id"
+              >
+                <span class="data-row-title role-title">
+                  <span class="role-name" dir="auto">{{ roleName(role.name, role.isSystem) }}</span>
 
+                  <!--
+                    Owner is marked, not hidden: somebody looking for "who can do
+                    everything here" must find it, and see it is not theirs to edit.
+                  -->
                   @if (role.isSystem) {
-                    <!--
-                      Owner is marked, not hidden. Somebody looking for "who can
-                      do everything here" must be able to find it -- and must be
-                      able to see at a glance that it is not theirs to edit.
-                    -->
-                    <span class="badge badge-neutral">Protected</span>
-                  }
-                </span>
-
-                <span class="data-row-meta">
-                  @if (role.isSystem) {
-                    All {{ role.permissionCount }} permissions
-                  } @else if (role.permissionCount === 0) {
-                    No permissions
-                  } @else if (role.permissionCount === 1) {
-                    1 permission
+                    <span class="badge badge-neutral" i18n="@@roles.protected">Protected</span>
                   } @else {
-                    {{ role.permissionCount }} permissions
+                    <span class="badge badge-plain" i18n="@@roles.custom">Custom</span>
                   }
                 </span>
 
+                <span class="data-row-meta num">{{ countText(role) }}</span>
+
                 <span class="data-row-meta">
-                  <span class="data-cell-label">Updated&nbsp;</span>
+                  <span class="data-cell-label"
+                    ><span i18n="@@roles.cell.updated">Changed:</span>&nbsp;</span
+                  >
                   <time [attr.datetime]="role.updatedAt">{{
                     role.updatedAt | localDate: 'dateTime'
                   }}</time>
@@ -104,7 +110,7 @@
       </div>
 
       @if (!canCreate()) {
-        <p class="text-small text-muted role-note">
+        <p class="text-small text-muted role-note" i18n="@@roles.viewOnly">
           You can see this workspace's roles but not change them.
         </p>
       }

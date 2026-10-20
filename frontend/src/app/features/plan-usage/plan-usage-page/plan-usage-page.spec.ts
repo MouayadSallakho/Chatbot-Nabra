@@ -178,7 +178,7 @@ describe('PlanUsagePage', () => {
 
       const note = query('[data-testid="no-plan-change"]');
 
-      expect(note!.textContent).toContain('set by its subscription');
+      expect(note!.textContent).toContain("comes from the workspace's subscription");
       expect(note!.textContent).not.toContain('not available from this workspace yet');
     });
   });
@@ -188,9 +188,9 @@ describe('PlanUsagePage', () => {
       await mount();
       await answer(unlimited);
 
-      const agents = query('[data-testid="figure-aiAgents"]');
-
-      expect(agents!.textContent).toContain('Unlimited');
+      // The figure is what is held; the state says, in a word, there is no cap.
+      expect(query('[data-testid="figure-aiAgents"]')!.textContent).toContain('2 in use');
+      expect(query('[data-testid="state-aiAgents"]')!.textContent).toContain('Unlimited');
 
       // The three sentinels a reader must never see.
       expect(text()).not.toContain('999999999');
@@ -202,7 +202,7 @@ describe('PlanUsagePage', () => {
       await mount();
       await answer(unlimited);
 
-      expect(query('[data-testid="usage-aiAgents"] .usage-bar')).toBeNull();
+      expect(query('[data-testid="usage-aiAgents"] app-meter')).toBeNull();
       expect(query('[data-testid="usage-aiAgents"]')!.textContent).toContain(
         'No limit on this plan',
       );
@@ -212,8 +212,10 @@ describe('PlanUsagePage', () => {
       await mount();
       await answer(unlimited);
 
-      expect(query('[data-testid="note-aiAgents"]')).toBeNull();
+      expect(query('[data-testid="consequence-aiAgents"]')).toBeNull();
       expect(text()).not.toContain('Limit reached');
+      // Nothing is capped, so the threshold legend has nothing to explain.
+      expect(query('[data-testid="threshold-legend"]')).toBeNull();
     });
   });
 
@@ -229,11 +231,48 @@ describe('PlanUsagePage', () => {
       await mount();
       await answer(starter);
 
-      expect(query('[data-testid="note-members"]')!.textContent).toContain('Approaching the limit');
-      expect(query('[data-testid="note-knowledgeDocuments"]')!.textContent).toContain(
-        'Nearly at the limit',
+      const state = (name: string) => query(`[data-testid="state-${name}"]`)!;
+
+      // A word and a marker of its own for each state (the badge class draws a
+      // triangle, an octagon, a "no entry" disc), never the colour alone.
+      expect(state('members').textContent).toContain('Approaching the limit');
+      expect(state('members').classList).toContain('badge-warning');
+      expect(state('knowledgeDocuments').textContent).toContain('Nearly at the limit');
+      expect(state('knowledgeDocuments').classList).toContain('badge-danger');
+      expect(state('aiAgents').textContent).toContain('Limit reached');
+      expect(state('aiAgents').classList).toContain('badge-exhausted');
+      expect(state('webChatEndpoints').textContent).toContain('Within the limit');
+      expect(state('webChatEndpoints').classList).toContain('badge-neutral');
+      expect(query('[data-testid="threshold-legend"]')).not.toBeNull();
+    });
+
+    it('draws a real meter with the figures in words', async () => {
+      await mount();
+      await answer(starter);
+
+      const meter = query('[data-testid="usage-members"] [role="meter"]')!;
+
+      expect(meter.getAttribute('aria-valuenow')).toBe('4');
+      expect(meter.getAttribute('aria-valuemax')).toBe('5');
+      expect(meter.getAttribute('aria-valuetext')).toBe('4 of 5. Approaching the limit');
+      expect(meter.classList).toContain('is-warning');
+      expect(query('[data-testid="usage-aiAgents"] [role="meter"]')!.classList).toContain(
+        'is-exhausted',
       );
-      expect(query('[data-testid="note-aiAgents"]')!.textContent).toContain('Limit reached');
+      expect(query('[data-testid="usage-members"]')!.textContent).toContain('80% used');
+      expect(query('[data-testid="usage-members"]')!.textContent).toContain('1 left');
+    });
+
+    it('says what a state means for the next one', async () => {
+      await mount();
+      await answer(starter);
+
+      expect(query('[data-testid="consequence-members"]')!.textContent).toContain(
+        'Nothing is refused yet',
+      );
+      expect(query('[data-testid="consequence-aiAgents"]')!.textContent).toContain(
+        'New ones are refused',
+      );
     });
 
     it('says nothing alarming while usage is normal', async () => {
@@ -241,7 +280,7 @@ describe('PlanUsagePage', () => {
       await answer(starter);
 
       // Website chat is 0 of 1: nothing to warn about.
-      expect(query('[data-testid="note-webChatEndpoints"]')).toBeNull();
+      expect(query('[data-testid="consequence-webChatEndpoints"]')).toBeNull();
     });
 
     it('shows a limit of zero as exhausted rather than as unlimited', async () => {
@@ -261,15 +300,17 @@ describe('PlanUsagePage', () => {
       await mount();
       await answer(starter);
 
-      expect(query('[data-testid="figure-monthly"]')!.textContent).toContain('1,800 of 2,000');
+      expect(query('[data-testid="figure-monthlyProviderOperations"]')!.textContent).toContain(
+        '1,800 of 2,000',
+      );
 
-      const period = query('[data-testid="monthly-period"]')!.textContent ?? '';
+      const period = query('[data-testid="period-monthlyProviderOperations"]')!.textContent ?? '';
 
-      // The half-open window read as a month: the last day, never the first of
-      // the next one.
-      expect(period).toContain('September 2026');
+      // The half-open window read as days: it ends on the last day, and the
+      // boundary instant is said as the day it starts again.
+      expect(period).toContain('Sep 1 to Sep 30');
       expect(period).toContain('UTC');
-      expect(period).not.toContain('1 Oct');
+      expect(period).toContain('starts again on Oct 1');
     });
 
     it('explains what an exhausted allowance actually stops', async () => {
@@ -283,9 +324,10 @@ describe('PlanUsagePage', () => {
         ),
       });
 
-      const note = query('[data-testid="monthly-exhausted"]')!.textContent ?? '';
+      const note =
+        query('[data-testid="consequence-monthlyProviderOperations"]')!.textContent ?? '';
 
-      expect(note).toContain('monthly AI operation limit');
+      expect(note).toContain('do not run until the month resets');
 
       // And what still works, so nobody concludes the workspace is down.
       expect(note).toContain('handled by a person are unaffected');
@@ -295,8 +337,10 @@ describe('PlanUsagePage', () => {
       await mount();
       await answer(unlimited);
 
-      expect(query('[data-testid="figure-monthly"]')!.textContent).toContain('Unlimited');
-      expect(query('[data-testid="monthly-exhausted"]')).toBeNull();
+      expect(query('[data-testid="state-monthlyProviderOperations"]')!.textContent).toContain(
+        'Unlimited',
+      );
+      expect(query('[data-testid="consequence-monthlyProviderOperations"]')).toBeNull();
     });
   });
 
@@ -381,7 +425,23 @@ describe('PlanUsagePage', () => {
       http.expectOne((request) => request.url === url).flush(unlimited);
       await settle();
 
-      expect(query('[data-testid="figure-aiAgents"]')!.textContent).toContain('Unlimited');
+      expect(query('[data-testid="state-aiAgents"]')!.textContent).toContain('Unlimited');
+    });
+
+    it('keeps the figures it has when a refresh fails, and says so', async () => {
+      await mount();
+      await answer(starter);
+
+      query<HTMLButtonElement>('[data-testid="refresh"]')!.click();
+      await settle();
+
+      http
+        .expectOne((request) => request.url === url)
+        .flush({}, { status: 500, statusText: 'Server Error' });
+      await settle();
+
+      expect(query('[data-testid="refresh-failed"]')).not.toBeNull();
+      expect(query('[data-testid="figure-members"]')!.textContent).toContain('4 of 5');
     });
   });
 });

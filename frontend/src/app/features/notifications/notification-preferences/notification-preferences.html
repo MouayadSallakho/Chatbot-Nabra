@@ -1,99 +1,142 @@
 <div class="page">
   <app-page-header
     heading="Notifications"
+    i18n-heading="@@notifications.heading"
     description="Choose which operational alerts are also emailed to you. These choices are yours alone."
+    i18n-description="@@notificationPreferences.description"
   />
 
   <app-notifications-nav />
 
   <p class="visually-hidden" aria-live="polite" data-testid="announcement">{{ announcement() }}</p>
 
-  <div class="page-section">
-    <p
-      class="alert alert-info"
-      data-testid="in-app-note"
-      i18n="@@notificationPreferences.inAppNote"
-    >
+  <div class="page-section preferences-page">
+    <p class="guidance" data-testid="in-app-note" i18n="@@notificationPreferences.inAppNote">
       In-app notifications are always on. Email is off unless you turn a category on here, and it is
-      only ever sent to your own account's address. Emails never contain report files — they link to
+      only ever sent to your own account's address. Emails never contain report files: they link to
       Nabra, where you sign in as usual.
     </p>
 
     @if (!emailConfigured()) {
-      <p class="alert alert-warning" data-testid="email-unavailable">
-        Email is not set up on this deployment, so nothing will be emailed yet. Your choices are
-        saved and take effect once it is.
+      <p
+        class="alert alert-warning"
+        data-testid="email-unavailable"
+        i18n="@@notificationPreferences.emailUnavailable"
+      >
+        Email is not set up on this deployment, so nothing is emailed yet. Your choices are saved
+        and take effect once it is.
       </p>
     }
 
     @if (loading()) {
-      <div class="card card-body" aria-busy="true">
-        <p class="text-small text-secondary">Loading preferences…</p>
+      <div class="card card-body admin-skeleton" aria-busy="true">
+        <p class="visually-hidden" role="status" i18n="@@notificationPreferences.loading">
+          Loading preferences…
+        </p>
+        @for (row of [0, 1, 2, 3, 4]; track row) {
+          <span class="skeleton skeleton-text" aria-hidden="true"></span>
+        }
       </div>
     } @else if (failure(); as error) {
       <p class="alert alert-danger" role="alert">
-        Preferences could not be loaded. {{ error.message }}
+        <span i18n="@@notificationPreferences.loadFailed">Preferences could not be loaded.</span>
+        {{ error.message }}
       </p>
     } @else {
-      <form class="card card-body preferences" [formGroup]="form" (ngSubmit)="save()">
-        <fieldset class="categories">
-          <legend class="text-section-title">Email me about</legend>
-
-          @for (category of categories; track category.key) {
-            <div class="category">
-              <input
-                type="checkbox"
-                role="switch"
-                class="form-check-input category-switch"
-                [id]="'email-' + category.key"
-                [formControlName]="category.key"
-                [attr.aria-describedby]="'email-' + category.key + '-description'"
-                [attr.data-testid]="'email-' + category.key"
-              />
-              <div class="category-text">
-                <label class="category-label" [for]="'email-' + category.key">{{
-                  category.label
-                }}</label>
-                <p class="category-description" [id]="'email-' + category.key + '-description'">
-                  {{ category.description }}
-                </p>
-              </div>
-            </div>
-          }
-        </fieldset>
-
-        @if (saveFailure(); as error) {
-          <div class="alert alert-danger" role="alert" data-testid="save-error">
-            <p class="alert-text">
-              @if (error.kind === 'stale') {
-                Your preferences were changed somewhere else since you opened this page. Nothing was
-                saved.
+      <form class="card form-section preferences" [formGroup]="form" (ngSubmit)="save()">
+        <div class="card-header">
+          <div>
+            <h2
+              id="email-heading"
+              class="form-section-title"
+              i18n="@@notificationPreferences.legend"
+            >
+              Email me about
+            </h2>
+            <p class="form-section-lede" data-testid="on-count">
+              @if (onCount() === 0) {
+                <span i18n="@@notificationPreferences.allOff"
+                  >Every category is off: nothing is emailed to you.</span
+                >
               } @else {
-                {{ error.message }}
+                <span i18n="@@notificationPreferences.someOn"
+                  >Categories turned on: {{ onCount() }} of {{ categories.length }}.</span
+                >
               }
             </p>
-            @if (error.kind === 'stale') {
-              <button
-                type="button"
-                class="btn btn-secondary btn-sm"
-                (click)="reload()"
-                data-testid="reload"
-              >
-                Reload preferences
-              </button>
-            }
           </div>
-        }
+        </div>
 
-        <div class="form-actions">
-          <button
-            type="submit"
-            class="btn btn-primary"
-            [disabled]="saving() || form.pristine"
-            data-testid="save"
-          >
-            {{ saving() ? 'Saving…' : 'Save preferences' }}
-          </button>
+        <div class="card-body">
+          <fieldset class="categories" aria-labelledby="email-heading">
+            @for (category of categories; track category.key) {
+              <div class="category">
+                <input
+                  type="checkbox"
+                  role="switch"
+                  class="form-check-input category-switch"
+                  [id]="'email-' + category.key"
+                  [formControlName]="category.key"
+                  [attr.aria-describedby]="'email-' + category.key + '-description'"
+                  [attr.data-testid]="'email-' + category.key"
+                />
+                <div class="category-text">
+                  <label class="category-label" [for]="'email-' + category.key">{{
+                    category.label
+                  }}</label>
+                  <p class="category-description" [id]="'email-' + category.key + '-description'">
+                    {{ category.description }}
+                  </p>
+                </div>
+              </div>
+            }
+          </fieldset>
+
+          @if (saveFailure(); as error) {
+            <div class="alert alert-danger" role="alert" data-testid="save-error">
+              <p class="alert-text">
+                @if (error.kind === 'stale') {
+                  <span i18n="@@notificationPreferences.stale"
+                    >Your preferences were changed somewhere else since you opened this page.
+                    Nothing was saved.</span
+                  >
+                } @else {
+                  {{ error.message }}
+                }
+              </p>
+              @if (error.kind === 'stale') {
+                <button
+                  type="button"
+                  class="btn btn-secondary btn-sm"
+                  (click)="reload()"
+                  data-testid="reload"
+                  i18n="@@notificationPreferences.reload"
+                >
+                  Reload preferences
+                </button>
+              }
+            </div>
+          }
+
+          <div class="section-actions">
+            @if (dirty()) {
+              <span class="unsaved-note" aria-live="polite" i18n="@@notificationPreferences.unsaved"
+                >Unsaved changes</span
+              >
+            }
+            <button
+              type="submit"
+              class="btn btn-primary"
+              [disabled]="saving() || !dirty()"
+              data-testid="save"
+            >
+              @if (saving()) {
+                <span i18n="@@notificationPreferences.saving">Saving…</span>
+              } @else {
+                <span i18n="@@notificationPreferences.save">Save preferences</span>
+              }
+            </button>
+          </div>
         </div>
       </form>
     }

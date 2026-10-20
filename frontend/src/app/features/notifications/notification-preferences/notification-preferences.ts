@@ -7,6 +7,8 @@ import {
   inject,
   signal,
 } from '@angular/core';
+import { HasUnsavedChanges, protectUnsavedChanges } from '@app/core/navigation/unsaved-changes';
+import { categoryWord } from '@app/core/notifications/notification-words';
 import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
 import { ApiError, toApiError } from '@app/core/api/api-error';
@@ -40,7 +42,7 @@ interface Category {
   templateUrl: './notification-preferences.html',
   styleUrl: './notification-preferences.scss',
 })
-export class NotificationPreferencesPage {
+export class NotificationPreferencesPage implements HasUnsavedChanges {
   private readonly api = inject(NotificationApi);
   private readonly workspace = inject(WorkspaceContextService);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
@@ -49,28 +51,28 @@ export class NotificationPreferencesPage {
   protected readonly categories: readonly Category[] = [
     {
       key: 'reports',
-      label: 'Reports',
-      description: 'A report you requested, or one of your schedules, finished or failed.',
+      label: categoryWord('Reports'),
+      description: $localize`:@@notificationPreferences.reports:A report you requested, or one of your schedules, finished or failed.`,
     },
     {
       key: 'usage',
-      label: 'Usage',
-      description: 'AI usage reached 70%, 90% or 100% of the monthly limit.',
+      label: categoryWord('Usage'),
+      description: $localize`:@@notificationPreferences.usage:AI usage reached 70%, 90% or 100% of the monthly limit.`,
     },
     {
       key: 'billing',
-      label: 'Billing',
-      description: 'The subscription became past due, was suspended, ended or recovered.',
+      label: categoryWord('Billing'),
+      description: $localize`:@@notificationPreferences.billing:The subscription became past due, was suspended, ended or recovered.`,
     },
     {
       key: 'knowledge',
-      label: 'Knowledge',
-      description: 'Indexing a knowledge document failed.',
+      label: categoryWord('Knowledge'),
+      description: $localize`:@@notificationPreferences.knowledge:Indexing a knowledge document failed.`,
     },
     {
       key: 'channelHealth',
-      label: 'Channel health',
-      description: 'A WhatsApp delivery outcome could not be confirmed.',
+      label: categoryWord('ChannelHealth'),
+      description: $localize`:@@notificationPreferences.channelHealth:A WhatsApp delivery outcome could not be confirmed.`,
     },
   ];
 
@@ -90,8 +92,40 @@ export class NotificationPreferencesPage {
   protected readonly announcement = signal('');
   private etag: string | null = null;
 
+  /** Whether the switches differ from what is stored, mirrored for the guard and the note. */
+  protected readonly dirty = signal(false);
+
+  /** How many categories are emailed now, for the summary. */
+  protected readonly onCount = signal(0);
+
   constructor() {
+    this.form.valueChanges.subscribe(() => this.sync());
+    // The tab being closed or reloaded is the other way unsaved choices are lost.
+    protectUnsavedChanges(() => this.dirty());
     void this.load();
+  }
+
+  /** Asked by the route guard. */
+  hasUnsavedChanges(): boolean {
+    return this.dirty();
+  }
+
+  /** What the server holds, for comparing against the switches. */
+  private stored: EmailPreferences | null = null;
+
+  /**
+   * Compared by value, so turning a switch on and off again leaves the page
+   * clean, as the role and member editors do.
+   */
+  private sync(): void {
+    const now = this.form.getRawValue();
+    const stored = this.stored;
+
+    this.dirty.set(
+      stored !== null &&
+        (Object.keys(now) as (keyof EmailPreferences)[]).some((key) => now[key] !== stored[key]),
+    );
+    this.onCount.set(Object.values(this.form.getRawValue()).filter(Boolean).length);
   }
 
   protected async save(): Promise<void> {
@@ -110,8 +144,10 @@ export class NotificationPreferencesPage {
       );
 
       this.etag = saved.etag;
+      this.stored = saved.value.email;
       this.form.reset(saved.value.email);
-      this.announcement.set('Email preferences saved.');
+      this.sync();
+      this.announcement.set($localize`:@@notificationPreferences.saved:Email preferences saved.`);
       // Save is disabled while saving and again once nothing has changed, so the
       // browser has already dropped focus on the body. Back to the start of the
       // choices, so the reader is still in the form they were using.
@@ -146,7 +182,9 @@ export class NotificationPreferencesPage {
 
       this.etag = stored.etag;
       this.emailConfigured.set(stored.value.emailConfigured);
+      this.stored = stored.value.email;
       this.form.reset(stored.value.email);
+      this.sync();
       this.failure.set(null);
     } catch (error: unknown) {
       this.failure.set(toApiError(error));

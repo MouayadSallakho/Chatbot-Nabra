@@ -324,8 +324,32 @@ describe('BillingPage', () => {
       await answer(inArrears);
 
       expect(query('[data-testid="status"]')!.textContent).toContain('Payment failed');
-      expect(text()).toContain('keeps its plan for now');
-      expect(query('[data-testid="grace-ends"]')).not.toBeNull();
+      expect(text()).toContain('keeps its plan during a grace period');
+
+      // The deadline in words, and what happens after it; the subscribed plan
+      // is still the one in effect, so no fallback is claimed.
+      const grace = query('[data-testid="grace"]')!;
+
+      expect(grace.textContent).toContain('Plan kept until');
+      expect(grace.textContent).toContain('2026');
+      expect(grace.textContent).toContain('Nothing is deleted');
+      expect(query('[data-testid="fallback"]')).toBeNull();
+    });
+
+    it('says which plan is in effect once the fallback applies', async () => {
+      await mount();
+      await answer({
+        ...subscribed,
+        currentPlanName: 'Free',
+        subscription: { ...subscribed.subscription!, status: 'Suspended' },
+      });
+
+      expect(query('[data-testid="status"]')!.textContent).toContain('Suspended');
+      expect(query('[data-testid="plan-in-effect"]')!.textContent).toContain('Free');
+      expect(query('[data-testid="fallback"]')!.textContent).toContain('(not in effect)');
+      // A suspended subscription does not renew, so no renewal date is shown.
+      expect(query('[data-testid="period-end"]')).toBeNull();
+      expect(query('[data-testid="grace"]')).toBeNull();
     });
 
     it('says outright that cancellation is scheduled', async () => {
@@ -372,7 +396,7 @@ describe('BillingPage', () => {
 
       expect(query('[data-testid="not-managed"]')).not.toBeNull();
       expect(query('[data-testid="offers"]')).toBeNull();
-      expect(text()).toContain('not configured to take payments');
+      expect(text()).toContain('not set up to take payments');
     });
 
     it('never puts a provider identifier on the page', async () => {
@@ -392,7 +416,12 @@ describe('BillingPage', () => {
       await answer(forSale);
 
       expect(query('[data-testid="payment-footnote"]')!.textContent).toContain(
-        'never sent to, seen by or stored on this platform',
+        'never sent to, seen by or stored on Nabra',
+      );
+      // And the page changes only on the provider's confirmation, never on the
+      // browser coming back.
+      expect(query('[data-testid="payment-footnote"]')!.textContent).toContain(
+        'never because the browser came back',
       );
     });
 

@@ -33,6 +33,10 @@ import { Sparkline } from '@app/shared/charts/sparkline';
 import { StackedBar } from '@app/shared/charts/stacked-bar';
 import type { AnalyticsAiUsage, AnalyticsModelUsage } from '@app/features/analytics/analytics-api';
 import { ProviderUsageCard } from '@app/features/analytics/provider-usage/provider-usage';
+import type { WorkspaceSubscription } from '@app/features/billing/billing-api';
+import { SubscriptionSummary } from '@app/features/billing/subscription-summary/subscription-summary';
+import type { PlanEntitlement } from '@app/features/plan-usage/plan-usage-api';
+import { QuotaRow } from '@app/features/plan-usage/quota-row/quota-row';
 
 /** A named group of colour tokens, drawn as swatches with their live values. */
 interface TokenGroup {
@@ -50,6 +54,47 @@ const SAMPLE_CHART_DAYS: readonly Readonly<Record<string, number>>[] = [
   { customer: 23, human: 4, ai: 19, conversations: 8 },
   { customer: 11, human: 2, ai: 9, conversations: 4 },
 ];
+
+const SAMPLE_PLAN = $localize`:@@lab.admin.samplePlan:Growth (sample)`;
+const SAMPLE_FALLBACK = $localize`:@@lab.admin.sampleFallback:Starter fallback (sample)`;
+
+function sampleQuota(
+  entitlement: PlanEntitlement['entitlement'],
+  used: number,
+  limit: number,
+  state: PlanEntitlement['state'],
+): PlanEntitlement {
+  return {
+    entitlement,
+    used,
+    limit,
+    unlimited: false,
+    percentUsed: Math.round((used / limit) * 100),
+    state,
+    remaining: Math.max(0, limit - used),
+    period: null,
+  };
+}
+
+function daysFromNow(days: number): string {
+  return new Date(Date.now() + days * 86_400_000).toISOString();
+}
+
+function sampleSubscription(
+  status: WorkspaceSubscription['status'],
+  overrides: Partial<WorkspaceSubscription> = {},
+): WorkspaceSubscription {
+  return {
+    status,
+    interval: 'Monthly',
+    planName: SAMPLE_PLAN,
+    currentPeriodEnd: daysFromNow(21),
+    trialEndsAt: null,
+    cancelAtPeriodEnd: false,
+    graceEndsAt: null,
+    ...overrides,
+  };
+}
 
 /** One line of the sample transcript. */
 interface SampleMessage {
@@ -323,6 +368,8 @@ const SAMPLE_ROWS: readonly SampleRow[] = SAMPLE_TRANSCRIPT.map((message, index)
     Sparkline,
     StackedBar,
     ProviderUsageCard,
+    QuotaRow,
+    SubscriptionSummary,
   ],
   templateUrl: './design-lab.html',
   styleUrl: './design-lab.scss',
@@ -397,6 +444,70 @@ export class DesignLab {
   protected readonly sampleParts: readonly ChartPart[] = [
     { key: 'ai', label: $localize`:@@lab.charts.ai:AI (sample)`, value: 223, tone: 'ai' },
     { key: 'human', label: $localize`:@@lab.charts.team:Team (sample)`, value: 69, tone: 'human' },
+  ];
+
+  /**
+   * Sample limits, one per state the server reports, plus an unlimited one and
+   * a monthly one (Phase 36.10). The local stack runs an unlimited plan, so
+   * these exist only here, labelled as sample.
+   */
+  protected readonly sampleQuotas: readonly PlanEntitlement[] = [
+    sampleQuota('members', 6, 10, 'Normal'),
+    sampleQuota('aiAgents', 4, 5, 'Warning'),
+    sampleQuota('knowledgeDocuments', 46, 50, 'Critical'),
+    sampleQuota('webChatEndpoints', 3, 3, 'Exhausted'),
+    {
+      entitlement: 'whatsAppConnections',
+      used: 2,
+      limit: null,
+      unlimited: true,
+      percentUsed: null,
+      state: 'Normal',
+      remaining: null,
+      period: null,
+    },
+    {
+      ...sampleQuota('monthlyProviderOperations', 1820, 2000, 'Critical'),
+      period: { from: '2026-10-01T00:00:00Z', to: '2026-11-01T00:00:00Z' },
+    },
+  ];
+
+  /** Sample subscriptions, one per state worth seeing (Phase 36.10). */
+  protected readonly sampleSubscriptions: readonly {
+    readonly key: string;
+    readonly subscription: WorkspaceSubscription;
+    readonly current: string;
+  }[] = [
+    {
+      key: 'past-due',
+      current: SAMPLE_PLAN,
+      subscription: sampleSubscription('PastDue', { graceEndsAt: daysFromNow(5) }),
+    },
+    {
+      key: 'suspended',
+      current: SAMPLE_FALLBACK,
+      subscription: sampleSubscription('Suspended'),
+    },
+    {
+      key: 'canceling',
+      current: SAMPLE_PLAN,
+      subscription: sampleSubscription('Active', { cancelAtPeriodEnd: true }),
+    },
+    {
+      key: 'canceled',
+      current: SAMPLE_FALLBACK,
+      subscription: sampleSubscription('Canceled', { currentPeriodEnd: null }),
+    },
+    {
+      key: 'trial',
+      current: SAMPLE_PLAN,
+      subscription: sampleSubscription('Trialing', { trialEndsAt: daysFromNow(9) }),
+    },
+    {
+      key: 'pending',
+      current: SAMPLE_FALLBACK,
+      subscription: sampleSubscription('PendingActivation', { currentPeriodEnd: null }),
+    },
   ];
 
   protected readonly sampleUsage: AnalyticsAiUsage = {

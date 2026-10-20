@@ -18,9 +18,14 @@ import { PermissionDefinition } from '@app/core/authorization/permission-codes';
 import { PermissionService } from '@app/core/authorization/permission-service';
 import { Role, RoleApi } from '@app/core/authorization/role-api';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
+import { LocalDatePipe } from '@app/core/i18n/locale-pipes';
+import { LocaleFormat } from '@app/core/i18n/locale-format';
 import { EmptyState } from '@app/shared/empty-state/empty-state';
+import { Icon } from '@app/shared/icon/icon';
 import { PageHeader } from '@app/shared/page-header/page-header';
 import { PermissionGroup, groupPermissions } from '../permission-groups';
+import { PermissionPicker } from '../permission-picker/permission-picker';
+import { grantSummary, impactSummary, roleDisplayName } from '../permission-words';
 import { ROLE_NAME_MAX } from '../role-limits';
 
 /**
@@ -47,7 +52,15 @@ import { ROLE_NAME_MAX } from '../role-limits';
 @Component({
   selector: 'app-role-editor',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, RouterLink, PageHeader, EmptyState],
+  imports: [
+    ReactiveFormsModule,
+    RouterLink,
+    PageHeader,
+    EmptyState,
+    Icon,
+    PermissionPicker,
+    LocalDatePipe,
+  ],
   templateUrl: './role-editor.html',
   styleUrl: './role-editor.scss',
 })
@@ -56,6 +69,7 @@ export class RoleEditor implements OnInit, HasUnsavedChanges {
   private readonly permissionApi = inject(PermissionApi);
   private readonly workspace = inject(WorkspaceContextService);
   private readonly permissions = inject(PermissionService);
+  private readonly locale = inject(LocaleFormat);
 
   /** From the route, through `withComponentInputBinding`. */
   readonly roleId = input.required<string>();
@@ -80,6 +94,11 @@ export class RoleEditor implements OnInit, HasUnsavedChanges {
   protected readonly stale = signal(false);
 
   protected readonly nameLimit = ROLE_NAME_MAX;
+
+  protected readonly roleName = roleDisplayName;
+
+  protected readonly ownerDescription = $localize`:@@roles.editor.owner.description:The workspace owner's role, maintained by Nabra.`;
+  protected readonly customDescription = $localize`:@@roles.editor.custom.description:A role this workspace defines.`;
 
   /** The version the next conditional write must present. */
   private readonly version = signal<string | null>(null);
@@ -179,6 +198,29 @@ export class RoleEditor implements OnInit, HasUnsavedChanges {
       this.catalogue().some((permission) => !this.permissions.canDelegate(permission.code)),
   );
 
+  /** How many capabilities were withheld from the editable list. */
+  protected readonly withheldCount = computed(
+    () =>
+      this.catalogue().filter((permission) => !this.permissions.canDelegate(permission.code))
+        .length,
+  );
+
+  /** The codes ticked now, for the picker. */
+  protected readonly ticked = this.selected.asReadonly();
+
+  /** "Grants 10 of 29 permissions", for what is ticked now (or granted, read-only). */
+  protected readonly grantText = computed(() => {
+    const role = this.role();
+    const count = this.editable() ? this.selected().size : (role?.permissions.length ?? 0);
+
+    return grantSummary(count, this.catalogue().length, this.locale.language);
+  });
+
+  /** What the ticked (or granted) permissions can lead to, once each. */
+  protected readonly impacts = computed(() =>
+    impactSummary(this.editable() ? this.selected() : (this.role()?.permissions ?? [])),
+  );
+
   /**
    * The whole catalogue, unfiltered.
    *
@@ -253,7 +295,7 @@ export class RoleEditor implements OnInit, HasUnsavedChanges {
   }
 
   /** Ticks or unticks one capability. Local only until the set is saved. */
-  protected toggle(code: string, ticked: boolean): void {
+  protected toggle({ code, ticked }: { code: string; ticked: boolean }): void {
     this.selected.update((current) => {
       const next = new Set(current);
 

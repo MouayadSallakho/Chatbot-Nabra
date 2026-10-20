@@ -1,65 +1,7 @@
-// The create form shares the editor's permission-group presentation, and the
-// styles are duplicated rather than shared through a global class. The two
-// screens are one refactor away from diverging -- create has no precondition and
-// no read-only mode -- and a shared stylesheet between two feature components
-// would couple them for the sake of forty lines.
-.section-note {
-  margin-block-end: var(--space-3);
-}
-
-.role-form {
-  display: grid;
-  gap: var(--space-4);
-}
-
-.field {
-  display: grid;
-  gap: var(--space-2);
-}
-
-.form-actions {
+// The numbered sections live in `_authoring.scss`, the permission areas and
+// impact hints in `_admin.scss`, shared with the role editor.
+.role-create {
   display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-}
-
-.permission-group {
-  display: grid;
-  gap: var(--space-3);
-  margin-block-end: var(--space-3);
-  border-width: 1px;
-  min-inline-size: 0;
-}
-
-.permission-group-name {
-  color: var(--text-secondary);
-  text-transform: uppercase;
-  letter-spacing: var(--letter-spacing-caps);
-  // Floated, the legend leaves the fieldset's border and becomes ordinary
-  // content: a heading inside the card, not a label cutting through its edge.
-  float: inline-start;
-  inline-size: 100%;
-  padding: 0;
-  margin: 0;
-}
-
-.permission-option {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: var(--space-3);
-  align-items: start;
-  cursor: pointer;
-  padding-block: var(--space-1);
-}
-
-.permission-option-text {
-  display: grid;
-  gap: var(--space-1);
-  min-inline-size: 0;
-}
-
-.permission-label {
-  font: var(--text-body-strong);
-  overflow-wrap: anywhere;
+  flex-direction: column;
+  gap: var(--space-6);
 }

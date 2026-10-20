@@ -15,7 +15,13 @@ import { Icon } from '@app/shared/icon/icon';
 
 /** What a paged list holds. Each kind has its own counted phrase and landmark name. */
 export type PagedItems =
-  'aiAgents' | 'conversations' | 'customers' | 'documents' | 'notifications' | 'reports';
+  | 'aiAgents'
+  | 'conversations'
+  | 'customers'
+  | 'documents'
+  | 'members'
+  | 'notifications'
+  | 'reports';
 
 interface PagedItemsWords {
   /** "of 57 customers", whole, for each plural category. */
@@ -32,6 +38,17 @@ interface PagedItemsWords {
  * wording (localisation-arabic-rtl.md, 3.10).
  */
 const WORDS: Readonly<Record<PagedItems, PagedItemsWords>> = {
+  members: {
+    ofTotal: (n) => ({
+      zero: $localize`:@@pager.members.zero:of ${n}:count: members`,
+      one: $localize`:@@pager.members.one:of ${n}:count: member`,
+      two: $localize`:@@pager.members.two:of ${n}:count: members`,
+      few: $localize`:@@pager.members.few:of ${n}:count: members`,
+      many: $localize`:@@pager.members.many:of ${n}:count: members`,
+      other: $localize`:@@pager.members.other:of ${n}:count: members`,
+    }),
+    label: () => $localize`:@@pager.members.label:Member pages`,
+  },
   aiAgents: {
     ofTotal: (n) => ({
       zero: $localize`:@@pager.aiAgents.zero:of ${n}:count: AI agents`,

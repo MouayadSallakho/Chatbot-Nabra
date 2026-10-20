@@ -19,7 +19,7 @@ import { TeamPage } from './team-page';
 describe('TeamPage', () => {
   const tenantId = '11111111-1111-1111-1111-111111111111';
   const membersUrl = `/api/tenants/${tenantId}/members?page=1&pageSize=20`;
-  const invitationsUrl = `/api/tenants/${tenantId}/invitations?page=1&pageSize=20`;
+  const invitationsUrl = `/api/tenants/${tenantId}/invitations?page=1&pageSize=100`;
 
   const owner: MemberSummary = {
     userId: 'aaaaaaaa-0000-0000-0000-000000000001',
@@ -85,17 +85,25 @@ describe('TeamPage', () => {
     fixture.detectChanges();
   }
 
-  function flush(members: readonly MemberSummary[], invitations: readonly Invitation[]): void {
+  function flush(
+    members: readonly MemberSummary[],
+    invitations: readonly Invitation[],
+    memberTotal = members.length,
+  ): void {
     http.expectOne(membersUrl).flush({
       items: members,
       page: 1,
       pageSize: 20,
-      total: members.length,
+      total: memberTotal,
     });
+    flushInvitations(invitations);
+  }
+
+  function flushInvitations(invitations: readonly Invitation[]): void {
     http.expectOne(invitationsUrl).flush({
       items: invitations,
       page: 1,
-      pageSize: 20,
+      pageSize: 100,
       total: invitations.length,
     });
   }
@@ -130,19 +138,82 @@ describe('TeamPage', () => {
     flush([{ ...bob, roles: [] }], []);
     await settle();
 
-    expect(text()).toContain('No roles yet');
+    expect(text()).toContain('No roles: can see the workspace only');
   });
 
-  it('lists pending invitations and leaves concluded ones out', async () => {
-    // An accepted or revoked invitation is history. A list that accumulated
-    // every invitation a workspace ever issued would bury the ones that matter.
+  it('lists waiting invitations, and folds concluded ones away with their state', async () => {
+    // An accepted or revoked invitation is history: kept out of the list of
+    // things to act on, but still findable, each with its state in words.
     await mount('members.view');
 
-    flush([owner], [pendingInvitation, { ...pendingInvitation, id: 'other', status: 'Accepted' }]);
+    flush(
+      [owner],
+      [
+        pendingInvitation,
+        { ...pendingInvitation, id: 'accepted', email: 'dave@example.test', status: 'Accepted' },
+        { ...pendingInvitation, id: 'revoked', email: 'erin@example.test', status: 'Revoked' },
+      ],
+    );
     await settle();
 
-    expect(text()).toContain('carol@example.test');
-    expect(text()).not.toContain('other');
+    const waiting = host().querySelector('[data-testid="pending-invitations"]')!;
+    const past = host().querySelector('[data-testid="past-invitations"]')!;
+
+    expect(waiting.textContent).toContain('carol@example.test');
+    expect(waiting.textContent).toContain('Waiting');
+    expect(waiting.textContent).not.toContain('dave@example.test');
+    expect(past.tagName).toBe('DETAILS');
+    expect(past.hasAttribute('open')).toBe(false);
+    expect(past.querySelector('[data-testid="invitation-accepted"]')!.textContent).toContain(
+      'Accepted',
+    );
+    expect(past.querySelector('[data-testid="invitation-revoked"]')!.textContent).toContain(
+      'Revoked',
+    );
+    expect(host().querySelector('[data-testid="waiting-summary"]')!.textContent).toContain(
+      '1 invitation is waiting',
+    );
+  });
+
+  it('pages through the members with the page in the address', async () => {
+    await mount('members.view');
+
+    flush([owner, bob], [], 45);
+    await settle();
+
+    expect(host().querySelector('[data-testid="team-facts"]')!.textContent).toContain('45');
+
+    const next = [...host().querySelectorAll<HTMLButtonElement>('app-pagination button')].find(
+      (candidate) => (candidate.textContent ?? '').includes('Next'),
+    );
+
+    next!.click();
+    await settle();
+
+    // Only the members are read again; the invitations stay as they are.
+    http.expectOne(`/api/tenants/${tenantId}/members?page=2&pageSize=20`).flush({
+      items: [bob],
+      page: 2,
+      pageSize: 20,
+      total: 45,
+    });
+    await settle();
+
+    expect(text()).toContain('bob@example.test');
+    expect(text()).not.toContain('owner@example.test');
+  });
+
+  it('keeps the members when only the invitations fail to load', async () => {
+    await mount('members.view');
+
+    http.expectOne(membersUrl).flush({ items: [owner], page: 1, pageSize: 20, total: 1 });
+    http.expectOne(invitationsUrl).flush('nope', { status: 500, statusText: 'Server Error' });
+    await settle();
+
+    expect(text()).toContain('owner@example.test');
+    expect(text()).toContain('Invitations could not be read just now.');
+    // Never a count of zero for something that was not read.
+    expect(text()).not.toContain('Invitations waiting');
   });
 
   it('offers inviting only with the invite permission', async () => {
@@ -187,7 +258,8 @@ describe('TeamPage', () => {
       .expectOne(`/api/tenants/${tenantId}/invitations/${pendingInvitation.id}/revoke`)
       .flush(null);
     await settle();
-    flush([owner], []);
+    // Only the invitations are read again: the members page stays where it was.
+    flushInvitations([]);
     await settle();
     await settle();
 

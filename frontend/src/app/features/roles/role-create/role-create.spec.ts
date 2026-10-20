@@ -78,7 +78,7 @@ describe('RoleCreate', () => {
   const text = (): string => host().textContent ?? '';
 
   const tick = (label: string): HTMLInputElement | undefined =>
-    [...host().querySelectorAll<HTMLLabelElement>('label.permission-option')]
+    [...host().querySelectorAll<HTMLLabelElement>('label.perm-option')]
       .find((option) => (option.textContent ?? '').includes(label))
       ?.querySelector('input') ?? undefined;
 
@@ -116,7 +116,9 @@ describe('RoleCreate', () => {
     expect(tick('Edit AI agents')).toBeUndefined();
     expect(tick('Activate and disable AI agents')).toBeUndefined();
 
-    expect(text()).toContain('Only capabilities your own roles include are listed.');
+    expect(host().querySelector('[data-testid="ceiling-note"]')!.textContent).toContain(
+      'Only permissions your own roles include are listed',
+    );
   });
 
   it('offers the whole catalogue to somebody who holds it all', async () => {
@@ -128,7 +130,7 @@ describe('RoleCreate', () => {
       expect(tick(permission.label)).toBeDefined();
     }
 
-    expect(text()).not.toContain('Only capabilities your own roles include are listed.');
+    expect(host().querySelector('[data-testid="ceiling-note"]')).toBeNull();
   });
 
   it('sends only what was ticked from the narrowed list', async () => {

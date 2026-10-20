@@ -1,7 +1,9 @@
 <div class="page">
   <app-page-header
     heading="Notifications"
+    i18n-heading="@@notifications.heading"
     description="Operational alerts about this workspace, addressed to you. Only you can see these."
+    i18n-description="@@notifications.description"
   >
     @if (unreadCount() > 0) {
       <button
@@ -11,7 +13,8 @@
         (click)="markAllRead()"
         data-testid="page-mark-all-read"
       >
-        Mark all as read
+        <app-icon name="check" [strokeWidth]="2" />
+        <span i18n="@@notifications.markAllRead">Mark all as read</span>
       </button>
     }
   </app-page-header>
@@ -22,38 +25,63 @@
 
   <div class="page-section">
     @if (loading()) {
-      <div class="card card-body" aria-busy="true">
-        <p class="text-small text-secondary">Loading notifications…</p>
+      <!-- The shape of a page of notifications, so nothing jumps when they arrive. -->
+      <div class="card notification-history" aria-busy="true">
+        <p class="visually-hidden" role="status" i18n="@@notifications.loading">
+          Loading notifications…
+        </p>
+        @for (row of [0, 1, 2]; track row) {
+          <div class="card-body admin-skeleton" aria-hidden="true">
+            <span class="skeleton skeleton-title"></span>
+            <span class="skeleton skeleton-text"></span>
+          </div>
+        }
       </div>
     } @else if (failure(); as error) {
-      <p class="alert alert-danger" role="alert">
-        Notifications could not be loaded. {{ error.message }}
-      </p>
+      <div class="card">
+        <app-empty-state
+          icon="alert"
+          tone="error"
+          heading="Notifications could not be loaded"
+          i18n-heading="@@notifications.pageLoadFailed"
+          [description]="error.message"
+        />
+      </div>
     } @else if (items().length === 0) {
       <div class="card">
         <app-empty-state
-          icon="inbox"
+          icon="bell"
           heading="No notifications yet"
-          description="When a report finishes, usage nears its limit, billing needs attention, knowledge indexing fails or a WhatsApp delivery cannot be confirmed, you will be told here."
+          i18n-heading="@@notifications.emptyTitle"
+          description="When a report finishes, usage nears its limit, billing needs attention, knowledge indexing fails or a WhatsApp delivery cannot be confirmed, you are told here."
+          i18n-description="@@notifications.pageEmpty"
         />
       </div>
     } @else {
-      <section class="card" aria-labelledby="history-heading">
-        <h2 id="history-heading" class="visually-hidden">Notification history</h2>
+      <section class="card notification-history" aria-labelledby="history-heading">
+        <h2 id="history-heading" class="visually-hidden" i18n="@@notifications.history">
+          Notification history
+        </h2>
         <p class="history-summary text-small text-secondary" data-testid="summary">
-          {{ unreadCount() }} unread of {{ totalCount() }}. Notifications are kept for 90 days.
+          {{ summary() }}
+          <span i18n="@@notifications.kept">Notifications are kept for 90 days.</span>
         </p>
-        <ul class="history-list">
-          @for (notification of items(); track notification.id) {
-            <li>
-              <app-notification-item
-                [notification]="notification"
-                (opened)="opened($event)"
-                (markedRead)="markRead($event)"
-              />
-            </li>
-          }
-        </ul>
+
+        @for (day of days(); track day.key) {
+          <h3 class="history-day" [attr.data-testid]="'day-' + day.key">{{ day.label }}</h3>
+          <ul class="history-list">
+            @for (notification of day.items; track notification.id) {
+              <li>
+                <app-notification-item
+                  [notification]="notification"
+                  timeStyle="time"
+                  (opened)="opened($event)"
+                  (markedRead)="markRead($event)"
+                />
+              </li>
+            }
+          </ul>
+        }
       </section>
 
       <app-pagination

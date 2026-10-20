@@ -5,6 +5,7 @@
       backLabel="Team"
       i18n-backLabel="@@back.team"
       heading="Team member"
+      i18n-heading="@@team.member.heading"
     />
 
     <div class="page-section">
@@ -12,7 +13,9 @@
         <app-empty-state
           icon="team"
           heading="You do not have access to the team"
+          i18n-heading="@@team.noAccess.heading"
           description="Seeing who belongs to this workspace needs a permission your roles do not include. Ask somebody who administers this workspace if you need it."
+          i18n-description="@@team.noAccess.body"
         />
       </div>
     </div>
@@ -22,15 +25,19 @@
       backLabel="Team"
       i18n-backLabel="@@back.team"
       heading="Team member"
+      i18n-heading="@@team.member.heading"
     />
 
     <div class="page-section" aria-busy="true">
-      <p class="visually-hidden" role="status">Loading member…</p>
-      <div class="card">
-        <div class="card-body">
-          <span class="skeleton skeleton-title"></span>
-          <span class="skeleton skeleton-text"></span>
-        </div>
+      <p class="visually-hidden" role="status" i18n="@@team.member.loading">Loading member…</p>
+      <div class="admin-facts" aria-hidden="true">
+        <span class="skeleton skeleton-text"></span>
+        <span class="skeleton skeleton-text"></span>
+      </div>
+      <div class="card card-body admin-skeleton" aria-hidden="true">
+        <span class="skeleton skeleton-title"></span>
+        <span class="skeleton skeleton-text"></span>
+        <span class="skeleton skeleton-text"></span>
       </div>
     </div>
   } @else if (failure(); as error) {
@@ -39,50 +46,86 @@
       backLabel="Team"
       i18n-backLabel="@@back.team"
       heading="Team member"
+      i18n-heading="@@team.member.heading"
     />
 
     <div class="page-section">
       <div class="card">
-        <app-empty-state
-          icon="alert"
-          tone="error"
-          [heading]="error.kind === 'notFound' ? 'Member not found' : 'Could not load member'"
-          [description]="error.message"
-        >
-          <a stateActions class="btn btn-secondary btn-sm" routerLink="/team">Back to team</a>
-        </app-empty-state>
+        @if (error.kind === 'notFound') {
+          <app-empty-state
+            icon="alert"
+            tone="error"
+            heading="Member not found"
+            i18n-heading="@@team.member.notFound"
+            [description]="error.message"
+          >
+            <a
+              stateActions
+              class="btn btn-secondary btn-sm"
+              routerLink="/team"
+              i18n="@@team.backToTeam"
+              >Back to team</a
+            >
+          </app-empty-state>
+        } @else {
+          <app-empty-state
+            icon="alert"
+            tone="error"
+            heading="Could not load member"
+            i18n-heading="@@team.member.loadFailed"
+            [description]="error.message"
+          >
+            <button
+              stateActions
+              type="button"
+              class="btn btn-secondary btn-sm"
+              (click)="load()"
+              i18n="@@team.tryAgain"
+            >
+              Try again
+            </button>
+          </app-empty-state>
+        }
       </div>
     </div>
   } @else if (member(); as current) {
+    <!-- The heading is an address: isolated, left to right, in a page-direction heading. -->
     <app-page-header
       backLink="/team"
       backLabel="Team"
       i18n-backLabel="@@back.team"
       [heading]="current.email"
-      [description]="
-        current.isOwner
-          ? 'The workspace owner. Their access is maintained by the platform.'
-          : 'A member of this workspace.'
-      "
+      headingDir="auto"
     >
+      @if (current.isOwner) {
+        <span pageStatus class="badge badge-neutral" i18n="@@team.owner">Owner</span>
+      }
+      @if (isSelf()) {
+        <span pageStatus class="badge badge-plain" i18n="@@team.you">You</span>
+      }
     </app-page-header>
 
     <!--
-      The stale-save banner. Deliberately not an error beside one checkbox: this
-      person's access moved underneath the whole screen, and only re-reading
-      fixes it. Nothing local has been touched, so the reader can see what they
-      had chosen before deciding to reload.
+      The stale-save banner. Not an error beside one checkbox: this person's
+      access moved underneath the whole screen. Nothing local has been touched.
     -->
     @if (stale()) {
       <div class="page-section">
-        <div class="stale-notice" role="alert">
-          <p class="conflict-title">This team member was updated elsewhere.</p>
-          <p class="text-small text-secondary">
+        <div class="stale-notice" role="alert" data-testid="stale-notice">
+          <p class="conflict-title" i18n="@@team.member.stale.title">
+            This team member was updated elsewhere.
+          </p>
+          <p class="text-small text-secondary" i18n="@@team.member.stale.body">
             Your changes have not been saved and are still on screen. Reload to see their current
-            access — anything you have ticked here will be replaced.
+            access; anything you have ticked here will be replaced.
           </p>
           <div class="conflict-actions">
-            <button type="button" class="btn btn-primary btn-sm" (click)="reload()">
+            <button
+              type="button"
+              class="btn btn-primary btn-sm"
+              (click)="reload()"
+              i18n="@@team.member.stale.reload"
+            >
               Reload latest
             </button>
           </div>
@@ -90,60 +133,103 @@
       </div>
     }
 
-    <div class="page-section">
-      <div class="card member-facts">
-        <div>
-          <p class="text-label text-muted">Joined</p>
-          <p class="text-body">{{ current.joinedAt | localDate: 'dateTime' }}</p>
-        </div>
-        <div>
-          <p class="text-label text-muted">Access last changed</p>
-          <p class="text-body">{{ current.accessUpdatedAt | localDate: 'dateTime' }}</p>
-        </div>
+    <dl class="admin-facts page-section" data-testid="member-facts">
+      <div>
+        <dt i18n="@@team.facts.joined">Joined</dt>
+        <dd>
+          <time [attr.datetime]="current.joinedAt">{{ current.joinedAt | localDate: 'date' }}</time>
+        </dd>
       </div>
-    </div>
+      <div>
+        <dt i18n="@@team.facts.accessChanged">Access last changed</dt>
+        <dd>
+          <time [attr.datetime]="current.accessUpdatedAt">{{
+            current.accessUpdatedAt | localDate: 'dateTime'
+          }}</time>
+        </dd>
+      </div>
+      <div>
+        <dt i18n="@@team.facts.access">Access</dt>
+        <dd data-testid="permission-total">{{ permissionTotal() }}</dd>
+      </div>
+    </dl>
+
+    @if (accessAreas().length || accessImpacts().length) {
+      <!-- What they can do now, from the access the server published for them. -->
+      <section class="card card-body page-section access-glance" aria-labelledby="access-heading">
+        <h2 id="access-heading" class="text-section-title" i18n="@@team.access.heading">
+          What they can do now
+        </h2>
+        @if (accessAreas().length) {
+          <ul class="access-areas" data-testid="access-areas">
+            @for (area of accessAreas(); track area.key) {
+              <li>
+                <span>{{ area.name }}</span>
+                <span class="num text-muted">{{ area.held }}</span>
+              </li>
+            }
+          </ul>
+        }
+        @if (accessImpacts().length) {
+          <ul class="perm-impacts">
+            @for (impact of accessImpacts(); track impact.kind) {
+              <li class="impact" [attr.data-impact]="impact.kind">
+                <app-icon [name]="impact.icon" [strokeWidth]="1.75" />{{ impact.text }}
+              </li>
+            }
+          </ul>
+        }
+      </section>
+    }
 
     @if (!editable()) {
       <!--
-        Read-only, and it says which of the four reasons applies. They lead to
-        different next steps: one is permanent, one is about this particular
-        member, and one means asking for more permission.
+        Read-only, and it says which of the reasons applies: they lead to
+        different next steps (permanent, ask a colleague, ask for permission).
       -->
       <div class="page-section">
-        <div class="card card-body">
+        <div class="card card-body admin-note" data-testid="read-only-reason">
           @switch (readOnlyReason()) {
             @case ('owner') {
-              <h2 class="text-section-title">Owner access is protected</h2>
-              <p class="text-small text-secondary">
-                The workspace owner's access is maintained by the platform and cannot be changed
-                from team management. Transferring ownership is not something this release supports.
+              <h2 class="text-section-title" i18n="@@team.readOnly.owner.title">
+                Owner access is protected
+              </h2>
+              <p class="text-small text-secondary" i18n="@@team.readOnly.owner.body">
+                The workspace owner's access is maintained by Nabra and cannot be changed from team
+                management. Transferring ownership is not something this release supports.
               </p>
             }
             @case ('self') {
-              <h2 class="text-section-title">This is your own access</h2>
-              <p class="text-small text-secondary">
-                You cannot change your own roles here. It is the one change that could lock you —
-                and possibly everybody else — out of administering this workspace, so it is left to
+              <h2 class="text-section-title" i18n="@@team.readOnly.self.title">
+                This is your own access
+              </h2>
+              <p class="text-small text-secondary" i18n="@@team.readOnly.self.body">
+                You cannot change your own roles here. It is the one change that could lock you, and
+                possibly everybody else, out of administering this workspace, so it is left to
                 somebody else to make.
               </p>
             }
             @case ('outranked') {
-              <h2 class="text-section-title">You cannot change this member's access</h2>
-              <p class="text-small text-secondary">
+              <h2 class="text-section-title" i18n="@@team.readOnly.outranked.title">
+                You cannot change this member's access
+              </h2>
+              <p class="text-small text-secondary" i18n="@@team.readOnly.outranked.body">
                 This member holds access your own roles do not include, so their roles are not yours
                 to change. Ask somebody who administers this workspace if it needs changing.
               </p>
 
               @if (rolesBeyondMe().length > 0) {
                 <p class="text-small text-muted">
-                  Beyond your access:
-                  {{ beyondNames() }}
+                  <span i18n="@@team.readOnly.beyond">Beyond your access:</span>&nbsp;<span
+                    dir="auto"
+                    >{{ beyondNames() }}</span
+                  >
                 </p>
               }
             }
             @default {
-              <h2 class="text-section-title">Read-only</h2>
-              <p class="text-small text-secondary">
+              <h2 class="text-section-title" i18n="@@team.readOnly.title">Read-only</h2>
+              <p class="text-small text-secondary" i18n="@@team.readOnly.body">
                 You can see this member's access but not change it. Assigning roles needs a
                 permission your roles do not include.
               </p>
@@ -152,90 +238,111 @@
         </div>
       </div>
 
-      <div class="page-section">
-        <h2 class="text-section-title">Roles</h2>
+      <section class="page-section" aria-labelledby="roles-heading">
+        <h2 id="roles-heading" class="text-section-title" i18n="@@team.roles.heading">Roles</h2>
 
         @if (current.roles.length === 0) {
           <div class="card card-body">
-            <p class="text-small text-muted">
+            <p class="text-small text-muted" i18n="@@team.roles.none">
               This member holds no roles, so they can see the workspace but do nothing in it yet.
             </p>
           </div>
         } @else {
-          <div class="card card-body">
-            <ul class="role-readout">
-              @for (role of current.roles; track role.id) {
-                <li>
-                  <span class="role-name">{{ role.name }}</span>
-                  @if (role.isSystem) {
-                    <span class="badge badge-neutral">Protected</span>
-                  }
-                </li>
-              }
-            </ul>
-          </div>
+          <ul class="card role-readout" data-testid="role-readout">
+            @for (role of current.roles; track role.id) {
+              <li>
+                <span class="role-name" dir="auto">{{ roleName(role.name, role.isSystem) }}</span>
+                @if (role.isSystem) {
+                  <span class="badge badge-neutral" i18n="@@roles.protected">Protected</span>
+                }
+              </li>
+            }
+          </ul>
         }
-      </div>
+      </section>
     } @else {
-      <div class="page-section">
-        <h2 class="text-section-title">Roles</h2>
-        <p class="text-small text-secondary section-note">
-          Tick what this member may do. Only roles your own access lets you hand out are listed, and
-          a member with no roles can see the workspace but do nothing in it.
-        </p>
-
-        @if (assignable().length === 0) {
-          <div class="card card-body">
-            <p class="text-small text-muted">
-              There are no roles you can assign yet. Create one in Roles &amp; permissions first.
+      <section class="card form-section page-section" aria-labelledby="roles-heading">
+        <div class="card-header">
+          <div>
+            <h2 id="roles-heading" class="form-section-title" i18n="@@team.roles.heading">Roles</h2>
+            <p class="form-section-lede" i18n="@@team.roles.lede">
+              Tick what this member may do. Only roles your own access lets you hand out are listed.
+              Their access changes as soon as you save.
             </p>
           </div>
-        } @else {
-          <fieldset class="card role-options">
-            <legend class="visually-hidden">Roles for this member</legend>
-
-            @for (role of assignable(); track role.id) {
-              <label class="role-option">
-                <input
-                  type="checkbox"
-                  class="form-check-input"
-                  [checked]="isTicked(role.id)"
-                  (change)="toggle(role.id, $any($event.target).checked)"
-                />
-                <span class="role-option-text">
-                  <span class="role-name">{{ role.name }}</span>
-                  <span class="text-small text-muted">
-                    @if (role.permissionCount === 1) {
-                      1 permission
-                    } @else {
-                      {{ role.permissionCount }} permissions
-                    }
-                  </span>
-                </span>
-              </label>
-            }
-          </fieldset>
-        }
-
-        @if (saveFailure(); as error) {
-          <p class="alert alert-danger" role="alert">{{ error.message }}</p>
-        }
-
-        <div class="form-actions">
-          <button
-            type="button"
-            class="btn btn-primary"
-            [disabled]="!dirty() || saving()"
-            (click)="save()"
-          >
-            {{ saving() ? 'Saving…' : 'Save access' }}
-          </button>
-
-          @if (dirty()) {
-            <p class="text-small text-muted" aria-live="polite">You have unsaved changes.</p>
-          }
         </div>
-      </div>
+
+        <div class="card-body">
+          @if (assignable().length === 0) {
+            <p class="text-small text-muted" i18n="@@team.roles.noneAssignable">
+              There are no roles you can assign yet. Create one in Roles &amp; permissions first.
+            </p>
+          } @else {
+            <fieldset class="role-options">
+              <legend class="visually-hidden" i18n="@@team.roles.legend">
+                Roles for this member
+              </legend>
+
+              @for (role of assignable(); track role.id) {
+                <label class="role-option" [attr.data-testid]="'role-option-' + role.id">
+                  <input
+                    type="checkbox"
+                    class="form-check-input"
+                    [checked]="isTicked(role.id)"
+                    (change)="onToggle(role.id, $event)"
+                  />
+                  <span class="role-option-text">
+                    <span class="role-name" dir="auto">{{ role.name }}</span>
+                    <span class="text-small text-muted">{{ roleCount(role) }}</span>
+                  </span>
+                </label>
+              }
+            </fieldset>
+          }
+
+          @if (saveFailure(); as error) {
+            <p class="alert alert-danger" role="alert">{{ error.message }}</p>
+          }
+
+          <div class="section-actions">
+            <span class="unsaved-or-count" aria-live="polite">
+              @if (dirty()) {
+                <span class="unsaved-note" i18n="@@team.unsaved">Unsaved changes</span>
+                <span class="text-small text-secondary" data-testid="change-summary" dir="auto">{{
+                  changeText()
+                }}</span>
+              } @else {
+                <span class="text-small text-muted">{{ selectedText() }}</span>
+              }
+            </span>
+            <button
+              type="button"
+              class="btn btn-primary"
+              [disabled]="!dirty() || saving()"
+              (click)="save()"
+              data-testid="save-access"
+            >
+              @if (saving()) {
+                <span i18n="@@team.saving">Saving…</span>
+              } @else {
+                <span i18n="@@team.saveAccess">Save access</span>
+              }
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <app-confirm-dialog
+        #removeAllDialog
+        [heading]="removeAllHeading()"
+        body="They will still see the workspace, but will be able to do nothing in it until somebody gives them a role again."
+        i18n-body="@@team.removeAll.body"
+        confirmLabel="Remove every role"
+        i18n-confirmLabel="@@team.removeAll.confirm"
+        cancelLabel="Keep their roles"
+        i18n-cancelLabel="@@team.removeAll.cancel"
+        tone="danger"
+      />
     }
   }
 </div>

@@ -1,29 +1,36 @@
 <div class="page">
   <app-page-header
     heading="Team"
+    i18n-heading="@@team.heading"
     description="The people who can reach this workspace, and what each of them may do. Access comes from the roles somebody holds."
+    i18n-description="@@team.description"
   >
     @if (canInvite() && canView() && !loading()) {
-      <a pageActions class="btn btn-primary" routerLink="/team/invite">Invite member</a>
+      <a pageActions class="btn btn-primary" routerLink="/team/invite" data-testid="invite-member">
+        <app-icon name="plus" [strokeWidth]="2" />
+        <span i18n="@@team.invite.action">Invite member</span>
+      </a>
     }
   </app-page-header>
 
-  <div class="page-section">
-    @if (!canView()) {
-      <!--
-        Says what is true and what to do about it. No "403", no permission code,
-        and nothing implying the account is broken.
-      -->
+  @if (!canView()) {
+    <!-- What is true and what to do about it: no "403" and no permission code. -->
+    <div class="page-section">
       <div class="card">
         <app-empty-state
           icon="team"
           heading="You do not have access to the team"
+          i18n-heading="@@team.noAccess.heading"
           description="Seeing who belongs to this workspace needs a permission your roles do not include. Ask somebody who administers this workspace if you need it."
+          i18n-description="@@team.noAccess.body"
+          data-testid="team-denied"
         />
       </div>
-    } @else if (loading()) {
+    </div>
+  } @else if (loading()) {
+    <div class="page-section">
       <div class="data-list member-list" aria-busy="true">
-        <p class="visually-hidden" role="status">Loading the team…</p>
+        <p class="visually-hidden" role="status" i18n="@@team.loading">Loading the team…</p>
         @for (row of skeletonRows; track row) {
           <div class="data-row data-row-skeleton" aria-hidden="true">
             <span class="skeleton skeleton-title"></span>
@@ -32,56 +39,94 @@
           </div>
         }
       </div>
-    } @else if (failure(); as error) {
+    </div>
+  } @else if (failure(); as error) {
+    <div class="page-section">
       <div class="card">
         <app-empty-state
           icon="alert"
           tone="error"
           heading="Could not load the team"
+          i18n-heading="@@team.loadFailed"
           [description]="error.message"
         >
-          <button stateActions type="button" class="btn btn-secondary btn-sm" (click)="load()">
+          <button
+            stateActions
+            type="button"
+            class="btn btn-secondary btn-sm"
+            (click)="load()"
+            i18n="@@team.tryAgain"
+          >
             Try again
           </button>
         </app-empty-state>
       </div>
-    } @else {
-      <h2 class="text-section-title">Members</h2>
+    </div>
+  } @else {
+    <dl class="admin-facts page-section" data-testid="team-facts">
+      <div>
+        <dt i18n="@@team.facts.members">Members</dt>
+        <dd>{{ memberTotal() | localNumber }}</dd>
+      </div>
+      @if (!invitationsFailure()) {
+        <div>
+          <dt i18n="@@team.facts.waiting">Invitations waiting</dt>
+          <dd>{{ pending().length | localNumber }}</dd>
+        </div>
+      }
+    </dl>
 
-      <div class="data-list member-list">
+    <!-- ------------------------------------------------------------ members -->
+    <section class="page-section" aria-labelledby="members-heading">
+      <h2 id="members-heading" class="text-section-title" i18n="@@team.members.heading">Members</h2>
+
+      <div class="data-list member-list" [attr.aria-busy]="membersBusy()">
         <div class="data-list-head" aria-hidden="true">
-          <span>Member</span>
-          <span>Roles</span>
-          <span>Joined</span>
+          <span i18n="@@team.column.member">Member</span>
+          <span i18n="@@team.column.roles">Roles</span>
+          <span i18n="@@team.column.joined">Joined</span>
         </div>
 
-        <ul>
+        <ul data-testid="members">
           @for (member of members(); track member.userId) {
             <li>
-              <a class="data-row" [routerLink]="['/team', member.userId]">
-                <span class="data-row-title">
-                  <span class="member-email">{{ member.email }}</span>
+              <a
+                class="data-row"
+                [routerLink]="['/team', member.userId]"
+                [attr.data-testid]="'member-' + member.userId"
+              >
+                <span class="data-row-title member-title">
+                  <!-- An address: always left to right, isolated from the page. -->
+                  <span class="member-email" dir="ltr">{{ member.email }}</span>
 
                   @if (member.isOwner) {
                     <!--
-                      Marked, not hidden. Somebody looking for "who owns this
-                      workspace" must be able to find them, and must be able to
-                      see at a glance that their access is not editable here.
+                      Marked, not hidden: whoever owns the workspace can be
+                      found, and it shows their access is not edited here.
                     -->
-                    <span class="badge badge-neutral">Owner</span>
+                    <span class="badge badge-neutral" i18n="@@team.owner">Owner</span>
+                  }
+                  @if (member.userId === myId()) {
+                    <span class="badge badge-plain" i18n="@@team.you">You</span>
                   }
                 </span>
 
                 <span class="data-row-meta">
                   @if (member.roles.length === 0) {
-                    No roles yet
+                    <span class="member-no-roles" i18n="@@team.member.noRoles"
+                      >No roles: can see the workspace only</span
+                    >
                   } @else {
-                    {{ roleNames(member) }}
+                    <span class="data-cell-label"
+                      ><span i18n="@@team.cell.roles">Roles:</span>&nbsp;</span
+                    ><span dir="auto">{{ memberRoles(member) }}</span>
                   }
                 </span>
 
                 <span class="data-row-meta">
-                  <span class="data-cell-label">Joined&nbsp;</span>
+                  <span class="data-cell-label"
+                    ><span i18n="@@team.cell.joined">Joined:</span>&nbsp;</span
+                  >
                   <time [attr.datetime]="member.joinedAt">{{
                     member.joinedAt | localDate: 'date'
                   }}</time>
@@ -94,74 +139,172 @@
         </ul>
       </div>
 
-      <h2 id="pending-invitations" class="text-section-title invitations-heading" tabindex="-1">
-        Pending invitations
+      <app-pagination
+        [page]="page()"
+        [pageSize]="pageSize"
+        [total]="memberTotal()"
+        items="members"
+        [busy]="membersBusy()"
+        (pageChange)="goTo($event)"
+      />
+    </section>
+
+    <!-- -------------------------------------------------------- invitations -->
+    <section class="page-section" aria-labelledby="pending-invitations">
+      <h2
+        id="pending-invitations"
+        class="text-section-title"
+        tabindex="-1"
+        i18n="@@team.invitations.heading"
+      >
+        Invitations
       </h2>
 
       @if (revokeFailure(); as error) {
         <p class="alert alert-danger" role="alert">{{ error.message }}</p>
       }
 
-      @if (pending().length === 0) {
-        <div class="card">
-          <div class="card-body">
-            <p class="text-small text-muted">
-              No invitations are waiting. Anybody you invite appears here until they accept.
-            </p>
-          </div>
+      @if (invitationsFailure(); as error) {
+        <div class="card card-body invitation-note">
+          <span class="badge badge-neutral" i18n="@@team.invitations.notChecked">Not checked</span>
+          <span class="text-small text-secondary" i18n="@@team.invitations.failed"
+            >Invitations could not be read just now.</span
+          >
+          <button
+            type="button"
+            class="btn btn-ghost btn-sm"
+            (click)="retryInvitations()"
+            i18n="@@team.tryAgain"
+          >
+            Try again
+          </button>
         </div>
       } @else {
-        <div class="data-list member-list">
-          <ul>
-            @for (invitation of pending(); track invitation.id) {
-              <li>
-                <div class="data-row invitation-row">
-                  <span class="data-row-title">
-                    <span class="member-email">{{ invitation.email }}</span>
-                    <span class="badge badge-neutral">Invited</span>
-                  </span>
+        <p class="section-note text-small text-secondary" data-testid="waiting-summary">
+          {{ waitingText() }}
+          <span i18n="@@team.invitations.lede"
+            >A link works once, for the address it was sent to, until it expires or is
+            revoked.</span
+          >
+        </p>
 
-                  <span class="data-row-meta">
-                    @if (invitation.roles.length === 0) {
-                      Joins with no roles
-                    } @else {
-                      {{ invitation.roles.join(', ') }}
+        @if (pending().length > 0) {
+          <div class="data-list invitation-list">
+            <div class="data-list-head" aria-hidden="true">
+              <span i18n="@@team.column.invited">Invited</span>
+              <span i18n="@@team.column.joinsWith">Joins with</span>
+              <span i18n="@@team.column.expires">Link expires</span>
+            </div>
+            <ul data-testid="pending-invitations">
+              @for (invitation of pending(); track invitation.id) {
+                <li>
+                  <div
+                    class="data-row invitation-row"
+                    [attr.data-testid]="'invitation-' + invitation.id"
+                  >
+                    <span class="data-row-title member-title">
+                      <span class="member-email" dir="ltr">{{ invitation.email }}</span>
+                      <span class="badge" [class]="statusTone(invitation.status)">{{
+                        statusWord(invitation.status)
+                      }}</span>
+                    </span>
+
+                    <span class="data-row-meta">
+                      @if (invitation.roles.length === 0) {
+                        <span class="member-no-roles" i18n="@@team.invitation.noRoles"
+                          >No roles: will see the workspace only</span
+                        >
+                      } @else {
+                        <span dir="auto">{{ roleNames(invitation.roles) }}</span>
+                      }
+                    </span>
+
+                    <span class="data-row-meta invitation-expiry">
+                      <span>{{ expiry(invitation) }}</span>
+                      <time class="text-muted" [attr.datetime]="invitation.expiresAt">{{
+                        invitation.expiresAt | localDate: 'date'
+                      }}</time>
+                    </span>
+
+                    @if (canInvite()) {
+                      <button
+                        type="button"
+                        class="btn btn-danger-ghost btn-sm invitation-revoke"
+                        [disabled]="revoking() === invitation.id"
+                        [attr.aria-label]="revokeLabel(invitation)"
+                        (click)="revoke(invitation)"
+                        data-testid="revoke"
+                      >
+                        @if (revoking() === invitation.id) {
+                          <span i18n="@@team.revoking">Revoking…</span>
+                        } @else {
+                          <span i18n="@@team.revoke">Revoke</span>
+                        }
+                      </button>
+                    }
+                  </div>
+                </li>
+              }
+            </ul>
+          </div>
+        }
+
+        @if (past().length > 0) {
+          <!--
+            History, folded away: accepted, revoked and expired invitations are
+            answers to "what happened to that invite?", not things to act on.
+          -->
+          <details class="card past-invitations" data-testid="past-invitations">
+            <summary class="past-summary">
+              <app-icon class="past-chevron" name="chevron-down" [strokeWidth]="1.75" />
+              <span i18n="@@team.past.summary">Past invitations</span>
+              <span class="text-muted num">({{ past().length | localNumber }})</span>
+            </summary>
+            <ul class="past-list">
+              @for (invitation of past(); track invitation.id) {
+                <li class="past-row" [attr.data-testid]="'invitation-' + invitation.id">
+                  <span class="member-email" dir="ltr">{{ invitation.email }}</span>
+                  <span class="badge" [class]="statusTone(invitation.status)">{{
+                    statusWord(invitation.status)
+                  }}</span>
+                  <span class="text-small text-muted">
+                    <span i18n="@@team.past.sent">Sent</span>&nbsp;<time
+                      [attr.datetime]="invitation.createdAt"
+                      >{{ invitation.createdAt | localDate: 'date' }}</time
+                    >
+                    @if (invitation.invitedByEmail; as by) {
+                      · <span i18n="@@team.past.by">by</span>&nbsp;<span dir="ltr">{{ by }}</span>
                     }
                   </span>
+                </li>
+              }
+            </ul>
+          </details>
+        }
 
-                  <span class="data-row-meta">
-                    <span class="data-cell-label">Expires&nbsp;</span>
-                    <time [attr.datetime]="invitation.expiresAt">{{
-                      invitation.expiresAt | localDate: 'date'
-                    }}</time>
-                  </span>
-
-                  @if (canInvite()) {
-                    <button
-                      type="button"
-                      class="btn btn-danger-ghost btn-sm invitation-revoke"
-                      [disabled]="revoking() === invitation.id"
-                      [attr.aria-label]="'Revoke the invitation for ' + invitation.email"
-                      (click)="revoke(invitation)"
-                    >
-                      {{ revoking() === invitation.id ? 'Revoking…' : 'Revoke' }}
-                    </button>
-                  }
-                </div>
-              </li>
-            }
-          </ul>
-        </div>
+        @if (invitationsTruncated()) {
+          <p
+            class="text-small text-muted"
+            data-testid="invitations-truncated"
+            i18n="@@team.invitations.truncated"
+          >
+            Only the newest {{ invitations().length | localNumber }} of
+            {{ invitationTotal() | localNumber }} invitations are shown.
+          </p>
+        }
       }
-    }
-  </div>
+    </section>
+  }
 
   <app-confirm-dialog
     #revokeDialog
-    [heading]="'Revoke the invitation for ' + (revokeTarget()?.email ?? '') + '?'"
+    [heading]="revokeHeading()"
     body="Their invitation link stops working immediately and cannot be reinstated. You can invite the same address again later."
+    i18n-body="@@team.revoke.dialog.body"
     confirmLabel="Revoke invitation"
+    i18n-confirmLabel="@@team.revoke.dialog.confirm"
     cancelLabel="Keep invitation"
+    i18n-cancelLabel="@@team.revoke.dialog.cancel"
     tone="danger"
   />
 </div>

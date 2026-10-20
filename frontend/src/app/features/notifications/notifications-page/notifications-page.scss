@@ -1,9 +1,12 @@
 // Every value is a semantic token, so light and dark need no separate rules.
-
 .page-section {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
+}
+
+.notification-history {
+  overflow: hidden;
 }
 
 .history-summary {
@@ -12,12 +15,26 @@
   border-block-end: 1px solid var(--border-subtle);
 }
 
+// One day's notifications: a quiet label, then the rows.
+.history-day {
+  margin: 0;
+  padding: var(--space-2) var(--space-4);
+  border-block-end: 1px solid var(--border-subtle);
+  background-color: var(--surface-muted);
+  color: var(--text-secondary);
+  font: var(--text-caption);
+}
+
 .history-list {
   margin: 0;
   padding: 0;
   list-style: none;
 
   > li + li {
+    border-block-start: 1px solid var(--border-subtle);
+  }
+
+  & + .history-day {
     border-block-start: 1px solid var(--border-subtle);
   }
 }

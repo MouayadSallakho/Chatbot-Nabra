@@ -7,13 +7,14 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [RouterLink, RouterLinkActive],
   template: `
-    <nav class="notifications-nav" aria-label="Notifications">
+    <nav class="notifications-nav" aria-label="Notifications" i18n-aria-label="@@notifications.nav">
       <a
         class="notifications-nav-link"
         routerLink="/notifications"
         routerLinkActive="active"
         ariaCurrentWhenActive="page"
         [routerLinkActiveOptions]="{ exact: true }"
+        i18n="@@notifications.nav.all"
         >All notifications</a
       >
       <a
@@ -21,6 +22,7 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
         routerLink="/notifications/preferences"
         routerLinkActive="active"
         ariaCurrentWhenActive="page"
+        i18n="@@notifications.nav.preferences"
         >Email preferences</a
       >
     </nav>
@@ -34,6 +36,9 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
     }
 
     .notifications-nav-link {
+      display: inline-flex;
+      align-items: center;
+      min-block-size: 2.5rem;
       padding: var(--space-2) var(--space-3);
       border-block-end: 2px solid transparent;
       color: var(--text-secondary);

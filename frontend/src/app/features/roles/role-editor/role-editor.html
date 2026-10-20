@@ -5,6 +5,7 @@
       backLabel="Roles & permissions"
       i18n-backLabel="@@back.roles"
       heading="Role"
+      i18n-heading="@@roles.editor.heading"
     />
 
     <div class="page-section">
@@ -12,7 +13,9 @@
         <app-empty-state
           icon="roles"
           heading="You do not have access to roles"
+          i18n-heading="@@roles.noAccess.heading"
           description="Viewing this workspace's roles needs a permission your roles do not include. Ask somebody who administers this workspace if you need it."
+          i18n-description="@@roles.editor.noAccess.body"
         />
       </div>
     </div>
@@ -22,14 +25,23 @@
       backLabel="Roles & permissions"
       i18n-backLabel="@@back.roles"
       heading="Role"
+      i18n-heading="@@roles.editor.heading"
     />
 
+    <!-- The shape of the editor that is coming: a name card, then two areas. -->
     <div class="page-section" aria-busy="true">
-      <p class="visually-hidden" role="status">Loading role…</p>
-      <div class="card card-body">
+      <p class="visually-hidden" role="status" i18n="@@roles.editor.loading">Loading role…</p>
+      <div class="card card-body admin-skeleton" aria-hidden="true">
         <span class="skeleton skeleton-title"></span>
-        <span class="skeleton skeleton-text"></span>
+        <span class="skeleton skeleton-bar"></span>
       </div>
+      @for (row of [0, 1]; track row) {
+        <div class="card card-body admin-skeleton" aria-hidden="true">
+          <span class="skeleton skeleton-text"></span>
+          <span class="skeleton skeleton-text"></span>
+          <span class="skeleton skeleton-text"></span>
+        </div>
+      }
     </div>
   } @else if (failure(); as error) {
     <app-page-header
@@ -37,18 +49,46 @@
       backLabel="Roles & permissions"
       i18n-backLabel="@@back.roles"
       heading="Role"
+      i18n-heading="@@roles.editor.heading"
     />
 
     <div class="page-section">
       <div class="card">
-        <app-empty-state
-          icon="alert"
-          tone="error"
-          [heading]="error.kind === 'notFound' ? 'Role not found' : 'Could not load role'"
-          [description]="error.message"
-        >
-          <a stateActions class="btn btn-secondary btn-sm" routerLink="/roles">Back to roles</a>
-        </app-empty-state>
+        @if (error.kind === 'notFound') {
+          <app-empty-state
+            icon="alert"
+            tone="error"
+            heading="Role not found"
+            i18n-heading="@@roles.editor.notFound"
+            [description]="error.message"
+          >
+            <a
+              stateActions
+              class="btn btn-secondary btn-sm"
+              routerLink="/roles"
+              i18n="@@roles.backToRoles"
+              >Back to roles</a
+            >
+          </app-empty-state>
+        } @else {
+          <app-empty-state
+            icon="alert"
+            tone="error"
+            heading="Could not load role"
+            i18n-heading="@@roles.editor.loadFailed"
+            [description]="error.message"
+          >
+            <button
+              stateActions
+              type="button"
+              class="btn btn-secondary btn-sm"
+              (click)="load()"
+              i18n="@@roles.tryAgain"
+            >
+              Try again
+            </button>
+          </app-empty-state>
+        }
       </div>
     </div>
   } @else if (role(); as current) {
@@ -56,31 +96,39 @@
       backLink="/roles"
       backLabel="Roles & permissions"
       i18n-backLabel="@@back.roles"
-      [heading]="current.name"
-      [description]="
-        current.isSystem
-          ? 'The workspace owner. This role is maintained by the platform.'
-          : 'A role this workspace defines.'
-      "
+      [heading]="roleName(current.name, current.isSystem)"
+      headingDir="auto"
+      [description]="current.isSystem ? ownerDescription : customDescription"
     >
+      @if (current.isSystem) {
+        <span pageStatus class="badge badge-neutral" i18n="@@roles.protected">Protected</span>
+      } @else {
+        <span pageStatus class="badge badge-plain" i18n="@@roles.custom">Custom</span>
+      }
     </app-page-header>
 
     <!--
-      The stale-save banner. It is deliberately not an error beside one field:
-      the role moved underneath the whole screen, and the only thing that
-      recovers is reading it again. Nothing local has been touched, so the reader
-      can copy anything they want to keep before reloading.
+      The stale-save banner. Not an error beside one field: the role moved
+      underneath the whole screen, and only reading it again recovers. Nothing
+      local has been touched, so the reader can see what they had chosen first.
     -->
     @if (stale()) {
       <div class="page-section">
-        <div class="stale-notice" role="alert">
-          <p class="conflict-title">This role was updated elsewhere.</p>
-          <p class="text-small text-secondary">
+        <div class="stale-notice" role="alert" data-testid="stale-notice">
+          <p class="conflict-title" i18n="@@roles.editor.stale.title">
+            This role was updated elsewhere.
+          </p>
+          <p class="text-small text-secondary" i18n="@@roles.editor.stale.body">
             Your changes have not been saved and are still on screen. Reload to see the current
-            version — anything you have typed here will be replaced.
+            version; anything you have typed or ticked here will be replaced.
           </p>
           <div class="conflict-actions">
-            <button type="button" class="btn btn-primary btn-sm" (click)="reload()">
+            <button
+              type="button"
+              class="btn btn-primary btn-sm"
+              (click)="reload()"
+              i18n="@@roles.editor.stale.reload"
+            >
               Reload latest version
             </button>
           </div>
@@ -88,112 +136,148 @@
       </div>
     }
 
+    <dl class="admin-facts page-section" data-testid="role-facts">
+      <div>
+        <dt i18n="@@roles.facts.access">Access</dt>
+        <dd data-testid="grant-summary">{{ grantText() }}</dd>
+      </div>
+      <div>
+        <dt i18n="@@roles.facts.updated">Last changed</dt>
+        <dd>
+          <time [attr.datetime]="current.updatedAt">{{
+            current.updatedAt | localDate: 'dateTime'
+          }}</time>
+        </dd>
+      </div>
+      <div>
+        <dt i18n="@@roles.facts.created">Created</dt>
+        <dd>
+          <time [attr.datetime]="current.createdAt">{{
+            current.createdAt | localDate: 'date'
+          }}</time>
+        </dd>
+      </div>
+    </dl>
+
     @if (current.isSystem) {
       <!--
-        Owner detail, read-only and explained. Deliberately not a form of
-        disabled checkboxes: showing somebody a control and then refusing it
-        reads as a fault rather than a rule.
+        Owner, read-only and explained. Not a form of disabled checkboxes:
+        showing somebody a control and then refusing it reads as a fault.
       -->
       <div class="page-section">
-        <div class="card card-body">
-          <h2 class="text-section-title">Protected system role</h2>
-          <p class="text-small text-secondary">
-            Owner always has every permission this platform defines, including any added in future
-            releases. It cannot be renamed and its permissions cannot be changed. To give somebody a
-            narrower set of capabilities, create a custom role.
+        <div class="card card-body admin-note" data-testid="read-only-reason">
+          <h2 class="text-section-title" i18n="@@roles.owner.title">Protected system role</h2>
+          <p class="text-small text-secondary" i18n="@@roles.owner.body">
+            Owner always has every permission Nabra defines, including any added in future releases.
+            It cannot be renamed and its permissions cannot be changed. To give somebody a narrower
+            set of capabilities, create a custom role.
           </p>
         </div>
       </div>
 
-      <div class="page-section">
-        <h2 class="text-section-title">Permissions</h2>
-
-        @for (group of allGroups(); track group.name) {
-          <div class="card card-body permission-group">
-            <h3 class="text-label permission-group-name">{{ group.name }}</h3>
-            <ul class="permission-readout">
-              @for (permission of group.permissions; track permission.code) {
-                <li>
-                  <span class="permission-label">{{ permission.label }}</span>
-                  <span class="text-small text-muted">{{ permission.description }}</span>
-                </li>
-              }
-            </ul>
-          </div>
-        }
-      </div>
+      <section class="page-section" aria-labelledby="role-permissions-heading">
+        <h2 id="role-permissions-heading" class="text-section-title" i18n="@@roles.permissions">
+          Permissions
+        </h2>
+        <app-permission-picker mode="read" [groups]="allGroups()" />
+      </section>
     } @else if (!editable()) {
       <!--
         A custom role this reader may look at but not administer: either they
-        cannot manage roles at all, or this one carries authority they do not
-        hold. Rendered as a record of what it grants rather than as a form of
-        disabled controls -- a checkbox nobody may ever tick reads as a fault,
-        and a catalogue filtered down to the reader's own authority would hide
-        the very capabilities that put this role out of their reach.
+        cannot manage roles at all, or it grants authority they do not hold. A
+        record of what it grants, never the catalogue narrowed to the reader's
+        own authority, which would hide the very capabilities that put it out
+        of reach.
       -->
       <div class="page-section">
-        <div class="card card-body">
-          <h2 class="text-section-title">
-            {{ readOnlyReason() === 'outranked' ? 'You cannot change this role' : 'Read-only' }}
-          </h2>
-          <p class="text-small text-secondary">
-            @if (readOnlyReason() === 'outranked') {
+        <div class="card card-body admin-note" data-testid="read-only-reason">
+          @if (readOnlyReason() === 'outranked') {
+            <h2 class="text-section-title" i18n="@@roles.outranked.title">
+              You cannot change this role
+            </h2>
+            <p class="text-small text-secondary" i18n="@@roles.outranked.body">
               This role grants capabilities your own roles do not include, so it is not yours to
               change. Ask somebody who administers this workspace if you need it changed.
-            } @else {
+            </p>
+          } @else {
+            <h2 class="text-section-title" i18n="@@roles.readOnly.title">Read-only</h2>
+            <p class="text-small text-secondary" i18n="@@roles.readOnly.body">
               You can see what this role grants but not change it. Changing roles needs a permission
               your roles do not include.
-            }
-          </p>
+            </p>
+          }
         </div>
       </div>
 
-      <div class="page-section">
-        <h2 class="text-section-title">Permissions</h2>
+      <section class="page-section" aria-labelledby="role-permissions-heading">
+        <h2 id="role-permissions-heading" class="text-section-title" i18n="@@roles.permissions">
+          Permissions
+        </h2>
 
-        @if (roleGroups().length === 0) {
-          <div class="card card-body">
-            <p class="text-small text-muted">This role grants nothing.</p>
-          </div>
-        }
-
-        @for (group of roleGroups(); track group.name) {
-          <div class="card card-body permission-group">
-            <h3 class="text-label permission-group-name">{{ group.name }}</h3>
-            <ul class="permission-readout">
-              @for (permission of group.permissions; track permission.code) {
-                <li>
-                  <span class="permission-label">{{ permission.label }}</span>
-                  <span class="text-small text-muted">{{ permission.description }}</span>
+        @if (impacts().length) {
+          <div class="impact-summary">
+            <p class="impact-summary-title" i18n="@@roles.impacts.held">
+              Somebody holding this role:
+            </p>
+            <ul class="perm-impacts">
+              @for (impact of impacts(); track impact.kind) {
+                <li class="impact" [attr.data-impact]="impact.kind">
+                  <app-icon [name]="impact.icon" [strokeWidth]="1.75" />{{ impact.text }}
                 </li>
               }
             </ul>
           </div>
         }
-      </div>
-    } @else {
-      <div class="page-section">
-        <h2 class="text-section-title">Name</h2>
 
-        <form
-          class="card card-body role-form"
-          [formGroup]="nameForm"
-          (ngSubmit)="saveName()"
-          novalidate
-        >
+        @if (roleGroups().length === 0) {
+          <div class="card card-body">
+            <p class="text-small text-muted" i18n="@@roles.grantsNothing">
+              This role grants nothing.
+            </p>
+          </div>
+        } @else {
+          <app-permission-picker mode="read" [groups]="roleGroups()" />
+        }
+      </section>
+    } @else {
+      <section class="card form-section page-section" aria-labelledby="role-name-heading">
+        <div class="card-header">
+          <span class="form-section-index" aria-hidden="true">1</span>
+          <div>
+            <h2 id="role-name-heading" class="form-section-title" i18n="@@roles.section.name">
+              Name
+            </h2>
+            <p class="form-section-lede" i18n="@@roles.section.name.lede">
+              What members see when a role is given to them. Saved on its own.
+            </p>
+          </div>
+        </div>
+
+        <form class="card-body" [formGroup]="nameForm" (ngSubmit)="saveName()" novalidate>
           <div class="field">
-            <label class="form-label" for="role-name">Role name</label>
+            <label class="form-label" for="role-name" i18n="@@roles.name.label">Role name</label>
             <input
               id="role-name"
               class="form-control"
               type="text"
               formControlName="name"
+              dir="auto"
               [attr.maxlength]="nameLimit"
+              [attr.aria-invalid]="
+                nameForm.controls.name.touched && nameForm.controls.name.hasError('required')
+              "
+              [attr.aria-describedby]="
+                nameForm.controls.name.touched && nameForm.controls.name.hasError('required')
+                  ? 'role-name-error'
+                  : null
+              "
               autocomplete="off"
             />
 
             @if (nameForm.controls.name.touched && nameForm.controls.name.hasError('required')) {
-              <p class="form-error" role="alert">A role name is required.</p>
+              <p id="role-name-error" class="form-error" role="alert" i18n="@@roles.name.required">
+                A role name is required.
+              </p>
             }
           </div>
 
@@ -201,72 +285,104 @@
             <p class="alert alert-danger" role="alert">{{ error.message }}</p>
           }
 
-          <div class="form-actions">
-            <button type="submit" class="btn btn-primary" [disabled]="!nameDirty() || nameSaving()">
-              {{ nameSaving() ? 'Saving…' : 'Save name' }}
+          <div class="section-actions">
+            @if (nameDirty()) {
+              <span class="unsaved-note" aria-live="polite" i18n="@@roles.unsaved"
+                >Unsaved changes</span
+              >
+            }
+            <button
+              type="submit"
+              class="btn btn-primary"
+              [disabled]="!nameDirty() || nameSaving()"
+              data-testid="save-name"
+            >
+              @if (nameSaving()) {
+                <span i18n="@@roles.saving">Saving…</span>
+              } @else {
+                <span i18n="@@roles.saveName">Save name</span>
+              }
             </button>
           </div>
         </form>
-      </div>
+      </section>
 
-      <div class="page-section">
-        <h2 class="text-section-title">Permissions</h2>
-        <p class="text-small text-secondary section-note">
-          Somebody holding this role may do everything ticked below, in this workspace only.
-        </p>
-
-        @for (group of groups(); track group.name) {
-          <fieldset class="card card-body permission-group">
-            <legend class="text-label permission-group-name">{{ group.name }}</legend>
-
-            @for (permission of group.permissions; track permission.code) {
-              <label class="permission-option">
-                <input
-                  type="checkbox"
-                  class="form-check-input"
-                  [checked]="isTicked(permission.code)"
-                  (change)="toggle(permission.code, $any($event.target).checked)"
-                />
-                <span class="permission-option-text">
-                  <span class="permission-label">{{ permission.label }}</span>
-                  <span class="text-small text-muted">{{ permission.description }}</span>
-                </span>
-              </label>
-            }
-          </fieldset>
-        }
-
-        @if (permissionsFailure(); as error) {
-          <p class="alert alert-danger" role="alert">{{ error.message }}</p>
-        }
-
-        <div class="form-actions">
-          <button
-            type="button"
-            class="btn btn-primary"
-            [disabled]="!permissionsDirty() || permissionsSaving()"
-            (click)="savePermissions()"
-          >
-            {{ permissionsSaving() ? 'Saving…' : 'Save permissions' }}
-          </button>
-
-          @if (permissionsDirty()) {
-            <p class="text-small text-muted" aria-live="polite">You have unsaved changes.</p>
-          }
+      <section class="card form-section page-section" aria-labelledby="role-permissions-heading">
+        <div class="card-header">
+          <span class="form-section-index" aria-hidden="true">2</span>
+          <div>
+            <h2
+              id="role-permissions-heading"
+              class="form-section-title"
+              i18n="@@roles.section.permissions"
+            >
+              Permissions
+            </h2>
+            <p class="form-section-lede" i18n="@@roles.section.permissions.lede">
+              Somebody holding this role may do everything ticked below, in this workspace only.
+              Each area lists its permissions from the least to the most authority.
+            </p>
+          </div>
         </div>
 
-        @if (narrowed()) {
-          <!--
-            Said plainly rather than left as an unexplained short list: somebody
-            who knows the platform has more capabilities should be told why they
-            are not here, not left wondering whether the page failed to load.
-          -->
-          <p class="text-small text-muted section-note">
-            Only capabilities your own roles include are listed. You cannot grant something you
-            cannot do yourself.
-          </p>
-        }
-      </div>
+        <div class="card-body">
+          <div class="impact-summary" data-testid="impact-summary">
+            <p class="impact-summary-title">{{ grantText() }}</p>
+            @if (impacts().length) {
+              <ul class="perm-impacts" aria-live="polite">
+                @for (impact of impacts(); track impact.kind) {
+                  <li class="impact" [attr.data-impact]="impact.kind">
+                    <app-icon [name]="impact.icon" [strokeWidth]="1.75" />{{ impact.text }}
+                  </li>
+                }
+              </ul>
+            }
+          </div>
+
+          @if (narrowed()) {
+            <!--
+              Said plainly rather than left as an unexplained short list:
+              somebody who knows there are more capabilities is told why these
+              are not offered, not left wondering whether the page failed.
+            -->
+            <p class="guidance" data-testid="ceiling-note" i18n="@@roles.ceiling">
+              Only permissions your own roles include are listed ({{ withheldCount() }} are not).
+              You cannot grant something you cannot do yourself.
+            </p>
+          }
+
+          <app-permission-picker
+            [groups]="groups()"
+            [selected]="ticked()"
+            (toggled)="toggle($event)"
+          />
+
+          @if (permissionsFailure(); as error) {
+            <p class="alert alert-danger" role="alert">{{ error.message }}</p>
+          }
+
+          <div class="section-actions">
+            @if (permissionsDirty()) {
+              <span class="unsaved-note" aria-live="polite" i18n="@@roles.unsaved"
+                >Unsaved changes</span
+              >
+            }
+            <button
+              type="button"
+              class="btn btn-primary"
+              [disabled]="!permissionsDirty() || permissionsSaving()"
+              (click)="savePermissions()"
+              data-testid="save-permissions"
+            >
+              @if (permissionsSaving()) {
+                <span i18n="@@roles.saving">Saving…</span>
+              } @else {
+                <span i18n="@@roles.savePermissions">Save permissions</span>
+              }
+            </button>
+          </div>
+        </div>
+      </section>
     }
   }
 </div>

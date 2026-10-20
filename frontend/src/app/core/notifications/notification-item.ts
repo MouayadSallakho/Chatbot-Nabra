@@ -10,6 +10,7 @@ import {
   actionLabel,
   isInternalAction,
 } from './notification-api';
+import { categoryWord, notificationText } from './notification-words';
 
 /**
  * One notification, rendered.
@@ -41,17 +42,20 @@ import {
       <div class="notification-content">
         <p class="notification-heading">
           <span class="visually-hidden">{{ severityLabel() }} </span>
-          <!-- Written by the server, in English today: isolated so it lays out in either page. -->
-          <span class="notification-title" dir="auto" [id]="titleId()">{{
-            notification().title
-          }}</span>
-          @if (unread()) {
-            <span class="notification-dot" aria-hidden="true"></span>
-          }
+          <!-- In the reader's language; a kind this build does not know keeps the server's words. -->
+          <span class="notification-title" dir="auto" [id]="titleId()">{{ text().title }}</span>
         </p>
-        <p class="notification-body" dir="auto">{{ notification().body }}</p>
+        <p class="notification-body" dir="auto">{{ text().body }}</p>
 
         <div class="notification-meta">
+          @if (unread()) {
+            <!-- Unread is a dot, a heavier title and this word: never one of them alone. -->
+            <span class="notification-unread" aria-hidden="true">
+              <span class="notification-dot"></span>
+              <ng-container i18n="@@notifications.unreadWord">Unread</ng-container>
+            </span>
+          }
+          <span class="notification-category">{{ category() }}</span>
           <time
             class="notification-time"
             [attr.datetime]="notification().createdAt"
@@ -65,7 +69,7 @@ import {
               [routerLink]="path"
               (click)="opened.emit(notification())"
               data-testid="notification-action"
-              >{{ label() }}<span class="visually-hidden">: {{ notification().title }}</span></a
+              >{{ label() }}<span class="visually-hidden">: {{ text().title }}</span></a
             >
           }
 
@@ -78,7 +82,7 @@ import {
             >
               <app-icon name="check" [strokeWidth]="2" />
               <ng-container i18n="@@notifications.markRead">Mark as read</ng-container
-              ><span class="visually-hidden">: {{ notification().title }}</span>
+              ><span class="visually-hidden">: {{ text().title }}</span>
             </button>
           }
         </div>
@@ -99,6 +103,7 @@ import {
 
     .notification-icon {
       display: inline-flex;
+      // token-lint-ignore: optical alignment of the 20px icon with the title's first line
       margin-block-start: 2px;
       color: var(--info-fg);
 
@@ -135,6 +140,22 @@ import {
       font: var(--text-body-strong);
     }
 
+    .is-unread {
+      box-shadow: inset 3px 0 0 var(--action);
+    }
+
+    :host-context([dir='rtl']) .is-unread {
+      box-shadow: inset -3px 0 0 var(--action);
+    }
+
+    .notification-unread {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-1);
+      color: var(--text-primary);
+      font-weight: 600;
+    }
+
     .notification-dot {
       flex: none;
       inline-size: 8px;
@@ -142,6 +163,10 @@ import {
       border-radius: var(--radius-pill);
       // Unread is news, not an alarm, and not a voice: ink.
       background: var(--action);
+    }
+
+    .notification-category {
+      color: var(--text-muted);
     }
 
     .notification-body {
@@ -183,6 +208,12 @@ import {
 export class NotificationItem {
   readonly notification = input.required<AppNotification>();
 
+  /**
+   * How the time is said: relative in the bell ("5 minutes ago"), the time of
+   * day in the history, where each day already has its own heading.
+   */
+  readonly timeStyle = input<'relative' | 'time'>('relative');
+
   /** Emitted when the action link is followed, so the caller can mark it read. */
   readonly opened = output<AppNotification>();
 
@@ -204,6 +235,10 @@ export class NotificationItem {
 
   private readonly language = inject(APP_LANGUAGE);
 
+  protected readonly text = computed(() => notificationText(this.notification(), this.language));
+
+  protected readonly category = computed(() => categoryWord(this.notification().category));
+
   /** "Warning, unread:" for a screen reader, ahead of the title. */
   protected readonly severityLabel = computed(() => {
     const word = severityWord(this.notification().severity);
@@ -218,7 +253,9 @@ export class NotificationItem {
   );
 
   protected readonly relative = computed(() =>
-    relativeTime(this.notification().createdAt, Date.now(), this.language),
+    this.timeStyle() === 'time'
+      ? formatDate(this.language, this.notification().createdAt, 'time')
+      : relativeTime(this.notification().createdAt, Date.now(), this.language),
   );
 }
 

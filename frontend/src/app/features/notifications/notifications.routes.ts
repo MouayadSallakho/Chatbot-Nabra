@@ -1,4 +1,5 @@
 import { Routes } from '@angular/router';
+import { unsavedChangesGuard } from '@app/core/navigation/unsaved-changes';
 
 /**
  * Notifications: the full history, and the member's own email preferences.
@@ -16,6 +17,8 @@ export const notificationRoutes: Routes = [
   },
   {
     path: 'preferences',
+    // Like every other editor: leaving with unsaved choices asks first.
+    canDeactivate: [unsavedChangesGuard],
     title: $localize`:@@title.notificationPreferences:Notification preferences`,
     loadComponent: () =>
       import('./notification-preferences/notification-preferences').then(

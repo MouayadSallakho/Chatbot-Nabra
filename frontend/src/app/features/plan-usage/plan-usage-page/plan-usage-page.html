@@ -1,7 +1,9 @@
 <div class="page">
   <app-page-header
-    heading="Plan &amp; usage"
+    heading="Plan & usage"
+    i18n-heading="@@plan.heading"
     description="What this workspace's plan allows, and how much of it is in use. Every figure is counted from what the workspace actually holds."
+    i18n-description="@@plan.description"
   >
     @if (canView()) {
       <button
@@ -14,196 +16,183 @@
       >
         @if (refreshing()) {
           <span class="spinner" aria-hidden="true"></span>
+          <span class="btn-label" i18n="@@plan.refreshing">Refreshing…</span>
+        } @else {
+          <app-icon name="refresh" [strokeWidth]="1.75" />
+          <span class="btn-label" i18n="@@plan.refresh">Refresh</span>
         }
-        <span class="btn-label">{{ refreshing() ? 'Refreshing…' : 'Refresh' }}</span>
       </button>
     }
   </app-page-header>
 
-  <div class="page-section">
+  <div class="page-section plan">
     @if (!canView()) {
-      <!--
-        The same permission as the rest of analytics, and the same honest
-        refusal: what is true and what to do, with no status code and no
-        permission name.
-      -->
+      <!-- The same permission as analytics, and the same honest refusal. -->
       <div class="card">
         <app-empty-state
           icon="usage"
           heading="You do not have access to plan and usage"
+          i18n-heading="@@plan.noAccess.heading"
           description="Seeing what this workspace's plan allows needs a permission your roles do not include. Ask somebody who administers this workspace if you need it."
+          i18n-description="@@plan.noAccess.body"
+          data-testid="plan-denied"
         />
       </div>
     } @else if (loading()) {
-      <div class="card card-body" aria-busy="true">
-        <p class="text-small text-secondary">Loading plan and usage…</p>
+      <!-- The shape of the page that is coming: the plan, then rows of limits. -->
+      <div class="card card-body admin-skeleton" aria-busy="true">
+        <p class="visually-hidden" role="status" i18n="@@plan.loading">Loading plan and usage…</p>
+        <span class="skeleton skeleton-title" aria-hidden="true"></span>
+        <span class="skeleton skeleton-text" aria-hidden="true"></span>
       </div>
-    } @else if (failure(); as error) {
-      <div class="card">
-        <app-empty-state
-          icon="usage"
-          heading="Could not load plan and usage"
-          [description]="error.message"
-        >
-          <button stateActions type="button" class="btn btn-secondary" (click)="refresh()">
-            Try again
-          </button>
-        </app-empty-state>
+      <div class="card card-body quota-list" aria-hidden="true">
+        @for (row of [0, 1, 2]; track row) {
+          <div class="quota">
+            <span class="skeleton skeleton-text"></span>
+            <span class="skeleton skeleton-bar"></span>
+          </div>
+        }
       </div>
+    } @else if (!usage()) {
+      @if (failure(); as error) {
+        <div class="card">
+          <app-empty-state
+            icon="alert"
+            tone="error"
+            heading="Could not load plan and usage"
+            i18n-heading="@@plan.loadFailed"
+            [description]="error.message"
+          >
+            <button
+              stateActions
+              type="button"
+              class="btn btn-secondary btn-sm"
+              (click)="refresh()"
+              i18n="@@plan.tryAgain"
+            >
+              Try again
+            </button>
+          </app-empty-state>
+        </div>
+      }
     } @else if (usage(); as plan) {
-      <!--
-        The plan itself. Its name, and nothing else about it: there is no price
-        in this platform, and a field implying one would be read as a promise.
-      -->
-      <div class="card">
+      @if (failure(); as error) {
+        <!-- A failed refresh keeps what was read, and says so. -->
+        <p class="alert alert-warning" role="alert" data-testid="refresh-failed">
+          <span i18n="@@plan.refreshFailed"
+            >These figures could not be refreshed and may be out of date.</span
+          >
+          {{ error.message }}
+        </p>
+      }
+
+      <!-- The plan itself: its name, and nothing implying a price. -->
+      <section
+        class="card card-body plan-current"
+        aria-labelledby="plan-heading"
+        data-testid="current-plan"
+      >
+        <h2 id="plan-heading" class="text-label text-muted" i18n="@@plan.current">Current plan</h2>
+        <p class="plan-name" dir="auto">{{ plan.planName }}</p>
+        <p class="text-small text-muted">
+          <span i18n="@@plan.assigned">In effect since</span>&nbsp;<time
+            [attr.datetime]="plan.assignedAt"
+            >{{ plan.assignedAt | localDate: 'longDate' }}</time
+          >
+        </p>
+        <!--
+          A plan changes by subscribing, so this points at Billing for whoever
+          may see it; still not an Upgrade button, which would be a commercial
+          decision on a screen read by people who cannot make it.
+        -->
+        <p class="text-small text-secondary" data-testid="no-plan-change">
+          @if (canSeeBilling()) {
+            <span i18n="@@plan.changeHow.billing"
+              >The plan comes from the workspace's subscription.</span
+            >&nbsp;<a routerLink="/billing" i18n="@@plan.openBilling">Open billing</a>
+          } @else {
+            <span i18n="@@plan.changeHow.other"
+              >The plan comes from the workspace's subscription, which somebody with access to
+              billing can change.</span
+            >
+          }
+        </p>
+      </section>
+
+      <section class="card" aria-labelledby="resources-heading" [attr.aria-busy]="refreshing()">
         <div class="card-header">
-          <h2 class="card-title">Current plan</h2>
-        </div>
-        <div class="card-body plan-header" data-testid="current-plan">
-          <p class="plan-name">{{ plan.planName }}</p>
-
-          <!--
-            Truthful again from Phase 25. A plan now changes by subscribing, so
-            this points at Billing rather than claiming nothing can change it --
-            a sentence that was true before billing existed and became a lie the
-            moment it did.
-
-            Still not an Upgrade button: this screen reports usage, and the
-            commercial decision belongs on the screen behind billing.view, which
-            not every reader of this page holds.
-          -->
-          <p class="text-small text-muted" data-testid="no-plan-change">
-            A workspace's plan is set by its subscription. See Billing to change it, if you have
-            access to it.
-          </p>
-        </div>
-      </div>
-
-      <!-- Resource usage. -->
-      <div class="card">
-        <div class="card-header">
-          <h2 class="card-title">Resource usage</h2>
-          <p class="text-small text-muted">
-            Counted from what this workspace holds right now. Disabling something does not free it —
-            only deleting it does.
-          </p>
+          <div>
+            <h2 id="resources-heading" class="card-title" i18n="@@plan.resources">
+              Resource limits
+            </h2>
+            <p class="text-small text-muted" i18n="@@plan.resources.lede">
+              Counted from what this workspace holds right now. Disabling something does not free
+              it; only deleting it does.
+            </p>
+          </div>
         </div>
         <div class="card-body">
-          <ul class="usage-list" data-testid="resource-usage">
-            @for (row of resources(); track row.entitlement) {
-              <li class="usage-row" [attr.data-testid]="'usage-' + row.entitlement">
-                <div class="usage-heading">
-                  <h3 class="usage-label">{{ row.label }}</h3>
-
-                  <!--
-                    The numbers as words. A screen reader gets this; the bar
-                    below is decorative and hidden from it.
-                  -->
-                  <p class="usage-figure" [attr.data-testid]="'figure-' + row.entitlement">
-                    {{ row.figure }}
-                  </p>
-                </div>
-
-                @if (row.unlimited) {
-                  <!--
-                    No bar at all. A bar needs something to be a proportion of,
-                    and drawing one against nothing implies a limit off to the
-                    right that does not exist.
-                  -->
-                  <p class="text-small text-muted usage-unlimited">No limit on this plan.</p>
-                } @else {
-                  <span class="usage-bar" aria-hidden="true">
-                    <span
-                      class="usage-fill"
-                      [class.usage-fill-warning]="row.state === 'Warning'"
-                      [class.usage-fill-critical]="row.state === 'Critical'"
-                      [class.usage-fill-exhausted]="row.state === 'Exhausted'"
-                      [style.width.%]="row.percentUsed ?? 0"
-                    ></span>
-                  </span>
-
-                  <p class="text-small text-muted">
-                    {{ row.percentUsed }}% used.
-                    <!--
-                      The state in words beside the colour, never colour alone.
-                    -->
-                    @if (row.note) {
-                      <strong
-                        class="usage-note"
-                        [class.usage-note-critical]="row.state !== 'Warning'"
-                        [attr.data-testid]="'note-' + row.entitlement"
-                        >{{ row.note }}.</strong
-                      >
-                    }
-                  </p>
-                }
-
-                <p class="text-small text-secondary usage-description">{{ row.description }}</p>
+          @if (!allUnlimited()) {
+            <!-- The thresholds, said once: the states below are the server's. -->
+            <ul class="quota-legend" data-testid="threshold-legend">
+              <li>
+                <span class="badge badge-neutral" i18n="@@plan.state.normal">Within the limit</span>
+                <span i18n="@@plan.legend.normal">below 70%</span>
               </li>
-            }
-          </ul>
-        </div>
-      </div>
-
-      <!-- The monthly AI allowance, which is the only one measured over a period. -->
-      @if (monthly(); as ai) {
-        <div class="card">
-          <div class="card-header">
-            <h2 class="card-title">AI provider operations</h2>
-            <p class="text-small text-muted">
-              One operation is one call this workspace made to an AI provider. Measured over UTC
-              calendar months, not a rolling window.
-            </p>
-          </div>
-          <div class="card-body" data-testid="monthly-usage">
-            <p class="usage-figure usage-figure-large" data-testid="figure-monthly">
-              {{ ai.figure }}
-            </p>
-
-            @if (ai.period) {
-              <p class="text-small text-muted" data-testid="monthly-period">
-                {{ monthLabel(ai.period) }}
-              </p>
-            }
-
-            @if (ai.unlimited) {
-              <p class="text-small text-muted">This plan does not limit AI provider operations.</p>
-            } @else {
-              <span class="usage-bar" aria-hidden="true">
-                <span
-                  class="usage-fill"
-                  [class.usage-fill-warning]="ai.state === 'Warning'"
-                  [class.usage-fill-critical]="ai.state === 'Critical'"
-                  [class.usage-fill-exhausted]="ai.state === 'Exhausted'"
-                  [style.width.%]="ai.percentUsed ?? 0"
-                ></span>
-              </span>
-
-              <p class="text-small text-muted">
-                {{ ai.percentUsed }}% used.
-                @if (ai.note) {
-                  <strong
-                    class="usage-note"
-                    [class.usage-note-critical]="ai.state !== 'Warning'"
-                    data-testid="note-monthly"
-                    >{{ ai.note }}.</strong
-                  >
-                }
-              </p>
-
-              @if (ai.state === 'Exhausted') {
-                <p
-                  class="text-small usage-note usage-note-critical"
-                  data-testid="monthly-exhausted"
+              <li>
+                <span class="badge badge-warning" i18n="@@plan.state.warning"
+                  >Approaching the limit</span
                 >
-                  This workspace has reached its monthly AI operation limit. AI replies, knowledge
-                  indexing and agent previews will not run until the next UTC month. Conversations
-                  handled by a person are unaffected.
-                </p>
-              }
+                <span i18n="@@plan.legend.warning">from 70%</span>
+              </li>
+              <li>
+                <span class="badge badge-danger" i18n="@@plan.state.critical"
+                  >Nearly at the limit</span
+                >
+                <span i18n="@@plan.legend.critical">from 90%</span>
+              </li>
+              <li>
+                <span class="badge badge-exhausted" i18n="@@plan.state.exhausted"
+                  >Limit reached</span
+                >
+                <span i18n="@@plan.legend.exhausted">100%: new ones are refused</span>
+              </li>
+            </ul>
+          }
+
+          <div class="quota-list" [class.is-refreshing]="refreshing()" data-testid="resource-usage">
+            @for (entitlement of resources(); track entitlement.entitlement) {
+              <app-quota-row
+                [entitlement]="entitlement"
+                [attr.data-testid]="'usage-' + entitlement.entitlement"
+              />
             }
           </div>
         </div>
+      </section>
+
+      @if (monthly().length) {
+        <section class="card" aria-labelledby="monthly-heading" data-testid="monthly-usage">
+          <div class="card-header">
+            <div>
+              <h2 id="monthly-heading" class="card-title" i18n="@@plan.monthly">
+                Monthly AI allowance
+              </h2>
+              <p class="text-small text-muted" i18n="@@plan.monthly.lede">
+                One operation is one call this workspace made to an AI provider. Measured over UTC
+                calendar months, not a rolling window.
+              </p>
+            </div>
+          </div>
+          <div class="card-body quota-list" [class.is-refreshing]="refreshing()">
+            @for (entitlement of monthly(); track entitlement.entitlement) {
+              <app-quota-row
+                [entitlement]="entitlement"
+                [attr.data-testid]="'usage-' + entitlement.entitlement"
+              />
+            }
+          </div>
+        </section>
       }
     }
   </div>

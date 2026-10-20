@@ -65,6 +65,7 @@
       <a href="#lab-voices" i18n="@@lab.voices.short">Voices</a>
       <a href="#lab-transcript" i18n="@@lab.transcript.short">Transcript</a>
       <a href="#lab-charts" i18n="@@lab.charts.short">Charts</a>
+      <a href="#lab-admin" i18n="@@lab.admin.short">Plan and billing</a>
     </nav>
 
     <!-- Colour ----------------------------------------------------------- -->
@@ -827,6 +828,34 @@ Answer briefly. Hand over to a person for refunds.</textarea>
       </div>
 
       <app-provider-usage [usage]="sampleUsage" [models]="sampleModels" />
+    </section>
+
+    <section class="lab-section" id="lab-admin" aria-labelledby="lab-admin-title">
+      <h2 id="lab-admin-title" class="text-section-title" i18n="@@lab.admin">
+        Plan and billing states (sample data)
+      </h2>
+      <p class="section-note" i18n="@@lab.admin.note">
+        Every figure, plan name and date in this section is sample data written for this page. The
+        product screens draw only what the API returns; these states are shown here because the
+        local deployment runs an unlimited plan and takes no payments.
+      </p>
+
+      <div class="card card-body quota-list" data-testid="lab-quotas">
+        @for (quota of sampleQuotas; track quota.entitlement) {
+          <app-quota-row [entitlement]="quota" />
+        }
+      </div>
+
+      <div class="admin-pair" data-testid="lab-subscriptions">
+        @for (sample of sampleSubscriptions; track sample.key) {
+          <div class="card card-body">
+            <app-subscription-summary
+              [subscription]="sample.subscription"
+              [currentPlanName]="sample.current"
+            />
+          </div>
+        }
+      </div>
     </section>
   </main>
 

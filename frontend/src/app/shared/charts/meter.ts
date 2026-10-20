@@ -1,14 +1,15 @@
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 
 /** What a meter's fill says about the amount. */
-export type MeterState = 'normal' | 'warning' | 'critical';
+export type MeterState = 'normal' | 'warning' | 'critical' | 'exhausted';
 
 /**
  * How much of a known limit is used: "9 of 10 members".
  *
  * A real `meter` role with its minimum, maximum, value and a value text in
  * words, so assistive technology hears the same sentence the screen shows.
- * The fill carries the state (ink, then warning amber, then danger); the
+ * The fill carries the state (ink, then warning amber, then danger, then a
+ * full danger bar outlined at the limit); the
  * track is a lighter step behind it, and the words beside it always say the
  * numbers, so the state never rests on the colour. Only for a limit the API
  * actually returned: an unlimited entitlement has no meter.
@@ -26,6 +27,7 @@ export type MeterState = 'normal' | 'warning' | 'critical';
     '[attr.aria-label]': 'label()',
     '[class.is-warning]': "state() === 'warning'",
     '[class.is-critical]': "state() === 'critical'",
+    '[class.is-exhausted]': "state() === 'exhausted'",
   },
   template: `<span class="meter-fill" [style.inline-size.%]="percent()"></span>`,
 })

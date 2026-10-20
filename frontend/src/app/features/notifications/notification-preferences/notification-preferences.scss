@@ -1,16 +1,10 @@
 // Every value is a semantic token, so light and dark need no separate rules.
 
-.page-section {
+.preferences-page {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
   max-inline-size: 48rem;
-}
-
-.preferences {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-5);
 }
 
 .categories {
@@ -20,10 +14,6 @@
   margin: 0;
   padding: 0;
   border: 0;
-
-  legend {
-    margin-block-end: var(--space-2);
-  }
 }
 
 .category {
@@ -41,6 +31,7 @@
   flex: none;
   inline-size: 40px;
   block-size: 22px;
+  // token-lint-ignore: optical alignment of the 22px switch with the label's first line
   margin: 2px 0 0;
   border: 1px solid var(--border-control);
   border-radius: var(--radius-pill);
@@ -96,7 +87,7 @@
   color: var(--text-secondary);
 }
 
-.form-actions {
-  display: flex;
-  gap: var(--space-3);
+.category + .category {
+  padding-block-start: var(--space-4);
+  border-block-start: 1px solid var(--border-subtle);
 }

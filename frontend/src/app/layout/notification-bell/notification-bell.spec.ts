@@ -35,7 +35,9 @@ describe('NotificationBell', () => {
   const critical: AppNotification = {
     ...unread,
     id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
-    kind: 'UsageExhausted',
+    // A kind this build has no words for: its server text is what is shown, so
+    // it is the path where markup in that text must stay text.
+    kind: 'SomethingNewer',
     category: 'Usage',
     severity: 'Critical',
     title: '<script>alert(1)</script>',

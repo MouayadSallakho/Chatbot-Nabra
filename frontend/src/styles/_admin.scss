@@ -1,0 +1,595 @@
+// =============================================================================
+// Workspace administration: team, roles, plan & usage, billing, notifications
+// (Phase 36.10)
+// =============================================================================
+//
+// Shared by several pages each, so no component stylesheet carries a copy.
+// Semantic tokens only; logical properties only.
+// -----------------------------------------------------------------------------
+
+// -----------------------------------------------------------------------------
+// Facts: a strip of labelled values under a page header (a role, a member)
+// -----------------------------------------------------------------------------
+.admin-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3) var(--space-7);
+  margin: 0;
+
+  > div {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    min-inline-size: 0;
+  }
+
+  dt {
+    color: var(--text-muted);
+    font: var(--text-caption);
+  }
+
+  dd {
+    margin: 0;
+    color: var(--text-primary);
+    font: var(--text-body-strong);
+    font-variant-numeric: tabular-nums;
+    overflow-wrap: anywhere;
+  }
+}
+
+// Two equal columns from 64rem (the Design Lab's sample subscriptions).
+.admin-pair {
+  display: grid;
+  gap: var(--space-4);
+
+  @media (min-width: 64rem) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+// A card that explains a rule (read-only, protected, out of reach).
+.admin-note {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+
+  > * {
+    margin: 0;
+  }
+}
+
+.admin-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+// -----------------------------------------------------------------------------
+// Permissions by area (role create, role editor, read-only roles)
+// -----------------------------------------------------------------------------
+// One framed group per area; two columns from 80rem so twenty-nine
+// permissions read as two short columns rather than one long page.
+app-permission-picker {
+  display: grid;
+  align-items: start;
+  gap: var(--space-3);
+
+  @media (min-width: 80rem) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.perm-area {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: var(--space-2) var(--space-4);
+  min-inline-size: 0;
+  margin: 0;
+  padding: var(--space-4) var(--space-4) var(--space-3);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background-color: var(--surface-default);
+}
+
+// Floated, a legend leaves the fieldset's border and becomes ordinary content.
+.perm-area-name {
+  float: inline-start;
+  inline-size: 100%;
+  margin: 0;
+  padding: 0;
+  color: var(--text-primary);
+  font: var(--text-card-title);
+}
+
+.perm-area-count {
+  margin: 0;
+  color: var(--text-muted);
+  font: var(--text-small);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.perm-option,
+.perm-readout {
+  grid-column: 1 / -1;
+}
+
+.perm-option {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-3);
+  align-items: start;
+  padding-block: var(--space-2);
+  border-block-start: 1px solid var(--border-subtle);
+  cursor: pointer;
+
+  .form-check-input {
+    margin-block-start: 0.1875rem;
+  }
+}
+
+.perm-option-text,
+.perm-readout li {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-inline-size: 0;
+}
+
+.perm-label {
+  color: var(--text-primary);
+  font: var(--text-body-strong);
+  overflow-wrap: anywhere;
+}
+
+.perm-description {
+  color: var(--text-secondary);
+  font: var(--text-small);
+}
+
+.perm-readout {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+
+  li {
+    padding-block: var(--space-2);
+    border-block-start: 1px solid var(--border-subtle);
+  }
+}
+
+// What a permission can lead to: an icon of its own and a word, never colour.
+.perm-impacts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
+  margin: var(--space-1) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.impact {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-block-size: 1.375rem;
+  padding-inline: var(--space-2);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  background-color: var(--surface-muted);
+  color: var(--text-secondary);
+  font: var(--text-caption);
+
+  .icon {
+    inline-size: 0.875rem;
+    block-size: 0.875rem;
+  }
+}
+
+// The role as a whole: how much it grants, and everything it can lead to.
+.impact-summary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background-color: var(--surface-muted);
+
+  .perm-impacts {
+    margin: 0;
+  }
+}
+
+.impact-summary-title {
+  margin: 0;
+  color: var(--text-primary);
+  font: var(--text-body-strong);
+  font-variant-numeric: tabular-nums;
+}
+
+// -----------------------------------------------------------------------------
+// Folded history (past invitations)
+// -----------------------------------------------------------------------------
+.past-invitations {
+  overflow: hidden;
+}
+
+.past-summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-block-size: 2.75rem;
+  padding: var(--space-2) var(--space-5);
+  color: var(--text-primary);
+  font: var(--text-body-strong);
+  cursor: pointer;
+  list-style: none;
+
+  &::-webkit-details-marker {
+    display: none;
+  }
+
+  &:hover {
+    background-color: var(--surface-hover);
+  }
+
+  &:focus-visible {
+    outline: var(--focus-ring-width) solid var(--focus-ring);
+    outline-offset: calc(-1 * var(--focus-ring-width));
+  }
+}
+
+// Points to the reading end while closed, down once open; mirrored by the
+// page's direction, not by the icon set.
+.past-chevron {
+  transform: rotate(calc(-90deg * var(--direction-flip, 1)));
+  transition: transform var(--duration-sm) var(--ease-standard);
+
+  [open] > summary > & {
+    transform: none;
+  }
+}
+
+.past-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-block-start: 1px solid var(--border-subtle);
+}
+
+.past-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-3);
+  padding: var(--space-3) var(--space-5);
+
+  & + & {
+    border-block-start: 1px solid var(--border-subtle);
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Roles for a member (invite form, member detail)
+// -----------------------------------------------------------------------------
+.role-options {
+  display: grid;
+  gap: var(--space-2);
+  min-inline-size: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+
+  @media (min-width: 48rem) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.role-option {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-3);
+  align-items: start;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+
+  &:hover {
+    background-color: var(--surface-hover);
+  }
+
+  // Ticked is marked by the checkbox and a stronger edge, never by colour alone.
+  &:has(input:checked) {
+    border-color: var(--border-control);
+    background-color: var(--surface-selected);
+  }
+
+  .form-check-input {
+    margin-block-start: 0.1875rem;
+  }
+}
+
+.role-option-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-inline-size: 0;
+}
+
+.role-name {
+  color: var(--text-primary);
+  font: var(--text-body-strong);
+  overflow-wrap: anywhere;
+}
+
+// Roles a reader may not change, as a plain list.
+.role-readout {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+
+  li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-5);
+  }
+
+  li + li {
+    border-block-start: 1px solid var(--border-subtle);
+  }
+}
+
+// What a member can do now: areas with how much of each they hold.
+.access-glance {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+
+  > h2 {
+    margin: 0;
+  }
+}
+
+.access-areas {
+  display: grid;
+  gap: var(--space-1) var(--space-6);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+
+  @media (min-width: 48rem) {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  li {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding-block: var(--space-1);
+    border-block-end: 1px solid var(--border-subtle);
+    font: var(--text-small);
+  }
+}
+
+// The save row's start: "Unsaved changes" and what saving would change, or how
+// many roles are ticked.
+.unsaved-or-count {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-3);
+  margin-inline-end: auto;
+  min-inline-size: 0;
+
+  .unsaved-note {
+    margin-inline-end: 0;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Limit reached: the one quota state that refuses something, so it is the
+// strongest badge (a solid fill) with a marker of its own, a "no entry" disc,
+// beside the warning triangle and the danger octagon of the states before it.
+// -----------------------------------------------------------------------------
+.badge-exhausted {
+  --badge-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Ccircle cx='6' cy='6' r='5.4' fill='%23fff'/%3E%3Cpath d='M3.2 6h5.6' stroke='%23000' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E");
+
+  background-color: var(--danger-solid);
+  border-color: var(--danger-solid);
+  color: var(--danger-contrast);
+
+  &::before {
+    inline-size: 0.75rem;
+    block-size: 0.75rem;
+    border-radius: 0;
+    mask: var(--badge-glyph) center / contain no-repeat;
+    mask-mode: luminance;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Quotas (Plan & usage, the Design Lab)
+// -----------------------------------------------------------------------------
+.quota-list {
+  display: grid;
+  gap: var(--space-6);
+  transition: opacity var(--duration-sm) var(--ease-standard);
+
+  @media (min-width: 64rem) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-6) var(--space-8);
+  }
+
+  // A refresh dims what is there instead of blanking it.
+  &.is-refreshing {
+    opacity: 0.6;
+  }
+}
+
+.quota {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-inline-size: 0;
+
+  > p {
+    margin: 0;
+  }
+
+  .meter {
+    block-size: 0.625rem;
+  }
+}
+
+.quota-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-1) var(--space-3);
+}
+
+.quota-label {
+  margin: 0;
+  color: var(--text-primary);
+  font: var(--text-card-title);
+}
+
+.quota-figure {
+  color: var(--text-primary);
+  font: var(--text-numeric);
+  font-size: 1.25rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.quota-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-1) var(--space-3);
+  color: var(--text-muted);
+  font: var(--text-small);
+  font-variant-numeric: tabular-nums;
+}
+
+.quota-consequence {
+  color: var(--text-primary);
+  font: var(--text-small);
+  font-weight: 550;
+}
+
+.quota-description {
+  color: var(--text-secondary);
+  font: var(--text-small);
+}
+
+.quota-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-5);
+  margin: 0 0 var(--space-5);
+  padding: 0 0 var(--space-4);
+  border-block-end: 1px solid var(--border-subtle);
+  list-style: none;
+  color: var(--text-muted);
+  font: var(--text-small);
+
+  li {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+}
+
+// -----------------------------------------------------------------------------
+// A subscription (Billing, the Design Lab)
+// -----------------------------------------------------------------------------
+.subscription {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+
+  p {
+    margin: 0;
+  }
+}
+
+.subscription-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+
+.subscription-plan {
+  color: var(--text-primary);
+  font: var(--text-page-title);
+  font-size: 1.5rem;
+}
+
+.subscription-sentence {
+  max-inline-size: 60ch;
+  color: var(--text-secondary);
+  font: var(--text-small);
+}
+
+// A fact the reader must not miss (grace, cancellation, fallback): framed,
+// with its words carrying the meaning; the warning tone only adds to them.
+.subscription-callout {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border-default);
+  border-inline-start-width: 3px;
+  border-radius: var(--radius-md);
+  background-color: var(--surface-muted);
+  color: var(--text-primary);
+  font: var(--text-small);
+
+  &.is-warning {
+    border-color: var(--warning-border);
+    border-inline-start-color: var(--warning-fg);
+    background-color: var(--warning-bg);
+  }
+}
+
+.subscription-callout-title {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.subscription-plans {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-7);
+
+  > div {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+
+  dt {
+    color: var(--text-muted);
+    font: var(--text-caption);
+  }
+
+  dd {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-1);
+    margin: 0;
+    font-weight: 600;
+  }
+}

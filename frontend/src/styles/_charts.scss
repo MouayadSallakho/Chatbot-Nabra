@@ -356,9 +356,17 @@
     background-color: var(--warning-fg);
   }
 
-  .meter.is-critical & {
+  .meter.is-critical &,
+  .meter.is-exhausted & {
     background-color: var(--danger-fg);
   }
+}
+
+// At the limit the fill reaches the end of the track; the state's word and
+// marker beside the meter say "Limit reached", so this is never colour alone.
+.meter.is-exhausted {
+  outline: 1px solid var(--danger-fg);
+  outline-offset: 1px;
 }
 
 // -----------------------------------------------------------------------------

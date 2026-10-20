@@ -140,6 +140,30 @@ describe('InviteMember', () => {
     expect(window.sessionStorage.length).toBe(0);
   });
 
+  it('says so when the clipboard refuses, and leaves the link to select', async () => {
+    await mount('members.view', 'members.invite', 'members.roles.manage');
+
+    type('bob@example.test');
+    submit();
+    await settle();
+
+    http.expectOne(invitationsUrl).flush(created);
+    await settle();
+
+    const clipboard = vi
+      .spyOn(navigator.clipboard ?? { writeText: () => Promise.resolve() }, 'writeText')
+      .mockRejectedValue(new Error('denied'));
+
+    host().querySelector<HTMLButtonElement>('[data-testid="copy-link"]')!.click();
+    await settle();
+
+    expect(text()).toContain('This browser did not allow copying.');
+    expect(text()).not.toContain('Copied.');
+    expect(host().querySelector('[data-testid="invitation-link"]')).not.toBeNull();
+
+    clipboard.mockRestore();
+  });
+
   it('puts the token in the fragment, not the query string', async () => {
     // A fragment is never sent to the server and is not forwarded in a Referer
     // header. A query string is both.

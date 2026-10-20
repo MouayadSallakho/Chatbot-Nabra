@@ -7,7 +7,13 @@ import { AuthService } from '@app/core/auth/auth-service';
 import { PermissionApi } from '@app/core/authorization/permission-api';
 import { LOCAL_STORAGE } from '@app/core/storage/local-storage';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
-import { memoryStorage, permissionApiGranting } from '@app/testing/test-doubles';
+import { ToastService } from '@app/core/feedback/toast-service';
+import {
+  answerConfirmation,
+  memoryStorage,
+  permissionApiGranting,
+  stubDialogs,
+} from '@app/testing/test-doubles';
 import { AssignableRole, Member, TeamApi } from '../team-api';
 import { MemberDetail } from './member-detail';
 
@@ -105,6 +111,76 @@ describe('MemberDetail', () => {
     );
 
   afterEach(() => http.verify());
+
+  it('asks before taking every role away, and sends nothing if the reader keeps them', async () => {
+    const held: Member = {
+      ...bob,
+      roles: [{ id: 'role-support', name: 'Support', isSystem: false }],
+      permissions: ['ai-agents.view'],
+    };
+
+    await mount(held, Manager);
+    document.body.append(host());
+    stubDialogs(host());
+
+    tick('Support')!.click();
+    await settle();
+
+    // What saving would change, by name, before it is saved.
+    expect(host().querySelector('[data-testid="change-summary"]')!.textContent).toContain(
+      'Removes Support.',
+    );
+
+    button('Save access')!.click();
+    await settle();
+
+    expect(host().querySelector('dialog')!.textContent).toContain(
+      'Remove every role from bob@example.test?',
+    );
+
+    answerConfirmation(host(), false);
+    await settle();
+
+    // Declined: no request, and the unticked box is still the reader's choice.
+    http.expectNone(`${memberUrl}/roles`);
+    expect(tick('Support')!.checked).toBe(false);
+
+    button('Save access')!.click();
+    await settle();
+    answerConfirmation(host());
+    await settle();
+
+    const saved = http.expectOne(`${memberUrl}/roles`);
+
+    expect(saved.request.body).toEqual({ roleIds: [] });
+    saved.flush({ ...bob }, { headers: { ETag: '"v2"' } });
+    await settle();
+
+    expect(
+      TestBed.inject(ToastService)
+        .toasts()
+        .map((toast) => toast.text),
+    ).toContain('Access for bob@example.test saved.');
+
+    host().remove();
+  });
+
+  it('shows what a member can do now, by area, when the reader may see the catalogue', async () => {
+    await mount({ ...bob, permissions: ['ai-agents.view', 'ai-agents.preview'] }, [
+      ...Manager,
+      'roles.view',
+      'ai-agents.preview',
+    ]);
+
+    const areas = host().querySelector('[data-testid="access-areas"]')!.textContent ?? '';
+
+    expect(areas).toContain('AI agents');
+    expect(areas).toContain('2 of 5');
+    expect(text()).toContain('Uses the AI provider, which costs money');
+    expect(host().querySelector('[data-testid="permission-total"]')!.textContent).toContain(
+      '2 permissions',
+    );
+  });
 
   it('offers the roles the actor may assign', async () => {
     await mount(bob, Manager);

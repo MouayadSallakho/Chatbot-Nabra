@@ -1,4 +1,13 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  ElementRef,
+  Injector,
+  afterNextRender,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
@@ -8,9 +17,13 @@ import { PermissionDefinition } from '@app/core/authorization/permission-codes';
 import { PermissionService } from '@app/core/authorization/permission-service';
 import { RoleApi } from '@app/core/authorization/role-api';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
+import { LocaleFormat } from '@app/core/i18n/locale-format';
 import { EmptyState } from '@app/shared/empty-state/empty-state';
+import { Icon } from '@app/shared/icon/icon';
 import { PageHeader } from '@app/shared/page-header/page-header';
 import { PermissionGroup, groupPermissions } from '../permission-groups';
+import { PermissionPicker } from '../permission-picker/permission-picker';
+import { grantSummary, impactSummary } from '../permission-words';
 import { ROLE_NAME_MAX } from '../role-limits';
 
 /**
@@ -30,7 +43,7 @@ import { ROLE_NAME_MAX } from '../role-limits';
 @Component({
   selector: 'app-role-create',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, RouterLink, PageHeader, EmptyState],
+  imports: [ReactiveFormsModule, RouterLink, PageHeader, EmptyState, Icon, PermissionPicker],
   templateUrl: './role-create.html',
   styleUrl: './role-create.scss',
 })
@@ -40,6 +53,9 @@ export class RoleCreate {
   private readonly workspace = inject(WorkspaceContextService);
   private readonly permissions = inject(PermissionService);
   private readonly router = inject(Router);
+  private readonly locale = inject(LocaleFormat);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly injector = inject(Injector);
 
   protected readonly loading = signal(true);
   protected readonly loadFailure = signal<ApiError | null>(null);
@@ -98,8 +114,23 @@ export class RoleCreate {
       this.catalogue().some((permission) => !this.permissions.canDelegate(permission.code)),
   );
 
-  /** How many capabilities are ticked, for the summary line. */
-  protected readonly selectedCount = computed(() => this.selected().size);
+  /** How many capabilities were withheld, for the ceiling note. */
+  protected readonly withheldCount = computed(
+    () =>
+      this.catalogue().filter((permission) => !this.permissions.canDelegate(permission.code))
+        .length,
+  );
+
+  /** The codes ticked now, for the picker. */
+  protected readonly ticked = this.selected.asReadonly();
+
+  /** "Grants 3 of 29 permissions". */
+  protected readonly grantText = computed(() =>
+    grantSummary(this.selected().size, this.catalogue().length, this.locale.language),
+  );
+
+  /** What the ticked permissions can lead to, once each. */
+  protected readonly impacts = computed(() => impactSummary(this.selected()));
 
   constructor() {
     void this.load();
@@ -109,7 +140,7 @@ export class RoleCreate {
     return this.selected().has(code);
   }
 
-  protected toggle(code: string, ticked: boolean): void {
+  protected toggle({ code, ticked }: { code: string; ticked: boolean }): void {
     this.selected.update((current) => {
       const next = new Set(current);
 
@@ -165,6 +196,15 @@ export class RoleCreate {
     // of them survives the unique index.
     if (!tenantId || this.name.invalid || this.submitting()) {
       this.name.markAsTouched();
+
+      if (this.name.invalid) {
+        // The first (and only) field that can be wrong; the reader may be far
+        // down the permission list when they press Create.
+        afterNextRender(
+          () => this.host.nativeElement.querySelector<HTMLElement>('#role-name')?.focus(),
+          { injector: this.injector },
+        );
+      }
 
       return;
     }

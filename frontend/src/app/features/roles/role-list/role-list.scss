@@ -1,12 +1,18 @@
 // Column template for the shared data list; everything else is the primitive's.
 .role-list {
-  --data-list-columns: minmax(0, 2fr) 11rem minmax(0, 1fr) 1.5rem;
+  --data-list-columns: minmax(0, 2fr) 12rem minmax(0, 1fr) 1.5rem;
 }
 
-.role-list .data-row-title {
+.role-title {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2);
+}
+
+.role-name {
+  min-inline-size: 0;
+  overflow-wrap: anywhere;
 }
 
 .role-note {

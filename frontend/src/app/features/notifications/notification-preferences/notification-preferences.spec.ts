@@ -87,6 +87,35 @@ describe('NotificationPreferencesPage', () => {
     expect(host().textContent).toContain('In-app notifications are always on');
   });
 
+  it('knows when choices are unsaved, by value, and says so', async () => {
+    await mount();
+
+    const page = fixture.componentInstance;
+    const save = (): HTMLButtonElement =>
+      host().querySelector<HTMLButtonElement>('[data-testid="save"]')!;
+
+    expect(page.hasUnsavedChanges()).toBe(false);
+    expect(save().disabled).toBe(true);
+    expect(host().querySelector('[data-testid="on-count"]')!.textContent).toContain(
+      'Every category is off',
+    );
+
+    toggle('billing').click();
+    await settle();
+
+    expect(page.hasUnsavedChanges()).toBe(true);
+    expect(save().disabled).toBe(false);
+    expect(host().textContent).toContain('Unsaved changes');
+    expect(host().querySelector('[data-testid="on-count"]')!.textContent).toContain('1 of 5');
+
+    // Turned back: nothing differs from what is stored, so nothing is unsaved.
+    toggle('billing').click();
+    await settle();
+
+    expect(page.hasUnsavedChanges()).toBe(false);
+    expect(save().disabled).toBe(true);
+  });
+
   it('saves every category against the version it read', async () => {
     await mount();
     document.body.append(host());

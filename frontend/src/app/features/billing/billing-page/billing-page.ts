@@ -6,13 +6,10 @@ import { WorkspaceContextService } from '@app/core/workspace/workspace-context-s
 import { EmptyState } from '@app/shared/empty-state/empty-state';
 import { PageHeader } from '@app/shared/page-header/page-header';
 import { LocaleFormat } from '@app/core/i18n/locale-format';
-import {
-  BillingApi,
-  BillingOffer,
-  SubscriptionStatus,
-  WorkspaceBilling,
-  formatAmount,
-} from '../billing-api';
+import { Icon } from '@app/shared/icon/icon';
+import { BillingApi, BillingOffer, WorkspaceBilling, formatAmount } from '../billing-api';
+import { cadenceWord, trialWords } from '../billing-words';
+import { SubscriptionSummary } from '../subscription-summary/subscription-summary';
 
 /** An offer with the words a reader needs beside the number. */
 interface OfferRow {
@@ -21,35 +18,8 @@ interface OfferRow {
   readonly price: string;
   readonly cadence: string;
   readonly trial: string | null;
+  readonly buyLabel: string;
 }
-
-/** What each subscription state means, said plainly. */
-const STATUS_WORDS: Readonly<Record<SubscriptionStatus, { label: string; note: string }>> = {
-  PendingActivation: {
-    label: 'Awaiting first payment',
-    note: 'This subscription has been started but the first payment has not completed yet.',
-  },
-  Trialing: {
-    label: 'Trial',
-    note: 'The trial is running. The plan is available in full until it ends.',
-  },
-  Active: {
-    label: 'Active',
-    note: 'Payments are up to date.',
-  },
-  PastDue: {
-    label: 'Payment failed',
-    note: 'A payment did not go through. This workspace keeps its plan for now; update the payment method to avoid losing it.',
-  },
-  Suspended: {
-    label: 'Suspended',
-    note: 'Payment was not resolved in time, so this workspace has moved to a smaller plan. Nothing was deleted.',
-  },
-  Canceled: {
-    label: 'Cancelled',
-    note: 'This subscription has ended and the workspace has moved to a smaller plan. Nothing was deleted.',
-  },
-};
 
 /**
  * What this workspace pays for, and the two ways to act on it.
@@ -80,7 +50,7 @@ const STATUS_WORDS: Readonly<Record<SubscriptionStatus, { label: string; note: s
 @Component({
   selector: 'app-billing-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [PageHeader, EmptyState],
+  imports: [PageHeader, EmptyState, Icon, SubscriptionSummary],
   templateUrl: './billing-page.html',
   styleUrl: './billing-page.scss',
 })
@@ -119,13 +89,6 @@ export class BillingPage {
 
   protected readonly subscription = computed(() => this.billing()?.subscription ?? null);
 
-  /** The subscription's state in words, for the reader rather than for a machine. */
-  protected readonly statusWords = computed(() => {
-    const status = this.subscription()?.status;
-
-    return status ? STATUS_WORDS[status] : null;
-  });
-
   protected readonly offers = computed<readonly OfferRow[]>(() =>
     (this.billing()?.offers ?? []).map((offer) => this.row(offer)),
   );
@@ -146,7 +109,11 @@ export class BillingPage {
     const tenantId = this.tenantId();
 
     if (!tenantId) {
-      this.failure.set({ kind: 'unknown', status: 0, message: 'No workspace is selected.' });
+      this.failure.set({
+        kind: 'unknown',
+        status: 0,
+        message: $localize`:@@billing.noWorkspace:No workspace is selected.`,
+      });
       this.loading.set(false);
 
       return;
@@ -166,8 +133,8 @@ export class BillingPage {
     try {
       this.billing.set(await firstValueFrom(this.api.billing(tenantId)));
     } catch (error) {
+      // A failed refresh keeps what was read; a failed first read has nothing.
       this.failure.set(toApiError(error));
-      this.billing.set(null);
     } finally {
       this.loading.set(false);
       this.refreshing.set(false);
@@ -221,20 +188,23 @@ export class BillingPage {
     }
   }
 
-  protected date(value: string): string {
-    return this.locale.date(value, 'longDate');
-  }
-
   private row(offer: BillingOffer): OfferRow {
+    const price = formatAmount(offer.amountMinorUnits, offer.currency, this.locale.language);
+    const cadence = cadenceWord(offer.interval);
+    const plan = offer.planName;
+
     return {
       id: offer.id,
-      planName: offer.planName,
-      price: formatAmount(offer.amountMinorUnits, offer.currency, this.locale.language),
-      cadence: offer.interval === 'Annual' ? 'per year' : 'per month',
+      planName: plan,
+      price,
+      cadence,
       trial:
         offer.trialDays && offer.trialDays > 0
-          ? `${offer.trialDays}-day trial, then the price above`
+          ? trialWords(offer.trialDays, this.locale.language)
           : null,
+      // Named for what it buys: two offers can share a plan name, and a reader
+      // moving between buttons must hear which is which.
+      buyLabel: $localize`:@@billing.buy.label:Subscribe to ${plan}:plan:, ${price}:price: ${cadence}:cadence:`,
     };
   }
 
@@ -256,13 +226,16 @@ export class BillingPage {
    */
   private describe(error: ApiError): string {
     if (error.kind === 'invalidResponse') {
-      return 'The payment provider could not be reached. Nothing has been charged.';
+      return $localize`:@@billing.error.provider:The payment provider could not be reached. Nothing has been charged.`;
     }
 
     if (error.kind === 'providerUnavailable') {
-      return 'This installation is not set up to take payments, so nothing can be bought here.';
+      return $localize`:@@billing.error.notConfigured:This installation is not set up to take payments, so nothing can be bought here.`;
     }
 
-    return error.message || 'That could not be started. Nothing has been charged.';
+    return (
+      error.message ||
+      $localize`:@@billing.error.unknown:That could not be started. Nothing has been charged.`
+    );
   }
 }

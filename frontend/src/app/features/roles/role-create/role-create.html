@@ -4,9 +4,13 @@
     backLabel="Roles & permissions"
     i18n-backLabel="@@back.roles"
     heading="Create role"
-    description="A role is a named set of things its holders may do in this workspace."
+    i18n-heading="@@roles.create.heading"
+    description="A role is a named set of things its holders may do in this workspace. Members get their access from the roles they hold."
+    i18n-description="@@roles.create.description"
   >
-    <a pageActions class="btn btn-secondary" routerLink="/roles">Cancel</a>
+    <a pageActions class="btn btn-secondary" routerLink="/roles" i18n="@@roles.create.cancel"
+      >Cancel</a
+    >
   </app-page-header>
 
   @if (!allowed()) {
@@ -15,19 +19,36 @@
         <app-empty-state
           icon="roles"
           heading="You cannot create roles"
+          i18n-heading="@@roles.create.denied.heading"
           description="Creating a role needs permissions your roles do not include. Ask somebody who administers this workspace if you need them."
+          i18n-description="@@roles.create.denied.body"
         >
-          <a stateActions class="btn btn-secondary btn-sm" routerLink="/roles">Back to roles</a>
+          <a
+            stateActions
+            class="btn btn-secondary btn-sm"
+            routerLink="/roles"
+            i18n="@@roles.backToRoles"
+            >Back to roles</a
+          >
         </app-empty-state>
       </div>
     </div>
   } @else if (loading()) {
     <div class="page-section" aria-busy="true">
-      <p class="visually-hidden" role="status">Loading permissions…</p>
-      <div class="card card-body">
+      <p class="visually-hidden" role="status" i18n="@@roles.create.loading">
+        Loading permissions…
+      </p>
+      <div class="card card-body admin-skeleton" aria-hidden="true">
         <span class="skeleton skeleton-title"></span>
-        <span class="skeleton skeleton-text"></span>
+        <span class="skeleton skeleton-bar"></span>
       </div>
+      @for (row of [0, 1]; track row) {
+        <div class="card card-body admin-skeleton" aria-hidden="true">
+          <span class="skeleton skeleton-text"></span>
+          <span class="skeleton skeleton-text"></span>
+          <span class="skeleton skeleton-text"></span>
+        </div>
+      }
     </div>
   } @else if (loadFailure(); as error) {
     <div class="page-section">
@@ -36,101 +57,130 @@
           icon="alert"
           tone="error"
           heading="Could not load permissions"
+          i18n-heading="@@roles.create.loadFailed"
           [description]="error.message"
         >
-          <button stateActions type="button" class="btn btn-secondary btn-sm" (click)="load()">
+          <button
+            stateActions
+            type="button"
+            class="btn btn-secondary btn-sm"
+            (click)="load()"
+            i18n="@@roles.tryAgain"
+          >
             Try again
           </button>
         </app-empty-state>
       </div>
     </div>
   } @else {
-    <form [formGroup]="form" (ngSubmit)="create()" novalidate>
-      <div class="page-section">
-        <div class="card card-body role-form">
+    <form class="role-create" [formGroup]="form" (ngSubmit)="create()" novalidate>
+      <section class="card form-section" aria-labelledby="create-name-heading">
+        <div class="card-header">
+          <span class="form-section-index" aria-hidden="true">1</span>
+          <div>
+            <h2 id="create-name-heading" class="form-section-title" i18n="@@roles.section.name">
+              Name
+            </h2>
+            <p class="form-section-lede" i18n="@@roles.create.name.lede">
+              Something a colleague would recognise when it is given to them.
+            </p>
+          </div>
+        </div>
+        <div class="card-body">
           <div class="field">
-            <label class="form-label" for="role-name">Role name</label>
+            <label class="form-label" for="role-name" i18n="@@roles.name.label">Role name</label>
             <input
               id="role-name"
               class="form-control"
               type="text"
               formControlName="name"
+              dir="auto"
               [attr.maxlength]="nameLimit"
+              [attr.aria-invalid]="showNameError()"
+              [attr.aria-describedby]="
+                showNameError() ? 'role-name-hint role-name-error' : 'role-name-hint'
+              "
               autocomplete="off"
             />
-            <p class="form-hint text-small text-muted">
-              Something a colleague would recognise, such as “Support agent”.
+            <p id="role-name-hint" class="form-hint" i18n="@@roles.name.hint">
+              For example “Support agent” or “Billing contact”.
             </p>
 
             @if (showNameError()) {
-              <p class="form-error" role="alert">A role name is required.</p>
+              <p id="role-name-error" class="form-error" role="alert" i18n="@@roles.name.required">
+                A role name is required.
+              </p>
             }
           </div>
         </div>
-      </div>
+      </section>
 
-      <div class="page-section">
-        <h2 class="text-section-title">Permissions</h2>
-        <p class="text-small text-secondary section-note">
-          Tick what somebody holding this role may do. You can change these later, and a role that
-          grants nothing is a valid starting point.
-        </p>
-
-        @for (group of groups(); track group.name) {
-          <fieldset class="card card-body permission-group">
-            <legend class="text-label permission-group-name">{{ group.name }}</legend>
-
-            @for (permission of group.permissions; track permission.code) {
-              <label class="permission-option">
-                <input
-                  type="checkbox"
-                  class="form-check-input"
-                  [checked]="isTicked(permission.code)"
-                  (change)="toggle(permission.code, $any($event.target).checked)"
-                />
-                <span class="permission-option-text">
-                  <span class="permission-label">{{ permission.label }}</span>
-                  <span class="text-small text-muted">{{ permission.description }}</span>
-                </span>
-              </label>
-            }
-          </fieldset>
-        }
-      </div>
-
-      @if (failure(); as error) {
-        <div class="page-section">
-          <p class="alert alert-danger" role="alert">{{ error.message }}</p>
+      <section class="card form-section" aria-labelledby="create-permissions-heading">
+        <div class="card-header">
+          <span class="form-section-index" aria-hidden="true">2</span>
+          <div>
+            <h2
+              id="create-permissions-heading"
+              class="form-section-title"
+              i18n="@@roles.section.permissions"
+            >
+              Permissions
+            </h2>
+            <p class="form-section-lede" i18n="@@roles.create.permissions.lede">
+              Tick what somebody holding this role may do. You can change these later, and a role
+              that grants nothing is a valid starting point.
+            </p>
+          </div>
         </div>
-      }
 
-      <div class="page-section form-actions">
-        <button type="submit" class="btn btn-primary" [disabled]="submitting()">
-          {{ submitting() ? 'Creating…' : 'Create role' }}
-        </button>
+        <div class="card-body">
+          <div class="impact-summary" data-testid="impact-summary">
+            <p class="impact-summary-title">{{ grantText() }}</p>
+            @if (impacts().length) {
+              <ul class="perm-impacts" aria-live="polite">
+                @for (impact of impacts(); track impact.kind) {
+                  <li class="impact" [attr.data-impact]="impact.kind">
+                    <app-icon [name]="impact.icon" [strokeWidth]="1.75" />{{ impact.text }}
+                  </li>
+                }
+              </ul>
+            }
+          </div>
 
-        <p class="text-small text-muted" aria-live="polite">
-          @if (selectedCount() === 0) {
-            No permissions selected
-          } @else if (selectedCount() === 1) {
-            1 permission selected
-          } @else {
-            {{ selectedCount() }} permissions selected
+          @if (narrowed()) {
+            <p class="guidance" data-testid="ceiling-note" i18n="@@roles.ceiling">
+              Only permissions your own roles include are listed ({{ withheldCount() }} are not).
+              You cannot grant something you cannot do yourself.
+            </p>
           }
-        </p>
 
-        @if (narrowed()) {
-          <!--
-            Said plainly rather than left as an unexplained short list: somebody
-            who knows the platform has more capabilities should be told why they
-            are not here, not left wondering whether the page failed to load.
-          -->
-          <p class="text-small text-muted">
-            Only capabilities your own roles include are listed. You cannot grant something you
-            cannot do yourself.
-          </p>
-        }
-      </div>
+          <app-permission-picker
+            [groups]="groups()"
+            [selected]="ticked()"
+            (toggled)="toggle($event)"
+          />
+
+          @if (failure(); as error) {
+            <p class="alert alert-danger" role="alert">{{ error.message }}</p>
+          }
+
+          <div class="section-actions">
+            <span class="text-small text-muted" aria-live="polite">{{ grantText() }}</span>
+            <button
+              type="submit"
+              class="btn btn-primary"
+              [disabled]="submitting()"
+              data-testid="create-role"
+            >
+              @if (submitting()) {
+                <span i18n="@@roles.create.creating">Creating…</span>
+              } @else {
+                <span i18n="@@roles.create.submit">Create role</span>
+              }
+            </button>
+          </div>
+        </div>
+      </section>
     </form>
   }
 </div>

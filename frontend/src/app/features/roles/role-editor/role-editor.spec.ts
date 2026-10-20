@@ -98,7 +98,7 @@ describe('RoleEditor', () => {
   const text = (): string => host().textContent ?? '';
 
   const tick = (label: string): HTMLInputElement | undefined =>
-    [...host().querySelectorAll<HTMLLabelElement>('label.permission-option')]
+    [...host().querySelectorAll<HTMLLabelElement>('label.perm-option')]
       .find((option) => (option.textContent ?? '').includes(label))
       ?.querySelector('input') ?? undefined;
 
@@ -115,6 +115,56 @@ describe('RoleEditor', () => {
     expect(text()).toContain('Support agent');
     expect(tick('View AI agents')?.checked).toBe(true);
     expect(tick('Edit AI agents')?.checked).toBe(false);
+  });
+
+  it('groups the permissions by area and counts what each grants', async () => {
+    await mount(custom, ...ManagerWithAgents);
+
+    const area = host().querySelector('[data-testid="area-area-ai-agents"]')!;
+
+    expect(area.tagName).toBe('FIELDSET');
+    expect(area.querySelector('legend')!.textContent).toContain('AI agents');
+    expect(
+      host().querySelector('[data-testid="area-count-area-ai-agents"]')!.textContent,
+    ).toContain('1 of 5 granted');
+
+    tick('Edit AI agents')!.click();
+    await settle();
+
+    expect(
+      host().querySelector('[data-testid="area-count-area-ai-agents"]')!.textContent,
+    ).toContain('2 of 5 granted');
+  });
+
+  it('says what a permission can lead to, beside it and for the role as a whole', async () => {
+    await mount(custom, ...ManagerWithAgents);
+
+    // Beside the permission, and part of its checkbox's description.
+    const preview = tick('Preview AI agents')!;
+    const described = (preview.getAttribute('aria-describedby') ?? '')
+      .split(' ')
+      .map((id) => host().querySelector(`#${id}`)?.textContent ?? '')
+      .join(' ');
+
+    expect(described).toContain('Uses the AI provider, which costs money');
+    // Named by the label alone, so the name stays short.
+    expect(host().querySelector(`#${preview.getAttribute('aria-labelledby')}`)!.textContent).toBe(
+      'Preview AI agents',
+    );
+
+    // The role as a whole: nothing consequential is granted yet...
+    const summary = (): string =>
+      host().querySelector('[data-testid="impact-summary"]')!.textContent ?? '';
+
+    expect(summary()).toContain(`Grants 1 of ${EVERY_PERMISSION.length} permissions`);
+    expect(summary()).not.toContain('costs money');
+
+    // ...and ticking one that is says so at once.
+    preview.click();
+    await settle();
+
+    expect(summary()).toContain(`Grants 2 of ${EVERY_PERMISSION.length} permissions`);
+    expect(summary()).toContain('Uses the AI provider, which costs money');
   });
 
   it('renders the protected role read-only and explains why', async () => {
@@ -158,7 +208,9 @@ describe('RoleEditor', () => {
 
     expect(tick('View AI agents')).toBeDefined();
     expect(tick('Edit AI agents')).toBeUndefined();
-    expect(text()).toContain('Only capabilities your own roles include are listed.');
+    expect(host().querySelector('[data-testid="ceiling-note"]')!.textContent).toContain(
+      'Only permissions your own roles include are listed',
+    );
   });
 
   it('shows the whole catalogue to somebody who holds it all', async () => {
@@ -168,7 +220,7 @@ describe('RoleEditor', () => {
       expect(tick(permission.label)).toBeDefined();
     }
 
-    expect(text()).not.toContain('Only capabilities your own roles include are listed.');
+    expect(host().querySelector('[data-testid="ceiling-note"]')).toBeNull();
   });
 
   it('shows the protected role every permission, not just the reader’s', async () => {

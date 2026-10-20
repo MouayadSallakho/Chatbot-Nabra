@@ -108,6 +108,17 @@ describe('NotificationsPage', () => {
     expect(host().querySelectorAll('[data-testid="notification"]').length).toBe(2);
     expect(host().querySelector('[data-testid="summary"]')?.textContent).toContain('1 unread of 2');
     http.expectNone(`${base}/read-all`);
+
+    // Both arrived on one day, so one day heading; each row says its time of
+    // day rather than repeating "3 weeks ago" under it.
+    const days = host().querySelectorAll('.history-day');
+
+    expect(days.length).toBe(1);
+    expect(days[0].textContent).toContain('September 24, 2026');
+    expect(host().querySelector('.notification-time')!.textContent).not.toContain('ago');
+
+    // Unread is a word as well as a dot and weight, on the unread one only.
+    expect(host().querySelectorAll('.notification-unread').length).toBe(1);
   });
 
   it('pages with Previous and Next, and says where it is', async () => {

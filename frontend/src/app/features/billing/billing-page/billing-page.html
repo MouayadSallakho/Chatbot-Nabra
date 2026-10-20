@@ -1,7 +1,9 @@
 <div class="page">
   <app-page-header
     heading="Billing"
-    description="What this workspace pays for. Payment details, invoices and cancellation are held by the payment provider, never by this platform."
+    i18n-heading="@@billing.heading"
+    description="What this workspace pays for. Payment details, invoices and cancellation are held by the payment provider, never by Nabra."
+    i18n-description="@@billing.description"
   >
     @if (canView()) {
       <button
@@ -14,208 +16,182 @@
       >
         @if (refreshing()) {
           <span class="spinner" aria-hidden="true"></span>
+          <span class="btn-label" i18n="@@billing.refreshing">Refreshing…</span>
+        } @else {
+          <app-icon name="refresh" [strokeWidth]="1.75" />
+          <span class="btn-label" i18n="@@billing.refresh">Refresh</span>
         }
-        <span class="btn-label">{{ refreshing() ? 'Refreshing…' : 'Refresh' }}</span>
       </button>
     }
   </app-page-header>
 
-  <div class="page-section">
+  <div class="page-section billing">
     @if (!canView()) {
-      <!--
-        Its own permission, and the same honest refusal used everywhere else:
-        what is true and what to do, with no status code and no permission name.
-      -->
       <div class="card">
         <app-empty-state
           icon="billing"
           heading="You do not have access to billing"
+          i18n-heading="@@billing.noAccess.heading"
           description="Seeing what this workspace pays needs a permission your roles do not include. Ask somebody who administers this workspace if you need it."
+          i18n-description="@@billing.noAccess.body"
+          data-testid="billing-denied"
         />
       </div>
     } @else if (loading()) {
-      <div class="card card-body" aria-busy="true">
-        <p class="text-small text-secondary">Loading billing…</p>
+      <div class="card card-body admin-skeleton" aria-busy="true">
+        <p class="visually-hidden" role="status" i18n="@@billing.loading">Loading billing…</p>
+        <span class="skeleton skeleton-title" aria-hidden="true"></span>
+        <span class="skeleton skeleton-text" aria-hidden="true"></span>
+        <span class="skeleton skeleton-text" aria-hidden="true"></span>
       </div>
-    } @else if (failure(); as error) {
-      <div class="card">
-        <app-empty-state
-          icon="billing"
-          heading="Could not load billing"
-          [description]="error.message"
-        >
-          <button stateActions type="button" class="btn btn-secondary" (click)="refresh()">
-            Try again
-          </button>
-        </app-empty-state>
-      </div>
-    } @else if (billing(); as workspace) {
-      @if (actionFailure(); as problem) {
-        <!--
-          Stated where the reader is looking, and phrased so they know where
-          they stand: nothing was charged.
-        -->
-        <div class="card card-problem" role="alert" data-testid="action-failure">
-          <p class="text-small">{{ problem }}</p>
+    } @else if (!billing()) {
+      @if (failure(); as error) {
+        <div class="card">
+          <app-empty-state
+            icon="alert"
+            tone="error"
+            heading="Could not load billing"
+            i18n-heading="@@billing.loadFailed"
+            [description]="error.message"
+          >
+            <button
+              stateActions
+              type="button"
+              class="btn btn-secondary btn-sm"
+              (click)="refresh()"
+              i18n="@@billing.tryAgain"
+            >
+              Try again
+            </button>
+          </app-empty-state>
         </div>
+      }
+    } @else if (billing(); as workspace) {
+      @if (failure(); as error) {
+        <p class="alert alert-warning" role="alert" data-testid="refresh-failed">
+          <span i18n="@@billing.refreshFailed"
+            >Billing could not be refreshed; this is what was read before.</span
+          >
+          {{ error.message }}
+        </p>
+      }
+
+      @if (actionFailure(); as problem) {
+        <!-- Where the reader is looking, and saying where they stand: nothing was charged. -->
+        <p class="alert alert-danger" role="alert" data-testid="action-failure">{{ problem }}</p>
       }
 
       @if (!workspace.isManaged) {
         <!--
-          A deployment that sells nothing. Said plainly rather than shown as an
-          empty catalogue, which would read as a temporary outage.
+          A deployment that sells nothing: said plainly, rather than an empty
+          catalogue that would read as an outage.
         -->
         <div class="card">
           <app-empty-state
             icon="billing"
             heading="Subscriptions are not available on this deployment"
-            description="This installation is not configured to take payments. Nothing is for sale here and nothing is owed. Your workspace's plan is set by whoever runs this installation."
+            i18n-heading="@@billing.notManaged.heading"
+            description="This installation is not set up to take payments. Nothing is for sale here and nothing is owed. The workspace's plan is set by whoever runs this installation."
+            i18n-description="@@billing.notManaged.body"
             data-testid="not-managed"
           />
         </div>
+        <dl class="admin-facts" data-testid="plan-in-effect">
+          <div>
+            <dt i18n="@@billing.plan.inEffect">In effect now</dt>
+            <dd dir="auto">{{ workspace.currentPlanName }}</dd>
+          </div>
+        </dl>
       } @else {
-        <!-- What is being paid for now. -->
-        <div class="card">
+        <section class="card" aria-labelledby="subscription-heading">
           <div class="card-header">
-            <h2 class="card-title">Current subscription</h2>
+            <h2 id="subscription-heading" class="card-title" i18n="@@billing.current">
+              Subscription
+            </h2>
           </div>
 
           @if (subscription(); as current) {
             <div class="card-body billing-current" data-testid="current-subscription">
-              <p class="billing-plan">{{ current.planName }}</p>
-
-              <p class="billing-status" data-testid="status">
-                <!--
-                  The state in words, never colour alone. Colour is an addition
-                  to the sentence, not a replacement for it.
-                -->
-                <span
-                  class="billing-badge"
-                  [class.billing-badge-warning]="current.status === 'PastDue'"
-                  [class.billing-badge-ended]="
-                    current.status === 'Suspended' || current.status === 'Canceled'
-                  "
-                  >{{ statusWords()?.label }}</span
-                >
-                <span class="text-small text-secondary">{{ statusWords()?.note }}</span>
-              </p>
-
-              @if (current.cancelAtPeriodEnd && current.status !== 'Canceled') {
-                <!--
-                  Said outright, not left to a changed field label. The status
-                  badge still reads Active -- correctly, because it is -- and a
-                  reader scanning it would otherwise have no way to know the
-                  subscription will not renew.
-                -->
-                <p class="text-small billing-scheduled" data-testid="cancellation-scheduled">
-                  Cancellation is scheduled. This subscription will not renew, and the workspace
-                  keeps its plan until the date below.
-                </p>
-              }
-
-              <dl class="billing-facts">
-                <div>
-                  <dt class="text-small text-muted">Billing period</dt>
-                  <dd class="text-small">
-                    {{ current.interval === 'Annual' ? 'Yearly' : 'Monthly' }}
-                  </dd>
-                </div>
-
-                @if (current.trialEndsAt) {
-                  <div>
-                    <dt class="text-small text-muted">Trial ends</dt>
-                    <dd class="text-small" data-testid="trial-ends">
-                      {{ date(current.trialEndsAt) }}
-                    </dd>
-                  </div>
-                }
-
-                @if (current.currentPeriodEnd) {
-                  <div>
-                    <dt class="text-small text-muted">
-                      {{ current.cancelAtPeriodEnd ? 'Access ends' : 'Renews' }}
-                    </dt>
-                    <dd class="text-small" data-testid="period-end">
-                      {{ date(current.currentPeriodEnd) }}
-                    </dd>
-                  </div>
-                }
-
-                @if (current.graceEndsAt) {
-                  <div>
-                    <dt class="text-small text-muted">Plan kept until</dt>
-                    <dd class="text-small" data-testid="grace-ends">
-                      {{ date(current.graceEndsAt) }}
-                    </dd>
-                  </div>
-                }
-              </dl>
+              <app-subscription-summary
+                [subscription]="current"
+                [currentPlanName]="workspace.currentPlanName"
+              />
 
               @if (canManage()) {
                 <!--
-                  One button, to somebody else's page. Payment methods,
-                  invoices, receipts and cancellation are the provider's
-                  speciality and their compliance surface; rebuilding them here
-                  would move every one of those obligations onto this platform.
+                  One button, to somebody else's page: payment methods,
+                  invoices, receipts and cancellation are the provider's.
                 -->
-                <button
-                  type="button"
-                  class="btn btn-secondary"
-                  (click)="manage()"
-                  [disabled]="starting() !== null"
-                  data-testid="manage-billing"
-                >
-                  @if (starting() === 'portal') {
-                    <span class="spinner" aria-hidden="true"></span>
-                  }
-                  <span class="btn-label">Manage payment and invoices</span>
-                </button>
-
-                <p class="text-small text-muted">
-                  Opens the payment provider's own secure portal. This platform never sees or stores
-                  card details.
-                </p>
+                <div class="billing-manage">
+                  <button
+                    type="button"
+                    class="btn btn-secondary"
+                    (click)="manage()"
+                    [disabled]="starting() !== null"
+                    data-testid="manage-billing"
+                  >
+                    @if (starting() === 'portal') {
+                      <span class="spinner" aria-hidden="true"></span>
+                    }
+                    <span class="btn-label" i18n="@@billing.manage"
+                      >Manage payment and invoices</span
+                    >
+                  </button>
+                  <p class="text-small text-muted" i18n="@@billing.manage.note">
+                    Opens the payment provider's own secure portal in this tab. Nabra never sees or
+                    stores card details.
+                  </p>
+                </div>
               } @else {
-                <p class="text-small text-muted" data-testid="manage-denied">
+                <p
+                  class="text-small text-muted"
+                  data-testid="manage-denied"
+                  i18n="@@billing.manage.denied"
+                >
                   Changing what this workspace pays needs a permission your roles do not include.
                 </p>
               }
             </div>
           } @else {
             <div class="card-body billing-current" data-testid="no-subscription">
-              <p class="billing-plan">{{ workspace.currentPlanName }}</p>
+              <dl class="admin-facts">
+                <div>
+                  <dt i18n="@@billing.plan.inEffect">In effect now</dt>
+                  <dd dir="auto">{{ workspace.currentPlanName }}</dd>
+                </div>
+              </dl>
               <!--
                 True whether this workspace never subscribed or had a
-                subscription that has ended. The earlier wording credited the
-                plan to whoever runs the installation, which is false the moment
-                somebody cancels and lands on the fallback -- and false to the
-                one reader most likely to be looking.
+                subscription that ended: it is on the plan above.
               -->
-              <p class="text-small text-secondary">
-                This workspace has no active subscription, so it is on the plan above.
+              <p class="text-small text-secondary" i18n="@@billing.noSubscription">
+                This workspace has no subscription, so it is on the plan above.
               </p>
             </div>
           }
-        </div>
+        </section>
 
-        <!-- What could be bought. -->
         @if (workspace.canPurchase) {
-          <div class="card">
+          <section class="card" aria-labelledby="offers-heading">
             <div class="card-header">
-              <h2 class="card-title">Available plans</h2>
-              <p class="text-small text-muted">
-                Payment is taken on the provider's own secure page. You will be sent there and
-                returned here afterwards.
-              </p>
+              <div>
+                <h2 id="offers-heading" class="card-title" i18n="@@billing.offers">
+                  Available plans
+                </h2>
+                <p class="text-small text-muted" i18n="@@billing.offers.lede">
+                  Payment is taken on the provider's own secure page. You are sent there and brought
+                  back here afterwards.
+                </p>
+              </div>
             </div>
             <div class="card-body">
               <ul class="offer-list" data-testid="offers">
                 @for (offer of offers(); track offer.id) {
                   <li class="offer" [attr.data-testid]="'offer-' + offer.id">
                     <div class="offer-details">
-                      <h3 class="offer-name">{{ offer.planName }}</h3>
+                      <h3 class="offer-name" dir="auto">{{ offer.planName }}</h3>
                       <p class="offer-price">
-                        <strong>{{ offer.price }}</strong>
+                        <strong class="num">{{ offer.price }}</strong>
                         <span class="text-small text-muted">{{ offer.cadence }}</span>
                       </p>
                       @if (offer.trial) {
@@ -224,35 +200,20 @@
                     </div>
 
                     @if (canManage()) {
-                      <!--
-                        Named for what it buys, not just "Subscribe". Two offers
-                        sit side by side and both headings read "Starter"; a
-                        reader moving between buttons would otherwise hear
-                        "Subscribe, Subscribe" with nothing to choose between
-                        them. The price and cadence are on screen, so the label
-                        only repeats what a sighted reader already has.
-                      -->
                       <button
                         type="button"
                         class="btn btn-primary"
                         (click)="buy(offer.id)"
                         [disabled]="starting() !== null"
-                        [attr.aria-label]="
-                          'Subscribe to ' +
-                          offer.planName +
-                          ', ' +
-                          offer.price +
-                          ' ' +
-                          offer.cadence
-                        "
+                        [attr.aria-label]="offer.buyLabel"
                         [attr.data-testid]="'buy-' + offer.id"
                       >
                         @if (starting() === offer.id) {
                           <span class="spinner" aria-hidden="true"></span>
+                          <span class="btn-label" i18n="@@billing.opening">Opening…</span>
+                        } @else {
+                          <span class="btn-label" i18n="@@billing.subscribe">Subscribe</span>
                         }
-                        <span class="btn-label">{{
-                          starting() === offer.id ? 'Opening…' : 'Subscribe'
-                        }}</span>
                       </button>
                     }
                   </li>
@@ -260,32 +221,39 @@
               </ul>
 
               @if (!canManage()) {
-                <p class="text-small text-muted" data-testid="buy-denied">
+                <p
+                  class="text-small text-muted"
+                  data-testid="buy-denied"
+                  i18n="@@billing.buy.denied"
+                >
                   Buying a subscription needs a permission your roles do not include.
                 </p>
               }
             </div>
-          </div>
+          </section>
         } @else if (!subscription()) {
-          <!--
-            Configured to sell, but with nothing on sale. Different from the
-            unconfigured case above, and worth saying so: there is somebody to
-            ask.
-          -->
+          <!-- Set up to sell, with nothing on sale: there is somebody to ask. -->
           <div class="card">
             <app-empty-state
               icon="billing"
               heading="Nothing is on sale yet"
+              i18n-heading="@@billing.noOffers.heading"
               description="This installation takes payments but has no plans on sale at the moment. Ask whoever runs it if you were expecting to see one."
+              i18n-description="@@billing.noOffers.body"
               data-testid="no-offers"
             />
           </div>
         }
 
-        <p class="text-small text-muted billing-footnote" data-testid="payment-footnote">
+        <p
+          class="text-small text-muted billing-footnote"
+          data-testid="payment-footnote"
+          i18n="@@billing.footnote"
+        >
           Card details are entered on the payment provider's own page and are never sent to, seen by
-          or stored on this platform. After paying, this page may take a few seconds to update while
-          the provider confirms the payment.
+          or stored on Nabra. After paying, this page can take a few seconds to show it: it changes
+          only once the provider has confirmed the payment to Nabra, never because the browser came
+          back.
         </p>
       }
     }

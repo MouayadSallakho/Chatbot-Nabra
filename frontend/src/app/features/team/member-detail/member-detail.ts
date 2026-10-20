@@ -6,6 +6,7 @@ import {
   inject,
   input,
   signal,
+  viewChild,
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
@@ -14,10 +15,30 @@ import { ApiError, toApiError } from '@app/core/api/api-error';
 import { AuthService } from '@app/core/auth/auth-service';
 import { PermissionService } from '@app/core/authorization/permission-service';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
+import { PermissionApi } from '@app/core/authorization/permission-api';
+import { PermissionDefinition } from '@app/core/authorization/permission-codes';
+import { ConfirmDialog } from '@app/core/feedback/confirm-dialog';
+import { ToastService } from '@app/core/feedback/toast-service';
+import { LocaleFormat } from '@app/core/i18n/locale-format';
 import { EmptyState } from '@app/shared/empty-state/empty-state';
+import { Icon } from '@app/shared/icon/icon';
 import { PageHeader } from '@app/shared/page-header/page-header';
 import { LocalDatePipe } from '@app/core/i18n/locale-pipes';
+import { groupPermissions } from '@app/features/roles/permission-groups';
+import {
+  impactSummary,
+  permissionCount,
+  roleDisplayName,
+} from '@app/features/roles/permission-words';
 import { AssignableRole, Member, TeamApi } from '../team-api';
+import { roleList, rolesSelected } from '../team-words';
+
+/** One area of a member's access, for the at-a-glance list. */
+interface AccessArea {
+  readonly key: string;
+  readonly name: string;
+  readonly held: string;
+}
 
 /**
  * One member, and the roles they hold.
@@ -43,7 +64,7 @@ import { AssignableRole, Member, TeamApi } from '../team-api';
 @Component({
   selector: 'app-member-detail',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, PageHeader, EmptyState, LocalDatePipe],
+  imports: [RouterLink, PageHeader, EmptyState, Icon, ConfirmDialog, LocalDatePipe],
   templateUrl: './member-detail.html',
   styleUrl: './member-detail.scss',
 })
@@ -52,6 +73,14 @@ export class MemberDetail implements OnInit, HasUnsavedChanges {
   private readonly workspace = inject(WorkspaceContextService);
   private readonly permissions = inject(PermissionService);
   private readonly auth = inject(AuthService);
+  private readonly permissionApi = inject(PermissionApi);
+  private readonly toasts = inject(ToastService);
+  private readonly locale = inject(LocaleFormat);
+
+  private readonly removeAllDialog = viewChild<ConfirmDialog>('removeAllDialog');
+
+  /** The catalogue, when the reader may see it (`roles.view`); otherwise empty. */
+  protected readonly catalogue = signal<readonly PermissionDefinition[]>([]);
 
   /** From the route, through `withComponentInputBinding`. */
   readonly userId = input.required<string>();
@@ -72,6 +101,7 @@ export class MemberDetail implements OnInit, HasUnsavedChanges {
 
   protected readonly canView = computed(() => this.permissions.has('members.view'));
   protected readonly canManage = computed(() => this.permissions.has('members.roles.manage'));
+  protected readonly canSeeCatalogue = computed(() => this.permissions.has('roles.view'));
 
   protected readonly isOwner = computed(() => this.member()?.isOwner ?? false);
 
@@ -154,10 +184,91 @@ export class MemberDetail implements OnInit, HasUnsavedChanges {
 
   /** Those roles as one readable phrase, for the read-only explanation. */
   protected beyondNames(): string {
-    return this.rolesBeyondMe()
-      .map((role) => role.name)
-      .join(', ');
+    return roleList(
+      this.rolesBeyondMe().map((role) => roleDisplayName(role.name, role.isSystem)),
+      this.locale.language,
+    );
   }
+
+  /**
+   * The member's access by area: "Conversations, 4 of 4". Drawn from the
+   * permission union the server published for them, against the catalogue,
+   * so it is the access they actually have, not a guess from role names.
+   */
+  protected readonly accessAreas = computed<readonly AccessArea[]>(() => {
+    const held = new Set(this.member()?.permissions ?? []);
+
+    return groupPermissions(this.catalogue())
+      .map((group) => {
+        const count = group.permissions.filter((permission) => held.has(permission.code)).length;
+        const n = this.locale.number(count);
+        const total = this.locale.number(group.permissions.length);
+
+        return {
+          key: group.key,
+          name: group.name,
+          count,
+          held: $localize`:@@team.access.areaCount:${n}:held: of ${total}:total:`,
+        };
+      })
+      .filter((area) => area.count > 0);
+  });
+
+  /** What the member's access can lead to (reads what customers wrote, spends money…). */
+  protected readonly accessImpacts = computed(() =>
+    impactSummary(this.member()?.permissions ?? []),
+  );
+
+  protected readonly permissionTotal = computed(() =>
+    permissionCount(this.member()?.permissions.length ?? 0, this.locale.language),
+  );
+
+  protected readonly selectedText = computed(() =>
+    rolesSelected(this.selected().size, this.locale.language),
+  );
+
+  /** What saving would change, by role name: "Adds Support Agent. Removes Analyst." */
+  protected readonly changeText = computed(() => {
+    const names = new Map<string, string>();
+
+    for (const role of this.assignable()) {
+      names.set(role.id, role.name);
+    }
+    for (const role of this.member()?.roles ?? []) {
+      names.set(role.id, roleDisplayName(role.name, role.isSystem));
+    }
+
+    const stored = this.saved();
+    const current = this.selected();
+    const added = [...current].filter((id) => !stored.has(id)).map((id) => names.get(id) ?? id);
+    const removed = [...stored].filter((id) => !current.has(id)).map((id) => names.get(id) ?? id);
+    const parts: string[] = [];
+
+    if (added.length) {
+      const list = roleList(added, this.locale.language);
+
+      parts.push($localize`:@@team.change.adds:Adds ${list}:roles:.`);
+    }
+    if (removed.length) {
+      const list = roleList(removed, this.locale.language);
+
+      parts.push($localize`:@@team.change.removes:Removes ${list}:roles:.`);
+    }
+
+    return parts.join(' ');
+  });
+
+  protected readonly roleName = roleDisplayName;
+
+  protected roleCount(role: AssignableRole): string {
+    return permissionCount(role.permissionCount, this.locale.language);
+  }
+
+  protected readonly removeAllHeading = computed(() => {
+    const email = this.member()?.email ?? '';
+
+    return $localize`:@@team.removeAll.heading:Remove every role from ${email}:email:?`;
+  });
 
   ngOnInit(): void {
     void this.load();
@@ -168,6 +279,10 @@ export class MemberDetail implements OnInit, HasUnsavedChanges {
   }
 
   /** Ticks or unticks one role. Local only until saved. */
+  protected onToggle(roleId: string, event: Event): void {
+    this.toggle(roleId, (event.target as HTMLInputElement).checked);
+  }
+
   protected toggle(roleId: string, ticked: boolean): void {
     this.selected.update((current) => {
       const next = new Set(current);
@@ -203,11 +318,18 @@ export class MemberDetail implements OnInit, HasUnsavedChanges {
       // Only asked for when it could be used. Somebody reading a member they
       // cannot reassign has no use for the list, and requesting it would produce
       // a 403 in their console for no reason.
-      const assignable = this.canManage()
-        ? await firstValueFrom(this.api.assignableRoles(tenantId))
-        : [];
+      const [assignable, catalogue] = await Promise.all([
+        this.canManage() ? firstValueFrom(this.api.assignableRoles(tenantId)) : Promise.resolve([]),
+        // The at-a-glance access needs the catalogue, published only to
+        // `roles.view`. Without it the page shows the count alone; a failure
+        // here costs the glance, never the page.
+        this.canSeeCatalogue()
+          ? firstValueFrom(this.permissionApi.catalogue(tenantId)).catch(() => [])
+          : Promise.resolve([]),
+      ]);
 
       this.assignable.set(assignable);
+      this.catalogue.set(catalogue);
       this.adopt(member.value, member.etag);
     } catch (error) {
       this.failure.set(toApiError(error));
@@ -231,6 +353,14 @@ export class MemberDetail implements OnInit, HasUnsavedChanges {
       return;
     }
 
+    // Taking every role away leaves somebody able to see the workspace and do
+    // nothing in it. Allowed, as before, but asked first.
+    const dialog = this.removeAllDialog();
+
+    if (this.selected().size === 0 && this.saved().size > 0 && dialog && !(await dialog.ask())) {
+      return;
+    }
+
     this.saving.set(true);
     this.saveFailure.set(null);
     this.stale.set(false);
@@ -245,6 +375,10 @@ export class MemberDetail implements OnInit, HasUnsavedChanges {
       // changed belongs to somebody else's session, and they will see it on their
       // next request.
       this.adopt(updated.value, updated.etag);
+
+      const email = updated.value.email;
+
+      this.toasts.success($localize`:@@team.saved:Access for ${email}:email: saved.`);
     } catch (error) {
       const failure = toApiError(error);
 

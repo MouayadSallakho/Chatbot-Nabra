@@ -55,6 +55,9 @@ their noun (an agent is مفعّل, a channel is مفعّلة), so they are sepa
 | Usage limit          | حد الاستخدام                 |                       | no      |                                                          |
 | Subscription         | الاشتراك                     |                       | no      |                                                          |
 | Invoice              | فاتورة                       |                       | no      |                                                          |
+| Grace period         | مهلة السماح                  |                       | no      | while a payment has failed (Phase 36.10)                 |
+| Fallback plan        | الباقة البديلة               |                       | no      | the plan a lapsed workspace lands on                     |
+| Plan                 | الباقة                       |                       | no      | «الباقة السارية الآن» for the plan in effect             |
 | Export               | تصدير                        |                       | no      |                                                          |
 | Schedule             | جدولة                        |                       | no      |                                                          |
 | Save changes         | حفظ التغييرات                | حفظ التغييرات         | yes     |                                                          |

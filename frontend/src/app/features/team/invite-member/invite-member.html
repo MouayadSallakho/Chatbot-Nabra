@@ -4,58 +4,97 @@
     backLabel="Team"
     i18n-backLabel="@@back.team"
     heading="Invite member"
+    i18n-heading="@@team.invite.heading"
     description="Send somebody a link that adds them to this workspace. They join as the account that opens it, so the address here has to be theirs."
-  >
-  </app-page-header>
+    i18n-description="@@team.invite.description"
+  />
 
-  <div class="page-section">
+  <div class="page-section invite">
     @if (!canInvite()) {
       <div class="card">
         <app-empty-state
           icon="team"
           heading="You cannot invite people"
+          i18n-heading="@@team.invite.denied.heading"
           description="Inviting somebody to this workspace needs a permission your roles do not include. Ask somebody who administers this workspace if you need it."
+          i18n-description="@@team.invite.denied.body"
+          data-testid="invite-denied"
         />
       </div>
     } @else if (created(); as invitation) {
       <!--
         The one time the link exists. It is on screen because there is nowhere
-        else it could be: it is not stored, and no later request will return it.
+        else it could be: not stored, and no later request returns it.
       -->
-      <div class="card invite-created">
+      <section class="card card-body invite-created" aria-labelledby="invite-created-heading">
+        <p class="invite-created-status">
+          <span class="badge badge-success" i18n="@@team.invite.created.badge"
+            >Invitation created</span
+          >
+        </p>
         <h2 id="invite-created-heading" class="text-section-title" tabindex="-1">
-          Invitation created
+          <span i18n="@@team.invite.created.heading">Send this link to</span>&nbsp;<bdi dir="ltr">{{
+            invitation.email
+          }}</bdi>
         </h2>
-        <p class="text-small text-secondary">
-          Send this link to <strong>{{ invitation.email }}</strong> however you normally reach them.
-          It works once, expires on its own, and only that address can use it.
+        <p class="text-small text-secondary" i18n="@@team.invite.created.body">
+          Send it however you normally reach them. It works once, expires on its own, and only that
+          address can use it.
         </p>
 
-        <p class="invite-link" data-testid="invitation-link">{{ invitation.link }}</p>
+        <p class="invite-link" dir="ltr" data-testid="invitation-link">{{ invitation.link }}</p>
+
+        <dl class="admin-facts">
+          <div>
+            <dt i18n="@@team.invite.created.joinsWith">Joins with</dt>
+            <dd>
+              @if (invitation.roles) {
+                <span dir="auto">{{ invitation.roles }}</span>
+              } @else {
+                <span i18n="@@team.invitation.noRoles">No roles: will see the workspace only</span>
+              }
+            </dd>
+          </div>
+        </dl>
 
         <div class="invite-actions">
-          <button type="button" class="btn btn-primary" (click)="copy()">
-            Copy invitation link
+          <button type="button" class="btn btn-primary" (click)="copy()" data-testid="copy-link">
+            <span i18n="@@team.invite.copy">Copy invitation link</span>
           </button>
           <button type="button" class="btn btn-secondary" (click)="inviteAnother()">
-            Invite somebody else
+            <span i18n="@@team.invite.another">Invite somebody else</span>
           </button>
-          <a class="btn btn-secondary" routerLink="/team">Back to team</a>
+          <a class="btn btn-ghost" routerLink="/team" i18n="@@team.backToTeam">Back to team</a>
         </div>
 
+        <p class="visually-hidden" role="status">
+          @if (copied()) {
+            <span i18n="@@team.invite.copied.status">Invitation link copied.</span>
+          }
+        </p>
         @if (copied()) {
-          <p class="text-small text-muted" role="status">Copied.</p>
+          <p class="text-small invite-copied" aria-hidden="true">
+            <app-icon name="check" [strokeWidth]="2" />
+            <span i18n="@@team.invite.copied">Copied.</span>
+          </p>
+        }
+        @if (copyFailed()) {
+          <p class="alert alert-warning" role="alert" i18n="@@team.invite.copyFailed">
+            This browser did not allow copying. Select the link above and copy it yourself.
+          </p>
         }
 
-        <p class="text-small text-muted">
+        <p class="guidance" i18n="@@team.invite.once">
           This link is shown only now. If it is lost, revoke the invitation from the team page and
           create a new one.
         </p>
-      </div>
+      </section>
     } @else if (loading()) {
-      <div class="card card-body" aria-busy="true">
-        <p class="visually-hidden" role="status">Loading roles…</p>
-        <span class="skeleton skeleton-text"></span>
+      <div class="card card-body admin-skeleton" aria-busy="true">
+        <p class="visually-hidden" role="status" i18n="@@team.invite.loading">Loading roles…</p>
+        <span class="skeleton skeleton-title" aria-hidden="true"></span>
+        <span class="skeleton skeleton-bar" aria-hidden="true"></span>
+        <span class="skeleton skeleton-text" aria-hidden="true"></span>
       </div>
     } @else if (loadFailure(); as error) {
       <div class="card">
@@ -63,110 +102,141 @@
           icon="alert"
           tone="error"
           heading="Could not prepare the invitation"
+          i18n-heading="@@team.invite.loadFailed"
           [description]="error.message"
         >
-          <button stateActions type="button" class="btn btn-secondary btn-sm" (click)="load()">
+          <button
+            stateActions
+            type="button"
+            class="btn btn-secondary btn-sm"
+            (click)="load()"
+            i18n="@@team.tryAgain"
+          >
             Try again
           </button>
         </app-empty-state>
       </div>
     } @else {
-      <form class="card invite-form" [formGroup]="form" (ngSubmit)="submit()" novalidate>
-        <div class="field">
-          <label class="form-label" for="invite-email">Email address</label>
-          <input
-            id="invite-email"
-            class="form-control"
-            type="email"
-            formControlName="email"
-            autocomplete="off"
-            inputmode="email"
-            [attr.aria-invalid]="showEmailError()"
-            [attr.aria-describedby]="
-              showEmailError() ? 'invite-email-hint invite-email-error' : 'invite-email-hint'
-            "
-          />
-          <p id="invite-email-hint" class="text-small text-muted">
-            They must sign in with this address to accept. An invitation cannot be used by a
-            different account.
-          </p>
+      <form class="invite-form" [formGroup]="form" (ngSubmit)="submit()" novalidate>
+        <section class="card form-section" aria-labelledby="invite-who-heading">
+          <div class="card-header">
+            <span class="form-section-index" aria-hidden="true">1</span>
+            <div>
+              <h2 id="invite-who-heading" class="form-section-title" i18n="@@team.invite.who">
+                Who
+              </h2>
+              <p class="form-section-lede" i18n="@@team.invite.who.lede">
+                They must sign in with this address to accept. An invitation cannot be used by a
+                different account.
+              </p>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="field">
+              <label class="form-label" for="invite-email" i18n="@@team.invite.email"
+                >Email address</label
+              >
+              <input
+                id="invite-email"
+                class="form-control"
+                type="email"
+                formControlName="email"
+                dir="ltr"
+                autocomplete="off"
+                inputmode="email"
+                spellcheck="false"
+                [attr.aria-invalid]="showEmailError()"
+                [attr.aria-describedby]="showEmailError() ? 'invite-email-error' : null"
+              />
 
-          @if (showEmailError()) {
-            <p id="invite-email-error" class="form-error" role="alert">{{ emailErrorText() }}</p>
-          }
-        </div>
-
-        <div class="field">
-          <h2 class="text-section-title">Access</h2>
-
-          @if (!canAssign()) {
-            <!--
-              Legitimate and worth saying plainly rather than hiding the form:
-              somebody who may invite but not hand out access can still bring a
-              colleague in, and an administrator gives them access afterwards.
-            -->
-            <p class="text-small text-secondary">
-              You can invite somebody, but giving them access needs a further permission your roles
-              do not include. They will join able to see the workspace and nothing else, until an
-              administrator assigns them a role.
-            </p>
-          } @else if (assignable().length === 0) {
-            <p class="text-small text-secondary">
-              There are no roles you can assign yet. They will join without access until a role is
-              created and given to them.
-            </p>
-          } @else {
-            <p class="text-small text-secondary section-note">
-              Only roles your own access lets you hand out are listed. You can leave them all
-              unticked and assign access later.
-            </p>
-
-            <fieldset class="role-options">
-              <legend class="visually-hidden">Roles for this invitation</legend>
-
-              @for (role of assignable(); track role.id) {
-                <label class="role-option">
-                  <input
-                    type="checkbox"
-                    class="form-check-input"
-                    [checked]="isTicked(role.id)"
-                    (change)="toggle(role.id, $any($event.target).checked)"
-                  />
-                  <span class="role-option-text">
-                    <span class="role-name">{{ role.name }}</span>
-                    <span class="text-small text-muted">
-                      @if (role.permissionCount === 1) {
-                        1 permission
-                      } @else {
-                        {{ role.permissionCount }} permissions
-                      }
-                    </span>
-                  </span>
-                </label>
+              @if (showEmailError()) {
+                <p id="invite-email-error" class="form-error" role="alert">
+                  {{ emailErrorText() }}
+                </p>
               }
-            </fieldset>
-          }
-        </div>
+            </div>
+          </div>
+        </section>
 
-        @if (failure(); as error) {
-          <p class="alert alert-danger" role="alert">{{ error.message }}</p>
-        }
-
-        <div class="form-actions">
-          <button type="submit" class="btn btn-primary" [disabled]="submitting()">
-            {{ submitting() ? 'Creating…' : 'Create invitation' }}
-          </button>
-
-          <p class="text-small text-muted" aria-live="polite">
-            @if (selectedCount() === 0) {
-              Joins with no access
-            } @else if (selectedCount() === 1) {
-              1 role selected
+        <section class="card form-section" aria-labelledby="invite-access-heading">
+          <div class="card-header">
+            <span class="form-section-index" aria-hidden="true">2</span>
+            <div>
+              <h2 id="invite-access-heading" class="form-section-title" i18n="@@team.invite.access">
+                Access
+              </h2>
+              <p class="form-section-lede" i18n="@@team.invite.access.lede">
+                The roles they hold once they accept. You can leave them all unticked and assign
+                access later.
+              </p>
+            </div>
+          </div>
+          <div class="card-body">
+            @if (!canAssign()) {
+              <!--
+                Legitimate, and said plainly rather than hiding the form: somebody
+                who may invite but not hand out access can still bring a
+                colleague in, and an administrator gives them access afterwards.
+              -->
+              <p class="guidance" data-testid="cannot-assign" i18n="@@team.invite.cannotAssign">
+                You can invite somebody, but giving them access needs a further permission your
+                roles do not include. They will join able to see the workspace and nothing else,
+                until an administrator assigns them a role.
+              </p>
+            } @else if (assignable().length === 0) {
+              <p class="guidance" i18n="@@team.invite.noRoles">
+                There are no roles you can assign yet. They will join without access until a role is
+                created and given to them.
+              </p>
             } @else {
-              {{ selectedCount() }} roles selected
+              <fieldset class="role-options">
+                <legend class="visually-hidden" i18n="@@team.invite.rolesLegend">
+                  Roles for this invitation
+                </legend>
+
+                @for (role of assignable(); track role.id) {
+                  <label class="role-option" [attr.data-testid]="'role-option-' + role.id">
+                    <input
+                      type="checkbox"
+                      class="form-check-input"
+                      [checked]="isTicked(role.id)"
+                      (change)="onToggle(role.id, $event)"
+                    />
+                    <span class="role-option-text">
+                      <span class="role-name" dir="auto">{{ role.name }}</span>
+                      <span class="text-small text-muted">{{ roleCount(role) }}</span>
+                    </span>
+                  </label>
+                }
+              </fieldset>
+              <p class="text-small text-muted" i18n="@@team.invite.ceiling">
+                Only roles your own access lets you hand out are listed.
+              </p>
             }
-          </p>
-        </div>
+
+            @if (failure(); as error) {
+              <p class="alert alert-danger" role="alert">{{ error.message }}</p>
+            }
+
+            <div class="section-actions">
+              <span class="text-small text-muted unsaved-or-count" aria-live="polite">{{
+                selectedText()
+              }}</span>
+              <button
+                type="submit"
+                class="btn btn-primary"
+                [disabled]="submitting()"
+                data-testid="create-invitation"
+              >
+                @if (submitting()) {
+                  <span i18n="@@team.invite.creating">Creating…</span>
+                } @else {
+                  <span i18n="@@team.invite.submit">Create invitation</span>
+                }
+              </button>
+            </div>
+          </div>
+        </section>
       </form>
     }
   </div>
