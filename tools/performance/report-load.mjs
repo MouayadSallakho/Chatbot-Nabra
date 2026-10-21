@@ -11,12 +11,14 @@ import { createHash } from 'node:crypto';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Client, sleep, summarise } from './lib/client.mjs';
+import { seedPassword } from './lib/env.mjs';
+
+const PASSWORD = seedPassword();
 
 const [outDir, backlogArg = '60'] = process.argv.slice(2);
 if (!outDir) throw new Error('usage: report-load.mjs <out-dir> [backlog]');
 mkdirSync(outDir, { recursive: true });
 
-const PASSWORD = process.env.SEED_PASSWORD || 'Synthetic-Local-Only-2026!';
 const owner = new Client();
 await owner.signIn('p34.a.owner@omniai.example', PASSWORD);
 const tenant = (await owner.ok('GET', '/api/me/tenants')).json.find((t) => t.slug === 'p34-a').id;

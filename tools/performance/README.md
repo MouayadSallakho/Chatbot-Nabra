@@ -8,9 +8,12 @@ It is for a developer's local stack only.
 - Every tool targets **loopback only**. The allow-list is hard-coded
   (`lib/target.mjs` for Node, `k6/lib.js` for k6). A non-loopback host is refused
   before the first request. Widening it is a code change that needs review.
-- Accounts are synthetic, on the reserved `omniai.example` domain. The default
-  password is a synthetic value shared with `seed/seed.mjs`. Override it with
-  `SEED_PASSWORD` / `-e PASSWORD=`.
+- Accounts are synthetic, on the reserved `omniai.example` domain. Their
+  password is **required and never committed**: set `SEED_PASSWORD` for the
+  Node tools and the seed, or pass `-e PASSWORD=` to k6. Keep the value with
+  your local stack's evidence, outside the repository. Without it, every Node
+  tool stops with exit code 2 before opening a connection (`lib/env.mjs`), and a
+  k6 scenario fails in its init stage before the first request.
 - Cookies, antiforgery tokens and public-chat credentials stay in memory. They
   are never printed or written to disk.
 - Drills that need a secret, such as `meta-ambiguity.mjs`, read the local

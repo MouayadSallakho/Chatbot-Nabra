@@ -145,7 +145,7 @@ public static class NotificationCatalog
     /// Never interpolated. A header built from workspace-authored text is how a
     /// line break becomes a <c>Bcc:</c>; a subject that is a constant cannot.
     /// </remarks>
-    public static string Subject(NotificationKind kind) => "OmniAI: " + Describe(kind).Title;
+    public static string Subject(NotificationKind kind) => "Nabra: " + Describe(kind).Title;
 
     private static NotificationText Usage(int percent) =>
         new(

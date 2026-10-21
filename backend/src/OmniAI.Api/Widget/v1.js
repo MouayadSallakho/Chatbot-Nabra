@@ -1,12 +1,12 @@
 /*
- * OmniAI website chat loader, version 1.
+ * Nabra website chat loader, version 1.
  *
  * WHAT THIS FILE IS ALLOWED TO DO, AND NOTHING MORE.
  *
  * It runs on somebody else's website. That is the whole reason it is this small
  * and this boring: it creates one iframe, positions it, and relays a two-message
- * protocol. Everything a visitor can see or type lives inside the iframe, on an
- * OmniAI origin, where the host page's CSS cannot reach it and the host page's
+ * protocol. Everything a visitor can see or type lives inside the iframe, on a
+ * Nabra origin, where the host page's CSS cannot reach it and the host page's
  * JavaScript cannot read it.
  *
  * It never uses eval, never uses document.write, never builds HTML from a string,
@@ -62,7 +62,13 @@
     return;
   }
 
-  var publicKey = script.getAttribute('data-omniai-key');
+  /*
+   * The workspace's public key. Snippets issued from Phase 37.1 carry it as
+   * data-nabra-key; every snippet pasted before then carries data-omniai-key,
+   * and those sites must keep working without anybody editing them. When one
+   * tag carries both, the newer name wins.
+   */
+  var publicKey = script.getAttribute('data-nabra-key') || script.getAttribute('data-omniai-key');
 
   if (!publicKey) {
     return;
@@ -92,11 +98,11 @@
 
   /* A real title. A frame announced as "iframe" is a frame a screen-reader user
    * has no reason to enter. */
-  frame.title = 'Chat';
+  frame.title = frameTitle();
   frame.src = frameUrl;
 
   /*
-   * allow-same-origin keeps the iframe on the OmniAI origin, which is what lets
+   * allow-same-origin keeps the iframe on the Nabra origin, which is what lets
    * it call its own API and use its own sessionStorage. It grants the iframe
    * nothing over this page: the two are different origins, so the browser keeps
    * them apart regardless.
@@ -114,7 +120,7 @@
   frame.setAttribute('allow', '');
 
   /* The origin only. The host page's path can carry an order number, a search
-   * term or a customer identifier, and none of that is OmniAI's business. */
+   * term or a customer identifier, and none of that is Nabra's business. */
   frame.setAttribute('referrerpolicy', 'strict-origin');
 
   frame.setAttribute('aria-hidden', 'false');
@@ -137,6 +143,22 @@
 
   /* The repeating handshake, while it is running. */
   var handshake = null;
+
+  /*
+   * The frame's accessible name, in the language of the page it sits on.
+   *
+   * The host page's own <html lang> decides, because that is the language its
+   * visitor is reading; the browser's language stands in only when the page
+   * declares none. Any Arabic tag ("ar", "ar-SA") gets the Arabic word, every
+   * other language the English one. Written as escapes so the word survives a
+   * host page that declares some other character set.
+   */
+  function frameTitle() {
+    var lang = document.documentElement.getAttribute('lang') || window.navigator.language || '';
+
+    /* "الدردشة": chat. */
+    return /^ar(-|$)/i.test(lang) ? '\u0627\u0644\u062F\u0631\u062F\u0634\u0629' : 'Chat';
+  }
 
   function compact() {
     return window.innerWidth <= COMPACT_BREAKPOINT;
@@ -215,7 +237,7 @@
 
   function onMessage(event) {
     /* Both halves matter. The origin check alone would accept a message from any
-     * other OmniAI frame on the page; the source check alone would accept a
+     * other Nabra frame on the page; the source check alone would accept a
      * message from this frame after it had been navigated elsewhere. */
     if (event.origin !== origin || event.source !== frame.contentWindow) {
       return;

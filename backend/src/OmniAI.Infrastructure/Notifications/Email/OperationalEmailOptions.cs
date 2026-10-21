@@ -181,7 +181,7 @@ public sealed class SmtpSettings
 
     public string? FromAddress { get; set; }
 
-    public string FromName { get; set; } = "OmniAI";
+    public string FromName { get; set; } = "Nabra";
 
     /// <summary>How long connecting, signing in and sending may each take.</summary>
     public TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(30);

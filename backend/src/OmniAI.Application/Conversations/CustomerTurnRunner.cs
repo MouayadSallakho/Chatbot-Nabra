@@ -252,6 +252,14 @@ public sealed class CustomerTurnRunner(
                 .FailTurnAsync(opened, _clock.GetUtcNow(), CancellationToken.None)
                 .ConfigureAwait(false);
 
+            // The customer's message was committed before the provider was
+            // called, so an open inbox has something new to show even though no
+            // reply exists. Announced once, here, for this attempt: a replay of
+            // the same key is refused before it reaches this point. Quietly, and
+            // with no token, so neither a broken backplane nor an abandoned
+            // request can replace the failure the caller is about to see.
+            await Announce(turn, CancellationToken.None).ConfigureAwait(false);
+
             throw;
         }
 

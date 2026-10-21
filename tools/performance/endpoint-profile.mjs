@@ -5,11 +5,14 @@
 // Usage: OMNIAI_PERF_BASE=http://127.0.0.1:5034 node endpoint-profile.mjs [email] [slug] [samples]
 
 import { Client, summarise } from './lib/client.mjs';
+import { seedPassword } from './lib/env.mjs';
+
+const PASSWORD = seedPassword();
 
 const [email = 'p34.a.owner@omniai.example', slug = 'p34-a', samplesArg = '20'] = process.argv.slice(2);
 const samples = Number(samplesArg);
 const client = new Client();
-await client.signIn(email, process.env.SEED_PASSWORD || 'Synthetic-Local-Only-2026!');
+await client.signIn(email, PASSWORD);
 const tenant = (await client.ok('GET', '/api/me/tenants')).json.find((t) => t.slug === slug).id;
 const T = `/api/tenants/${tenant}`;
 

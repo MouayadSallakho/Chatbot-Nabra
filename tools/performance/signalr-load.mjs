@@ -15,12 +15,13 @@ import { writeFileSync } from 'node:fs';
 import { Client, sleep, summarise } from './lib/client.mjs';
 import { HubConnection } from './lib/signalr.mjs';
 import { loopbackBase } from './lib/target.mjs';
+import { seedPassword } from './lib/env.mjs';
 
 const [countArg = '100', holdArg = '60', outFile] = process.argv.slice(2);
 const count = Number(countArg);
 const hold = Number(holdArg);
 const bases = [loopbackBase(process.env.OMNIAI_PERF_BASE), ...(process.env.OMNIAI_PERF_BASE_B ? [loopbackBase(process.env.OMNIAI_PERF_BASE_B)] : [])];
-const PASSWORD = process.env.SEED_PASSWORD || 'Synthetic-Local-Only-2026!';
+const PASSWORD = seedPassword();
 
 // Accounts allowed to view conversations in each workspace (from the seed).
 const accounts = {

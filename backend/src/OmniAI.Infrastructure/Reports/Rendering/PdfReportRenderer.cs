@@ -77,8 +77,8 @@ internal sealed class PdfReportRenderer : IReportRenderer
         SKDocumentPdfMetadata metadata = new()
         {
             Title = PdfText.Clean(document.Title),
-            Creator = "OmniAI reports",
-            Producer = "OmniAI",
+            Creator = "Nabra reports",
+            Producer = "Nabra",
             Creation = document.GeneratedAt.UtcDateTime,
             Modified = document.GeneratedAt.UtcDateTime,
             RasterDpi = SKDocumentPdfMetadata.DefaultRasterDpi,

@@ -39,7 +39,7 @@ public sealed class OperationalEmailTests(PostgresTestDatabase database)
         Assert.Equal([NotificationEmailStatus.Sent], statuses);
 
         OperationalEmailMessage message = Assert.Single(harness.Email.Sent);
-        Assert.Equal("OmniAI: AI usage has reached 70% of the monthly limit", message.Subject);
+        Assert.Equal("Nabra: AI usage has reached 70% of the monthly limit", message.Subject);
         Assert.Contains("https://app.omniai.example/plan-usage", message.TextBody, StringComparison.Ordinal);
 
         NotificationEmail email = Assert.Single(await harness.EmailsAsync(world.Tenant));
@@ -382,7 +382,13 @@ public sealed class OperationalEmailTests(PostgresTestDatabase database)
         Assert.Contains("@example.test", recipient, StringComparison.Ordinal);
         Assert.Contains("notifications@omniai.example", message.MailFrom, StringComparison.Ordinal);
 
-        Assert.Contains("Subject: OmniAI: Subscription payment is past due", message.Headers, StringComparison.Ordinal);
+        Assert.Contains("Subject: Nabra: Subscription payment is past due", message.Headers, StringComparison.Ordinal);
+
+        // The public name, never the code name: in the sender a person sees, as
+        // the default display name, and in both parts of the body.
+        Assert.Matches("(?m)^From: \"?Nabra\"? <notifications@omniai[.]example>", message.Headers);
+        Assert.DoesNotContain("OmniAI", message.Headers, StringComparison.Ordinal);
+        Assert.DoesNotContain("OmniAI", Decode(message.Raw), StringComparison.Ordinal);
         Assert.Contains("Auto-Submitted: auto-generated", message.Headers, StringComparison.Ordinal);
         Assert.DoesNotContain("Bcc:", message.Headers, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Cc:", message.Headers, StringComparison.Ordinal);
@@ -441,7 +447,7 @@ public sealed class OperationalEmailTests(PostgresTestDatabase database)
         Assert.DoesNotContain("attacker", string.Join(" ", sent.Recipients), StringComparison.Ordinal);
         Assert.DoesNotContain("Bcc:", sent.Headers, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("hijacked", sent.Headers, StringComparison.Ordinal);
-        Assert.Contains("Subject: OmniAI: Your report is ready", sent.Headers, StringComparison.Ordinal);
+        Assert.Contains("Subject: Nabra: Your report is ready", sent.Headers, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -661,7 +667,7 @@ public sealed class OperationalEmailTests(PostgresTestDatabase database)
             .Build();
 
     private static OperationalEmailMessage Message() =>
-        new(EmailAddress.Create("member@example.test"), "OmniAI: test", "text", "<p>html</p>");
+        new(EmailAddress.Create("member@example.test"), "Nabra: test", "text", "<p>html</p>");
 
     /// <summary>The message with quoted-printable soft breaks and escapes undone, for searching.</summary>
     private static string Decode(string raw)

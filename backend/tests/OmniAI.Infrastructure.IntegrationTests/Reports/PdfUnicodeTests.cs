@@ -199,6 +199,24 @@ public sealed class PdfUnicodeTests
         Assert.Empty(pdf.GetPages().SelectMany(page => page.GetImages()));
     }
 
+    [Fact]
+    public async Task The_pdf_names_nabra_as_its_creator_and_never_the_code_name()
+    {
+        // A reader's document properties show these, so they are words a person
+        // reads like any other.
+        byte[] bytes = await ReportRenderingTests.Render(new PdfReportRenderer(), Document());
+
+        using PdfDocument pdf = PdfDocument.Open(bytes);
+
+        Assert.Equal("Nabra reports", pdf.Information.Creator);
+        Assert.Equal("Nabra", pdf.Information.Producer);
+
+        string all = string.Concat(pdf.GetPages().Select(page => page.Text));
+
+        Assert.DoesNotContain("omniai", all, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("OmniAI", Encoding.Latin1.GetString(bytes), StringComparison.Ordinal);
+    }
+
     private static ReportDocument Document()
     {
         ReportValue[] Row(string label) =>

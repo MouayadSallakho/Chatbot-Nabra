@@ -21,16 +21,23 @@ describe('widget loader v1', () => {
    * Runs the loader as the browser would, with a script element it can find.
    *
    * `document.currentScript` is how the loader reads its own configuration and
-   * derives the OmniAI origin from its own `src`. Nothing is configured any other
+   * derives the Nabra origin from its own `src`. Nothing is configured any other
    * way, which is what makes the same file work on any deployment.
    */
-  function run(options: { key?: string | null; src?: string } = {}): void {
+  function run(
+    options: { key?: string | null; src?: string; attributes?: Record<string, string> } = {},
+  ): void {
     const script = document.createElement('script');
 
     script.src = options.src ?? `${origin}/widget/v1.js`;
 
-    if (options.key !== null) {
-      script.setAttribute('data-omniai-key', options.key ?? publicKey);
+    if (options.attributes) {
+      for (const [name, value] of Object.entries(options.attributes)) {
+        script.setAttribute(name, value);
+      }
+    } else if (options.key !== null) {
+      // The attribute the install snippet carries from Phase 37.1.
+      script.setAttribute('data-nabra-key', options.key ?? publicKey);
     }
 
     Object.defineProperty(document, 'currentScript', { value: script, configurable: true });
@@ -103,7 +110,7 @@ describe('widget loader v1', () => {
     expect(frame()!.src).toBe(`${origin}/embed/${publicKey}`);
   });
 
-  it('derives the OmniAI origin from its own address, never from configuration', () => {
+  it('derives the Nabra origin from its own address, never from configuration', () => {
     run({ src: 'https://chat.acme-omniai.example/widget/v1.js' });
 
     expect(frame()!.src).toBe(`https://chat.acme-omniai.example/embed/${publicKey}`);
@@ -113,6 +120,44 @@ describe('widget loader v1', () => {
     run({ key: 'a/b?c#d' });
 
     expect(frame()!.src).toBe(`${origin}/embed/a%2Fb%3Fc%23d`);
+  });
+
+  describe('the key attribute', () => {
+    const legacyKey = 'bbbbbbbbbbbbbbbbbbbbbb';
+
+    it('reads data-nabra-key, which the install snippet now carries', () => {
+      run({ attributes: { 'data-nabra-key': publicKey } });
+
+      expect(frame()!.src).toBe(`${origin}/embed/${publicKey}`);
+    });
+
+    it('still reads data-omniai-key, so every snippet already pasted keeps working', () => {
+      run({ attributes: { 'data-omniai-key': legacyKey } });
+
+      expect(frame()!.src).toBe(`${origin}/embed/${legacyKey}`);
+    });
+
+    it('prefers data-nabra-key when one tag carries both', () => {
+      run({ attributes: { 'data-omniai-key': legacyKey, 'data-nabra-key': publicKey } });
+
+      expect(document.querySelectorAll('iframe')).toHaveLength(1);
+      expect(frame()!.src).toBe(`${origin}/embed/${publicKey}`);
+    });
+
+    it('falls back to data-omniai-key when data-nabra-key is empty', () => {
+      run({ attributes: { 'data-nabra-key': '', 'data-omniai-key': legacyKey } });
+
+      expect(frame()!.src).toBe(`${origin}/embed/${legacyKey}`);
+    });
+
+    it('loads once on a page with one tag of each', () => {
+      run({ attributes: { 'data-omniai-key': legacyKey } });
+      run({ attributes: { 'data-nabra-key': publicKey } });
+
+      // One widget per page, whichever attribute each tag uses: the first wins.
+      expect(document.querySelectorAll('iframe')).toHaveLength(1);
+      expect(frame()!.src).toBe(`${origin}/embed/${legacyKey}`);
+    });
   });
 
   it('does nothing at all without a key', () => {
@@ -135,7 +180,7 @@ describe('widget loader v1', () => {
     const granted = frame()!.getAttribute('sandbox')!.split(' ').filter(Boolean).sort();
 
     // The minimum the widget actually needs: scripts, because it is an Angular
-    // application; and same-origin, because it stays on the OmniAI origin, which
+    // application; and same-origin, because it stays on the Nabra origin, which
     // is what lets it call its own API and use its own sessionStorage.
     //
     // allow-same-origin grants the iframe nothing over this page -- the two are
@@ -190,7 +235,7 @@ describe('widget loader v1', () => {
     run();
 
     // The host page's path can carry an order number, a search term or a customer
-    // identifier, and none of that is OmniAI's business.
+    // identifier, and none of that is Nabra's business.
     expect(frame()!.getAttribute('referrerpolicy')).toBe('strict-origin');
   });
 
@@ -200,6 +245,56 @@ describe('widget loader v1', () => {
     // A frame announced as "iframe" is a frame a screen-reader user has no reason
     // to enter.
     expect(frame()!.title).toBe('Chat');
+  });
+
+  describe('frame title in the host page language', () => {
+    const arabic = 'الدردشة';
+    let hostLang: string | null;
+
+    beforeEach(() => {
+      hostLang = document.documentElement.getAttribute('lang');
+    });
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+
+      if (hostLang === null) {
+        document.documentElement.removeAttribute('lang');
+      } else {
+        document.documentElement.setAttribute('lang', hostLang);
+      }
+    });
+
+    it.each(['ar', 'ar-SA', 'AR-eg'])('says «الدردشة» on a page in %s', (lang) => {
+      document.documentElement.setAttribute('lang', lang);
+      run();
+
+      expect(frame()!.title).toBe(arabic);
+    });
+
+    it.each(['en', 'en-GB', 'fr', 'arn'])('says "Chat" on a page in %s', (lang) => {
+      // "arn" is Mapudungun: a tag that merely begins with the letters is not Arabic.
+      document.documentElement.setAttribute('lang', lang);
+      run();
+
+      expect(frame()!.title).toBe('Chat');
+    });
+
+    it("falls back to the browser's language when the page declares none", () => {
+      document.documentElement.removeAttribute('lang');
+      vi.spyOn(window.navigator, 'language', 'get').mockReturnValue('ar-SA');
+      run();
+
+      expect(frame()!.title).toBe(arabic);
+    });
+
+    it("prefers the page's language over the browser's", () => {
+      document.documentElement.setAttribute('lang', 'en');
+      vi.spyOn(window.navigator, 'language', 'get').mockReturnValue('ar');
+      run();
+
+      expect(frame()!.title).toBe('Chat');
+    });
   });
 
   it('greets the widget at its exact origin, repeatedly until it answers', async () => {
@@ -298,7 +393,7 @@ describe('widget loader v1', () => {
 
     const closedWidth = frame()!.style.width;
 
-    // The origin check alone would accept any other OmniAI frame on the page; the
+    // The origin check alone would accept any other Nabra frame on the page; the
     // source check alone would accept this frame after it had been navigated away.
     fromWidget({ type: 'omniai:v1:open' }, 'https://attacker.example');
     fromWidget({ type: 'omniai:v1:open' }, origin, { name: 'some other frame' });

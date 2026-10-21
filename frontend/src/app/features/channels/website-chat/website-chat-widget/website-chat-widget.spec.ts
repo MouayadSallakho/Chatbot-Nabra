@@ -30,7 +30,7 @@ describe('WebsiteChatWidget', () => {
     allowedOrigins: [],
     maxAllowedOrigins: 20,
     installSnippet:
-      '<script async src="https://omniai.test/widget/v1.js" data-omniai-key="aaaaaaaaaaaaaaaaaaaaaa"></script>',
+      '<script async src="https://omniai.test/widget/v1.js" data-nabra-key="aaaaaaaaaaaaaaaaaaaaaa"></script>',
     loaderUrl: 'https://omniai.test/widget/v1.js',
     ...overrides,
   });
@@ -100,7 +100,7 @@ describe('WebsiteChatWidget', () => {
     http.expectOne(url).flush(configuration(), { headers: { ETag: '"v1"' } });
     await settle();
 
-    expect(text()).toContain('data-omniai-key="aaaaaaaaaaaaaaaaaaaaaa"');
+    expect(text()).toContain('data-nabra-key="aaaaaaaaaaaaaaaaaaaaaa"');
     expect(text()).toContain('https://omniai.test/widget/v1.js');
   });
 

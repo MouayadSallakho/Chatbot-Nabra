@@ -166,7 +166,7 @@ internal static class WidgetInstall
 
         snippet.Append("<script async src=\"");
         snippet.Append(LoaderUrl(request));
-        snippet.Append("\" data-omniai-key=\"");
+        snippet.Append("\" data-nabra-key=\"");
         snippet.Append(publicKey);
         snippet.Append("\"></script>");
 

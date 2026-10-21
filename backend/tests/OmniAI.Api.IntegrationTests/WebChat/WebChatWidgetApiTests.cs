@@ -158,9 +158,14 @@ public sealed class WebChatWidgetApiTests(WebChatApiFixture fixture)
         Assert.Contains("/widget/v1.js", configuration.LoaderUrl, StringComparison.Ordinal);
         Assert.Contains(configuration.LoaderUrl, configuration.InstallSnippet, StringComparison.Ordinal);
         Assert.Contains(
-            $"data-omniai-key=\"{publicKey}\"",
+            $"data-nabra-key=\"{publicKey}\"",
             configuration.InstallSnippet,
             StringComparison.Ordinal);
+
+        // Every business that installs the chat reads this text, so it carries
+        // the public name only. The loader still accepts the older attribute for
+        // snippets pasted before Phase 37.1.
+        Assert.DoesNotContain("omniai", configuration.InstallSnippet, StringComparison.OrdinalIgnoreCase);
 
         // The snippet is public HTML. Nothing that opens anything belongs in it.
         Assert.DoesNotContain("credential", configuration.InstallSnippet, StringComparison.OrdinalIgnoreCase);

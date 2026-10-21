@@ -226,6 +226,18 @@ only until somebody writes a second implementation. A reply that was stored and
 not announced is a reply the next read finds; a reply refused because the
 announcement failed is a reply nobody ever gets.
 
+**A failed AI turn is announced too (Phase 37.1).** The customer's message is
+committed before the provider is called, so when generation fails the
+conversation has still changed. `CustomerTurnRunner` announces once, after
+`FailTurnAsync` has committed and before the original failure is rethrown, on
+both channels (website chat and WhatsApp share the runner). It uses
+`AnnounceQuietlyAsync` with no cancellation token, so a broken backplane or an
+abandoned request can neither replace the failure the caller sees nor change the
+replay outcome. A replay of the same client message id is refused as already
+failed before it reaches that point, so it is never announced twice. The event is
+the existing `conversationChanged(conversationId)`: no new event, field or
+payload. Before 37.1 the message reached an open inbox only after a reload.
+
 ---
 
 ## 10. The public realtime ticket
@@ -276,6 +288,13 @@ the event. On one instance that is indistinguishable from working; on two it is
 an inbox that updates for roughly half the staff, depending on which instance
 their websocket landed on — silent, load-dependent, and absent from every local
 test.
+
+The backplane serialises messages between instances with MessagePack, which
+arrives through the backplane package. From Phase 37.1 it is pinned centrally to
+2.5.303, the first 2.x release that clears GHSA-qhrr-8q5h-9q3h.
+`FailedTurnRealtimeApiTests` proves the whole path with two in-process API hosts on
+one Redis: a member connected to the second instance receives
+`conversationChanged` for a turn that failed on the first.
 
 Redis remains authoritative for Phase 16 protection, which is unchanged. Realtime
 is best effort: if the backplane fails, persisted data is still correct, no

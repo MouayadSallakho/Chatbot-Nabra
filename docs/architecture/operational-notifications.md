@@ -198,7 +198,7 @@ Infrastructure adapter `SmtpOperationalEmailSender` uses **MailKit 4.18.0**
 | `Email:Smtp:Port` | 587 |
 | `Email:Smtp:Security` | `StartTls` (`SslOnConnect`, or `None` for loopback only) |
 | `Email:Smtp:Username` / `Password` | both or neither; password e.g. `Email__Smtp__Password` |
-| `Email:Smtp:FromAddress` / `FromName` | required / `OmniAI` |
+| `Email:Smtp:FromAddress` / `FromName` | required / `Nabra` (from Phase 37.1; was `OmniAI`) |
 | `Email:Smtp:Timeout` | 30 s (1 s – 2 min) |
 | `Email:AppBaseUrl` | required when a host is set |
 
@@ -233,13 +233,21 @@ accepted) → `Failed / rejected`. Anything else after transmission began → `U
 / outcome_unknown`, never retried. Statuses: Pending, Sending, Sent, Failed,
 Unknown, Skipped.
 
-**Content.** `OperationalEmailRenderer`: a constant subject (`OmniAI: {title}`), a
+**Content.** `OperationalEmailRenderer`: a constant subject (`Nabra: {title}`), a
 text/plain and an HTML part (multipart/alternative), fixed markup with every
 inserted value HTML-encoded, the workspace name reduced to one line, one link built
 from `AppBaseUrl` + the internal action path, no image, font, stylesheet or
 tracking pixel, `Auto-Submitted: auto-generated`, no attachment — a report email
 links to Reports, where the authenticated download remains the only way to the
-file. No token, session, key or invitation ever appears in a link. SMTP
+file. No token, session, key or invitation ever appears in a link.
+
+**The public name (Phase 37.1).** Everything a recipient reads says Nabra: the
+subject prefix, the heading line of both parts, the footer ("your Nabra
+notification preferences"), the fallback action ("Open Nabra") and the default
+sender name. OmniAI stays the internal code name. `PublicNameTests` fails the
+build's test run if a user-facing literal under `backend/src` says OmniAI again.
+The body is still English for every recipient; the recipient's language arrives
+in 37.3. SMTP
 transcripts, bodies and credentials are never logged (no protocol logger).
 
 **Failure isolation.** Email never rolls back anything: the notification and the

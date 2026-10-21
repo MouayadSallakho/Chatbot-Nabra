@@ -38,9 +38,32 @@ public sealed class NotificationTemplateTests
 
         // The subject is a constant line: no line break can reach a header.
         string subject = NotificationCatalog.Subject(kind);
-        Assert.StartsWith("OmniAI: ", subject, StringComparison.Ordinal);
+        Assert.StartsWith("Nabra: ", subject, StringComparison.Ordinal);
         Assert.DoesNotContain('\r', subject);
         Assert.DoesNotContain('\n', subject);
+    }
+
+    [Theory]
+    [MemberData(nameof(Kinds))]
+    public void Every_email_names_Nabra_and_never_the_code_name(NotificationKind kind)
+    {
+        // A link base without the code name in it, so that what is asserted is
+        // the product's own words rather than a deployment's address.
+        OperationalEmailMessage email = OperationalEmailRenderer.Render(
+            NotificationOf(kind),
+            EmailAddress.Create("member@example.test"),
+            "Northwind",
+            new OperationalEmailLinks(new Uri("https://app.nabra.example/")));
+
+        Assert.StartsWith("Nabra: ", email.Subject, StringComparison.Ordinal);
+        Assert.StartsWith("Nabra\n", email.TextBody, StringComparison.Ordinal);
+        Assert.Contains(">Nabra</p>", email.HtmlBody, StringComparison.Ordinal);
+        Assert.Contains("your Nabra notification preferences", email.TextBody, StringComparison.Ordinal);
+        Assert.Contains("your Nabra notification preferences", email.HtmlBody, StringComparison.Ordinal);
+
+        Assert.DoesNotContain("omniai", email.Subject, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("omniai", email.TextBody, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("omniai", email.HtmlBody, StringComparison.OrdinalIgnoreCase);
     }
 
     [Theory]
@@ -80,7 +103,7 @@ public sealed class NotificationTemplateTests
         Assert.DoesNotContain("url(", email.HtmlBody, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(1, Occurrences(email.HtmlBody, "href="));
 
-        Assert.Equal("OmniAI: Your report is ready", email.Subject);
+        Assert.Equal("Nabra: Your report is ready", email.Subject);
         Assert.Contains("https://app.omniai.example/reports", email.TextBody, StringComparison.Ordinal);
         Assert.Contains("href=\"https://app.omniai.example/reports\"", email.HtmlBody, StringComparison.Ordinal);
     }
@@ -94,7 +117,7 @@ public sealed class NotificationTemplateTests
             "Header\r\nBcc: attacker@example.invalid",
             Links);
 
-        Assert.Equal("OmniAI: Subscription payment is past due", email.Subject);
+        Assert.Equal("Nabra: Subscription payment is past due", email.Subject);
         Assert.DoesNotContain("\r\nBcc:", email.TextBody, StringComparison.Ordinal);
         Assert.Contains("Workspace: Header  Bcc: attacker@example.invalid", email.TextBody, StringComparison.Ordinal);
         Assert.Equal("member@example.test", email.To.Value);

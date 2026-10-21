@@ -8,11 +8,14 @@
 
 import { writeFileSync } from 'node:fs';
 import { Client, sleep } from './lib/client.mjs';
+import { seedPassword } from './lib/env.mjs';
+
+const PASSWORD = seedPassword();
 
 const [secondsArg = '120', intervalArg = '500', outFile] = process.argv.slice(2);
 const until = Date.now() + Number(secondsArg) * 1000;
 const owner = new Client();
-await owner.signIn('p34.a.owner@omniai.example', process.env.SEED_PASSWORD || 'Synthetic-Local-Only-2026!');
+await owner.signIn('p34.a.owner@omniai.example', PASSWORD);
 const tenant = (await owner.ok('GET', '/api/me/tenants')).json.find((t) => t.slug === 'p34-a').id;
 
 // Optional: a fresh visitor starting a conversation each sample (a protected public write).

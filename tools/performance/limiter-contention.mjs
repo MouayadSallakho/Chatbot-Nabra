@@ -10,13 +10,16 @@
 
 import { Client } from './lib/client.mjs';
 import { loopbackBase } from './lib/target.mjs';
+import { seedPassword } from './lib/env.mjs';
+
+const PASSWORD = seedPassword();
 
 const A = loopbackBase(process.env.OMNIAI_PERF_BASE);
 const B = process.env.OMNIAI_PERF_BASE_B ? loopbackBase(process.env.OMNIAI_PERF_BASE_B) : A;
 const run = Date.now() % 100000;
 const net = 100 + (run % 100);
 const owner = new Client(A);
-await owner.signIn(process.env.OWNER_EMAIL || 'p34.a.owner@omniai.example', process.env.SEED_PASSWORD || 'Synthetic-Local-Only-2026!');
+await owner.signIn(process.env.OWNER_EMAIL || 'p34.a.owner@omniai.example', PASSWORD);
 
 async function freshWorkspace(label) {
   const t = (await owner.ok('POST', '/api/tenants', { name: `Limiter ${label} ${run}`, slug: `lim-${label}-${run}` })).json;

@@ -129,7 +129,7 @@ the API with `Content-Disposition: attachment` built only from server parts
 | --- | --- | --- |
 | CSV | CsvHelper (already pinned) | Primary table only. UTF-8 **with BOM** so Excel reads non-Latin names. Text beginning `= + - @ \t \r` is prefixed with `'` (OWASP). Numbers invariant; dates ISO. |
 | XLSX | DocumentFormat.OpenXml (already pinned) | Summary sheet + one sheet per table, bold frozen header, content-sized columns, numeric counts/money (`0.000000`) beside a currency column, real dates. Text is only ever an inline string; the renderer never writes a formula element; no macros, external links or data connections. |
-| PDF | SkiaSharp PDF backend + HarfBuzz + Unicode.Bidi | A4 landscape, title, workspace label (only if the requester holds `workspace.view`), UTC period, generated time, summary, tables, notes, "Page n of m". Bundled font embedded; no fetched font, image, link, annotation, JavaScript, form or open action. |
+| PDF | SkiaSharp PDF backend + HarfBuzz + Unicode.Bidi | A4 landscape, title, workspace label (only if the requester holds `workspace.view`), UTC period, generated time, summary, tables, notes, "Page n of m". Bundled font embedded; no fetched font, image, link, annotation, JavaScript, form or open action. Document properties: Creator `Nabra reports`, Producer `Nabra` (Phase 37.1; were `OmniAI`). |
 
 ### Unicode PDF text
 

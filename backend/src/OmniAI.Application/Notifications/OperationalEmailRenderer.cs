@@ -48,7 +48,7 @@ public static class OperationalEmailRenderer
         string action = ActionLabel(notification.Category);
 
         StringBuilder text = new();
-        text.Append("OmniAI").Append('\n');
+        text.Append("Nabra").Append('\n');
 
         if (workspace.Length > 0)
         {
@@ -72,7 +72,7 @@ public static class OperationalEmailRenderer
             .Append("<body style=\"margin:0;padding:24px;background:#f4f5f7;font-family:Arial,Helvetica,sans-serif;color:#1f232b;\">")
             .Append("<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:560px;margin:0 auto;background:#ffffff;border:1px solid #dfe1e6;border-radius:8px;\">")
             .Append("<tr><td style=\"padding:24px;\">")
-            .Append("<p style=\"margin:0 0 16px;font-weight:bold;font-size:16px;\">OmniAI</p>");
+            .Append("<p style=\"margin:0 0 16px;font-weight:bold;font-size:16px;\">Nabra</p>");
 
         if (workspace.Length > 0)
         {
@@ -104,7 +104,7 @@ public static class OperationalEmailRenderer
     }
 
     private const string Footer =
-        "You are receiving this operational email because you turned it on in your OmniAI notification "
+        "You are receiving this operational email because you turned it on in your Nabra notification "
         + "preferences. You can turn it off there at any time.";
 
     private static string ActionLabel(NotificationCategory category) => category switch
@@ -114,7 +114,7 @@ public static class OperationalEmailRenderer
         NotificationCategory.Billing => "Open Billing",
         NotificationCategory.Knowledge => "Open Knowledge",
         NotificationCategory.ChannelHealth => "Open WhatsApp",
-        _ => "Open OmniAI",
+        _ => "Open Nabra",
     };
 
     /// <summary>

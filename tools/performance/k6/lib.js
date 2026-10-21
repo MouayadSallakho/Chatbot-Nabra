@@ -34,7 +34,15 @@ export const BASE = (() => {
   return raw.replace(/\/$/, '');
 })();
 
-export const PASSWORD = __ENV.PASSWORD || 'Synthetic-Local-Only-2026!';
+// The synthetic accounts' password has no committed default. Missing, the
+// scenario stops in its init stage, before any request.
+export const PASSWORD = (() => {
+  if (!__ENV.PASSWORD) {
+    throw new Error('PASSWORD is not set. Pass the synthetic accounts\' password with -e PASSWORD=... (see tools/performance/README.md).');
+  }
+
+  return __ENV.PASSWORD;
+})();
 
 function xsrf() {
   const cookies = http.cookieJar().cookiesForURL(BASE);

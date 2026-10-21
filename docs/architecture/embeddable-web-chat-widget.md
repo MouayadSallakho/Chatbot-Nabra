@@ -16,7 +16,7 @@ decides which websites may open it.
 ```
 customer's page (https://shop.example.com)
 └── <script async src="https://omniai.example/widget/v1.js"
-            data-omniai-key="KEY"></script>
+            data-nabra-key="KEY"></script>
         │  creates one iframe, positions it, relays two messages
         ▼
     <iframe src="https://omniai.example/embed/KEY"
@@ -76,7 +76,7 @@ content-derived strong ETag and `public, max-age=3600`.
 | `sandbox`        | `allow-scripts allow-same-origin` | Scripts, so the widget runs. Same-origin, so it stays on the OmniAI origin and can use its own API and storage. It grants the iframe nothing over the host page — they are different origins regardless. |
 | `allow`          | _(empty)_                         | Camera, microphone and geolocation are denied by default cross-origin; saying so explicitly means a future default cannot quietly grant one.                                                             |
 | `referrerpolicy` | `strict-origin`                   | The host page's path can carry an order number, a search term or a customer identifier. None of that is OmniAI's business.                                                                               |
-| `title`          | `Chat`                            | A frame announced as "iframe" is a frame a screen-reader user has no reason to enter.                                                                                                                    |
+| `title`          | `Chat`, or «الدردشة» on an Arabic page | A frame announced as "iframe" is a frame a screen-reader user has no reason to enter. From Phase 37.1 it follows the host page's `<html lang>` (any `ar` tag → Arabic, anything else → English), falling back to the browser's language when the page declares none. |
 
 Everything else is withheld: no forms, no popups, no top-level navigation, no
 downloads, no pointer lock. A widget that could navigate the host page away would
@@ -89,6 +89,14 @@ calls `preventDefault()`. A composer that relied on native submission would be a
 composer whose Send button silently did nothing inside this sandbox — so the
 capability is not granted, and the code does not want it. Chrome's console during
 verification carries no sandbox violation of any kind.
+
+**Names in the loader (Phase 37.1).** The loader's text says Nabra, the public
+name, and so does the install snippet: it carries the key as `data-nabra-key`.
+The loader reads `data-nabra-key` first and falls back to `data-omniai-key`, so
+every snippet pasted before 37.1 keeps working unedited; when one tag carries
+both, the newer name wins, and a page with one tag of each still loads one
+widget. The `__omniaiWidgetLoaded` global and the `omniai:v1:` bridge messages
+keep their names: nobody installing the chat reads them.
 
 These are the attributes on the frame the loader actually creates, not the ones it
 intends to: `widget-loader.spec.ts` evaluates the shipped `Widget/v1.js` in a DOM

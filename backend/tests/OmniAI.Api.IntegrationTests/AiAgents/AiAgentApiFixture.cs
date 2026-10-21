@@ -76,67 +76,92 @@ public class AiAgentApiFixture : IAsyncLifetime
     {
         await _database.InitializeAsync();
 
-        _application = new WebApplicationFactory<Program>()
-            .WithWebHostBuilder(builder =>
-            {
-                builder.UseSetting(ConnectionStringSetting, _database.ConnectionString);
-
-                // No AI provider, whatever the developer's machine happens to have
-                // configured.
-                //
-                // The hosted application reads OPENAI_API_KEY through
-                // configuration, and configuration includes the process
-                // environment -- so without this line a machine with a real key
-                // would silently register the real OpenAI adapter and these tests
-                // would make live, billed calls to the internet. That is not a
-                // hypothetical: it happened once during development, which is why
-                // the override is here rather than in a comment asking people to
-                // remember.
-                //
-                // Overriding it to blank makes every suite built on this fixture
-                // deterministic and offline. The suite that needs the real adapter
-                // installs it explicitly over a canned socket.
-                if (DisableAiProvider)
-                {
-                    builder.UseSetting(ApiKeySetting, string.Empty);
-                }
-
-                // Public chat protection, configured exactly as a deployment would
-                // configure it: a connection string, a secret from the
-                // environment, and a non-secret policy section. Nothing here
-                // replaces a service, so what the suite exercises is the real
-                // Redis-backed limiter and the real HMAC key derivation.
-                // Which plan a workspace created through the API starts on. Named
-                // explicitly, as a real deployment must: there is no fallback, so
-                // a suite that forgot this would fail to create a workspace rather
-                // than quietly create an unlimited one.
-                builder.UseSetting(DefaultPlanSetting, SeededPlans.DevelopmentCode);
-
-                builder.UseSetting(RedisConnectionSetting, _redis.ConnectionString);
-                builder.UseSetting(NetworkKeySecretSetting, _redis.NetworkKeySecret);
-                builder.UseSetting(KeyPrefixSetting, _redis.KeyPrefix);
-
-                foreach ((string key, string value) in HostSettings)
-                {
-                    builder.UseSetting(key, value);
-                }
-
-                builder.ConfigureServices(services =>
-                {
-                    // Gives these in-memory requests a connection to have come
-                    // from. TestServer has no socket, so without this every public
-                    // chat write is refused for having no establishable origin --
-                    // which is the correct production behaviour and useless for a
-                    // suite asserting on anything else. See SimulatedPeerStartupFilter.
-                    services.AddSingleton<IStartupFilter>(
-                        new SimulatedPeerStartupFilter(
-                            SimulatedPeerStartupFilter.Default,
-                            honourHeader: true));
-
-                    ConfigureTestServices(services);
-                });
-            });
+        _application = new WebApplicationFactory<Program>().WithWebHostBuilder(ConfigureHost);
     }
+
+    /// <summary>
+    /// The configuration every instance of this host runs with.
+    /// </summary>
+    /// <remarks>
+    /// One method rather than a lambda, so a second instance of the same
+    /// application (see <see cref="CreateSecondInstance"/>) is configured
+    /// identically and cannot drift from the first.
+    /// </remarks>
+    private void ConfigureHost(IWebHostBuilder builder)
+    {
+        builder.UseSetting(ConnectionStringSetting, _database.ConnectionString);
+
+        // No AI provider, whatever the developer's machine happens to have
+        // configured.
+        //
+        // The hosted application reads OPENAI_API_KEY through
+        // configuration, and configuration includes the process
+        // environment -- so without this line a machine with a real key
+        // would silently register the real OpenAI adapter and these tests
+        // would make live, billed calls to the internet. That is not a
+        // hypothetical: it happened once during development, which is why
+        // the override is here rather than in a comment asking people to
+        // remember.
+        //
+        // Overriding it to blank makes every suite built on this fixture
+        // deterministic and offline. The suite that needs the real adapter
+        // installs it explicitly over a canned socket.
+        if (DisableAiProvider)
+        {
+            builder.UseSetting(ApiKeySetting, string.Empty);
+        }
+
+        // Public chat protection, configured exactly as a deployment would
+        // configure it: a connection string, a secret from the
+        // environment, and a non-secret policy section. Nothing here
+        // replaces a service, so what the suite exercises is the real
+        // Redis-backed limiter and the real HMAC key derivation.
+        // Which plan a workspace created through the API starts on. Named
+        // explicitly, as a real deployment must: there is no fallback, so
+        // a suite that forgot this would fail to create a workspace rather
+        // than quietly create an unlimited one.
+        builder.UseSetting(DefaultPlanSetting, SeededPlans.DevelopmentCode);
+
+        builder.UseSetting(RedisConnectionSetting, _redis.ConnectionString);
+        builder.UseSetting(NetworkKeySecretSetting, _redis.NetworkKeySecret);
+        builder.UseSetting(KeyPrefixSetting, _redis.KeyPrefix);
+
+        foreach ((string key, string value) in HostSettings)
+        {
+            builder.UseSetting(key, value);
+        }
+
+        builder.ConfigureServices(services =>
+        {
+            // Gives these in-memory requests a connection to have come
+            // from. TestServer has no socket, so without this every public
+            // chat write is refused for having no establishable origin --
+            // which is the correct production behaviour and useless for a
+            // suite asserting on anything else. See SimulatedPeerStartupFilter.
+            services.AddSingleton<IStartupFilter>(
+                new SimulatedPeerStartupFilter(
+                    SimulatedPeerStartupFilter.Default,
+                    honourHeader: true));
+
+            ConfigureTestServices(services);
+        });
+    }
+
+    /// <summary>
+    /// A second, independent instance of the same application.
+    /// </summary>
+    /// <remarks>
+    /// Same database, same Redis, same configuration; its own process state,
+    /// hubs and connections. Two of these are two API instances behind a load
+    /// balancer as far as SignalR is concerned, which is what the backplane
+    /// tests need. The caller owns and disposes it.
+    /// </remarks>
+    public WebApplicationFactory<Program> CreateSecondInstance() =>
+        new WebApplicationFactory<Program>().WithWebHostBuilder(ConfigureHost);
+
+    /// <summary>The first instance of the hosted application.</summary>
+    public WebApplicationFactory<Program> Application =>
+        _application ?? throw new InvalidOperationException("The fixture was not initialised.");
 
     public async Task DisposeAsync()
     {

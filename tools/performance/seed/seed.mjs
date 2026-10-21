@@ -14,12 +14,15 @@
 //   OMNIAI_PERF_BASE=http://127.0.0.1:5034 node seed.mjs [out.json]
 // Tunables (env): SEED_CONVERSATIONS_A (1200), SEED_CONVERSATIONS_B (300),
 //   SEED_KNOWLEDGE_A (40), SEED_KNOWLEDGE_B (10), SEED_PARALLEL (16),
-//   SEED_PASSWORD (synthetic default below), SEED_PREFIX (p34).
+//   SEED_PREFIX (p34).
+// Required (env): SEED_PASSWORD, the synthetic accounts' password. It has no
+//   committed default; the tool stops with exit code 2 when it is missing.
 
 import { writeFileSync } from 'node:fs';
 import { Client } from '../lib/client.mjs';
+import { seedPassword } from '../lib/env.mjs';
 
-const PASSWORD = process.env.SEED_PASSWORD || 'Synthetic-Local-Only-2026!';
+const PASSWORD = seedPassword();
 const PREFIX = process.env.SEED_PREFIX || 'p34';
 const PARALLEL = Number(process.env.SEED_PARALLEL || 16);
 const out = { generatedAt: new Date().toISOString(), tenants: {} };

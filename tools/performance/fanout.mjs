@@ -10,9 +10,10 @@
 import { Client, sleep } from './lib/client.mjs';
 import { HubConnection } from './lib/signalr.mjs';
 import { loopbackBase } from './lib/target.mjs';
+import { seedPassword } from './lib/env.mjs';
 
 const MAIL = loopbackBase(process.env.MAILPIT, 'http://127.0.0.1:8034');
-const PASSWORD = process.env.SEED_PASSWORD || 'Synthetic-Local-Only-2026!';
+const PASSWORD = seedPassword();
 const [eligibleArg = '40', ineligibleArg = '5'] = process.argv.slice(2);
 const run = Date.now() % 100000;
 

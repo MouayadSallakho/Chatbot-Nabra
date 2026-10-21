@@ -814,11 +814,22 @@ internal sealed class RecordingRealtimeNotifier : IConversationRealtimeNotifier
     /// </remarks>
     public Exception? Failure { get; set; }
 
+    /// <summary>
+    /// Runs at the moment of each announcement, before it is recorded or fails.
+    /// </summary>
+    /// <remarks>
+    /// For the tests that care about order: what had already been committed when
+    /// the inbox was told something changed.
+    /// </remarks>
+    public Action<ConversationId>? Observe { get; set; }
+
     public Task ConversationChangedAsync(
         TenantId tenantId,
         ConversationId conversationId,
         CancellationToken cancellationToken = default)
     {
+        Observe?.Invoke(conversationId);
+
         if (Failure is not null)
         {
             throw Failure;

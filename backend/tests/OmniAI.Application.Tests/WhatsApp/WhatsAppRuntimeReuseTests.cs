@@ -1,3 +1,4 @@
+using OmniAI.Application.Ai;
 using OmniAI.Application.Tests.WebChat;
 using OmniAI.Application.WhatsApp;
 using OmniAI.Application.WhatsApp.Persistence;
@@ -97,6 +98,34 @@ public sealed class WhatsAppRuntimeReuseTests
         Assert.Empty(scenario.WhatsApp.Deliveries);
     }
 
+    [Fact]
+    public async Task A_failed_reply_is_announced_so_the_inbox_shows_the_message()
+    {
+        // The same rule as website chat, through the same runner: the
+        // customer's words are stored before the provider is called, so the
+        // inbox is told even when no reply exists to send.
+        Scenario scenario = Scenario.Build(
+            RecordingGenerator.Failing(() => new AiRuntimeUnavailableException()));
+
+        ClaimedInboundMessage claimed = await scenario.ClaimAsync(
+            "wamid.FAILED==",
+            "Is the shop open today?");
+
+        int before = scenario.Harness.Announcer.Announced.Count(
+            announced => announced.Conversation == scenario.Conversation.Id);
+
+        await Assert.ThrowsAsync<AiRuntimeUnavailableException>(
+            () => scenario.Processor.HandleAsync(claimed));
+
+        Assert.Equal(
+            before + 1,
+            scenario.Harness.Announcer.Announced.Count(
+                announced => announced.Conversation == scenario.Conversation.Id));
+
+        // Nothing to deliver, because nothing was generated.
+        Assert.Empty(scenario.WhatsApp.Deliveries);
+    }
+
     private sealed class Scenario
     {
         public static readonly DateTimeOffset Noon = Harness.Noon;
@@ -113,9 +142,9 @@ public sealed class WhatsAppRuntimeReuseTests
 
         public required ReceiveWhatsAppWebhookHandler Webhook { get; init; }
 
-        public static Scenario Build()
+        public static Scenario Build(RecordingGenerator? generator = null)
         {
-            Harness harness = Harness.Build();
+            Harness harness = Harness.Build(generator);
 
             WhatsAppWorld whatsapp = new();
 

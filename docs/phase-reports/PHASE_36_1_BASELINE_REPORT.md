@@ -189,7 +189,7 @@ Absent, and to keep absent: gradients (the only two are functional: select chevr
 
 ## 9. See it live
 
-- Admin: http://localhost:4200/sign-in → `p36.owner@omniai.example` / `Synthetic-Local-Only-2026!` (support and analyst accounts in `demo-accounts.md`).
+- Admin: http://localhost:4200/sign-in → `p36.owner@omniai.example`. Its synthetic password, and the support and analyst accounts, are in `C:\Users\mouay\Desktop\omniai-redesign-evidence\p36-01\demo-accounts.md`, outside the repository.
 - Hosted chat: http://localhost:4200/chat/9veAaKzu0Ee-isA7jrQzYw (Arabic agent: http://localhost:4200/chat/o-M5OubU2TJkyTCA-CRvYg).
 - Widget host page: http://127.0.0.1:8099/?key=9veAaKzu0Ee-isA7jrQzYw (serve `widget-host/` as in `stack.md`).
 - Gallery: `C:\Users\mouay\Desktop\omniai-redesign-evidence\p36-01\before\index.html`.

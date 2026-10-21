@@ -12,6 +12,9 @@
 import { Client, sleep } from './lib/client.mjs';
 import { HubConnection } from './lib/signalr.mjs';
 import { loopbackBase } from './lib/target.mjs';
+import { seedPassword } from './lib/env.mjs';
+
+const PASSWORD = seedPassword();
 
 const [secondsArg = '70', countArg = '40'] = process.argv.slice(2);
 const A = loopbackBase(process.env.OMNIAI_PERF_BASE);
@@ -19,7 +22,7 @@ const B = loopbackBase(process.env.OMNIAI_PERF_BASE_B);
 const other = (base) => (base === A ? B : A);
 
 const owner = new Client(A);
-await owner.signIn('p34.a.owner@omniai.example', process.env.SEED_PASSWORD || 'Synthetic-Local-Only-2026!');
+await owner.signIn('p34.a.owner@omniai.example', PASSWORD);
 const tenant = (await owner.ok('GET', '/api/me/tenants')).json.find((t) => t.slug === 'p34-a').id;
 const T = `/api/tenants/${tenant}`;
 
