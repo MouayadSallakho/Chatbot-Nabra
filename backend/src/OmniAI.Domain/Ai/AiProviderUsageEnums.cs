@@ -12,6 +12,17 @@ public enum AiProvider
 {
     /// <summary>The only provider this platform calls today.</summary>
     OpenAi = 1,
+
+    /// <summary>
+    /// The in-process stand-in a developer machine may opt into (Phase 37.2).
+    /// </summary>
+    /// <remarks>
+    /// Nobody is paid. It has its own value rather than borrowing
+    /// <see cref="OpenAi"/>, so a local row can never be mistaken for real spend,
+    /// and a deployment outside Development cannot produce one: the API refuses to
+    /// start there with the stand-in requested.
+    /// </remarks>
+    DevelopmentStandIn = 2,
 }
 
 /// <summary>

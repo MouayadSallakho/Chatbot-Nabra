@@ -221,6 +221,15 @@ to make vectors is a fact about the deployment, not about whether a key happens 
 be present — so a deployment with no key still reports readiness honestly rather
 than failing to render.
 
+**The local stand-in has its own profile, `dev:standin:1536` (Phase 37.2).** On a
+Development host running the stand-in (ai-runtime.md C19), the registered profile
+and every vector written carry that identifier. Retrieval already compares only
+the active profile, on both the document (`d.indexed_profile = @profile`) and the
+chunk (`c.embedding_profile = @profile`), so stand-in vectors and real embeddings
+never mix, and no query changed. A document indexed by the stand-in reads as
+**NeedsIndex** once a real provider is configured, and the reverse holds too:
+switching between them means indexing again.
+
 ---
 
 ## 7. PostgreSQL and pgvector

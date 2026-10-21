@@ -31,6 +31,7 @@ using OmniAI.Infrastructure.Knowledge;
 using OmniAI.Infrastructure.Knowledge.Files;
 using OmniAI.Infrastructure.WebChat;
 using OmniAI.Infrastructure.Ai;
+using OmniAI.Infrastructure.Ai.StandIn;
 using OmniAI.Infrastructure.Persistence.Repositories;
 using OmniAI.Infrastructure.Persistence;
 using OmniAI.Infrastructure.Plans;
@@ -265,13 +266,32 @@ public static class InfrastructureServiceCollectionExtensions
     /// security control for deployments.
     /// </para>
     /// </param>
+    /// <param name="allowLocalStandIn">
+    /// <para>
+    /// Whether this host may run the local AI stand-in (Phase 37.2). The
+    /// composition root passes Development here and nothing else.
+    /// </para>
+    /// <para>
+    /// The stand-in is composed only when this is <see langword="true"/> and
+    /// <see cref="LocalAiStandInSwitch.Variable"/> is exactly
+    /// <see cref="LocalAiStandInSwitch.EnabledValue"/>. The variable on a host
+    /// that may not run it, with any other value, or together with the live
+    /// OpenAI opt-in stops startup; see <see cref="LocalAiStandInSwitch"/>.
+    /// Without the variable nothing here changes.
+    /// </para>
+    /// </param>
     public static IServiceCollection AddOmniAiRuntime(
         this IServiceCollection services,
         IConfiguration configuration,
-        bool requireLiveProviderOptIn = false)
+        bool requireLiveProviderOptIn = false,
+        bool allowLocalStandIn = false)
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configuration);
+
+        // Decided first, so a refused combination stops the process before
+        // anything is registered.
+        bool standIn = LocalAiStandInSwitch.IsEnabled(configuration, allowLocalStandIn);
 
         string? apiKey = configuration[OpenAiOptions.ApiKeyVariable];
 
@@ -304,8 +324,10 @@ public static class InfrastructureServiceCollectionExtensions
         // The catalogue is read and validated here, at startup: a misspelled model
         // or a negative rate should stop a deployment from starting, not appear a
         // month later as a cost report nobody can explain.
+        //
+        // The stand-in's zero rate is added only with the stand-in itself.
         services.AddSingleton<IAiProviderPricing>(
-            AiProviderPricingCatalog.Create(ReadPricing(configuration)));
+            AiProviderPricingCatalog.Create(ReadPricing(configuration), includeLocalStandIn: standIn));
 
         services.AddSingleton<IAiProviderUsageLedger, AiProviderUsageLedger>();
 
@@ -337,10 +359,22 @@ public static class InfrastructureServiceCollectionExtensions
 
         services.AddSingleton(embeddingOptions);
         services.AddSingleton(EmbeddingProfile.Create(
-            embeddingOptions.ProfileId,
+            standIn ? LocalAiStandInOptions.ProfileId : embeddingOptions.ProfileId,
             EmbeddingOptions.Dimensions,
             embeddingOptions.MaxBatchSize,
             embeddingOptions.MaxInputCharacters));
+
+        if (standIn)
+        {
+            // The local stand-in, for both capabilities: in process, no network,
+            // no key. Its vectors carry their own profile, so a document indexed
+            // here reads as needing an index once a real provider is configured.
+            services.AddSingleton(LocalAiStandInOptions.Read(configuration));
+            services.AddSingleton<IAiTextGenerator, LocalStandInTextGenerator>();
+            services.AddSingleton<ITextEmbeddingGenerator, LocalStandInEmbeddingGenerator>();
+
+            return services;
+        }
 
         if (string.IsNullOrWhiteSpace(apiKey))
         {

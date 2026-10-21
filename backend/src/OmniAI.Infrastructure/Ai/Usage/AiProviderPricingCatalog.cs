@@ -79,20 +79,41 @@ internal sealed class AiProviderPricingCatalog : IAiProviderPricing
     /// a negative rate should stop a deployment from starting, not surface a
     /// month later as a cost report nobody can explain.
     /// </remarks>
+    /// <param name="entries">The configured rates.</param>
+    /// <param name="includeLocalStandIn">
+    /// <para>
+    /// Adds the local AI stand-in's built-in zero rate for both operations
+    /// (Phase 37.2). The composition root passes <see langword="true"/> only when
+    /// it registers the stand-in, so without the stand-in there is no rate for
+    /// <see cref="AiProvider.DevelopmentStandIn"/> at all.
+    /// </para>
+    /// <para>
+    /// It prices the stand-in's word counts, which are not tokens, at nothing.
+    /// It changes no configured rate and not the rule that a call reporting no
+    /// usage is unrated.
+    /// </para>
+    /// </param>
     /// <exception cref="InvalidOperationException">An entry is not usable.</exception>
-    public static AiProviderPricingCatalog Create(IReadOnlyList<AiModelRateOptions>? entries)
+    public static AiProviderPricingCatalog Create(
+        IReadOnlyList<AiModelRateOptions>? entries,
+        bool includeLocalStandIn = false)
     {
-        if (entries is null || entries.Count == 0)
+        if ((entries is null || entries.Count == 0) && !includeLocalStandIn)
         {
             return Empty;
         }
 
         Dictionary<RateKey, List<AiModelRates>> byKey = [];
 
-        foreach (AiModelRateOptions entry in entries)
-        {
-            AiModelRates rates = Read(entry);
+        IEnumerable<AiModelRates> all = (entries ?? []).Select(Read);
 
+        if (includeLocalStandIn)
+        {
+            all = all.Concat(LocalStandInRates());
+        }
+
+        foreach (AiModelRates rates in all)
+        {
             RateKey key = new(rates.Provider, rates.Model.Value, rates.Operation);
 
             if (!byKey.TryGetValue(key, out List<AiModelRates>? versions))
@@ -141,6 +162,38 @@ internal sealed class AiProviderPricingCatalog : IAiProviderPricing
         return versions.FirstOrDefault(rates => rates.EffectiveFrom <= instant);
     }
 
+    /// <summary>The local AI stand-in's zero rate, for both operations.</summary>
+    /// <remarks>
+    /// In force from the Unix epoch, so every stand-in call is rated. USD like
+    /// the configured default, so a local workspace's totals are not split by
+    /// currency.
+    /// </remarks>
+    private static AiModelRates[] LocalStandInRates()
+    {
+        ModelName model = ModelName.Create(StandIn.LocalAiStandInOptions.Model);
+        CurrencyCode currency = CurrencyCode.Create("USD");
+
+        return
+        [
+            AiModelRates.Create(
+                AiProvider.DevelopmentStandIn,
+                model,
+                AiOperationType.TextGeneration,
+                currency,
+                DateTimeOffset.UnixEpoch,
+                inputPerMillion: 0m,
+                cachedInputPerMillion: 0m,
+                outputPerMillion: 0m),
+            AiModelRates.Create(
+                AiProvider.DevelopmentStandIn,
+                model,
+                AiOperationType.Embedding,
+                currency,
+                DateTimeOffset.UnixEpoch,
+                inputPerMillion: 0m),
+        ];
+    }
+
     private static AiModelRates Read(AiModelRateOptions entry)
     {
         ArgumentNullException.ThrowIfNull(entry);
@@ -149,6 +202,15 @@ internal sealed class AiProviderPricingCatalog : IAiProviderPricing
         {
             throw new InvalidOperationException(
                 $"'{entry.Provider}' is not a provider this platform calls.");
+        }
+
+        if (provider == AiProvider.DevelopmentStandIn)
+        {
+            // Its zero rate is built in and exists only while the stand-in is
+            // registered; a configured one would outlive it.
+            throw new InvalidOperationException(
+                $"'{entry.Provider}' cannot be priced in configuration. The local AI stand-in's "
+                + "zero rate is built in and applies only while the stand-in is running.");
         }
 
         if (!Enum.TryParse(entry.Operation, ignoreCase: true, out AiOperationType operation))

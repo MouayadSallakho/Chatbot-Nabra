@@ -313,6 +313,11 @@ configured OpenAI must not be met with an application that refuses to run. What
 bound — because a deployment that meant to cap spending at 200 tokens and
 mistyped it must not silently run at whatever this code prefers.
 
+**Phase 37.2.** A Development host may run the local stand-in instead of either
+of these (ai-runtime.md C19). Nothing in this adapter, its key handling or the
+`OMNIAI_LIVE_OPENAI` guard changed. Asking for the stand-in together with
+`OMNIAI_LIVE_OPENAI=1` stops startup, so a process never holds both.
+
 ### D16 — Test transport
 
 **Decision.** Deterministic tests inject an `HttpClientPipelineTransport` over a

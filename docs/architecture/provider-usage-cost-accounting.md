@@ -24,6 +24,9 @@ is no estimation, no tokenizer, no character count, no "roughly four characters
 per token". When the provider returns no usage, the operation is stored with
 every count null.
 
+The one exception is the local stand-in on a developer machine (§16). Its counts
+are word counts, not tokens, and its provider value says so.
+
 **Why.** An estimated token count is indistinguishable on a screen from a
 measured one, and the difference only surfaces when somebody reconciles a figure
 against a provider's own statement and finds it does not match. At that point
@@ -344,3 +347,43 @@ as the data:
 A spec sweeps the rendered page for the vocabulary of billing — invoice, credit,
 wallet, subscription, amount due, balance, quota, billing, payment, VAT — and
 fails if any of it appears.
+
+---
+
+## 16. The local stand-in (Phase 37.2, Development only)
+
+**Decision.** The local stand-in (ai-runtime.md C19) records each call like any
+provider call: one row written before the work, then settled `Succeeded` or
+`Failed`. Its rows carry provider **`DevelopmentStandIn`** and model
+**`local-stand-in`**, and they cost **zero**.
+
+**Its counts are word counts, not tokens.** No tokeniser is involved. For
+generation, input is the words of the instructions, every turn and every
+grounding passage (title and text), and output is the words of the reply. For an
+embedding batch, input is the words of every input. Total is their sum. These
+figures fill the token columns so the rate applies; they must not be compared
+with a provider's token counts.
+
+**The zero rate exists only with the stand-in.** `AiProviderPricingCatalog.Create`
+adds it, for `TextGeneration` and `Embedding`, in force from the Unix epoch and in
+USD, only when the composition root registers the stand-in. Without the stand-in
+there is no rate for `DevelopmentStandIn` at all. A configured `AiPricing:Rates`
+entry for that provider stops startup ("its zero rate is built in"), so no
+configured rate can outlive the stand-in.
+
+**Unchanged.** Configured rates price exactly as before. A call that reports no
+usage is still unrated, never free, even under the zero rate (§8). §1 still holds
+for every real provider.
+
+**Why a separate provider value.** So a local row can never be mistaken for real
+spend, and a usage breakdown by provider, which the analytics `models` rows
+carry, shows it apart. The value is stored by name in the existing
+`provider varchar(32)` column, which has no check constraint, so no migration was
+needed. Outside Development the API refuses to start with the stand-in requested,
+so a real deployment cannot write such a row.
+
+**Contract.** The `models[].provider` string of
+`GET /api/tenants/{tenantId}/analytics/dashboard`, and the provider column of a
+report's model usage rows, may now also read `DevelopmentStandIn`, but only on a
+Development host running the stand-in. The change is additive, and the current
+frontend shows the model name, not the provider.

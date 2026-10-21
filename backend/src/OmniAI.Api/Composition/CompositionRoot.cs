@@ -43,6 +43,7 @@ using OmniAI.Api.Realtime;
 using OmniAI.Application.Notifications;
 using OmniAI.Application.Conversations.Realtime;
 using OmniAI.Infrastructure.Conversations.Realtime;
+using OmniAI.Infrastructure.Ai.StandIn;
 using OmniAI.Application.Conversations;
 using OmniAI.Application.Tenants.CreateTenant;
 using OmniAI.Application.WebChat.CreateWebChatEndpoint;
@@ -103,6 +104,12 @@ internal static class CompositionRoot
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configuration);
         ArgumentNullException.ThrowIfNull(environment);
+
+        // Phase 37.2: the local AI stand-in is a developer-machine tool. Asked for
+        // anywhere else, or alongside the live provider, the process refuses to
+        // start here, before anything is built. The runtime registration below
+        // checks again, so no path composes it without this rule.
+        _ = LocalAiStandInSwitch.IsEnabled(configuration, environment.IsDevelopment());
 
         // Phase 35: a deployment missing what it cannot run correctly without
         // refuses to start, naming the keys, instead of degrading at first use.
@@ -245,9 +252,13 @@ internal static class CompositionRoot
         // not a decision anybody made, and treating it as one has already cost
         // real money once. Development therefore requires a deliberate opt-in
         // alongside the key; production does not, and must not.
+        //
+        // Development may also run the local AI stand-in instead, when
+        // OMNIAI_DEV_AI_STANDIN=1 asks for it (Phase 37.2).
         services.AddOmniAiRuntime(
             configuration,
-            requireLiveProviderOptIn: environment.IsDevelopment());
+            requireLiveProviderOptIn: environment.IsDevelopment(),
+            allowLocalStandIn: environment.IsDevelopment());
 
         // Application use cases. Registered as their concrete types, because
         // nothing substitutes them at runtime -- an interface per handler would be

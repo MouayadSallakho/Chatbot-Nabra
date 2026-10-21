@@ -286,6 +286,11 @@ lives in the test projects and is never registered by the composition root. That
 is the difference between an application that admits it cannot do something and
 one that quietly pretends.
 
+**Phase 37.2 adds one exception, on developer machines only:** the local stand-in
+of C19. It is opt-in, refused outside Development, and every reply it writes says
+that it is a local test reply. Without its switch, this decision holds exactly as
+written.
+
 ### C14 — Three flat failure types
 
 **Decision.** Three sealed exception types, no base class, no error-code
@@ -397,6 +402,77 @@ other people's typing.
 Neither level records the preview message or the agent's instructions, so turning
 logging up cannot start writing customers' text or a tenant's configuration into
 the log.
+
+### C19 — The local stand-in (Phase 37.2, Development only)
+
+**Decision.** A developer machine may run an in-process stand-in behind the same
+two seams the real provider uses: `LocalStandInTextGenerator : IAiTextGenerator`
+and `LocalStandInEmbeddingGenerator : ITextEmbeddingGenerator`, both in
+`OmniAI.Infrastructure.Ai.StandIn`. It opens no socket, reads no key and spends
+nothing. Replies, knowledge indexing, retrieval, agent preview, the failed-turn
+announcement and usage by purpose can then all be exercised locally.
+
+**When it is composed.** `AddOmniAiRuntime` composes it only when all of these
+hold, checked at run time (the dev API runs a Release build, so a compile-time
+symbol could not be the switch):
+
+| Host | `OMNIAI_DEV_AI_STANDIN` | `OMNIAI_LIVE_OPENAI` | Result |
+| --- | --- | --- | --- |
+| Development | exactly `1` | not `1` | the stand-in, for generation and embeddings |
+| Development | absent or blank | any | today's behaviour, unchanged |
+| Development | any other value (`0`, `true`, `1 `) | any | **startup refused**, "must be exactly 1" |
+| Development | `1` | `1` | **startup refused**: a process uses the stand-in or the live provider, never both |
+| not Development | any non-blank value | any | **startup refused**, naming the variable |
+
+`LocalAiStandInSwitch.IsEnabled` makes the decision. The composition root calls
+it first, before any other startup check, and `AddOmniAiRuntime` calls it again,
+so no path composes the stand-in without the rule. The refusal outside
+Development is proven by an in-process host built in `Production`
+(`LocalStandInApiTests`); no API container is started outside Development. The
+switch is not a provider secret, so the provider canary keeps passing with it
+present. The OpenAI adapters, the key handling and the `OMNIAI_LIVE_OPENAI` guard
+are unchanged.
+
+**What a reply looks like.** Deterministic: the same request always gets the same
+reply. It is written in the language of the customer's latest message (Arabic
+when Arabic letters outnumber the others), and it starts with a visible marker,
+so nobody can take it for a real answer:
+
+- "Local test reply: this answer was written by a local test stand-in, not by an
+  AI model." Then the message, quoted, and the knowledge passages it was given,
+  in retrieval order (at most three named, then "And N more."), or "No knowledge
+  passage matched your message."
+- «رد تجريبي محلي: كتب هذا الرد بديلٌ محلي للاختبار، وليس نموذج ذكاء اصطناعي.»
+  Then «رسالتك: «…»» and «مقاطع من المعرفة تطابق رسالتك (N):», or «لا يوجد في
+  المعرفة مقطع يطابق رسالتك.»
+
+**Timing and failures on demand.** Every reply waits
+`LocalAiStandIn:ReplyDelayMilliseconds` (default 1000, from 0 to 60000), so the
+typing state shows. Only the customer's latest message is read for markers:
+
+- `[[fail]]` (any case) fails exactly like an unavailable provider: the ledger row
+  is settled `Failed`, and `AiRuntimeUnavailableException` is thrown, so the
+  caller answers 503 and the 37.1 failed-turn announcement runs.
+- `[[slow]]` adds 10 seconds to the delay. That is still inside every caller's
+  timeout. A caller who gives up meanwhile cancels it, and the row is settled
+  `Failed`, because the stand-in knows it did no work.
+
+**Embeddings.** Each word (letters and digits; English lower-cased; Arabic with
+diacritics and tatweel removed, alef forms unified, ى read as ي and ة as ه, and a
+leading «ال» dropped) is hashed with 64-bit FNV-1a into one of 1,536 buckets,
+weighted 1 + ln(count), and the vector is scaled to unit length. Cosine
+similarity then rises with the words two texts share, so a question retrieves
+the passages that use its words, in Arabic and English. The vectors carry their
+own profile, `dev:standin:1536`; see knowledge-base-rag.md §6.
+
+**Accounting.** Each call is one ledger row, with provider `DevelopmentStandIn`
+and model `local-stand-in`, priced at zero by a built-in rate that exists only
+while the stand-in is registered. The counts are word counts, not tokens; see
+provider-usage-cost-accounting.md §16.
+
+**Forbids.** Composing it outside Development, or together with the live
+provider. Falling back to it when a real provider fails. Configuring its rate.
+Removing the marker from its replies.
 
 ---
 
