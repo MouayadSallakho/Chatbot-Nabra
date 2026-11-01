@@ -26,6 +26,18 @@ brings the remaining areas onto the same mechanism (row 28).
 When Identity reports several errors at once, `code` is the first and `codes` lists
 them all, in order, for a form that shows each rule next to its field.
 
+## Conversations (Phase 37.4)
+
+All four are `400` and are checked before membership or permission, so the
+answer is the same for anybody and says nothing about the workspace.
+
+| Code | Status | Where | Meaning |
+| --- | --- | --- | --- |
+| `conversations.filter.invalid` | 400 | `GET …/conversations` | `filter` is not `needs-person` (or empty). Refused rather than ignored, so a misspelt filter never shows every conversation under a heading that promises a few |
+| `transcript.cursor.conflict` | 400 | `GET …/conversations/{id}/messages` | `after` was combined with `before` or `tail=true`: a page cannot be read forwards and backwards at once |
+| `transcript.include.invalid` | 400 | `GET …/conversations/{id}/messages` | `include` names something other than `events` |
+| `conversations.read.sequence.invalid` | 400 | `POST …/conversations/{id}/read` | `sequence` is missing or negative |
+
 ## Codes that existed before this list
 
 | Code | Status | Where |

@@ -122,6 +122,71 @@ internal sealed class FakeConversationInboxStore : IConversationInboxStore
         }
     }
 
+    /// <summary>Handling changes stored, in order.</summary>
+    public List<ConversationHandlingEvent> HandlingEvents { get; } = [];
+
+    /// <summary>Read markers, as the upsert leaves them.</summary>
+    public Dictionary<(ConversationId, UserId), long> ReadMarkers { get; } = [];
+
+    /// <summary>The newest sequence a conversation reports; defaults to the last allocated.</summary>
+    public long? NewestSequence { get; set; }
+
+    public Task<ConcurrencyToken> SaveHandlingChangeAsync(
+        Conversation conversation,
+        ConversationHandlingEvent change,
+        ConcurrencyToken expected,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(change);
+
+        // Saved like the real store: a refused precondition stores neither.
+        Task<ConcurrencyToken> saved = SaveAsync(conversation, expected, cancellationToken);
+
+        lock (_sync)
+        {
+            HandlingEvents.Add(change);
+        }
+
+        return saved;
+    }
+
+    public Task<long> ReadNewestSequenceAsync(
+        ConversationId conversationId,
+        CancellationToken cancellationToken = default)
+    {
+        lock (_sync)
+        {
+            return Task.FromResult(NewestSequence ?? _sequence - 1);
+        }
+    }
+
+    public Task<bool> MarkReadAsync(
+        TenantId tenantId,
+        ConversationId conversationId,
+        UserId member,
+        long sequence,
+        DateTimeOffset readAt,
+        CancellationToken cancellationToken = default)
+    {
+        lock (_sync)
+        {
+            if (!_conversations.TryGetValue(conversationId, out Conversation? conversation)
+                || conversation.TenantId != tenantId)
+            {
+                return Task.FromResult(false);
+            }
+
+            long clamped = Math.Min(sequence, NewestSequence ?? _sequence - 1);
+
+            ReadMarkers[(conversationId, member)] =
+                ReadMarkers.TryGetValue((conversationId, member), out long stored)
+                    ? Math.Max(stored, clamped)
+                    : clamped;
+
+            return Task.FromResult(true);
+        }
+    }
+
     public async Task<HumanReplyOutcome> AppendReplyAsync(
         Conversation conversation,
         UserId sender,

@@ -180,6 +180,19 @@ public sealed class ReplyToConversationHandler(
                 .ConfigureAwait(false);
         }
 
+        // Whoever wrote the reply has read the conversation up to it. Last, so a
+        // failure here can never stand between a reply and its delivery; and for a
+        // replayed key too, so a retry after such a failure repairs the marker.
+        await _store
+            .MarkReadAsync(
+                tenantId,
+                conversationId,
+                sender,
+                outcome.Message.IngestionSequence,
+                _clock.GetUtcNow(),
+                cancellationToken)
+            .ConfigureAwait(false);
+
         return outcome.Message;
     }
 }

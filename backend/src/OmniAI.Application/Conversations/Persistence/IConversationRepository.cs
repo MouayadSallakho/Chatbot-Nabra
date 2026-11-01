@@ -1,4 +1,5 @@
 using OmniAI.Application.Concurrency;
+using OmniAI.Application.Customers;
 using OmniAI.Domain.AiAgents;
 using OmniAI.Domain.Conversations;
 using OmniAI.Domain.Tenants;
@@ -49,9 +50,32 @@ public sealed record ConversationMessageAuthor(Guid UserId, string Email);
 /// The ingestion sequence to continue after, or <see langword="null"/> when the
 /// page reached the end of the conversation.
 /// </param>
+/// <param name="PreviousCursor">
+/// The ingestion sequence to read the page before this one with (as
+/// <c>before</c>), or <see langword="null"/> when nothing is earlier. Filled by
+/// the backward reads and by the admin handler; the ascending repository read
+/// leaves it null, so the public transports that share it are unchanged.
+/// </param>
 public sealed record ConversationMessagePage(
     IReadOnlyList<ConversationMessageRecord> Items,
-    long? NextCursor);
+    long? NextCursor,
+    long? PreviousCursor = null);
+
+/// <summary>Who a conversation is with, as an inbox row shows them.</summary>
+/// <param name="Id">The customer's id (the canonical record: a merge moves conversations).</param>
+/// <param name="DisplayName">The label somebody in the workspace gave them, if any.</param>
+/// <param name="LabelCode">Which label to show when there is no name; see <c>CustomerLabels</c>.</param>
+/// <param name="Reference">
+/// For a WhatsApp conversation, the number it runs on, already masked to its last
+/// four digits. <see langword="null"/> on every other channel. There is no raw form.
+/// </param>
+/// <param name="ShortCode">Six characters that tell unnamed customers apart; never a key.</param>
+public sealed record ConversationCustomer(
+    Guid Id,
+    string? DisplayName,
+    CustomerLabelCode LabelCode,
+    string? Reference,
+    string ShortCode);
 
 /// <summary>One conversation, as the admin list publishes it.</summary>
 /// <remarks>
@@ -59,6 +83,11 @@ public sealed record ConversationMessagePage(
 /// not load a thousand transcripts, so the row carries a count and a short
 /// preview and the transcript is fetched only when one is opened.
 /// </remarks>
+/// <param name="Customer">Who it is with (Phase 37.4).</param>
+/// <param name="Unread">
+/// Whether its newest message is beyond the reader's own read marker, or the
+/// reader has no marker and it has a message (Phase 37.4).
+/// </param>
 public sealed record ConversationSummary(
     Guid Id,
     ChannelKind Channel,
@@ -70,7 +99,59 @@ public sealed record ConversationSummary(
     int MessageCount,
     string? LastMessagePreview,
     MessageSender? LastMessageSender,
-    ConversationMessageAuthor? AssignedTo);
+    ConversationMessageAuthor? AssignedTo,
+    ConversationCustomer? Customer = null,
+    bool Unread = false);
+
+/// <summary>Which conversations a list shows.</summary>
+public enum ConversationListFilter
+{
+    /// <summary>Every conversation of the workspace.</summary>
+    All = 0,
+
+    /// <summary>
+    /// Open, the customer wrote last, and either a person is handling it or the
+    /// AI's turn for that last message failed (plan D-5).
+    /// </summary>
+    NeedsPerson = 1,
+}
+
+/// <summary>What changed in a transcript besides its messages.</summary>
+public enum TranscriptEventKind
+{
+    /// <summary>The AI did not answer a customer message (its turn failed).</summary>
+    AiTurnFailed = 1,
+
+    /// <summary>A person took the conversation over.</summary>
+    TakenOver = 2,
+
+    /// <summary>A person handed the conversation back to the AI.</summary>
+    ReturnedToAi = 3,
+}
+
+/// <summary>
+/// Something that happened in a conversation that is not a message, placed by
+/// the message it follows.
+/// </summary>
+/// <param name="Id">
+/// Stable: the failed turn's id, or the handling event's id. An event on a page
+/// boundary can be served with both pages; the id is how a client keeps one.
+/// </param>
+/// <param name="AfterSequence">
+/// The ingestion sequence of the message it follows (zero before the first).
+/// </param>
+/// <param name="Actor">Who, for a takeover or a return; <see langword="null"/> for a failed turn.</param>
+/// <param name="Reason">
+/// For a failed turn, a stable code with no provider detail; otherwise
+/// <see langword="null"/>.
+/// </param>
+public sealed record TranscriptEvent(
+    Guid Id,
+    TranscriptEventKind Kind,
+    DateTimeOffset At,
+    long AfterSequence,
+    ConversationMessageAuthor? Actor,
+    string? Reason);
 
 /// <summary>A page of conversations.</summary>
 public sealed record ConversationPage(
@@ -80,6 +161,12 @@ public sealed record ConversationPage(
     int Total);
 
 /// <summary>One conversation's detail, for the admin.</summary>
+/// <param name="Customer">Who it is with (Phase 37.4).</param>
+/// <param name="Unread">As on <see cref="ConversationSummary"/>, for the reader (Phase 37.4).</param>
+/// <param name="LastReadSequence">
+/// The reader's own read marker, or <see langword="null"/> when they have never
+/// marked this conversation read (Phase 37.4).
+/// </param>
 public sealed record ConversationDetail(
     Guid Id,
     ChannelKind Channel,
@@ -89,7 +176,10 @@ public sealed record ConversationDetail(
     DateTimeOffset LastActivityAt,
     string? AiAgentName,
     int MessageCount,
-    ConversationMessageAuthor? AssignedTo);
+    ConversationMessageAuthor? AssignedTo,
+    ConversationCustomer? Customer = null,
+    bool Unread = false,
+    long? LastReadSequence = null);
 
 /// <summary>
 /// Reading conversations, for administrators and for the visitors who own them.
@@ -111,10 +201,14 @@ public sealed record ConversationDetail(
 public interface IConversationRepository
 {
     /// <summary>One page of a workspace's conversations, most recently active first.</summary>
+    /// <param name="filter">Which conversations; the total counts the filtered set.</param>
+    /// <param name="viewer">Whose read markers decide <c>Unread</c>.</param>
     Task<ConversationPage> ListAsync(
         TenantId tenantId,
         int page,
         int pageSize,
+        ConversationListFilter filter,
+        UserId viewer,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -129,9 +223,11 @@ public interface IConversationRepository
     /// more: taking one over and routing it are conditional writes, and the
     /// version the reader saw is what they must present back.
     /// </remarks>
+    /// <param name="viewer">Whose read marker decides <c>Unread</c> and <c>LastReadSequence</c>.</param>
     Task<Versioned<ConversationDetail>?> FindAsync(
         TenantId tenantId,
         ConversationId conversationId,
+        UserId viewer,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -157,6 +253,47 @@ public interface IConversationRepository
         ConversationId conversationId,
         long? afterSequence,
         int limit,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// A page of history read from the newest end: the <paramref name="limit"/>
+    /// messages before a cursor, or the newest ones. Still in ingestion order
+    /// inside the page, so a client merging pages by sequence needs no change.
+    /// </summary>
+    /// <param name="beforeSequence">
+    /// Only messages with a lower sequence, or <see langword="null"/> for the
+    /// newest messages of the conversation.
+    /// </param>
+    /// <returns>
+    /// The page, with <c>PreviousCursor</c> set when earlier messages exist and
+    /// <c>NextCursor</c> set when later ones do.
+    /// </returns>
+    Task<ConversationMessagePage> ListMessagesBeforeAsync(
+        ConversationId conversationId,
+        long? beforeSequence,
+        int limit,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Whether this conversation has a message with a lower sequence.</summary>
+    Task<bool> HasMessagesBeforeAsync(
+        ConversationId conversationId,
+        long sequence,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// What happened in a span of the transcript besides its messages: failed AI
+    /// turns, takeovers and returns to the AI, ordered by where they sit.
+    /// </summary>
+    /// <param name="fromSequence">Inclusive lower bound on <c>AfterSequence</c>.</param>
+    /// <param name="toSequence">Inclusive upper bound on <c>AfterSequence</c>.</param>
+    /// <remarks>
+    /// For the workspace's own transcript only. No public transport calls this,
+    /// and none of their views has a field an event could be put into.
+    /// </remarks>
+    Task<IReadOnlyList<TranscriptEvent>> ListTranscriptEventsAsync(
+        ConversationId conversationId,
+        long fromSequence,
+        long toSequence,
         CancellationToken cancellationToken = default);
 
     /// <summary>

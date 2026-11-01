@@ -102,6 +102,16 @@ internal static class PersistenceSchema
     /// </remarks>
     public const string HumanRepliesTable = "conversation_human_replies";
 
+    /// <summary>
+    /// Takeovers and returns to the AI, with who and where (Phase 37.4, M4).
+    /// </summary>
+    public const string ConversationHandlingEventsTable = "conversation_handling_events";
+
+    /// <summary>
+    /// Each member's read marker on each conversation (Phase 37.4, M5).
+    /// </summary>
+    public const string ConversationReadsTable = "conversation_reads";
+
     /// <summary>The workspaces' connected WhatsApp numbers.</summary>
     public const string WhatsAppConnectionsTable = "whatsapp_connections";
 

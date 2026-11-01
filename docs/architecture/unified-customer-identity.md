@@ -205,6 +205,38 @@ stale one is `412`, with no automatic retry.
 
 ---
 
+## C9a. Who a conversation is with, on the inbox rows (Phase 37.4)
+
+**Decision.** Every conversation list item and the conversation detail carry
+`customer: { id, displayName, labelCode, reference, shortCode }`, under
+`conversations.view` alone (plan decision D-4): the participant is part of the
+conversation, and the WhatsApp detail already showed the masked number under
+that permission. Opening the customer's profile still needs `customers.view`.
+
+- `labelCode` is the C9 label rule as a code: `Named`, `WhatsAppCustomer`,
+  `AnonymousVisitor`, `UnnamedCustomer` (`CustomerLabels.CodeFor`, the same
+  rule as the English label the directory and reports use). The client words it
+  in the reader's language; the API sends no sentence.
+- `reference` is set on WhatsApp conversations only: the number that
+  conversation runs on (`whatsapp_contacts`), masked by `WhatsAppCustomerId.Masked`
+  straight after the read (`••••1234`). The raw `wa_id` leaves no method and no
+  response.
+- `shortCode` is six Crockford base32 characters (no I, L, O, U) derived from the
+  **last 30 bits** of the customer id, the random end of a UUIDv7. It is never
+  taken from the leading characters, which are a timestamp and would repeat for
+  everybody who arrived in the same minute. It is stable (derived from an
+  immutable id), needs no column and no backfill, and is **a label, never a
+  key**: two customers of one workspace can share a code, so nothing resolves a
+  customer by it. The client writes "Visitor 7KQ2MX" / «زائر 7KQ2MX».
+- A conversation always names its canonical customer: a merge moves
+  conversations in the same transaction (C6), so a merged source never appears.
+
+**Cost.** A fixed number of statements per page: the customers' names, the
+channels each has used (the label rule needs them), and, only when the page has a
+WhatsApp conversation, the numbers. Never a query per row.
+
+---
+
 ## C10. Future channels follow the same contract
 
 Instagram and Messenger, when they arrive, add their own provider-specific

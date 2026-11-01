@@ -78,6 +78,22 @@ public sealed class WhatsAppEndToEndApiTests(WhatsAppApiFixture fixture)
         Assert.EndsWith("0123", reference, StringComparison.Ordinal);
         Assert.DoesNotContain("447700900", reference, StringComparison.Ordinal);
 
+        // The same masked number on the inbox row and the detail (Phase 37.4),
+        // and the raw number nowhere in either response.
+        HttpResponseMessage listed = await owner.GetAsync(
+            WebChat.WebChatApiFixture.Relative($"/api/tenants/{tenantId}/conversations"));
+        string listJson = await listed.Content.ReadAsStringAsync();
+        JsonElement row = JsonDocument.Parse(listJson).RootElement.GetProperty("items").EnumerateArray()
+            .Single(item => item.GetProperty("id").GetGuid() == conversationId);
+        JsonElement customer = row.GetProperty("customer");
+
+        Assert.Equal(reference, customer.GetProperty("reference").GetString());
+        Assert.Equal("WhatsAppCustomer", customer.GetProperty("labelCode").GetString());
+        Assert.Equal(6, customer.GetProperty("shortCode").GetString()!.Length);
+        Assert.Equal(reference, conversation.GetProperty("customer").GetProperty("reference").GetString());
+        Assert.DoesNotContain(Customer, listJson, StringComparison.Ordinal);
+        Assert.DoesNotContain(Customer, conversation.GetRawText(), StringComparison.Ordinal);
+
         // The customer's words are in the transcript even though no AI provider
         // is configured on this host.
         Assert.Contains(

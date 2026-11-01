@@ -62,3 +62,47 @@ public sealed class ConversationAssigneeIneligibleException : Exception
             + "them would leave the customer waiting. Give them the reply "
             + "permission first.");
 }
+
+/// <summary>
+/// A conversation read or read marker was asked for in a way that cannot be
+/// served: an unknown filter, contradictory cursors, an unknown <c>include</c>,
+/// or a negative sequence.
+/// </summary>
+/// <remarks>
+/// Carries a stable <see cref="Code"/> for the problem body, so the client words
+/// the refusal by code (problem-codes.md). The message stays English and names no
+/// conversation, workspace or person.
+/// </remarks>
+public sealed class ConversationQueryInvalidException : Exception
+{
+    private ConversationQueryInvalidException(string code, string message)
+        : base(message) =>
+        Code = code;
+
+    /// <summary>The stable code, such as <c>conversations.filter.invalid</c>.</summary>
+    public string Code { get; }
+
+    /// <summary>The list was asked for a filter it does not know.</summary>
+    public static ConversationQueryInvalidException UnknownFilter() =>
+        new(
+            "conversations.filter.invalid",
+            "That filter is not known. Use needs-person, or leave the filter out.");
+
+    /// <summary><c>after</c> was combined with <c>before</c> or <c>tail</c>.</summary>
+    public static ConversationQueryInvalidException CursorConflict() =>
+        new(
+            "transcript.cursor.conflict",
+            "Read forwards with after, or backwards with before or tail, not both.");
+
+    /// <summary><c>include</c> named something the transcript cannot add.</summary>
+    public static ConversationQueryInvalidException UnknownInclude() =>
+        new(
+            "transcript.include.invalid",
+            "That include is not known. Use events, or leave include out.");
+
+    /// <summary>The read marker was missing or negative.</summary>
+    public static ConversationQueryInvalidException InvalidReadSequence() =>
+        new(
+            "conversations.read.sequence.invalid",
+            "The sequence must be a message sequence of zero or more.");
+}

@@ -144,6 +144,11 @@ internal sealed partial class DomainProblemDetailsHandler(
 
                 return;
 
+            case ConversationQueryInvalidException invalidQuery:
+                problem.Extensions["code"] = invalidQuery.Code;
+
+                return;
+
             default:
                 break;
         }
@@ -544,6 +549,14 @@ internal sealed partial class DomainProblemDetailsHandler(
         // 409: the request is well-formed and permitted, and contradicts the
         // state of the conversation. Not 403, which would suggest the person is
         // not allowed to reply at all -- they are, once they take it over.
+        // A conversation read asked for something that cannot be served: an
+        // unknown filter or include, cursors in both directions, or a negative
+        // read marker. 400, with the stable code in the extensions.
+        ConversationQueryInvalidException invalidQuery => (
+            StatusCodes.Status400BadRequest,
+            "Invalid conversation request",
+            invalidQuery.Message),
+
         ConversationNotHandledByHumanException notHuman => (
             StatusCodes.Status409Conflict,
             "Conversation is answered by the AI",

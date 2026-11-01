@@ -337,6 +337,10 @@ scaffolder got wrong or could not express:
 
 No historical migration was edited. No physical `xmin` column exists.
 
+> **Phase 37.4:** three generated, unedited migrations, in the approved plan's
+> order: `AddConversationHandlingIndex` (M6), `AddConversationHandlingEvents`
+> (M4), `AddConversationReads` (M5). All add objects only. See §14.
+
 ---
 
 ## 13. Known limitations
@@ -352,5 +356,108 @@ No historical migration was edited. No physical `xmin` column exists.
 - **Value-object ids cannot be unwrapped in EF predicates.** Several reads are
   deliberately two queries rather than one join for this reason; each is
   commented where it occurs.
-- No queue, no unread counts, no SLA, no canned replies, no attachments, and no
-  customer-initiated "request a human" — none of which exists.
+- No queue, no unread counts (Phase 37.4 adds a per-member unread flag, not a
+  count), no SLA, no canned replies, no attachments, and no customer-initiated
+  "request a human" — none of which exists.
+
+---
+
+## 14. Phase 37.4: who, newest first, what happened, and what is unread
+
+Every change is additive and opt-in; without the new parameters every existing
+read answers as before, with new fields only (see the contract table in
+`docs/phase-reports/PHASE_37_4_INBOX_REPORT.md`).
+
+### 14.1 Handoff history (migration M4, `conversation_handling_events`)
+
+A takeover or a return to the AI writes one row — kind, actor, when, and
+`after_sequence` (the newest message's sequence, read **under the conversation
+lock**, so an AI reply that was in flight is already stored and the event lands
+after it) — in the **same transaction** as the handling change. The aggregate
+raises the event (`Conversation.TakeOverByHuman(actor, at, afterSequence)` and
+`ReturnToAi(…)`) only when handling actually changes: an idempotent press, a
+refused precondition (`412`/`428`) or a missing permission stores nothing.
+
+- Own table, never `System` messages: every public transport reads messages.
+- `actor_user_id` is a composite key into the workspace's membership (Restrict),
+  like a reply's sender. No index on the tenant or actor alone.
+- **History starts at Phase 37.4.** Earlier handoffs left no trace, and none is
+  invented.
+
+### 14.2 Newest page first
+
+`GET …/messages?tail=true` reads the newest `limit` messages; `before={sequence}`
+the `limit` messages before it. **Pages stay ascending inside**, so a client
+merging pages by sequence needs no change. `previousCursor` (new, on every page)
+is the value for the next `before`, or null when nothing is earlier;
+`nextCursor` keeps its meaning (continue forwards with `after`, null at the
+newest end). `after` with `tail` or `before` is `400 transcript.cursor.conflict`.
+`tail=true` with `before` reads before the cursor. The forward read is the read
+it always was; it gains only `previousCursor`.
+
+### 14.3 What happened in the transcript (`include=events`)
+
+`include=events` adds `events: [{ id, kind, at, afterSequence, actor, reason }]`
+for the page's span; without it the field is absent.
+
+| `kind` | From | `actor` | `reason` |
+| --- | --- | --- | --- |
+| `AiTurnFailed` | `conversation_turns.status = 'Failed'`, placed after its customer message | null | `generation_failed` |
+| `TakenOver` | `conversation_handling_events` | `{ userId, email }` | null |
+| `ReturnedToAi` | `conversation_handling_events` | `{ userId, email }` | null |
+
+- A turn completed without a reply (a person was handling the conversation) is
+  not a failure and is never marked. A later successful turn does not hide an
+  earlier failure.
+- `reason` is one stable code. A turn stores only that it failed, not why: the
+  provider's error is deliberately never persisted, and no column was approved
+  for a cause. Finer codes would need one (see the report's open issues).
+- **Span.** A page owns events whose `afterSequence` lies from its first message
+  (or the start of the conversation when nothing is earlier, or the `after`
+  cursor of a forward read) to its last message (or the end when nothing is
+  later), inclusive. An event exactly on a forward page's boundary can come with
+  both pages; `id` identifies it. Reading backwards gives no duplicates.
+- Never on a public transport: the visitor's transcript has no field for an
+  event and ignores `include`.
+
+### 14.4 "Needs a person" (`filter=needs-person`, migration M6)
+
+**Open**, the **customer wrote the last message**, and one of:
+
+1. **a person is handling it**;
+2. **the AI's turn for that last message failed**;
+3. **the AI is handling it, but the turn for that last message completed without
+   a reply**: the customer wrote while a person handled the conversation, and it
+   was handed back to the AI before anybody answered. The AI never answers
+   retroactively (§2), so without this branch that message would wait for ever
+   and appear nowhere.
+
+Branches 1 and 2 are plan decision D-5. Branch 3 widens D-5 at the owner's
+request (Phase 37.4, Revision 1). A conversation leaves the list when a person or
+the AI replies, or when it is closed. `total` counts the filtered set; paging is unchanged. Any other `filter` is
+`400 conversations.filter.invalid`. One predicate over the newest message
+(`ix_messages_conversation_ingestion`, read backwards) and its turn
+(`ux_conversation_turns_customer_message`); no index was added to `messages` or
+`conversation_turns`. M6 adds `ix_conversations_tenant_handling_activity
+(tenant_id, handling, last_activity_at)` for the handling branch.
+
+### 14.5 Unread state (migration M5, `conversation_reads`)
+
+One marker per member per conversation: `last_read_sequence`, `read_at`.
+
+- `unread` (list and detail): the newest message's sequence is above the reader's
+  marker, or the reader has no marker and the conversation has a message. The
+  detail also returns the reader's `lastReadSequence` (null when never marked).
+- `POST …/conversations/{id}/read { "sequence": n }` → `204`. Needs
+  `conversations.view` only; the marker is the caller's own (no field names a
+  member). It **only moves forward** (`GREATEST`) and is **clamped** to the newest
+  message, in one upsert statement, so no `If-Match` is needed. Missing or
+  negative is `400 conversations.read.sequence.invalid`; another workspace's
+  conversation or a non-member is `404`; a member without `conversations.view`
+  is `403`.
+- Sending a reply marks the conversation read for its sender up to the reply,
+  after the delivery is queued and the inbox told, so it can never stand between
+  a reply and its delivery; a replayed reply key repeats it.
+- The membership key cascades: a marker means nothing once its member has left.
+- **No backfill.** From Phase 37.4 every conversation with a message reads as
+  unread for every member until it is opened.

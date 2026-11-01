@@ -13,6 +13,36 @@ namespace OmniAI.Application.Customers;
 public static class CustomerLabels
 {
     /// <summary>
+    /// The same rule as <see cref="For"/>, as a code a client words in its
+    /// reader's language.
+    /// </summary>
+    /// <remarks>
+    /// The API publishes the code, not the English sentence, wherever a screen
+    /// draws the label itself (the conversation list from Phase 37.4). Both come
+    /// from this one rule, so they cannot disagree.
+    /// </remarks>
+    public static CustomerLabelCode CodeFor(
+        CustomerDisplayName? displayName,
+        IReadOnlyList<ChannelKind> channels)
+    {
+        ArgumentNullException.ThrowIfNull(channels);
+
+        if (displayName is not null)
+        {
+            return CustomerLabelCode.Named;
+        }
+
+        if (channels.Count > 1)
+        {
+            return CustomerLabelCode.UnnamedCustomer;
+        }
+
+        return channels.Count == 1 && channels[0] == ChannelKind.WhatsApp
+            ? CustomerLabelCode.WhatsAppCustomer
+            : CustomerLabelCode.AnonymousVisitor;
+    }
+
+    /// <summary>
     /// What to call a customer who has no label.
     /// </summary>
     /// <remarks>
@@ -36,18 +66,29 @@ public static class CustomerLabels
     {
         ArgumentNullException.ThrowIfNull(channels);
 
-        if (displayName is not null)
+        return CodeFor(displayName, channels) switch
         {
-            return displayName.Value;
-        }
-
-        if (channels.Count > 1)
-        {
-            return "Unnamed customer";
-        }
-
-        return channels.Count == 1 && channels[0] == ChannelKind.WhatsApp
-            ? "WhatsApp customer"
-            : "Anonymous visitor";
+            CustomerLabelCode.Named => displayName!.Value,
+            CustomerLabelCode.UnnamedCustomer => "Unnamed customer",
+            CustomerLabelCode.WhatsAppCustomer => "WhatsApp customer",
+            _ => "Anonymous visitor",
+        };
     }
+}
+
+/// <summary>Which label a customer is shown with.</summary>
+/// <remarks>There is no zero member, so an uninitialised value is detectable.</remarks>
+public enum CustomerLabelCode
+{
+    /// <summary>Somebody in the workspace named this customer.</summary>
+    Named = 1,
+
+    /// <summary>Unnamed, and reaches the workspace on WhatsApp only.</summary>
+    WhatsAppCustomer = 2,
+
+    /// <summary>Unnamed, and reaches the workspace on website chat only (or has no conversation).</summary>
+    AnonymousVisitor = 3,
+
+    /// <summary>Unnamed, and reaches the workspace on more than one channel.</summary>
+    UnnamedCustomer = 4,
 }

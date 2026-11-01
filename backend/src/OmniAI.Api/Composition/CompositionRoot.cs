@@ -347,6 +347,7 @@ internal static class CompositionRoot
         services.AddScoped<ConversationHandoffHandler>();
         services.AddScoped<ConversationAssignmentHandler>();
         services.AddScoped<ReplyToConversationHandler>();
+        services.AddScoped<MarkConversationReadHandler>();
 
         // The one orchestration both channels enter. Website chat and WhatsApp
         // hand it a customer turn and get back the same outcome; neither has a

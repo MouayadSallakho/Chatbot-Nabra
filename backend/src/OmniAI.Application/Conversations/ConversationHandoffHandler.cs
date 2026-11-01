@@ -4,6 +4,7 @@ using OmniAI.Application.Conversations.Persistence;
 using OmniAI.Domain.Authorization;
 using OmniAI.Domain.Conversations;
 using OmniAI.Domain.Tenants;
+using OmniAI.Domain.Users;
 
 namespace OmniAI.Application.Conversations;
 
@@ -126,21 +127,30 @@ public sealed class ConversationHandoffHandler(
         }
 
         DateTimeOffset now = _clock.GetUtcNow();
+        UserId actor = _authorizer.RequireCurrentUser();
 
-        bool changed = command.ToHuman
-            ? conversation.TakeOverByHuman(now)
-            : conversation.ReturnToAi(now);
+        // Read under the lock, after any turn that was running has stored its
+        // reply, so the event sits after that reply in the transcript — the order
+        // the customer saw.
+        long afterSequence = await _store
+            .ReadNewestSequenceAsync(conversationId, cancellationToken)
+            .ConfigureAwait(false);
 
-        if (!changed)
+        ConversationHandlingEvent? change = command.ToHuman
+            ? conversation.TakeOverByHuman(actor, now, afterSequence)
+            : conversation.ReturnToAi(actor, now, afterSequence);
+
+        if (change is null)
         {
             // Somebody pressed the button the conversation was already on. Their
             // intent is satisfied, so this is a success — but saving would burn a
-            // version and invalidate everybody else's screen for no change.
+            // version and invalidate everybody else's screen for no change, and
+            // the history would record a handoff that did not happen.
             return found;
         }
 
         ConcurrencyToken version = await _store
-            .SaveAsync(conversation, command.Expected, cancellationToken)
+            .SaveHandlingChangeAsync(conversation, change, command.Expected, cancellationToken)
             .ConfigureAwait(false);
 
         await _realtime

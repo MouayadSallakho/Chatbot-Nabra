@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using OmniAI.Api.Http;
 using OmniAI.Api.Security;
 using OmniAI.Application.Concurrency;
@@ -18,7 +19,34 @@ namespace OmniAI.Api.Conversations;
 /// </remarks>
 public sealed record WorkspaceMemberResponse(Guid UserId, string Email);
 
+/// <summary>Who a conversation is with (Phase 37.4).</summary>
+/// <param name="DisplayName">The name somebody in the workspace gave them, or null.</param>
+/// <param name="LabelCode">
+/// <c>Named</c>, <c>WhatsAppCustomer</c>, <c>AnonymousVisitor</c> or
+/// <c>UnnamedCustomer</c>: the client words the label by this code, in the
+/// reader's language, when there is no name.
+/// </param>
+/// <param name="Reference">
+/// For a WhatsApp conversation, its number masked to the last four digits
+/// (<c>••••1234</c>); null on every other channel. Never the raw number.
+/// </param>
+/// <param name="ShortCode">
+/// Six Crockford base32 characters derived from the customer id, the same in every
+/// list ("Visitor 7KQ2MX"). A label, never a key: two customers can share one.
+/// </param>
+public sealed record ConversationCustomerResponse(
+    Guid Id,
+    string? DisplayName,
+    string LabelCode,
+    string? Reference,
+    string ShortCode);
+
 /// <summary>One conversation, in a workspace's list.</summary>
+/// <param name="Customer">Who it is with (Phase 37.4).</param>
+/// <param name="Unread">
+/// Whether its newest message is beyond the reader's own read marker, or the reader
+/// never marked it read and it has a message (Phase 37.4).
+/// </param>
 public sealed record ConversationSummaryResponse(
     Guid Id,
     string Channel,
@@ -30,7 +58,9 @@ public sealed record ConversationSummaryResponse(
     int MessageCount,
     string? LastMessagePreview,
     string? LastMessageSender,
-    WorkspaceMemberResponse? AssignedTo);
+    WorkspaceMemberResponse? AssignedTo,
+    ConversationCustomerResponse? Customer,
+    bool Unread);
 
 /// <summary>A page of conversations.</summary>
 public sealed record ConversationPageResponse(
@@ -40,6 +70,11 @@ public sealed record ConversationPageResponse(
     int Total);
 
 /// <summary>One conversation's detail.</summary>
+/// <param name="Customer">Who it is with (Phase 37.4).</param>
+/// <param name="Unread">As on the list, for the reader (Phase 37.4).</param>
+/// <param name="LastReadSequence">
+/// The reader's own read marker, or null when they never marked it read (Phase 37.4).
+/// </param>
 public sealed record ConversationDetailResponse(
     Guid Id,
     string Channel,
@@ -49,7 +84,10 @@ public sealed record ConversationDetailResponse(
     DateTimeOffset LastActivityAt,
     string? AgentName,
     int MessageCount,
-    WorkspaceMemberResponse? AssignedTo);
+    WorkspaceMemberResponse? AssignedTo,
+    ConversationCustomerResponse? Customer,
+    bool Unread,
+    long? LastReadSequence);
 
 /// <summary>A reply written by a person.</summary>
 /// <param name="ClientMessageId">
@@ -60,6 +98,33 @@ public sealed record ReplyToConversationRequest(string? ClientMessageId, string?
 
 /// <summary>Who to route a conversation to, or nobody.</summary>
 public sealed record AssignConversationRequest(Guid? Member);
+
+/// <summary>Mark a conversation read up to a message (Phase 37.4).</summary>
+/// <param name="Sequence">
+/// The sequence of the newest message the reader has seen. A value above the
+/// newest message is clamped to it; a value below the stored marker changes nothing.
+/// </param>
+public sealed record MarkConversationReadRequest(long? Sequence);
+
+/// <summary>
+/// Something that happened in a transcript that is not a message (Phase 37.4).
+/// </summary>
+/// <param name="Id">Stable; an event on a page boundary can come with both pages.</param>
+/// <param name="Kind"><c>AiTurnFailed</c>, <c>TakenOver</c> or <c>ReturnedToAi</c>.</param>
+/// <param name="At">When it happened.</param>
+/// <param name="AfterSequence">The sequence of the message it follows; zero before the first.</param>
+/// <param name="Actor">Who, for <c>TakenOver</c> and <c>ReturnedToAi</c>; null for a failed turn.</param>
+/// <param name="Reason">
+/// For <c>AiTurnFailed</c>, a stable code with no provider detail
+/// (<c>generation_failed</c>); null otherwise.
+/// </param>
+public sealed record TranscriptEventResponse(
+    Guid Id,
+    string Kind,
+    DateTimeOffset At,
+    long AfterSequence,
+    WorkspaceMemberResponse? Actor,
+    string? Reason);
 
 /// <summary>One message in a transcript.</summary>
 /// <remarks>
@@ -80,9 +145,19 @@ public sealed record TranscriptMessageResponse(
     WorkspaceMemberResponse? SentBy);
 
 /// <summary>A page of a transcript.</summary>
+/// <param name="PreviousCursor">
+/// The sequence to pass as <c>before</c> for the page before this one, or null
+/// when nothing is earlier (Phase 37.4).
+/// </param>
+/// <param name="Events">
+/// Only with <c>include=events</c> (Phase 37.4); absent otherwise.
+/// </param>
 public sealed record TranscriptPageResponse(
     IReadOnlyList<TranscriptMessageResponse> Items,
-    long? NextCursor);
+    long? NextCursor,
+    long? PreviousCursor = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    IReadOnlyList<TranscriptEventResponse>? Events = null);
 
 /// <summary>
 /// Reading a workspace's conversations.
@@ -112,13 +187,31 @@ internal static class ConversationEndpoints
             .AddEndpointFilter<AntiforgeryEndpointFilter>();
 
         workspace.MapGet("/", ListAsync)
-            .WithName("ListTenantConversations");
+            .WithName("ListTenantConversations")
+            .WithSummary("Lists conversations, most recently active first, with the customer and the reader's unread state. Optional filter=needs-person (400 conversations.filter.invalid for any other value); total counts the filtered set.")
+            .Produces<ConversationPageResponse>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status403Forbidden);
 
         workspace.MapGet("/{conversationId:guid}", GetAsync)
-            .WithName("GetTenantConversationById");
+            .WithName("GetTenantConversationById")
+            .WithSummary("Reads one conversation with its ETag, the customer, and the reader's unread state and read marker.")
+            .Produces<ConversationDetailResponse>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status403Forbidden);
 
         workspace.MapGet("/{conversationId:guid}/messages", ListMessagesAsync)
-            .WithName("ListTenantConversationMessages");
+            .WithName("ListTenantConversationMessages")
+            .WithSummary("Reads a transcript page, ascending inside the page. Forwards with after (unchanged), or backwards with tail=true or before={sequence}; after with tail or before is 400 transcript.cursor.conflict. include=events adds failed AI turns, takeovers and returns to the AI in the page's span (400 transcript.include.invalid for anything else).")
+            .Produces<TranscriptPageResponse>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status403Forbidden);
+
+        workspace.MapPost("/{conversationId:guid}/read", MarkReadAsync)
+            .WithName("MarkTenantConversationRead")
+            .WithSummary("Moves the caller's own read marker forward to a message sequence (clamped to the newest message; never moves back). conversations.view; no If-Match.")
+            .Produces(StatusCodes.Status204NoContent)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status403Forbidden);
 
         // The operational routes. All four are unsafe writes on the same
         // authenticated, antiforgery-protected group as everything else here:
@@ -147,11 +240,12 @@ internal static class ConversationEndpoints
         Guid tenantId,
         int? page,
         int? pageSize,
+        string? filter,
         ReadConversationsHandler handler,
         CancellationToken cancellationToken)
     {
         ConversationPage? result = await handler
-            .ListAsync(new ListConversationsQuery(tenantId, page, pageSize), cancellationToken)
+            .ListAsync(new ListConversationsQuery(tenantId, page, pageSize, filter), cancellationToken)
             .ConfigureAwait(false);
 
         if (result is null)
@@ -172,7 +266,9 @@ internal static class ConversationEndpoints
                     item.MessageCount,
                     item.LastMessagePreview,
                     item.LastMessageSender?.ToString(),
-                    ToMember(item.AssignedTo)))],
+                    ToMember(item.AssignedTo),
+                    ToCustomer(item.Customer),
+                    item.Unread))],
                 result.Page,
                 result.PageSize,
                 result.Total));
@@ -215,12 +311,22 @@ internal static class ConversationEndpoints
         Guid conversationId,
         long? after,
         int? limit,
+        long? before,
+        bool? tail,
+        string? include,
         ReadConversationsHandler handler,
         CancellationToken cancellationToken)
     {
-        ConversationMessagePage? page = await handler
+        ConversationTranscriptPage? page = await handler
             .ListMessagesAsync(
-                new ListConversationMessagesQuery(tenantId, conversationId, after, limit),
+                new ListConversationMessagesQuery(
+                    tenantId,
+                    conversationId,
+                    after,
+                    limit,
+                    before,
+                    tail ?? false,
+                    include),
                 cancellationToken)
             .ConfigureAwait(false);
 
@@ -238,7 +344,39 @@ internal static class ConversationEndpoints
                     message.SentAt,
                     message.IngestionSequence,
                     ToMember(message.SentBy)))],
-                page.NextCursor));
+                page.NextCursor,
+                page.PreviousCursor,
+                page.Events is null
+                    ? null
+                    : [.. page.Events.Select(entry => new TranscriptEventResponse(
+                        entry.Id,
+                        entry.Kind.ToString(),
+                        entry.At,
+                        entry.AfterSequence,
+                        ToMember(entry.Actor),
+                        entry.Reason))]));
+    }
+
+    /// <summary><c>POST .../conversations/{id}/read</c>.</summary>
+    /// <remarks>
+    /// <strong>No <c>If-Match</c>, deliberately.</strong> The marker only moves
+    /// forward and is clamped to the newest message, so any order of requests
+    /// converges on the same marker; a version would only refuse correct ones.
+    /// </remarks>
+    private static async Task<IResult> MarkReadAsync(
+        Guid tenantId,
+        Guid conversationId,
+        MarkConversationReadRequest? request,
+        MarkConversationReadHandler handler,
+        CancellationToken cancellationToken)
+    {
+        bool stored = await handler
+            .HandleAsync(
+                new MarkConversationReadCommand(tenantId, conversationId, request?.Sequence),
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        return stored ? Results.NoContent() : Results.NotFound();
     }
 
     /// <summary><c>POST .../conversations/{id}/take-over</c>.</summary>
@@ -440,8 +578,21 @@ internal static class ConversationEndpoints
             detail.LastActivityAt,
             detail.AiAgentName,
             detail.MessageCount,
-            ToMember(detail.AssignedTo));
+            ToMember(detail.AssignedTo),
+            ToCustomer(detail.Customer),
+            detail.Unread,
+            detail.LastReadSequence);
 
     private static WorkspaceMemberResponse? ToMember(ConversationMessageAuthor? author) =>
         author is null ? null : new WorkspaceMemberResponse(author.UserId, author.Email);
+
+    private static ConversationCustomerResponse? ToCustomer(ConversationCustomer? customer) =>
+        customer is null
+            ? null
+            : new ConversationCustomerResponse(
+                customer.Id,
+                customer.DisplayName,
+                customer.LabelCode.ToString(),
+                customer.Reference,
+                customer.ShortCode);
 }

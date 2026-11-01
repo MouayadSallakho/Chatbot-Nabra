@@ -355,6 +355,58 @@ public sealed class Conversation
     }
 
     /// <summary>
+    /// Hands the conversation to a person, and says who did it and where.
+    /// </summary>
+    /// <param name="actor">The member taking it over.</param>
+    /// <param name="takenOverAt">When.</param>
+    /// <param name="afterSequence">
+    /// The ingestion sequence of the newest message, read under the conversation
+    /// lock; zero when there is none yet.
+    /// </param>
+    /// <returns>
+    /// The event to store, or <see langword="null"/> when a person was already
+    /// handling it: an idempotent press changes nothing and records nothing.
+    /// </returns>
+    /// <exception cref="DomainStateException">The conversation is closed.</exception>
+    /// <exception cref="DomainValidationException">An argument is not real.</exception>
+    public ConversationHandlingEvent? TakeOverByHuman(
+        UserId actor,
+        DateTimeOffset takenOverAt,
+        long afterSequence) =>
+        ConversationHandlingEvent.RequireValid(actor, afterSequence) && TakeOverByHuman(takenOverAt)
+            ? ConversationHandlingEvent.Record(
+                Id,
+                TenantId,
+                ConversationHandlingEventKind.TakenOver,
+                actor,
+                takenOverAt,
+                afterSequence)
+            : null;
+
+    /// <summary>
+    /// Gives the conversation back to the AI, and says who did it and where.
+    /// </summary>
+    /// <returns>
+    /// The event to store, or <see langword="null"/> when the AI was already
+    /// answering it.
+    /// </returns>
+    /// <exception cref="DomainStateException">The conversation is closed.</exception>
+    /// <exception cref="DomainValidationException">An argument is not real.</exception>
+    public ConversationHandlingEvent? ReturnToAi(
+        UserId actor,
+        DateTimeOffset returnedAt,
+        long afterSequence) =>
+        ConversationHandlingEvent.RequireValid(actor, afterSequence) && ReturnToAi(returnedAt)
+            ? ConversationHandlingEvent.Record(
+                Id,
+                TenantId,
+                ConversationHandlingEventKind.ReturnedToAi,
+                actor,
+                returnedAt,
+                afterSequence)
+            : null;
+
+    /// <summary>
     /// Routes the conversation to one member, replacing any previous assignment.
     /// </summary>
     /// <remarks>

@@ -103,6 +103,15 @@ public sealed class OmniAiDbContext(DbContextOptions<OmniAiDbContext> options)
     /// </remarks>
     public DbSet<HumanReply> HumanReplies => Set<HumanReply>();
 
+    /// <summary>
+    /// Who took each conversation over or handed it back, and where in its
+    /// transcript (Phase 37.4). Read by the workspace's own transcript only.
+    /// </summary>
+    public DbSet<ConversationHandlingEvent> ConversationHandlingEvents => Set<ConversationHandlingEvent>();
+
+    /// <summary>Each member's read marker on each conversation (Phase 37.4).</summary>
+    internal DbSet<ConversationReadRow> ConversationReads => Set<ConversationReadRow>();
+
     /// <summary>Website chat endpoints: where a workspace's AI is reachable from.</summary>
     public DbSet<WebChatEndpoint> WebChatEndpoints => Set<WebChatEndpoint>();
 

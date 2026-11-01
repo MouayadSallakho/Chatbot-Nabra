@@ -146,6 +146,18 @@ internal sealed class ConversationConfiguration : IEntityTypeConfiguration<Conve
         builder.HasIndex(conversation => new { conversation.TenantId, conversation.StartedAt })
             .HasDatabaseName("ix_conversations_tenant_started");
 
+        // The "needs a person" list (Phase 37.4, M6). Its handling branch is
+        // "a person is handling it", read in the list's own order; the other
+        // branch (the AI's last turn failed) is reached through the newest
+        // message, whose index already exists.
+        builder.HasIndex(conversation => new
+            {
+                conversation.TenantId,
+                conversation.Handling,
+                conversation.LastActivityAt,
+            })
+            .HasDatabaseName("ix_conversations_tenant_handling_activity");
+
         builder.Property<uint>(PersistenceSchema.XminConcurrencyToken)
             .HasColumnName(PersistenceSchema.XminConcurrencyToken)
             .HasColumnType("xid")

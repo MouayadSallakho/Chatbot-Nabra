@@ -11,6 +11,7 @@ using OmniAI.Domain.AiAgents;
 using OmniAI.Domain.Conversations;
 using OmniAI.Domain.Customers;
 using OmniAI.Domain.Tenants;
+using OmniAI.Domain.Users;
 using OmniAI.Domain.WebChat;
 using OmniAI.Application.Ai.Usage;
 
@@ -610,14 +611,39 @@ internal sealed class FakeWebChatWorld : IWebChatEndpointRepository, IWebChatRun
         TenantId tenantId,
         int page,
         int pageSize,
+        ConversationListFilter filter,
+        UserId viewer,
         CancellationToken cancellationToken = default) =>
         Task.FromResult(new ConversationPage([], page, pageSize, 0));
 
     public Task<Versioned<ConversationDetail>?> FindAsync(
         TenantId tenantId,
         ConversationId conversationId,
+        UserId viewer,
         CancellationToken cancellationToken = default) =>
         Task.FromResult<Versioned<ConversationDetail>?>(null);
+
+    // The public transports never read backwards or read events; these exist only
+    // because the read contract has them.
+    public Task<ConversationMessagePage> ListMessagesBeforeAsync(
+        ConversationId conversationId,
+        long? beforeSequence,
+        int limit,
+        CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException("The public transports read forwards only.");
+
+    public Task<bool> HasMessagesBeforeAsync(
+        ConversationId conversationId,
+        long sequence,
+        CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException("The public transports read forwards only.");
+
+    public Task<IReadOnlyList<TranscriptEvent>> ListTranscriptEventsAsync(
+        ConversationId conversationId,
+        long fromSequence,
+        long toSequence,
+        CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException("Transcript events are never read by a public transport.");
 
     public Task<bool> BelongsToAsync(
         TenantId tenantId,

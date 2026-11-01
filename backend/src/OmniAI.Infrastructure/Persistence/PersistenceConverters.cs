@@ -169,6 +169,9 @@ internal static class PersistenceConverters
     public static readonly ValueConverter<HumanReplyId, Guid> HumanReplyId =
         new(id => id.Value, value => Domain.Conversations.HumanReplyId.From(value));
 
+    public static readonly ValueConverter<ConversationHandlingEventId, Guid> ConversationHandlingEventId =
+        new(id => id.Value, value => Domain.Conversations.ConversationHandlingEventId.From(value));
+
     /// <summary>
     /// An optional message id, for a turn that has no reply yet.
     /// </summary>

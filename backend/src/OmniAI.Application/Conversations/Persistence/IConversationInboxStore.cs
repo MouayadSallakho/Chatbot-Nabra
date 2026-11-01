@@ -59,6 +59,51 @@ public interface IConversationInboxStore
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Saves a change of handling together with the event that records it, in one
+    /// transaction, if the conversation is still at the version the caller read.
+    /// </summary>
+    /// <remarks>
+    /// One save, so a conversation is never handed over without its history saying
+    /// so, and a refused precondition stores neither.
+    /// </remarks>
+    /// <exception cref="ConversationVersionMismatchException">
+    /// Somebody else changed it in between.
+    /// </exception>
+    Task<ConcurrencyToken> SaveHandlingChangeAsync(
+        Conversation conversation,
+        ConversationHandlingEvent change,
+        ConcurrencyToken expected,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// The ingestion sequence of the conversation's newest message, or zero when
+    /// it has none. Asked under the conversation lock.
+    /// </summary>
+    Task<long> ReadNewestSequenceAsync(
+        ConversationId conversationId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Moves a member's read marker forward, never back.
+    /// </summary>
+    /// <remarks>
+    /// A sequence above the conversation's newest message is clamped to it, so a
+    /// marker never claims a message that does not exist yet. A lower sequence
+    /// than the stored one changes nothing, which is why no version is needed:
+    /// two tabs marking the same conversation read cannot undo each other.
+    /// </remarks>
+    /// <returns>
+    /// <see langword="false"/> when no such conversation belongs to this workspace.
+    /// </returns>
+    Task<bool> MarkReadAsync(
+        TenantId tenantId,
+        ConversationId conversationId,
+        UserId member,
+        long sequence,
+        DateTimeOffset readAt,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Appends a reply from a person, at most once per client message id.
     /// </summary>
     /// <remarks>

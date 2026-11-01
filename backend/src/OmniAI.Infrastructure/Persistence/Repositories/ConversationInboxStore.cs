@@ -84,6 +84,72 @@ internal sealed class ConversationInboxStore(OmniAiDbContext context) : IConvers
         return RowVersionTokens.Encode(version);
     }
 
+    public Task<ConcurrencyToken> SaveHandlingChangeAsync(
+        Conversation conversation,
+        ConversationHandlingEvent change,
+        ConcurrencyToken expected,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(change);
+
+        // Added before the save, so the conversation's new handling and the row
+        // that records it are one transaction: a refused precondition stores
+        // neither, and a stored change always has its history.
+        _context.ConversationHandlingEvents.Add(change);
+
+        return SaveAsync(conversation, expected, cancellationToken);
+    }
+
+    public async Task<long> ReadNewestSequenceAsync(
+        ConversationId conversationId,
+        CancellationToken cancellationToken = default) =>
+        await _context.Set<Message>()
+            .AsNoTracking()
+            .Where(message => message.ConversationId == conversationId)
+            .MaxAsync(
+                message => (long?)EF.Property<long>(message, PersistenceSchema.MessageIngestionSequence),
+                cancellationToken)
+            .ConfigureAwait(false)
+        ?? 0;
+
+    public async Task<bool> MarkReadAsync(
+        TenantId tenantId,
+        ConversationId conversationId,
+        UserId member,
+        long sequence,
+        DateTimeOffset readAt,
+        CancellationToken cancellationToken = default)
+    {
+        // One statement, so the rules cannot interleave with another writer:
+        //  - the conversation must be this workspace's (no row is inserted for a
+        //    foreign or unknown id, and the caller answers not-found);
+        //  - the sequence is clamped to the newest message, so a marker never
+        //    claims a message that does not exist yet;
+        //  - an existing marker only moves forward (GREATEST), and read_at moves
+        //    only with it.
+        // The membership key (user, tenant) is enforced by the foreign key.
+        int written = await _context.Database
+            .ExecuteSqlInterpolatedAsync(
+                $"""
+                INSERT INTO conversation_reads (conversation_id, user_id, tenant_id, last_read_sequence, read_at)
+                SELECT c.id, {member.Value}, c.tenant_id,
+                       LEAST({sequence}, COALESCE((SELECT max(m.ingestion_sequence) FROM messages m WHERE m.conversation_id = c.id), 0)),
+                       {readAt}
+                FROM conversations c
+                WHERE c.id = {conversationId.Value} AND c.tenant_id = {tenantId.Value}
+                ON CONFLICT (conversation_id, user_id) DO UPDATE
+                SET last_read_sequence = GREATEST(conversation_reads.last_read_sequence, EXCLUDED.last_read_sequence),
+                    read_at = CASE
+                        WHEN EXCLUDED.last_read_sequence > conversation_reads.last_read_sequence THEN EXCLUDED.read_at
+                        ELSE conversation_reads.read_at
+                    END
+                """,
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        return written > 0;
+    }
+
     public async Task<HumanReplyOutcome> AppendReplyAsync(
         Conversation conversation,
         UserId sender,

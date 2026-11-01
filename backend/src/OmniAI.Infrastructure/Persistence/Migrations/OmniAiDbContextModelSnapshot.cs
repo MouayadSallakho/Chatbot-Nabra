@@ -879,7 +879,53 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                     b.HasIndex("TenantId", "CustomerId", "LastActivityAt")
                         .HasDatabaseName("ix_conversations_tenant_customer_activity");
 
+                    b.HasIndex("TenantId", "Handling", "LastActivityAt")
+                        .HasDatabaseName("ix_conversations_tenant_handling_activity");
+
                     b.ToTable("conversations", (string)null);
+                });
+
+            modelBuilder.Entity("OmniAI.Domain.Conversations.ConversationHandlingEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("Actor")
+                        .HasColumnType("uuid")
+                        .HasColumnName("actor_user_id");
+
+                    b.Property<long>("AfterSequence")
+                        .HasColumnType("bigint")
+                        .HasColumnName("after_sequence");
+
+                    b.Property<Guid>("ConversationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("conversation_id");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("kind");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ConversationId", "AfterSequence")
+                        .HasDatabaseName("ix_conversation_handling_events_conversation");
+
+                    b.ToTable("conversation_handling_events", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_conversation_handling_events_after_sequence", "after_sequence >= 0");
+                        });
                 });
 
             modelBuilder.Entity("OmniAI.Domain.Conversations.ConversationTurn", b =>
@@ -2783,6 +2829,40 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("OmniAI.Infrastructure.Persistence.ConversationReadRow", b =>
+                {
+                    b.Property<Guid>("ConversationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("conversation_id");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<long>("LastReadSequence")
+                        .HasColumnType("bigint")
+                        .HasColumnName("last_read_sequence");
+
+                    b.Property<DateTimeOffset>("ReadAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("read_at");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("ConversationId", "UserId")
+                        .HasName("pk_conversation_reads");
+
+                    b.HasIndex("UserId", "TenantId")
+                        .HasDatabaseName("ix_conversation_reads_member");
+
+                    b.ToTable("conversation_reads", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_conversation_reads_last_read_sequence", "last_read_sequence >= 0");
+                        });
+                });
+
             modelBuilder.Entity("OmniAI.Infrastructure.Persistence.DataProtectionKeyRow", b =>
                 {
                     b.Property<int>("Id")
@@ -3114,6 +3194,32 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_conversations_customer");
+                });
+
+            modelBuilder.Entity("OmniAI.Domain.Conversations.ConversationHandlingEvent", b =>
+                {
+                    b.HasOne("OmniAI.Domain.Conversations.Conversation", null)
+                        .WithMany()
+                        .HasForeignKey("ConversationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_conversation_handling_events_conversation");
+
+                    b.HasOne("OmniAI.Domain.Tenants.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_conversation_handling_events_tenant")
+                        .HasAnnotation("OmniAI:SuppressForeignKeyIndex", true);
+
+                    b.HasOne("OmniAI.Domain.Tenants.TenantMembership", null)
+                        .WithMany()
+                        .HasForeignKey("Actor", "TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_conversation_handling_events_actor_member")
+                        .HasAnnotation("OmniAI:SuppressForeignKeyIndex", true);
                 });
 
             modelBuilder.Entity("OmniAI.Domain.Conversations.ConversationTurn", b =>
@@ -3569,6 +3675,24 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_whatsapp_deliveries_message");
+                });
+
+            modelBuilder.Entity("OmniAI.Infrastructure.Persistence.ConversationReadRow", b =>
+                {
+                    b.HasOne("OmniAI.Domain.Conversations.Conversation", null)
+                        .WithMany()
+                        .HasForeignKey("ConversationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_conversation_reads_conversation");
+
+                    b.HasOne("OmniAI.Domain.Tenants.TenantMembership", null)
+                        .WithMany()
+                        .HasForeignKey("UserId", "TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_conversation_reads_member")
+                        .HasAnnotation("OmniAI:SuppressForeignKeyIndex", true);
                 });
 
             modelBuilder.Entity("OmniAI.Infrastructure.Persistence.KnowledgeChunkRow", b =>
