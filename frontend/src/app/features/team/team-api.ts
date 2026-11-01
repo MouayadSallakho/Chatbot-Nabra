@@ -2,6 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable, map } from 'rxjs';
 import { Versioned, withEntityTag } from '@app/core/api/versioned';
+import { AppLanguage } from '@app/core/i18n/language';
 
 /** One role a member holds. */
 export interface MemberRole {
@@ -173,8 +174,10 @@ export class TeamApi {
    *
    * Not workspace-scoped, because the person accepting does not belong to one
    * yet. The token says which invitation; the session says who is accepting.
+   * The language is the page's, which the server records for the account's
+   * emails.
    */
-  accept(token: string): Observable<AcceptedInvitation> {
-    return this.http.post<AcceptedInvitation>('/api/invitations/accept', { token });
+  accept(token: string, language: AppLanguage): Observable<AcceptedInvitation> {
+    return this.http.post<AcceptedInvitation>('/api/invitations/accept', { token, language });
   }
 }

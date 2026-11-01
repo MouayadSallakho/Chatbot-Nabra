@@ -5,6 +5,7 @@ import { Router, provideRouter } from '@angular/router';
 import { TenantApi } from '@app/core/api/tenant-api';
 import { AuthService } from '@app/core/auth/auth-service';
 import { PermissionApi } from '@app/core/authorization/permission-api';
+import { APP_LANGUAGE, AppLanguage } from '@app/core/i18n/language';
 import { InvitationHandoff } from '@app/core/invitations/invitation-handoff';
 import { LOCAL_STORAGE } from '@app/core/storage/local-storage';
 import { memoryStorage, permissionApiGranting } from '@app/testing/test-doubles';
@@ -29,7 +30,7 @@ describe('AcceptInvitation', () => {
     window.history.replaceState(null, '', `/accept-invitation${fragment}`);
   }
 
-  async function mount(authenticated: boolean): Promise<void> {
+  async function mount(authenticated: boolean, language?: AppLanguage): Promise<void> {
     TestBed.configureTestingModule({
       imports: [AcceptInvitation],
       providers: [
@@ -40,6 +41,7 @@ describe('AcceptInvitation', () => {
         { provide: LOCAL_STORAGE, useValue: memoryStorage() },
         { provide: TenantApi, useValue: { get: () => undefined, create: () => undefined } },
         { provide: PermissionApi, useValue: permissionApiGranting('*') },
+        ...(language ? [{ provide: APP_LANGUAGE, useValue: language }] : []),
         {
           provide: AuthService,
           useValue: {
@@ -108,13 +110,26 @@ describe('AcceptInvitation', () => {
 
     const request = http.expectOne(acceptUrl);
 
-    expect(request.request.body).toEqual({ token });
+    expect(request.request.body).toEqual({ token, language: 'en' });
 
     request.flush({ tenantId: 't1', name: 'Acme Trading', slug: 'acme' });
     await settle();
 
     expect(text()).toContain('You are in');
     expect(text()).toContain('Acme Trading');
+  });
+
+  it('sends the language the page is in, for the emails the account receives (Phase 37.3)', async () => {
+    openLinkWith(`#token=${token}`);
+
+    await mount(true, 'ar');
+
+    const request = http.expectOne(acceptUrl);
+
+    expect(request.request.body).toEqual({ token, language: 'ar' });
+
+    request.flush({ tenantId: 't1', name: 'Acme Trading', slug: 'acme' });
+    await settle();
   });
 
   it('handles a second invitation opened in a tab that already used one', async () => {
@@ -142,7 +157,7 @@ describe('AcceptInvitation', () => {
 
     const request = http.expectOne(acceptUrl);
 
-    expect(request.request.body).toEqual({ token: second });
+    expect(request.request.body).toEqual({ token: second, language: 'en' });
 
     request.flush({ tenantId: 't2', name: 'Beta Logistics', slug: 'beta' });
     await settle();
@@ -176,7 +191,7 @@ describe('AcceptInvitation', () => {
 
     const retry = http.expectOne(acceptUrl);
 
-    expect(retry.request.body).toEqual({ token });
+    expect(retry.request.body).toEqual({ token, language: 'en' });
 
     retry.flush({ tenantId: 't1', name: 'Acme Trading', slug: 'acme' });
     await settle();

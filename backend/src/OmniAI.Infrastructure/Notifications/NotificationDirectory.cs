@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using OmniAI.Application.Notifications;
 using OmniAI.Domain.Authorization;
+using OmniAI.Domain.Notifications;
 using OmniAI.Domain.Reports;
 using OmniAI.Domain.Tenants;
 using OmniAI.Domain.Users;
@@ -90,6 +91,26 @@ internal sealed class NotificationDirectory(OmniAiDbContext context)
             .ConfigureAwait(false);
 
         return execution is null ? null : (execution.RequestedBy, execution.Type, execution.ScheduleId is not null);
+    }
+
+    public async Task<ReportType?> ReportTypeOfOccurrenceAsync(
+        TenantId tenantId,
+        NotificationOccurrenceId occurrenceId,
+        CancellationToken cancellationToken = default)
+    {
+        // Two primary-key reads in the workspace: the occurrence's source, then the
+        // execution it names.
+        Guid? source = await _context.NotificationOccurrences
+            .AsNoTracking()
+            .Where(occurrence => occurrence.Id == occurrenceId && occurrence.TenantId == tenantId)
+            .Select(occurrence => occurrence.SourceId)
+            .FirstOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        return source is Guid execution
+            && await ReportAsync(tenantId, execution, cancellationToken).ConfigureAwait(false) is { } report
+            ? report.Type
+            : null;
     }
 
     public async Task<Guid?> WhatsAppConnectionOfDeliveryAsync(

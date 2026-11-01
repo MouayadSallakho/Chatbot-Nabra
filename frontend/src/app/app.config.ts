@@ -20,7 +20,12 @@ import { WorkspaceContextService } from '@app/core/workspace/workspace-context-s
 import { PUBLIC_SURFACE_PATH } from '@app/core/i18n/language';
 import { warmRoute } from '@app/core/navigation/route-warmup';
 import { readsAhead } from '@app/core/auth/session-probe';
-import { LOGIN_PATH, REGISTER_PATH } from '@app/core/auth/auth-guard';
+import {
+  FORGOT_PASSWORD_PATH,
+  LOGIN_PATH,
+  REGISTER_PATH,
+  RESET_PASSWORD_PATH,
+} from '@app/core/auth/auth-guard';
 import { ACCEPT_INVITATION_PATH } from '@app/core/invitations/invitation-handoff';
 import { routes } from './app.routes';
 
@@ -88,7 +93,13 @@ export const appConfig: ApplicationConfig = {
       // (Phase 36.11). Nothing started here is used unless the session is
       // confirmed.
       const path = inject(DOCUMENT).location.pathname;
-      const prefetch = readsAhead(path, [LOGIN_PATH, REGISTER_PATH, ACCEPT_INVITATION_PATH])
+      const prefetch = readsAhead(path, [
+        LOGIN_PATH,
+        REGISTER_PATH,
+        FORGOT_PASSWORD_PATH,
+        RESET_PASSWORD_PATH,
+        ACCEPT_INVITATION_PATH,
+      ])
         ? workspace.prefetch()
         : null;
 

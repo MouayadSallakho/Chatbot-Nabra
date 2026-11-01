@@ -19,7 +19,7 @@ namespace OmniAI.Api.Auth;
 /// would be a second copy of them that can disagree with the first.
 /// </para>
 /// </remarks>
-public sealed record RegisterRequest(string? Email, string? Password);
+public sealed record RegisterRequest(string? Email, string? Password, string? Language = null);
 
 /// <summary>
 /// Request body for <c>POST /api/auth/login</c>.
@@ -31,7 +31,7 @@ public sealed record RegisterRequest(string? Email, string? Password);
 /// about how long a stolen device stays useful, and it is not one to make in
 /// passing: the session cookie expires when the browser closes, deliberately.
 /// </remarks>
-public sealed record LoginRequest(string? Email, string? Password);
+public sealed record LoginRequest(string? Email, string? Password, string? Language = null);
 
 /// <summary>
 /// The authenticated account, as <c>GET /api/auth/me</c> publishes it.
@@ -48,7 +48,16 @@ public sealed record LoginRequest(string? Email, string? Password);
 /// written out by hand rather than serialised from the Identity entity precisely
 /// so that adding a column to that entity cannot quietly add a field here.
 /// </remarks>
-public sealed record CurrentUserResponse(Guid Id, string Email);
+public sealed record CurrentUserResponse(Guid Id, string Email, string? Language);
+
+/// <summary><c>POST /api/auth/password/forgot</c> (Phase 37.3).</summary>
+public sealed record ForgotPasswordRequest(string? Email);
+
+/// <summary><c>POST /api/auth/password/reset</c> (Phase 37.3): the two halves of the link, and the new password.</summary>
+public sealed record ResetPasswordRequest(string? UserId, string? Token, string? NewPassword);
+
+/// <summary><c>PUT /api/me/language</c> (Phase 37.3).</summary>
+public sealed record ChangeLanguageRequest(string? Language);
 
 /// <summary>
 /// One workspace the caller belongs to, as <c>GET /api/me/tenants</c> publishes it.

@@ -119,7 +119,8 @@ public sealed class NotificationTemplateTests
 
         Assert.Equal("Nabra: Subscription payment is past due", email.Subject);
         Assert.DoesNotContain("\r\nBcc:", email.TextBody, StringComparison.Ordinal);
-        Assert.Contains("Workspace: Header  Bcc: attacker@example.invalid", email.TextBody, StringComparison.Ordinal);
+        // Isolated since Phase 37.3 (FSI…PDI), so a name keeps its own direction.
+        Assert.Contains("Workspace: \u2068Header  Bcc: attacker@example.invalid\u2069", email.TextBody, StringComparison.Ordinal);
         Assert.Equal("member@example.test", email.To.Value);
     }
 

@@ -76,6 +76,13 @@
   color: var(--text-muted);
 }
 
+// The way to a new password, under the password field on sign-in. Padded so
+// the link, which stands alone rather than inside a sentence, is a 24px target.
+.auth-forgot a {
+  display: inline-block;
+  padding-block: var(--space-1);
+}
+
 .auth-note {
   margin-block-start: var(--space-4);
 }

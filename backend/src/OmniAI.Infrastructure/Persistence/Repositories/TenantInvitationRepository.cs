@@ -30,6 +30,7 @@ internal sealed class TenantInvitationRepository(OmniAiDbContext context)
     public async Task AddAsync(
         TenantInvitation invitation,
         DateTimeOffset now,
+        Domain.Accounts.AccountEmail? queuedEmail,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(invitation);
@@ -45,6 +46,13 @@ internal sealed class TenantInvitationRepository(OmniAiDbContext context)
 
         _context.TenantInvitations.Add(invitation);
         TenantInvitations.SetCanonicalEmail(_context, invitation);
+
+        // Phase 37.3: the invitation email, in the same save, so a rolled-back
+        // invitation queues nothing.
+        if (queuedEmail is not null)
+        {
+            _context.Set<Domain.Accounts.AccountEmail>().Add(queuedEmail);
+        }
 
         try
         {
@@ -106,10 +114,13 @@ internal sealed class TenantInvitationRepository(OmniAiDbContext context)
         // itself never appears in a query, a parameter log or a plan.
         InvitationTokenHash lookup = hash;
 
+        // Either way in (Phase 37.3): the link the inviter copied, or the one in the
+        // invitation email. Both columns are uniquely indexed. The use case then
+        // confirms the match in constant time (TenantInvitation.IsRedeemableWith).
         return await _context.TenantInvitations
             .Include(invitation => invitation.Roles)
             .FirstOrDefaultAsync(
-                invitation => invitation.TokenHash == lookup,
+                invitation => invitation.TokenHash == lookup || invitation.EmailTokenHash == lookup,
                 cancellationToken)
             .ConfigureAwait(false);
     }

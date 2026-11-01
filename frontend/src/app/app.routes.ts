@@ -1,7 +1,14 @@
 import { Routes } from '@angular/router';
 import { AppShell } from '@app/layout/app-shell/app-shell';
 import { HOME_PATH, NAV_ITEMS } from '@app/layout/navigation';
-import { LOGIN_PATH, REGISTER_PATH, anonymousGuard, authGuard } from '@app/core/auth/auth-guard';
+import {
+  FORGOT_PASSWORD_PATH,
+  LOGIN_PATH,
+  REGISTER_PATH,
+  RESET_PASSWORD_PATH,
+  anonymousGuard,
+  authGuard,
+} from '@app/core/auth/auth-guard';
 import { WORKSPACE_SETUP_PATH, workspaceGuard } from '@app/core/workspace/workspace-guard';
 import { ACCEPT_INVITATION_PATH } from '@app/core/invitations/invitation-handoff';
 import { TeamApi } from '@app/features/team/team-api';
@@ -78,9 +85,9 @@ const designLabShellRoutes: Routes =
 /**
  * Three tiers, and the order of the guards on each is the design.
  *
- * <strong>Anonymous.</strong> Sign-in and registration, behind `anonymousGuard`
- * so a signed-in reader is not shown a form that would sign them in as
- * themselves again.
+ * <strong>Anonymous.</strong> Sign-in, registration and the two password-reset
+ * pages, behind `anonymousGuard` so a signed-in reader is not shown a form that
+ * would sign them in as themselves again.
  *
  * <strong>Authenticated, no workspace yet.</strong> The workspace screen. It sits
  * outside the shell deliberately: a sidebar full of workspace-scoped links would
@@ -108,6 +115,23 @@ export const routes: Routes = [
     title: $localize`:@@title.createAccount:Create account`,
     canActivate: [anonymousGuard],
     loadComponent: () => import('@app/features/auth/register/register').then((m) => m.Register),
+  },
+  {
+    path: FORGOT_PASSWORD_PATH,
+    title: $localize`:@@title.forgotPassword:Reset your password`,
+    canActivate: [anonymousGuard],
+    loadComponent: () =>
+      import('@app/features/auth/forgot-password/forgot-password').then((m) => m.ForgotPassword),
+  },
+  {
+    // Behind `anonymousGuard` like sign-in. A signed-in reader opening a reset
+    // link is sent into the application, and the redirect drops the fragment,
+    // so the token does not stay in the address bar either way.
+    path: RESET_PASSWORD_PATH,
+    title: $localize`:@@title.resetPassword:Set a new password`,
+    canActivate: [anonymousGuard],
+    loadComponent: () =>
+      import('@app/features/auth/reset-password/reset-password').then((m) => m.ResetPassword),
   },
   {
     // Outside the shell and behind no guard at all. Somebody opening an

@@ -176,6 +176,16 @@ public interface INotificationSources
         Guid executionId,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// The report type behind a report notification, derived rather than stored:
+    /// the occurrence's source is the execution (Phase 37.3).
+    /// </summary>
+    /// <returns>The type; null when the occurrence or the execution is gone.</returns>
+    Task<ReportType?> ReportTypeOfOccurrenceAsync(
+        TenantId tenantId,
+        NotificationOccurrenceId occurrenceId,
+        CancellationToken cancellationToken = default);
+
     /// <returns>The connection a delivery was sent through; null if it is gone.</returns>
     Task<Guid?> WhatsAppConnectionOfDeliveryAsync(
         TenantId tenantId,

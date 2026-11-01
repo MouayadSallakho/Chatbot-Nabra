@@ -158,6 +158,7 @@ internal sealed class NotificationHarness(PostgresTestDatabase database)
             new NotificationStore(context),
             Authority(context),
             new IdentityAccountDirectory(context),
+            new NotificationDirectory(context),
             new TenantRepository(context),
             Email,
             new OperationalEmailLinks(AppBase),

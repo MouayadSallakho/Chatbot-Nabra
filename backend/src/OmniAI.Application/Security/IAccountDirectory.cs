@@ -37,4 +37,10 @@ public interface IAccountDirectory
     /// address.
     /// </returns>
     Task<EmailAddress?> FindEmailAsync(UserId userId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// The language the person reads what the server sends them in (Phase 37.3).
+    /// </summary>
+    /// <returns>Their choice, or null when they have none or the account is gone.</returns>
+    Task<UserLanguage?> FindLanguageAsync(UserId userId, CancellationToken cancellationToken = default);
 }

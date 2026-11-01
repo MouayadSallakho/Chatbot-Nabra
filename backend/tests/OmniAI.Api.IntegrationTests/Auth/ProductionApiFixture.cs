@@ -114,6 +114,7 @@ public abstract class ProductionApiFixture : IAsyncLifetime
                     _redis.ConnectionString);
                 builder.UseSetting("PUBLIC_CHAT_NETWORK_KEY_SECRET", _redis.NetworkKeySecret);
                 builder.UseSetting("PublicChatProtection:KeyPrefix", _redis.KeyPrefix);
+                builder.UseSetting("AccountProtection:KeyPrefix", _redis.KeyPrefix + ":acp");
 
                 foreach ((string key, string value) in HostSettings)
                 {

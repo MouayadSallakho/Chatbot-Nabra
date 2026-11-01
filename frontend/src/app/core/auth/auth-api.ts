@@ -1,6 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
+import { AppLanguage } from '@app/core/i18n/language';
 
 /**
  * The signed-in account, as the backend publishes it.
@@ -19,6 +20,29 @@ export interface AuthenticatedUser {
 export interface Credentials {
   readonly email: string;
   readonly password: string;
+}
+
+/**
+ * What registering takes: the credentials, and the language the page was in.
+ *
+ * The language is what the server writes the account's emails in -- a password
+ * reset, a notification. It is the interface's language at the moment the
+ * account was made, which is the best evidence of what this person reads.
+ */
+export interface Registration extends Credentials {
+  readonly language?: AppLanguage;
+}
+
+/**
+ * What setting a new password takes.
+ *
+ * `userId` and `token` come from the reset link's fragment and are held in
+ * memory only for as long as it takes to send them here.
+ */
+export interface PasswordReset {
+  readonly userId: string;
+  readonly token: string;
+  readonly newPassword: string;
 }
 
 /**
@@ -56,8 +80,35 @@ export class AuthApi {
   }
 
   /** Creates an account and signs it in. */
-  register(credentials: Credentials): Observable<AuthenticatedUser> {
-    return this.http.post<AuthenticatedUser>('/api/auth/register', credentials);
+  register(registration: Registration): Observable<AuthenticatedUser> {
+    return this.http.post<AuthenticatedUser>('/api/auth/register', registration);
+  }
+
+  /**
+   * Asks for a password-reset link to be emailed.
+   *
+   * 202 whether or not an account uses the address, deliberately: the answer
+   * must not tell anybody which addresses are registered.
+   */
+  forgotPassword(email: string): Observable<void> {
+    return this.http.post<void>('/api/auth/password/forgot', { email });
+  }
+
+  /**
+   * Sets a new password with a reset link's token. 204, and every session the
+   * account had is ended on the server.
+   */
+  resetPassword(reset: PasswordReset): Observable<void> {
+    return this.http.post<void>('/api/auth/password/reset', reset);
+  }
+
+  /**
+   * Records the language the signed-in account reads, for the emails the
+   * server writes to it. The interface itself still takes its language from
+   * this browser's stored choice.
+   */
+  saveLanguage(language: AppLanguage): Observable<void> {
+    return this.http.put<void>('/api/me/language', { language });
   }
 
   /** Signs in. 401 for any failure, deliberately without saying which. */

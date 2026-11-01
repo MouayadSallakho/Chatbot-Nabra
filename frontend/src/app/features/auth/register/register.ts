@@ -10,26 +10,19 @@ import {
 } from '@app/core/invitations/invitation-handoff';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
 import { WORKSPACE_SETUP_PATH } from '@app/core/workspace/workspace-guard';
+import { APP_LANGUAGE } from '@app/core/i18n/language';
 import { Icon } from '@app/shared/icon/icon';
 import { EntryFrame } from '@app/layout/entry-frame/entry-frame';
-
-/**
- * The minimum password length, mirroring the server's policy.
- *
- * <strong>A copy, and only for immediate feedback.</strong> The server owns the
- * policy and re-checks it; this exists so somebody typing a short password is
- * told before they submit rather than after a round trip. If the two ever
- * disagree, the server wins and its message is what appears.
- */
-const PASSWORD_MIN_LENGTH = 12;
+import { PASSWORD_MIN_LENGTH } from '../password-policy';
 
 /**
  * The registration screen.
  *
  * <strong>It creates an account and nothing else.</strong> No workspace, no
- * role, no permission. The request body has two fields, so there is no way for
- * this form to ask for anything it should not have, and choosing a workspace is
- * a separate, deliberate step on the screen after it.
+ * role, no permission. The request body is the address, the password and the
+ * page's language (for the account's emails), so there is no way for this form
+ * to ask for anything it should not have, and choosing a workspace is a
+ * separate, deliberate step on the screen after it.
  *
  * <strong>The password never leaves the form control.</strong> It goes into the
  * request body and is cleared on failure. Nothing writes it to a signal, a
@@ -47,6 +40,9 @@ export class Register {
   private readonly workspace = inject(WorkspaceContextService);
   private readonly invitations = inject(InvitationHandoff);
   private readonly router = inject(Router);
+
+  /** The language this page is in, which the account's emails will be written in. */
+  private readonly language = inject(APP_LANGUAGE);
 
   protected readonly loginPath = LOGIN_PATH;
 
@@ -99,6 +95,7 @@ export class Register {
       await this.auth.register({
         email: this.form.controls.email.value.trim(),
         password: this.form.controls.password.value,
+        language: this.language,
       });
 
       // A brand new account belongs to no workspace. The list is loaded anyway

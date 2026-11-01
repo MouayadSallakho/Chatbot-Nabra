@@ -1,3 +1,4 @@
+using OmniAI.Domain.Accounts;
 using OmniAI.Domain.Invitations;
 using OmniAI.Domain.Tenants;
 using OmniAI.Domain.Users;
@@ -34,9 +35,11 @@ public interface ITenantInvitationRepository
     /// <exception cref="InvitationAlreadyOpenException">
     /// An invitation for this address is already open.
     /// </exception>
+    /// <param name="queuedEmail">The invitation email to queue in the same transaction, or none (Phase 37.3).</param>
     Task AddAsync(
         TenantInvitation invitation,
         DateTimeOffset now,
+        AccountEmail? queuedEmail,
         CancellationToken cancellationToken = default);
 
     /// <summary>One page of a workspace's invitations, newest first.</summary>

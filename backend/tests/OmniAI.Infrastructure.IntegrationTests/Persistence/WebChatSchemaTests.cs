@@ -54,8 +54,15 @@ public sealed class WebChatSchemaTests(PostgresTestDatabase database)
         // billing_events.claim_token is Phase 35's billing-worker lease token, of
         // the same kind: a new random value per claim, compared by the database to
         // prove ownership, cleared when the event settles.
+        //
+        // account_emails.claim_token is Phase 37.3's account-email worker lease
+        // token, of the same kind. tenant_invitations.email_token_hash is Phase
+        // 37.3's too, and is a digest like token_hash: the SHA-256 of the token an
+        // invitation email carries, which is minted when it is sent and never
+        // stored.
         Assert.Equal(
-            "ai_provider_usages.cached_input_tokens:bigint, "
+            "account_emails.claim_token:uuid, "
+            + "ai_provider_usages.cached_input_tokens:bigint, "
             + "ai_provider_usages.input_tokens:bigint, "
             + "ai_provider_usages.output_tokens:bigint, "
             + "ai_provider_usages.reasoning_tokens:bigint, "
@@ -64,6 +71,7 @@ public sealed class WebChatSchemaTests(PostgresTestDatabase database)
             + "notification_emails.claim_token:uuid, "
             + "notification_occurrences.claim_token:uuid, "
             + "report_executions.claim_token:uuid, "
+            + "tenant_invitations.email_token_hash:bytea, "
             + "tenant_invitations.token_hash:bytea, web_chat_sessions.access_token_hash:bytea, "
             + "whatsapp_credentials.protected_token:bytea",
             columns as string);

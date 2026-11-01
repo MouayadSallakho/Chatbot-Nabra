@@ -133,12 +133,13 @@ public sealed class AuthEndpointsTests(TenantApiFixture api) : IClassFixture<Ten
     }
 
     [Fact]
-    public async Task Repeated_failures_lock_the_account_without_saying_so()
+    public async Task Repeated_failures_are_throttled_on_their_network_and_never_lock_the_account()
     {
-        // Five failures, then a lockout -- and the sixth attempt uses the CORRECT
-        // password, so a success would mean the counter was never applied. The
-        // response is the same generic refusal: disclosing the lockout would be
-        // disclosing that the account exists.
+        // Phase 37.3 Revision 1 (D-2, no hard lockout). Five failures from this
+        // network, then the sixth attempt uses the CORRECT password: it is refused
+        // by the failure limiter (429, before the password is checked), not by an
+        // account lockout, and the account itself is not locked -- from any other
+        // network its owner signs in (AccountProtectionApiTests).
         using HttpClient registering = api.CreateClient();
         string email = ApiAuthentication.UniqueEmail();
         await ApiAuthentication.RegisterAsync(registering, email);
@@ -153,21 +154,21 @@ public sealed class AuthEndpointsTests(TenantApiFixture api) : IClassFixture<Ten
         }
 
         using HttpClient client = api.CreateClient();
-        using HttpResponseMessage lockedOut =
+        using HttpResponseMessage throttled =
             await ApiAuthentication.SignInAsync(client, email, ApiAuthentication.Password);
 
-        Assert.Equal(HttpStatusCode.Unauthorized, lockedOut.StatusCode);
+        Assert.Equal(HttpStatusCode.TooManyRequests, throttled.StatusCode);
+        Assert.True(throttled.Headers.Contains("Retry-After"));
 
-        (_, string detail) = await ProblemAsync(lockedOut);
+        (_, string detail) = await ProblemAsync(throttled);
 
         Assert.DoesNotContain("lock", detail, StringComparison.OrdinalIgnoreCase);
 
-        // The counter really is the reason, rather than the password having been
-        // wrong: the database says the account is locked.
-        object? lockedUntil = await api.Database.ExecuteScalarAsync(
-            $"SELECT count(*) FROM users WHERE email = '{email}' AND lockout_end > now()");
+        // Identity's lockout was never applied: no lockout end, no failure count.
+        object? locked = await api.Database.ExecuteScalarAsync(
+            $"SELECT count(*) FROM users WHERE email = '{email}' AND (lockout_end IS NOT NULL OR access_failed_count > 0)");
 
-        Assert.Equal(1L, lockedUntil as long?);
+        Assert.Equal(0L, locked as long?);
     }
 
     [Theory]
@@ -250,11 +251,12 @@ public sealed class AuthEndpointsTests(TenantApiFixture api) : IClassFixture<Ten
     }
 
     [Fact]
-    public async Task The_current_account_response_carries_two_fields_and_no_credential()
+    public async Task The_current_account_response_carries_three_fields_and_no_credential()
     {
         // Written out by hand rather than serialised from the Identity entity, so
         // that adding a column there cannot quietly add a field here. The password
-        // hash, the security stamp and the lockout state must never appear.
+        // hash, the security stamp and the lockout state must never appear. Phase
+        // 37.3 added the third field on purpose: the stored language.
         using HttpClient client = api.CreateClient();
         string email = ApiAuthentication.UniqueEmail();
         await ApiAuthentication.RegisterAsync(client, email);
@@ -265,7 +267,7 @@ public sealed class AuthEndpointsTests(TenantApiFixture api) : IClassFixture<Ten
         using JsonDocument document = JsonDocument.Parse(body);
 
         Assert.Equal(
-            ["id", "email"],
+            ["id", "email", "language"],
             document.RootElement.EnumerateObject().Select(field => field.Name));
 
         foreach (string forbidden in

@@ -9,6 +9,18 @@ export const LOGIN_PATH = 'sign-in';
 /** Where a new account is created. */
 export const REGISTER_PATH = 'create-account';
 
+/** Where somebody who cannot sign in asks for a link to set a new password. */
+export const FORGOT_PASSWORD_PATH = 'forgot-password';
+
+/**
+ * Where that link lands.
+ *
+ * COUPLED TO THE BACKEND: the reset email is written as
+ * `<app>/reset-password#uid=…&token=…`, so this path is part of a link already
+ * sitting in somebody's inbox and cannot be renamed on this side alone.
+ */
+export const RESET_PASSWORD_PATH = 'reset-password';
+
 /**
  * Keeps the admin application out of reach without a session.
  *

@@ -19,6 +19,7 @@ import { filter, firstValueFrom, fromEvent } from 'rxjs';
 import { ApiError, toApiError } from '@app/core/api/api-error';
 import { AuthService } from '@app/core/auth/auth-service';
 import { LOGIN_PATH, REGISTER_PATH } from '@app/core/auth/auth-guard';
+import { APP_LANGUAGE } from '@app/core/i18n/language';
 import { InvitationHandoff } from '@app/core/invitations/invitation-handoff';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
 import { HOME_PATH } from '@app/layout/navigation';
@@ -70,6 +71,9 @@ export class AcceptInvitation implements OnInit {
   private readonly workspace = inject(WorkspaceContextService);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
+
+  /** The language this page is in, which the account's emails will be written in. */
+  private readonly language = inject(APP_LANGUAGE);
 
   protected readonly state = signal<AcceptState>('reading');
   protected readonly failure = signal<ApiError | null>(null);
@@ -216,7 +220,9 @@ export class AcceptInvitation implements OnInit {
     this.failure.set(null);
 
     try {
-      const accepted: AcceptedInvitation = await firstValueFrom(this.api.accept(token));
+      const accepted: AcceptedInvitation = await firstValueFrom(
+        this.api.accept(token, this.language),
+      );
 
       // Spent, whatever happens next. Holding it would mean a later visit
       // silently retried something already concluded.

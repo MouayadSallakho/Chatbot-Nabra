@@ -33,7 +33,22 @@ namespace OmniAI.Infrastructure.Identity;
 /// The subclass exists so the type is this platform's own and those fields have
 /// somewhere to land when they are actually required.
 /// </para>
+/// <para>
+/// <strong>Phase 37.3 added the first one: <see cref="Language"/>.</strong> It is
+/// the only preference the server holds (D22), so it is a column here rather than
+/// a preferences table.
+/// </para>
 /// </remarks>
 public sealed class OmniAiUser : IdentityUser<Guid>
 {
+    /// <summary>
+    /// <c>en</c>, <c>ar</c>, or null when the person has not chosen. What the server
+    /// writes to them is in this language, and in English while it is null.
+    /// </summary>
+    /// <remarks>
+    /// Kept as the stored code, like every other column on this type; the
+    /// Application reads it as <see cref="Domain.Users.UserLanguage"/> through
+    /// <see cref="IdentityAccountDirectory"/>.
+    /// </remarks>
+    public string? Language { get; set; }
 }

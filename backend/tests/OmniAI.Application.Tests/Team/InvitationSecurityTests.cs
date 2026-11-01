@@ -205,6 +205,8 @@ public sealed class InvitationSecurityTests
                 TestAuthority.Outsider(Inviter),
                 world.Tokens,
                 new InvitationPolicy(),
+                world.Accounts,
+                world.Email,
                 world.Clock)
             .HandleAsync(new CreateTenantInvitationCommand(Workspace, "bob@example.test", [])));
     }
@@ -495,10 +497,62 @@ public sealed class InvitationSecurityTests
         TenantRole.CreateCustom(Tenant, TenantRoleName.Create(name), permissions, Now);
 
     /// <summary>One workspace, its roles, its invitations and its accounts.</summary>
+    // ----------------------------------------------- invitation email (37.3)
+
+    [Fact]
+    public async Task An_invitation_keeps_the_language_asked_for_and_queues_one_email()
+    {
+        Fixture world = new();
+        world.Accounts.Speaking(Inviter, UserLanguage.English);
+
+        IssuedInvitation issued = await world
+            .Creator(PlatformPermissions.MembersInvite)
+            .HandleAsync(new CreateTenantInvitationCommand(Workspace, "bob@example.test", [], UserLanguage.Arabic));
+
+        Assert.Equal(UserLanguage.Arabic, issued.Invitation.Language);
+
+        OmniAI.Domain.Accounts.AccountEmail queued = Assert.Single(world.Invitations.QueuedEmails);
+        Assert.Equal(issued.Invitation.Id, queued.InvitationId);
+        Assert.Equal(issued.Invitation.TenantId, queued.TenantId);
+        Assert.Null(queued.UserId);
+    }
+
+    [Fact]
+    public async Task Without_a_language_an_invitation_takes_the_inviter_s_and_else_none()
+    {
+        Fixture speaking = new();
+        speaking.Accounts.Speaking(Inviter, UserLanguage.Arabic);
+
+        IssuedInvitation inherited = await speaking
+            .Creator(PlatformPermissions.MembersInvite)
+            .HandleAsync(new CreateTenantInvitationCommand(Workspace, "bob@example.test", []));
+
+        Assert.Equal(UserLanguage.Arabic, inherited.Invitation.Language);
+
+        IssuedInvitation unset = await new Fixture()
+            .Creator(PlatformPermissions.MembersInvite)
+            .HandleAsync(new CreateTenantInvitationCommand(Workspace, "carol@example.test", []));
+
+        Assert.Null(unset.Invitation.Language);
+    }
+
+    [Fact]
+    public async Task A_deployment_that_cannot_send_email_queues_no_invitation_email()
+    {
+        Fixture world = new(emailConfigured: false);
+
+        await world
+            .Creator(PlatformPermissions.MembersInvite)
+            .HandleAsync(new CreateTenantInvitationCommand(Workspace, "bob@example.test", []));
+
+        Assert.Empty(world.Invitations.QueuedEmails);
+    }
+
     private sealed class Fixture
     {
-        public Fixture()
+        public Fixture(bool emailConfigured = true)
         {
+            Email = new StubEmailSender(emailConfigured);
             Accounts.With(Inviter, "inviter@example.test");
             Memberships.Grant(Inviter, WorkspaceView);
         }
@@ -510,6 +564,9 @@ public sealed class InvitationSecurityTests
         public InMemoryAccountDirectory Accounts { get; } = new();
 
         public PredictableInvitationTokens Tokens { get; } = new();
+
+        /// <summary>Whether invitation emails are queued (Phase 37.3).</summary>
+        public StubEmailSender Email { get; }
 
         public FixedTimeProvider Clock { get; } = new(Now);
 
@@ -553,6 +610,8 @@ public sealed class InvitationSecurityTests
                 TestAuthority.With(Inviter, Workspace, held),
                 Tokens,
                 new InvitationPolicy(),
+                Accounts,
+                Email,
                 Clock);
 
         public RevokeTenantInvitationHandler Revoker(params PermissionCode[] held) =>

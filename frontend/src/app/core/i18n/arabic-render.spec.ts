@@ -169,4 +169,62 @@ describe('Arabic renders', () => {
     expect(text(root.querySelector('.handoff-divider'))).toBe('استلم أحد أعضاء الفريق المحادثة');
     expect(text(root.querySelector('[data-testid="entry-language"]'))).toBe('English العربية');
   });
+  describe('the password-reset pages (Phase 37.3)', () => {
+    async function render<T>(component: Type<T>): Promise<HTMLElement> {
+      const { provideHttpClient } = await import('@angular/common/http');
+      const { provideHttpClientTesting } = await import('@angular/common/http/testing');
+
+      TestBed.configureTestingModule({
+        providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting()],
+      });
+      const fixture = TestBed.createComponent(component);
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      return fixture.nativeElement as HTMLElement;
+    }
+
+    afterEach(() => window.history.replaceState(null, '', '/'));
+
+    it('offers the way to a new password on the sign-in page', async () => {
+      const { Login } = await import('@app/features/auth/login/login');
+      const root = await render(Login);
+
+      expect(text(root.querySelector('a[href="/forgot-password"]'))).toBe('نسيت كلمة المرور؟');
+    });
+
+    it('asks for the address in Arabic, with the address itself left to right', async () => {
+      const { ForgotPassword } = await import('@app/features/auth/forgot-password/forgot-password');
+      const root = await render(ForgotPassword);
+
+      expect(text(root.querySelector('h1'))).toBe('إعادة تعيين كلمة المرور');
+      expect(text(root.querySelector('label[for="email"]'))).toBe('البريد الإلكتروني');
+      expect(root.querySelector('#email')?.getAttribute('dir')).toBe('ltr');
+      expect(text(root.querySelector('button[type="submit"]'))).toBe('إرسال رابط إعادة التعيين');
+    });
+
+    it('sets a new password in Arabic, with the policy in Western digits', async () => {
+      window.history.replaceState(null, '', '/reset-password#uid=u-1&token=t-1');
+      const { ResetPassword } = await import('@app/features/auth/reset-password/reset-password');
+      const root = await render(ResetPassword);
+
+      expect(text(root.querySelector('h1'))).toBe('تعيين كلمة مرور جديدة');
+      expect(text(root.querySelector('label[for="password"]'))).toBe('كلمة المرور الجديدة');
+      expect(text(root.querySelector('label[for="confirmation"]'))).toBe(
+        'تأكيد كلمة المرور الجديدة',
+      );
+      expect(text(root.querySelector('#password-hint'))).toBe(
+        '12 حرفًا على الأقل. العبارة التي يسهل تذكّرها خيار جيد.',
+      );
+    });
+
+    it('says in Arabic that a link without its parts is not valid', async () => {
+      window.history.replaceState(null, '', '/reset-password');
+      const { ResetPassword } = await import('@app/features/auth/reset-password/reset-password');
+      const root = await render(ResetPassword);
+
+      expect(text(root.querySelector('h1'))).toBe('هذا الرابط غير صالح');
+      expect(text(root.querySelector('a[href="/forgot-password"]'))).toBe('طلب رابط جديد');
+    });
+  });
 });

@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using OmniAI.Domain.Users;
 using OmniAI.Infrastructure.Identity;
 
 namespace OmniAI.Infrastructure.Persistence.Configurations;
@@ -44,7 +45,8 @@ internal sealed class OmniAiUserConfiguration : IEntityTypeConfiguration<OmniAiU
 
     public void Configure(EntityTypeBuilder<OmniAiUser> builder)
     {
-        builder.ToTable(PersistenceSchema.UsersTable);
+        builder.ToTable(PersistenceSchema.UsersTable, table =>
+            table.HasCheckConstraint("ck_users_language", "language IS NULL OR language IN ('en', 'ar')"));
 
         builder.Property(user => user.Id).HasColumnName("id");
         builder.Property(user => user.UserName).HasColumnName("user_name").HasMaxLength(MaxKeyLength);
@@ -65,6 +67,12 @@ internal sealed class OmniAiUserConfiguration : IEntityTypeConfiguration<OmniAiU
         builder.Property(user => user.LockoutEnd).HasColumnName("lockout_end");
         builder.Property(user => user.LockoutEnabled).HasColumnName("lockout_enabled");
         builder.Property(user => user.AccessFailedCount).HasColumnName("access_failed_count");
+
+        // Phase 37.3 (M1). Nullable: an account that has not chosen has none, and
+        // the server writes to it in English. No index: read by primary key only.
+        builder.Property(user => user.Language)
+            .HasColumnName("language")
+            .HasMaxLength(UserLanguages.MaxCodeLength);
 
         // Identity's own indexes, renamed. The normalized-email index is made
         // unique here rather than left as Identity's non-unique default: email is

@@ -215,7 +215,9 @@ public sealed class NotificationDispatcher(
 /// </para>
 /// <para>
 /// <strong>The address is read from the account now.</strong> It is not copied
-/// into the queue, and never comes from a request.
+/// into the queue, and never comes from a request. So is the language the email is
+/// worded in (Phase 37.3), and the report type of a report email, derived from the
+/// notification's occurrence rather than stored.
 /// </para>
 /// </remarks>
 public sealed class OperationalEmailDispatcher(
@@ -223,6 +225,7 @@ public sealed class OperationalEmailDispatcher(
     INotificationStore store,
     ReportAuthority authority,
     IAccountDirectory accounts,
+    INotificationSources sources,
     ITenantRepository tenants,
     IOperationalEmailSender sender,
     OperationalEmailLinks links,
@@ -238,6 +241,8 @@ public sealed class OperationalEmailDispatcher(
     private readonly ReportAuthority _authority = authority ?? throw new ArgumentNullException(nameof(authority));
 
     private readonly IAccountDirectory _accounts = accounts ?? throw new ArgumentNullException(nameof(accounts));
+
+    private readonly INotificationSources _sources = sources ?? throw new ArgumentNullException(nameof(sources));
 
     private readonly ITenantRepository _tenants = tenants ?? throw new ArgumentNullException(nameof(tenants));
 
@@ -302,7 +307,16 @@ public sealed class OperationalEmailDispatcher(
 
         string? workspace = (await _tenants.FindByIdAsync(claimed.TenantId, cancellationToken).ConfigureAwait(false))?.Name.Value;
 
-        OperationalEmailMessage message = OperationalEmailRenderer.Render(notification, to, workspace, _links);
+        // Worded now, in the language the recipient holds now (Phase 37.3): a
+        // member who switched since the notification was created reads the new one.
+        UserLanguage language = UserLanguages.OrDefault(
+            await _accounts.FindLanguageAsync(claimed.RecipientUserId, cancellationToken).ConfigureAwait(false));
+
+        ReportType? reportType = notification.Category == NotificationCategory.Reports
+            ? await _sources.ReportTypeOfOccurrenceAsync(claimed.TenantId, notification.OccurrenceId, cancellationToken).ConfigureAwait(false)
+            : null;
+
+        OperationalEmailMessage message = OperationalEmailRenderer.Render(notification, to, workspace, _links, language, reportType);
 
         // The dispatch boundary (Phase 35), crossed immediately before the message
         // is handed to the SMTP server and never earlier. Up to here a crash leaves

@@ -105,7 +105,7 @@ internal sealed class RedisPublicChatProtection : IPublicChatProtection
     /// after a Redis restart or a failover to a replica that never loaded it.
     /// </para>
     /// </remarks>
-    private const string DecisionScript = """
+    internal const string DecisionScript = """
         local total = #KEYS
         for index = 1, total do
           local limit = tonumber(ARGV[2 * index - 1])

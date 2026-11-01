@@ -1,5 +1,8 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideHttpClient } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
+import { AuthService } from '@app/core/auth/auth-service';
 import { MEDIA_QUERY_FACTORY, MediaQueries } from '@app/core/media/media';
 import { LOCAL_STORAGE } from '@app/core/storage/local-storage';
 import { PAGE_RELOAD } from '@app/core/i18n/language-service';
@@ -152,6 +155,36 @@ describe('ProfileMenu', () => {
 
       expect(TestBed.inject(LOCAL_STORAGE)?.getItem(LANGUAGE_STORAGE_KEY)).toBe('ar');
       expect(reloads).toBe(1);
+    });
+
+    it("tells the server a signed-in member's choice, then restarts the page (Phase 37.3)", async () => {
+      TestBed.configureTestingModule({
+        providers: [
+          provideHttpClient(),
+          provideHttpClientTesting(),
+          { provide: AuthService, useValue: { isAuthenticated: () => true } },
+        ],
+      });
+      await render();
+      await open();
+
+      languageItems()[1].click();
+
+      const http = TestBed.inject(HttpTestingController);
+      const request = http.expectOne('/api/me/language');
+
+      expect(request.request.method).toBe('PUT');
+      expect(request.request.body).toEqual({ language: 'ar' });
+      // The reload would cancel the request, so it waits for the answer.
+      expect(reloads).toBe(0);
+
+      request.flush(null, { status: 204, statusText: 'No Content' });
+      await fixture.whenStable();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(TestBed.inject(LOCAL_STORAGE)?.getItem(LANGUAGE_STORAGE_KEY)).toBe('ar');
+      expect(reloads).toBe(1);
+      http.verify();
     });
 
     it('does not reload for the language the page is already in', async () => {

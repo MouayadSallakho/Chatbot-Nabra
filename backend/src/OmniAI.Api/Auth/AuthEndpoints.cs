@@ -1,6 +1,9 @@
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Identity;
 using OmniAI.Api.Security;
+using OmniAI.Application.Accounts;
+using OmniAI.Application.WebChat.Protection;
+using OmniAI.Domain.Security;
 using OmniAI.Domain.Users;
 using OmniAI.Infrastructure.Identity;
 
@@ -61,20 +64,48 @@ internal static class AuthEndpoints
             .AddEndpointFilter<AntiforgeryEndpointFilter>();
 
         // Anonymous by necessity: somebody who is not signed in has to be able to
-        // obtain a token, create an account and sign in. These three are the
-        // complete anonymous surface of the authenticated API, alongside /health
-        // and the development OpenAPI document.
+        // obtain a token, create an account and sign in -- and, from Phase 37.3,
+        // ask for and use a password reset link. These five are the complete
+        // anonymous surface of the authenticated API, alongside /health and the
+        // development OpenAPI document.
         auth.MapGet("/csrf", IssueAntiforgeryTokenAsync)
             .AllowAnonymous()
             .WithName("GetAntiforgeryToken");
 
         auth.MapPost("/register", RegisterAsync)
             .AllowAnonymous()
-            .WithName("Register");
+            .WithName("Register")
+            .WithSummary("Creates an account and signs it in. Optional language (\"en\" or \"ar\"), else Accept-Language; every refusal carries a code.")
+            .Produces<CurrentUserResponse>(StatusCodes.Status201Created)
+            .ProducesProblem(StatusCodes.Status400BadRequest);
 
         auth.MapPost("/login", LoginAsync)
             .AllowAnonymous()
-            .WithName("Login");
+            .WithName("Login")
+            .WithSummary("Signs in. Rate-limited per address and per network (429 auth.throttled, 503 auth.throttle.unavailable); every refusal carries a code.")
+            .Produces<CurrentUserResponse>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests)
+            .ProducesProblem(StatusCodes.Status503ServiceUnavailable);
+
+        // Phase 37.3. See PasswordResetEndpoints.
+        auth.MapPost("/password/forgot", PasswordResetEndpoints.ForgotAsync)
+            .AllowAnonymous()
+            .WithName("ForgotPassword")
+            .WithSummary("Asks for a password reset email. Always 202 with no body, whether or not the address has an account.")
+            .Produces(StatusCodes.Status202Accepted)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests)
+            .ProducesProblem(StatusCodes.Status503ServiceUnavailable);
+
+        auth.MapPost("/password/reset", PasswordResetEndpoints.ResetAsync)
+            .AllowAnonymous()
+            .WithName("ResetPassword")
+            .WithSummary("Sets a new password with a reset link's user id and token, and ends every session of that account.")
+            .Produces(StatusCodes.Status204NoContent)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests)
+            .ProducesProblem(StatusCodes.Status503ServiceUnavailable);
 
         auth.MapPost("/logout", LogoutAsync)
             .RequireAuthorization()
@@ -82,7 +113,10 @@ internal static class AuthEndpoints
 
         auth.MapGet("/me", GetCurrentUserAsync)
             .RequireAuthorization()
-            .WithName("GetCurrentUser");
+            .WithName("GetCurrentUser")
+            .WithSummary("The signed-in account: id, email, and the stored language (\"en\", \"ar\" or null).")
+            .Produces<CurrentUserResponse>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status401Unauthorized);
 
         return endpoints;
     }
@@ -165,12 +199,19 @@ internal static class AuthEndpoints
     {
         ArgumentNullException.ThrowIfNull(request);
 
+        if (!AccountProblems.TryReadLanguage(request.Language, out UserLanguage? requested, out IResult? unsupported))
+        {
+            return unsupported!;
+        }
+
         string email = (request.Email ?? string.Empty).Trim();
         string password = request.Password ?? string.Empty;
 
         if (email.Length == 0 || password.Length == 0)
         {
-            return InvalidRegistration("An email address and a password are both required.");
+            return InvalidRegistration(
+                "An email address and a password are both required.",
+                AccountProblems.RegistrationIncomplete);
         }
 
         // The id is allocated here, as a UUIDv7, rather than left to Identity's
@@ -183,6 +224,10 @@ internal static class AuthEndpoints
             Id = UserId.New().Value,
             UserName = email,
             Email = email,
+
+            // Phase 37.3: the language the person is using, else their browser's,
+            // else none (which reads English).
+            Language = UserLanguages.Code(AccountProblems.Preferred(http, requested)),
         };
 
         IdentityResult created = await users.CreateAsync(user, password).ConfigureAwait(false);
@@ -192,8 +237,9 @@ internal static class AuthEndpoints
             // Identity's own messages describe the rule that was broken -- how
             // long a password must be, that an address is taken, that an address
             // is malformed. They are written for the person filling in the form
-            // and contain no credential, no hash and no internal detail.
-            return InvalidRegistration(string.Join(" ", created.Errors.Select(error => error.Description)));
+            // and contain no credential, no hash and no internal detail. Each now
+            // also carries a code (Phase 37.3, row 6b).
+            return AccountProblems.FromIdentity("Registration rejected", created.Errors);
         }
 
         await signIn.SignInAsync(user, isPersistent: false).ConfigureAwait(false);
@@ -213,18 +259,93 @@ internal static class AuthEndpoints
     /// <summary>
     /// <c>POST /api/auth/login</c>. Verifies a password and issues the session cookie.
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <strong>Failures are limited, attempts are not (Phase 37.3 Revision 1, D-2: no
+    /// hard lockout).</strong> Three failure counters in the same Redis on every
+    /// instance: one address on one network, one network, and one address on every
+    /// network. They are checked before the password is, and a refusal (429) comes
+    /// before the check, so throttling says nothing about the account or the
+    /// password. The check also reserves an in-flight slot atomically, so a burst of
+    /// parallel guesses cannot overshoot a limit before the first is counted. A failed check, an unknown address included, increments all
+    /// three; a successful sign-in increments nothing and clears that address's
+    /// failures on that network. A whole support team behind one address signs in
+    /// freely, and a stranger's guesses slow only the stranger's network. An
+    /// unreachable limiter refuses with 503 rather than letting guesses through.
+    /// </para>
+    /// <para>
+    /// <strong>Identity's lockout is not applied here</strong> (<c>lockoutOnFailure:
+    /// false</c>), so nobody can lock another person out by knowing their address.
+    /// </para>
+    /// <para>
+    /// <strong>The language is filled only while the account has none.</strong>
+    /// From an optional <c>language</c>, else <c>Accept-Language</c>; a chosen one is
+    /// never overwritten here.
+    /// </para>
+    /// </remarks>
     private static async Task<IResult> LoginAsync(
         HttpContext http,
         LoginRequest request,
         UserManager<OmniAiUser> users,
         SignInManager<OmniAiUser> signIn,
         IAntiforgery antiforgery,
-        IHostEnvironment environment)
+        IHostEnvironment environment,
+        IAccountProtection protection,
+        IAccountSubjectKeys subjects,
+        IClientNetworkKeys networks,
+        IAccountLanguages languages,
+        ISecurityEventLog audit,
+        TimeProvider clock,
+        ILoggerFactory loggers)
     {
         ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(protection);
+        ArgumentNullException.ThrowIfNull(subjects);
+        ArgumentNullException.ThrowIfNull(networks);
+        ArgumentNullException.ThrowIfNull(languages);
+        ArgumentNullException.ThrowIfNull(audit);
+        ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(loggers);
+
+        if (!AccountProblems.TryReadLanguage(request.Language, out UserLanguage? requested, out IResult? unsupported))
+        {
+            return unsupported!;
+        }
 
         string email = (request.Email ?? string.Empty).Trim();
         string password = request.Password ?? string.Empty;
+
+        string subject;
+        ClientNetworkKey? client;
+        AccountProtectionDecision decision;
+
+        try
+        {
+            subject = subjects.Derive(users.NormalizeEmail(email) ?? string.Empty);
+            client = ClientNetworkIdentity.Resolve(http, networks);
+            decision = await protection
+                .CheckSignInAsync(subject, client, http.RequestAborted)
+                .ConfigureAwait(false);
+        }
+        catch (Exception unprotected) when (unprotected is AccountProtectionUnavailableException or PublicChatProtectionUnavailableException)
+        {
+            return AccountProblems.Unavailable(loggers.CreateLogger(typeof(AuthEndpoints)), unprotected);
+        }
+
+        if (!decision.Allowed)
+        {
+            await audit
+                .RecordAsync(
+                    SecurityEvent.Record(
+                        SecurityEventKinds.SignInThrottled,
+                        clock.GetUtcNow(),
+                        subjectKey: subject,
+                        clientNetworkKey: client?.Value),
+                    http.RequestAborted)
+                .ConfigureAwait(false);
+
+            return AccountProblems.TooMany(http, decision);
+        }
 
         OmniAiUser? user = email.Length == 0
             ? null
@@ -241,22 +362,45 @@ internal static class AuthEndpoints
             // result is discarded.
             users.PasswordHasher.HashPassword(new OmniAiUser(), password);
 
-            return SignInRejected();
+            // Counted exactly like a wrong password, so the counters cannot tell
+            // an unknown address from a known one either.
+            return await FailedAsync(protection, subject, client, loggers, http.RequestAborted).ConfigureAwait(false);
         }
 
-        // lockoutOnFailure: the whole point of the configured policy. Without it
-        // the failure counter is never incremented and the lockout window is
-        // unreachable.
+        // lockoutOnFailure: false (Revision 1). The failure limiter is the only
+        // throttle; Identity's lockout would let anybody who knows an address lock
+        // its owner out. A lockout left from before is still honoured until it
+        // expires, and a password reset lifts it.
         SignInResult result = await signIn
-            .PasswordSignInAsync(user, password, isPersistent: false, lockoutOnFailure: true)
+            .PasswordSignInAsync(user, password, isPersistent: false, lockoutOnFailure: false)
             .ConfigureAwait(false);
 
         if (!result.Succeeded)
         {
-            // Every unsuccessful outcome -- wrong password, locked out, not
+            // Every unsuccessful outcome -- wrong password, an old lockout, not
             // allowed, two-factor required -- answers identically. See the
             // SignInFailed note.
-            return SignInRejected();
+            return await FailedAsync(protection, subject, client, loggers, http.RequestAborted).ConfigureAwait(false);
+        }
+
+        try
+        {
+            await protection.RecordSignInSuccessAsync(subject, client, CancellationToken.None).ConfigureAwait(false);
+        }
+        catch (AccountProtectionUnavailableException unrecorded)
+        {
+            // The person proved the password; an uncleared count only means their
+            // earlier failures age out on their own.
+            AccountProblems.LogNotCleared(loggers.CreateLogger(typeof(AuthEndpoints)), unrecorded);
+        }
+
+        if (AccountProblems.Preferred(http, requested) is UserLanguage language && user.Language is null)
+        {
+            await languages
+                .FillIfUnsetAsync(UserId.From(user.Id), language, http.RequestAborted)
+                .ConfigureAwait(false);
+
+            user.Language = UserLanguages.Code(language);
         }
 
         IssueAntiforgeryCookie(http, antiforgery, environment);
@@ -331,9 +475,10 @@ internal static class AuthEndpoints
         return Results.Ok(Describe(user));
     }
 
-    /// <summary>Projects an account onto the two fields this API publishes.</summary>
+    /// <summary>Projects an account onto the fields this API publishes.</summary>
+    /// <remarks>Three from Phase 37.3: the stored language joined the id and the address.</remarks>
     private static CurrentUserResponse Describe(OmniAiUser user) =>
-        new(user.Id, user.Email ?? string.Empty);
+        new(user.Id, user.Email ?? string.Empty, UserLanguages.Code(UserLanguages.FromStored(user.Language)));
 
     /// <summary>Writes the readable request-token cookie.</summary>
     private static void IssueAntiforgeryCookie(
@@ -354,15 +499,37 @@ internal static class AuthEndpoints
             AuthenticationSetup.XsrfCookieOptions(environment));
     }
 
-    private static IResult InvalidRegistration(string detail) =>
-        Results.Problem(
-            title: "Registration rejected",
-            detail: detail,
-            statusCode: StatusCodes.Status400BadRequest);
+    /// <summary>
+    /// Counts a failed sign-in, then refuses it. When the failure cannot be counted
+    /// the answer is 503, as when the limiter cannot decide: fail closed.
+    /// </summary>
+    private static async Task<IResult> FailedAsync(
+        IAccountProtection protection,
+        string subject,
+        ClientNetworkKey? client,
+        ILoggerFactory loggers,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await protection.RecordSignInFailureAsync(subject, client, cancellationToken).ConfigureAwait(false);
+        }
+        catch (AccountProtectionUnavailableException unprotected)
+        {
+            return AccountProblems.Unavailable(loggers.CreateLogger(typeof(AuthEndpoints)), unprotected);
+        }
 
+        return SignInRejected();
+    }
+
+    private static IResult InvalidRegistration(string detail, string code) =>
+        AccountProblems.Problem(StatusCodes.Status400BadRequest, "Registration rejected", detail, code);
+
+    /// <remarks>The same bytes for an unknown address and a wrong password, code included.</remarks>
     private static IResult SignInRejected() =>
-        Results.Problem(
-            title: "Sign-in failed",
-            detail: SignInFailed,
-            statusCode: StatusCodes.Status401Unauthorized);
+        AccountProblems.Problem(
+            StatusCodes.Status401Unauthorized,
+            "Sign-in failed",
+            SignInFailed,
+            AccountProblems.CredentialsInvalid);
 }

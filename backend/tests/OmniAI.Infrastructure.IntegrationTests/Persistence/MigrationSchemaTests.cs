@@ -93,9 +93,14 @@ public sealed class MigrationSchemaTests(PostgresTestDatabase database)
         Assert.EndsWith("_Initial", applied[0], StringComparison.Ordinal);
         Assert.Single(applied, migration => migration.EndsWith("_Initial", StringComparison.Ordinal));
 
-        // Phase 35 added exactly one.
-        Assert.Equal(2, applied.Length);
+        // Phase 35 added exactly one; Phase 37.3 added the four the approved plan
+        // lists for it (M1, M3, M2, M2a), in that order.
+        Assert.Equal(6, applied.Length);
         Assert.EndsWith("_ProductionReadinessHardening", applied[1], StringComparison.Ordinal);
+        Assert.EndsWith("_AddUserLanguage", applied[2], StringComparison.Ordinal);
+        Assert.EndsWith("_AddSecurityEvents", applied[3], StringComparison.Ordinal);
+        Assert.EndsWith("_AddAccountEmailOutbox", applied[4], StringComparison.Ordinal);
+        Assert.EndsWith("_AddInvitationEmail", applied[5], StringComparison.Ordinal);
     }
 
     /// <remarks>

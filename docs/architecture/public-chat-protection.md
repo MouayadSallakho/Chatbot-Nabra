@@ -764,6 +764,21 @@ solve different problems and both are required.
 
 ---
 
+## P29. The account endpoints share this limiter (Phase 37.3)
+
+Sign-in and password reset are limited by the same Redis and the same key secret,
+with counters of their own under
+`AccountProtection:KeyPrefix` (`omniai:acp:v1`). The address of an account request
+becomes a keyed pseudonym like a network does (P12), under a key derived from the
+same secret with its own label, so the two can never be compared. Reset counters
+use the atomic script of P7; sign-in counts failures only, with a read-only check
+before the password and an increment after a failure (Revision 1). P3, P11 and P27
+apply unchanged: an unreachable store, or a request with no establishable client
+address, is refused with `503 auth.throttle.unavailable`. The limits and the
+reasons are in `authentication-tenant-membership.md` D30.
+
+---
+
 ## DEFERRED
 
 Named so that their absence is a decision rather than an oversight:

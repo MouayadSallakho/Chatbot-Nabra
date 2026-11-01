@@ -1,6 +1,6 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
-import { AuthApi, AuthenticatedUser, Credentials } from './auth-api';
+import { AuthApi, AuthenticatedUser, Credentials, PasswordReset, Registration } from './auth-api';
 import { toApiError } from '@app/core/api/api-error';
 
 /**
@@ -109,10 +109,39 @@ export class AuthService {
    * say. Registration failures are the caller's to explain -- a taken address
    * and a password that is too short need different words.
    */
-  async register(credentials: Credentials): Promise<AuthenticatedUser> {
+  async register(registration: Registration): Promise<AuthenticatedUser> {
     await this.renewAntiforgery();
 
-    return this.adopt(() => firstValueFrom(this.api.register(credentials)));
+    return this.adopt(() => firstValueFrom(this.api.register(registration)));
+  }
+
+  /**
+   * Asks for a password-reset link. Resolves on the server's 202, which it
+   * sends whether or not an account uses the address.
+   *
+   * A fresh antiforgery token first, for the reason `login` gives. Nothing about
+   * the session changes: asking for a link signs nobody in or out.
+   *
+   * @throws The raw failure, so the calling screen can read its code.
+   */
+  async forgotPassword(email: string): Promise<void> {
+    await this.renewAntiforgery();
+    await firstValueFrom(this.api.forgotPassword(email));
+  }
+
+  /**
+   * Sets a new password with a reset link's token.
+   *
+   * It does not sign anybody in. The server ends every session the account
+   * had; this browser, which reached the page anonymously, stays anonymous and
+   * signs in with the new password like anybody else.
+   *
+   * @throws The raw failure, because a refusal can carry several password
+   * codes and the screen shows each one.
+   */
+  async resetPassword(reset: PasswordReset): Promise<void> {
+    await this.renewAntiforgery();
+    await firstValueFrom(this.api.resetPassword(reset));
   }
 
   /**

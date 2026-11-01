@@ -91,6 +91,6 @@ export class ProfileMenu {
   }
 
   protected selectLanguage(language: AppLanguage): void {
-    this.languageService.choose(language);
+    void this.languageService.choose(language);
   }
 }

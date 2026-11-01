@@ -49,6 +49,8 @@
       proven over real HTTP. Every other API fixture runs the real clock.
     -->
     <Compile Include="..\Shared\FixedTimeProvider.cs" Link="FixedTimeProvider.cs" />
+    <!-- A loopback SMTP server that records what it is sent (Phase 32; shared from Phase 37.3). -->
+    <Compile Include="..\Shared\SmtpSink.cs" Link="SmtpSink.cs" />
     <!--
       Deterministic AI text generator. Installed by one dedicated fixture in place
       of the unconfigured production implementation, so the preview slice can be

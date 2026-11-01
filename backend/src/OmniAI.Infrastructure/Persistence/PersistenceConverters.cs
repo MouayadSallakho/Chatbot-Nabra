@@ -71,6 +71,12 @@ internal static class PersistenceConverters
     public static readonly ValueConverter<InvitationTokenHash, byte[]> InvitationTokenHash =
         new(hash => hash.ToArray(), value => Domain.Invitations.InvitationTokenHash.From(value));
 
+    /// <summary>The emailed token's hash (Phase 37.3), absent until an invitation email is sent.</summary>
+    public static readonly ValueConverter<InvitationTokenHash?, byte[]?> NullableInvitationTokenHash =
+        new(
+            hash => hash == null ? null : hash.ToArray(),
+            value => value == null ? null : Domain.Invitations.InvitationTokenHash.From(value));
+
     /// <summary>
     /// A role name, stored as the display form the workspace typed.
     /// </summary>
@@ -404,4 +410,26 @@ internal static class PersistenceConverters
 
     public static readonly ValueConverter<Domain.Notifications.NotificationEmailId, Guid> NotificationEmailId =
         new(id => id.Value, value => Domain.Notifications.NotificationEmailId.From(value));
+
+    public static readonly ValueConverter<Domain.Security.SecurityEventId, Guid> SecurityEventId =
+        new(id => id.Value, value => Domain.Security.SecurityEventId.From(value));
+
+    public static readonly ValueConverter<Domain.Accounts.AccountEmailId, Guid> AccountEmailId =
+        new(id => id.Value, value => Domain.Accounts.AccountEmailId.From(value));
+
+    public static readonly ValueConverter<TenantInvitationId?, Guid?> NullableTenantInvitationId =
+        new(
+            id => id == null ? null : id.Value.Value,
+            value => value == null ? null : Domain.Invitations.TenantInvitationId.From(value.Value));
+
+    /// <summary>A language as its stored code; a code this version does not know reads as none.</summary>
+    public static readonly ValueConverter<Domain.Users.UserLanguage?, string?> NullableUserLanguage =
+        new(
+            language => language == null ? null : Domain.Users.UserLanguages.Code(language.Value),
+            code => Domain.Users.UserLanguages.FromStored(code));
+
+    public static readonly ValueConverter<TenantId?, Guid?> NullableTenantId =
+        new(
+            id => id == null ? null : id.Value.Value,
+            value => value == null ? null : Domain.Tenants.TenantId.From(value.Value));
 }

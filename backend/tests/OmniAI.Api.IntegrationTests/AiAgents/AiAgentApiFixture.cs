@@ -126,6 +126,10 @@ public class AiAgentApiFixture : IAsyncLifetime
         builder.UseSetting(NetworkKeySecretSetting, _redis.NetworkKeySecret);
         builder.UseSetting(KeyPrefixSetting, _redis.KeyPrefix);
 
+        // Phase 37.3: the account limiter's counters, in this fixture's namespace,
+        // so classes sharing one Redis never share a sign-in budget.
+        builder.UseSetting("AccountProtection:KeyPrefix", _redis.KeyPrefix + ":acp");
+
         foreach ((string key, string value) in HostSettings)
         {
             builder.UseSetting(key, value);

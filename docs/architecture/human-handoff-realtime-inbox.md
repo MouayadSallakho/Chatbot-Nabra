@@ -301,6 +301,17 @@ is best effort: if the backplane fails, persisted data is still correct, no
 message is lost, and clients re-fetch on reconnect. SignalR is never the source
 of truth.
 
+**Ending an account's connections (Phase 37.3).** A connection is authenticated
+once, when it opens, so a password reset closes it explicitly. Each instance keeps
+its admin hub connections by account (`SessionConnections`, filled by
+`SessionStampHubFilter`). The reset aborts the account's connections on its own
+instance and publishes the account on the Redis channel `omniai:auth:revoked`;
+every instance aborts its own. The same filter re-checks the session stamp on every
+hub invocation, so a connection that missed the message is refused and closed on
+its next call (authentication-tenant-membership.md D32).
+`SessionRevocationApiTests` proves both with two in-process hosts on one Redis. The
+public chat hub has no account and is unaffected.
+
 ---
 
 ## 12. Migration

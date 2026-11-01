@@ -2,7 +2,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 
-namespace OmniAI.Infrastructure.IntegrationTests.Notifications;
+namespace OmniAI.Testing;
 
 /// <summary>How the sink answers the conversation.</summary>
 internal enum SmtpSinkMode
@@ -98,7 +98,9 @@ internal sealed class SmtpSink : IAsyncDisposable
         using (client)
         {
             NetworkStream stream = client.GetStream();
-            using StreamReader reader = new(stream, Encoding.ASCII, leaveOpen: true);
+            // Latin-1, not ASCII: one char per byte, so an 8-bit (UTF-8) part survives
+            // intact and can be decoded again by Parse (Phase 37.3).
+            using StreamReader reader = new(stream, Encoding.Latin1, leaveOpen: true);
             await using StreamWriter writer = new(stream, Encoding.ASCII, leaveOpen: true) { NewLine = "\r\n", AutoFlush = true };
 
             List<string> recipients = [];
@@ -146,7 +148,8 @@ internal sealed class SmtpSink : IAsyncDisposable
 
                         while (await reader.ReadLineAsync() is string content && content != ".")
                         {
-                            data.Append(content).Append("\r\n");
+                            // RFC 5321 dot-stuffing, undone.
+                            data.Append(content.StartsWith("..", StringComparison.Ordinal) ? content[1..] : content).Append("\r\n");
                         }
 
                         if (Mode == SmtpSinkMode.DropAfterData)
@@ -186,4 +189,12 @@ internal sealed record SinkMessage(string MailFrom, IReadOnlyList<string> Recipi
 {
     /// <summary>The header block: everything before the first blank line.</summary>
     public string Headers => Raw[..Math.Max(0, Raw.IndexOf("\r\n\r\n", StringComparison.Ordinal))];
+
+    /// <summary>The message decoded: subject, parts and their text, in any language.</summary>
+    public MimeKit.MimeMessage Parse()
+    {
+        using MemoryStream bytes = new(Encoding.Latin1.GetBytes(Raw));
+
+        return MimeKit.MimeMessage.Load(bytes);
+    }
 }

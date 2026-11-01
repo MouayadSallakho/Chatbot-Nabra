@@ -125,7 +125,9 @@ public sealed class AcceptTenantInvitationHandler(
             .FindByTokenHashAsync(hash, cancellationToken)
             .ConfigureAwait(false);
 
-        if (invitation is null)
+        // The database found it by either hash; the comparison that decides is the
+        // constant-time one, against both (Phase 37.3).
+        if (invitation is null || !invitation.IsRedeemableWith(hash))
         {
             return null;
         }

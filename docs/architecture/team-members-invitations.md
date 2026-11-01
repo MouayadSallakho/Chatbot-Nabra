@@ -411,6 +411,46 @@ decisions independent.
 whatever channel the administrator already uses, that it works once, and that it
 is shown only now.
 
+**Superseded in Phase 37.3 (D-1 option A).** Invitations are now also emailed; see
+T20. The link the inviter copies keeps working beside the emailed one, so the invite
+screen's promise still holds.
+
+---
+
+## T20. The invitation email, and its second token (Phase 37.3)
+
+**Decision.** When an invitation is created and the deployment can send email, one
+invitation email is queued in the same transaction (`account_emails`, kind
+`Invitation`, linked to the invitation through its `(id, tenant_id)` key). It is
+written in the invitation's language: the optional `language` on `POST
+…/invitations` (`"en"` or `"ar"`), else the inviter's own stored language, else
+English. The invitation keeps it (`tenant_invitations.language`, migration
+`AddInvitationEmail`). An unsupported value is `400 language.unsupported`, and
+nothing is created.
+
+**The email carries its own token.** Minted by the account email worker at the
+moment it sends, 256 bits like the first (T9), and only its SHA-256 is stored, in
+`tenant_invitations.email_token_hash` (unique where set). The hash is written
+together with the dispatch boundary, in one transaction, and only while the worker
+still owns the email and the invitation is still open, so a worker that lost its
+claim can never replace the hash of a message somebody already has. The link is
+`/accept-invitation#token=…`, in the fragment, exactly as T11.
+
+**Acceptance matches either token.** The repository looks the invitation up by
+either hash; `TenantInvitation.IsRedeemableWith` then compares the presented hash
+with both, in constant time, and both comparisons always run. Revocation, expiry and
+acceptance end both tokens at once, because they change the invitation, not a token.
+A wrong token is still `404`, identical to one never issued.
+
+**What the invitee is told.** The workspace name (encoded and isolated), that they
+can sign in with this address or create an account with it, and when the invitation
+expires (UTC). Not the roles, and not the inviter's address. Sent and failed emails
+are audited (`auth.invitation.email_sent` and `…email_failed`, with the workspace).
+
+**Acceptance fills the language.** `POST /api/invitations/accept` takes an optional
+`language` too; the accepting account's language is filled from it (else
+`Accept-Language`) only while the account has none.
+
 ---
 
 ## T19. Known staleness: an administrator's own permissions can move underneath them
@@ -457,11 +497,12 @@ it.
 - Usability checked before identity, so a withdrawn link discloses nothing
 - `410` distinguished from `404`, and neither naming the invited address
 - `EmailAddress` as a value object with canonical equality
-- Manual link sharing, with no email delivery anywhere in the platform
+- Manual link sharing, and from Phase 37.3 an invitation email beside it (T20)
 
 ## DEFERRED
 
-- Email delivery of invitations, and any SMTP or provider dependency
+- ~~Email delivery of invitations~~ (Phase 37.3, T20). Bounce handling and a
+  per-tenant sending identity remain deferred
 - Removing a member from a workspace
 - Leaving a workspace
 - Ownership transfer, and Owner assignment

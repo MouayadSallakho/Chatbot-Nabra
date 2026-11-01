@@ -462,7 +462,7 @@ export class CommandPalette {
       hint: this.language.current === value ? inUse : languageWord,
       lang: value,
       dir: directionOf(value),
-      run: () => this.language.choose(value),
+      run: () => void this.language.choose(value),
     }));
 
     return [...themes, ...languages];

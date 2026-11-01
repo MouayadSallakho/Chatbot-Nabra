@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using Microsoft.Extensions.DependencyInjection;
 using OmniAI.Api.IntegrationTests.AiAgents;
 
 namespace OmniAI.Api.IntegrationTests.Auth;
@@ -171,6 +172,40 @@ public sealed class AnonymousAccessTests(AiAgentApiFixture api) : IClassFixture<
         Assert.True(
             response.IsSuccessStatusCode,
             $"{route} answered {(int)response.StatusCode}.");
+    }
+
+    [Fact]
+    public void The_anonymous_account_surface_is_exactly_five_routes()
+    {
+        // Phase 37.3 added the two password reset routes; nothing else under
+        // /api/auth or /api/me may answer without a session. Read from the
+        // endpoints' own metadata, so a new route cannot slip in unnoticed.
+        Microsoft.AspNetCore.Routing.EndpointDataSource source =
+            api.Services.GetRequiredService<Microsoft.AspNetCore.Routing.EndpointDataSource>();
+
+        string[] anonymous =
+        [
+            .. source.Endpoints
+                .OfType<Microsoft.AspNetCore.Routing.RouteEndpoint>()
+                .Where(endpoint => endpoint.Metadata.GetMetadata<Microsoft.AspNetCore.Authorization.IAllowAnonymous>() is not null)
+                .Where(endpoint => endpoint.RoutePattern.RawText is string route
+                    && (route.StartsWith("/api/auth", StringComparison.Ordinal) || route.StartsWith("/api/me", StringComparison.Ordinal)))
+                .Select(endpoint => string.Concat(
+                    endpoint.Metadata.GetMetadata<Microsoft.AspNetCore.Routing.HttpMethodMetadata>()?.HttpMethods[0],
+                    " ",
+                    endpoint.RoutePattern.RawText))
+                .Order(StringComparer.Ordinal),
+        ];
+
+        Assert.Equal(
+            [
+                "GET /api/auth/csrf",
+                "POST /api/auth/login",
+                "POST /api/auth/password/forgot",
+                "POST /api/auth/password/reset",
+                "POST /api/auth/register",
+            ],
+            anonymous);
     }
 
     /// <summary>A workspace with one agent, created by somebody who is signed in.</summary>

@@ -40,6 +40,8 @@ using OmniAI.Application.Members.ListTenantMembers;
 using OmniAI.Application.Members.ReplaceTenantMemberRoles;
 using Microsoft.AspNetCore.SignalR;
 using OmniAI.Api.Realtime;
+using OmniAI.Application.Accounts;
+using OmniAI.Infrastructure.Accounts;
 using OmniAI.Application.Notifications;
 using OmniAI.Application.Conversations.Realtime;
 using OmniAI.Infrastructure.Conversations.Realtime;
@@ -125,7 +127,7 @@ internal static class CompositionRoot
         // is calling. The environment is passed in because cookie security is
         // the one setting that must differ between Development and everywhere
         // else -- see AuthenticationSetup for exactly how far that goes.
-        services.AddOmniAiAuthentication(environment);
+        services.AddOmniAiAuthentication(configuration, environment);
 
         // Infrastructure decides how persistence is built; the composition root
         // only decides where its configuration comes from.
@@ -209,6 +211,12 @@ internal static class CompositionRoot
             configuration,
             allowEphemeralNetworkKeySecret: environment.IsDevelopment());
 
+        // Phase 37.3: the account limits (sign-in, reset requests, resets) share
+        // that Redis and that key secret, so every instance counts the same
+        // attempts. Then the account services and their email outbox.
+        services.AddOmniAiAccountProtection(configuration);
+        services.AddOmniAiAccounts();
+
         // Realtime. Registered here because it shares the protection's Redis, and
         // for no other reason: the two have nothing to say to each other.
         //
@@ -222,7 +230,14 @@ internal static class CompositionRoot
 
         services.AddOmniAiRealtimeTickets(realtimeRedis);
 
-        ISignalRServerBuilder realtime = services.AddSignalR();
+        // Phase 37.3: each instance knows its admin hub connections by account, so a
+        // password reset can close them, and every invocation re-checks the stamp.
+        services.AddSingleton<SessionConnections>();
+        services.AddSingleton<SessionStampHubFilter>();
+        services.AddSingleton<ISessionRevocation, SessionRevocation>();
+        services.AddHostedService<SessionRevocationListener>();
+
+        ISignalRServerBuilder realtime = services.AddSignalR(options => options.AddFilter<SessionStampHubFilter>());
 
         if (!string.IsNullOrWhiteSpace(realtimeRedis))
         {

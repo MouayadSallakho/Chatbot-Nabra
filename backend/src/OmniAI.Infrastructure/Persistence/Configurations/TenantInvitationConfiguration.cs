@@ -32,7 +32,10 @@ internal sealed class TenantInvitationConfiguration : IEntityTypeConfiguration<T
     {
         ArgumentNullException.ThrowIfNull(builder);
 
-        builder.ToTable("tenant_invitations");
+        builder.ToTable("tenant_invitations", table =>
+            table.HasCheckConstraint(
+                "ck_tenant_invitations_language",
+                "language IS NULL OR language IN ('en', 'ar')"));
 
         builder.HasKey(invitation => invitation.Id);
 
@@ -75,6 +78,18 @@ internal sealed class TenantInvitationConfiguration : IEntityTypeConfiguration<T
             .HasConversion(PersistenceConverters.InvitationTokenHash)
             .HasColumnType("bytea")
             .IsRequired();
+
+        // Phase 37.3 (M2a): the invitation email's language, and the hash of the
+        // token it carries. Both empty for an invitation nobody emailed.
+        builder.Property(invitation => invitation.Language)
+            .HasColumnName("language")
+            .HasConversion(PersistenceConverters.NullableUserLanguage)
+            .HasMaxLength(UserLanguages.MaxCodeLength);
+
+        builder.Property(invitation => invitation.EmailTokenHash)
+            .HasColumnName("email_token_hash")
+            .HasConversion(PersistenceConverters.NullableInvitationTokenHash)
+            .HasColumnType("bytea");
 
         builder.Property(invitation => invitation.Status)
             .HasColumnName("status")
@@ -119,6 +134,13 @@ internal sealed class TenantInvitationConfiguration : IEntityTypeConfiguration<T
 
         // At most one open invitation per workspace and address. Predicated on the
         // stored status so the index is over immutable input.
+        // The emailed token is looked up exactly like the copied one, and is just as
+        // unique.
+        builder.HasIndex(invitation => invitation.EmailTokenHash)
+            .HasDatabaseName("ux_tenant_invitations_email_token_hash")
+            .IsUnique()
+            .HasFilter("email_token_hash IS NOT NULL");
+
         builder.HasIndex(nameof(TenantInvitation.TenantId), PersistenceSchema.CanonicalEmail)
             .HasDatabaseName("ux_tenant_invitations_open")
             .IsUnique()

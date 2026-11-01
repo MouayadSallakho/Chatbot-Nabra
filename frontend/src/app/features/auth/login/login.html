@@ -97,6 +97,16 @@
           <span i18n="@@signIn.password.error">Enter your password.</span>
         </p>
       }
+      <!--
+        Beside the field it rescues, where somebody stuck on their password is
+        already looking, and after it in the tab order, so it never sits
+        between the reader and the field they came to fill.
+      -->
+      <p class="auth-forgot text-small">
+        <a [routerLink]="['/', forgotPasswordPath]" i18n="@@signIn.forgotPassword"
+          >Forgot your password?</a
+        >
+      </p>
     </div>
 
     <div class="auth-actions">
@@ -114,14 +124,5 @@
   <p class="auth-alternate text-small text-secondary">
     <span i18n="@@signIn.noAccount">No account yet?</span>
     <a [routerLink]="['/', registerPath]" i18n="@@signIn.createAccount">Create one</a>
-  </p>
-
-  <!--
-    Said plainly rather than left for somebody to discover. Password recovery
-    is a later phase, and a form with a dead "forgot password" link would be
-    worse than one that admits the feature is not there.
-  -->
-  <p class="auth-note text-small text-muted" i18n="@@signIn.resetNote">
-    Password reset is not available yet. Contact an administrator if you cannot sign in.
   </p>
 </app-entry-frame>

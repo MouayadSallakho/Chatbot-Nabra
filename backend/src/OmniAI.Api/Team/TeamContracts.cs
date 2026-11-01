@@ -100,7 +100,7 @@ public sealed record AssignableRoleResponse(Guid Id, string Name, int Permission
 public sealed record ReplaceMemberRolesRequest(IReadOnlyList<Guid>? RoleIds);
 
 /// <summary>Whom to invite, and what they should be able to do.</summary>
-public sealed record CreateInvitationRequest(string? Email, IReadOnlyList<Guid>? RoleIds);
+public sealed record CreateInvitationRequest(string? Email, IReadOnlyList<Guid>? RoleIds, string? Language = null);
 
 /// <summary>An invitation, as any later read publishes it.</summary>
 /// <remarks>
@@ -192,7 +192,7 @@ public sealed record CreatedInvitationResponse(InvitationResponse Invitation, st
 }
 
 /// <summary>The token from an invitation link.</summary>
-public sealed record AcceptInvitationRequest(string? Token);
+public sealed record AcceptInvitationRequest(string? Token, string? Language = null);
 
 /// <summary>The workspace an invitation admitted somebody to.</summary>
 public sealed record AcceptedInvitationResponse(Guid TenantId, string Name, string Slug)

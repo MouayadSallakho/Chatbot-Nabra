@@ -203,6 +203,12 @@ internal static class PersistenceSchema
     /// <summary>Queued operational emails and where each got to.</summary>
     public const string NotificationEmailsTable = "notification_emails";
 
+    /// <summary>Audit records of security events (Phase 37.3).</summary>
+    public const string SecurityEventsTable = "security_events";
+
+    /// <summary>Queued account emails: password reset, password changed, invitation (Phase 37.3).</summary>
+    public const string AccountEmailsTable = "account_emails";
+
     /// <summary>
     /// The PostgreSQL extension that provides the <c>vector</c> type and the
     /// HNSW index method.

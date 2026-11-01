@@ -62,4 +62,18 @@ internal sealed class IdentityAccountDirectory(OmniAiDbContext context) : IAccou
 
         return EmailAddress.FromStored(account.Email, account.NormalizedEmail);
     }
+
+    public async Task<UserLanguage?> FindLanguageAsync(
+        UserId userId,
+        CancellationToken cancellationToken = default)
+    {
+        string? code = await _context.Users
+            .AsNoTracking()
+            .Where(user => user.Id == userId.Value)
+            .Select(user => user.Language)
+            .FirstOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        return UserLanguages.FromStored(code);
+    }
 }

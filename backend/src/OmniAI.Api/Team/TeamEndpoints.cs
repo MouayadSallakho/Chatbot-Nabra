@@ -1,5 +1,7 @@
 using OmniAI.Api.Http;
+using OmniAI.Api.Auth;
 using OmniAI.Api.Security;
+using OmniAI.Application.Accounts;
 using OmniAI.Application.Concurrency;
 using OmniAI.Application.Invitations.AcceptTenantInvitation;
 using OmniAI.Application.Invitations.CreateTenantInvitation;
@@ -12,6 +14,7 @@ using OmniAI.Application.Members.ListTenantMembers;
 using OmniAI.Application.Members.ReplaceTenantMemberRoles;
 using OmniAI.Application.Members;
 using OmniAI.Application.Security;
+using OmniAI.Domain.Users;
 
 namespace OmniAI.Api.Team;
 
@@ -248,9 +251,15 @@ internal static class TeamEndpoints
     {
         ArgumentNullException.ThrowIfNull(request);
 
+        // Phase 37.3 (row 8a): the invitation email's language, optional.
+        if (!AccountProblems.TryReadLanguage(request.Language, out UserLanguage? language, out IResult? unsupported))
+        {
+            return unsupported!;
+        }
+
         IssuedInvitation issued = await handler
             .HandleAsync(
-                new CreateTenantInvitationCommand(tenantId, request.Email, request.RoleIds),
+                new CreateTenantInvitationCommand(tenantId, request.Email, request.RoleIds, language),
                 cancellationToken)
             .ConfigureAwait(false);
 
@@ -303,15 +312,33 @@ internal static class TeamEndpoints
         AcceptInvitationRequest request,
         HttpContext http,
         AcceptTenantInvitationHandler handler,
+        ICurrentUser currentUser,
+        IAccountLanguages languages,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(currentUser);
+        ArgumentNullException.ThrowIfNull(languages);
 
         http.Response.Headers.CacheControl = "no-store";
+
+        if (!AccountProblems.TryReadLanguage(request.Language, out UserLanguage? requested, out IResult? unsupported))
+        {
+            return unsupported!;
+        }
 
         AcceptedInvitation? accepted = await handler
             .HandleAsync(new AcceptTenantInvitationCommand(request.Token), cancellationToken)
             .ConfigureAwait(false);
+
+        // Phase 37.3: the language the person is using fills their account's, only
+        // while it has none. A chosen one is never overwritten here.
+        if (accepted is not null
+            && currentUser.Id is Domain.Users.UserId me
+            && AccountProblems.Preferred(http, requested) is UserLanguage language)
+        {
+            await languages.FillIfUnsetAsync(me, language, cancellationToken).ConfigureAwait(false);
+        }
 
         // A token that matches nothing is answered exactly as a token that was
         // never issued, and nothing distinguishes a mistyped value from a probe.

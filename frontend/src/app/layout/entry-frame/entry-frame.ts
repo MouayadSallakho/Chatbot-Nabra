@@ -90,6 +90,6 @@ export class EntryFrame {
   protected readonly voiceWords = VOICE_WORDS;
 
   protected choose(language: AppLanguage): void {
-    this.language.choose(language);
+    void this.language.choose(language);
   }
 }

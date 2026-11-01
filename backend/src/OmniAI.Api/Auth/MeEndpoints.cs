@@ -1,4 +1,7 @@
 using OmniAI.Api.Security;
+using OmniAI.Application.Accounts;
+using OmniAI.Application.Security;
+using OmniAI.Domain.Users;
 using OmniAI.Application.Authorization.GetMyTenantPermissions;
 using OmniAI.Application.Tenants.ListMyTenants;
 using OmniAI.Application.Tenants;
@@ -35,6 +38,14 @@ internal static class MeEndpoints
 
         me.MapGet("/tenants/{tenantId:guid}/permissions", ListMyPermissionsAsync)
             .WithName("ListMyTenantPermissions");
+
+        // Phase 37.3.
+        me.MapPut("/language", ChangeLanguageAsync)
+            .WithName("ChangeMyLanguage")
+            .WithSummary("Stores the language the server writes to this account in (\"en\" or \"ar\"). The interface keeps its own choice in the browser.")
+            .Produces(StatusCodes.Status204NoContent)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status401Unauthorized);
 
         return endpoints;
     }
@@ -122,6 +133,41 @@ internal static class MeEndpoints
                 detail: $"No tenant exists with id '{tenantId}'.",
                 statusCode: StatusCodes.Status404NotFound)
             : Results.Ok(permissions.Select(code => code.Value).ToArray());
+    }
+
+    /// <summary>
+    /// <c>PUT /api/me/language</c>. Changes the stored language, chosen or not.
+    /// </summary>
+    /// <remarks>
+    /// The only way a chosen language changes (Phase 37.3): sign-in and invitation
+    /// acceptance fill it only while it is empty. The account menu calls this when a
+    /// signed-in person switches. A missing value is refused like an unknown one.
+    /// </remarks>
+    private static async Task<IResult> ChangeLanguageAsync(
+        Auth.ChangeLanguageRequest request,
+        ICurrentUser currentUser,
+        IAccountLanguages languages,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        if (!UserLanguages.TryParse(request.Language, out UserLanguage language))
+        {
+            return AccountProblems.Problem(
+                StatusCodes.Status400BadRequest,
+                "Language not supported",
+                "The language must be \"en\" or \"ar\".",
+                AccountProblems.LanguageUnsupported);
+        }
+
+        UserId me = currentUser.Id ?? throw new NotAuthenticatedException();
+
+        return await languages.SetAsync(me, language, cancellationToken).ConfigureAwait(false)
+            ? Results.NoContent()
+            : Results.Problem(
+                title: "Not authenticated",
+                detail: "This request does not identify a signed-in user.",
+                statusCode: StatusCodes.Status401Unauthorized);
     }
 
     private static WorkspaceResponse ToResponse(TenantView tenant) =>

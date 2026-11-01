@@ -42,6 +42,13 @@ namespace OmniAI.Domain.Invitations;
 /// </remarks>
 public sealed class TenantInvitation
 {
+    /// <summary>
+    /// Stands in for a missing emailed token, so the second comparison always runs.
+    /// No SHA-256 output is 32 zero bytes, so it never matches.
+    /// </summary>
+    private static readonly InvitationTokenHash NoEmailedToken =
+        InvitationTokenHash.From(new byte[InvitationTokenHash.Length]);
+
     private readonly List<InvitationRoleGrant> _roles = [];
 
     private TenantInvitation(
@@ -51,7 +58,8 @@ public sealed class TenantInvitation
         UserId invitedByUserId,
         InvitationTokenHash tokenHash,
         DateTimeOffset createdAt,
-        DateTimeOffset expiresAt)
+        DateTimeOffset expiresAt,
+        UserLanguage? language)
     {
         Id = id;
         TenantId = tenantId;
@@ -60,6 +68,7 @@ public sealed class TenantInvitation
         TokenHash = tokenHash;
         CreatedAt = createdAt;
         ExpiresAt = expiresAt;
+        Language = language;
         Status = TenantInvitationStatus.Pending;
     }
 
@@ -112,6 +121,22 @@ public sealed class TenantInvitation
     public DateTimeOffset? RevokedAt { get; private set; }
 
     /// <summary>The roles it intends to grant. May be empty.</summary>
+    /// <summary>
+    /// The language the invitation email is written in (Phase 37.3): what the
+    /// inviter asked for, else the inviter's own, else none, which reads English.
+    /// </summary>
+    public UserLanguage? Language { get; private set; }
+
+    /// <summary>
+    /// The SHA-256 of the token in the invitation email, once one was sent.
+    /// </summary>
+    /// <remarks>
+    /// A second way in, beside <see cref="TokenHash"/> (the link the inviter
+    /// copied, which keeps working). Minted when the email is sent, so it never
+    /// waits in a queue; only its hash is stored, like the first one.
+    /// </remarks>
+    public InvitationTokenHash? EmailTokenHash { get; private set; }
+
     public IReadOnlyCollection<InvitationRoleGrant> Roles => _roles;
 
     /// <summary>The ids of those roles.</summary>
@@ -142,7 +167,8 @@ public sealed class TenantInvitation
         InvitationTokenHash tokenHash,
         IEnumerable<TenantRoleId> roleIds,
         DateTimeOffset createdAt,
-        DateTimeOffset expiresAt)
+        DateTimeOffset expiresAt,
+        UserLanguage? language = null)
     {
         ArgumentNullException.ThrowIfNull(tokenHash);
         ArgumentNullException.ThrowIfNull(roleIds);
@@ -175,7 +201,8 @@ public sealed class TenantInvitation
             invitedByUserId,
             tokenHash,
             createdAt,
-            expiresAt);
+            expiresAt,
+            language);
 
         foreach (TenantRoleId roleId in roleIds.Distinct())
         {
@@ -197,6 +224,49 @@ public sealed class TenantInvitation
     /// unusable the moment the clock passes <see cref="ExpiresAt"/>, whether or
     /// not anything has got round to recording that.
     /// </remarks>
+    /// <summary>
+    /// Whether a presented token's hash is one of this invitation's two, compared
+    /// in constant time.
+    /// </summary>
+    /// <remarks>
+    /// Both comparisons always run, so the time taken does not say which of the two
+    /// matched, or whether an emailed token exists at all.
+    /// </remarks>
+    public bool IsRedeemableWith(InvitationTokenHash presented)
+    {
+        ArgumentNullException.ThrowIfNull(presented);
+
+        bool copied = TokenHash.Equals(presented);
+        bool emailed = (EmailTokenHash ?? NoEmailedToken).Equals(presented) & EmailTokenHash is not null;
+
+        return copied | emailed;
+    }
+
+    /// <summary>
+    /// Records the hash of the token an invitation email is about to carry.
+    /// </summary>
+    /// <remarks>
+    /// Only while the invitation can still be accepted. Replacing an earlier one
+    /// is allowed: it belonged to an attempt that certainly sent nothing, and the
+    /// message carrying the new one is the only one that will exist.
+    /// </remarks>
+    public void IssueEmailToken(InvitationTokenHash hash, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(hash);
+
+        if (!IsUsableAt(now))
+        {
+            throw new DomainStateException("This invitation can no longer be emailed.");
+        }
+
+        if (TokenHash.Equals(hash))
+        {
+            throw new DomainValidationException("The emailed token must differ from the copied one.");
+        }
+
+        EmailTokenHash = hash;
+    }
+
     public bool IsUsableAt(DateTimeOffset now) =>
         Status == TenantInvitationStatus.Pending && now < ExpiresAt;
 

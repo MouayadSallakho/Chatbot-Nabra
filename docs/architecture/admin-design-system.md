@@ -738,6 +738,16 @@ Deferred rather than faked. Each needs a server capability first.
 | KPI trends and period-over-period comparison | The dashboard returns one period, no comparison |
 | Overview count of documents needing indexing | No aggregate; counting would mean reading every page |
 | Server-held UI preferences (theme, pin) | No profile preferences endpoint; both stay in `localStorage` |
+
+**D22 still stands for display (Phase 37.3).** The interface's language, theme and
+sidebar pin are still the browser's (`localStorage`); the server does not drive what
+the admin shows. What changed is that the **language is now also a stored
+communication preference**: `users.language` decides what the server writes to the
+person (emails). The client sends the language in use with sign-up
+(`POST /api/auth/register`) and invitation acceptance (`POST /api/invitations/accept`),
+and when a signed-in person switches language it also saves it with
+`PUT /api/me/language`, without waiting on it for more than two seconds and without
+failing the switch if the call fails. See `authentication-tenant-membership.md` D28.
 | Searching records from the command palette, and "recent" items in it | No search endpoint across conversations, customers or documents, and no server-held history; the palette searches commands only (D23) |
 
 ## D23. Command palette (Phase 36.4)

@@ -4,7 +4,7 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ApiError } from '@app/core/api/api-error';
 import { AuthService } from '@app/core/auth/auth-service';
 import { SESSION_ENDED } from '@app/core/auth/session-expiry-interceptor';
-import { REGISTER_PATH } from '@app/core/auth/auth-guard';
+import { FORGOT_PASSWORD_PATH, REGISTER_PATH } from '@app/core/auth/auth-guard';
 import {
   ACCEPT_INVITATION_PATH,
   InvitationHandoff,
@@ -51,6 +51,7 @@ export class Login {
     inject(ActivatedRoute).snapshot.queryParamMap.get('reason') === SESSION_ENDED;
 
   protected readonly registerPath = REGISTER_PATH;
+  protected readonly forgotPasswordPath = FORGOT_PASSWORD_PATH;
 
   /** Whether this sign-in is a step inside accepting an invitation. */
   protected readonly invitationPending = this.invitations.pending;

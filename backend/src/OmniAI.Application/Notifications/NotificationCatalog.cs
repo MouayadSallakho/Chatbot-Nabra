@@ -3,6 +3,7 @@ using OmniAI.Application.Reports;
 using OmniAI.Domain.Authorization;
 using OmniAI.Domain.Notifications;
 using OmniAI.Domain.Reports;
+using OmniAI.Domain.Users;
 
 namespace OmniAI.Application.Notifications;
 
@@ -24,6 +25,15 @@ public sealed record NotificationText(string Title, string Body, string? ActionP
 /// content, a document title, a phone number, a provider identifier, a payment
 /// detail or an exception. A kind whose recipients hold the permission for that
 /// area learns nothing there they could not read on that area's own screen.
+/// </para>
+/// <para>
+/// <strong>Two languages for email (Phase 37.3).</strong> The in-app text is
+/// stored in English, as before, and the client words it by kind. An email is
+/// worded when it is sent, in the recipient's language, by
+/// <see cref="Describe(NotificationKind, UserLanguage, ReportType?, Guid?, Guid?)"/>;
+/// its sentences are the ones the client already shows, so a notification reads the
+/// same in the inbox and in the bell. A report's name is wrapped in Unicode isolates
+/// (FSI…PDI), so an English name inside Arabic text keeps its own direction.
 /// </para>
 /// <para>
 /// <strong>Recipient policy uses existing permissions only.</strong>
@@ -145,7 +155,151 @@ public static class NotificationCatalog
     /// Never interpolated. A header built from workspace-authored text is how a
     /// line break becomes a <c>Bcc:</c>; a subject that is a constant cannot.
     /// </remarks>
-    public static string Subject(NotificationKind kind) => "Nabra: " + Describe(kind).Title;
+    public static string Subject(NotificationKind kind) => Subject(kind, UserLanguage.English);
+
+    /// <summary>The fixed subject line in one language: <c>Nabra: …</c> or <c>نبرة: …</c>.</summary>
+    public static string Subject(NotificationKind kind, UserLanguage language) =>
+        EmailWords.Product(language) + ": " + Describe(kind, language).Title;
+
+    /// <summary>
+    /// What an email for this kind says, in the recipient's language.
+    /// </summary>
+    /// <remarks>
+    /// The action path is the same as the in-app one. When the report type is not
+    /// known any more (its source has been cleaned up), the sentence leaves the name
+    /// out rather than guessing it.
+    /// </remarks>
+    public static NotificationText Describe(
+        NotificationKind kind,
+        UserLanguage language,
+        ReportType? reportType = null,
+        Guid? sourceId = null,
+        Guid? connectionId = null)
+    {
+        string? actionPath = Describe(kind, reportType, sourceId, connectionId).ActionPath;
+        string? report = reportType is ReportType type ? EmailWords.Isolate(ReportName(type, language)) : null;
+
+        (string title, string body) = language == UserLanguage.Arabic
+            ? Arabic(kind, report)
+            : English(kind, report);
+
+        return new NotificationText(title, body, actionPath);
+    }
+
+    /// <summary>A report's name in one language: the catalogue's own title, or its Arabic name.</summary>
+    public static string ReportName(ReportType type, UserLanguage language) =>
+        language != UserLanguage.Arabic
+            ? ReportCatalog.For(type).Title
+            : type switch
+            {
+                ReportType.ConversationActivity => "نشاط المحادثات",
+                ReportType.ChannelUsage => "استخدام القنوات",
+                ReportType.AiHumanHandling => "تولّي الذكاء الاصطناعي والفريق للمحادثات",
+                ReportType.CustomerActivity => "نشاط العملاء",
+                ReportType.AgentActivity => "نشاط وكلاء الذكاء الاصطناعي",
+                ReportType.ProviderUsage => "استخدام مزوّدي الذكاء الاصطناعي",
+                ReportType.ProviderCost => "التكلفة التقديرية للمزوّدين",
+                ReportType.WhatsAppDelivery => "حالة تسليم رسائل واتساب",
+                _ => throw new ArgumentOutOfRangeException(nameof(type), type, "Unknown report type."),
+            };
+
+    private static (string Title, string Body) English(NotificationKind kind, string? report) => kind switch
+    {
+        NotificationKind.ReportCompleted => (
+            "Your report is ready",
+            report is null
+                ? "Your report has finished generating and is ready to download."
+                : $"Your “{report}” report has finished generating and is ready to download."),
+
+        NotificationKind.ReportFailed => (
+            "Your report could not be generated",
+            report is null
+                ? "Your report failed. Open Reports to see why."
+                : $"Your “{report}” report failed. Open Reports to see why."),
+
+        NotificationKind.ScheduledReportCompleted => (
+            "Scheduled report ready",
+            report is null
+                ? "A scheduled report has finished generating and is ready to download."
+                : $"A scheduled “{report}” report has finished generating and is ready to download."),
+
+        NotificationKind.ScheduledReportFailed => (
+            "Scheduled report generation failed",
+            report is null
+                ? "A scheduled report could not be generated. Open Reports to see why."
+                : $"A scheduled “{report}” report could not be generated. Open Reports to see why."),
+
+        _ => (Describe(kind).Title, Describe(kind).Body),
+    };
+
+    /// <summary>
+    /// The Arabic sentences, word for word the client's own (messages.ar.json,
+    /// <c>notification.*</c>), which follow GLOSSARY.md.
+    /// </summary>
+    private static (string Title, string Body) Arabic(NotificationKind kind, string? report) => kind switch
+    {
+        NotificationKind.ReportCompleted => (
+            "تقريرك جاهز",
+            report is null
+                ? "اكتمل إنشاء تقريرك وهو جاهز للتنزيل."
+                : $"اكتمل إنشاء تقريرك «{report}» وهو جاهز للتنزيل."),
+
+        NotificationKind.ReportFailed => (
+            "تعذّر إنشاء تقريرك",
+            report is null
+                ? "فشل إنشاء تقريرك. افتح التقارير لمعرفة السبب."
+                : $"فشل إنشاء تقريرك «{report}». افتح التقارير لمعرفة السبب."),
+
+        NotificationKind.ScheduledReportCompleted => (
+            "التقرير المجدول جاهز",
+            report is null
+                ? "اكتمل إنشاء تقرير مجدول وهو جاهز للتنزيل."
+                : $"اكتمل إنشاء تقرير «{report}» مجدول وهو جاهز للتنزيل."),
+
+        NotificationKind.ScheduledReportFailed => (
+            "فشل إنشاء التقرير المجدول",
+            report is null
+                ? "تعذّر إنشاء تقرير مجدول. افتح التقارير لمعرفة السبب."
+                : $"تعذّر إنشاء تقرير «{report}» مجدول. افتح التقارير لمعرفة السبب."),
+
+        NotificationKind.UsageWarning or NotificationKind.UsageCritical => (
+            string.Create(CultureInfo.InvariantCulture, $"بلغ استخدام الذكاء الاصطناعي {PercentOf(kind)}% من الحد الشهري"),
+            string.Create(
+                CultureInfo.InvariantCulture,
+                $"استخدمت مساحة العمل هذه {PercentOf(kind)}% من عمليات الذكاء الاصطناعي الشهرية. لا يُرفض شيء حتى بلوغ الحد.")),
+
+        NotificationKind.UsageExhausted => (
+            "بلغت عمليات الذكاء الاصطناعي حدّها الشهري",
+            "استخدمت مساحة العمل هذه كل عمليات الذكاء الاصطناعي الشهرية. تُرفض العمليات الجديدة حتى يتجدّد الحد مطلع الشهر القادم (بالتوقيت العالمي)."),
+
+        NotificationKind.BillingPastDue => (
+            "دفعة الاشتراك متأخرة",
+            "لم تنجح إحدى دفعات الاشتراك. تبقى الباقة سارية خلال مهلة السماح؛ حدّث بيانات الدفع في الفوترة للاحتفاظ بها."),
+
+        NotificationKind.BillingSuspended => (
+            "عُلّق الاشتراك",
+            "انتهت مهلة السماح دون دفعة ناجحة، فانتقلت مساحة العمل إلى الباقة البديلة. لم يُحذف شيء."),
+
+        NotificationKind.BillingRecovered => (
+            "عاد الاشتراك ساريًا",
+            "عاد الاشتراك ساريًا واستعادت مساحة العمل باقتها."),
+
+        NotificationKind.BillingCanceled => (
+            "انتهى الاشتراك",
+            "انتهى الاشتراك وانتقلت مساحة العمل إلى الباقة البديلة. لم يُحذف شيء."),
+
+        NotificationKind.KnowledgeIndexingFailed => (
+            "فشلت فهرسة المعرفة",
+            "فشلت فهرسة أحد مستندات المعرفة، فلم يُحدَّث. أعد محاولة فهرسته."),
+
+        NotificationKind.WhatsAppDeliveryUnknown => (
+            "نتيجة تسليم رسالة واتساب غير معروفة",
+            "سُلّم ردّ إلى واتساب لكن تعذّر تأكيد نتيجته. لم يُرسَل مرة أخرى، كي لا يتلقاه العميل مرتين."),
+
+        _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unknown notification kind."),
+    };
+
+    private static int PercentOf(NotificationKind kind) => kind == NotificationKind.UsageCritical ? 90 : 70;
 
     private static NotificationText Usage(int percent) =>
         new(

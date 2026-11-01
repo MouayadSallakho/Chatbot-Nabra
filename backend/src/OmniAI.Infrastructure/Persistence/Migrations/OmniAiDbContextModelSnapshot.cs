@@ -104,6 +104,89 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                     b.ToTable("user_tokens", (string)null);
                 });
 
+            modelBuilder.Entity("OmniAI.Domain.Accounts.AccountEmail", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer")
+                        .HasColumnName("attempts");
+
+                    b.Property<DateTimeOffset>("AvailableAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("available_at");
+
+                    b.Property<Guid?>("ClaimToken")
+                        .HasColumnType("uuid")
+                        .HasColumnName("claim_token");
+
+                    b.Property<DateTimeOffset?>("ClaimedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("claimed_at");
+
+                    b.Property<string>("FailureCode")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("failure_code");
+
+                    b.Property<Guid?>("InvitationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("invitation_id");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("kind");
+
+                    b.Property<DateTimeOffset>("RequestedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("requested_at");
+
+                    b.Property<DateTimeOffset?>("SentAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("sent_at");
+
+                    b.Property<DateTimeOffset?>("SettledAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("settled_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("status");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid?>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_account_emails");
+
+                    b.HasIndex("AvailableAt")
+                        .HasDatabaseName("ix_account_emails_claimable")
+                        .HasFilter("status IN ('Pending', 'Sending')");
+
+                    b.HasIndex("InvitationId", "TenantId");
+
+                    b.HasIndex("UserId", "RequestedAt")
+                        .HasDatabaseName("ix_account_emails_user_requested");
+
+                    b.ToTable("account_emails", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_account_emails_attempts", "attempts >= 0");
+
+                            t.HasCheckConstraint("ck_account_emails_recipient", "(user_id IS NULL) <> (invitation_id IS NULL)");
+                        });
+                });
+
             modelBuilder.Entity("OmniAI.Domain.Ai.AiProviderUsage", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1053,6 +1136,10 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(256)")
                         .HasColumnName("email");
 
+                    b.Property<byte[]>("EmailTokenHash")
+                        .HasColumnType("bytea")
+                        .HasColumnName("email_token_hash");
+
                     b.Property<DateTimeOffset>("ExpiresAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("expires_at");
@@ -1060,6 +1147,11 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("InvitedByUserId")
                         .HasColumnType("uuid")
                         .HasColumnName("invited_by_user_id");
+
+                    b.Property<string>("Language")
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("language");
 
                     b.Property<DateTimeOffset?>("RevokedAt")
                         .HasColumnType("timestamp with time zone")
@@ -1085,6 +1177,11 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                     b.HasAlternateKey("Id", "TenantId")
                         .HasName("ak_tenant_invitations_id_tenant");
 
+                    b.HasIndex("EmailTokenHash")
+                        .IsUnique()
+                        .HasDatabaseName("ux_tenant_invitations_email_token_hash")
+                        .HasFilter("email_token_hash IS NOT NULL");
+
                     b.HasIndex("TenantId")
                         .HasDatabaseName("ix_tenant_invitations_tenant");
 
@@ -1097,7 +1194,10 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ux_tenant_invitations_open")
                         .HasFilter("status = 'Pending'");
 
-                    b.ToTable("tenant_invitations", (string)null);
+                    b.ToTable("tenant_invitations", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_tenant_invitations_language", "language IS NULL OR language IN ('en', 'ar')");
+                        });
                 });
 
             modelBuilder.Entity("OmniAI.Domain.Knowledge.AgentKnowledgeAssignment", b =>
@@ -2005,6 +2105,54 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                     b.ToTable("report_schedules", (string)null);
                 });
 
+            modelBuilder.Entity("OmniAI.Domain.Security.SecurityEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("ClientNetworkKey")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("client_network_key");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("kind");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at");
+
+                    b.Property<string>("SubjectKey")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("subject_key");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid?>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OccurredAt")
+                        .HasDatabaseName("ix_security_events_occurred");
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("UserId", "OccurredAt")
+                        .HasDatabaseName("ix_security_events_user_occurred")
+                        .HasFilter("user_id IS NOT NULL");
+
+                    b.ToTable("security_events", (string)null);
+                });
+
             modelBuilder.Entity("OmniAI.Domain.Tenants.Tenant", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2571,6 +2719,11 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("email_confirmed");
 
+                    b.Property<string>("Language")
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("language");
+
                     b.Property<bool>("LockoutEnabled")
                         .HasColumnType("boolean")
                         .HasColumnName("lockout_enabled");
@@ -2624,7 +2777,10 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("ix_users_normalized_user_name");
 
-                    b.ToTable("users", (string)null);
+                    b.ToTable("users", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_users_language", "language IS NULL OR language IN ('en', 'ar')");
+                        });
                 });
 
             modelBuilder.Entity("OmniAI.Infrastructure.Persistence.DataProtectionKeyRow", b =>
@@ -2773,6 +2929,22 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_user_tokens_user");
+                });
+
+            modelBuilder.Entity("OmniAI.Domain.Accounts.AccountEmail", b =>
+                {
+                    b.HasOne("OmniAI.Infrastructure.Persistence.UserReferenceRow", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .HasConstraintName("fk_account_emails_user");
+
+                    b.HasOne("OmniAI.Domain.Invitations.TenantInvitation", null)
+                        .WithMany()
+                        .HasForeignKey("InvitationId", "TenantId")
+                        .HasPrincipalKey("Id", "TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .HasConstraintName("fk_account_emails_invitation");
                 });
 
             modelBuilder.Entity("OmniAI.Domain.Ai.AiProviderUsage", b =>
@@ -3224,6 +3396,21 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_report_schedules_tenant");
+                });
+
+            modelBuilder.Entity("OmniAI.Domain.Security.SecurityEvent", b =>
+                {
+                    b.HasOne("OmniAI.Domain.Tenants.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_security_events_tenant");
+
+                    b.HasOne("OmniAI.Infrastructure.Persistence.UserReferenceRow", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_security_events_user");
                 });
 
             modelBuilder.Entity("OmniAI.Domain.Tenants.TenantMembership", b =>

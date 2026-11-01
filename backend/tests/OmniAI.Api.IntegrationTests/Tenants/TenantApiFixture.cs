@@ -39,6 +39,10 @@ public sealed class TenantApiFixture : IAsyncLifetime
 
     private readonly PostgresTestDatabase _database = new();
 
+    // Phase 37.3: sign-in is rate-limited in Redis and refused (503) without it,
+    // exactly as a deployment without the store would be.
+    private readonly RedisTestServer _redis = new();
+
     private WebApplicationFactory<Program>? _application;
 
     /// <summary>Direct database access, for asserting on stored rows.</summary>
@@ -58,6 +62,16 @@ public sealed class TenantApiFixture : IAsyncLifetime
                 // suite that forgot this could not create a workspace at all rather
                 // than quietly creating an unlimited one.
                 builder.UseSetting("Plans:DefaultPlanCode", "development");
+
+                builder.UseSetting("ConnectionStrings:OmniAiProtectionRedis", _redis.ConnectionString);
+                builder.UseSetting("PUBLIC_CHAT_NETWORK_KEY_SECRET", _redis.NetworkKeySecret);
+                builder.UseSetting("PublicChatProtection:KeyPrefix", _redis.KeyPrefix);
+                builder.UseSetting("AccountProtection:KeyPrefix", _redis.KeyPrefix + ":acp");
+
+                // A connection to have come from: TestServer has no socket, and an
+                // account request from an unknown network is refused (Phase 37.3).
+                builder.ConfigureServices(services => services.AddSingleton<Microsoft.AspNetCore.Hosting.IStartupFilter>(
+                    new SimulatedPeerStartupFilter(SimulatedPeerStartupFilter.Default, honourHeader: false)));
             });
     }
 

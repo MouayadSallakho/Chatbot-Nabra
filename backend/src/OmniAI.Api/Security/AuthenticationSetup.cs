@@ -55,9 +55,11 @@ internal static class AuthenticationSetup
 
     public static IServiceCollection AddOmniAiAuthentication(
         this IServiceCollection services,
+        IConfiguration configuration,
         IHostEnvironment environment)
     {
         ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(configuration);
         ArgumentNullException.ThrowIfNull(environment);
 
         // Development is the only environment allowed to serve the cookie over
@@ -77,7 +79,12 @@ internal static class AuthenticationSetup
             // SignInManager is what turns a verified password into a cookie. It is
             // not part of AddIdentityCore's default set, because a headless API
             // that only validates credentials does not need it.
-            .AddSignInManager();
+            .AddSignInManager()
+            // Phase 37.3: the password-reset token provider, and the only token
+            // provider this platform registers. Before it, none existed, so
+            // GeneratePasswordResetTokenAsync would have thrown; no other token's
+            // lifetime changes because no other token exists.
+            .AddNabraPasswordReset(configuration, environment.IsDevelopment());
 
         // AddIdentity was rejected in favour of AddIdentityCore: the former
         // requires a role type, which would have brought three role tables and a
@@ -140,7 +147,15 @@ internal static class AuthenticationSetup
 
                     return Task.CompletedTask;
                 };
+
+                // Phase 37.3: the stamp is checked on every request, not every thirty
+                // minutes, so a password reset ends every earlier session at once, on
+                // every instance. Replaces Identity's interval validator; no cookie is
+                // reissued per request.
+                options.Events.OnValidatePrincipal = SessionStamps.ValidatePrincipalAsync;
             });
+
+        services.AddScoped<SessionStamps>();
 
         services.AddAuthorization();
 
@@ -235,14 +250,13 @@ internal static class AuthenticationSetup
     /// one wearing punctuation.
     /// </para>
     /// <para>
-    /// <strong>Lockout: five failures, fifteen minutes.</strong> Enough to stop an
-    /// online guessing attack from getting anywhere, short enough that somebody
-    /// who genuinely mistyped is not locked out for the afternoon. It applies to
-    /// new accounts as well as established ones -- the alternative leaves every
-    /// freshly registered account unprotected, which is precisely the set an
-    /// attacker would target. Identity's own counter is used; no bespoke
-    /// brute-force tracking exists, and no distributed rate limiter is introduced
-    /// for a scaling problem this deployment does not have.
+    /// <strong>Lockout: configured, and no longer applied at sign-in (Phase 37.3
+    /// Revision 1).</strong> Five failures and fifteen minutes stay configured, but
+    /// sign-in passes <c>lockoutOnFailure: false</c>: Identity's lockout let anybody
+    /// who knew an address lock its owner out. Guessing is stopped instead by the
+    /// failure limiter in Redis, which slows only the network the guesses come from
+    /// (authentication-tenant-membership.md D30). A lockout left from before is
+    /// honoured until it expires, and a password reset lifts it.
     /// </para>
     /// <para>
     /// <strong>Email confirmation is off, and that is a deferral, not an

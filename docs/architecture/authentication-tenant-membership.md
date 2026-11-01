@@ -354,6 +354,16 @@ never incremented and the whole policy is unreachable — so the test that prove
 lockout uses the *correct* password on the sixth attempt, because a success there
 would mean the counter was never applied.
 
+**Superseded in Phase 37.3 Revision 1: no hard lockout.** Sign-in now passes
+`lockoutOnFailure: false`. Identity's lockout let anybody who knew an address lock
+its owner out for fifteen minutes, again and again (decision D-2: nobody can lock
+another person out). The settings above stay configured but are no longer reached
+from sign-in: a lockout left from before is honoured until it expires, and a
+password reset lifts it. Guessing is stopped by the failure limiter (D30), which
+slows only the network the guesses come from. The test now proves the opposite of
+the old one: after the failures, the right password is refused with `429` on that
+network, and the account has no lockout end and no failure count.
+
 ### D12 — Antiforgery
 
 Cookie authentication means the browser attaches the session to requests another
@@ -704,15 +714,21 @@ It rethrows, so the calling screen still stops its own spinner.
 
 ### D24 — Anonymous surface
 
-Exactly five endpoints answer without a session:
+Exactly seven endpoints answer without a session (five until Phase 37.3):
 
 ```
-GET  /health              liveness; a probe that needed a session could not be called
-GET  /openapi/v1.json     Development only
-GET  /api/auth/csrf       a client that cannot get a token can never sign in
+GET  /health                      liveness; a probe that needed a session could not be called
+GET  /openapi/v1.json             Development only
+GET  /api/auth/csrf               a client that cannot get a token can never sign in
 POST /api/auth/register
 POST /api/auth/login
+POST /api/auth/password/forgot    Phase 37.3 (D29)
+POST /api/auth/password/reset     Phase 37.3 (D29)
 ```
+
+`AnonymousAccessTests.The_anonymous_account_surface_is_exactly_five_routes` reads
+the endpoints' metadata and fails if anything else under `/api/auth` or `/api/me`
+allows anonymous callers.
 
 Everything else requires authentication, asserted per route group rather than
 once — authorization is configured per group, so proving one answers `401` proves
@@ -721,7 +737,9 @@ nothing about another.
 ### D25 — Generic sign-in failure
 
 Wrong password, unknown address and locked-out account all produce the same `401`
-with the same title and the same sentence.
+with the same title, the same sentence and, from Phase 37.3, the same code,
+`auth.credentials.invalid` (D31). From Revision 1 sign-in locks no account (D11);
+only a lockout left from before can still apply, until it expires.
 
 Distinguishing the first two turns the login form into an account-existence
 oracle: somebody can learn which of a list of addresses are registered here simply
@@ -744,9 +762,10 @@ Closing it is part of the deferred email-verification work.
 
 ### D26 — Registration creates an account and nothing else
 
-No workspace, no role, no permission. The request body has two fields, so there is
-no field through which a caller could ask for a tenant or a privilege — asserted
-anyway, by posting extra fields and confirming they change nothing.
+No workspace, no role, no permission. The request body has two fields and, from
+Phase 37.3, an optional third, `language` (D28), so there is no field through which
+a caller could ask for a tenant or a privilege — asserted anyway, by posting extra
+fields and confirming they change nothing.
 
 Signing the new account in immediately is deliberate: somebody who has just proved
 they hold the password by choosing it has told us everything a sign-in would. It
@@ -763,6 +782,193 @@ exactly as Phase 11 accepted them. Verified in the browser: a rename sent
 The only interaction is ordering — membership is resolved before any precondition
 is compared, so another tenant's real tag produces `404` rather than a
 precondition result.
+
+## Phase 37.3: accounts and email
+
+### D28 — Each person's language
+
+`users.language` (`varchar(8) NULL`, check `ck_users_language`: `en`, `ar` or
+null; migration `AddUserLanguage`). One value per person, not per workspace. It is
+a **communication preference**: what the server writes to the person (emails today)
+is in it, and in English while it is null. The interface still takes its own
+language from the browser's stored choice (`omniai.lang`, admin-design-system D22).
+
+How it is set:
+
+1. The optional `language` (`"en"` or `"ar"`, exact) on `POST /api/auth/register`,
+   `POST /api/auth/login` and `POST /api/invitations/accept`.
+2. Otherwise the request's `Accept-Language`: the first supported primary tag by
+   q-value, so `ar-SA;q=0.9` is Arabic. A range with `q=0` and `*` decide nothing.
+3. Otherwise it stays null.
+
+Sign-in and acceptance fill it **only while it is null** (one conditional
+`UPDATE … WHERE language IS NULL`). Only `PUT /api/me/language { language }`
+(signed in, antiforgery, `204`) changes a chosen value; the client calls it when a
+signed-in person switches language. Anything other than the two codes is
+`400 language.unsupported`. `GET /api/auth/me` returns it as a third field,
+`language` (`"en"`, `"ar"` or `null`).
+
+### D29 — Password reset
+
+**Request.** `POST /api/auth/password/forgot { email }` answers **`202` with no body,
+always**, whatever the address. Nothing in the answer, its headers or its timing says
+whether an account exists:
+
+- the limiter counts unknown addresses exactly like known ones (D30);
+- the database runs the same two statements either way, in one transaction: a
+  `SELECT … FOR UPDATE` of the account row (nothing for an unknown address), then
+  one statement that queues the email when the account exists and has none pending,
+  and writes the `auth.password_reset.requested` audit row in every case;
+- every answer, refusals included, is padded to `Auth:PasswordReset:MinimumResponseTime`
+  (400 ms), measured by a stopwatch. The API suite sends 120 requests per case,
+  interleaved, and requires the medians and 90th percentiles to sit within 40 ms
+  (measured: medians 402.1 and 402.2 ms).
+
+**What is queued.** One `account_emails` row: the account and the request time (M2).
+No address, token, link, subject or body column exists. A pending row already queued
+for the account is reused; there is never a second pending one.
+
+**The token.** ASP.NET Core Identity's own password-reset token, from a dedicated
+provider, `PasswordResetTokenProvider : DataProtectorTokenProvider<OmniAiUser>`
+(`NabraPasswordReset`), registered with `AddTokenProvider` and set as
+`Tokens.PasswordResetTokenProvider`. Before Phase 37.3 no token provider was
+registered at all, so no other token's lifetime changed. The token is a
+data-protected payload (time, user id, purpose, security stamp) under the shared key
+ring, so either production API validates a token the other minted. The provider
+writes the payload itself so it can use the platform clock, compare the user id and
+the stamp with `CryptographicOperations.FixedTimeEquals`, and encode as base64url.
+
+- Lifetime `Auth:PasswordReset:TokenLifetime`, default **30 minutes**, bounded to
+  10–60 minutes, and 1–60 in Development only (owner decision 2026-10-21, so an
+  expired link can be checked by hand).
+- Single use: a successful reset rotates the security stamp, so that token and
+  every earlier one stop validating.
+- Nothing about it is stored.
+
+**The link.** Built by the account email worker at send time, never earlier:
+`Email:AppBaseUrl` + `/reset-password#uid=<userId>&token=<token>`. The fragment
+never reaches a server log or a `Referer`; the page removes it from the address bar
+with `history.replaceState` as soon as it reads it. A request older than
+`Auth:PasswordReset:RequestLifetime` (15 minutes) when its turn comes is skipped
+(`request_expired`), not sent late.
+
+**Reset.** `POST /api/auth/password/reset { userId, token, newPassword }`:
+
+- `204` on success;
+- `400 auth.reset.invalid` for every bad link: malformed, altered, expired or used
+  token, unknown or malformed user id, missing token. The bodies are byte-identical
+  apart from `traceId`;
+- `400 auth.password.*` (with `codes`) only once the token has been accepted, because
+  Identity checks the token before the password. The new password goes through the
+  same validators as registration (D10).
+
+On success, in order: the lockout is lifted, the new stamp is written to the stamp
+cache (D32), the account's realtime connections close on every instance (D32), a
+"your password was changed" email is queued (no link to act on), and
+`auth.password_reset.completed` and `auth.sessions.revoked` are recorded.
+
+### D30 — Rate limits on the anonymous account endpoints
+
+The public chat's Redis limiter (same Lua script, same store, same key secret),
+with its own counters under `AccountProtection:KeyPrefix` (`omniai:acp:v1`), shared
+by every API instance. Per address means an HMAC of the address as Identity
+normalises it, under a key derived from `PUBLIC_CHAT_NETWORK_KEY_SECRET` with the
+label `nabra:account-subject:v1`; per network means the existing keyed network hash.
+A request whose client address cannot be established is refused with `503`:
+unknown is not a bucket (public-chat-protection.md P11).
+
+| Counter | Default | Configuration |
+| --- | --- | --- |
+| Failed sign-ins for one address from one network | 5 per 15 minutes | `AccountProtection:SignInFailuresPerAddressOnNetwork` |
+| Failed sign-ins from one network | 50 per 15 minutes | `AccountProtection:SignInFailuresPerNetwork` |
+| Failed sign-ins for one address from every network | 100 per hour | `AccountProtection:SignInFailuresPerAddress` |
+| Reset requests per address | 3 per hour | `AccountProtection:ResetRequestsPerAddress` |
+| Reset requests per network | 10 per hour | `AccountProtection:ResetRequestsPerNetwork` |
+| Reset attempts per network | 20 per 15 minutes | `AccountProtection:ResetsPerNetwork` |
+
+Each is `Limit` and `WindowSeconds`; a counter's window starts at its first count.
+
+**Sign-in counts failures, not attempts (Revision 1).** Before the password is
+checked the three sign-in counters are **read**; if one has reached its limit the
+request is refused with `429`, so a throttled correct password is refused like a
+wrong one and throttling says nothing about either. When there is room, the same
+atomic step reserves an **in-flight** slot in each counter, and failures plus
+sign-ins in flight never exceed a limit: without it, a burst of parallel guesses
+would all pass the check before the first was counted. A slot whose outcome is never
+recorded expires after ten seconds; a refusal caused only by sign-ins still in flight
+asks the caller to retry in one second. After a failed check all three
+are incremented; an unknown address counts as a failure too, so the counters cannot
+tell it from a wrong password. A successful sign-in increments nothing: it releases
+its slot and clears that address's failures on that network. So:
+
+- a support team of any size behind one office address signs in freely; only failures
+  count against the network;
+- a stranger's guesses throttle only the stranger's network, and the owner signs in
+  from their own;
+- guessing spread over many networks stops at the per-address ceiling, which then
+  refuses the owner too until it expires (the remaining risk, below).
+
+A refusal is `429 auth.throttled` with `Retry-After` (whole seconds, at least one,
+the remaining life of the counter that refused), naming no limit or window;
+throttled sign-ins and reset requests are audited. A failure that cannot be counted
+is answered `503`, like a check that cannot be made. Reset requests and reset
+attempts still count every attempt (above), unchanged.
+
+**Remaining risk.** Guessing spread over many networks can reach the per-address
+ceiling (100 failures in an hour) and so refuse the owner's sign-in for the rest of
+that hour, from every network. It needs a hundred guesses from at least twenty
+networks, it never locks the account, and a password reset is unaffected. When the store cannot be reached, or is not configured,
+the endpoint answers `503 auth.throttle.unavailable` rather than serving unlimited
+(fail closed); the log gets the reason.
+
+### D31 — Codes on sign-in and registration refusals
+
+Every refusal of `login` and `register` carries a stable `code` beside the unchanged
+status, title and English `detail`; the client words it by code. The list is in
+`problem-codes.md`: `auth.credentials.invalid`, `auth.registration.incomplete`,
+`auth.email.taken`, `auth.email.invalid`, `auth.password.<rule>` (for example
+`auth.password.too_short`), `auth.registration.rejected`, `language.unsupported`,
+`auth.throttled`, `auth.throttle.unavailable`. A refusal with several Identity
+errors also lists them all in `codes`. No code says whether an address has an account.
+
+### D32 — Every session ends at once
+
+The cookie already carried Identity's security-stamp claim. From Phase 37.3 the
+application cookie's `OnValidatePrincipal` (`SessionStamps.ValidatePrincipalAsync`)
+compares it with the account's current stamp **on every request**, in constant time,
+instead of Identity's thirty-minute interval validator. No cookie is reissued.
+
+- The current stamp comes from Redis (`omniai:auth:stamp:v1:{userId}`, ten-minute
+  expiry) or, on a miss or a Redis failure, from `users`. A database read is cached
+  only with `SET NX`; a reset writes its stamp unconditionally before it answers, so
+  the next request on any instance is refused with `401`.
+- On a mismatch the database is read once more before anybody is signed out, so a
+  cached stamp left behind by a failed write can never lock out a fresh session.
+- Realtime: each instance keeps its admin hub connections by account
+  (`SessionConnections`). A reset aborts the account's connections on its own
+  instance and publishes the account on the Redis channel `omniai:auth:revoked`;
+  every instance aborts its own. A hub filter also re-checks the stamp on every
+  invocation, so a connection that missed the message can do nothing.
+- Measured on the dev stack: p95 of `GET /api/auth/me` 17.4 and 16.8 ms before,
+  17.1, 16.9 and 16.6 ms after (budget +2 ms).
+
+### D33 — The audit table
+
+`security_events` (migration `AddSecurityEvents`): `occurred_at`, `kind`, nullable
+`user_id` and `tenant_id` (both `ON DELETE SET NULL`, so a record outlives what it
+names), `subject_key` (the keyed hash of an address a request named) and
+`client_network_key`. **No address, token, password, link or free text.** Kinds are
+a closed list in code (`SecurityEventKinds`):
+
+`auth.password_reset.requested`, `auth.password_reset.throttled`,
+`auth.password_reset.email_sent`, `auth.password_reset.email_failed`,
+`auth.password_reset.completed`, `auth.password_reset.rejected`,
+`auth.password_changed.email_sent`, `auth.password_changed.email_failed`,
+`auth.sessions.revoked`, `auth.signin.throttled`, `auth.invitation.email_sent`,
+`auth.invitation.email_failed`.
+
+Writes are best effort: a failure is logged (event 4300) and the request carries
+on. The security decisions themselves never depend on the audit row.
 
 ---
 
@@ -803,13 +1009,13 @@ authorise production deployment.**
 | | Why it matters |
 | --- | --- |
 | Email confirmation | Addresses are unverified; registration enumeration stays open until it lands |
-| Password recovery | There is no reset. A forgotten password today means a lost account |
+| ~~Password recovery~~ | Done in Phase 37.3 (D29) |
 | Multi-factor authentication | Password alone is the whole factor |
 | Roles and permissions | Membership means full access. Must land **before** member administration is exposed |
 | User invitations | No way to add a second member, deliberately |
 | User administration | No list, search, or account deletion. Deletion semantics are unanswered — see D14 |
 | SSO / OIDC | No external provider |
 | External API tokens, mobile auth, refresh tokens | See D7 |
-| Security-event auditing | Sign-ins and failures are logged, not audited. Server-side session revocation belongs here |
-| Production rate limiting | Identity's lockout is per-account, not per-origin |
+| Security-event auditing | Phase 37.3 audits password reset, throttling, session revocation and account emails (D33). Successful and failed sign-ins are still logged, not audited. A reset ends every session (D32); sign-out still ends only the browser's cookie |
+| Production rate limiting | Sign-in failures and password reset are limited per address and per network from Phase 37.3 (D30); registration is not limited yet |
 | Reverse-proxy deployment | The application accepts a trusted forwarded scheme (D9b) and refuses insecure requests (D9d). What is deferred is the deployment side: naming the production proxy's address, adopting the `__Host-` prefix, and verifying TLS termination end to end against the real host |

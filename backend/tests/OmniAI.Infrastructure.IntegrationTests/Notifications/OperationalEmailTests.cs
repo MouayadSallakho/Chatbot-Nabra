@@ -307,6 +307,7 @@ public sealed class OperationalEmailTests(PostgresTestDatabase database)
                     new NotificationStore(context),
                     NotificationHarness.Authority(context),
                     new OmniAI.Infrastructure.Identity.IdentityAccountDirectory(context),
+                    new NotificationDirectory(context),
                     new OmniAI.Infrastructure.Persistence.Repositories.TenantRepository(context),
                     sender,
                     new OperationalEmailLinks(new Uri("http://localhost:4200/")),
@@ -315,6 +316,54 @@ public sealed class OperationalEmailTests(PostgresTestDatabase database)
         }
 
         return statuses;
+    }
+
+    // ------------------------------------------------- language (Phase 37.3)
+
+    [Fact]
+    public async Task An_email_is_worded_when_sent_in_the_recipient_s_current_language_naming_its_report()
+    {
+        await using SmtpSink sink = new();
+
+        ReportWorld world = await ReportWorld.CreateAsync(database, "شركة النور");
+        NotificationHarness harness = new(database);
+
+        await harness.EmailEverythingAsync(world.Tenant, world.Owner);
+
+        Domain.Reports.ReportExecution execution = await world.PendingAsync(Domain.Reports.ReportType.AgentActivity);
+        await harness.RecordAsync(world.Tenant, NotificationKind.ReportCompleted, $"report:{execution.Id.Value:N}", execution.Id.Value);
+        await harness.DispatchAllAsync();
+
+        // Chosen after the notification was created: the email follows the choice
+        // as it stands when it is sent.
+        await database.ExecuteScalarAsync($"UPDATE users SET language = 'ar' WHERE id = '{world.Owner.Value}'");
+
+        Assert.Equal([NotificationEmailStatus.Sent], await SendWithSinkAsync(harness, sink, world.Tenant));
+
+        MimeKit.MimeMessage email = Assert.Single(sink.Messages).Parse();
+
+        Assert.Equal("نبرة: تقريرك جاهز", email.Subject);
+        Assert.Contains("«\u2068نشاط وكلاء الذكاء الاصطناعي\u2069»", email.TextBody, StringComparison.Ordinal);
+        Assert.Contains("<html lang=\"ar\" dir=\"rtl\">", email.HtmlBody, StringComparison.Ordinal);
+        Assert.Contains("<bdi>شركة النور</bdi>", email.HtmlBody, StringComparison.Ordinal);
+        Assert.Contains("فتح التقارير", email.HtmlBody, StringComparison.Ordinal);
+
+        // The in-app notification keeps its stored English text; only the email changed.
+        Assert.Equal("Your report is ready", Assert.Single(await harness.NotificationsAsync(world.Tenant)).Title);
+    }
+
+    [Fact]
+    public async Task An_account_without_a_language_is_emailed_in_english()
+    {
+        await using SmtpSink sink = new();
+        (ReportWorld world, NotificationHarness harness) = await QueuedWithSinkAsync(sink);
+
+        Assert.Equal([NotificationEmailStatus.Sent], await SendWithSinkAsync(harness, sink, world.Tenant));
+
+        MimeKit.MimeMessage email = Assert.Single(sink.Messages).Parse();
+
+        Assert.Equal("Nabra: Subscription payment is past due", email.Subject);
+        Assert.Contains("<html lang=\"en\" dir=\"ltr\">", email.HtmlBody, StringComparison.Ordinal);
     }
 
     // ------------------------------------------------------ SMTP, for real
@@ -367,6 +416,7 @@ public sealed class OperationalEmailTests(PostgresTestDatabase database)
                 new NotificationStore(context),
                 NotificationHarness.Authority(context),
                 new OmniAI.Infrastructure.Identity.IdentityAccountDirectory(context),
+                new NotificationDirectory(context),
                 new OmniAI.Infrastructure.Persistence.Repositories.TenantRepository(context),
                 sender,
                 new OperationalEmailLinks(new Uri("http://localhost:4200/")),

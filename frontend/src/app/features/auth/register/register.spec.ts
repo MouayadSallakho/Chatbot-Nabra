@@ -5,6 +5,7 @@ import { Router, provideRouter } from '@angular/router';
 import { LOCAL_STORAGE } from '@app/core/storage/local-storage';
 import { memoryStorage, permissionApiGranting } from '@app/testing/test-doubles';
 import { PermissionApi } from '@app/core/authorization/permission-api';
+import { APP_LANGUAGE, AppLanguage } from '@app/core/i18n/language';
 import { Register } from './register';
 
 /** Creating an account, and nothing else. */
@@ -17,7 +18,10 @@ describe('Register', () => {
   let storage: Storage;
   let navigatedTo: unknown[] | null;
 
-  beforeEach(() => {
+  beforeEach(() => mount());
+
+  /** Renders the screen, in English unless a page language is given. */
+  function mount(language?: AppLanguage): void {
     navigatedTo = null;
     storage = memoryStorage();
 
@@ -32,6 +36,7 @@ describe('Register', () => {
         provideHttpClient(),
         provideHttpClientTesting(),
         { provide: LOCAL_STORAGE, useValue: storage },
+        ...(language ? [{ provide: APP_LANGUAGE, useValue: language }] : []),
       ],
     });
 
@@ -46,7 +51,7 @@ describe('Register', () => {
     http = TestBed.inject(HttpTestingController);
     fixture = TestBed.createComponent(Register);
     fixture.detectChanges();
-  });
+  }
 
   afterEach(() => http.verify());
 
@@ -126,7 +131,35 @@ describe('Register', () => {
 
     const request = http.expectOne('/api/auth/register');
 
-    expect(request.request.body).toEqual({ email: account.email, password: 'abcdefghijkl' });
+    // The page's language travels with the account, for the emails the server
+    // writes to it (Phase 37.3). This page is in English.
+    expect(request.request.body).toEqual({
+      email: account.email,
+      password: 'abcdefghijkl',
+      language: 'en',
+    });
+
+    request.flush(account, { status: 201, statusText: 'Created' });
+    await settle();
+
+    http.expectOne('/api/me/tenants').flush([]);
+    await settle();
+  });
+
+  it('sends the language the page is in, so the account is written to in Arabic (Phase 37.3)', async () => {
+    TestBed.resetTestingModule();
+    mount('ar');
+
+    await fill(account.email, password);
+
+    submit().click();
+    await settle();
+
+    await answerToken();
+
+    const request = http.expectOne('/api/auth/register');
+
+    expect(request.request.body).toEqual({ email: account.email, password, language: 'ar' });
 
     request.flush(account, { status: 201, statusText: 'Created' });
     await settle();
@@ -203,11 +236,11 @@ describe('Register', () => {
     expect(JSON.stringify(storage)).not.toContain(password);
   });
 
-  it('says that addresses are not verified and there is no reset', async () => {
-    // Somebody should know their address has not been verified before they rely
-    // on it for a recovery flow that does not exist yet either.
+  it('says that addresses are not verified, and no longer that there is no reset', async () => {
+    // Somebody should know their address has not been verified. Password reset
+    // exists from Phase 37.3, so the page must not deny it.
     expect(host().textContent).toContain('not verified');
-    expect(host().textContent).toContain('no password reset');
+    expect(host().textContent).not.toContain('no password reset');
   });
 
   it('offers a way back to signing in', () => {

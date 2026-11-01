@@ -233,21 +233,23 @@ accepted) → `Failed / rejected`. Anything else after transmission began → `U
 / outcome_unknown`, never retried. Statuses: Pending, Sending, Sent, Failed,
 Unknown, Skipped.
 
-**Content.** `OperationalEmailRenderer`: a constant subject (`Nabra: {title}`), a
+**Content.** `OperationalEmailRenderer`: a constant subject (`Nabra: {title}`, or
+`نبرة: {title}` in Arabic), a
 text/plain and an HTML part (multipart/alternative), fixed markup with every
 inserted value HTML-encoded, the workspace name reduced to one line, one link built
 from `AppBaseUrl` + the internal action path, no image, font, stylesheet or
 tracking pixel, `Auto-Submitted: auto-generated`, no attachment — a report email
 links to Reports, where the authenticated download remains the only way to the
-file. No token, session, key or invitation ever appears in a link.
+file. No token, session, key or invitation ever appears in a link of an
+operational email. The account emails (section 14) are the one exception, under
+their own rule.
 
 **The public name (Phase 37.1).** Everything a recipient reads says Nabra: the
 subject prefix, the heading line of both parts, the footer ("your Nabra
 notification preferences"), the fallback action ("Open Nabra") and the default
 sender name. OmniAI stays the internal code name. `PublicNameTests` fails the
 build's test run if a user-facing literal under `backend/src` says OmniAI again.
-The body is still English for every recipient; the recipient's language arrives
-in 37.3. SMTP
+From Phase 37.3 every email is in its recipient's language (section 14). SMTP
 transcripts, bodies and credentials are never logged (no protocol logger).
 
 **Failure isolation.** Email never rolls back anything: the notification and the
@@ -296,7 +298,65 @@ client lazily, so it stays out of the initial bundle.
   Suspended occurrence; grace-expiry suspension is the Phase 25 sweeper's.
 - No member-removal flow exists in the product yet; removal semantics are enforced
   by the re-checks and tested at the database level.
-- Emails are English only; no digest, quiet hours, SMS, push or chat channels.
+- ~~Emails are English only.~~ English and Arabic from Phase 37.3 (section 14).
+  No digest, quiet hours, SMS, push or chat channels.
 - Only the SMTP adapter exists; the abstraction admits others later.
 - The notification SignalR subscription opens its own connection to the existing
   hub rather than sharing the inbox's.
+
+## 14. Languages and account emails (Phase 37.3)
+
+**Every email in its recipient's language.** The language is read when the email is
+sent, from the recipient's `users.language` (authentication-tenant-membership.md
+D28), and English when they have none. A member who switches between the
+notification and the email reads the new language. Only the email changes: the
+in-app notification keeps its stored English text, and the client words it by kind,
+as before.
+
+| Email | Recipient's language from | Renderer |
+| --- | --- | --- |
+| 13 operational kinds (report ready/failed ×4, usage 70/90/exhausted, billing ×4, knowledge indexing failed, WhatsApp delivery unknown) | `users.language` | `OperationalEmailRenderer` |
+| Set a new password | `users.language` | `AccountEmailRenderer.PasswordReset` |
+| Your password was changed | `users.language` | `AccountEmailRenderer.PasswordChanged` |
+| Invitation | the invitation's `language` (asked for by the inviter, else the inviter's own, else English) | `AccountEmailRenderer.Invitation` |
+
+**Words.** `NotificationCatalog.Describe(kind, language, reportType…)` holds both
+texts in code. The Arabic sentences are word for word the client's own
+(`messages.ar.json`, `notification.*` and `reports.type.*`), so a notification
+reads the same in the bell and in the inbox; they follow `GLOSSARY.md`. A report
+email names the report: its type is derived at send time (notification → occurrence
+→ execution), and when it is gone the sentence leaves the name out. A test fails if
+any kind lacks either language.
+
+**Layout.** One `EmailLayout` for every email: the subject is a constant per kind
+and language; the HTML part is `<html lang="ar" dir="rtl">` (with `dir` repeated on
+the body and the card) or `lang="en" dir="ltr"`; the plain-text part says the same
+words. Names somebody wrote (a workspace, a report) are isolated: FSI…PDI in text,
+`<bdi>` in HTML, and stray directional controls in a workspace name become spaces.
+Digits are Western and instants read `yyyy-MM-dd HH:mm` UTC in both languages. No
+image, font, stylesheet or tracking, as before.
+
+**Account emails.** `account_emails` (migrations `AddAccountEmailOutbox` and
+`AddInvitationEmail`) holds who and when only: the account, or the invitation and
+its workspace (exactly one, `ck_account_emails_recipient`), the kind and the request
+time. No address, token, link, subject or body column. `AccountEmailWorker` claims
+and settles exactly like `OperationalEmailWorker` (same pacing settings, same
+lease, Unknown after a stale Sending, never resent after the boundary) and audits
+each sent or failed email (`security_events`).
+
+**Their links carry a secret, in the fragment only.** A reset email links to
+`/reset-password#uid=…&token=…`, an invitation email to
+`/accept-invitation#token=…`. The token is minted by the worker at the moment it
+sends and exists only in that method's memory: never in a row, a log or a queue. For
+an invitation, only the SHA-256 of the emailed token is stored, on the invitation
+(`email_token_hash`), together with the dispatch boundary in one transaction, and
+only while the worker still owns the email and the invitation is still open. The
+password-changed email has no link to act on but a plain sign-in link.
+
+**Skips.** Email not configured (`email_not_configured`), account gone
+(`account_unavailable`), reset request older than 15 minutes (`request_expired`),
+invitation accepted, revoked or expired (`invitation_closed`).
+
+**Development.** The dev stack sends to Mailpit (`axllent/mailpit:v1.27`, no relay)
+on loopback inside the API's network namespace; its web UI is on
+`127.0.0.1:8026`. See `stack.md`.

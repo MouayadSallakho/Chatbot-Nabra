@@ -149,6 +149,32 @@ internal sealed class InboxHubClient : IAsyncDisposable
         }
     }
 
+    /// <summary>
+    /// Whether the server ended this connection within the time given (Phase 37.3).
+    /// </summary>
+    /// <remarks>
+    /// The reader stops when the socket stops being open, however that happened:
+    /// a close frame, or an aborted transport.
+    /// </remarks>
+    public async Task<bool> WaitForCloseAsync(TimeSpan within)
+    {
+        try
+        {
+            await _reader.WaitAsync(within);
+        }
+        catch (TimeoutException)
+        {
+            return false;
+        }
+        catch (Exception exception) when (
+            exception is OperationCanceledException or WebSocketException or IOException or JsonException)
+        {
+            // Ended by the server, which is what is being waited for.
+        }
+
+        return true;
+    }
+
     public async ValueTask DisposeAsync()
     {
         await _stop.CancelAsync();

@@ -182,36 +182,40 @@ public static partial class PublicChatProtectionSetup
                     + "exists to prevent.");
             }
 
-            services.AddSingleton<IClientNetworkKeys>(
-                _ => HmacClientNetworkKeys.From(secret.Trim()));
-
-            return;
+            services.AddSingleton(NetworkKeySecret.Configured(secret.Trim()));
         }
-
-        if (!allowEphemeral)
+        else if (!allowEphemeral)
         {
-            services.AddSingleton<IClientNetworkKeys>(_ => HmacClientNetworkKeys.Unavailable(
+            services.AddSingleton(NetworkKeySecret.Missing(
                 "No public chat network key secret is configured, so no trustworthy rate-limit "
                 + "identity can be derived and public web chat writes are refused. Set the "
                 + $"{NetworkKeySecretVariable} environment variable."));
+        }
+        else
+        {
+            services.AddSingleton(provider =>
+            {
+                // Random, per process, never written anywhere. Restarting renames the
+                // buckets; it does not remove them.
+                string ephemeral = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
 
-            return;
+                LogEphemeralSecret(
+                    provider
+                        .GetRequiredService<ILoggerFactory>()
+                        .CreateLogger(typeof(PublicChatProtectionSetup).FullName!),
+                    NetworkKeySecretVariable);
+
+                return NetworkKeySecret.Configured(ephemeral);
+            });
         }
 
+        // One secret, read once, behind both key sources (Phase 37.3): the network
+        // keys here, and the account limiter's address keys, which derive their own
+        // key from it under a distinct label (HmacAccountSubjectKeys).
         services.AddSingleton<IClientNetworkKeys>(provider =>
-        {
-            // Random, per process, never written anywhere. Restarting renames the
-            // buckets; it does not remove them.
-            string ephemeral = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
-
-            LogEphemeralSecret(
-                provider
-                    .GetRequiredService<ILoggerFactory>()
-                    .CreateLogger(typeof(PublicChatProtectionSetup).FullName!),
-                NetworkKeySecretVariable);
-
-            return HmacClientNetworkKeys.From(ephemeral);
-        });
+            provider.GetRequiredService<NetworkKeySecret>() is { Value: string value }
+                ? HmacClientNetworkKeys.From(value)
+                : HmacClientNetworkKeys.Unavailable(provider.GetRequiredService<NetworkKeySecret>().Unavailable!));
     }
 
     /// <summary>

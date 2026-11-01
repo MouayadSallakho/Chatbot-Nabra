@@ -1,6 +1,5 @@
-using System.Net;
-using System.Text;
 using OmniAI.Domain.Notifications;
+using OmniAI.Domain.Reports;
 using OmniAI.Domain.Users;
 
 namespace OmniAI.Application.Notifications;
@@ -10,11 +9,11 @@ namespace OmniAI.Application.Notifications;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <strong>Fixed markup, encoded values.</strong> The HTML is a constant shape;
-/// every value placed in it — the workspace name above all, which a workspace
-/// wrote — is HTML-encoded, so <c>&lt;script&gt;</c> arrives as text. No value
-/// is ever placed in an attribute except the link, which is built from trusted
-/// configuration and a validated internal path.
+/// <strong>Fixed markup, encoded values.</strong> The HTML is a constant shape
+/// (<see cref="EmailLayout"/>); every value placed in it — the workspace name above
+/// all, which a workspace wrote — is HTML-encoded, so <c>&lt;script&gt;</c> arrives
+/// as text. No value is ever placed in an attribute except the link, which is
+/// built from trusted configuration and a validated internal path.
 /// </para>
 /// <para>
 /// <strong>Nothing to load.</strong> No image, no web font, no tracking pixel and
@@ -31,9 +30,16 @@ namespace OmniAI.Application.Notifications;
 /// reaches a header, so a line break in a workspace name cannot add a
 /// <c>Bcc:</c>.
 /// </para>
+/// <para>
+/// <strong>In the recipient's language (Phase 37.3).</strong> The dispatcher passes
+/// the recipient's stored language and, for report kinds, the report type, and the
+/// words come from <see cref="NotificationCatalog"/> in that language. Without a
+/// language the stored English text is used, as before.
+/// </para>
 /// </remarks>
 public static class OperationalEmailRenderer
 {
+    /// <summary>The stored English text, as before Phase 37.3.</summary>
     public static OperationalEmailMessage Render(
         Notification notification,
         EmailAddress to,
@@ -41,106 +47,89 @@ public static class OperationalEmailRenderer
         OperationalEmailLinks links)
     {
         ArgumentNullException.ThrowIfNull(notification);
+
+        return Compose(
+            notification,
+            to,
+            workspaceName,
+            links,
+            UserLanguage.English,
+            new NotificationText(notification.Title, notification.Body, notification.ActionPath));
+    }
+
+    /// <summary>The same email, worded in the recipient's language.</summary>
+    /// <param name="reportType">For report kinds, when the report is still known.</param>
+    public static OperationalEmailMessage Render(
+        Notification notification,
+        EmailAddress to,
+        string? workspaceName,
+        OperationalEmailLinks links,
+        UserLanguage language,
+        ReportType? reportType)
+    {
+        ArgumentNullException.ThrowIfNull(notification);
+
+        NotificationText words = NotificationCatalog.Describe(notification.Kind, language, reportType);
+
+        // The link is the one the notification was created with: the words change
+        // with the language, where they lead does not.
+        return Compose(
+            notification,
+            to,
+            workspaceName,
+            links,
+            language,
+            words with { ActionPath = notification.ActionPath });
+    }
+
+    private static OperationalEmailMessage Compose(
+        Notification notification,
+        EmailAddress to,
+        string? workspaceName,
+        OperationalEmailLinks links,
+        UserLanguage language,
+        NotificationText words)
+    {
         ArgumentNullException.ThrowIfNull(links);
 
-        string workspace = SingleLine(workspaceName);
-        string link = links.For(notification.ActionPath).AbsoluteUri;
-        string action = ActionLabel(notification.Category);
-
-        StringBuilder text = new();
-        text.Append("Nabra").Append('\n');
-
-        if (workspace.Length > 0)
-        {
-            text.Append("Workspace: ").Append(workspace).Append('\n');
-        }
-
-        text.Append('\n')
-            .Append(notification.Title).Append('\n')
-            .Append('\n')
-            .Append(notification.Body).Append('\n')
-            .Append('\n')
-            .Append(action).Append(": ").Append(link).Append('\n')
-            .Append('\n')
-            .Append(Footer).Append('\n');
-
-        StringBuilder html = new();
-        html.Append("<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\">")
-            .Append("<meta name=\"viewport\" content=\"width=device-width\"><title>")
-            .Append(Encode(notification.Title))
-            .Append("</title></head>")
-            .Append("<body style=\"margin:0;padding:24px;background:#f4f5f7;font-family:Arial,Helvetica,sans-serif;color:#1f232b;\">")
-            .Append("<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:560px;margin:0 auto;background:#ffffff;border:1px solid #dfe1e6;border-radius:8px;\">")
-            .Append("<tr><td style=\"padding:24px;\">")
-            .Append("<p style=\"margin:0 0 16px;font-weight:bold;font-size:16px;\">Nabra</p>");
-
-        if (workspace.Length > 0)
-        {
-            html.Append("<p style=\"margin:0 0 16px;font-size:13px;color:#5e6470;\">Workspace: ")
-                .Append(Encode(workspace))
-                .Append("</p>");
-        }
-
-        html.Append("<h1 style=\"margin:0 0 12px;font-size:20px;\">")
-            .Append(Encode(notification.Title))
-            .Append("</h1>")
-            .Append("<p style=\"margin:0 0 20px;font-size:15px;line-height:1.5;\">")
-            .Append(Encode(notification.Body))
-            .Append("</p>")
-            .Append("<p style=\"margin:0 0 24px;\"><a href=\"")
-            .Append(Encode(link))
-            .Append("\" style=\"display:inline-block;padding:10px 16px;background:#2f5bd3;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:bold;\">")
-            .Append(Encode(action))
-            .Append("</a></p>")
-            .Append("<p style=\"margin:0;font-size:12px;color:#5e6470;line-height:1.5;\">")
-            .Append(Encode(Footer))
-            .Append("</p></td></tr></table></body></html>");
+        (string text, string html) = EmailLayout.Compose(
+            language,
+            EmailLayout.SingleLine(workspaceName),
+            words.Title,
+            [words.Body],
+            (ActionLabel(notification.Category, language), links.For(words.ActionPath)),
+            Footer(language));
 
         return new OperationalEmailMessage(
             to,
-            NotificationCatalog.Subject(notification.Kind),
-            text.ToString(),
-            html.ToString());
+            NotificationCatalog.Subject(notification.Kind, language),
+            text,
+            html);
     }
 
-    private const string Footer =
-        "You are receiving this operational email because you turned it on in your Nabra notification "
-        + "preferences. You can turn it off there at any time.";
+    private static string Footer(UserLanguage language) => language == UserLanguage.Arabic
+        ? "تصلك هذه الرسالة التشغيلية لأنك فعّلتها في تفضيلات الإشعارات في نبرة. يمكنك إيقافها من هناك في أي وقت."
+        : "You are receiving this operational email because you turned it on in your Nabra notification "
+            + "preferences. You can turn it off there at any time.";
 
-    private static string ActionLabel(NotificationCategory category) => category switch
-    {
-        NotificationCategory.Reports => "Open Reports",
-        NotificationCategory.Usage => "Open Plan & usage",
-        NotificationCategory.Billing => "Open Billing",
-        NotificationCategory.Knowledge => "Open Knowledge",
-        NotificationCategory.ChannelHealth => "Open WhatsApp",
-        _ => "Open Nabra",
-    };
-
-    /// <summary>
-    /// A label reduced to one line of visible text.
-    /// </summary>
-    /// <remarks>
-    /// Line breaks and other control characters become spaces. The body is not a
-    /// header, so this is not the injection defence — the constant subject is —
-    /// but a workspace name has no business spanning lines in either part.
-    /// </remarks>
-    private static string SingleLine(string? value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
+    /// <summary>The button's words: the client's own <c>notifications.action.*</c>.</summary>
+    private static string ActionLabel(NotificationCategory category, UserLanguage language) => language == UserLanguage.Arabic
+        ? category switch
         {
-            return string.Empty;
+            NotificationCategory.Reports => "فتح التقارير",
+            NotificationCategory.Usage => "فتح الباقة والاستخدام",
+            NotificationCategory.Billing => "فتح الفوترة",
+            NotificationCategory.Knowledge => "فتح المعرفة",
+            NotificationCategory.ChannelHealth => "فتح واتساب",
+            _ => "فتح نبرة",
         }
-
-        StringBuilder line = new(value.Length);
-
-        foreach (char character in value)
+        : category switch
         {
-            line.Append(char.IsControl(character) ? ' ' : character);
-        }
-
-        return line.ToString().Trim();
-    }
-
-    private static string Encode(string value) => WebUtility.HtmlEncode(value);
+            NotificationCategory.Reports => "Open Reports",
+            NotificationCategory.Usage => "Open Plan & usage",
+            NotificationCategory.Billing => "Open Billing",
+            NotificationCategory.Knowledge => "Open Knowledge",
+            NotificationCategory.ChannelHealth => "Open WhatsApp",
+            _ => "Open Nabra",
+        };
 }

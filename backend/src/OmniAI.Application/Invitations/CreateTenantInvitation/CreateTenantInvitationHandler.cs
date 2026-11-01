@@ -1,4 +1,7 @@
 using OmniAI.Application.Authorization;
+using OmniAI.Application.Notifications;
+using OmniAI.Application.Security;
+using OmniAI.Domain.Accounts;
 using OmniAI.Application.Authorization.Persistence;
 using OmniAI.Application.Concurrency;
 using OmniAI.Application.Invitations.Persistence;
@@ -20,7 +23,8 @@ namespace OmniAI.Application.Invitations.CreateTenantInvitation;
 public sealed record CreateTenantInvitationCommand(
     Guid TenantId,
     string? Email,
-    IReadOnlyList<Guid>? RoleIds);
+    IReadOnlyList<Guid>? RoleIds,
+    UserLanguage? Language = null);
 
 /// <summary>
 /// An invitation, and the one time its secret is visible.
@@ -62,6 +66,8 @@ public sealed class CreateTenantInvitationHandler(
     TenantAuthorizer authorizer,
     IInvitationTokens tokens,
     InvitationPolicy policy,
+    IAccountDirectory accounts,
+    IOperationalEmailSender email,
     TimeProvider clock)
 {
     private readonly IWorkspaceEntitlementService _entitlements =
@@ -81,6 +87,12 @@ public sealed class CreateTenantInvitationHandler(
 
     private readonly InvitationPolicy _policy =
         policy ?? throw new ArgumentNullException(nameof(policy));
+
+    private readonly IAccountDirectory _accounts =
+        accounts ?? throw new ArgumentNullException(nameof(accounts));
+
+    private readonly IOperationalEmailSender _email =
+        email ?? throw new ArgumentNullException(nameof(email));
 
     private readonly TimeProvider _clock =
         clock ?? throw new ArgumentNullException(nameof(clock));
@@ -183,6 +195,11 @@ public sealed class CreateTenantInvitationHandler(
         DateTimeOffset now = _clock.GetUtcNow();
         NewInvitationToken token = _tokens.Create();
 
+        // Phase 37.3 (row 8a): the language the invitation email is written in.
+        // What the inviter asked for, else the inviter's own, else none (English).
+        UserLanguage? language = command.Language
+            ?? await _accounts.FindLanguageAsync(inviterId, cancellationToken).ConfigureAwait(false);
+
         TenantInvitation invitation = TenantInvitation.Issue(
             tenantId,
             email,
@@ -190,9 +207,16 @@ public sealed class CreateTenantInvitationHandler(
             token.Hash,
             intended.Select(role => role.Id),
             now,
-            _policy.ExpiresAfter(now));
+            _policy.ExpiresAfter(now),
+            language);
 
-        await _invitations.AddAsync(invitation, now, cancellationToken).ConfigureAwait(false);
+        // One invitation email, queued with the invitation itself, so neither
+        // exists without the other. Its token is minted when it is sent; the link
+        // the inviter copies keeps working beside it. A deployment that cannot
+        // send email queues nothing, as for operational email.
+        AccountEmail? queued = _email.IsConfigured ? AccountEmail.ForInvitation(invitation, now) : null;
+
+        await _invitations.AddAsync(invitation, now, queued, cancellationToken).ConfigureAwait(false);
 
         return new IssuedInvitation(invitation, token.Token, intended);
     }

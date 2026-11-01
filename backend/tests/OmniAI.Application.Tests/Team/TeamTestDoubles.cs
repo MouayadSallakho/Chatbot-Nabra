@@ -149,12 +149,21 @@ internal sealed class InMemoryInvitationRepository : ITenantInvitationRepository
     /// <summary>Every invitation this store holds, for assertions.</summary>
     public IReadOnlyList<TenantInvitation> All => _invitations;
 
+    /// <summary>The invitation emails queued with invitations (Phase 37.3).</summary>
+    public List<OmniAI.Domain.Accounts.AccountEmail> QueuedEmails { get; } = [];
+
     public Task AddAsync(
         TenantInvitation invitation,
         DateTimeOffset now,
+        OmniAI.Domain.Accounts.AccountEmail? queuedEmail,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(invitation);
+
+        if (queuedEmail is not null)
+        {
+            QueuedEmails.Add(queuedEmail);
+        }
 
         foreach (TenantInvitation stale in _invitations.Where(candidate =>
             candidate.TenantId == invitation.TenantId
@@ -204,7 +213,7 @@ internal sealed class InMemoryInvitationRepository : ITenantInvitationRepository
     public Task<TenantInvitation?> FindByTokenHashAsync(
         InvitationTokenHash hash,
         CancellationToken cancellationToken = default) =>
-        Task.FromResult(_invitations.Find(invitation => invitation.TokenHash == hash));
+        Task.FromResult(_invitations.Find(invitation => invitation.TokenHash == hash || invitation.EmailTokenHash == hash));
 
     public Task UpdateAsync(
         TenantInvitation invitation,
@@ -248,6 +257,15 @@ internal sealed class InMemoryInvitationRepository : ITenantInvitationRepository
 internal sealed class InMemoryAccountDirectory : IAccountDirectory
 {
     private readonly Dictionary<UserId, EmailAddress> _accounts = [];
+    private readonly Dictionary<UserId, UserLanguage> _languages = [];
+
+    /// <summary>Gives an account a stored language (Phase 37.3).</summary>
+    public InMemoryAccountDirectory Speaking(UserId userId, UserLanguage language)
+    {
+        _languages[userId] = language;
+
+        return this;
+    }
 
     public InMemoryAccountDirectory With(UserId userId, string email)
     {
@@ -261,6 +279,22 @@ internal sealed class InMemoryAccountDirectory : IAccountDirectory
         CancellationToken cancellationToken = default) =>
         Task.FromResult(
             _accounts.TryGetValue(userId, out EmailAddress email) ? email : (EmailAddress?)null);
+
+    public Task<UserLanguage?> FindLanguageAsync(
+        UserId userId,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(_languages.TryGetValue(userId, out UserLanguage language) ? language : (UserLanguage?)null);
+}
+
+/// <summary>An email transport that sends nothing; only whether it is configured matters here.</summary>
+internal sealed class StubEmailSender(bool configured) : OmniAI.Application.Notifications.IOperationalEmailSender
+{
+    public bool IsConfigured { get; } = configured;
+
+    public Task<OmniAI.Application.Notifications.OperationalEmailResult> SendAsync(
+        OmniAI.Application.Notifications.OperationalEmailMessage message,
+        CancellationToken cancellationToken = default) =>
+        throw new InvalidOperationException("Use cases queue email; they never send it.");
 }
 
 /// <summary>

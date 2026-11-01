@@ -287,10 +287,16 @@ describe('Login', () => {
     expect(host().textContent).toContain('could not be reached');
   });
 
-  it('says plainly that password reset does not exist', async () => {
-    // A form with a dead "forgot password" link would be worse than one that
-    // admits the feature is not there.
-    expect(host().textContent).toContain('Password reset is not available yet');
+  it('offers a way to a new password beside the password field (Phase 37.3)', () => {
+    const link = host().querySelector<HTMLAnchorElement>('a[href="/forgot-password"]');
+
+    expect(link?.textContent?.trim()).toBe('Forgot your password?');
+    // Under the field it rescues, and after it in the tab order.
+    expect(passwordBox().compareDocumentPosition(link!) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+    // The note that said reset did not exist is gone with the reason for it.
+    expect(host().textContent).not.toContain('not available yet');
   });
 
   it('offers a way to create an account', () => {

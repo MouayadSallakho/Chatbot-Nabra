@@ -83,4 +83,23 @@ public sealed record OperationalEmailLinks(Uri AppBaseUrl)
 
         return new Uri(root + (actionPath ?? "/"), UriKind.Absolute);
     }
+
+    /// <summary>
+    /// An account link: an application page with a secret in its fragment (Phase 37.3).
+    /// </summary>
+    /// <remarks>
+    /// Only the account emails use this, and only for a reset or an invitation. The
+    /// fragment is the one part of a URL a browser never sends to a server and
+    /// never forwards in a <c>Referer</c>, so the secret reaches the page and
+    /// nothing else. Operational emails never carry one.
+    /// </remarks>
+    /// <param name="pagePath">An application route, such as <c>/reset-password</c>.</param>
+    /// <param name="fragment">Already-encoded <c>name=value</c> pairs.</param>
+    public Uri WithFragment(string pagePath, string fragment)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(pagePath);
+        ArgumentException.ThrowIfNullOrEmpty(fragment);
+
+        return new Uri(For(pagePath).AbsoluteUri + "#" + fragment, UriKind.Absolute);
+    }
 }
