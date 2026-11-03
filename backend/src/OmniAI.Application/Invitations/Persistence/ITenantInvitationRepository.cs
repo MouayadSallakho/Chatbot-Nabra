@@ -43,19 +43,43 @@ public interface ITenantInvitationRepository
         CancellationToken cancellationToken = default);
 
     /// <summary>One page of a workspace's invitations, newest first.</summary>
+    /// <param name="tenantId">The workspace.</param>
+    /// <param name="status">
+    /// Only invitations in this status as shown at <paramref name="now"/>, or every
+    /// invitation when <see langword="null"/> (Phase 37.5b, row 24).
+    /// </param>
+    /// <param name="now">The instant the status is judged at.</param>
+    /// <param name="skip">How many to skip.</param>
+    /// <param name="take">How many to return.</param>
+    /// <param name="cancellationToken">Cancels the read.</param>
     /// <remarks>
     /// Newest first because a pending invitation somebody just created is the one
     /// they are looking for, unlike the member list where the workspace's history
     /// is the useful order.
+    /// <para>
+    /// <strong>The status is the one the list shows.</strong> A stored pending
+    /// invitation past its <c>expires_at</c> is <c>Expired</c>, the same rule as
+    /// <c>TenantInvitation.HasExpiredAt</c>, so filtering by <c>Pending</c> never
+    /// returns a row the page then calls expired.
+    /// </para>
     /// </remarks>
     Task<IReadOnlyList<TenantInvitation>> ListAsync(
         TenantId tenantId,
+        TenantInvitationStatus? status,
+        DateTimeOffset now,
         int skip,
         int take,
         CancellationToken cancellationToken = default);
 
-    /// <summary>How many invitations the workspace has, in any state.</summary>
-    Task<int> CountAsync(TenantId tenantId, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// How many invitations the workspace has in a status, or in any state when
+    /// <paramref name="status"/> is <see langword="null"/>.
+    /// </summary>
+    Task<int> CountAsync(
+        TenantId tenantId,
+        TenantInvitationStatus? status,
+        DateTimeOffset now,
+        CancellationToken cancellationToken = default);
 
     /// <summary>One invitation of a workspace, by its id.</summary>
     /// <returns>

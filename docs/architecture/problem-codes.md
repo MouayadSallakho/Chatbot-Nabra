@@ -7,8 +7,8 @@ language, and never shows `detail`. A code, once published, keeps its meaning.
 
 Phase 37.3 started this list with the account endpoints (D-2, row 6b). Phase 37.5a
 added the guarantee that every correctable refusal carries a code, and the codes of
-the knowledge, agent, channel and workspace areas (row 28a); Phase 37.5b names the
-codes of roles, invitations, team and billing.
+the knowledge, agent, channel and workspace areas (row 28a). Phase 37.5b named the
+codes of roles, invitations, team and billing (row 28b).
 
 ## Accounts (Phase 37.3)
 
@@ -21,8 +21,8 @@ codes of roles, invitations, team and billing.
 | `auth.password.<rule>` | 400 | `register`, `password/reset` | Identity's password rule, from its error code: `PasswordTooShort` → `auth.password.too_short`, `PasswordRequiresUniqueChars` → `auth.password.requires_unique_chars`, and so on. With today's policy (12 characters, nothing else) only `too_short` occurs in practice |
 | `auth.registration.rejected` | 400 | `register` | Any other Identity refusal |
 | `auth.reset.invalid` | 400 | `POST /api/auth/password/reset` | The reset link cannot be used: malformed, altered, expired or already used token, or an unknown account. One code and one body for all of them |
-| `auth.throttled` | 429 | `login`, `password/forgot`, `password/reset` | Too many failed sign-ins (for `login`, only failures count) or too many reset requests. `Retry-After` says, in whole seconds, when to try again; the body names no limit, window or address |
-| `auth.throttle.unavailable` | 503 | `login`, `password/forgot`, `password/reset` | The rate limiter could not decide (store unreachable, or the client's network could not be established), so the request was refused rather than served unlimited |
+| `auth.throttled` | 429 | `login`, `password/forgot`, `password/reset`, `GET /api/auth/session` (37.5b) | Too many failed sign-ins (for `login`, only failures count) or too many reset requests. `Retry-After` says, in whole seconds, when to try again; the body names no limit, window or address |
+| `auth.throttle.unavailable` | 503 | `login`, `password/forgot`, `password/reset`, `GET /api/auth/session` (37.5b) | The rate limiter could not decide (store unreachable, or the client's network could not be established), so the request was refused rather than served unlimited |
 | `language.unsupported` | 400 | `register`, `login`, `invitations/accept`, `POST …/invitations`, `PUT /api/me/language` | `language` is not `"en"` or `"ar"` |
 
 When Identity reports several errors at once, `code` is the first and `codes` lists
@@ -53,11 +53,19 @@ refusal by `code`, falls back to the generic wording for a code it does not know
 and never shows `detail`.
 
 Tests hold this in place (`ProblemCodeTests`): a source scan fails when a
-`DomainValidationException` or `DomainStateException` in the knowledge, agent or
-channel folders, or a knowledge file refusal, has no code; another fails when a
-published code is missing from this file; and HTTP checks prove the codes reach
-the wire. The areas of Phase 37.5b (roles, invitations, team, billing) answer the
-generic codes until that step names theirs.
+`DomainValidationException` or `DomainStateException` in the knowledge, agent,
+channel, role, invitation, team or billing folders (with the workspace, address,
+account and plan value objects they are built from), or a knowledge file refusal,
+has no code; another fails when a published code is missing from this file; and
+HTTP checks prove the codes reach the wire. Areas outside these (customers,
+conversations, notifications, reports) still answer the generic codes for their
+domain rules.
+
+**No `errors` map in these areas.** None of the areas above answers with a
+validation `errors` map (no endpoint returns `ValidationProblem`): each refusal is
+one rule with one code, so no parallel `errorCodes` map exists. Should an endpoint
+ever answer with `errors`, it keeps that map unchanged and gets `code`
+`validation.failed` beside it, through the same guarantee.
 
 | Code | Status | Meaning |
 | --- | --- | --- |
@@ -197,6 +205,69 @@ enumerated (`embeddable-web-chat-widget.md` §10). A visitor's own message refus
 | --- | --- | --- | --- |
 | `workspace.name.invalid` | 400 | `PUT /api/tenants/{id}/name`, `POST /api/tenants` | The name is blank, longer than 200 characters after trimming, or holds control characters. One code for all three, as the plan designed |
 | `workspace.slug.taken` | 409 | `POST /api/tenants` | Another workspace already holds this slug |
+| `workspace.slug.invalid` | 400 | `POST /api/tenants` | The slug is missing, the wrong length, or not lowercase letters, digits and single hyphens (Phase 37.5b; one code for every slug rule) |
+| `workspace.id.invalid` | 400 | any | An all-zero workspace id (Phase 37.5b) |
+
+## Roles and permissions (Phase 37.5b)
+
+| Code | Status | Where | Meaning |
+| --- | --- | --- | --- |
+| `roles.name.required` | 400 | create, rename | A role needs a name |
+| `roles.name.too_long` | 400 | create, rename | Past the name bound; never truncated |
+| `roles.name.control_characters` | 400 | create, rename | No control characters in a name |
+| `roles.name.taken` | 409 | create, rename | Another role of this workspace already has this name, ignoring case |
+| `roles.permission.invalid` | 400 | create, permissions | A permission code that is not written like one (`group.action`, lowercase) |
+| `roles.permission.unknown` | 400 | create, permissions | A well-formed code that is not in the catalogue |
+| `roles.system.protected` | 409 | rename, permissions | The Owner role is the protected system role: it is never renamed and always grants everything |
+| `roles.id.invalid` | 400 | any | An all-zero role id |
+
+## Invitations (Phase 37.5b)
+
+| Code | Status | Where | Meaning |
+| --- | --- | --- | --- |
+| `invitations.status.invalid` | 400 | `GET …/invitations?status=` | Not `Pending`, `Accepted`, `Revoked` or `Expired` (any letter case; a number is refused). Checked before membership, so the answer is the same for anybody |
+| `invitations.role.unassignable` | 400 | `POST …/invitations` | A role id that is not a role of this workspace |
+| `invitations.email.already_member` | 409 | `POST …/invitations` | The address already belongs to a member; change their roles instead |
+| `invitations.email.already_invited` | 409 | `POST …/invitations` | An invitation for this address is already open; revoke it first |
+| `invitations.revoke.closed` | 409 | `POST …/invitations/{id}/revoke` | The invitation was already accepted, revoked or expired |
+| `invitations.no_longer_usable` | 410 | `POST /api/invitations/accept` | A real invitation that was used, withdrawn or expired, or whose inviter's authority no longer stands |
+| `invitations.account.mismatch` | 403 | `POST /api/invitations/accept` | Signed in as somebody other than the invited address; neither address is named |
+| `invitations.id.invalid` | 400 | any | An all-zero invitation id |
+
+## Team (Phase 37.5b)
+
+| Code | Status | Where | Meaning |
+| --- | --- | --- | --- |
+| `team.member.self` | 409 | `PUT …/members/{id}/roles` | Nobody changes their own access from team management |
+| `team.member.owner_protected` | 409 | `PUT …/members/{id}/roles`, `POST …/invitations` | The Owner's access is not changed from team management, and the Owner role is never handed out there |
+| `team.member.protected` | 409 | team management | Any other protected membership. No route raises it today; it is the general form of the two above |
+| `team.role.unassignable` | 400 | `PUT …/members/{id}/roles` | A role id that is not a role of this workspace |
+
+## Email addresses (Phase 37.5b)
+
+The address rules, wherever an address is taken from a person (today, a new
+invitation).
+
+| Code | Status | Meaning |
+| --- | --- | --- |
+| `email.required` | 400 | No address |
+| `email.too_long` | 400 | Past the address bound |
+| `email.invalid_characters` | 400 | Spaces or control characters |
+| `email.invalid` | 400 | Not an address this platform can use |
+
+## Billing (Phase 37.5b)
+
+The purchase refusals keep the codes they have carried since the billing step;
+they are listed here so the whole set is in one place.
+
+| Code | Status | Where | Meaning |
+| --- | --- | --- | --- |
+| `billing.offer_id.invalid` | 400 | `POST …/billing/checkout` | The request names no offer (an all-zero id) |
+| `billing.checkout.unknownoffer` | 409 | checkout | No such offer |
+| `billing.checkout.offernotavailable` | 409 | checkout | The offer is withdrawn |
+| `billing.checkout.alreadysubscribed` | 409 | checkout | The workspace already has a subscription; manage it in the provider's portal |
+| `billing.checkout.offernotpurchasable` | 409 | checkout | The offer cannot be bought on this deployment |
+| `billing.portal.nocustomer` | 409 | `POST …/billing/portal` | The workspace has never bought anything, so there is nothing to manage |
 
 ## Internal consistency codes (Phase 37.5a)
 
@@ -211,10 +282,15 @@ if it does, it is a defect, and the code tells an operator where to look.
 | `knowledge.tenant.required`, `knowledge.instant.invalid`, `knowledge.source.invalid`, `knowledge.assignment.invalid`, `knowledge.fingerprint.invalid`, `knowledge.embedding_profile.invalid` | Knowledge |
 | `website-chat.endpoint.invalid`, `website-chat.instant.invalid`, `chat.session.invalid`, `chat.access_token.invalid` | Website chat |
 | `whatsapp.connection.invalid`, `whatsapp.instant.invalid`, `whatsapp.contact.invalid`, `whatsapp.provider_id.invalid`, `whatsapp.customer_identity.invalid`, `whatsapp.delivery.invalid`, `whatsapp.inbound.invalid` | WhatsApp |
+| `roles.tenant.required`, `roles.assignment.invalid` | Roles (Phase 37.5b) |
+| `invitations.tenant.required`, `invitations.email.required`, `invitations.inviter.required`, `invitations.expiry.invalid`, `invitations.role.required`, `invitations.role_grant.invalid`, `invitations.token_hash.invalid`, `invitations.email.not_sendable`, `invitations.email_token.invalid`, `invitations.accept.account_required`, `invitations.accept.closed`, `invitations.expire.not_due` | Invitations (37.5b). `invitations.accept.closed` is the aggregate's own guard; the accept route answers `410 invitations.no_longer_usable` first |
+| `team.membership.invalid`, `users.id.invalid`, `accounts.email.invalid` | Team and accounts (37.5b) |
+| `billing.checkout_intent.invalid`, `billing.customer.invalid`, `billing.event.invalid`, `billing.id.invalid`, `billing.offer.invalid`, `billing.provider_reference.invalid`, `billing.price.invalid`, `billing.subscription.invalid` | Billing (37.5b): records built from the provider's answers and the operator's catalogue |
+| `plans.code.invalid`, `plans.name.invalid`, `plans.limit.invalid`, `plans.id.invalid`, `plans.assignment.invalid`, `plans.instant.invalid`, `plans.entitlement.unknown`, `plans.usage.invalid` | Plans (37.5b): the plan definitions behind billing and the entitlements |
 
 ## Codes that existed before this list
 
 | Code | Status | Where |
 | --- | --- | --- |
 | `antiforgery.invalid` | 400 | every antiforgery-checked endpoint |
-| Entitlement and billing codes | 402, 409 | see `workspace-plans-entitlements-quotas.md` and `saas-subscription-billing.md` |
+| Entitlement codes (`entitlement.<kind>.exhausted`) | 409 | see `workspace-plans-entitlements-quotas.md`; the billing codes are listed above |

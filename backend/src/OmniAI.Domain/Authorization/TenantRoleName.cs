@@ -86,7 +86,10 @@ public sealed record TenantRoleName
     {
         if (string.IsNullOrWhiteSpace(value))
         {
-            throw new DomainValidationException("Role name is required.");
+            throw new DomainValidationException("Role name is required.")
+            {
+                Code = "roles.name.required",
+            };
         }
 
         string trimmed = value.Trim();
@@ -95,7 +98,10 @@ public sealed record TenantRoleName
         {
             throw new DomainValidationException(
                 $"Role name must be at most {MaxLength} characters; " +
-                $"the supplied name has {trimmed.Length}. It is not truncated.");
+                $"the supplied name has {trimmed.Length}. It is not truncated.")
+            {
+                Code = "roles.name.too_long",
+            };
         }
 
         // Control characters serve no purpose in a single-line label -- including
@@ -106,7 +112,10 @@ public sealed record TenantRoleName
             if (char.IsControl(character))
             {
                 throw new DomainValidationException(
-                    "Role name must not contain control characters.");
+                    "Role name must not contain control characters.")
+                {
+                    Code = "roles.name.control_characters",
+                };
             }
         }
 

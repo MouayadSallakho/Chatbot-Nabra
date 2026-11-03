@@ -39,6 +39,9 @@ public readonly record struct PlanLimit
         maximum < 0
             ? throw new DomainValidationException(
                 "A plan limit cannot be negative. Leave it unset to mean unlimited.")
+                {
+                    Code = "plans.limit.invalid",
+                }
             : new PlanLimit(maximum);
 
     /// <summary>Reads a configured or stored value, where null means unlimited.</summary>

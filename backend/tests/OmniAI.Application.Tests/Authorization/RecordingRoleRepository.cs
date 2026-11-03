@@ -142,11 +142,39 @@ internal sealed class RecordingRoleRepository : ITenantRoleRepository
                     role.Kind,
                     role.EffectivePermissions.Count,
                     role.CreatedAt,
-                    role.UpdatedAt))
+                    role.UpdatedAt,
+                    Holders(tenantId, role.Id)))
         ];
 
         return Task.FromResult(summaries);
     }
+
+    public Task<int> CountMembersAsync(
+        TenantId tenantId,
+        TenantRoleId roleId,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(Holders(tenantId, roleId));
+
+    public Task<IReadOnlyDictionary<TenantRoleId, string>> FindNamesAsync(
+        TenantId tenantId,
+        IReadOnlyCollection<TenantRoleId> roleIds,
+        CancellationToken cancellationToken = default)
+    {
+        NameReads++;
+
+        // Both predicates, as the real query applies them.
+        IReadOnlyDictionary<TenantRoleId, string> names = _roles
+            .Where(role => role.TenantId == tenantId && roleIds.Contains(role.Id))
+            .ToDictionary(role => role.Id, role => role.Name.Value);
+
+        return Task.FromResult(names);
+    }
+
+    /// <summary>How many times role names were read in a batch (Phase 37.5b).</summary>
+    public int NameReads { get; private set; }
+
+    private int Holders(TenantId tenantId, TenantRoleId roleId) =>
+        _assignments.Count(assignment => assignment.TenantId == tenantId && assignment.TenantRoleId == roleId);
 
     public Task<Versioned<TenantRole>?> FindAsync(
         TenantId tenantId,

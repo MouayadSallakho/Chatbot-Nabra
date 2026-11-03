@@ -39,6 +39,19 @@ public interface IAccountDirectory
     Task<EmailAddress?> FindEmailAsync(UserId userId, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// The addresses of several accounts at once (Phase 37.5b), with the same rule
+    /// as <see cref="FindEmailAsync"/>.
+    /// </summary>
+    /// <returns>
+    /// One entry per account that exists and has a usable address; the others are
+    /// simply absent.
+    /// </returns>
+    /// <remarks>One statement for a whole page of rows that each name an account.</remarks>
+    Task<IReadOnlyDictionary<UserId, EmailAddress>> FindEmailsAsync(
+        IReadOnlyCollection<UserId> userIds,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// The language the person reads what the server sends them in (Phase 37.3).
     /// </summary>
     /// <returns>Their choice, or null when they have none or the account is gone.</returns>

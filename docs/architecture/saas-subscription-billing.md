@@ -480,6 +480,29 @@ webhook secret in the repository. A test that needs a card.
 
 ---
 
+## B25. The billing read names the plans and their limits (Phase 37.5b)
+
+**Decision.** `GET …/billing` (`billing.view`, as before) gains:
+- `currentPlan: { code, name, limits }`, the plan the workspace is on. Its limits are
+  the ones the entitlements were just judged against, so they cost no further read
+  and cannot disagree with the plan-usage screen. `currentPlanName` stays.
+- `fallbackPlan: { code, name, limits } | null`, what `Billing:FallbackPlanCode` would
+  suspend the workspace to. `null` when none is configured, or when the code is
+  unusable, names no plan, or names an unlimited plan: everything B11 refuses reads
+  as "no fallback" here, and never fails the read
+  (`FallbackPlanResolver.FindAsync`).
+
+`limits` holds the six plan limits, named as the plan-usage read names its
+entitlements (`members`, `aiAgents`, `knowledgeDocuments`, `webChatEndpoints`,
+`whatsAppConnections`, `monthlyProviderOperations`); `null` means unlimited and is
+always written.
+
+**Plan definitions, not usage.** How much of each limit is used stays on
+`GET …/plan-usage`, behind `analytics.view`. The refusals are unchanged: `403` for a
+member without `billing.view`, `404` outside the workspace.
+
+---
+
 ## Configuration
 
 | Setting | Meaning |

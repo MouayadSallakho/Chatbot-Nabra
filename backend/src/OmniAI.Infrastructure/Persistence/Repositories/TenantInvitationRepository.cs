@@ -73,13 +73,13 @@ internal sealed class TenantInvitationRepository(OmniAiDbContext context)
 
     public async Task<IReadOnlyList<TenantInvitation>> ListAsync(
         TenantId tenantId,
+        TenantInvitationStatus? status,
+        DateTimeOffset now,
         int skip,
         int take,
         CancellationToken cancellationToken = default) =>
-        await _context.TenantInvitations
-            .AsNoTracking()
+        await InStatus(tenantId, status, now)
             .Include(invitation => invitation.Roles)
-            .Where(invitation => invitation.TenantId == tenantId)
             .OrderByDescending(invitation => invitation.CreatedAt)
             .ThenBy(invitation => invitation.Id)
             .Skip(skip)
@@ -87,10 +87,42 @@ internal sealed class TenantInvitationRepository(OmniAiDbContext context)
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 
-    public Task<int> CountAsync(TenantId tenantId, CancellationToken cancellationToken = default) =>
-        _context.TenantInvitations
+    public Task<int> CountAsync(
+        TenantId tenantId,
+        TenantInvitationStatus? status,
+        DateTimeOffset now,
+        CancellationToken cancellationToken = default) =>
+        InStatus(tenantId, status, now).CountAsync(cancellationToken);
+
+    /// <summary>
+    /// A workspace's invitations in the status the list would show at
+    /// <paramref name="now"/> (Phase 37.5b, row 24).
+    /// </summary>
+    /// <remarks>
+    /// The stored status, except that a pending invitation whose <c>expires_at</c>
+    /// has passed is expired: <c>TenantInvitation.HasExpiredAt</c>, in SQL. The
+    /// workspace is in every branch, on <c>ix_tenant_invitations_tenant</c>.
+    /// </remarks>
+    private IQueryable<TenantInvitation> InStatus(
+        TenantId tenantId,
+        TenantInvitationStatus? status,
+        DateTimeOffset now)
+    {
+        IQueryable<TenantInvitation> invitations = _context.TenantInvitations
             .AsNoTracking()
-            .CountAsync(invitation => invitation.TenantId == tenantId, cancellationToken);
+            .Where(invitation => invitation.TenantId == tenantId);
+
+        return status switch
+        {
+            null => invitations,
+            TenantInvitationStatus.Pending => invitations.Where(invitation =>
+                invitation.Status == TenantInvitationStatus.Pending && invitation.ExpiresAt > now),
+            TenantInvitationStatus.Expired => invitations.Where(invitation =>
+                invitation.Status == TenantInvitationStatus.Expired
+                || (invitation.Status == TenantInvitationStatus.Pending && invitation.ExpiresAt <= now)),
+            TenantInvitationStatus stored => invitations.Where(invitation => invitation.Status == stored),
+        };
+    }
 
     public async Task<TenantInvitation?> FindAsync(
         TenantId tenantId,

@@ -161,6 +161,12 @@ internal sealed partial class DomainProblemDetailsHandler(
 
                 return;
 
+            // Phase 37.5b: one type, two rules a screen words differently.
+            case ProtectedMembershipException protectedMember:
+                problem.Extensions["code"] = protectedMember.Code;
+
+                return;
+
             // A file refusal names its reason, and the bound it broke where it has
             // one, so a client can say "more than 300 pages" in the reader's
             // language without parsing the English sentence for the number.
@@ -223,6 +229,14 @@ internal sealed partial class DomainProblemDetailsHandler(
         WhatsAppPhoneNumberInUseException => "whatsapp.phone_number.in_use",
         ConversationNotOnWhatsAppException => "whatsapp.conversation.not_on_whatsapp",
         TenantSlugAlreadyExistsException => "workspace.slug.taken",
+
+        // Phase 37.5b: roles, invitations and team.
+        TenantRoleNameAlreadyExistsException => "roles.name.taken",
+        AlreadyAMemberException => "invitations.email.already_member",
+        InvitationAlreadyOpenException => "invitations.email.already_invited",
+        InvitationNoLongerUsableException => "invitations.no_longer_usable",
+        InvitationNotForThisAccountException => "invitations.account.mismatch",
+        InvitationStatusFilterInvalidException => "invitations.status.invalid",
         _ => null,
     };
 
@@ -578,6 +592,13 @@ internal sealed partial class DomainProblemDetailsHandler(
             StatusCodes.Status409Conflict,
             "Invitation already open",
             openInvitation.Message),
+
+        // The invitation list was asked for a status it does not know (Phase
+        // 37.5b). 400 with its code, checked before membership.
+        InvitationStatusFilterInvalidException invitationStatus => (
+            StatusCodes.Status400BadRequest,
+            "Invalid invitation request",
+            invitationStatus.Message),
 
         // A real invitation that has been used, withdrawn, expired, or whose
         // issuing authority no longer stands. 410 rather than 404, because the

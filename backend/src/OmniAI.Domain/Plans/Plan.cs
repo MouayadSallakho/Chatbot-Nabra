@@ -156,7 +156,10 @@ public sealed class Plan
     {
         if (code.IsEmpty)
         {
-            throw new DomainValidationException("A plan needs a code.");
+            throw new DomainValidationException("A plan needs a code.")
+            {
+                Code = "plans.code.invalid",
+            };
         }
 
         return new Plan(
@@ -209,12 +212,18 @@ public sealed class Plan
         EntitlementKind.WebChatEndpoints => MaxWebChatEndpoints,
         EntitlementKind.WhatsAppConnections => MaxWhatsAppConnections,
         EntitlementKind.MonthlyProviderOperations => MaxMonthlyProviderOperations,
-        _ => throw new DomainValidationException($"'{kind}' is not an entitlement this plan caps."),
+        _ => throw new DomainValidationException($"'{kind}' is not an entitlement this plan caps.")
+            {
+                Code = "plans.entitlement.unknown",
+            },
     };
 
     private static DateTimeOffset RequireInstant(DateTimeOffset instant) =>
         instant == default
             ? throw new DomainValidationException("A plan must record when it was created.")
+                {
+                    Code = "plans.instant.invalid",
+                }
             : instant.ToUniversalTime();
 }
 
@@ -257,12 +266,18 @@ public sealed class WorkspacePlanAssignment
     {
         if (tenantId.IsEmpty)
         {
-            throw new DomainValidationException("A plan assignment needs a workspace.");
+            throw new DomainValidationException("A plan assignment needs a workspace.")
+            {
+                Code = "plans.assignment.invalid",
+            };
         }
 
         if (planId.IsEmpty)
         {
-            throw new DomainValidationException("A plan assignment needs a plan.");
+            throw new DomainValidationException("A plan assignment needs a plan.")
+            {
+                Code = "plans.assignment.invalid",
+            };
         }
 
         return new WorkspacePlanAssignment(
@@ -271,6 +286,9 @@ public sealed class WorkspacePlanAssignment
             assignedAt == default
                 ? throw new DomainValidationException(
                     "A plan assignment must record when it was made.")
+                    {
+                        Code = "plans.assignment.invalid",
+                    }
                 : assignedAt.ToUniversalTime());
     }
 

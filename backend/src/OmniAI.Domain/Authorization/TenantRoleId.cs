@@ -43,7 +43,10 @@ public readonly record struct TenantRoleId
     {
         if (value == Guid.Empty)
         {
-            throw new DomainValidationException("Tenant role id must not be an empty GUID.");
+            throw new DomainValidationException("Tenant role id must not be an empty GUID.")
+            {
+                Code = "roles.id.invalid",
+            };
         }
 
         return new TenantRoleId(value);

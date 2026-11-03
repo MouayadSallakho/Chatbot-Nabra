@@ -65,9 +65,10 @@ internal static class AuthEndpoints
 
         // Anonymous by necessity: somebody who is not signed in has to be able to
         // obtain a token, create an account and sign in -- and, from Phase 37.3,
-        // ask for and use a password reset link. These five are the complete
-        // anonymous surface of the authenticated API, alongside /health and the
-        // development OpenAPI document.
+        // ask for and use a password reset link, and from Phase 37.5b ask whether
+        // they are signed in. These six are the complete anonymous surface of the
+        // authenticated API, alongside /health and the development OpenAPI
+        // document.
         auth.MapGet("/csrf", IssueAntiforgeryTokenAsync)
             .AllowAnonymous()
             .WithName("GetAntiforgeryToken");
@@ -110,6 +111,18 @@ internal static class AuthEndpoints
         auth.MapPost("/logout", LogoutAsync)
             .RequireAuthorization()
             .WithName("Logout");
+
+        // Phase 37.5b (row 29): the eighth anonymous route. A question with no
+        // side effect: no cookie is written, nothing is cached, and every caller
+        // counts against a per-network limit.
+        auth.MapGet("/session", GetSessionAsync)
+            .AllowAnonymous()
+            .WithMetadata(SessionProbe.Marker)
+            .WithName("GetSession")
+            .WithSummary("Whether this request carries a good session: 200 {authenticated:false}, or {authenticated:true,user:{id,email,language}}. Never 401, never a cookie, Cache-Control: no-store; rate-limited per network (429 auth.throttled, 503 auth.throttle.unavailable).")
+            .Produces<SessionResponse>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests)
+            .ProducesProblem(StatusCodes.Status503ServiceUnavailable);
 
         auth.MapGet("/me", GetCurrentUserAsync)
             .RequireAuthorization()
@@ -473,6 +486,66 @@ internal static class AuthEndpoints
         }
 
         return Results.Ok(Describe(user));
+    }
+
+    /// <summary>
+    /// <c>GET /api/auth/session</c>. Whether the caller is signed in, without a 401.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <strong>For signed-out pages.</strong> <c>/api/auth/me</c> answers a signed-out
+    /// caller with 401, which a browser logs as an error on every sign-in page; this
+    /// answers 200 either way. <c>/api/auth/me</c> is unchanged.
+    /// </para>
+    /// <para>
+    /// <strong>Exactly the session the other routes would see.</strong> The cookie is
+    /// validated by the same per-request stamp check, so a revoked session answers
+    /// <c>false</c> here as it answers 401 elsewhere, and a signed-in answer carries
+    /// the same facts as <c>/me</c>. What differs is only that this route never
+    /// writes a cookie (see <see cref="SessionProbe"/>).
+    /// </para>
+    /// <para>
+    /// <strong>Nothing to enumerate.</strong> It takes no input: the only session it
+    /// can describe is the caller's own. The limit is checked first, for every
+    /// caller, and fails closed.
+    /// </para>
+    /// </remarks>
+    private static async Task<IResult> GetSessionAsync(
+        HttpContext http,
+        UserManager<OmniAiUser> users,
+        IAccountProtection protection,
+        IClientNetworkKeys networks,
+        ILoggerFactory loggers)
+    {
+        ArgumentNullException.ThrowIfNull(protection);
+        ArgumentNullException.ThrowIfNull(networks);
+        ArgumentNullException.ThrowIfNull(loggers);
+
+        // On every answer, refusals included: a session's state is never kept by a
+        // cache, a proxy or the browser's history.
+        http.Response.Headers.CacheControl = "no-store";
+
+        try
+        {
+            AccountProtectionDecision decision = await protection
+                .AuthoriseSessionCheckAsync(ClientNetworkIdentity.Resolve(http, networks), http.RequestAborted)
+                .ConfigureAwait(false);
+
+            if (!decision.Allowed)
+            {
+                return AccountProblems.TooMany(http, decision);
+            }
+        }
+        catch (Exception unprotected) when (unprotected is AccountProtectionUnavailableException or PublicChatProtectionUnavailableException)
+        {
+            return AccountProblems.Unavailable(loggers.CreateLogger(typeof(AuthEndpoints)), unprotected);
+        }
+
+        OmniAiUser? user = http.User.Identity?.IsAuthenticated == true
+            ? await users.GetUserAsync(http.User).ConfigureAwait(false)
+            : null;
+
+        return Results.Ok(user is null ? SessionResponse.SignedOut : new SessionResponse(true, Describe(user)));
     }
 
     /// <summary>Projects an account onto the fields this API publishes.</summary>

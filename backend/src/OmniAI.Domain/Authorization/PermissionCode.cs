@@ -90,7 +90,10 @@ public readonly record struct PermissionCode : IComparable<PermissionCode>
     {
         if (string.IsNullOrWhiteSpace(value))
         {
-            throw new DomainValidationException("Permission code is required.");
+            throw new DomainValidationException("Permission code is required.")
+            {
+                Code = "roles.permission.invalid",
+            };
         }
 
         // ToLowerInvariant, not ToLower: the result must not depend on the
@@ -101,14 +104,20 @@ public readonly record struct PermissionCode : IComparable<PermissionCode>
         {
             throw new DomainValidationException(
                 $"Permission code must be at most {MaxLength} characters; " +
-                $"the supplied code has {normalised.Length}. It is not truncated.");
+                $"the supplied code has {normalised.Length}. It is not truncated.")
+            {
+                Code = "roles.permission.invalid",
+            };
         }
 
         if (normalised[0] is GroupSeparator or Hyphen
             || normalised[^1] is GroupSeparator or Hyphen)
         {
             throw new DomainValidationException(
-                $"Permission code must not start or end with '.' or '-'; '{normalised}' does.");
+                $"Permission code must not start or end with '.' or '-'; '{normalised}' does.")
+            {
+                Code = "roles.permission.invalid",
+            };
         }
 
         int separators = 0;
@@ -125,14 +134,20 @@ public readonly record struct PermissionCode : IComparable<PermissionCode>
             {
                 throw new DomainValidationException(
                     "Permission code may contain only lowercase letters, digits, hyphens and " +
-                    $"dots; '{normalised}' contains '{character}'.");
+                    $"dots; '{normalised}' contains '{character}'.")
+                {
+                    Code = "roles.permission.invalid",
+                };
             }
 
             if (index > 0 && IsSeparator(character) && IsSeparator(normalised[index - 1]))
             {
                 throw new DomainValidationException(
                     $"Permission code must not contain adjacent '.' or '-' characters; " +
-                    $"'{normalised}' does.");
+                    $"'{normalised}' does.")
+                {
+                    Code = "roles.permission.invalid",
+                };
             }
         }
 
@@ -140,7 +155,10 @@ public readonly record struct PermissionCode : IComparable<PermissionCode>
         {
             throw new DomainValidationException(
                 "Permission code must name a group and an action separated by a dot, " +
-                $"for example 'ai-agents.edit'; '{normalised}' does not.");
+                $"for example 'ai-agents.edit'; '{normalised}' does not.")
+            {
+                Code = "roles.permission.invalid",
+            };
         }
 
         return new PermissionCode(normalised);

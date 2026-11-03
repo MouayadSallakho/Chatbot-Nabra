@@ -97,18 +97,27 @@ public sealed class BillingPlanOffer
     {
         if (planId.IsEmpty)
         {
-            throw new DomainValidationException("An offer must sell a plan.");
+            throw new DomainValidationException("An offer must sell a plan.")
+            {
+                Code = "billing.offer.invalid",
+            };
         }
 
         if (code.IsEmpty)
         {
-            throw new DomainValidationException("An offer needs a code.");
+            throw new DomainValidationException("An offer needs a code.")
+            {
+                Code = "billing.offer.invalid",
+            };
         }
 
         if (trialDays is int days and (< 0 or > 365))
         {
             throw new DomainValidationException(
-                $"A trial of {days} days is not something this platform offers.");
+                $"A trial of {days} days is not something this platform offers.")
+            {
+                Code = "billing.offer.invalid",
+            };
         }
 
         return new BillingPlanOffer(
@@ -122,6 +131,9 @@ public sealed class BillingPlanOffer
             isActive: true,
             createdAt == default
                 ? throw new DomainValidationException("An offer must record when it was created.")
+                    {
+                        Code = "billing.offer.invalid",
+                    }
                 : createdAt.ToUniversalTime());
     }
 
@@ -188,11 +200,17 @@ public sealed class BillingProviderPriceMapping
     {
         if (offerId.IsEmpty)
         {
-            throw new DomainValidationException("A price mapping needs an offer.");
+            throw new DomainValidationException("A price mapping needs an offer.")
+            {
+                Code = "billing.offer.invalid",
+            };
         }
 
         return externalPriceId.IsEmpty
             ? throw new DomainValidationException("A price mapping needs a provider price.")
+                {
+                    Code = "billing.offer.invalid",
+                }
             : new BillingProviderPriceMapping(
                 offerId,
                 provider,

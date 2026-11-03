@@ -714,7 +714,8 @@ It rethrows, so the calling screen still stops its own spinner.
 
 ### D24 — Anonymous surface
 
-Exactly seven endpoints answer without a session (five until Phase 37.3):
+Exactly eight endpoints answer without a session (five until Phase 37.3, seven
+until Phase 37.5b):
 
 ```
 GET  /health                      liveness; a probe that needed a session could not be called
@@ -724,9 +725,10 @@ POST /api/auth/register
 POST /api/auth/login
 POST /api/auth/password/forgot    Phase 37.3 (D29)
 POST /api/auth/password/reset     Phase 37.3 (D29)
+GET  /api/auth/session            Phase 37.5b (D34)
 ```
 
-`AnonymousAccessTests.The_anonymous_account_surface_is_exactly_five_routes` reads
+`AnonymousAccessTests.The_anonymous_account_surface_is_exactly_six_routes` reads
 the endpoints' metadata and fails if anything else under `/api/auth` or `/api/me`
 allows anonymous callers.
 
@@ -885,6 +887,7 @@ unknown is not a bucket (public-chat-protection.md P11).
 | Reset requests per address | 3 per hour | `AccountProtection:ResetRequestsPerAddress` |
 | Reset requests per network | 10 per hour | `AccountProtection:ResetRequestsPerNetwork` |
 | Reset attempts per network | 20 per 15 minutes | `AccountProtection:ResetsPerNetwork` |
+| Session checks per network, every caller (Phase 37.5b, D34) | 600 per 10 minutes | `AccountProtection:SessionChecksPerNetwork` |
 
 Each is `Limit` and `WindowSeconds`; a counter's window starts at its first count.
 
@@ -912,12 +915,14 @@ A refusal is `429 auth.throttled` with `Retry-After` (whole seconds, at least on
 the remaining life of the counter that refused), naming no limit or window;
 throttled sign-ins and reset requests are audited. A failure that cannot be counted
 is answered `503`, like a check that cannot be made. Reset requests and reset
-attempts still count every attempt (above), unchanged.
+attempts still count every attempt (above), unchanged. A completed reset clears the
+address's own sign-in failures (Phase 37.5b, D35).
 
 **Remaining risk.** Guessing spread over many networks can reach the per-address
 ceiling (100 failures in an hour) and so refuse the owner's sign-in for the rest of
 that hour, from every network. It needs a hundred guesses from at least twenty
-networks, it never locks the account, and a password reset is unaffected. When the store cannot be reached, or is not configured,
+networks, it never locks the account, a password reset is unaffected, and from Phase 37.5b
+a completed reset lifts the ceiling for that address at once (D35). When the store cannot be reached, or is not configured,
 the endpoint answers `503 auth.throttle.unavailable` rather than serving unlimited
 (fail closed); the log gets the reason.
 
@@ -976,6 +981,57 @@ Writes are best effort: a failure is logged (event 4300) and the request carries
 on. The security decisions themselves never depend on the audit row.
 
 ---
+
+## Phase 37.5b: the session check, and signing in after a reset
+
+### D34 — `GET /api/auth/session`
+
+**Why.** A signed-out page asked `GET /api/auth/me`, which answers `401`, and the
+browser logged that as an error on every sign-in page. The session check answers the
+same question without one.
+
+**Contract.** Anonymous. `200` with exactly `{"authenticated":false}` when signed
+out, and also when the cookie's session was revoked (D32), has expired, or names an
+account that is gone. Signed in: `{"authenticated":true,"user":{"id","email","language"}}`,
+the same three facts `/api/auth/me` answers with, from the same projection (a test
+compares the two bodies). It takes no input, so the only session it can describe is
+the caller's own: there is nothing to enumerate. `/api/auth/me` is unchanged,
+including its `401`.
+
+**No side effects.**
+- `Cache-Control: no-store` on every answer, refusals included.
+- **It never writes a cookie.** The endpoint carries the `SessionProbe` marker.
+  On a marked endpoint the cookie is not renewed: the sliding expiration's
+  `OnCheckSlidingExpiration` and the stamp check's own renewal are both skipped. A
+  revoked session is not signed out either: it is just not authenticated for that
+  request, and the next ordinary request clears the cookie as before. A side effect
+  worth having: a page that polls the check cannot keep an unused session alive.
+- Tests prove there is no `Set-Cookie` signed out, signed in, past half the cookie's
+  life, with the stamp check renewing on every request, revoked, and throttled.
+
+**Rate limit.** Every caller counts, signed in or not, per client network (D30),
+checked first: `429 auth.throttled` with `Retry-After`, or `503
+auth.throttle.unavailable` when the limiter cannot decide (fail closed). A throttled
+check writes no audit row: it names no account and changes nothing, and writing a
+row per refused poll would turn the limit into a way to fill the table.
+
+### D35 — A completed reset clears the address's sign-in failures
+
+The owner's decision after 37.3. Somebody who has just proved they hold the inbox
+can sign in at once, so a completed reset (`204`) clears two counters, **both the
+address's own**:
+- its ceiling across every network (`signin:fail:address`);
+- its count on the network the reset came from (`signin:fail:address-network`).
+
+**Never another address's counters**, and never the network's own counter: that one
+counts every address on the network, so clearing it would let one person's reset
+wipe out failures somebody else caused. The subject is derived exactly as sign-in
+derives it, from Identity's normalised address. In-flight reservations are left to
+expire (ten seconds). A refused reset clears nothing.
+
+Best effort, like a successful sign-in's clear: when the store cannot be reached the
+reset still stands, a warning is logged (event 4342), and the failures expire on
+their own. The reset itself is already audited (`auth.password_reset.completed`).
 
 ## Verified in a real browser
 

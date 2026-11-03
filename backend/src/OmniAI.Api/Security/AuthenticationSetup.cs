@@ -153,6 +153,18 @@ internal static class AuthenticationSetup
                 // every instance. Replaces Identity's interval validator; no cookie is
                 // reissued per request.
                 options.Events.OnValidatePrincipal = SessionStamps.ValidatePrincipalAsync;
+
+                // Phase 37.5b: the session check is a question, so the sliding
+                // expiration never reissues the cookie on it. See SessionProbe.
+                options.Events.OnCheckSlidingExpiration = context =>
+                {
+                    if (SessionProbe.Applies(context.HttpContext))
+                    {
+                        context.ShouldRenew = false;
+                    }
+
+                    return Task.CompletedTask;
+                };
             });
 
         services.AddScoped<SessionStamps>();

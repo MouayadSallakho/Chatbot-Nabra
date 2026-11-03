@@ -11,6 +11,10 @@ namespace OmniAI.Application.Authorization;
 /// <param name="PermissionCount">How many capabilities it grants.</param>
 /// <param name="CreatedAt">When it was created.</param>
 /// <param name="UpdatedAt">When its name or permissions last changed.</param>
+/// <param name="MemberCount">
+/// How many members of the workspace hold it (Phase 37.5b, row 23), counted from
+/// their assignments. The Owner holds a real assignment, so it is counted too.
+/// </param>
 /// <remarks>
 /// <strong>A count, not the set.</strong> The list exists so somebody can see
 /// which roles a workspace has and pick one; the permissions themselves are on
@@ -35,4 +39,5 @@ public sealed record TenantRoleSummary(
     TenantRoleKind Kind,
     int PermissionCount,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    int MemberCount);

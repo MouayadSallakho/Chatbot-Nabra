@@ -121,12 +121,20 @@ internal static class PasswordResetEndpoints
     /// account's realtime connections close on every instance, a lockout is lifted,
     /// a "your password was changed" email is queued, and two audit rows are
     /// written. The person then signs in with the new password.
+    /// <para>
+    /// <strong>Phase 37.5b: they can sign in at once.</strong> The address's sign-in
+    /// failures are cleared: its ceiling across every network and its count on the
+    /// network the reset came from. Only this address's counters, never the
+    /// network's, which other addresses share. Best effort: when the store cannot
+    /// be reached the reset still stands and the failures expire on their own.
+    /// </para>
     /// </remarks>
     public static async Task<IResult> ResetAsync(
         HttpContext http,
         ResetPasswordRequest request,
         UserManager<OmniAiUser> users,
         IAccountProtection protection,
+        IAccountSubjectKeys subjects,
         IClientNetworkKeys networks,
         SessionStamps stamps,
         ISessionRevocation revocation,
@@ -140,6 +148,7 @@ internal static class PasswordResetEndpoints
         ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(users);
         ArgumentNullException.ThrowIfNull(protection);
+        ArgumentNullException.ThrowIfNull(subjects);
         ArgumentNullException.ThrowIfNull(networks);
         ArgumentNullException.ThrowIfNull(stamps);
         ArgumentNullException.ThrowIfNull(revocation);
@@ -199,6 +208,22 @@ internal static class PasswordResetEndpoints
         // failed sign-ins that may have been somebody else's.
         await users.SetLockoutEndDateAsync(user, null).ConfigureAwait(false);
         await users.ResetAccessFailedCountAsync(user).ConfigureAwait(false);
+
+        // Phase 37.5b: nor by the limiter's count of those failures. The subject is
+        // derived exactly as sign-in derives it, from Identity's normalised address.
+        try
+        {
+            await protection
+                .ClearSignInFailuresAsync(
+                    subjects.Derive(users.NormalizeEmail(user.Email) ?? string.Empty),
+                    client,
+                    CancellationToken.None)
+                .ConfigureAwait(false);
+        }
+        catch (AccountProtectionUnavailableException uncleared)
+        {
+            AccountProblems.LogResetNotCleared(loggers.CreateLogger(typeof(PasswordResetEndpoints)), uncleared);
+        }
 
         await stamps.RecordAsync(user.Id, await users.GetSecurityStampAsync(user).ConfigureAwait(false)).ConfigureAwait(false);
         await revocation.RevokeAsync(userId, CancellationToken.None).ConfigureAwait(false);

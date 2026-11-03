@@ -39,6 +39,9 @@ public readonly record struct BillingOfferId(Guid Value)
     public static BillingOfferId From(Guid value) =>
         value == Guid.Empty
             ? throw new DomainValidationException("A billing offer id cannot be empty.")
+                {
+                    Code = "billing.offer_id.invalid",
+                }
             : new BillingOfferId(value);
 
     public override string ToString() => Value.ToString("D", CultureInfo.InvariantCulture);
@@ -54,6 +57,9 @@ public readonly record struct WorkspaceSubscriptionId(Guid Value)
     public static WorkspaceSubscriptionId From(Guid value) =>
         value == Guid.Empty
             ? throw new DomainValidationException("A subscription id cannot be empty.")
+                {
+                    Code = "billing.id.invalid",
+                }
             : new WorkspaceSubscriptionId(value);
 
     public override string ToString() => Value.ToString("D", CultureInfo.InvariantCulture);
@@ -69,6 +75,9 @@ public readonly record struct BillingCheckoutIntentId(Guid Value)
     public static BillingCheckoutIntentId From(Guid value) =>
         value == Guid.Empty
             ? throw new DomainValidationException("A checkout intent id cannot be empty.")
+                {
+                    Code = "billing.id.invalid",
+                }
             : new BillingCheckoutIntentId(value);
 
     public override string ToString() => Value.ToString("D", CultureInfo.InvariantCulture);
@@ -84,6 +93,9 @@ public readonly record struct BillingEventId(Guid Value)
     public static BillingEventId From(Guid value) =>
         value == Guid.Empty
             ? throw new DomainValidationException("A billing event id cannot be empty.")
+                {
+                    Code = "billing.id.invalid",
+                }
             : new BillingEventId(value);
 
     public override string ToString() => Value.ToString("D", CultureInfo.InvariantCulture);
@@ -113,13 +125,19 @@ public readonly record struct OfferCode
 
         if (trimmed.Length == 0)
         {
-            throw new DomainValidationException("An offer needs a code.");
+            throw new DomainValidationException("An offer needs a code.")
+            {
+                Code = "billing.offer.invalid",
+            };
         }
 
         if (trimmed.Length > MaxLength)
         {
             throw new DomainValidationException(
-                $"An offer code cannot be longer than {MaxLength} characters.");
+                $"An offer code cannot be longer than {MaxLength} characters.")
+            {
+                Code = "billing.offer.invalid",
+            };
         }
 
         foreach (char character in trimmed)
@@ -127,7 +145,10 @@ public readonly record struct OfferCode
             if (!char.IsAsciiLetterOrDigit(character) && character != '-')
             {
                 throw new DomainValidationException(
-                    "An offer code may contain only letters, digits and hyphens.");
+                    "An offer code may contain only letters, digits and hyphens.")
+                {
+                    Code = "billing.offer.invalid",
+                };
             }
         }
 
@@ -168,12 +189,18 @@ public readonly record struct ProviderReference
 
         if (trimmed.Length == 0)
         {
-            throw new DomainValidationException("A provider reference cannot be blank.");
+            throw new DomainValidationException("A provider reference cannot be blank.")
+            {
+                Code = "billing.provider_reference.invalid",
+            };
         }
 
         return trimmed.Length > MaxLength
             ? throw new DomainValidationException(
                 $"A provider reference cannot be longer than {MaxLength} characters.")
+                {
+                    Code = "billing.provider_reference.invalid",
+                }
             : new ProviderReference(trimmed);
     }
 
@@ -217,6 +244,9 @@ public readonly record struct Money
     public static Money Of(long minorUnits, BillingCurrency currency) =>
         minorUnits < 0
             ? throw new DomainValidationException("A price cannot be negative.")
+                {
+                    Code = "billing.price.invalid",
+                }
             : new Money(minorUnits, currency);
 
     public override string ToString() =>
@@ -243,7 +273,10 @@ public readonly record struct BillingCurrency
         if (trimmed.Length != 3 || !trimmed.All(char.IsAsciiLetterUpper))
         {
             throw new DomainValidationException(
-                "A currency must be a three-letter ISO 4217 code.");
+                "A currency must be a three-letter ISO 4217 code.")
+            {
+                Code = "billing.price.invalid",
+            };
         }
 
         return new BillingCurrency(trimmed);

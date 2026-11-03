@@ -170,4 +170,7 @@ internal static partial class AccountProblems
 
     [LoggerMessage(EventId = 4341, Level = LogLevel.Warning, Message = "A successful sign-in could not clear its address's failures on its network; they will expire on their own.")]
     public static partial void LogNotCleared(ILogger logger, Exception reason);
+
+    [LoggerMessage(EventId = 4342, Level = LogLevel.Warning, Message = "A completed password reset could not clear its address's sign-in failures; they will expire on their own.")]
+    public static partial void LogResetNotCleared(ILogger logger, Exception reason);
 }

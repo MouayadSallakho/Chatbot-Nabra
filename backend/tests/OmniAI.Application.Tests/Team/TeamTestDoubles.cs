@@ -188,20 +188,31 @@ internal sealed class InMemoryInvitationRepository : ITenantInvitationRepository
 
     public Task<IReadOnlyList<TenantInvitation>> ListAsync(
         TenantId tenantId,
+        TenantInvitationStatus? status,
+        DateTimeOffset now,
         int skip,
         int take,
         CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<TenantInvitation>>(
         [
-            .. _invitations
-                .Where(invitation => invitation.TenantId == tenantId)
+            .. InStatus(tenantId, status, now)
                 .OrderByDescending(invitation => invitation.CreatedAt)
                 .Skip(skip)
                 .Take(take)
         ]);
 
-    public Task<int> CountAsync(TenantId tenantId, CancellationToken cancellationToken = default) =>
-        Task.FromResult(_invitations.Count(invitation => invitation.TenantId == tenantId));
+    public Task<int> CountAsync(
+        TenantId tenantId,
+        TenantInvitationStatus? status,
+        DateTimeOffset now,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(InStatus(tenantId, status, now).Count());
+
+    /// <summary>The status the list shows, as the real query judges it (Phase 37.5b).</summary>
+    private IEnumerable<TenantInvitation> InStatus(TenantId tenantId, TenantInvitationStatus? status, DateTimeOffset now) =>
+        _invitations.Where(invitation =>
+            invitation.TenantId == tenantId
+            && (status is null || (invitation.HasExpiredAt(now) ? TenantInvitationStatus.Expired : invitation.Status) == status));
 
     public Task<TenantInvitation?> FindAsync(
         TenantId tenantId,
@@ -279,6 +290,19 @@ internal sealed class InMemoryAccountDirectory : IAccountDirectory
         CancellationToken cancellationToken = default) =>
         Task.FromResult(
             _accounts.TryGetValue(userId, out EmailAddress email) ? email : (EmailAddress?)null);
+
+    /// <summary>How many times addresses were read in a batch (Phase 37.5b).</summary>
+    public int BatchReads { get; private set; }
+
+    public Task<IReadOnlyDictionary<UserId, EmailAddress>> FindEmailsAsync(
+        IReadOnlyCollection<UserId> userIds,
+        CancellationToken cancellationToken = default)
+    {
+        BatchReads++;
+
+        return Task.FromResult<IReadOnlyDictionary<UserId, EmailAddress>>(
+            _accounts.Where(account => userIds.Contains(account.Key)).ToDictionary());
+    }
 
     public Task<UserLanguage?> FindLanguageAsync(
         UserId userId,

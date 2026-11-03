@@ -63,17 +63,26 @@ public sealed class InvitationRoleGrant
     {
         if (invitationId.IsEmpty)
         {
-            throw new DomainValidationException("An invitation role must name an invitation.");
+            throw new DomainValidationException("An invitation role must name an invitation.")
+            {
+                Code = "invitations.role_grant.invalid",
+            };
         }
 
         if (tenantId.IsEmpty)
         {
-            throw new DomainValidationException("An invitation role must name a tenant.");
+            throw new DomainValidationException("An invitation role must name a tenant.")
+            {
+                Code = "invitations.role_grant.invalid",
+            };
         }
 
         if (roleId.IsEmpty)
         {
-            throw new DomainValidationException("An invitation role must name a role.");
+            throw new DomainValidationException("An invitation role must name a role.")
+            {
+                Code = "invitations.role_grant.invalid",
+            };
         }
 
         return new InvitationRoleGrant(invitationId, tenantId, roleId);

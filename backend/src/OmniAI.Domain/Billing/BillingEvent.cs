@@ -118,12 +118,18 @@ public sealed class BillingEvent
     {
         if (providerEventId.IsEmpty)
         {
-            throw new DomainValidationException("A billing event needs a provider event id.");
+            throw new DomainValidationException("A billing event needs a provider event id.")
+            {
+                Code = "billing.event.invalid",
+            };
         }
 
         if (string.IsNullOrWhiteSpace(eventType))
         {
-            throw new DomainValidationException("A billing event needs a type.");
+            throw new DomainValidationException("A billing event needs a type.")
+            {
+                Code = "billing.event.invalid",
+            };
         }
 
         return new BillingEvent(

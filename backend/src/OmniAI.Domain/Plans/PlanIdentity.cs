@@ -16,6 +16,9 @@ public readonly record struct PlanId(Guid Value)
     public static PlanId From(Guid value) =>
         value == Guid.Empty
             ? throw new DomainValidationException("A plan id cannot be empty.")
+                {
+                    Code = "plans.id.invalid",
+                }
             : new PlanId(value);
 
     public override string ToString() => Value.ToString("D", CultureInfo.InvariantCulture);
@@ -58,13 +61,19 @@ public readonly record struct PlanCode
 
         if (trimmed.Length == 0)
         {
-            throw new DomainValidationException("A plan needs a code.");
+            throw new DomainValidationException("A plan needs a code.")
+            {
+                Code = "plans.code.invalid",
+            };
         }
 
         if (trimmed.Length > MaxLength)
         {
             throw new DomainValidationException(
-                $"A plan code cannot be longer than {MaxLength} characters.");
+                $"A plan code cannot be longer than {MaxLength} characters.")
+            {
+                Code = "plans.code.invalid",
+            };
         }
 
         foreach (char character in trimmed)
@@ -72,7 +81,10 @@ public readonly record struct PlanCode
             if (!char.IsAsciiLetterOrDigit(character) && character != '-')
             {
                 throw new DomainValidationException(
-                    "A plan code may contain only letters, digits and hyphens.");
+                    "A plan code may contain only letters, digits and hyphens.")
+                {
+                    Code = "plans.code.invalid",
+                };
             }
         }
 
@@ -97,12 +109,18 @@ public readonly record struct PlanDisplayName
 
         if (trimmed.Length == 0)
         {
-            throw new DomainValidationException("A plan needs a display name.");
+            throw new DomainValidationException("A plan needs a display name.")
+            {
+                Code = "plans.name.invalid",
+            };
         }
 
         return trimmed.Length > MaxLength
             ? throw new DomainValidationException(
                 $"A plan name cannot be longer than {MaxLength} characters.")
+                {
+                    Code = "plans.name.invalid",
+                }
             : new PlanDisplayName(trimmed);
     }
 

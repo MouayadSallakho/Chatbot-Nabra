@@ -469,6 +469,30 @@ it.
 
 ---
 
+## T21. The invitation list filters by status, and reads each kind of fact once (Phase 37.5b)
+
+**Decision.** `GET …/invitations?status=Pending|Accepted|Revoked|Expired`, under
+`members.view` as before. The status is the one the list shows (T13): a stored
+`Pending` row past its `ExpiresAt` is `Expired`, so `Pending` means stored pending and
+`expires_at > now`, and `Expired` means stored expired or stored pending with
+`expires_at <= now`. One instant decides the filter and every status on the page.
+`total` counts the filter. Without `status` the list is exactly what it was. The
+value is a name in any letter case; a number, a list or anything else is `400
+invitations.status.invalid`, checked before membership, so the answer is the same for
+anybody.
+
+**And the N+1 is gone.** The page used to read each invitation's roles one by one and
+its inviter's address separately. Now the count, the page, the role names of every
+invitation on it (`ITenantRoleRepository.FindNamesAsync`) and the inviters' addresses
+(`IAccountDirectory.FindEmailsAsync`) are one statement each, scoped by the workspace,
+on `ix_tenant_invitations_tenant`. A role that has gone is still left out, and names
+still sort ignoring case.
+
+**Forbids.** Filtering on the stored status alone, which would list expired
+invitations as pending.
+
+---
+
 ## DECIDED NOW
 
 - Three member permissions, and no codes for operations that do not exist

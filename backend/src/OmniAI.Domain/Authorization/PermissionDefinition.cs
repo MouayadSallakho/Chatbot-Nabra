@@ -43,4 +43,16 @@ public sealed record PermissionDefinition(
     PermissionCode Code,
     string Group,
     string Label,
-    string Description);
+    string Description)
+{
+    /// <summary>
+    /// The stable key of <see cref="Group"/>, such as <c>ai-agents</c> (Phase 37.5b,
+    /// row 26).
+    /// </summary>
+    /// <remarks>
+    /// The key a client translates the area's name by, as it translates a
+    /// permission's label and description by <see cref="Code"/>. The English
+    /// <see cref="Group"/> may be reworded; the key never changes.
+    /// </remarks>
+    public string GroupKey => PlatformPermissions.GroupKeyFor(Group);
+}

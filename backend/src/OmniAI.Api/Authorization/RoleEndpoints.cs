@@ -80,16 +80,25 @@ internal static class RoleEndpoints
         // would have nothing to authorise against and would hand the platform's
         // capability list to any signed-in caller.
         workspace.MapGet("/permissions", GetPermissionCatalogAsync)
-            .WithName("GetPermissionCatalog");
+            .WithName("GetPermissionCatalog")
+            .WithSummary("The capability catalogue. Each entry's code is the stable key of its label and description, and groupKey the stable key of its area.")
+            .Produces<PermissionResponse[]>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status404NotFound);
 
         workspace.MapGet("/roles", ListAsync)
-            .WithName("ListTenantRoles");
+            .WithName("ListTenantRoles")
+            .WithSummary("The workspace's roles, Owner first, each with how many members hold it (memberCount).")
+            .Produces<RoleSummaryResponse[]>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status404NotFound);
 
         workspace.MapPost("/roles", CreateAsync)
             .WithName("CreateTenantRole");
 
         workspace.MapGet("/roles/{roleId:guid}", GetByIdAsync)
-            .WithName(GetRoleByIdRouteName);
+            .WithName(GetRoleByIdRouteName)
+            .WithSummary("One role with its permissions, an ETag, and how many members hold it (memberCount).")
+            .Produces<RoleDetailResponse>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status404NotFound);
 
         // PUT on named sub-resources, not PATCH on the role. Each replaces one
         // addressable thing whose whole value is in the body, which is what PUT
@@ -196,6 +205,10 @@ internal static class RoleEndpoints
     /// <c>GET /api/tenants/{tenantId}/roles/{roleId}</c>. Returns <c>200</c> with
     /// an <c>ETag</c>, or <c>404</c> as Problem Details.
     /// </summary>
+    /// <remarks>
+    /// Its own response record since Phase 37.5b (<see cref="RoleDetailResponse"/>),
+    /// with the member count; the writes keep <see cref="RoleResponse"/>.
+    /// </remarks>
     private static async Task<IResult> GetByIdAsync(
         HttpContext http,
         Guid tenantId,
@@ -203,11 +216,18 @@ internal static class RoleEndpoints
         GetTenantRoleByIdHandler handler,
         CancellationToken cancellationToken)
     {
-        Versioned<TenantRoleView>? role = await handler
+        Versioned<TenantRoleDetailView>? role = await handler
             .HandleAsync(new GetTenantRoleByIdQuery(tenantId, roleId), cancellationToken)
             .ConfigureAwait(false);
 
-        return Respond(http, role, roleId);
+        if (role is null)
+        {
+            return RoleNotFound(roleId);
+        }
+
+        SetETag(http, role.Version);
+
+        return Results.Ok(RoleDetailResponse.From(role.Value));
     }
 
     /// <summary>

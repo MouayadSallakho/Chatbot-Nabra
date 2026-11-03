@@ -50,6 +50,10 @@ public sealed record ReplaceRolePermissionsRequest(IReadOnlyList<string?>? Permi
 /// <param name="PermissionCount">How many capabilities it grants.</param>
 /// <param name="CreatedAt">When it was created.</param>
 /// <param name="UpdatedAt">When its name or permissions last changed.</param>
+/// <param name="MemberCount">
+/// How many members hold it (Phase 37.5b), so an editor can say "saving changes
+/// access for 3 members" before anybody presses save.
+/// </param>
 public sealed record RoleSummaryResponse(
     Guid Id,
     string Name,
@@ -57,7 +61,8 @@ public sealed record RoleSummaryResponse(
     bool IsSystem,
     int PermissionCount,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt)
+    DateTimeOffset UpdatedAt,
+    int MemberCount)
 {
     /// <summary>Projects a summary.</summary>
     public static RoleSummaryResponse From(TenantRoleSummary role)
@@ -71,7 +76,8 @@ public sealed record RoleSummaryResponse(
             role.Kind is TenantRoleKind.Owner,
             role.PermissionCount,
             role.CreatedAt,
-            role.UpdatedAt);
+            role.UpdatedAt,
+            role.MemberCount);
     }
 }
 
@@ -119,6 +125,45 @@ public sealed record RoleResponse(
     }
 }
 
+/// <summary>
+/// One role as <c>GET …/roles/{id}</c> shows it: <see cref="RoleResponse"/>'s
+/// fields and how many members hold it (Phase 37.5b, row 23).
+/// </summary>
+/// <remarks>
+/// The read's own record, so the writes keep their exact shape and never claim a
+/// count they did not read.
+/// </remarks>
+public sealed record RoleDetailResponse(
+    Guid Id,
+    Guid TenantId,
+    string Name,
+    string Type,
+    bool IsSystem,
+    IReadOnlyList<string> Permissions,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset UpdatedAt,
+    int MemberCount)
+{
+    /// <summary>Projects a role's detail.</summary>
+    public static RoleDetailResponse From(TenantRoleDetailView detail)
+    {
+        ArgumentNullException.ThrowIfNull(detail);
+
+        RoleResponse role = RoleResponse.From(detail.Role);
+
+        return new RoleDetailResponse(
+            role.Id,
+            role.TenantId,
+            role.Name,
+            role.Type,
+            role.IsSystem,
+            role.Permissions,
+            role.CreatedAt,
+            role.UpdatedAt,
+            detail.MemberCount);
+    }
+}
+
 /// <summary>One capability a role may be given.</summary>
 /// <param name="Code">
 /// The security contract. This is the only field authorisation ever compares, and
@@ -127,6 +172,11 @@ public sealed record RoleResponse(
 /// <param name="Group">The product area, for grouping the checkboxes.</param>
 /// <param name="Label">The short name a person sees.</param>
 /// <param name="Description">One sentence saying what it actually allows.</param>
+/// <param name="GroupKey">
+/// The stable key of <paramref name="Group"/>, such as <c>ai-agents</c> (Phase
+/// 37.5b). A client translates the area by this key, and the label and description
+/// by <paramref name="Code"/>; the English texts may change, the keys never do.
+/// </param>
 /// <remarks>
 /// No internal type name, no handler name, no route and no ordinal. A client can
 /// render this and send codes back, and learns nothing about how the platform is
@@ -136,7 +186,8 @@ public sealed record PermissionResponse(
     string Code,
     string Group,
     string Label,
-    string Description)
+    string Description,
+    string GroupKey)
 {
     /// <summary>Projects a catalogue entry.</summary>
     public static PermissionResponse From(PermissionDefinition permission)
@@ -147,7 +198,8 @@ public sealed record PermissionResponse(
             permission.Code.Value,
             permission.Group,
             permission.Label,
-            permission.Description);
+            permission.Description,
+            permission.GroupKey);
     }
 }
 

@@ -161,6 +161,45 @@ internal sealed class RedisAccountProtection(IConnectionMultiplexer redis, Accou
         return EvaluateAsync(script, keys, values, cancellationToken);
     }
 
+    /// <summary>
+    /// Deletes the address's two own failure counters (Phase 37.5b). The
+    /// per-network counter, shared by every address on that network, is not
+    /// touched; nor are the in-flight reservations, which expire on their own.
+    /// </summary>
+    public async Task ClearSignInFailuresAsync(
+        string subjectKey,
+        ClientNetworkKey? client,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        RedisKey[] keys =
+        [
+            Key("signin:fail:address-network", subjectKey + ":" + Network(client)),
+            Key("signin:fail:address", subjectKey),
+        ];
+
+        try
+        {
+            await _redis.GetDatabase().KeyDeleteAsync(keys).ConfigureAwait(false);
+        }
+        catch (Exception failure) when (RedisPublicChatProtection.IsProtectionStoreFailure(failure, cancellationToken))
+        {
+            throw new AccountProtectionUnavailableException(
+                "The account protection store could not be reached, so the sign-in failures were not cleared. "
+                + failure.GetType().Name);
+        }
+    }
+
+    public Task<AccountProtectionDecision> AuthoriseSessionCheckAsync(
+        ClientNetworkKey? client,
+        CancellationToken cancellationToken = default) =>
+        DecideAsync(
+            [
+                new(Key("session:network", Network(client)), _limits.SessionChecksPerNetwork),
+            ],
+            cancellationToken);
+
     public Task<AccountProtectionDecision> AuthorisePasswordResetRequestAsync(
         string subjectKey,
         ClientNetworkKey? client,
@@ -276,6 +315,17 @@ internal sealed class UnprotectedAccounts(string reason) : IAccountProtection
         ClientNetworkKey? client,
         CancellationToken cancellationToken = default) =>
         throw new AccountProtectionUnavailableException(reason);
+
+    public Task ClearSignInFailuresAsync(
+        string subjectKey,
+        ClientNetworkKey? client,
+        CancellationToken cancellationToken = default) =>
+        throw new AccountProtectionUnavailableException(reason);
+
+    public Task<AccountProtectionDecision> AuthoriseSessionCheckAsync(
+        ClientNetworkKey? client,
+        CancellationToken cancellationToken = default) =>
+        throw new AccountProtectionUnavailableException(reason);
 }
 
 /// <summary>Registers the account limiter and the address keys.</summary>
@@ -327,6 +377,7 @@ public static class AccountProtectionSetup
             ResetRequestsPerAddress = Window(section, nameof(AccountProtectionOptions.ResetRequestsPerAddress), defaults.ResetRequestsPerAddress),
             ResetRequestsPerNetwork = Window(section, nameof(AccountProtectionOptions.ResetRequestsPerNetwork), defaults.ResetRequestsPerNetwork),
             ResetsPerNetwork = Window(section, nameof(AccountProtectionOptions.ResetsPerNetwork), defaults.ResetsPerNetwork),
+            SessionChecksPerNetwork = Window(section, nameof(AccountProtectionOptions.SessionChecksPerNetwork), defaults.SessionChecksPerNetwork),
             KeyPrefix = string.IsNullOrWhiteSpace(section[nameof(AccountProtectionOptions.KeyPrefix)])
                 ? defaults.KeyPrefix
                 : section[nameof(AccountProtectionOptions.KeyPrefix)]!.Trim(),

@@ -36,7 +36,10 @@ public readonly record struct TenantInvitationId
     {
         if (value == Guid.Empty)
         {
-            throw new DomainValidationException("Tenant invitation id must not be an empty GUID.");
+            throw new DomainValidationException("Tenant invitation id must not be an empty GUID.")
+            {
+                Code = "invitations.id.invalid",
+            };
         }
 
         return new TenantInvitationId(value);

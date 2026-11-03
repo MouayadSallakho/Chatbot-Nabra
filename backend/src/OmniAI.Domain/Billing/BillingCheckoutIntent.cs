@@ -110,16 +110,25 @@ public sealed class BillingCheckoutIntent
     {
         if (tenantId.IsEmpty)
         {
-            throw new DomainValidationException("A checkout must belong to a workspace.");
+            throw new DomainValidationException("A checkout must belong to a workspace.")
+            {
+                Code = "billing.checkout_intent.invalid",
+            };
         }
 
         if (offerId.IsEmpty)
         {
-            throw new DomainValidationException("A checkout must name what is being bought.");
+            throw new DomainValidationException("A checkout must name what is being bought.")
+            {
+                Code = "billing.checkout_intent.invalid",
+            };
         }
 
         DateTimeOffset started = now == default
             ? throw new DomainValidationException("A checkout must record when it started.")
+                {
+                    Code = "billing.checkout_intent.invalid",
+                }
             : now.ToUniversalTime();
 
         return new BillingCheckoutIntent(
@@ -156,7 +165,10 @@ public sealed class BillingCheckoutIntent
     {
         if (sessionId.IsEmpty)
         {
-            throw new DomainValidationException("A started checkout must have a provider session.");
+            throw new DomainValidationException("A started checkout must have a provider session.")
+            {
+                Code = "billing.checkout_intent.invalid",
+            };
         }
 
         ProviderSessionId = sessionId;
@@ -252,11 +264,17 @@ public sealed class WorkspaceBillingCustomer
     {
         if (tenantId.IsEmpty)
         {
-            throw new DomainValidationException("A billing customer must belong to a workspace.");
+            throw new DomainValidationException("A billing customer must belong to a workspace.")
+            {
+                Code = "billing.customer.invalid",
+            };
         }
 
         return providerCustomerId.IsEmpty
             ? throw new DomainValidationException("A billing customer needs a provider reference.")
+                {
+                    Code = "billing.customer.invalid",
+                }
             : new WorkspaceBillingCustomer(
                 tenantId,
                 provider,

@@ -241,6 +241,35 @@ public sealed class FallbackPlanResolver(IPlanCatalog catalog, BillingOptions op
             : plan;
     }
 
+    /// <summary>
+    /// The fallback plan for a read, or <see langword="null"/> where
+    /// <see cref="ResolveAsync"/> would refuse (Phase 37.5b, row 27).
+    /// </summary>
+    /// <remarks>
+    /// The billing read shows what a workspace would fall back to, and must not fail
+    /// because the deployment has none: unset, unusable, missing and unlimited are
+    /// all "no fallback" to a reader. Only <see cref="ResolveAsync"/> decides what a
+    /// suspension does.
+    /// </remarks>
+    public async Task<Plan?> FindAsync(CancellationToken cancellationToken = default)
+    {
+        string configured = _options.FallbackPlanCode?.Trim() ?? string.Empty;
+
+        if (configured.Length == 0)
+        {
+            return null;
+        }
+
+        try
+        {
+            return await ResolveAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (BillingNotConfiguredException)
+        {
+            return null;
+        }
+    }
+
     private static bool Unlimited(Plan plan) =>
         plan.MaxMembers.IsUnlimited
         && plan.MaxAiAgents.IsUnlimited

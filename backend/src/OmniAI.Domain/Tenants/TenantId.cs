@@ -40,7 +40,10 @@ public readonly record struct TenantId
     {
         if (value == Guid.Empty)
         {
-            throw new DomainValidationException("Tenant id must not be an empty GUID.");
+            throw new DomainValidationException("Tenant id must not be an empty GUID.")
+            {
+                Code = "workspace.id.invalid",
+            };
         }
 
         return new TenantId(value);

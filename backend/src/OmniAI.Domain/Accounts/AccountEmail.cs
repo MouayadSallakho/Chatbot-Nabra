@@ -18,7 +18,10 @@ public readonly record struct AccountEmailId
     {
         if (value == Guid.Empty)
         {
-            throw new DomainValidationException("Account email id must not be an empty GUID.");
+            throw new DomainValidationException("Account email id must not be an empty GUID.")
+            {
+                Code = "accounts.email.invalid",
+            };
         }
 
         return new AccountEmailId(value);
@@ -124,12 +127,18 @@ public sealed class AccountEmail
     {
         if (userId.IsEmpty)
         {
-            throw new DomainValidationException("An account email must name an account.");
+            throw new DomainValidationException("An account email must name an account.")
+            {
+                Code = "accounts.email.invalid",
+            };
         }
 
         if (kind == AccountEmailKind.Invitation)
         {
-            throw new DomainValidationException("An invitation email is addressed to an invitation, not an account.");
+            throw new DomainValidationException("An invitation email is addressed to an invitation, not an account.")
+            {
+                Code = "accounts.email.invalid",
+            };
         }
 
         return new AccountEmail(AccountEmailId.New(), userId, null, null, kind, requestedAt.ToUniversalTime());

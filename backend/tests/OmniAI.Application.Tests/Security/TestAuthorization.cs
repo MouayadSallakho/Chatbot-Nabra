@@ -84,11 +84,29 @@ internal sealed class InMemoryTenantRoleRepository : ITenantRoleRepository
                     role.Kind,
                     role.EffectivePermissions.Count,
                     role.CreatedAt,
-                    role.UpdatedAt))
+                    role.UpdatedAt,
+                    Holders(tenantId, role.Id)))
         ];
 
         return Task.FromResult(summaries);
     }
+
+    public Task<int> CountMembersAsync(
+        TenantId tenantId,
+        TenantRoleId roleId,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(Holders(tenantId, roleId));
+
+    public Task<IReadOnlyDictionary<TenantRoleId, string>> FindNamesAsync(
+        TenantId tenantId,
+        IReadOnlyCollection<TenantRoleId> roleIds,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyDictionary<TenantRoleId, string>>(_roles
+            .Where(role => role.TenantId == tenantId && roleIds.Contains(role.Id))
+            .ToDictionary(role => role.Id, role => role.Name.Value));
+
+    private int Holders(TenantId tenantId, TenantRoleId roleId) =>
+        _assignments.Count(assignment => assignment.TenantId == tenantId && assignment.TenantRoleId == roleId);
 
     public Task<Versioned<TenantRole>?> FindAsync(
         TenantId tenantId,
@@ -236,6 +254,17 @@ internal static class TestAuthority
             TenantRoleId roleId,
             CancellationToken cancellationToken = default) =>
             Task.FromResult<Versioned<TenantRole>?>(null);
+
+        public Task<int> CountMembersAsync(
+            TenantId tenantId,
+            TenantRoleId roleId,
+            CancellationToken cancellationToken = default) => Task.FromResult(0);
+
+        public Task<IReadOnlyDictionary<TenantRoleId, string>> FindNamesAsync(
+            TenantId tenantId,
+            IReadOnlyCollection<TenantRoleId> roleIds,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyDictionary<TenantRoleId, string>>(new Dictionary<TenantRoleId, string>());
 
         public Task<bool> NameExistsAsync(
             TenantId tenantId,

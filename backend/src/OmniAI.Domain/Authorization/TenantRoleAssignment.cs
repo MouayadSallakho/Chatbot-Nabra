@@ -89,17 +89,26 @@ public sealed class TenantRoleAssignment
     {
         if (userId.IsEmpty)
         {
-            throw new DomainValidationException("A role assignment must name a user.");
+            throw new DomainValidationException("A role assignment must name a user.")
+            {
+                Code = "roles.assignment.invalid",
+            };
         }
 
         if (tenantId.IsEmpty)
         {
-            throw new DomainValidationException("A role assignment must name a tenant.");
+            throw new DomainValidationException("A role assignment must name a tenant.")
+            {
+                Code = "roles.assignment.invalid",
+            };
         }
 
         if (tenantRoleId.IsEmpty)
         {
-            throw new DomainValidationException("A role assignment must name a role.");
+            throw new DomainValidationException("A role assignment must name a role.")
+            {
+                Code = "roles.assignment.invalid",
+            };
         }
 
         return new TenantRoleAssignment(userId, tenantId, tenantRoleId, createdAt);

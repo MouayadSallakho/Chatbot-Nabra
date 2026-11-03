@@ -73,7 +73,12 @@ internal static class TeamEndpoints
             .WithName("ReplaceTenantMemberRoles");
 
         workspace.MapGet("/invitations", ListInvitationsAsync)
-            .WithName("ListTenantInvitations");
+            .WithName("ListTenantInvitations")
+            .WithSummary("A page of invitations, newest first. Optional status=Pending|Accepted|Revoked|Expired (a pending invitation past its expiry is Expired); an unknown status is 400 invitations.status.invalid.")
+            .Produces<InvitationPageResponse>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound);
 
         workspace.MapPost("/invitations", CreateInvitationAsync)
             .WithName("CreateTenantInvitation");
@@ -201,6 +206,10 @@ internal static class TeamEndpoints
     }
 
     /// <summary><c>GET /api/tenants/{tenantId}/invitations</c>.</summary>
+    /// <remarks>
+    /// Phase 37.5b: an optional <c>status</c>. Without it the list is exactly what
+    /// it was; with it, <c>total</c> counts only that status.
+    /// </remarks>
     private static async Task<IResult> ListInvitationsAsync(
         Guid tenantId,
         HttpContext http,
@@ -214,7 +223,7 @@ internal static class TeamEndpoints
 
         TenantInvitationPage? invitations = await handler
             .HandleAsync(
-                new ListTenantInvitationsQuery(tenantId, page, pageSize),
+                new ListTenantInvitationsQuery(tenantId, page, pageSize, http.Request.Query["status"].ToString()),
                 cancellationToken)
             .ConfigureAwait(false);
 

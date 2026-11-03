@@ -19,6 +19,7 @@ namespace OmniAI.Api.IntegrationTests.ErrorHandling;
 /// <summary>
 /// Phase 37.5a, row 28a: every 400, 409 and 422 the knowledge, agent and channel
 /// areas return carries a stable <c>code</c>, and every code is in the catalogue.
+/// Phase 37.5b, row 28b: the same for roles, invitations, team and billing.
 /// </summary>
 /// <remarks>
 /// Three layers, because each catches what the others cannot:
@@ -44,6 +45,21 @@ public sealed partial class ProblemCodeTests(WebChatApiFixture fixture)
         "backend/src/OmniAI.Application/Knowledge",
         "backend/src/OmniAI.Application/WebChat",
         "backend/src/OmniAI.Application/WhatsApp",
+
+        // Phase 37.5b: roles, invitations, team and billing, with the value objects
+        // they are built from (the workspace, addresses and accounts, plans).
+        "backend/src/OmniAI.Domain/Authorization",
+        "backend/src/OmniAI.Domain/Invitations",
+        "backend/src/OmniAI.Domain/Billing",
+        "backend/src/OmniAI.Domain/Plans",
+        "backend/src/OmniAI.Domain/Tenants",
+        "backend/src/OmniAI.Domain/Users",
+        "backend/src/OmniAI.Domain/Accounts",
+        "backend/src/OmniAI.Application/Authorization",
+        "backend/src/OmniAI.Application/Invitations",
+        "backend/src/OmniAI.Application/Members",
+        "backend/src/OmniAI.Application/Billing",
+        "backend/src/OmniAI.Application/Plans",
     ];
 
     // ---- the fallback ----------------------------------------------------
@@ -156,7 +172,6 @@ public sealed partial class ProblemCodeTests(WebChatApiFixture fixture)
         string catalogue = File.ReadAllText(Path.Combine(Repository().FullName, "docs", "architecture", "problem-codes.md"));
 
         IEnumerable<string> fromThrowSites = AreaFolders
-            .Append("backend/src/OmniAI.Domain/Tenants")
             .SelectMany(folder => Source(folder))
             .SelectMany(file => CodeLiteral().Matches(File.ReadAllText(file.FullName)).Select(match => match.Groups["code"].Value));
 
@@ -175,6 +190,14 @@ public sealed partial class ProblemCodeTests(WebChatApiFixture fixture)
             "website-chat.agent.required",
             "whatsapp.agent.required",
             .. AreaTypes().Select(AreaCodeOf).OfType<string>(),
+
+            // Phase 37.5b: codes the edge or a refusal type carries.
+            "team.member.protected",
+            Application.Members.ProtectedMembershipException.Owner().Code,
+            Application.Members.ProtectedMembershipException.Self().Code,
+            Application.Billing.BillingCustomerMissingException.Code,
+            .. Enum.GetValues<Application.Billing.BillingCheckoutRefusal>()
+                .Select(reason => new Application.Billing.BillingCheckoutRefusedException(reason, "x").Code),
         ];
 
         string[] missing =
@@ -244,14 +267,29 @@ public sealed partial class ProblemCodeTests(WebChatApiFixture fixture)
     [Fact]
     public async Task A_refusal_outside_these_areas_still_carries_the_generic_code()
     {
-        HttpClient client = await fixture.CreateSignedInClientAsync();
+        (HttpClient owner, Guid tenantId, _) = await fixture.CreateOwnerAsync();
 
-        // A workspace slug the slug rules refuse: Tenants/TenantSlug has no
-        // specific code yet, so the guarantee gives it the generic one.
-        HttpResponseMessage refused = await client.PostAsJsonAsync("/api/tenants", new { name = "Fine", slug = "NOT A SLUG" });
+        // A customer merge naming no customer to keep: an endpoint refusal of the
+        // customer area, which has no specific code yet (Phase 37.5b coded the
+        // workspace slug, the earlier example), so the guarantee gives it the
+        // generic one.
+        HttpResponseMessage refused = await owner.PostAsJsonAsync(
+            WebChatApiFixture.Relative($"/api/tenants/{tenantId}/customers/{Guid.CreateVersion7()}/merge"),
+            new { });
 
         Assert.Equal(HttpStatusCode.BadRequest, refused.StatusCode);
         Assert.Equal("validation.failed", await CodeAsync(refused));
+    }
+
+    [Fact]
+    public async Task The_workspace_slug_now_names_its_rule()
+    {
+        HttpClient client = await fixture.CreateSignedInClientAsync();
+
+        HttpResponseMessage refused = await client.PostAsJsonAsync("/api/tenants", new { name = "Fine", slug = "NOT A SLUG" });
+
+        Assert.Equal(HttpStatusCode.BadRequest, refused.StatusCode);
+        Assert.Equal("workspace.slug.invalid", await CodeAsync(refused));
     }
 
     private static IEnumerable<Type> AreaTypes() =>
@@ -267,6 +305,14 @@ public sealed partial class ProblemCodeTests(WebChatApiFixture fixture)
         typeof(ConversationNotOnWhatsAppException),
         typeof(TenantSlugAlreadyExistsException),
         typeof(Application.Ai.AiTurnValidationException),
+
+        // Phase 37.5b.
+        typeof(Application.Authorization.TenantRoleNameAlreadyExistsException),
+        typeof(Application.Invitations.AlreadyAMemberException),
+        typeof(Application.Invitations.InvitationAlreadyOpenException),
+        typeof(Application.Invitations.InvitationNoLongerUsableException),
+        typeof(Application.Invitations.InvitationNotForThisAccountException),
+        typeof(Application.Invitations.InvitationStatusFilterInvalidException),
     ];
 
     /// <summary>
@@ -351,6 +397,7 @@ public sealed partial class ProblemCodeTests(WebChatApiFixture fixture)
     [GeneratedRegex(@"KnowledgeFileRejection\.\w+,\s*code,")]
     private static partial Regex CodeParameter();
 
-    [GeneratedRegex(@"Code\s*=\s*""(?<code>[a-z0-9._-]+)""")]
+    // A whole word, so a constant such as EnglishCode = "en" is not read as one.
+    [GeneratedRegex(@"\bCode\s*=\s*""(?<code>[a-z0-9._-]+)""")]
     private static partial Regex CodeLiteral();
 }

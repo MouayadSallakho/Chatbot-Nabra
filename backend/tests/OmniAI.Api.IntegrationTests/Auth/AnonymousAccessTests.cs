@@ -159,6 +159,7 @@ public sealed class AnonymousAccessTests(AiAgentApiFixture api) : IClassFixture<
     [Theory]
     [InlineData("/health")]
     [InlineData("/api/auth/csrf")]
+    [InlineData("/api/auth/session")]
     public async Task The_intentionally_anonymous_endpoints_still_answer(string route)
     {
         // The complete anonymous surface, besides registration and sign-in which
@@ -175,11 +176,12 @@ public sealed class AnonymousAccessTests(AiAgentApiFixture api) : IClassFixture<
     }
 
     [Fact]
-    public void The_anonymous_account_surface_is_exactly_five_routes()
+    public void The_anonymous_account_surface_is_exactly_six_routes()
     {
-        // Phase 37.3 added the two password reset routes; nothing else under
-        // /api/auth or /api/me may answer without a session. Read from the
-        // endpoints' own metadata, so a new route cannot slip in unnoticed.
+        // Phase 37.3 added the two password reset routes and Phase 37.5b the
+        // session check; nothing else under /api/auth or /api/me may answer
+        // without a session. Read from the endpoints' own metadata, so a new
+        // route cannot slip in unnoticed.
         Microsoft.AspNetCore.Routing.EndpointDataSource source =
             api.Services.GetRequiredService<Microsoft.AspNetCore.Routing.EndpointDataSource>();
 
@@ -200,6 +202,7 @@ public sealed class AnonymousAccessTests(AiAgentApiFixture api) : IClassFixture<
         Assert.Equal(
             [
                 "GET /api/auth/csrf",
+                "GET /api/auth/session",
                 "POST /api/auth/login",
                 "POST /api/auth/password/forgot",
                 "POST /api/auth/password/reset",

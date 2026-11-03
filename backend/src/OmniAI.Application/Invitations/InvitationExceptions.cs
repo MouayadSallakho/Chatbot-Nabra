@@ -152,3 +152,34 @@ public sealed class AlreadyAMemberException : Exception
     {
     }
 }
+
+/// <summary>
+/// The invitation list was asked for a status it does not know (Phase 37.5b, row 24).
+/// </summary>
+/// <remarks>
+/// Refused rather than ignored, so a misspelt filter never shows every invitation
+/// under a heading that promises only the pending ones. Raised before membership is
+/// checked, so the answer is the same for anybody and says nothing about the
+/// workspace. Published as <c>400 invitations.status.invalid</c>.
+/// </remarks>
+public sealed class InvitationStatusFilterInvalidException : Exception
+{
+    private const string DefaultMessage =
+        "That status is not known. Use Pending, Accepted, Revoked or Expired, or leave the "
+        + "status out.";
+
+    public InvitationStatusFilterInvalidException()
+        : base(DefaultMessage)
+    {
+    }
+
+    public InvitationStatusFilterInvalidException(string message)
+        : base(message)
+    {
+    }
+
+    public InvitationStatusFilterInvalidException(string message, Exception innerException)
+        : base(message, innerException)
+    {
+    }
+}

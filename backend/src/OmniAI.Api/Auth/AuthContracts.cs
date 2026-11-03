@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace OmniAI.Api.Auth;
 
 /// <summary>
@@ -49,6 +51,28 @@ public sealed record LoginRequest(string? Email, string? Password, string? Langu
 /// so that adding a column to that entity cannot quietly add a field here.
 /// </remarks>
 public sealed record CurrentUserResponse(Guid Id, string Email, string? Language);
+
+/// <summary>
+/// <c>GET /api/auth/session</c> (Phase 37.5b, row 29): whether this request carries
+/// a good session, and whose.
+/// </summary>
+/// <param name="Authenticated">
+/// <see langword="false"/> when signed out, and when the cookie's session was
+/// revoked, has expired or names an account that is gone.
+/// </param>
+/// <param name="User">
+/// The same three facts <c>GET /api/auth/me</c> answers with, and nothing more.
+/// Left out entirely when not authenticated, so a signed-out body is exactly
+/// <c>{"authenticated":false}</c>.
+/// </param>
+public sealed record SessionResponse(
+    bool Authenticated,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    CurrentUserResponse? User)
+{
+    /// <summary>The answer for every caller without a good session.</summary>
+    public static readonly SessionResponse SignedOut = new(false, null);
+}
 
 /// <summary><c>POST /api/auth/password/forgot</c> (Phase 37.3).</summary>
 public sealed record ForgotPasswordRequest(string? Email);

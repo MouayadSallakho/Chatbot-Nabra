@@ -355,6 +355,32 @@ public static class PlatformPermissions
     public const string ReportsGroup = "Reports";
 
     /// <summary>
+    /// The stable key of a group's display name (Phase 37.5b, row 26).
+    /// </summary>
+    /// <remarks>
+    /// <strong>A key, once published, never changes</strong>, even when the English
+    /// name is reworded: a client words the area by this key in the reader's
+    /// language. A switch rather than a dictionary, so a new group without a key
+    /// fails the first time the catalogue is read, not silently on the wire.
+    /// </remarks>
+    /// <exception cref="ArgumentOutOfRangeException">The group has no key.</exception>
+    public static string GroupKeyFor(string group) => group switch
+    {
+        WorkspaceGroup => "workspace",
+        AiAgentsGroup => "ai-agents",
+        RolesGroup => "roles",
+        MembersGroup => "members",
+        ConversationsGroup => "conversations",
+        CustomersGroup => "customers",
+        ChannelsGroup => "channels",
+        KnowledgeGroup => "knowledge",
+        AnalyticsGroup => "analytics",
+        BillingGroup => "billing",
+        ReportsGroup => "reports",
+        _ => throw new ArgumentOutOfRangeException(nameof(group), group, "This permission group has no stable key."),
+    };
+
+    /// <summary>
     /// The catalogue, in the order it is published and rendered.
     /// </summary>
     /// <remarks>
@@ -604,7 +630,10 @@ public static class PlatformPermissions
             {
                 throw new DomainValidationException(
                     $"'{code}' is not a permission this platform recognises. Roles may only " +
-                    "grant capabilities from the platform permission catalogue.");
+                    "grant capabilities from the platform permission catalogue.")
+                {
+                    Code = "roles.permission.unknown",
+                };
             }
         }
     }

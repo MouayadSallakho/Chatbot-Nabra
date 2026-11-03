@@ -114,13 +114,19 @@ public sealed class TenantMembership
         if (userId.IsEmpty)
         {
             throw new DomainValidationException(
-                "A tenant membership must name a user.");
+                "A tenant membership must name a user.")
+            {
+                Code = "team.membership.invalid",
+            };
         }
 
         if (tenantId.IsEmpty)
         {
             throw new DomainValidationException(
-                "A tenant membership must name a tenant.");
+                "A tenant membership must name a tenant.")
+            {
+                Code = "team.membership.invalid",
+            };
         }
 
         return new TenantMembership(userId, tenantId, createdAt, createdAt);

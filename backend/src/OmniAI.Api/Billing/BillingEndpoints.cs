@@ -39,7 +39,11 @@ internal static class BillingEndpoints
             .WithTags("Billing")
             .RequireAuthorization();
 
-        billing.MapGet("/", OverviewAsync).WithName("GetWorkspaceBilling");
+        billing.MapGet("/", OverviewAsync)
+            .WithName("GetWorkspaceBilling")
+            .WithSummary("What the workspace pays for: subscription, offers, and its current and fallback plans with their limits (null = unlimited). 404 without billing.view.")
+            .Produces<BillingResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status404NotFound);
 
         billing.MapPost("/checkout", CheckoutAsync)
             .WithName("StartWorkspaceBillingCheckout")
@@ -185,7 +189,9 @@ public sealed record BillingResponse(
     bool CanPurchase,
     string CurrentPlanName,
     WorkspaceSubscriptionResponse? Subscription,
-    IReadOnlyList<BillingOfferResponse> Offers)
+    IReadOnlyList<BillingOfferResponse> Offers,
+    BillingPlanResponse CurrentPlan,
+    BillingPlanResponse? FallbackPlan)
 {
     public static BillingResponse From(WorkspaceBilling billing)
     {
@@ -214,6 +220,47 @@ public sealed record BillingResponse(
                     offer.AmountMinorUnits,
                     offer.Currency,
                     offer.TrialDays)),
-            ]);
+            ],
+            BillingPlanResponse.From(billing.CurrentPlan),
+            billing.FallbackPlan is null ? null : BillingPlanResponse.From(billing.FallbackPlan));
     }
 }
+
+/// <summary>
+/// A plan on the billing read: its code, name and limits (Phase 37.5b, row 27).
+/// </summary>
+/// <remarks>
+/// Plan definitions only. Usage stays on <c>GET …/plan-usage</c>, behind
+/// <c>analytics.view</c>.
+/// </remarks>
+public sealed record BillingPlanResponse(string Code, string Name, BillingPlanLimitsResponse Limits)
+{
+    /// <summary>Projects a plan.</summary>
+    public static BillingPlanResponse From(BillingPlanView plan)
+    {
+        ArgumentNullException.ThrowIfNull(plan);
+
+        return new BillingPlanResponse(
+            plan.Code,
+            plan.Name,
+            new BillingPlanLimitsResponse(
+                plan.Limits.Members,
+                plan.Limits.AiAgents,
+                plan.Limits.KnowledgeDocuments,
+                plan.Limits.WebChatEndpoints,
+                plan.Limits.WhatsAppConnections,
+                plan.Limits.MonthlyProviderOperations));
+    }
+}
+
+/// <summary>
+/// The six limits a plan sets, named as the plan-usage read names its
+/// entitlements. <see langword="null"/> means unlimited, and is always written.
+/// </summary>
+public sealed record BillingPlanLimitsResponse(
+    int? Members,
+    int? AiAgents,
+    int? KnowledgeDocuments,
+    int? WebChatEndpoints,
+    int? WhatsAppConnections,
+    int? MonthlyProviderOperations);

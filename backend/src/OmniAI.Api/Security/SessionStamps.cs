@@ -149,9 +149,15 @@ internal sealed partial class SessionStamps(
                 .ConfigureAwait(false)
             : null;
 
+        // Phase 37.5b: a session check never reissues or deletes the cookie.
+        bool probe = SessionProbe.Applies(context.HttpContext);
+
         if (Matches(presented, current))
         {
-            RenewIfDue(context);
+            if (!probe)
+            {
+                RenewIfDue(context);
+            }
 
             return;
         }
@@ -168,14 +174,22 @@ internal sealed partial class SessionStamps(
             if (stored is not null && Matches(presented, stored))
             {
                 await stamps.RecordAsync(userId, stored).ConfigureAwait(false);
-                RenewIfDue(context);
+
+                if (!probe)
+                {
+                    RenewIfDue(context);
+                }
 
                 return;
             }
         }
 
         context.RejectPrincipal();
-        await context.HttpContext.SignOutAsync(IdentityConstants.ApplicationScheme).ConfigureAwait(false);
+
+        if (!probe)
+        {
+            await context.HttpContext.SignOutAsync(IdentityConstants.ApplicationScheme).ConfigureAwait(false);
+        }
     }
 
     /// <summary>

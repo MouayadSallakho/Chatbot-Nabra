@@ -103,6 +103,35 @@ public interface ITenantRoleRepository
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// How many members of the workspace hold one role (Phase 37.5b, row 23).
+    /// </summary>
+    /// <remarks>
+    /// Counted from the assignments, scoped by the workspace in the query itself,
+    /// on <c>ix_tenant_role_assignments_role</c>. A role of another workspace counts
+    /// zero, never another workspace's members.
+    /// </remarks>
+    Task<int> CountMembersAsync(
+        TenantId tenantId,
+        TenantRoleId roleId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// The names of several of the workspace's roles at once, by id (Phase 37.5b).
+    /// </summary>
+    /// <returns>
+    /// One entry per id that names a role of this workspace; an id of another
+    /// workspace, or of no role, is simply absent.
+    /// </returns>
+    /// <remarks>
+    /// One statement for a whole page, so a list that shows role names per row
+    /// does not read each role separately.
+    /// </remarks>
+    Task<IReadOnlyDictionary<TenantRoleId, string>> FindNamesAsync(
+        TenantId tenantId,
+        IReadOnlyCollection<TenantRoleId> roleIds,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Finds one role within a workspace, together with the version it was read
     /// at.
     /// </summary>

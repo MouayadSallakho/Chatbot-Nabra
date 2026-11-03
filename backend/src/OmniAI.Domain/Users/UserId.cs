@@ -53,7 +53,10 @@ public readonly record struct UserId
     {
         if (value == Guid.Empty)
         {
-            throw new DomainValidationException("User id must not be an empty GUID.");
+            throw new DomainValidationException("User id must not be an empty GUID.")
+            {
+                Code = "users.id.invalid",
+            };
         }
 
         return new UserId(value);

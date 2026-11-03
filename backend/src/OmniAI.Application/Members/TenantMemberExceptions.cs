@@ -75,6 +75,17 @@ public sealed class ProtectedMembershipException : Exception
     {
     }
 
+    /// <summary>
+    /// Which protection refused (Phase 37.5b): <c>team.member.owner_protected</c>,
+    /// <c>team.member.self</c>, or the general <c>team.member.protected</c>.
+    /// </summary>
+    /// <remarks>
+    /// On the type rather than mapped from it, because one type covers two rules a
+    /// screen words differently: "the Owner is managed elsewhere" and "you cannot
+    /// change your own access".
+    /// </remarks>
+    public string Code { get; init; } = "team.member.protected";
+
     /// <summary>The Owner's access is not assigned from the Team screen.</summary>
     /// <remarks>
     /// Ownership is the right to administer the workspace itself; handing it over
@@ -84,7 +95,10 @@ public sealed class ProtectedMembershipException : Exception
     /// could give away the workspace while intending to grant somebody a report.
     /// </remarks>
     public static ProtectedMembershipException Owner() =>
-        new("The Owner's access is protected and cannot be changed from team management.");
+        new("The Owner's access is protected and cannot be changed from team management.")
+        {
+            Code = "team.member.owner_protected",
+        };
 
     /// <summary>Nobody edits their own access here.</summary>
     /// <remarks>
@@ -96,7 +110,10 @@ public sealed class ProtectedMembershipException : Exception
     /// needs to do casually.
     /// </remarks>
     public static ProtectedMembershipException Self() =>
-        new("You cannot change your own access from team management.");
+        new("You cannot change your own access from team management.")
+        {
+            Code = "team.member.self",
+        };
 }
 
 /// <summary>

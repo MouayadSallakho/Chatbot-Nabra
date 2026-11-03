@@ -1,6 +1,5 @@
 using OmniAI.Application.Authorization;
 using OmniAI.Application.Authorization.Persistence;
-using OmniAI.Application.Concurrency;
 using OmniAI.Application.Invitations.Persistence;
 using OmniAI.Application.Security;
 using OmniAI.Domain.Authorization;
@@ -14,7 +13,16 @@ namespace OmniAI.Application.Invitations.ListTenantInvitations;
 /// <param name="TenantId">The workspace.</param>
 /// <param name="Page">1-based page number.</param>
 /// <param name="PageSize">How many to return.</param>
-public sealed record ListTenantInvitationsQuery(Guid TenantId, int Page = 1, int PageSize = 20);
+/// <param name="Status">
+/// Only invitations in this status, by its wire name: <c>Pending</c>,
+/// <c>Accepted</c>, <c>Revoked</c> or <c>Expired</c> (Phase 37.5b, row 24).
+/// <see langword="null"/> or empty lists every invitation, as before.
+/// </param>
+public sealed record ListTenantInvitationsQuery(
+    Guid TenantId,
+    int Page = 1,
+    int PageSize = 20,
+    string? Status = null);
 
 /// <summary>
 /// Lists invitations.
@@ -23,6 +31,12 @@ public sealed record ListTenantInvitationsQuery(Guid TenantId, int Page = 1, int
 /// Requires <c>members.view</c>, the same permission as the member list: an open
 /// invitation is a statement about who is about to be on the team, and somebody
 /// entitled to see the team is entitled to see that.
+/// <para>
+/// <strong>A constant number of statements per page (Phase 37.5b).</strong> The
+/// count, the page, the role names of every invitation on it and the inviters'
+/// addresses are read once each, however many invitations the page holds. Before,
+/// each invitation read each of its roles and its inviter separately.
+/// </para>
 /// </remarks>
 public sealed class ListTenantInvitationsHandler(
     ITenantInvitationRepository invitations,
@@ -56,6 +70,10 @@ public sealed class ListTenantInvitationsHandler(
     /// <returns>
     /// <see langword="null"/> when the caller does not belong to this workspace.
     /// </returns>
+    /// <exception cref="InvitationStatusFilterInvalidException">
+    /// <see cref="ListTenantInvitationsQuery.Status"/> names no status. Checked
+    /// first, so the answer is the same for anybody.
+    /// </exception>
     /// <exception cref="NotAuthenticatedException">Nobody is signed in.</exception>
     /// <exception cref="PermissionDeniedException">
     /// The caller is a member without <c>members.view</c>.
@@ -66,6 +84,7 @@ public sealed class ListTenantInvitationsHandler(
     {
         ArgumentNullException.ThrowIfNull(query);
 
+        TenantInvitationStatus? status = ParseStatus(query.Status);
         TenantId tenantId = TenantId.From(query.TenantId);
 
         if (!await _authorizer
@@ -81,15 +100,26 @@ public sealed class ListTenantInvitationsHandler(
             1,
             MaxPageSize);
 
+        // One instant for the filter and for every status shown, so a row the
+        // filter called pending is never shown as expired on the same page.
+        DateTimeOffset now = _clock.GetUtcNow();
+
         int total = await _invitations
-            .CountAsync(tenantId, cancellationToken)
+            .CountAsync(tenantId, status, now, cancellationToken)
             .ConfigureAwait(false);
 
         IReadOnlyList<TenantInvitation> stored = await _invitations
-            .ListAsync(tenantId, (page - 1) * pageSize, pageSize, cancellationToken)
+            .ListAsync(tenantId, status, now, (page - 1) * pageSize, pageSize, cancellationToken)
             .ConfigureAwait(false);
 
-        DateTimeOffset now = _clock.GetUtcNow();
+        IReadOnlyDictionary<TenantRoleId, string> roleNames = await _roles
+            .FindNamesAsync(tenantId, [.. stored.SelectMany(invitation => invitation.RoleIds)], cancellationToken)
+            .ConfigureAwait(false);
+
+        IReadOnlyDictionary<UserId, EmailAddress> inviters = await _accounts
+            .FindEmailsAsync([.. stored.Select(invitation => invitation.InvitedByUserId)], cancellationToken)
+            .ConfigureAwait(false);
+
         List<TenantInvitationView> items = [];
 
         foreach (TenantInvitation invitation in stored)
@@ -98,13 +128,37 @@ public sealed class ListTenantInvitationsHandler(
                 invitation.Id.Value,
                 invitation.Email.Value,
                 TenantInvitations.StatusAt(invitation, now),
-                await RoleNamesAsync(tenantId, invitation, cancellationToken).ConfigureAwait(false),
-                await InviterEmailAsync(invitation, cancellationToken).ConfigureAwait(false),
+                RoleNames(invitation, roleNames),
+                inviters.TryGetValue(invitation.InvitedByUserId, out EmailAddress inviter) ? inviter.Value : null,
                 invitation.CreatedAt,
                 invitation.ExpiresAt));
         }
 
         return new TenantInvitationPage(items, page, pageSize, total);
+    }
+
+    /// <summary>
+    /// The status a filter names, or <see langword="null"/> for no filter.
+    /// </summary>
+    /// <remarks>
+    /// The wire names, in any letter case. A number is refused even though the enum
+    /// would parse one: the contract is the name, and <c>?status=0</c> working by
+    /// accident would become something a client relies on.
+    /// </remarks>
+    private static TenantInvitationStatus? ParseStatus(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        string trimmed = value.Trim();
+
+        return trimmed.All(char.IsAsciiLetter)
+            && Enum.TryParse(trimmed, ignoreCase: true, out TenantInvitationStatus status)
+            && Enum.IsDefined(status)
+                ? status
+                : throw new InvitationStatusFilterInvalidException();
     }
 
     /// <summary>
@@ -117,46 +171,19 @@ public sealed class ListTenantInvitationsHandler(
     /// refuse the invitation anyway, and inventing a placeholder name would
     /// suggest it still grants something.
     /// </remarks>
-    private async Task<IReadOnlyList<string>> RoleNamesAsync(
-        TenantId tenantId,
+    private static List<string> RoleNames(
         TenantInvitation invitation,
-        CancellationToken cancellationToken)
+        IReadOnlyDictionary<TenantRoleId, string> roleNames)
     {
-        List<string> names = [];
-
-        foreach (TenantRoleId roleId in invitation.RoleIds)
-        {
-            Versioned<TenantRole>? role = await _roles
-                .FindAsync(tenantId, roleId, cancellationToken)
-                .ConfigureAwait(false);
-
-            if (role is not null)
-            {
-                names.Add(role.Value.Name.Value);
-            }
-        }
+        List<string> names =
+        [
+            .. invitation.RoleIds
+                .Where(roleNames.ContainsKey)
+                .Select(roleId => roleNames[roleId]),
+        ];
 
         names.Sort(StringComparer.OrdinalIgnoreCase);
 
         return names;
-    }
-
-    /// <summary>
-    /// Who issued an invitation, by address.
-    /// </summary>
-    /// <remarks>
-    /// Safe to show to somebody who may already see every member's address. Null
-    /// when the account is gone, rather than a placeholder that would look like a
-    /// person.
-    /// </remarks>
-    private async Task<string?> InviterEmailAsync(
-        TenantInvitation invitation,
-        CancellationToken cancellationToken)
-    {
-        EmailAddress? email = await _accounts
-            .FindEmailAsync(invitation.InvitedByUserId, cancellationToken)
-            .ConfigureAwait(false);
-
-        return email?.Value;
     }
 }

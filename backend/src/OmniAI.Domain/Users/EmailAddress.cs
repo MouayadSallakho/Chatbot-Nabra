@@ -80,13 +80,19 @@ public readonly record struct EmailAddress : IComparable<EmailAddress>
 
         if (trimmed.Length == 0)
         {
-            throw new DomainValidationException("An email address is required.");
+            throw new DomainValidationException("An email address is required.")
+            {
+                Code = "email.required",
+            };
         }
 
         if (trimmed.Length > MaxLength)
         {
             throw new DomainValidationException(
-                $"An email address must be {MaxLength} characters or fewer.");
+                $"An email address must be {MaxLength} characters or fewer.")
+            {
+                Code = "email.too_long",
+            };
         }
 
         foreach (char character in trimmed)
@@ -94,7 +100,10 @@ public readonly record struct EmailAddress : IComparable<EmailAddress>
             if (char.IsWhiteSpace(character) || char.IsControl(character))
             {
                 throw new DomainValidationException(
-                    "An email address must not contain spaces or control characters.");
+                    "An email address must not contain spaces or control characters.")
+                {
+                    Code = "email.invalid_characters",
+                };
             }
         }
 
@@ -106,7 +115,10 @@ public readonly record struct EmailAddress : IComparable<EmailAddress>
             || !trimmed.Contains('.', StringComparison.Ordinal))
         {
             throw new DomainValidationException(
-                $"'{trimmed}' is not an email address this platform can use.");
+                $"'{trimmed}' is not an email address this platform can use.")
+            {
+                Code = "email.invalid",
+            };
         }
 
         return new EmailAddress(trimmed, trimmed.ToUpperInvariant());

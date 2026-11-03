@@ -298,7 +298,10 @@ public sealed class TenantRole
             throw new DomainStateException(
                 $"The '{Name.Value}' role is a protected system role and cannot be " +
                 $"{attemptedChange}. It always grants every permission this platform " +
-                "defines. Create a custom role instead.");
+                "defines. Create a custom role instead.")
+            {
+                Code = "roles.system.protected",
+            };
         }
     }
 
@@ -306,7 +309,10 @@ public sealed class TenantRole
     {
         if (tenantId.IsEmpty)
         {
-            throw new DomainValidationException("A role must belong to a tenant.");
+            throw new DomainValidationException("A role must belong to a tenant.")
+            {
+                Code = "roles.tenant.required",
+            };
         }
     }
 }

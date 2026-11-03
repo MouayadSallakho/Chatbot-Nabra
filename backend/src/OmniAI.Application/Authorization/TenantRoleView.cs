@@ -65,3 +65,13 @@ public sealed record TenantRoleView(
             role.UpdatedAt);
     }
 }
+
+/// <summary>
+/// One role as its detail read shows it: the role, and how many members hold it
+/// (Phase 37.5b, row 23).
+/// </summary>
+/// <remarks>
+/// Separate from <see cref="TenantRoleView"/>, which the writes return, so a create,
+/// rename or permission change never claims a member count it did not read.
+/// </remarks>
+public sealed record TenantRoleDetailView(TenantRoleView Role, int MemberCount);

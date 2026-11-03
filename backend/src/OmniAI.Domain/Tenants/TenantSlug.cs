@@ -55,7 +55,10 @@ public sealed record TenantSlug
     {
         if (string.IsNullOrWhiteSpace(value))
         {
-            throw new DomainValidationException("Tenant slug is required.");
+            throw new DomainValidationException("Tenant slug is required.")
+            {
+                Code = "workspace.slug.invalid",
+            };
         }
 
         // ToLowerInvariant, not ToLower: the result must not depend on the
@@ -66,13 +69,19 @@ public sealed record TenantSlug
         {
             throw new DomainValidationException(
                 $"Tenant slug must be between {MinLength} and {MaxLength} characters; " +
-                $"'{normalised}' has {normalised.Length}.");
+                $"'{normalised}' has {normalised.Length}.")
+            {
+                Code = "workspace.slug.invalid",
+            };
         }
 
         if (normalised[0] == Hyphen || normalised[^1] == Hyphen)
         {
             throw new DomainValidationException(
-                $"Tenant slug must not start or end with a hyphen; '{normalised}' does.");
+                $"Tenant slug must not start or end with a hyphen; '{normalised}' does.")
+            {
+                Code = "workspace.slug.invalid",
+            };
         }
 
         for (int index = 0; index < normalised.Length; index++)
@@ -83,13 +92,19 @@ public sealed record TenantSlug
             {
                 throw new DomainValidationException(
                     $"Tenant slug may contain only lowercase letters, digits and hyphens; " +
-                    $"'{normalised}' contains '{character}'.");
+                    $"'{normalised}' contains '{character}'.")
+                {
+                    Code = "workspace.slug.invalid",
+                };
             }
 
             if (index > 0 && character == Hyphen && normalised[index - 1] == Hyphen)
             {
                 throw new DomainValidationException(
-                    $"Tenant slug must not contain consecutive hyphens; '{normalised}' does.");
+                    $"Tenant slug must not contain consecutive hyphens; '{normalised}' does.")
+                {
+                    Code = "workspace.slug.invalid",
+                };
             }
         }
 

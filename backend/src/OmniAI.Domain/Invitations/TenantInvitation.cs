@@ -175,23 +175,35 @@ public sealed class TenantInvitation
 
         if (tenantId.IsEmpty)
         {
-            throw new DomainValidationException("An invitation must name a tenant.");
+            throw new DomainValidationException("An invitation must name a tenant.")
+            {
+                Code = "invitations.tenant.required",
+            };
         }
 
         if (email.IsEmpty)
         {
-            throw new DomainValidationException("An invitation must name an email address.");
+            throw new DomainValidationException("An invitation must name an email address.")
+            {
+                Code = "invitations.email.required",
+            };
         }
 
         if (invitedByUserId.IsEmpty)
         {
-            throw new DomainValidationException("An invitation must name who issued it.");
+            throw new DomainValidationException("An invitation must name who issued it.")
+            {
+                Code = "invitations.inviter.required",
+            };
         }
 
         if (expiresAt <= createdAt)
         {
             throw new DomainValidationException(
-                "An invitation must expire after it was created.");
+                "An invitation must expire after it was created.")
+            {
+                Code = "invitations.expiry.invalid",
+            };
         }
 
         TenantInvitation invitation = new(
@@ -208,7 +220,10 @@ public sealed class TenantInvitation
         {
             if (roleId.IsEmpty)
             {
-                throw new DomainValidationException("An invitation role must name a role.");
+                throw new DomainValidationException("An invitation role must name a role.")
+                {
+                    Code = "invitations.role.required",
+                };
             }
 
             invitation._roles.Add(InvitationRoleGrant.For(invitation.Id, tenantId, roleId));
@@ -256,12 +271,18 @@ public sealed class TenantInvitation
 
         if (!IsUsableAt(now))
         {
-            throw new DomainStateException("This invitation can no longer be emailed.");
+            throw new DomainStateException("This invitation can no longer be emailed.")
+            {
+                Code = "invitations.email.not_sendable",
+            };
         }
 
         if (TokenHash.Equals(hash))
         {
-            throw new DomainValidationException("The emailed token must differ from the copied one.");
+            throw new DomainValidationException("The emailed token must differ from the copied one.")
+            {
+                Code = "invitations.email_token.invalid",
+            };
         }
 
         EmailTokenHash = hash;
@@ -289,13 +310,19 @@ public sealed class TenantInvitation
     {
         if (acceptedByUserId.IsEmpty)
         {
-            throw new DomainValidationException("An acceptance must name the account accepting.");
+            throw new DomainValidationException("An acceptance must name the account accepting.")
+            {
+                Code = "invitations.accept.account_required",
+            };
         }
 
         if (!IsUsableAt(now))
         {
             throw new DomainStateException(
-                "This invitation can no longer be accepted.");
+                "This invitation can no longer be accepted.")
+            {
+                Code = "invitations.accept.closed",
+            };
         }
 
         Status = TenantInvitationStatus.Accepted;
@@ -318,7 +345,10 @@ public sealed class TenantInvitation
             throw new DomainStateException(
                 Status == TenantInvitationStatus.Accepted
                     ? "This invitation has already been accepted and cannot be revoked."
-                    : "This invitation has already been closed.");
+                    : "This invitation has already been closed.")
+            {
+                Code = "invitations.revoke.closed",
+            };
         }
 
         Status = TenantInvitationStatus.Revoked;
@@ -338,7 +368,10 @@ public sealed class TenantInvitation
         if (!HasExpiredAt(now))
         {
             throw new DomainStateException(
-                "This invitation has not expired and must not be recorded as expired.");
+                "This invitation has not expired and must not be recorded as expired.")
+            {
+                Code = "invitations.expire.not_due",
+            };
         }
 
         Status = TenantInvitationStatus.Expired;

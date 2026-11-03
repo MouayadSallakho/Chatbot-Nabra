@@ -104,6 +104,11 @@ internal sealed class TenantRoleRepository(OmniAiDbContext context) : ITenantRol
     /// The grant counts for custom roles are computed in the database, so no
     /// permission row is transferred to render a number.
     /// </para>
+    /// <para>
+    /// <strong>The member count is a correlated count in the same statement</strong>
+    /// (Phase 37.5b), on <c>ix_tenant_role_assignments_role</c>, scoped by the
+    /// role's own workspace: one statement for the whole list, however many roles.
+    /// </para>
     /// </remarks>
     public async Task<IReadOnlyList<TenantRoleSummary>> ListAsync(
         TenantId tenantId,
@@ -121,6 +126,8 @@ internal sealed class TenantRoleRepository(OmniAiDbContext context) : ITenantRol
                 Name = role.Name.Value,
                 role.Kind,
                 GrantCount = role.Grants.Count,
+                MemberCount = _context.TenantRoleAssignments.Count(assignment =>
+                    assignment.TenantRoleId == role.Id && assignment.TenantId == role.TenantId),
                 role.CreatedAt,
                 role.UpdatedAt,
             })
@@ -137,8 +144,43 @@ internal sealed class TenantRoleRepository(OmniAiDbContext context) : ITenantRol
                     ? PlatformPermissions.AllCodes.Count
                     : row.GrantCount,
                 row.CreatedAt,
-                row.UpdatedAt))
+                row.UpdatedAt,
+                row.MemberCount))
         ];
+    }
+
+    public Task<int> CountMembersAsync(
+        TenantId tenantId,
+        TenantRoleId roleId,
+        CancellationToken cancellationToken = default) =>
+        _context.TenantRoleAssignments
+            .AsNoTracking()
+            .CountAsync(
+                assignment => assignment.TenantRoleId == roleId && assignment.TenantId == tenantId,
+                cancellationToken);
+
+    public async Task<IReadOnlyDictionary<TenantRoleId, string>> FindNamesAsync(
+        TenantId tenantId,
+        IReadOnlyCollection<TenantRoleId> roleIds,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(roleIds);
+
+        if (roleIds.Count == 0)
+        {
+            return new Dictionary<TenantRoleId, string>();
+        }
+
+        TenantRoleId[] named = [.. roleIds.Distinct()];
+
+        var rows = await _context.TenantRoles
+            .AsNoTracking()
+            .Where(role => role.TenantId == tenantId && named.Contains(role.Id))
+            .Select(role => new { role.Id, Name = role.Name.Value })
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        return rows.ToDictionary(row => row.Id, row => row.Name);
     }
 
     /// <summary>

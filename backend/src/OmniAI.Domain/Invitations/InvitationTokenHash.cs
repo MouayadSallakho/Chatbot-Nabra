@@ -50,7 +50,10 @@ public sealed class InvitationTokenHash : IEquatable<InvitationTokenHash>
         if (value.Length != Length)
         {
             throw new DomainValidationException(
-                $"An invitation token hash must be exactly {Length} bytes.");
+                $"An invitation token hash must be exactly {Length} bytes.")
+            {
+                Code = "invitations.token_hash.invalid",
+            };
         }
 
         return new InvitationTokenHash(value.ToArray());

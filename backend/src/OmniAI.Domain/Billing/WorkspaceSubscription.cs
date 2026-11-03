@@ -183,17 +183,26 @@ public sealed class WorkspaceSubscription
     {
         if (tenantId.IsEmpty)
         {
-            throw new DomainValidationException("A subscription must belong to a workspace.");
+            throw new DomainValidationException("A subscription must belong to a workspace.")
+            {
+                Code = "billing.subscription.invalid",
+            };
         }
 
         if (offerId.IsEmpty)
         {
-            throw new DomainValidationException("A subscription must record what was bought.");
+            throw new DomainValidationException("A subscription must record what was bought.")
+            {
+                Code = "billing.subscription.invalid",
+            };
         }
 
         if (planId.IsEmpty)
         {
-            throw new DomainValidationException("A subscription must record its plan.");
+            throw new DomainValidationException("A subscription must record its plan.")
+            {
+                Code = "billing.subscription.invalid",
+            };
         }
 
         return new WorkspaceSubscription(
@@ -207,6 +216,9 @@ public sealed class WorkspaceSubscription
             createdAt == default
                 ? throw new DomainValidationException(
                     "A subscription must record when it was created.")
+                    {
+                        Code = "billing.subscription.invalid",
+                    }
                 : createdAt.ToUniversalTime());
     }
 
@@ -334,7 +346,10 @@ public sealed class WorkspaceSubscription
     {
         if (offerId.IsEmpty || planId.IsEmpty)
         {
-            throw new DomainValidationException("A subscription must always name an offer and a plan.");
+            throw new DomainValidationException("A subscription must always name an offer and a plan.")
+            {
+                Code = "billing.subscription.invalid",
+            };
         }
 
         OfferId = offerId;

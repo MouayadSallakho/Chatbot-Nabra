@@ -243,7 +243,10 @@ public sealed class CreateTenantInvitationHandler(
             if (stored is null)
             {
                 throw new DomainValidationException(
-                    "One of the roles requested is not a role this workspace can assign.");
+                    "One of the roles requested is not a role this workspace can assign.")
+                {
+                    Code = "invitations.role.unassignable",
+                };
             }
 
             if (stored.Value.IsSystem)

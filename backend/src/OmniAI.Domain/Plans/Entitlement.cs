@@ -128,7 +128,10 @@ public sealed record EntitlementUsage
     {
         if (used < 0)
         {
-            throw new DomainValidationException("Usage cannot be negative.");
+            throw new DomainValidationException("Usage cannot be negative.")
+            {
+                Code = "plans.usage.invalid",
+            };
         }
 
         if (limit.IsUnlimited)

@@ -69,7 +69,66 @@ public sealed record WorkspaceBilling(
     WorkspaceSubscriptionView? Subscription,
     string CurrentPlanName,
     IReadOnlyList<BillingOfferView> Offers,
-    bool CanPurchase);
+    bool CanPurchase,
+
+    /// <summary>
+    /// The plan the workspace is on, with its limits (Phase 37.5b). The same plan
+    /// as <c>CurrentPlanName</c>.
+    /// </summary>
+    BillingPlanView CurrentPlan,
+
+    /// <summary>
+    /// The plan a suspended or cancelled workspace would fall back to, or
+    /// <see langword="null"/> when this deployment names none it would use.
+    /// </summary>
+    BillingPlanView? FallbackPlan);
+
+/// <summary>
+/// A plan as the billing screen shows it: its code, its name and the six limits it
+/// sets (Phase 37.5b, row 27).
+/// </summary>
+/// <remarks>
+/// <strong>A plan definition, not usage.</strong> How much of each limit a workspace
+/// has used stays behind <c>analytics.view</c> on the plan-usage read; somebody who
+/// may see what the workspace pays may see what its plan allows.
+/// </remarks>
+public sealed record BillingPlanView(string Code, string Name, BillingPlanLimits Limits)
+{
+    /// <summary>A plan's own definition.</summary>
+    public static BillingPlanView From(Plan plan)
+    {
+        ArgumentNullException.ThrowIfNull(plan);
+
+        return new BillingPlanView(
+            plan.Code.Value,
+            plan.DisplayName.Value,
+            BillingPlanLimits.From(kind => plan.LimitFor(kind).Maximum));
+    }
+}
+
+/// <summary>The six limits a plan sets; <see langword="null"/> means unlimited.</summary>
+public sealed record BillingPlanLimits(
+    int? Members,
+    int? AiAgents,
+    int? KnowledgeDocuments,
+    int? WebChatEndpoints,
+    int? WhatsAppConnections,
+    int? MonthlyProviderOperations)
+{
+    /// <summary>The limits, read one entitlement at a time.</summary>
+    public static BillingPlanLimits From(Func<EntitlementKind, int?> limit)
+    {
+        ArgumentNullException.ThrowIfNull(limit);
+
+        return new BillingPlanLimits(
+            limit(EntitlementKind.Members),
+            limit(EntitlementKind.AiAgents),
+            limit(EntitlementKind.KnowledgeDocuments),
+            limit(EntitlementKind.WebChatEndpoints),
+            limit(EntitlementKind.WhatsAppConnections),
+            limit(EntitlementKind.MonthlyProviderOperations));
+    }
+}
 
 /// <summary>
 /// Reads what a workspace is paying for.
@@ -86,7 +145,8 @@ public sealed class GetWorkspaceBillingHandler(
     IPlanCatalog plans,
     IWorkspaceEntitlementService entitlements,
     BillingOptions options,
-    TenantAuthorizer authorizer)
+    TenantAuthorizer authorizer,
+    FallbackPlanResolver fallback)
 {
     private readonly IWorkspaceSubscriptionStore _subscriptions =
         subscriptions ?? throw new ArgumentNullException(nameof(subscriptions));
@@ -105,6 +165,9 @@ public sealed class GetWorkspaceBillingHandler(
 
     private readonly TenantAuthorizer _authorizer =
         authorizer ?? throw new ArgumentNullException(nameof(authorizer));
+
+    private readonly FallbackPlanResolver _fallback =
+        fallback ?? throw new ArgumentNullException(nameof(fallback));
 
     /// <returns>
     /// The workspace's billing state, or <see langword="null"/> when the caller
@@ -188,6 +251,17 @@ public sealed class GetWorkspaceBillingHandler(
                 subscription.GraceEndsAt);
         }
 
+        // Phase 37.5b: the current plan's limits are the ones the entitlements were
+        // just judged against, so they cost no further read and cannot disagree
+        // with the usage screen. The fallback is what this deployment would
+        // suspend to; none configured, or one it would refuse, shows as null.
+        BillingPlanView currentPlan = new(
+            current.PlanCode,
+            current.PlanName,
+            BillingPlanLimits.From(kind => current.Find(kind)?.Limit));
+
+        Plan? fallbackPlan = await _fallback.FindAsync(cancellationToken).ConfigureAwait(false);
+
         return new WorkspaceBilling(
             // Whether this deployment takes payments at all -- not whether this
             // workspace happens to have bought something. A screen reading it the
@@ -200,6 +274,8 @@ public sealed class GetWorkspaceBillingHandler(
 
             // A second subscription is never started through checkout. A
             // workspace that already has one manages it in the provider's portal.
-            _options.IsConfigured && subscription is null && offers.Count > 0);
+            _options.IsConfigured && subscription is null && offers.Count > 0,
+            currentPlan,
+            fallbackPlan is null ? null : BillingPlanView.From(fallbackPlan));
     }
 }

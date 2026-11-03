@@ -196,7 +196,10 @@ public sealed class ReplaceTenantMemberRolesHandler(
             if (stored is null)
             {
                 throw new DomainValidationException(
-                    "One of the roles requested is not a role this workspace can assign.");
+                    "One of the roles requested is not a role this workspace can assign.")
+                {
+                    Code = "team.role.unassignable",
+                };
             }
 
             if (stored.Value.IsSystem)

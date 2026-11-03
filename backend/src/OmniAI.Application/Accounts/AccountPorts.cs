@@ -136,6 +136,34 @@ public interface IAccountProtection
     Task<AccountProtectionDecision> AuthorisePasswordResetAsync(
         ClientNetworkKey? client,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Clears an address's sign-in failures after a completed password reset
+    /// (Phase 37.5b, the owner's decision after 37.3).
+    /// </summary>
+    /// <remarks>
+    /// Two counters, both the address's own: its ceiling across every network, and
+    /// its count on the network the reset came from. The person has just proved
+    /// they hold the inbox, so they can sign in at once. The per-network counter is
+    /// left alone: it counts every address on that network, and a reset must never
+    /// clear another address's failures. Best effort, like a successful sign-in's
+    /// clear.
+    /// </remarks>
+    Task ClearSignInFailuresAsync(
+        string subjectKey,
+        ClientNetworkKey? client,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Counts an anonymous session check from a network (Phase 37.5b, row 29).
+    /// </summary>
+    /// <remarks>
+    /// Every caller counts, signed in or not, so the check cannot be used to probe
+    /// sessions faster than the limit. Fails closed like the other limits.
+    /// </remarks>
+    Task<AccountProtectionDecision> AuthoriseSessionCheckAsync(
+        ClientNetworkKey? client,
+        CancellationToken cancellationToken = default);
 }
 
 /// <summary>
@@ -166,6 +194,13 @@ public sealed class AccountProtectionOptions
     /// <summary>Attempts to set a new password with a link, per network.</summary>
     public RateLimitWindow ResetsPerNetwork { get; init; } = new(20, TimeSpan.FromMinutes(15));
 
+    /// <summary>
+    /// Anonymous session checks per network (Phase 37.5b). Generous, because an
+    /// office of people behind one address each open the app several times a day:
+    /// one a second on average over ten minutes.
+    /// </summary>
+    public RateLimitWindow SessionChecksPerNetwork { get; init; } = new(600, TimeSpan.FromMinutes(10));
+
     /// <summary>Namespaces the counters, like the public chat protection's prefix.</summary>
     public string KeyPrefix { get; init; } = "omniai:acp:v1";
 
@@ -177,6 +212,7 @@ public sealed class AccountProtectionOptions
         ResetRequestsPerAddress.Validate($"{SectionName}:{nameof(ResetRequestsPerAddress)}");
         ResetRequestsPerNetwork.Validate($"{SectionName}:{nameof(ResetRequestsPerNetwork)}");
         ResetsPerNetwork.Validate($"{SectionName}:{nameof(ResetsPerNetwork)}");
+        SessionChecksPerNetwork.Validate($"{SectionName}:{nameof(SessionChecksPerNetwork)}");
 
         if (string.IsNullOrWhiteSpace(KeyPrefix))
         {

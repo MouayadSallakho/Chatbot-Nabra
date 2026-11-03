@@ -39,7 +39,7 @@ public sealed class GetTenantRoleByIdHandler(
     /// The caller is a member without <c>roles.view</c>.
     /// </exception>
     /// <exception cref="Domain.DomainValidationException">An identifier is empty.</exception>
-    public async Task<Versioned<TenantRoleView>?> HandleAsync(
+    public async Task<Versioned<TenantRoleDetailView>?> HandleAsync(
         GetTenantRoleByIdQuery query,
         CancellationToken cancellationToken = default)
     {
@@ -59,8 +59,19 @@ public sealed class GetTenantRoleByIdHandler(
             .FindAsync(tenantId, roleId, cancellationToken)
             .ConfigureAwait(false);
 
-        return stored is null
-            ? null
-            : new Versioned<TenantRoleView>(TenantRoleView.From(stored.Value), stored.Version);
+        if (stored is null)
+        {
+            return null;
+        }
+
+        // Phase 37.5b: one indexed count, after the role was found in this
+        // workspace, so a missing role costs nothing more.
+        int members = await _roles
+            .CountMembersAsync(tenantId, roleId, cancellationToken)
+            .ConfigureAwait(false);
+
+        return new Versioned<TenantRoleDetailView>(
+            new TenantRoleDetailView(TenantRoleView.From(stored.Value), members),
+            stored.Version);
     }
 }

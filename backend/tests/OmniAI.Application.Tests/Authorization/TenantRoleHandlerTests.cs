@@ -482,13 +482,34 @@ public sealed class TenantRoleHandlerTests
 
         GetTenantRoleByIdHandler handler = new(roles, TestAuthority.Owner(Alice, Workspace));
 
-        Versioned<TenantRoleView>? found =
+        Versioned<TenantRoleDetailView>? found =
             await handler.HandleAsync(new GetTenantRoleByIdQuery(Workspace, role.Id.Value));
 
         Assert.NotNull(found);
-        Assert.Equal("Support agent", found.Value.Name);
-        Assert.Equal([PlatformPermissions.AiAgentsView], found.Value.Permissions);
+        Assert.Equal("Support agent", found.Value.Role.Name);
+        Assert.Equal([PlatformPermissions.AiAgentsView], found.Value.Role.Permissions);
         Assert.Equal(roles.Version, found.Version);
+        Assert.Equal(0, found.Value.MemberCount);
+    }
+
+    [Fact]
+    public async Task A_role_read_says_how_many_members_hold_it()
+    {
+        // Phase 37.5b, row 23: counted from the assignments of this workspace only.
+        RecordingRoleRepository roles = new();
+        TenantRole role = roles.AddRole(Custom("Support agent", PlatformPermissions.AiAgentsView));
+        roles.Assign(UserId.From(Guid.CreateVersion7()), role);
+        roles.Assign(UserId.From(Guid.CreateVersion7()), role);
+
+        GetTenantRoleByIdHandler handler = new(roles, TestAuthority.Owner(Alice, Workspace));
+
+        Versioned<TenantRoleDetailView>? found =
+            await handler.HandleAsync(new GetTenantRoleByIdQuery(Workspace, role.Id.Value));
+        IReadOnlyList<TenantRoleSummary> listed = await new ListTenantRolesHandler(roles, TestAuthority.Owner(Alice, Workspace))
+            .HandleAsync(new ListTenantRolesQuery(Workspace));
+
+        Assert.Equal(2, found!.Value.MemberCount);
+        Assert.Equal(2, Assert.Single(listed, summary => summary.Id == role.Id.Value).MemberCount);
     }
 
     [Fact]
@@ -499,12 +520,12 @@ public sealed class TenantRoleHandlerTests
 
         GetTenantRoleByIdHandler handler = new(roles, TestAuthority.Owner(Alice, Workspace));
 
-        Versioned<TenantRoleView>? found =
+        Versioned<TenantRoleDetailView>? found =
             await handler.HandleAsync(new GetTenantRoleByIdQuery(Workspace, owner.Id.Value));
 
         Assert.NotNull(found);
-        Assert.True(found.Value.IsSystem);
-        Assert.Equal(PlatformPermissions.AllCodes, found.Value.Permissions);
+        Assert.True(found.Value.Role.IsSystem);
+        Assert.Equal(PlatformPermissions.AllCodes, found.Value.Role.Permissions);
     }
 
     [Fact]

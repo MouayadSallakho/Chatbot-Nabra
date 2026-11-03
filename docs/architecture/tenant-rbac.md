@@ -228,6 +228,15 @@ API publishes all four. Authorisation reads **only the code**; nothing in the
 decision path touches the metadata, which is what makes the wording safe to
 change.
 
+**Stable keys (Phase 37.5b, row 26).** Each entry also carries `groupKey`, the
+stable key of its area: `workspace`, `ai-agents`, `roles`, `members`,
+`conversations`, `customers`, `channels`, `knowledge`, `analytics`, `reports`,
+`billing`. The permission `code` is the stable key of its label and description. A
+client translates by `groupKey` and `code` and treats the English `group`, `label`
+and `description` as a fallback. Keys never change; `PermissionGroupKeyTests` holds a
+snapshot of every code with its key, and a group without a key cannot be published
+(`PlatformPermissions.GroupKeyFor` throws).
+
 The text lives in the Domain because the capability does — "what can be done in
 this product" is a business statement, and a parallel table of strings is one
 somebody forgets to update. The cost is that these strings are English;
@@ -597,8 +606,13 @@ which codes the platform recognises by watching which came back invalid.
 ### List contract
 
 `id`, `name`, `type` (`System` / `Custom`), `isSystem`, `permissionCount`,
-`createdAt`, `updatedAt`. A count, not the set: the permissions are on the detail
-screen, one request away.
+`createdAt`, `updatedAt`, and from Phase 37.5b `memberCount`. A count, not the set:
+the permissions are on the detail screen, one request away.
+
+**`memberCount` (Phase 37.5b, row 23)** is how many members hold the role, counted
+from `tenant_role_assignments` in the list's own statement, a correlated count on
+`ix_tenant_role_assignments_role` scoped by the role's workspace. The Owner holds a
+real assignment, so it counts too. It is read live, so a role change shows at once.
 
 **For an Owner the count is the catalogue's size, not a row count.** Counting rows
 would report zero — true of the table and false about the role.
@@ -611,6 +625,11 @@ Published as a contract so the list does not reshuffle between page loads.
 Adds `tenantId` and `permissions` — the **effective** set, so an Owner returns the
 complete current catalogue rather than its empty stored set. No version field in
 the body: the version is the `ETag`.
+
+From Phase 37.5b the detail read also carries `memberCount`, one indexed count after
+the role was found in this workspace (`RoleDetailResponse`). The writes (create,
+rename, permissions) keep their exact shape and carry no count, because they did not
+read one.
 
 ---
 
