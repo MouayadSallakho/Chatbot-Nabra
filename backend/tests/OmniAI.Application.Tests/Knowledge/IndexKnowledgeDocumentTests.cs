@@ -418,4 +418,28 @@ internal sealed class RecordingAttemptStore : IKnowledgeIndexAttemptStore
 
         return Task.FromResult(true);
     }
+
+    public Task<KnowledgeIndexAttemptView?> FindLatestAsync(
+        TenantId tenantId,
+        KnowledgeDocumentId documentId,
+        CancellationToken cancellationToken = default)
+    {
+        KnowledgeIndexAttempt? latest = Started
+            .Where(attempt => attempt.TenantId == tenantId && attempt.DocumentId == documentId)
+            .OrderBy(attempt => attempt.StartedAt)
+            .LastOrDefault();
+
+        if (latest is null)
+        {
+            return Task.FromResult<KnowledgeIndexAttemptView?>(null);
+        }
+
+        Settlement? settled = Settled.LastOrDefault(settlement => settlement.Id == latest.Id);
+
+        return Task.FromResult<KnowledgeIndexAttemptView?>(new KnowledgeIndexAttemptView(
+            settled?.Status ?? KnowledgeIndexAttemptStatus.Started,
+            settled?.Code,
+            latest.StartedAt,
+            settled is null ? null : latest.StartedAt));
+    }
 }

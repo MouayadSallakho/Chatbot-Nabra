@@ -41,7 +41,10 @@ public sealed record WebChatAccentColor
     {
         if (string.IsNullOrWhiteSpace(value))
         {
-            throw new DomainValidationException("An accent colour is required.");
+            throw new DomainValidationException("An accent colour is required.")
+            {
+                Code = "website-chat.accent_color.required",
+            };
         }
 
         string trimmed = value.Trim();
@@ -49,7 +52,10 @@ public sealed record WebChatAccentColor
         if (trimmed.Length is not (4 or 7) || trimmed[0] != '#')
         {
             throw new DomainValidationException(
-                "An accent colour must be a hex colour such as #2563eb.");
+                "An accent colour must be a hex colour such as #2563eb.")
+            {
+                Code = "website-chat.accent_color.invalid",
+            };
         }
 
         foreach (char character in trimmed.AsSpan(1))
@@ -57,7 +63,10 @@ public sealed record WebChatAccentColor
             if (!char.IsAsciiHexDigit(character))
             {
                 throw new DomainValidationException(
-                    "An accent colour must be a hex colour such as #2563eb.");
+                    "An accent colour must be a hex colour such as #2563eb.")
+                {
+                    Code = "website-chat.accent_color.invalid",
+                };
             }
         }
 

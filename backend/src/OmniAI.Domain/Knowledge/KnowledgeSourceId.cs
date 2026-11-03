@@ -26,7 +26,10 @@ public readonly record struct KnowledgeSourceId
     {
         if (value == Guid.Empty)
         {
-            throw new DomainValidationException("Knowledge source id must not be an empty GUID.");
+            throw new DomainValidationException("Knowledge source id must not be an empty GUID.")
+            {
+                Code = "knowledge.source.invalid",
+            };
         }
 
         return new KnowledgeSourceId(value);

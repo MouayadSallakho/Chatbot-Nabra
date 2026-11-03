@@ -21,7 +21,7 @@ public sealed class GetTenantByIdHandlerTests
 
         GetTenantByIdHandler handler = HandlerFor(stored, memberOf: stored);
 
-        TenantView? found = await handler.HandleAsync(new GetTenantByIdQuery(stored.Id.Value));
+        TenantView? found = (await handler.HandleAsync(new GetTenantByIdQuery(stored.Id.Value)))?.Value;
 
         Assert.NotNull(found);
         Assert.Equal(stored.Id.Value, found.Id);
@@ -38,7 +38,7 @@ public sealed class GetTenantByIdHandlerTests
 
         GetTenantByIdHandler handler = HandlerFor(stored, memberOf: stored);
 
-        TenantView? found = await handler.HandleAsync(new GetTenantByIdQuery(stored.Id.Value));
+        TenantView? found = (await handler.HandleAsync(new GetTenantByIdQuery(stored.Id.Value)))?.Value;
 
         Assert.Equal(TenantStatus.Suspended, found?.Status);
     }
@@ -52,7 +52,7 @@ public sealed class GetTenantByIdHandlerTests
             new InMemoryTenantRepository(),
             TestAuthority.Outsider(Member));
 
-        TenantView? found = await handler.HandleAsync(new GetTenantByIdQuery(Guid.CreateVersion7()));
+        TenantView? found = (await handler.HandleAsync(new GetTenantByIdQuery(Guid.CreateVersion7())))?.Value;
 
         Assert.Null(found);
     }
@@ -74,7 +74,7 @@ public sealed class GetTenantByIdHandlerTests
             TestAuthority.Outsider(Member));
 
         TenantView? found =
-            await handler.HandleAsync(new GetTenantByIdQuery(somebodyElses.Id.Value));
+            (await handler.HandleAsync(new GetTenantByIdQuery(somebodyElses.Id.Value)))?.Value;
 
         Assert.Null(found);
     }

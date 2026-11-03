@@ -1,7 +1,10 @@
+using OmniAI.Api.Http;
 using OmniAI.Api.Security;
+using OmniAI.Application.Concurrency;
 using OmniAI.Application.Tenants;
 using OmniAI.Application.Tenants.CreateTenant;
 using OmniAI.Application.Tenants.GetTenantById;
+using OmniAI.Application.Tenants.RenameTenant;
 
 namespace OmniAI.Api.Tenants;
 
@@ -53,7 +56,22 @@ internal static class TenantEndpoints
             .WithName("CreateTenant");
 
         tenants.MapGet("/{tenantId:guid}", GetTenantByIdAsync)
-            .WithName(GetTenantByIdRouteName);
+            .WithName(GetTenantByIdRouteName)
+            .WithSummary("The workspace, with the ETag a rename must send in If-Match.")
+            .Produces<TenantResponse>()
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
+        // Phase 37.5a (D-3): the owner controls the name visitors see.
+        tenants.MapPut("/{tenantId:guid}/name", RenameTenantAsync)
+            .WithName("RenameTenant")
+            .WithSummary("Renames the workspace. Requires workspace.manage and If-Match; visitors see the new name at once.")
+            .Produces<TenantResponse>()
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status412PreconditionFailed)
+            .ProducesProblem(StatusCodes.Status428PreconditionRequired);
 
         return endpoints;
     }
@@ -92,11 +110,12 @@ internal static class TenantEndpoints
     /// this method; it simply does not match the route.
     /// </remarks>
     private static async Task<IResult> GetTenantByIdAsync(
+        HttpContext http,
         Guid tenantId,
         GetTenantByIdHandler handler,
         CancellationToken cancellationToken)
     {
-        TenantView? tenant = await handler
+        Versioned<TenantView>? tenant = await handler
             .HandleAsync(new GetTenantByIdQuery(tenantId), cancellationToken)
             .ConfigureAwait(false);
 
@@ -110,6 +129,50 @@ internal static class TenantEndpoints
                 statusCode: StatusCodes.Status404NotFound);
         }
 
-        return Results.Ok(TenantResponse.From(tenant));
+        // Phase 37.5a: the version a rename must name. The body is unchanged.
+        http.Response.Headers.ETag = EntityTags.Format(tenant.Version);
+
+        return Results.Ok(TenantResponse.From(tenant.Value));
+    }
+
+    /// <summary>
+    /// <c>PUT /api/tenants/{tenantId}/name</c>. Requires <c>If-Match</c> and
+    /// <c>workspace.manage</c>. Returns <c>200</c> with the workspace and its new
+    /// <c>ETag</c> (Phase 37.5a, row 20a).
+    /// </summary>
+    /// <remarks>
+    /// <c>428</c> without <c>If-Match</c>, <c>412</c> when it is stale,
+    /// <c>400 workspace.name.invalid</c> for a name the creation rules refuse,
+    /// <c>403</c> for a member without the permission and <c>404</c> for anybody
+    /// else. Each real rename writes one <c>workspace.renamed</c> security event.
+    /// The hosted and embedded chat reads show the new name on their next read.
+    /// </remarks>
+    private static async Task<IResult> RenameTenantAsync(
+        HttpContext http,
+        Guid tenantId,
+        RenameTenantRequest? request,
+        RenameTenantHandler handler,
+        CancellationToken cancellationToken)
+    {
+        if (EntityTags.ReadIfMatch(http.Request, out ConcurrencyToken expected) is IResult failure)
+        {
+            return failure;
+        }
+
+        Versioned<TenantView>? renamed = await handler
+            .HandleAsync(new RenameTenantCommand(tenantId, request?.Name, expected), cancellationToken)
+            .ConfigureAwait(false);
+
+        if (renamed is null)
+        {
+            return Results.Problem(
+                title: "Tenant not found",
+                detail: $"No tenant exists with id '{tenantId}'.",
+                statusCode: StatusCodes.Status404NotFound);
+        }
+
+        http.Response.Headers.ETag = EntityTags.Format(renamed.Version);
+
+        return Results.Ok(TenantResponse.From(renamed.Value));
     }
 }

@@ -20,4 +20,22 @@ public enum WebChatLauncherPosition
     /// put this one.
     /// </remarks>
     Left = 1,
+
+    /// <summary>
+    /// The bottom corner where the host page's text starts: left on a
+    /// left-to-right page, right on a right-to-left one (Phase 37.5a).
+    /// </summary>
+    /// <remarks>
+    /// Resolved by the loader from the page it is embedded in (<c>dir</c> on
+    /// <c>&lt;html&gt;</c>, else the computed direction), because only that page
+    /// knows which way it reads. One workspace with an English site and an Arabic
+    /// site keeps the launcher in the same reading position on both.
+    /// </remarks>
+    Start = 2,
+
+    /// <summary>
+    /// The bottom corner where the host page's text ends: right on a
+    /// left-to-right page, left on a right-to-left one (Phase 37.5a).
+    /// </summary>
+    End = 3,
 }

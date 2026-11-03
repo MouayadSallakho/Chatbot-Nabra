@@ -40,13 +40,35 @@ public sealed record WebChatEndpointResponse(
 }
 
 /// <summary>What the hosted chat page is told about where it is running.</summary>
-public sealed record PublicWebChatResponse(string AgentName, bool Available)
+/// <param name="AgentName">The display name the visitor sees.</param>
+/// <param name="Available">Whether a conversation can be started right now.</param>
+/// <param name="WorkspaceName">
+/// The workspace's display name, so a visitor knows whose chat it is (Phase
+/// 37.5a, owner decision D-3). The owner changes it with
+/// <c>PUT /api/tenants/{id}/name</c>.
+/// </param>
+/// <param name="Greeting">The panel's opening greeting, or <see langword="null"/> (Phase 37.5a).</param>
+/// <param name="AccentColor">The widget's accent colour, as on the embedded read (Phase 37.5a).</param>
+/// <param name="Theme"><c>System</c>, <c>Light</c> or <c>Dark</c>, as on the embedded read (Phase 37.5a).</param>
+public sealed record PublicWebChatResponse(
+    string AgentName,
+    bool Available,
+    string WorkspaceName,
+    string? Greeting,
+    string AccentColor,
+    string Theme)
 {
     public static PublicWebChatResponse From(PublicWebChatView view)
     {
         ArgumentNullException.ThrowIfNull(view);
 
-        return new PublicWebChatResponse(view.AgentName, view.Available);
+        return new PublicWebChatResponse(
+            view.AgentName,
+            view.Available,
+            view.WorkspaceName,
+            view.Greeting,
+            view.AccentColor,
+            view.Theme);
     }
 }
 

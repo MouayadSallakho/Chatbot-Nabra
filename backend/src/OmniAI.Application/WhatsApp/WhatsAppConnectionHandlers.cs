@@ -286,13 +286,19 @@ public sealed class WhatsAppConnectionHandlers(
 
         if (token.Length == 0)
         {
-            throw new DomainValidationException("An access token must not be blank.");
+            throw new DomainValidationException("An access token must not be blank.")
+            {
+                Code = "whatsapp.access_token.required",
+            };
         }
 
         if (token.Length > MaxAccessTokenLength)
         {
             throw new DomainValidationException(
-                $"An access token must be {MaxAccessTokenLength} characters or fewer.");
+                $"An access token must be {MaxAccessTokenLength} characters or fewer.")
+            {
+                Code = "whatsapp.access_token.too_long",
+            };
         }
 
         Versioned<WhatsAppConnection>? found =
@@ -449,6 +455,9 @@ public sealed class WhatsAppConnectionHandlers(
         return agent is null
             ? throw new DomainValidationException(
                 "That AI agent does not belong to this workspace.")
+                {
+                    Code = "whatsapp.agent.not_in_workspace",
+                }
             : id;
     }
 

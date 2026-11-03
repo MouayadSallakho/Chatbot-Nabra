@@ -41,7 +41,10 @@ public readonly record struct AiAgentId
     {
         if (value == Guid.Empty)
         {
-            throw new DomainValidationException("AI agent id must not be an empty GUID.");
+            throw new DomainValidationException("AI agent id must not be an empty GUID.")
+            {
+                Code = "ai-agents.id.invalid",
+            };
         }
 
         return new AiAgentId(value);

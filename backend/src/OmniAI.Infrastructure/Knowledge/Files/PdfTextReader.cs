@@ -2,6 +2,7 @@ using System.Text;
 using OmniAI.Application.Knowledge.Files;
 using UglyToad.PdfPig;
 using UglyToad.PdfPig.Content;
+using UglyToad.PdfPig.Exceptions;
 
 namespace OmniAI.Infrastructure.Knowledge.Files;
 
@@ -41,8 +42,10 @@ internal static class PdfTextReader
         {
             throw new KnowledgeFileRejectedException(
                 KnowledgeFileRejection.TooMuchContent,
+                KnowledgeFileRefusals.TooManyPages,
                 $"That PDF has {document.NumberOfPages} pages and the limit is "
-                + $"{policy.MaxPdfPages}. Split it into smaller documents.");
+                + $"{policy.MaxPdfPages}. Split it into smaller documents.",
+                limit: policy.MaxPdfPages);
         }
 
         StringBuilder text = new();
@@ -70,8 +73,10 @@ internal static class PdfTextReader
             {
                 throw new KnowledgeFileRejectedException(
                     KnowledgeFileRejection.TooMuchContent,
+                    KnowledgeFileRefusals.TooManyCharacters,
                     $"That PDF holds more than {policy.MaxExtractedCharacters:N0} characters of "
-                    + "text. Split it into smaller documents.");
+                    + "text. Split it into smaller documents.",
+                    limit: policy.MaxExtractedCharacters);
             }
         }
 
@@ -80,6 +85,7 @@ internal static class PdfTextReader
         return extracted.Length == 0
             ? throw new KnowledgeFileRejectedException(
                 KnowledgeFileRejection.NoText,
+                KnowledgeFileRefusals.NoText,
                 "No extractable text was found in that PDF. Scanned documents are not supported "
                 + "yet — this platform does not read text out of images.")
             : extracted;
@@ -100,16 +106,28 @@ internal static class PdfTextReader
         {
             return PdfDocument.Open(content);
         }
+        catch (PdfDocumentEncryptedException)
+        {
+            // The one parser failure worth telling apart (Phase 37.5a): the fix is
+            // "unlock it", not "repair it". Same status and the same sentence as
+            // a damaged file; only the code differs, and it says nothing about the
+            // file beyond what its owner already knows.
+            throw Unreadable(KnowledgeFileRefusals.Encrypted);
+        }
 #pragma warning disable CA1031 // Every parser failure has one safe answer.
         catch (Exception)
 #pragma warning restore CA1031
         {
-            throw new KnowledgeFileRejectedException(
-                KnowledgeFileRejection.Unreadable,
-                "That PDF could not be read. It may be damaged, or password-protected — "
-                + "protected files must be unlocked before uploading.");
+            throw Unreadable(KnowledgeFileRefusals.Damaged);
         }
     }
+
+    private static KnowledgeFileRejectedException Unreadable(string code) =>
+        new(
+            KnowledgeFileRejection.Unreadable,
+            code,
+            "That PDF could not be read. It may be damaged, or password-protected — "
+            + "protected files must be unlocked before uploading.");
 
     /// <summary>
     /// One page's text, with words rejoined into lines.

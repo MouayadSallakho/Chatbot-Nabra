@@ -77,3 +77,63 @@ public sealed record AiAgentResponse(
             "This AI agent status has no published API representation."),
     };
 }
+
+/// <summary>
+/// One channel an agent answers on (Phase 37.5a, row 18).
+/// </summary>
+/// <param name="Kind"><c>WebChat</c> or <c>WhatsApp</c>.</param>
+/// <param name="Id">The website chat endpoint's or the WhatsApp connection's id.</param>
+/// <param name="Status">That channel's own status: <c>Draft</c>, <c>Active</c> or <c>Disabled</c>.</param>
+/// <remarks>
+/// Identity and status only; the channel's own read, behind its own permission,
+/// holds everything else.
+/// </remarks>
+public sealed record AiAgentChannelResponse(string Kind, Guid Id, string Status)
+{
+    internal static IReadOnlyList<AiAgentChannelResponse> From(IReadOnlyList<AiAgentChannelView> channels)
+    {
+        ArgumentNullException.ThrowIfNull(channels);
+
+        return [.. channels.Select(channel => new AiAgentChannelResponse(
+            channel.Kind.ToString(),
+            channel.Id,
+            channel.Status))];
+    }
+}
+
+/// <summary>
+/// One AI agent as <c>GET …/ai-agents/{id}</c> publishes it: the agent, and the
+/// channels it answers on that the reader may see (Phase 37.5a, row 18).
+/// </summary>
+/// <remarks>
+/// A separate record so the writes keep their exact seven fields: a write's
+/// response would otherwise have to claim an empty channel list for an agent that
+/// answers on two.
+/// </remarks>
+public sealed record AiAgentDetailResponse(
+    Guid Id,
+    Guid TenantId,
+    string Name,
+    string Instructions,
+    string Status,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset UpdatedAt,
+    IReadOnlyList<AiAgentChannelResponse> Channels)
+{
+    internal static AiAgentDetailResponse From(AiAgentView view)
+    {
+        ArgumentNullException.ThrowIfNull(view);
+
+        AiAgentResponse published = AiAgentResponse.From(view);
+
+        return new AiAgentDetailResponse(
+            published.Id,
+            published.TenantId,
+            published.Name,
+            published.Instructions,
+            published.Status,
+            published.CreatedAt,
+            published.UpdatedAt,
+            AiAgentChannelResponse.From(view.Channels));
+    }
+}

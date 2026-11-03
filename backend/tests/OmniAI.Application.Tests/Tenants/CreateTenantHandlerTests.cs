@@ -1,3 +1,5 @@
+using OmniAI.Domain.Security;
+using OmniAI.Application.Concurrency;
 using OmniAI.Application.Security;
 using OmniAI.Application.Tenants;
 using OmniAI.Application.Tenants.CreateTenant;
@@ -355,5 +357,15 @@ public sealed class CreateTenantHandlerTests
 
             return Task.CompletedTask;
         }
+
+        public Task<Versioned<Tenant>?> FindVersionedAsync(TenantId id, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException("Creating a workspace never reads a version.");
+
+        public Task<ConcurrencyToken> RenameAsync(
+            Tenant tenant,
+            ConcurrencyToken expected,
+            SecurityEvent audit,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException("Creating a workspace never renames one.");
     }
 }

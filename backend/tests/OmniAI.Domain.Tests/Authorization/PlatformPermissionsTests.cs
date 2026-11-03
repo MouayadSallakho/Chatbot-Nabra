@@ -125,6 +125,7 @@ public sealed class PlatformPermissionsTests
         Assert.Equal(
             [
                 "workspace.view",
+                "workspace.manage",
                 "ai-agents.view",
                 "ai-agents.create",
                 "ai-agents.edit",

@@ -19,7 +19,8 @@ public sealed class GetKnowledgeDocumentByIdHandler(
     IKnowledgeDocumentRepository documents,
     IKnowledgeSourceRepository sources,
     TenantAuthorizer authorizer,
-    ITextEmbeddingGenerator embeddings)
+    ITextEmbeddingGenerator embeddings,
+    IKnowledgeIndexAttemptStore attempts)
 {
     private readonly IKnowledgeDocumentRepository _documents =
         documents ?? throw new ArgumentNullException(nameof(documents));
@@ -32,6 +33,9 @@ public sealed class GetKnowledgeDocumentByIdHandler(
 
     private readonly ITextEmbeddingGenerator _embeddings =
         embeddings ?? throw new ArgumentNullException(nameof(embeddings));
+
+    private readonly IKnowledgeIndexAttemptStore _attempts =
+        attempts ?? throw new ArgumentNullException(nameof(attempts));
 
     public async Task<Versioned<KnowledgeDocumentView>?> HandleAsync(
         GetKnowledgeDocumentByIdQuery query,
@@ -65,8 +69,17 @@ public sealed class GetKnowledgeDocumentByIdHandler(
             .FindAsync(tenantId, documentId, cancellationToken)
             .ConfigureAwait(false);
 
+        // What the last press of "Index" did (Phase 37.5a). One indexed read, and
+        // only for a document the caller was already allowed to open.
+        KnowledgeIndexAttemptView? lastAttempt = await _attempts
+            .FindLatestAsync(tenantId, documentId, cancellationToken)
+            .ConfigureAwait(false);
+
         return new Versioned<KnowledgeDocumentView>(
-            KnowledgeDocumentView.From(stored.Value, _embeddings.Profile.Id, source),
+            KnowledgeDocumentView.From(stored.Value, _embeddings.Profile.Id, source) with
+            {
+                LastIndexAttempt = lastAttempt,
+            },
             stored.Version);
     }
 }

@@ -94,6 +94,14 @@ public sealed record KnowledgeSourceResponse(
 }
 
 /// <summary>One document as the list publishes it. No content.</summary>
+/// <param name="SourceByteLength">
+/// The size of the file the text came from, in bytes; <see langword="null"/> for a
+/// typed document (Phase 37.5a).
+/// </param>
+/// <param name="LastIndexAttempt">
+/// What the most recent indexing attempt did; <see langword="null"/> when the
+/// document was never indexed (Phase 37.5a).
+/// </param>
 public sealed record KnowledgeDocumentSummaryResponse(
     Guid Id,
     Guid TenantId,
@@ -104,7 +112,79 @@ public sealed record KnowledgeDocumentSummaryResponse(
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
     DateTimeOffset? IndexedAt,
-    string? SourceFileType);
+    string? SourceFileType,
+    long? SourceByteLength,
+    KnowledgeIndexAttemptResponse? LastIndexAttempt);
+
+/// <summary>
+/// What the most recent indexing attempt on a document did (Phase 37.5a, row 15).
+/// </summary>
+/// <remarks>
+/// <c>status</c> is <c>Started</c> (indexing now), <c>Succeeded</c>, <c>Failed</c>
+/// or <c>Unknown</c> (the process stopped before it could say). <c>failureCode</c>
+/// is a stable word such as <c>provider_unavailable</c> or <c>quota_exhausted</c>,
+/// listed in <c>knowledge-base-rag.md</c>, and never a provider's own message.
+/// Readiness is unchanged and still derived: this says what the last attempt did,
+/// which readiness cannot.
+/// </remarks>
+public sealed record KnowledgeIndexAttemptResponse(
+    string Status,
+    string? FailureCode,
+    DateTimeOffset StartedAt,
+    DateTimeOffset? CompletedAt)
+{
+    public static KnowledgeIndexAttemptResponse? From(KnowledgeIndexAttemptView? attempt) =>
+        attempt is null
+            ? null
+            : new KnowledgeIndexAttemptResponse(
+                attempt.Status.ToString(),
+                attempt.FailureCode,
+                attempt.StartedAt,
+                attempt.CompletedAt);
+}
+
+/// <summary>
+/// One knowledge document as <c>GET …/knowledge/{id}</c> publishes it: the
+/// document, and what its last indexing attempt did (Phase 37.5a).
+/// </summary>
+/// <remarks>
+/// A separate record so the writes keep their exact shape: a write's response
+/// would otherwise have to claim <c>lastIndexAttempt: null</c> for a document that
+/// has been indexed many times.
+/// </remarks>
+public sealed record KnowledgeDocumentDetailResponse(
+    Guid Id,
+    Guid TenantId,
+    string Title,
+    string Content,
+    bool IsEnabled,
+    string Readiness,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset UpdatedAt,
+    DateTimeOffset? IndexedAt,
+    KnowledgeSourceResponse? Source,
+    KnowledgeIndexAttemptResponse? LastIndexAttempt)
+{
+    public static KnowledgeDocumentDetailResponse From(KnowledgeDocumentView document)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+
+        KnowledgeDocumentResponse published = KnowledgeDocumentResponse.From(document);
+
+        return new KnowledgeDocumentDetailResponse(
+            published.Id,
+            published.TenantId,
+            published.Title,
+            published.Content,
+            published.IsEnabled,
+            published.Readiness,
+            published.CreatedAt,
+            published.UpdatedAt,
+            published.IndexedAt,
+            published.Source,
+            KnowledgeIndexAttemptResponse.From(document.LastIndexAttempt));
+    }
+}
 
 /// <summary>One page of knowledge documents.</summary>
 public sealed record KnowledgeDocumentPageResponse(
@@ -129,7 +209,9 @@ public sealed record KnowledgeDocumentPageResponse(
                     item.CreatedAt,
                     item.UpdatedAt,
                     item.IndexedAt,
-                    item.SourceFileType?.ToString())),
+                    item.SourceFileType?.ToString(),
+                    item.SourceByteLength,
+                    KnowledgeIndexAttemptResponse.From(item.LastIndexAttempt))),
             ],
             page.Page,
             page.PageSize,

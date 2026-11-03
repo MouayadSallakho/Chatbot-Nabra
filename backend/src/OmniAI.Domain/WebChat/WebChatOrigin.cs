@@ -70,7 +70,10 @@ public sealed record WebChatOrigin
     {
         if (!TryCreate(value, out WebChatOrigin? origin, out string? problem))
         {
-            throw new DomainValidationException(problem);
+            throw new DomainValidationException(problem)
+            {
+                Code = "website-chat.origin.invalid",
+            };
         }
 
         return origin;

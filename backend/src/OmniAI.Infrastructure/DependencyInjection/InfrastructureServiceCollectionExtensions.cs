@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Npgsql;
 using OmniAI.Application.Ai;
+using OmniAI.Application.AiAgents;
 using OmniAI.Application.AiAgents.Persistence;
 using OmniAI.Application.Authorization.Persistence;
 using OmniAI.Application.Ai.Usage;
@@ -111,6 +112,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<ITenantMemberRepository, TenantMemberRepository>();
         services.AddScoped<ITenantInvitationRepository, TenantInvitationRepository>();
         services.AddScoped<IAiAgentRepository, AiAgentRepository>();
+        services.AddScoped<IAiAgentChannelReader, AiAgentChannelReader>();
         services.AddScoped<IKnowledgeDocumentRepository, KnowledgeDocumentRepository>();
         services.AddScoped<IAgentKnowledgeRepository, AgentKnowledgeRepository>();
         services.AddScoped<IKnowledgeIndexStore, KnowledgeIndexStore>();

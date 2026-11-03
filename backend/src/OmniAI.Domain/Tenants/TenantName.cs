@@ -40,7 +40,10 @@ public sealed record TenantName
     {
         if (string.IsNullOrWhiteSpace(value))
         {
-            throw new DomainValidationException("Tenant name is required.");
+            throw new DomainValidationException("Tenant name is required.")
+            {
+                Code = "workspace.name.invalid",
+            };
         }
 
         string normalised = value.Trim();
@@ -48,7 +51,10 @@ public sealed record TenantName
         if (normalised.Length > MaxLength)
         {
             throw new DomainValidationException(
-                $"Tenant name must be at most {MaxLength} characters; the supplied name has {normalised.Length}.");
+                $"Tenant name must be at most {MaxLength} characters; the supplied name has {normalised.Length}.")
+            {
+                Code = "workspace.name.invalid",
+            };
         }
 
         // Control characters serve no purpose in a display name and would corrupt
@@ -57,7 +63,10 @@ public sealed record TenantName
         {
             if (char.IsControl(character))
             {
-                throw new DomainValidationException("Tenant name must not contain control characters.");
+                throw new DomainValidationException("Tenant name must not contain control characters.")
+                {
+                    Code = "workspace.name.invalid",
+                };
             }
         }
 

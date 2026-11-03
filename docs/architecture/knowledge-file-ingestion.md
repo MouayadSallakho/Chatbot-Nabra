@@ -393,6 +393,17 @@ it invites using this endpoint as an oracle.
 `422` rather than `400` for content failures: the request is well-formed and
 permitted, and what is wrong is inside the file.
 
+**Phase 37.5a: each refusal names its rule.** The statuses and the English details
+are unchanged; the problem body gains a stable `code` (`knowledge.file.too_large`,
+`.unsupported_type`, `.type_mismatch`, `.empty`, `.not_utf8`, `.damaged`, `.encrypted`,
+`.no_text`, `.header_required`, `.too_many_pages`, `.too_many_characters`,
+`.too_many_rows`, `.too_many_columns`, `.cell_too_long`, `.archive_too_large`,
+`.required`, `.multipart_required`) and, where a bound was broken, a numeric `limit`
+in that rule's unit (bytes, pages, characters, rows, columns or entries). A
+password-protected PDF (PdfPig's `PdfDocumentEncryptedException`) is told apart from
+a damaged one by its code alone; its sentence stays the same. The full list is in
+`problem-codes.md`.
+
 ### Title
 
 An explicit title wins. Without one the filename is used, minus its extension —

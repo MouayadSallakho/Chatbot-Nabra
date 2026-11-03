@@ -69,11 +69,127 @@ public enum KnowledgeFileRejection
 /// offset, or a library's own wording would describe this deployment's internals
 /// to whoever uploaded the file — and the person reading it needs to know what to
 /// do, not what threw.
+/// <para>
+/// <strong>The reason picks the status; the code names the rule (Phase 37.5a).</strong>
+/// Six reasons are enough to choose between 413, 415 and 422, and far too few to
+/// tell a reader what to do: "too many pages" and "a cell is too long" are both
+/// <see cref="KnowledgeFileRejection.TooMuchContent"/>. Each throw site names its
+/// <see cref="KnowledgeFileRefusals"/> code, and the bound it broke where it has
+/// one, so a client words the refusal without reading the English sentence.
+/// </para>
 /// </remarks>
-public sealed class KnowledgeFileRejectedException(KnowledgeFileRejection reason, string message)
-    : Exception(message)
+public sealed class KnowledgeFileRejectedException : Exception
 {
-    public KnowledgeFileRejection Reason { get; } = reason;
+    /// <summary>A refusal with the reason's general code.</summary>
+    public KnowledgeFileRejectedException(KnowledgeFileRejection reason, string message)
+        : this(reason, KnowledgeFileRefusals.For(reason), message)
+    {
+    }
+
+    /// <summary>A refusal naming the exact rule, and the bound it broke.</summary>
+    /// <param name="reason">Decides the status.</param>
+    /// <param name="code">One of <see cref="KnowledgeFileRefusals"/>.</param>
+    /// <param name="message">The English sentence for a person.</param>
+    /// <param name="limit">The bound, in the rule's own unit, when it has one.</param>
+    public KnowledgeFileRejectedException(
+        KnowledgeFileRejection reason,
+        string code,
+        string message,
+        long? limit = null)
+        : base(message)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(code);
+
+        Reason = reason;
+        Code = code;
+        Limit = limit;
+    }
+
+    public KnowledgeFileRejection Reason { get; }
+
+    /// <summary>The stable code, published as the problem's <c>code</c>.</summary>
+    public string Code { get; }
+
+    /// <summary>
+    /// The bound that was broken — bytes, pages, characters, rows, columns or
+    /// entries, as the code says — published as the problem's <c>limit</c>.
+    /// </summary>
+    public long? Limit { get; }
+}
+
+/// <summary>
+/// The stable codes on a refused knowledge file (Phase 37.5a, row 17).
+/// </summary>
+/// <remarks>
+/// Listed in <c>docs/architecture/problem-codes.md</c>. A code, once published,
+/// keeps its meaning; a new rule gets a new code.
+/// </remarks>
+public static class KnowledgeFileRefusals
+{
+    /// <summary>Larger than the upload limit (<c>limit</c>: bytes). 413.</summary>
+    public const string TooLarge = "knowledge.file.too_large";
+
+    /// <summary>Not PDF, DOCX, TXT or CSV. 415.</summary>
+    public const string UnsupportedType = "knowledge.file.unsupported_type";
+
+    /// <summary>The bytes contradict the name or the declared type. 422.</summary>
+    public const string TypeMismatch = "knowledge.file.type_mismatch";
+
+    /// <summary>The file has no bytes, or a CSV has not even a header row. 422.</summary>
+    public const string Empty = "knowledge.file.empty";
+
+    /// <summary>A text or CSV file is not valid UTF-8. 422.</summary>
+    public const string NotUtf8 = "knowledge.file.not_utf8";
+
+    /// <summary>The file could not be parsed as its format. 422.</summary>
+    public const string Damaged = "knowledge.file.damaged";
+
+    /// <summary>A PDF is password-protected. 422.</summary>
+    public const string Encrypted = "knowledge.file.encrypted";
+
+    /// <summary>The file was read and holds no text (a scan, images only, no records). 422.</summary>
+    public const string NoText = "knowledge.file.no_text";
+
+    /// <summary>A PDF has more pages than the limit (<c>limit</c>: pages). 422.</summary>
+    public const string TooManyPages = "knowledge.file.too_many_pages";
+
+    /// <summary>More text than a document may hold (<c>limit</c>: characters). 422.</summary>
+    public const string TooManyCharacters = "knowledge.file.too_many_characters";
+
+    /// <summary>A CSV has more rows than the limit (<c>limit</c>: rows). 422.</summary>
+    public const string TooManyRows = "knowledge.file.too_many_rows";
+
+    /// <summary>A CSV has more columns than the limit (<c>limit</c>: columns). 422.</summary>
+    public const string TooManyColumns = "knowledge.file.too_many_columns";
+
+    /// <summary>A CSV cell is longer than the limit (<c>limit</c>: characters). 422.</summary>
+    public const string CellTooLong = "knowledge.file.cell_too_long";
+
+    /// <summary>
+    /// A DOCX has too many parts or expands too far (<c>limit</c>: entries or
+    /// bytes, as the detail says). 422.
+    /// </summary>
+    public const string ArchiveTooLarge = "knowledge.file.archive_too_large";
+
+    /// <summary>A CSV has no usable header row naming its columns. 422.</summary>
+    public const string HeaderRequired = "knowledge.file.header_required";
+
+    /// <summary>The multipart form has no file, or an empty one. 400.</summary>
+    public const string Required = "knowledge.file.required";
+
+    /// <summary>The request is not <c>multipart/form-data</c>. 415.</summary>
+    public const string MultipartRequired = "knowledge.file.multipart_required";
+
+    /// <summary>The general code for a reason, used when a site names no rule.</summary>
+    public static string For(KnowledgeFileRejection reason) => reason switch
+    {
+        KnowledgeFileRejection.TooLarge => TooLarge,
+        KnowledgeFileRejection.UnsupportedType => UnsupportedType,
+        KnowledgeFileRejection.TypeMismatch => TypeMismatch,
+        KnowledgeFileRejection.NoText => NoText,
+        KnowledgeFileRejection.TooMuchContent => TooManyCharacters,
+        _ => Damaged,
+    };
 }
 
 /// <summary>

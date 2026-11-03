@@ -1,4 +1,5 @@
 import { Injectable, OnDestroy, signal } from '@angular/core';
+import type { LauncherPosition } from './embed-chat-api';
 
 /** The protocol namespace. Version 1, and the version is part of every name. */
 const PROTOCOL = 'omniai:v1:';
@@ -117,7 +118,7 @@ export class EmbedBridge implements OnDestroy {
   }
 
   /** Tells the host the widget has loaded, and which corner it belongs in. */
-  ready(position: 'Left' | 'Right'): void {
+  ready(position: LauncherPosition): void {
     this.post({ type: READY, position });
   }
 

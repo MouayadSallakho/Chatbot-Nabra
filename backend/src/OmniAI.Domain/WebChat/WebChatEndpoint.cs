@@ -134,17 +134,26 @@ public sealed class WebChatEndpoint
     {
         if (tenantId.IsEmpty)
         {
-            throw new DomainValidationException("A web chat endpoint must belong to a workspace.");
+            throw new DomainValidationException("A web chat endpoint must belong to a workspace.")
+            {
+                Code = "website-chat.endpoint.invalid",
+            };
         }
 
         if (aiAgentId.IsEmpty)
         {
-            throw new DomainValidationException("A web chat endpoint must name an AI agent.");
+            throw new DomainValidationException("A web chat endpoint must name an AI agent.")
+            {
+                Code = "website-chat.endpoint.invalid",
+            };
         }
 
         if (publicKey.IsEmpty)
         {
-            throw new DomainValidationException("A web chat endpoint must have a public key.");
+            throw new DomainValidationException("A web chat endpoint must have a public key.")
+            {
+                Code = "website-chat.endpoint.invalid",
+            };
         }
 
         return new WebChatEndpoint(
@@ -234,7 +243,10 @@ public sealed class WebChatEndpoint
         {
             throw new DomainValidationException(
                 $"A website chat widget may be allowed on at most {MaxAllowedOrigins} websites; "
-                + $"{distinct.Count} were supplied.");
+                + $"{distinct.Count} were supplied.")
+            {
+                Code = "website-chat.origin.too_many",
+            };
         }
 
         Widget = widget;
@@ -346,7 +358,10 @@ public sealed class WebChatEndpoint
     {
         if (instant == default)
         {
-            throw new DomainValidationException($"The {what} must be a real point in time.");
+            throw new DomainValidationException($"The {what} must be a real point in time.")
+            {
+                Code = "website-chat.instant.invalid",
+            };
         }
 
         return instant.ToUniversalTime();

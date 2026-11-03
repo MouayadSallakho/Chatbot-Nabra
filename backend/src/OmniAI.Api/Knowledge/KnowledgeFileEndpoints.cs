@@ -169,7 +169,8 @@ internal static class KnowledgeFileEndpoints
             return (null, null, Results.Problem(
                 statusCode: StatusCodes.Status415UnsupportedMediaType,
                 title: "A file upload is required",
-                detail: "Send the file as multipart/form-data with a \"file\" part."));
+                detail: "Send the file as multipart/form-data with a \"file\" part.",
+                extensions: Coded(KnowledgeFileRefusals.MultipartRequired)));
         }
 
         IFormCollection form;
@@ -196,7 +197,8 @@ internal static class KnowledgeFileEndpoints
             return (null, null, Results.Problem(
                 statusCode: StatusCodes.Status400BadRequest,
                 title: "A file is required",
-                detail: "Choose a file to upload."));
+                detail: "Choose a file to upload.",
+                extensions: Coded(KnowledgeFileRefusals.Required)));
         }
 
         if (file.Length > policy.MaxFileBytes)
@@ -229,5 +231,22 @@ internal static class KnowledgeFileEndpoints
             statusCode: StatusCodes.Status413PayloadTooLarge,
             title: "That file is too large",
             detail: $"Uploads must be {policy.MaxFileMegabytes} MB or smaller. Split the file "
-                + "into smaller documents, or upload the part that matters.");
+                + "into smaller documents, or upload the part that matters.",
+            extensions: Coded(KnowledgeFileRefusals.TooLarge, policy.MaxFileBytes));
+
+    /// <summary>
+    /// The stable code of a refusal written here rather than by a parser, and the
+    /// bound it broke, matching what a parser's refusal carries (Phase 37.5a).
+    /// </summary>
+    private static Dictionary<string, object?> Coded(string code, long? limit = null)
+    {
+        Dictionary<string, object?> extensions = new(StringComparer.Ordinal) { ["code"] = code };
+
+        if (limit is long bound)
+        {
+            extensions["limit"] = bound;
+        }
+
+        return extensions;
+    }
 }

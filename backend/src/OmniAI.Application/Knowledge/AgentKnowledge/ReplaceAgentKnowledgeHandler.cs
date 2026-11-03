@@ -118,7 +118,10 @@ public sealed class ReplaceAgentKnowledgeHandler(
             {
                 throw new DomainValidationException(
                     $"This workspace has no knowledge document with id '{documentId}'. "
-                    + "No assignment was changed.");
+                    + "No assignment was changed.")
+                {
+                    Code = "knowledge.assignment.document_unknown",
+                };
             }
         }
 
@@ -166,7 +169,10 @@ public sealed class ReplaceAgentKnowledgeHandler(
         {
             throw new DomainValidationException(
                 $"An AI agent may be assigned at most {GetAgentKnowledgeHandler.MaxDocuments} "
-                + $"knowledge documents; {ids.Count} were supplied.");
+                + $"knowledge documents; {ids.Count} were supplied.")
+            {
+                Code = "knowledge.assignment.too_many",
+            };
         }
 
         return [.. ids.Select(KnowledgeDocumentId.From).Distinct()];

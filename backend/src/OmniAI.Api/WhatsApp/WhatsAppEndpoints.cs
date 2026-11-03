@@ -3,6 +3,7 @@ using OmniAI.Api.Security;
 using OmniAI.Application.Concurrency;
 using OmniAI.Application.WhatsApp;
 using OmniAI.Application.WhatsApp.Persistence;
+using OmniAI.Api.ErrorHandling;
 
 namespace OmniAI.Api.WhatsApp;
 
@@ -164,7 +165,8 @@ internal static class WhatsAppEndpoints
             return Results.Problem(
                 statusCode: StatusCodes.Status400BadRequest,
                 title: "AI agent is required",
-                detail: "A WhatsApp connection must name the AI agent that will answer on it.");
+                detail: "A WhatsApp connection must name the AI agent that will answer on it.",
+                extensions: new Dictionary<string, object?> { [ProblemCodes.Member] = "whatsapp.agent.required" });
         }
 
         Versioned<WhatsAppConnectionView>? created = await handlers
@@ -213,7 +215,8 @@ internal static class WhatsAppEndpoints
             return Results.Problem(
                 statusCode: StatusCodes.Status400BadRequest,
                 title: "AI agent is required",
-                detail: "A WhatsApp connection must name the AI agent that will answer on it.");
+                detail: "A WhatsApp connection must name the AI agent that will answer on it.",
+                extensions: new Dictionary<string, object?> { [ProblemCodes.Member] = "whatsapp.agent.required" });
         }
 
         Versioned<WhatsAppConnectionView>? updated = await handlers

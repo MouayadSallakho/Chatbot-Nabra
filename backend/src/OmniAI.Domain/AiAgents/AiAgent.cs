@@ -125,7 +125,10 @@ public sealed class AiAgent
 
         if (tenantId.IsEmpty)
         {
-            throw new DomainValidationException("An AI agent must belong to a tenant.");
+            throw new DomainValidationException("An AI agent must belong to a tenant.")
+            {
+                Code = "ai-agents.tenant.required",
+            };
         }
 
         return new AiAgent(
@@ -251,7 +254,10 @@ public sealed class AiAgent
         {
             throw new DomainStateException(
                 "Cannot disable an AI agent that is still a draft. A draft has never been " +
-                "active, so there is nothing to switch off.");
+                "active, so there is nothing to switch off.")
+            {
+                Code = "ai-agents.disable.draft",
+            };
         }
 
         if (Status == AiAgentStatus.Disabled)
@@ -311,7 +317,10 @@ public sealed class AiAgent
     {
         if (instant == default)
         {
-            throw new DomainValidationException($"The {what} must be a real point in time.");
+            throw new DomainValidationException($"The {what} must be a real point in time.")
+            {
+                Code = "ai-agents.instant.invalid",
+            };
         }
 
         // Stored in UTC: the instant is what matters, and a single representation

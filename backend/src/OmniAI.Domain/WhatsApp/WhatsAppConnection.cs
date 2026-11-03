@@ -141,12 +141,18 @@ public sealed class WhatsAppConnection
     {
         if (tenantId.IsEmpty)
         {
-            throw new DomainValidationException("A WhatsApp connection must belong to a workspace.");
+            throw new DomainValidationException("A WhatsApp connection must belong to a workspace.")
+            {
+                Code = "whatsapp.connection.invalid",
+            };
         }
 
         if (aiAgentId.IsEmpty)
         {
-            throw new DomainValidationException("A WhatsApp connection must name an AI agent.");
+            throw new DomainValidationException("A WhatsApp connection must name an AI agent.")
+            {
+                Code = "whatsapp.agent.required",
+            };
         }
 
         return new WhatsAppConnection(
@@ -197,12 +203,18 @@ public sealed class WhatsAppConnection
         {
             throw new DomainStateException(
                 "Take this WhatsApp connection out of service before changing which "
-                + "number or agent it uses.");
+                + "number or agent it uses.")
+            {
+                Code = "whatsapp.connection.in_service",
+            };
         }
 
         if (aiAgentId.IsEmpty)
         {
-            throw new DomainValidationException("A WhatsApp connection must name an AI agent.");
+            throw new DomainValidationException("A WhatsApp connection must name an AI agent.")
+            {
+                Code = "whatsapp.agent.required",
+            };
         }
 
         AiAgentId = aiAgentId;
@@ -240,7 +252,10 @@ public sealed class WhatsAppConnection
         {
             throw new DomainStateException(
                 "Add an access token before putting this WhatsApp connection into service. "
-                + "Without one it could receive messages and never answer them.");
+                + "Without one it could receive messages and never answer them.")
+            {
+                Code = "whatsapp.connection.access_token_missing",
+            };
         }
 
         if (Status == WhatsAppConnectionStatus.Active)
@@ -304,6 +319,9 @@ public sealed class WhatsAppConnection
         return trimmed.Length > 32
             ? throw new DomainValidationException(
                 "A display phone number must be 32 characters or fewer.")
+                {
+                    Code = "whatsapp.display_phone_number.too_long",
+                }
             : trimmed;
     }
 
@@ -311,7 +329,10 @@ public sealed class WhatsAppConnection
     {
         if (instant == default)
         {
-            throw new DomainValidationException("The instant must be a real point in time.");
+            throw new DomainValidationException("The instant must be a real point in time.")
+            {
+                Code = "whatsapp.instant.invalid",
+            };
         }
 
         return instant.ToUniversalTime();

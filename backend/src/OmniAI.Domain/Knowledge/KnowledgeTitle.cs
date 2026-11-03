@@ -21,7 +21,10 @@ public sealed record KnowledgeTitle
     {
         if (string.IsNullOrWhiteSpace(value))
         {
-            throw new DomainValidationException("A knowledge document needs a title.");
+            throw new DomainValidationException("A knowledge document needs a title.")
+            {
+                Code = "knowledge.title.required",
+            };
         }
 
         string normalised = value.Trim();
@@ -30,7 +33,10 @@ public sealed record KnowledgeTitle
         {
             throw new DomainValidationException(
                 $"A knowledge document title must be at most {MaxLength} characters; " +
-                $"the supplied title has {normalised.Length}. It is not truncated.");
+                $"the supplied title has {normalised.Length}. It is not truncated.")
+            {
+                Code = "knowledge.title.too_long",
+            };
         }
 
         foreach (char character in normalised)
@@ -42,7 +48,10 @@ public sealed record KnowledgeTitle
             {
                 throw new DomainValidationException(
                     "A knowledge document title must be a single line and must not contain "
-                    + "control characters.");
+                    + "control characters.")
+                {
+                    Code = "knowledge.title.control_characters",
+                };
             }
         }
 

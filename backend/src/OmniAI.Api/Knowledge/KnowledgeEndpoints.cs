@@ -44,13 +44,22 @@ internal static class KnowledgeEndpoints
             .AddEndpointFilter<AntiforgeryEndpointFilter>();
 
         knowledge.MapGet("/", ListAsync)
-            .WithName("ListKnowledgeDocuments");
+            .WithName("ListKnowledgeDocuments")
+            .WithSummary("One page of the workspace's knowledge documents, each with its file size and last indexing outcome.")
+            .Produces<KnowledgeDocumentPageResponse>()
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound);
 
         knowledge.MapPost("/", CreateAsync)
             .WithName("CreateKnowledgeDocument");
 
         knowledge.MapGet("/{knowledgeDocumentId:guid}", GetByIdAsync)
-            .WithName(GetKnowledgeDocumentByIdRouteName);
+            .WithName(GetKnowledgeDocumentByIdRouteName)
+            .WithSummary("One knowledge document with its ETag and last indexing outcome.")
+            .Produces<KnowledgeDocumentDetailResponse>()
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound);
 
         knowledge.MapPut("/{knowledgeDocumentId:guid}", UpdateAsync)
             .WithName("UpdateKnowledgeDocument");
@@ -121,7 +130,16 @@ internal static class KnowledgeEndpoints
                 cancellationToken)
             .ConfigureAwait(false);
 
-        return Respond(http, document, knowledgeDocumentId);
+        if (document is null)
+        {
+            return NotFound(knowledgeDocumentId);
+        }
+
+        // The read alone carries the last indexing outcome (Phase 37.5a); the
+        // writes keep their shape. See KnowledgeDocumentDetailResponse.
+        SetETag(http, document.Version);
+
+        return Results.Ok(KnowledgeDocumentDetailResponse.From(document.Value));
     }
 
     private static async Task<IResult> UpdateAsync(

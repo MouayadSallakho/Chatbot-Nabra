@@ -123,7 +123,10 @@ public readonly record struct ProviderMessageId
             : throw new DomainValidationException(
                 string.Create(
                     CultureInfo.InvariantCulture,
-                    $"A provider message id must be 1 to {MaxLength} printable characters."));
+                    $"A provider message id must be 1 to {MaxLength} printable characters."))
+                {
+                    Code = "whatsapp.provider_id.invalid",
+                };
 
     /// <summary>
     /// Reads one from a webhook, answering <see langword="false"/> rather than

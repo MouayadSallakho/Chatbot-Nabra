@@ -146,6 +146,12 @@ public static class SecurityEventKinds
     public const string InvitationEmailSent = "auth.invitation.email_sent";
     public const string InvitationEmailFailed = "auth.invitation.email_failed";
 
+    /// <summary>
+    /// A workspace's display name was changed (Phase 37.5a, D-3). Carries the
+    /// actor and the workspace; never the old or the new name.
+    /// </summary>
+    public const string WorkspaceRenamed = "workspace.renamed";
+
     public static IReadOnlyList<string> All { get; } =
     [
         PasswordResetRequested,
@@ -160,6 +166,7 @@ public static class SecurityEventKinds
         SignInThrottled,
         InvitationEmailSent,
         InvitationEmailFailed,
+        WorkspaceRenamed,
     ];
 
     public static bool IsKnown(string? kind) => kind is not null && All.Contains(kind, StringComparer.Ordinal);

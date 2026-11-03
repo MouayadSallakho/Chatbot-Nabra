@@ -595,3 +595,23 @@ honest about what it does.
 - Transcript export, retention policies and PII controls
 - Provider token accounting and per-workspace spend limits
 - Production deployment
+
+## Phase 37.5a: what the hosted page is told
+
+`GET /api/public/webchat/{publicKey}` (anonymous, as before) gains four fields beside
+`agentName` and `available`:
+
+| Field | Value |
+| --- | --- |
+| `workspaceName` | The workspace's display name (owner decision D-3), so a visitor knows whose chat it is. The owner changes it with `PUT /api/tenants/{id}/name` |
+| `greeting` | The widget's greeting, or `null` |
+| `accentColor` | The widget's accent colour, as on the embedded read |
+| `theme` | `System`, `Light` or `Dark`, as on the embedded read |
+
+Each passes the billboard rule: a visitor sees all of them on the page anyway, and
+the embedded widget already published the appearance. They come from the same single
+statement as before (the public-key read now also joins `tenants` for the name only,
+by the endpoint's own tenant). Nothing else about the workspace is read or published:
+no slug, status, plan, member, other endpoint or id. An unknown key still answers the
+same generic `404` as before (no `detail`, no `code`), and the public-chat rate limits
+are unchanged.

@@ -965,7 +965,12 @@ a closed list in code (`SecurityEventKinds`):
 `auth.password_reset.completed`, `auth.password_reset.rejected`,
 `auth.password_changed.email_sent`, `auth.password_changed.email_failed`,
 `auth.sessions.revoked`, `auth.signin.throttled`, `auth.invitation.email_sent`,
-`auth.invitation.email_failed`.
+`auth.invitation.email_failed`, and (Phase 37.5a) `workspace.renamed`.
+
+`workspace.renamed` carries the actor and the workspace, never the old or the new
+name. Unlike the account events it is **not** best effort: it is written in the same
+`SaveChanges` as the rename, so a rename never commits without its record and a stale
+rename writes neither.
 
 Writes are best effort: a failure is logged (event 4300) and the request carries
 on. The security decisions themselves never depend on the audit row.

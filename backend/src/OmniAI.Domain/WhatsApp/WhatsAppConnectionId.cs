@@ -30,7 +30,10 @@ public readonly record struct WhatsAppConnectionId
         if (value == Guid.Empty)
         {
             throw new DomainValidationException(
-                "WhatsApp connection id must not be an empty GUID.");
+                "WhatsApp connection id must not be an empty GUID.")
+            {
+                Code = "whatsapp.id.invalid",
+            };
         }
 
         return new WhatsAppConnectionId(value);

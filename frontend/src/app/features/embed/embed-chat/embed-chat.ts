@@ -21,7 +21,12 @@ import { ChatPanel } from '@app/shared/chat/chat-panel';
 import { visitorFailure } from '@app/shared/chat/visitor-copy';
 import { DEFAULT_ACCENT, applyAccent } from '../accent-color';
 import { EmbedBridge } from '../embed-bridge';
-import { EmbedChatApi, EmbeddedChatConfig } from '../embed-chat-api';
+import {
+  EmbedChatApi,
+  EmbeddedChatConfig,
+  LAUNCHER_POSITIONS,
+  LauncherPosition,
+} from '../embed-chat-api';
 import { EmbedSessionStore } from '../embed-session';
 
 /** The longest message the widget accepts, matching the server's bound. */
@@ -70,7 +75,7 @@ type EmbedState = 'connecting' | 'notEmbedded' | 'unavailable' | 'ready' | 'fail
   templateUrl: './embed-chat.html',
   styleUrl: './embed-chat.scss',
   host: {
-    '[class.embed-left]': 'position() === "Left"',
+    '[class.embed-left]': 'opensFromLeft()',
     '[class.embed-open]': 'panelOpen()',
     '[class.embed-compact]': 'bridge.compact()',
     '(keydown.escape)': 'onEscape()',
@@ -91,7 +96,26 @@ export class EmbedChat implements OnInit {
   protected readonly agentName = signal('');
   protected readonly greeting = signal<string | null>(null);
   protected readonly accent = signal(DEFAULT_ACCENT);
-  protected readonly position = signal<'Left' | 'Right'>('Right');
+  protected readonly position = signal<LauncherPosition>('Right');
+
+  /**
+   * Which edge of its frame the launcher hugs, and which corner the open panel
+   * grows out of; the loader places the frame itself. `Start` and `End` follow
+   * the host page's direction, which this frame cannot read, so its own language
+   * stands in: at worst the launcher sits 12px off its frame's outer edge and the
+   * opening animation starts from the other corner (Phase 37.5a).
+   */
+  protected readonly opensFromLeft = computed(() => {
+    const position = this.position();
+    const rtl = this.language === 'ar';
+
+    return position === 'Left' || (position === 'Start' && !rtl) || (position === 'End' && rtl);
+  });
+
+  /** The physical side the shared launcher understands. */
+  protected readonly launcherSide = computed<'Left' | 'Right'>(() =>
+    this.opensFromLeft() ? 'Left' : 'Right',
+  );
   protected readonly theme = signal<'System' | 'Light' | 'Dark'>('System');
   protected readonly panelOpen = signal(false);
   protected readonly messages = signal<readonly ChatMessage[]>([]);
@@ -446,7 +470,9 @@ export class EmbedChat implements OnInit {
     this.agentName.set(config.agentName);
     this.greeting.set(config.greeting);
     this.accent.set(config.accentColor);
-    this.position.set(config.launcherPosition === 'Left' ? 'Left' : 'Right');
+    this.position.set(
+      LAUNCHER_POSITIONS.includes(config.launcherPosition) ? config.launcherPosition : 'Right',
+    );
     this.theme.set(config.theme === 'Light' || config.theme === 'Dark' ? config.theme : 'System');
   }
 

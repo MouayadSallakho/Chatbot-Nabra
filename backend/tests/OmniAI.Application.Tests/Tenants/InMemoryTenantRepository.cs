@@ -1,5 +1,8 @@
+using System.Globalization;
+using OmniAI.Application.Concurrency;
 using OmniAI.Application.Tenants;
 using OmniAI.Application.Tenants.Persistence;
+using OmniAI.Domain.Security;
 using OmniAI.Domain.Authorization;
 using OmniAI.Domain.Tenants;
 using OmniAI.Domain.Users;
@@ -124,6 +127,52 @@ internal sealed class InMemoryTenantRepository : ITenantRepository
 
         return this;
     }
+
+    /// <summary>Each workspace's version, bumped on every stored change (Phase 37.5a).</summary>
+    private readonly Dictionary<TenantId, int> _versions = [];
+
+    private readonly List<SecurityEvent> _audits = [];
+
+    /// <summary>Every audit record a rename stored, in order.</summary>
+    public IReadOnlyList<SecurityEvent> Audits => _audits;
+
+    public int RenameAttempts { get; private set; }
+
+    public Task<Versioned<Tenant>?> FindVersionedAsync(TenantId id, CancellationToken cancellationToken = default)
+    {
+        Tenant? tenant = _stored.Find(candidate => candidate.Id == id);
+
+        return Task.FromResult(tenant is null ? null : new Versioned<Tenant>(tenant, VersionOf(tenant.Id)));
+    }
+
+    public Task<ConcurrencyToken> RenameAsync(
+        Tenant tenant,
+        ConcurrencyToken expected,
+        SecurityEvent audit,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(tenant);
+        ArgumentNullException.ThrowIfNull(audit);
+
+        RenameAttempts++;
+
+        // Stands in for the row version: the store, not the caller, decides.
+        if (VersionOf(tenant.Id) != expected)
+        {
+            throw TenantVersionMismatchException.ForTenant(tenant.Id.Value);
+        }
+
+        _versions[tenant.Id] = _versions.GetValueOrDefault(tenant.Id) + 1;
+        _audits.Add(audit);
+
+        return Task.FromResult(VersionOf(tenant.Id));
+    }
+
+    /// <summary>Moves a workspace's version on, as a concurrent writer would.</summary>
+    public void Touch(TenantId id) => _versions[id] = _versions.GetValueOrDefault(id) + 1;
+
+    public ConcurrencyToken VersionOf(TenantId id) =>
+        ConcurrencyToken.From("v" + _versions.GetValueOrDefault(id).ToString(CultureInfo.InvariantCulture));
 
     private bool ContainsSlug(TenantSlug slug) =>
         _stored.Exists(stored => stored.Slug == slug);

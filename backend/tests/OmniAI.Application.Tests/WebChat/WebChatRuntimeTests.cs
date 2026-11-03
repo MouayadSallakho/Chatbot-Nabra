@@ -535,7 +535,7 @@ public sealed class WebChatRuntimeTests
     // ---- The public face -------------------------------------------------
 
     [Fact]
-    public async Task The_public_page_is_told_the_agent_name_and_nothing_else()
+    public async Task The_public_page_is_told_what_a_visitor_sees_and_nothing_else()
     {
         Harness harness = Build();
 
@@ -546,10 +546,14 @@ public sealed class WebChatRuntimeTests
         Assert.Equal("Support", view.AgentName);
         Assert.True(view.Available);
 
-        // The type has exactly two properties. Anything about the workspace, the
-        // agent's configuration or its identity would have to be added here
-        // deliberately, which is the point of asserting the shape.
-        Assert.Equal(2, typeof(PublicWebChatView).GetProperties().Length);
+        // The exact shape. Phase 37.5a deliberately added the widget's appearance,
+        // which the embedded read already published, and the workspace's display
+        // name (owner decision D-3). Anything else about the workspace, the agent's
+        // configuration or its identity would have to be added here deliberately,
+        // which is the point of asserting the shape.
+        Assert.Equal(
+            ["AccentColor", "AgentName", "Available", "Greeting", "Theme", "WorkspaceName"],
+            typeof(PublicWebChatView).GetProperties().Select(property => property.Name).Order(StringComparer.Ordinal));
     }
 
     [Fact]

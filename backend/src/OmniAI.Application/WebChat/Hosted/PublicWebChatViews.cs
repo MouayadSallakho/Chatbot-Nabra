@@ -19,7 +19,26 @@ namespace OmniAI.Application.WebChat.Hosted;
 /// saying which — the page shows one unavailable state and the visitor learns
 /// nothing about the workspace's internal configuration.
 /// </param>
-public sealed record PublicWebChatView(string AgentName, bool Available);
+/// <remarks>
+/// Phase 37.5a adds what the embedded widget already shows — the greeting, the
+/// accent colour and the theme — and, by owner decision D-3, the workspace's
+/// display name. Each passes the billboard test: a visitor sees all of them on
+/// the page anyway.
+/// </remarks>
+public sealed record PublicWebChatView(string AgentName, bool Available)
+{
+    /// <summary>The workspace's display name (D-3).</summary>
+    public string WorkspaceName { get; init; } = string.Empty;
+
+    /// <summary>The greeting the panel opens with, or <see langword="null"/>.</summary>
+    public string? Greeting { get; init; }
+
+    /// <summary>The accent colour, as <c>#rrggbb</c> or <c>#rgb</c>.</summary>
+    public string AccentColor { get; init; } = Domain.WebChat.WebChatAccentColor.Default.Value;
+
+    /// <summary><c>System</c>, <c>Light</c> or <c>Dark</c>.</summary>
+    public string Theme { get; init; } = nameof(Domain.WebChat.WebChatTheme.System);
+}
 
 /// <summary>A conversation that has just been started by a visitor.</summary>
 /// <remarks>

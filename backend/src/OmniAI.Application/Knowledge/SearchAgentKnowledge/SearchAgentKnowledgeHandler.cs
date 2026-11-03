@@ -121,7 +121,10 @@ public sealed class SearchAgentKnowledgeHandler(
     {
         if (string.IsNullOrWhiteSpace(question))
         {
-            throw new DomainValidationException("A question is required to test retrieval.");
+            throw new DomainValidationException("A question is required to test retrieval.")
+            {
+                Code = "knowledge.search.question.required",
+            };
         }
 
         string trimmed = question.Trim();
@@ -130,7 +133,10 @@ public sealed class SearchAgentKnowledgeHandler(
         {
             throw new DomainValidationException(
                 $"A test question must be at most {MaxQuestionLength} characters; "
-                + $"the supplied question has {trimmed.Length}.");
+                + $"the supplied question has {trimmed.Length}.")
+            {
+                Code = "knowledge.search.question.too_long",
+            };
         }
 
         return trimmed;

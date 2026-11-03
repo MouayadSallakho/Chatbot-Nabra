@@ -35,4 +35,15 @@ public sealed class DomainStateException : Exception
         : base(message, innerException)
     {
     }
+
+    /// <summary>
+    /// The stable code of the state rule that refused, or <see langword="null"/>
+    /// where the throw site has not been given one yet (Phase 37.5a).
+    /// </summary>
+    /// <remarks>
+    /// Published as the problem response's <c>code</c>; a site without one is
+    /// answered with the generic <c>state.conflict</c>. See
+    /// <see cref="DomainValidationException.Code"/>.
+    /// </remarks>
+    public string? Code { get; init; }
 }

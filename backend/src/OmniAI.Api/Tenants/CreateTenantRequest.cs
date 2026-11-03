@@ -24,3 +24,10 @@ namespace OmniAI.Api.Tenants;
 /// </para>
 /// </remarks>
 public sealed record CreateTenantRequest(string? Name, string? Slug);
+
+/// <summary>What renaming a workspace requires (Phase 37.5a).</summary>
+/// <remarks>
+/// The name only. It follows the rules a workspace is created under: required,
+/// at most 200 characters after trimming, no control characters.
+/// </remarks>
+public sealed record RenameTenantRequest(string? Name);

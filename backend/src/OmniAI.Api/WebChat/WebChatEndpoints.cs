@@ -8,6 +8,7 @@ using OmniAI.Application.WebChat.CreateWebChatEndpoint;
 using OmniAI.Application.WebChat.GetWebChatEndpointById;
 using OmniAI.Application.WebChat.ListWebChatEndpoints;
 using OmniAI.Application.WebChat.SetWebChatEndpointStatus;
+using OmniAI.Api.ErrorHandling;
 
 namespace OmniAI.Api.WebChat;
 
@@ -180,7 +181,8 @@ internal static class WebChatEndpoints
             return Results.Problem(
                 statusCode: StatusCodes.Status400BadRequest,
                 title: "AI agent is required",
-                detail: "A website chat link must name the AI agent that will answer on it.");
+                detail: "A website chat link must name the AI agent that will answer on it.",
+                extensions: new Dictionary<string, object?> { [ProblemCodes.Member] = "website-chat.agent.required" });
         }
 
         Versioned<WebChatEndpointView>? created = await handler

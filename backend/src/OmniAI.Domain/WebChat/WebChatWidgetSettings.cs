@@ -68,13 +68,19 @@ public sealed record WebChatWidgetSettings
         if (!Enum.IsDefined(position))
         {
             throw new DomainValidationException(
-                "The launcher position must be Left or Right.");
+                "The launcher position must be Left, Right, Start or End.")
+            {
+                Code = "website-chat.launcher_position.invalid",
+            };
         }
 
         if (!Enum.IsDefined(theme))
         {
             throw new DomainValidationException(
-                "The widget theme must be System, Light or Dark.");
+                "The widget theme must be System, Light or Dark.")
+            {
+                Code = "website-chat.theme.invalid",
+            };
         }
 
         return new WebChatWidgetSettings(greeting, accent, position, theme);

@@ -36,7 +36,10 @@ public readonly record struct WebChatEndpointId
     {
         if (value == Guid.Empty)
         {
-            throw new DomainValidationException("Web chat endpoint id must not be an empty GUID.");
+            throw new DomainValidationException("Web chat endpoint id must not be an empty GUID.")
+            {
+                Code = "website-chat.id.invalid",
+            };
         }
 
         return new WebChatEndpointId(value);

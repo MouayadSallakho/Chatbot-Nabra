@@ -106,9 +106,15 @@ internal sealed class WebChatEndpointRepository(OmniAiDbContext context)
         // there is none to be given and none that could be believed. The workspace
         // comes back from the row, which is why a public URL cannot be edited into
         // a request against a different one.
+        //
+        // Phase 37.5a: the workspace's display name (D-3) and the widget's
+        // appearance come back in the same statement, joined by the endpoint's
+        // own tenant -- never by anything the caller sent. Only the name column
+        // of tenants is read.
         return await (
             from endpoint in _context.WebChatEndpoints
             join agent in _context.AiAgents on endpoint.AiAgentId equals agent.Id
+            join tenant in _context.Tenants on endpoint.TenantId equals tenant.Id
             where endpoint.PublicKey == publicKey
             select new PublicWebChatEndpoint(
                 endpoint.Id,
@@ -116,7 +122,11 @@ internal sealed class WebChatEndpointRepository(OmniAiDbContext context)
                 agent.Id,
                 agent.Name.Value,
                 agent.Status,
-                endpoint.Status))
+                endpoint.Status)
+            {
+                WorkspaceName = tenant.Name.Value,
+                Widget = endpoint.Widget,
+            })
             .FirstOrDefaultAsync(cancellationToken)
             .ConfigureAwait(false);
     }

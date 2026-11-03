@@ -54,6 +54,19 @@ public static class PlatformPermissions
     /// <summary>Reading the workspace itself -- its name, slug and status.</summary>
     public static readonly PermissionCode WorkspaceView = PermissionCode.Create("workspace.view");
 
+    /// <summary>
+    /// Changing the workspace's own settings -- today its name, which visitors
+    /// see on its public chat pages (Phase 37.5a, D-3); from Phase 37.6 also its
+    /// time zone.
+    /// </summary>
+    /// <remarks>
+    /// Separate from <see cref="WorkspaceView"/> and implying nothing, like every
+    /// other code here. The Owner holds it with no data step, because the Owner's
+    /// authority is <see cref="AllCodes"/>; a custom role is granted it like any
+    /// other permission.
+    /// </remarks>
+    public static readonly PermissionCode WorkspaceManage = PermissionCode.Create("workspace.manage");
+
     /// <summary>Seeing the tenant's AI agents: the list, and one agent's detail.</summary>
     public static readonly PermissionCode AiAgentsView = PermissionCode.Create("ai-agents.view");
 
@@ -358,6 +371,12 @@ public static class PlatformPermissions
             WorkspaceGroup,
             "View workspace",
             "See the workspace's name and status."),
+        new(
+            WorkspaceManage,
+            WorkspaceGroup,
+            "Manage workspace",
+            "Change the workspace's settings, such as its name, which visitors see on "
+            + "its public chat."),
         new(
             AiAgentsView,
             AiAgentsGroup,

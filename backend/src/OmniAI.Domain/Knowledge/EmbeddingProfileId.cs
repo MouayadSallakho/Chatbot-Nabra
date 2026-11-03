@@ -37,7 +37,10 @@ public sealed record EmbeddingProfileId
     {
         if (string.IsNullOrWhiteSpace(value))
         {
-            throw new DomainValidationException("An embedding profile identifier is required.");
+            throw new DomainValidationException("An embedding profile identifier is required.")
+            {
+                Code = "knowledge.embedding_profile.invalid",
+            };
         }
 
         string normalised = value.Trim();
@@ -46,7 +49,10 @@ public sealed record EmbeddingProfileId
         {
             throw new DomainValidationException(
                 $"An embedding profile identifier must be at most {MaxLength} characters; " +
-                $"the supplied identifier has {normalised.Length}.");
+                $"the supplied identifier has {normalised.Length}.")
+            {
+                Code = "knowledge.embedding_profile.invalid",
+            };
         }
 
         foreach (char character in normalised)
@@ -55,7 +61,10 @@ public sealed record EmbeddingProfileId
             {
                 throw new DomainValidationException(
                     "An embedding profile identifier must not contain whitespace or control "
-                    + "characters.");
+                    + "characters.")
+                {
+                    Code = "knowledge.embedding_profile.invalid",
+                };
             }
         }
 

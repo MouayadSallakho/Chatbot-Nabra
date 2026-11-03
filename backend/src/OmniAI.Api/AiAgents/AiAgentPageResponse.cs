@@ -1,3 +1,4 @@
+using OmniAI.Application.AiAgents;
 using OmniAI.Application.AiAgents.ListAiAgents;
 using OmniAI.Domain.AiAgents;
 
@@ -12,6 +13,11 @@ namespace OmniAI.Api.AiAgents;
 /// <param name="Status">The lifecycle state, as a stable name such as <c>Draft</c>.</param>
 /// <param name="CreatedAt">When the agent was created, in UTC.</param>
 /// <param name="UpdatedAt">When the agent last actually changed, in UTC.</param>
+/// <param name="Channels">
+/// The channels the agent answers on that the reader may see: website chat only
+/// with <c>website-chat.view</c>, WhatsApp only with <c>whatsapp.view</c>, empty
+/// with neither (Phase 37.5a).
+/// </param>
 /// <remarks>
 /// <para>
 /// Six fields, and the absent one is deliberate: <strong>there are no
@@ -38,7 +44,8 @@ public sealed record AiAgentSummaryResponse(
     string Name,
     string Status,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt)
+    DateTimeOffset UpdatedAt,
+    IReadOnlyList<AiAgentChannelResponse> Channels)
 {
     /// <summary>Maps an Application summary onto the HTTP contract.</summary>
     internal static AiAgentSummaryResponse From(AiAgentSummary summary)
@@ -51,7 +58,8 @@ public sealed record AiAgentSummaryResponse(
             summary.Name,
             Serialise(summary.Status),
             summary.CreatedAt,
-            summary.UpdatedAt);
+            summary.UpdatedAt,
+            AiAgentChannelResponse.From(summary.Channels));
     }
 
     /// <summary>

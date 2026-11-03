@@ -35,7 +35,11 @@ public sealed record EmbeddedWebChatView(
     string? Greeting,
     string AccentColor,
     string LauncherPosition,
-    string Theme);
+    string Theme)
+{
+    /// <summary>The workspace's display name (Phase 37.5a, owner decision D-3).</summary>
+    public string WorkspaceName { get; init; } = string.Empty;
+}
 
 /// <summary>A started embedded conversation, and the one time its credential exists.</summary>
 public sealed record StartedEmbeddedConversation(
@@ -129,7 +133,10 @@ public sealed class EmbeddedWebChatHandler(
             widget.Greeting?.Value,
             widget.Accent.Value,
             widget.Position.ToString(),
-            widget.Theme.ToString());
+            widget.Theme.ToString())
+        {
+            WorkspaceName = approved.WorkspaceName,
+        };
     }
 
     /// <summary>
@@ -228,7 +235,8 @@ public sealed class EmbeddedWebChatHandler(
         Domain.WebChat.WebChatEndpoint Endpoint,
         WebChatOrigin Origin,
         string AgentName,
-        bool IsServing);
+        bool IsServing,
+        string WorkspaceName);
 
     /// <summary>
     /// Resolves the endpoint and decides whether this website may embed it.
@@ -280,7 +288,8 @@ public sealed class EmbeddedWebChatHandler(
             origin,
             published.AiAgentName,
             published.Status == WebChatEndpointStatus.Active
-            && published.AiAgentStatus == AiAgentStatus.Active);
+            && published.AiAgentStatus == AiAgentStatus.Active,
+            published.WorkspaceName);
     }
 
     private static ClientNetworkKey RequireClient(ClientNetworkKey? client) =>

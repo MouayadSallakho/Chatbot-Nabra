@@ -181,6 +181,34 @@ describe('EmbedChat', () => {
     );
   });
 
+  // Phase 37.5a: Start and End follow the host page's direction, which only the
+  // loader can read, so the frame passes them on unresolved.
+  for (const position of ['Start', 'End'] as const) {
+    it(`passes ${position} to the page for the loader to resolve`, async () => {
+      await mount();
+
+      http.expectOne(configUrl).flush(config({ launcherPosition: position }));
+      await settle();
+
+      expect(parent.postMessage).toHaveBeenCalledWith(
+        { type: 'omniai:v1:ready', position },
+        parentOrigin,
+      );
+    });
+  }
+
+  it('falls back to the right-hand corner for a corner it does not know', async () => {
+    await mount();
+
+    http.expectOne(configUrl).flush(config({ launcherPosition: 'Middle' }));
+    await settle();
+
+    expect(parent.postMessage).toHaveBeenCalledWith(
+      { type: 'omniai:v1:ready', position: 'Right' },
+      parentOrigin,
+    );
+  });
+
   it('says nothing to the page at all when it may not run there', async () => {
     await mount();
 

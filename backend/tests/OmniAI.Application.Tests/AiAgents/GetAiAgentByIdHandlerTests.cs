@@ -19,7 +19,7 @@ public sealed class GetAiAgentByIdHandlerTests
         AiAgent agent = NewAgent(tenant, "Sales Assistant");
         InMemoryAiAgentRepository agents = new InMemoryAiAgentRepository().Seed(agent);
 
-        Versioned<AiAgentView>? found = await new GetAiAgentByIdHandler(agents, TestAuthority.Anywhere())
+        Versioned<AiAgentView>? found = await new GetAiAgentByIdHandler(agents, TestAuthority.Anywhere(), InMemoryAiAgentChannelReader.None)
             .HandleAsync(new GetAiAgentByIdQuery(tenant.Value, agent.Id.Value));
 
         Assert.NotNull(found);
@@ -36,7 +36,7 @@ public sealed class GetAiAgentByIdHandlerTests
         agent.Activate(Created.AddHours(1));
         InMemoryAiAgentRepository agents = new InMemoryAiAgentRepository().Seed(agent);
 
-        Versioned<AiAgentView> found = await new GetAiAgentByIdHandler(agents, TestAuthority.Anywhere())
+        Versioned<AiAgentView> found = await new GetAiAgentByIdHandler(agents, TestAuthority.Anywhere(), InMemoryAiAgentChannelReader.None)
             .HandleAsync(new GetAiAgentByIdQuery(tenant.Value, agent.Id.Value))
             ?? throw new InvalidOperationException();
 
@@ -51,7 +51,7 @@ public sealed class GetAiAgentByIdHandlerTests
     {
         InMemoryAiAgentRepository agents = new();
 
-        Versioned<AiAgentView>? found = await new GetAiAgentByIdHandler(agents, TestAuthority.Anywhere())
+        Versioned<AiAgentView>? found = await new GetAiAgentByIdHandler(agents, TestAuthority.Anywhere(), InMemoryAiAgentChannelReader.None)
             .HandleAsync(new GetAiAgentByIdQuery(Guid.CreateVersion7(), Guid.CreateVersion7()));
 
         Assert.Null(found);
@@ -67,7 +67,7 @@ public sealed class GetAiAgentByIdHandlerTests
         AiAgent agentB = NewAgent(tenantB, "Tenant B Assistant");
         InMemoryAiAgentRepository agents = new InMemoryAiAgentRepository().Seed(agentB);
 
-        Versioned<AiAgentView>? found = await new GetAiAgentByIdHandler(agents, TestAuthority.Anywhere())
+        Versioned<AiAgentView>? found = await new GetAiAgentByIdHandler(agents, TestAuthority.Anywhere(), InMemoryAiAgentChannelReader.None)
             .HandleAsync(new GetAiAgentByIdQuery(tenantA.Value, agentB.Id.Value));
 
         Assert.Null(found);
@@ -83,7 +83,7 @@ public sealed class GetAiAgentByIdHandlerTests
         AiAgent agentB = NewAgent(TenantId.New(), "Tenant B Assistant");
         InMemoryAiAgentRepository agents = new InMemoryAiAgentRepository().Seed(agentB);
 
-        GetAiAgentByIdHandler handler = new(agents, TestAuthority.Anywhere());
+        GetAiAgentByIdHandler handler = new(agents, TestAuthority.Anywhere(), InMemoryAiAgentChannelReader.None);
 
         Versioned<AiAgentView>? crossTenant = await handler
             .HandleAsync(new GetAiAgentByIdQuery(tenantA.Value, agentB.Id.Value));
@@ -101,7 +101,7 @@ public sealed class GetAiAgentByIdHandlerTests
         InMemoryAiAgentRepository agents = new();
 
         await Assert.ThrowsAsync<DomainValidationException>(() =>
-            new GetAiAgentByIdHandler(agents, TestAuthority.Anywhere())
+            new GetAiAgentByIdHandler(agents, TestAuthority.Anywhere(), InMemoryAiAgentChannelReader.None)
                 .HandleAsync(new GetAiAgentByIdQuery(Guid.Empty, Guid.CreateVersion7())));
     }
 
@@ -111,7 +111,7 @@ public sealed class GetAiAgentByIdHandlerTests
         InMemoryAiAgentRepository agents = new();
 
         await Assert.ThrowsAsync<DomainValidationException>(() =>
-            new GetAiAgentByIdHandler(agents, TestAuthority.Anywhere())
+            new GetAiAgentByIdHandler(agents, TestAuthority.Anywhere(), InMemoryAiAgentChannelReader.None)
                 .HandleAsync(new GetAiAgentByIdQuery(Guid.CreateVersion7(), Guid.Empty)));
     }
 
@@ -121,13 +121,13 @@ public sealed class GetAiAgentByIdHandlerTests
         InMemoryAiAgentRepository agents = new();
 
         await Assert.ThrowsAsync<ArgumentNullException>(() =>
-            new GetAiAgentByIdHandler(agents, TestAuthority.Anywhere()).HandleAsync(null!));
+            new GetAiAgentByIdHandler(agents, TestAuthority.Anywhere(), InMemoryAiAgentChannelReader.None).HandleAsync(null!));
     }
 
     [Fact]
     public void A_null_repository_is_rejected()
     {
-        Assert.Throws<ArgumentNullException>(() => new GetAiAgentByIdHandler(null!, TestAuthority.Anywhere()));
+        Assert.Throws<ArgumentNullException>(() => new GetAiAgentByIdHandler(null!, TestAuthority.Anywhere(), InMemoryAiAgentChannelReader.None));
     }
 
     internal static AiAgent NewAgent(TenantId tenant, string name) =>

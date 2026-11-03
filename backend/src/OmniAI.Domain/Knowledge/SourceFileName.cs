@@ -54,7 +54,10 @@ public sealed record SourceFileName
     {
         if (string.IsNullOrWhiteSpace(value))
         {
-            throw new DomainValidationException("An uploaded file needs a name.");
+            throw new DomainValidationException("An uploaded file needs a name.")
+            {
+                Code = "knowledge.file.name.required",
+            };
         }
 
         // The last segment of whatever separator convention the client used.
@@ -81,13 +84,19 @@ public sealed record SourceFileName
         if (sanitised.Length == 0)
         {
             throw new DomainValidationException(
-                "That file name could not be read. Rename the file and try again.");
+                "That file name could not be read. Rename the file and try again.")
+            {
+                Code = "knowledge.file.name.unreadable",
+            };
         }
 
         if (sanitised.Length > MaxLength)
         {
             throw new DomainValidationException(
-                $"A file name must be at most {MaxLength} characters.");
+                $"A file name must be at most {MaxLength} characters.")
+            {
+                Code = "knowledge.file.name.too_long",
+            };
         }
 
         return new SourceFileName(sanitised);

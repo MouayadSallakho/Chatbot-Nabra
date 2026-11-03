@@ -24,6 +24,9 @@ public readonly record struct WhatsAppContactId
     public static WhatsAppContactId From(Guid value) =>
         value == Guid.Empty
             ? throw new DomainValidationException("WhatsApp contact id must not be an empty GUID.")
+                {
+                    Code = "whatsapp.contact.invalid",
+                }
             : new WhatsAppContactId(value);
 
     public override string ToString() => Value.ToString("D", CultureInfo.InvariantCulture);
@@ -108,22 +111,34 @@ public sealed class WhatsAppContact
     {
         if (connectionId.IsEmpty)
         {
-            throw new DomainValidationException("A contact must belong to a connection.");
+            throw new DomainValidationException("A contact must belong to a connection.")
+            {
+                Code = "whatsapp.contact.invalid",
+            };
         }
 
         if (tenantId.IsEmpty)
         {
-            throw new DomainValidationException("A contact must belong to a workspace.");
+            throw new DomainValidationException("A contact must belong to a workspace.")
+            {
+                Code = "whatsapp.contact.invalid",
+            };
         }
 
         if (conversationId.IsEmpty)
         {
-            throw new DomainValidationException("A contact must name a conversation.");
+            throw new DomainValidationException("A contact must name a conversation.")
+            {
+                Code = "whatsapp.contact.invalid",
+            };
         }
 
         if (startedAt == default)
         {
-            throw new DomainValidationException("The start instant must be a real point in time.");
+            throw new DomainValidationException("The start instant must be a real point in time.")
+            {
+                Code = "whatsapp.contact.invalid",
+            };
         }
 
         return new WhatsAppContact(

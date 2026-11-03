@@ -64,7 +64,10 @@ internal static class EmbeddedChatEndpoints
             .AllowAnonymous();
 
         embed.MapGet("/{publicKey}", GetConfigAsync)
-            .WithName("GetEmbeddedWebChat");
+            .WithName("GetEmbeddedWebChat")
+            .WithSummary("An approved widget's configuration and the workspace's name. Every refusal is one indistinguishable 404.")
+            .Produces<EmbeddedChatConfigResponse>()
+            .Produces(StatusCodes.Status404NotFound);
 
         embed.MapPost("/{publicKey}/conversations", StartConversationAsync)
             .WithName("StartEmbeddedWebChatConversation");
@@ -127,7 +130,8 @@ internal static class EmbeddedChatEndpoints
             view.Greeting,
             view.AccentColor,
             view.LauncherPosition,
-            view.Theme));
+            view.Theme,
+            view.WorkspaceName));
     }
 
     /// <summary>

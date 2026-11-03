@@ -93,10 +93,19 @@ internal static class AiAgentEndpoints
             .WithName("CreateAiAgent");
 
         agents.MapGet("/", ListAsync)
-            .WithName("ListAiAgents");
+            .WithName("ListAiAgents")
+            .WithSummary("One page of the workspace's AI agents, each with the channels the reader may see.")
+            .Produces<AiAgentPageResponse>()
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound);
 
         agents.MapGet("/{aiAgentId:guid}", GetByIdAsync)
-            .WithName(GetAiAgentByIdRouteName);
+            .WithName(GetAiAgentByIdRouteName)
+            .WithSummary("One AI agent with its ETag and the channels the reader may see.")
+            .Produces<AiAgentDetailResponse>()
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound);
 
         // PUT on a named sub-resource, not PATCH on the agent. Each of these
         // replaces one addressable thing whose whole value is in the body, which
@@ -241,7 +250,16 @@ internal static class AiAgentEndpoints
             .HandleAsync(new GetAiAgentByIdQuery(tenantId, aiAgentId), cancellationToken)
             .ConfigureAwait(false);
 
-        return Respond(http, agent, aiAgentId);
+        if (agent is null)
+        {
+            return AgentNotFound(aiAgentId);
+        }
+
+        // The read alone carries the agent's channels (Phase 37.5a); the writes
+        // keep their seven fields. See AiAgentDetailResponse.
+        SetETag(http, agent.Version);
+
+        return Results.Ok(AiAgentDetailResponse.From(agent.Value));
     }
 
     /// <summary>

@@ -116,12 +116,18 @@ public sealed class KnowledgeSource
     {
         if (tenantId.IsEmpty)
         {
-            throw new DomainValidationException("A knowledge source must belong to a tenant.");
+            throw new DomainValidationException("A knowledge source must belong to a tenant.")
+            {
+                Code = "knowledge.source.invalid",
+            };
         }
 
         if (knowledgeDocumentId.IsEmpty)
         {
-            throw new DomainValidationException("A knowledge source must belong to a document.");
+            throw new DomainValidationException("A knowledge source must belong to a document.")
+            {
+                Code = "knowledge.source.invalid",
+            };
         }
 
         ArgumentNullException.ThrowIfNull(fileName);
@@ -222,7 +228,10 @@ public sealed class KnowledgeSource
     {
         if (!Enum.IsDefined(fileType))
         {
-            throw new DomainValidationException("That is not a knowledge file type.");
+            throw new DomainValidationException("That is not a knowledge file type.")
+            {
+                Code = "knowledge.source.invalid",
+            };
         }
     }
 
@@ -230,7 +239,10 @@ public sealed class KnowledgeSource
     {
         if (byteLength <= 0)
         {
-            throw new DomainValidationException("An uploaded file must not be empty.");
+            throw new DomainValidationException("An uploaded file must not be empty.")
+            {
+                Code = "knowledge.file.empty",
+            };
         }
     }
 
@@ -238,7 +250,10 @@ public sealed class KnowledgeSource
     {
         if (instant == default)
         {
-            throw new DomainValidationException("A knowledge source needs a real instant.");
+            throw new DomainValidationException("A knowledge source needs a real instant.")
+            {
+                Code = "knowledge.instant.invalid",
+            };
         }
 
         return instant.ToUniversalTime();

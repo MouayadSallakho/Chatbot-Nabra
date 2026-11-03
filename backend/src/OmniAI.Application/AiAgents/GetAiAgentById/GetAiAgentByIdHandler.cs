@@ -11,13 +11,19 @@ namespace OmniAI.Application.AiAgents.GetAiAgentById;
 /// <summary>
 /// Reads one AI agent within a tenant.
 /// </summary>
-public sealed class GetAiAgentByIdHandler(IAiAgentRepository agents, TenantAuthorizer authorizer)
+public sealed class GetAiAgentByIdHandler(
+    IAiAgentRepository agents,
+    TenantAuthorizer authorizer,
+    IAiAgentChannelReader channels)
 {
     private readonly IAiAgentRepository _agents =
         agents ?? throw new ArgumentNullException(nameof(agents));
 
     private readonly TenantAuthorizer _authorizer =
         authorizer ?? throw new ArgumentNullException(nameof(authorizer));
+
+    private readonly IAiAgentChannelReader _channels =
+        channels ?? throw new ArgumentNullException(nameof(channels));
 
     /// <summary>Finds the agent.</summary>
     /// <returns>
@@ -56,11 +62,22 @@ public sealed class GetAiAgentByIdHandler(IAiAgentRepository agents, TenantAutho
         // Checking the permission after the lookup would answer 403 for an agent
         // that exists and 404 for one that does not, turning a permission they
         // lack into a way to enumerate the ids they cannot see.
-        if (!await _authorizer
-            .RequireAsync(tenantId, PlatformPermissions.AiAgentsView, cancellationToken)
-            .ConfigureAwait(false))
+        //
+        // Phase 37.5a: resolved once, with the statements the single check made,
+        // because the same permissions decide which channel kinds the agent may
+        // show. The refusals are unchanged.
+        IReadOnlyList<PermissionCode>? held = await _authorizer
+            .EffectivePermissionsAsync(tenantId, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (held is null)
         {
             return null;
+        }
+
+        if (!held.Contains(PlatformPermissions.AiAgentsView))
+        {
+            throw PermissionDeniedException.ForPermission(PlatformPermissions.AiAgentsView);
         }
 
         Versioned<AiAgent>? stored = await _agents
@@ -69,8 +86,26 @@ public sealed class GetAiAgentByIdHandler(IAiAgentRepository agents, TenantAutho
 
         // The version travels with the representation, so a caller that reads an
         // agent always has what it needs to change it safely afterwards.
-        return stored is null
-            ? null
-            : new Versioned<AiAgentView>(AiAgentView.From(stored.Value), stored.Version);
+        if (stored is null)
+        {
+            return null;
+        }
+
+        AiAgentView view = AiAgentView.From(stored.Value);
+        AiAgentChannelKinds visible = AiAgentChannelVisibility.For(held);
+
+        if (visible != AiAgentChannelKinds.None)
+        {
+            IReadOnlyDictionary<AiAgentId, IReadOnlyList<AiAgentChannelView>> channels = await _channels
+                .ListAsync(tenantId, [agentId], visible, cancellationToken)
+                .ConfigureAwait(false);
+
+            if (channels.TryGetValue(agentId, out IReadOnlyList<AiAgentChannelView>? found))
+            {
+                view = view with { Channels = found };
+            }
+        }
+
+        return new Versioned<AiAgentView>(view, stored.Version);
     }
 }

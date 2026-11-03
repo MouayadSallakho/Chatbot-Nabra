@@ -9,13 +9,23 @@ const ORIGIN_HEADER = 'X-OmniAI-Embed-Origin';
 /** The header carrying the conversation credential. Never a cookie. */
 const SESSION_HEADER = 'X-OmniAI-Embed-Session';
 
+/** The corner a workspace chose: a physical one, or one that follows the page's direction. */
+export type LauncherPosition = 'Left' | 'Right' | 'Start' | 'End';
+
+/** Every corner the server may send; anything else falls back to `Right`. */
+export const LAUNCHER_POSITIONS: readonly LauncherPosition[] = ['Left', 'Right', 'Start', 'End'];
+
 /** Where the widget's appearance and availability come from. */
 export interface EmbeddedChatConfig {
   readonly agentName: string;
   readonly isAvailable: boolean;
   readonly greeting: string | null;
   readonly accentColor: string;
-  readonly launcherPosition: 'Left' | 'Right';
+  /**
+   * The configured corner. `Start` and `End` (Phase 37.5a) follow the host
+   * page's reading direction; the loader resolves them there.
+   */
+  readonly launcherPosition: LauncherPosition;
   readonly theme: 'System' | 'Light' | 'Dark';
 }
 

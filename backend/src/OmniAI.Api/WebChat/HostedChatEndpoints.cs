@@ -86,7 +86,10 @@ internal static class HostedChatEndpoints
             .AllowAnonymous();
 
         chat.MapGet("/{publicKey}", GetConfigAsync)
-            .WithName("GetPublicWebChat");
+            .WithName("GetPublicWebChat")
+            .WithSummary("What a hosted chat page shows: the agent's name, availability, the workspace's name and the widget's appearance.")
+            .Produces<PublicWebChatResponse>()
+            .Produces(StatusCodes.Status404NotFound);
 
         chat.MapPost("/{publicKey}/conversations", StartConversationAsync)
             .AddEndpointFilter<AntiforgeryEndpointFilter>()

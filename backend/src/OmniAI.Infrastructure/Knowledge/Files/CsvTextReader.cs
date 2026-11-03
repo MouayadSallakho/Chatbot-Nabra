@@ -79,8 +79,10 @@ internal static class CsvTextReader
             {
                 throw new KnowledgeFileRejectedException(
                     KnowledgeFileRejection.TooMuchContent,
+                    KnowledgeFileRefusals.TooManyRows,
                     $"That file has more than {policy.MaxCsvRows:N0} rows. Split it into smaller "
-                    + "files, or summarise it before uploading.");
+                    + "files, or summarise it before uploading.",
+                    limit: policy.MaxCsvRows);
             }
 
             string record = RenderRecord(parser, headers, policy);
@@ -103,8 +105,10 @@ internal static class CsvTextReader
             {
                 throw new KnowledgeFileRejectedException(
                     KnowledgeFileRejection.TooMuchContent,
+                    KnowledgeFileRefusals.TooManyCharacters,
                     $"That file renders to more than {policy.MaxExtractedCharacters:N0} "
-                    + "characters. Split it into smaller files.");
+                    + "characters. Split it into smaller files.",
+                    limit: policy.MaxExtractedCharacters);
             }
         }
 
@@ -113,6 +117,7 @@ internal static class CsvTextReader
         return extracted.Length == 0
             ? throw new KnowledgeFileRejectedException(
                 KnowledgeFileRejection.NoText,
+                KnowledgeFileRefusals.NoText,
                 "That file has a header row but no records in it.")
             : extracted;
     }
@@ -132,6 +137,7 @@ internal static class CsvTextReader
         {
             throw new KnowledgeFileRejectedException(
                 KnowledgeFileRejection.NoText,
+                KnowledgeFileRefusals.Empty,
                 "That file is empty.");
         }
 
@@ -143,6 +149,7 @@ internal static class CsvTextReader
         {
             throw new KnowledgeFileRejectedException(
                 KnowledgeFileRejection.Unreadable,
+                KnowledgeFileRefusals.HeaderRequired,
                 "That file needs a header row naming each column, so the values can be "
                 + "understood.");
         }
@@ -150,8 +157,10 @@ internal static class CsvTextReader
         return headers.Length > policy.MaxCsvColumns
             ? throw new KnowledgeFileRejectedException(
                 KnowledgeFileRejection.TooMuchContent,
+                KnowledgeFileRefusals.TooManyColumns,
                 $"That file has {headers.Length} columns and the limit is "
-                + $"{policy.MaxCsvColumns}.")
+                + $"{policy.MaxCsvColumns}.",
+                limit: policy.MaxCsvColumns)
             : headers;
     }
 
@@ -184,8 +193,10 @@ internal static class CsvTextReader
             {
                 throw new KnowledgeFileRejectedException(
                     KnowledgeFileRejection.TooMuchContent,
+                    KnowledgeFileRefusals.CellTooLong,
                     $"A cell in that file holds more than {policy.MaxCsvCellCharacters:N0} "
-                    + "characters. It is too large to read as a table.");
+                    + "characters. It is too large to read as a table.",
+                    limit: policy.MaxCsvCellCharacters);
             }
 
             if (record.Length > 0)
@@ -216,6 +227,7 @@ internal static class CsvTextReader
         {
             throw new KnowledgeFileRejectedException(
                 KnowledgeFileRejection.Unreadable,
+                KnowledgeFileRefusals.Damaged,
                 "That file could not be read as CSV. Check that quotes and commas are balanced.");
         }
     }

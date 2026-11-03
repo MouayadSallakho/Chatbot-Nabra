@@ -1,4 +1,5 @@
 using OmniAI.Application.Authorization;
+using OmniAI.Application.Concurrency;
 using OmniAI.Application.Tenants.Persistence;
 using OmniAI.Domain.Authorization;
 using OmniAI.Domain.Tenants;
@@ -39,7 +40,7 @@ public sealed class GetTenantByIdHandler(ITenantRepository tenants, TenantAuthor
     /// rather than treated as a lookup that happens to find nothing, because an
     /// empty GUID is malformed input rather than a tenant that does not exist.
     /// </exception>
-    public async Task<TenantView?> HandleAsync(
+    public async Task<Versioned<TenantView>?> HandleAsync(
         GetTenantByIdQuery query,
         CancellationToken cancellationToken = default)
     {
@@ -57,8 +58,10 @@ public sealed class GetTenantByIdHandler(ITenantRepository tenants, TenantAuthor
             return null;
         }
 
-        Tenant? tenant = await _tenants.FindByIdAsync(id, cancellationToken).ConfigureAwait(false);
+        // Versioned since Phase 37.5a: the read now sends the ETag a rename must
+        // name in If-Match.
+        Versioned<Tenant>? tenant = await _tenants.FindVersionedAsync(id, cancellationToken).ConfigureAwait(false);
 
-        return tenant is null ? null : TenantView.From(tenant);
+        return tenant is null ? null : new Versioned<TenantView>(TenantView.From(tenant.Value), tenant.Version);
     }
 }

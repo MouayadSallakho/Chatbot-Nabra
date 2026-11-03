@@ -270,7 +270,10 @@ public sealed class SendWebChatMessageHandler(
     {
         if (string.IsNullOrWhiteSpace(text))
         {
-            throw new DomainValidationException("Message text is required.");
+            throw new DomainValidationException("Message text is required.")
+            {
+                Code = "chat.message.required",
+            };
         }
 
         string trimmed = text.Trim();
@@ -279,7 +282,10 @@ public sealed class SendWebChatMessageHandler(
         {
             throw new DomainValidationException(
                 $"A message must be at most {_policy.MaxIncomingMessageLength} characters; "
-                + $"the supplied message has {trimmed.Length}. It is not truncated.");
+                + $"the supplied message has {trimmed.Length}. It is not truncated.")
+            {
+                Code = "chat.message.too_long",
+            };
         }
 
         return trimmed;

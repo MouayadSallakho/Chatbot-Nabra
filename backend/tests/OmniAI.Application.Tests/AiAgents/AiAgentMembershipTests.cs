@@ -73,7 +73,7 @@ public sealed class AiAgentMembershipTests
     {
         (InMemoryAiAgentRepository agents, TenantId tenantId, AiAgent agent) = Arrange();
 
-        GetAiAgentByIdHandler handler = new(agents, Outsider());
+        GetAiAgentByIdHandler handler = new(agents, Outsider(), InMemoryAiAgentChannelReader.None);
 
         Assert.Null(await handler.HandleAsync(
             new GetAiAgentByIdQuery(tenantId.Value, agent.Id.Value)));
@@ -87,7 +87,7 @@ public sealed class AiAgentMembershipTests
         // it to the same 404 the others produce.
         (InMemoryAiAgentRepository agents, TenantId tenantId, _) = Arrange();
 
-        ListAiAgentsHandler handler = new(agents, Outsider());
+        ListAiAgentsHandler handler = new(agents, Outsider(), InMemoryAiAgentChannelReader.None);
 
         await Assert.ThrowsAsync<TenantNotFoundException>(
             () => handler.HandleAsync(new ListAiAgentsQuery(tenantId.Value)));
@@ -242,10 +242,10 @@ public sealed class AiAgentMembershipTests
 
         List<Func<Task>> attempts =
         [
-            () => new GetAiAgentByIdHandler(agents, anonymous)
+            () => new GetAiAgentByIdHandler(agents, anonymous, InMemoryAiAgentChannelReader.None)
                 .HandleAsync(new GetAiAgentByIdQuery(tenantId.Value, agent.Id.Value)),
 
-            () => new ListAiAgentsHandler(agents, anonymous)
+            () => new ListAiAgentsHandler(agents, anonymous, InMemoryAiAgentChannelReader.None)
                 .HandleAsync(new ListAiAgentsQuery(tenantId.Value)),
 
             () => new CreateAiAgentHandler(

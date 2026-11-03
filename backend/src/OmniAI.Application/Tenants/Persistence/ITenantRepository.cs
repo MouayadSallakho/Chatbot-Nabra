@@ -1,3 +1,5 @@
+using OmniAI.Application.Concurrency;
+using OmniAI.Domain.Security;
 using OmniAI.Domain.Tenants;
 
 namespace OmniAI.Application.Tenants.Persistence;
@@ -94,5 +96,32 @@ public interface ITenantRepository
     /// </remarks>
     Task AddAsync(
         NewWorkspace workspace,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Finds a tenant with the version a conditional write must name
+    /// (Phase 37.5a).
+    /// </summary>
+    /// <returns>The tenant and its version, or <see langword="null"/>.</returns>
+    Task<Versioned<Tenant>?> FindVersionedAsync(TenantId id, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Stores a renamed tenant if it is still at <paramref name="expected"/>, and
+    /// its audit record in the same transaction (Phase 37.5a, row 20a).
+    /// </summary>
+    /// <returns>The tenant's new version.</returns>
+    /// <exception cref="TenantVersionMismatchException">
+    /// The tenant changed since <paramref name="expected"/> was read. Neither the
+    /// name nor the audit record was written.
+    /// </exception>
+    /// <remarks>
+    /// <strong>Both or neither.</strong> A rename is what visitors see on the
+    /// public chat, so a rename without its record, or a record of a rename that
+    /// did not happen, is not a state this method can leave behind.
+    /// </remarks>
+    Task<ConcurrencyToken> RenameAsync(
+        Tenant tenant,
+        ConcurrencyToken expected,
+        SecurityEvent audit,
         CancellationToken cancellationToken = default);
 }

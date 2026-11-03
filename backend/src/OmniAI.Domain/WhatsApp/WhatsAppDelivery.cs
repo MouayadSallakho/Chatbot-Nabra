@@ -22,6 +22,9 @@ public readonly record struct WhatsAppDeliveryId
     public static WhatsAppDeliveryId From(Guid value) =>
         value == Guid.Empty
             ? throw new DomainValidationException("Delivery id must not be an empty GUID.")
+                {
+                    Code = "whatsapp.delivery.invalid",
+                }
             : new WhatsAppDeliveryId(value);
 
     public override string ToString() => Value.ToString("D", CultureInfo.InvariantCulture);
@@ -194,7 +197,10 @@ public sealed class WhatsAppDelivery
 
         if (body.Length == 0)
         {
-            throw new DomainValidationException("An outbound message must carry text.");
+            throw new DomainValidationException("An outbound message must carry text.")
+            {
+                Code = "whatsapp.message.required",
+            };
         }
 
         if (body.Length > MaxTextLength)
@@ -202,12 +208,18 @@ public sealed class WhatsAppDelivery
             throw new DomainValidationException(
                 string.Create(
                     CultureInfo.InvariantCulture,
-                    $"An outbound message must be {MaxTextLength} characters or fewer."));
+                    $"An outbound message must be {MaxTextLength} characters or fewer."))
+            {
+                Code = "whatsapp.message.too_long",
+            };
         }
 
         if (messageId.IsEmpty)
         {
-            throw new DomainValidationException("A delivery must name the message it carries.");
+            throw new DomainValidationException("A delivery must name the message it carries.")
+            {
+                Code = "whatsapp.delivery.invalid",
+            };
         }
 
         return new WhatsAppDelivery(
@@ -366,7 +378,10 @@ public sealed class WhatsAppDelivery
     {
         if (instant == default)
         {
-            throw new DomainValidationException("The instant must be a real point in time.");
+            throw new DomainValidationException("The instant must be a real point in time.")
+            {
+                Code = "whatsapp.instant.invalid",
+            };
         }
 
         UpdatedAt = instant.ToUniversalTime();

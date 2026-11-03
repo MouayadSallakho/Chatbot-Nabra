@@ -1554,6 +1554,8 @@
     "roles.area.count": "{$granted} of {$total} granted",
     "permission.workspace.view": "View workspace",
     "permission.workspace.view.description": "See the workspace's name and status.",
+    "permission.workspace.manage": "Manage workspace",
+    "permission.workspace.manage.description": "Change the workspace's settings, such as its name, which visitors see on its public chat.",
     "permission.aiAgents.view": "View AI agents",
     "permission.aiAgents.view.description": "See the workspace's AI agents and read their instructions.",
     "permission.aiAgents.create": "Create AI agents",

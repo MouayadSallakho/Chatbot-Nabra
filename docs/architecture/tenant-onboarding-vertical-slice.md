@@ -390,3 +390,21 @@ not approve.
 10. The API integration tests run against a database named `omniai_test_*`, which
     one test asserts by reading the resolved connection string out of the hosted
     application.
+
+## Phase 37.5a: renaming the workspace (owner decision D-3)
+
+Visitors now see the workspace's name on the public chat reads, so its owner must
+control it.
+
+- `GET /api/tenants/{id}` sends a strong `ETag` (the row's `xmin`, as for agents and
+  roles). The body is unchanged.
+- `PUT /api/tenants/{id}/name` `{ name }` with `If-Match`: `428` without it, `412`
+  when stale, `200` with the workspace and a new `ETag` on success. The name follows
+  the creation rules (required, at most 200 characters after trimming, no control
+  characters); a refused one is `400 workspace.name.invalid`. Guarded by
+  `workspace.manage` (`tenant-rbac.md`): `403` for a member without it, `404` for
+  anybody else, checked before the workspace is read.
+- Renaming to the current name changes nothing and records nothing.
+- Each real rename writes one `workspace.renamed` security event (actor, workspace,
+  time; never the names) in the same transaction as the rename.
+- The hosted and embedded chat reads show the new name on their next read.

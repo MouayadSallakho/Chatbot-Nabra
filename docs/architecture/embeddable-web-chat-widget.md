@@ -306,7 +306,7 @@ theme. That is the entire surface a tenant controls.
 | ----------------- | --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Greeting          | plain text, ≤ 300 chars, optional | Line feeds allowed, other control characters refused. Rendered as the workspace's own words — **not** as an AI message, not in the transcript the server holds. |
 | Accent            | `#rrggbb`                         | Expanded and lower-cased. Reaches the browser as a CSS custom property value; six hex digits cannot introduce a declaration.                                    |
-| Launcher position | `Left` \| `Right`                 |                                                                                                                                                                 |
+| Launcher position | `Left` \| `Right` \| `Start` \| `End` | `Start` and `End` (Phase 37.5a) follow the host page's reading direction; see below. |
 | Theme             | `System` \| `Light` \| `Dark`     | `System` means the _visitor's_ OS setting, read inside the iframe.                                                                                              |
 
 The readable foreground on the accent is **computed**, not configured: WCAG
@@ -330,6 +330,24 @@ only once a conversation exists.
 There is deliberately no custom CSS, no custom HTML, no custom JavaScript, no font
 URL and no logo upload.
 
+**Phase 37.5a: corners that follow the page.** `Start` is the bottom corner where the
+host page's text starts and `End` the corner where it ends: left and right on a
+left-to-right page, the other way round on a right-to-left one. Only the host page
+knows which way it reads, so the **loader** resolves them, from `<html dir>` when the
+page declares it and otherwise from the direction the browser computed, on every
+layout (a page that switches language in place moves the launcher with it). The
+widget document passes the configured word to the loader unchanged in its `ready`
+message; `Left` and `Right` behave exactly as before, and an existing widget keeps
+its corner. The column stores the name, with no check constraint, so no migration
+was needed. A loader older than 37.5a would treat `Start`/`End` as `Right`; the
+loader is served by the API, so it is upgraded in the same deployment.
+
+**Phase 37.5a: the workspace's name (owner decision D-3).** The embedded read
+(`GET /api/public/embed/{key}`) also carries `workspaceName`, the workspace's display
+name, so a visitor knows whose chat it is. Nothing else about the workspace is read
+or published. The owner controls it with `PUT /api/tenants/{id}/name`
+(`tenant-onboarding-vertical-slice.md`), and visitors see a rename on the next read.
+
 ---
 
 ## 9. Configuring it
@@ -347,6 +365,13 @@ URL and no logo upload.
   action; replaying one against state nobody has seen could reinstate a website
   that had just been removed. The screen says so and offers an explicit reload
   that discards the local edits.
+
+**Coded refusals (Phase 37.5a, row 21).** The admin `PUT` names each refused rule
+with a stable `code` (`problem-codes.md`): `website-chat.origin.invalid` (one line is
+not an origin; the detail quotes it), `website-chat.origin.too_many`,
+`website-chat.launcher_position.invalid`, `website-chat.theme.invalid`,
+`website-chat.accent_color.invalid`, `website-chat.greeting.too_long`. A website
+listed twice is still merged and never refused, so there is no duplicate code.
 
 The response also carries the install snippet and loader URL, **composed
 server-side** from the address this deployment is actually answering on. A
@@ -370,6 +395,14 @@ Every way an embed request can fail returns **404 with no body**:
 The public key appears in the customer's own HTML. Telling these cases apart would
 let anybody holding one enumerate the websites a workspace has authorised — which
 is precisely the list needed to attack it.
+
+**Phase 37.5a keeps this exactly.** The admin side now carries stable codes; these
+public refusals do not, by design. Strictly, the 404 is not empty: since
+`UseStatusCodePages` the pipeline writes its generic problem body (`type`, `title`,
+`status` and a per-request `traceId`), with no `detail` and no `code`. That body is
+the same for every reason above apart from the trace id, which is the property that
+matters; a test compares an unknown key with an unapproved website, and the 37.5a
+report compares the responses before and after this step.
 
 The one thing that is _not_ flattened into 404 is an endpoint that exists and has
 approved this website but is not currently serving: that returns a configuration

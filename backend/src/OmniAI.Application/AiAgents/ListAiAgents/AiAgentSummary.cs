@@ -39,4 +39,11 @@ public sealed record AiAgentSummary(
     string Name,
     AiAgentStatus Status,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt)
+{
+    /// <summary>
+    /// The channels this agent answers on that the reader may see (Phase 37.5a,
+    /// row 18). Empty for a reader with neither channel permission.
+    /// </summary>
+    public IReadOnlyList<AiAgentChannelView> Channels { get; init; } = [];
+}

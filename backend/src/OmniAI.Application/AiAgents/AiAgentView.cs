@@ -49,4 +49,11 @@ public sealed record AiAgentView(
             agent.CreatedAt,
             agent.UpdatedAt);
     }
+
+    /// <summary>
+    /// The channels this agent answers on that the reader may see, filled only by
+    /// the single-agent read (Phase 37.5a, row 18). A write's response leaves it
+    /// empty, so the API publishes it on the read and nowhere else.
+    /// </summary>
+    public IReadOnlyList<AiAgentChannelView> Channels { get; init; } = [];
 }

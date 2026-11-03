@@ -65,7 +65,10 @@ public sealed record AgentInstructions
     {
         if (string.IsNullOrWhiteSpace(value))
         {
-            throw new DomainValidationException("AI agent instructions are required.");
+            throw new DomainValidationException("AI agent instructions are required.")
+            {
+                Code = "ai-agents.instructions.required",
+            };
         }
 
         string normalised = value.Trim();
@@ -74,7 +77,10 @@ public sealed record AgentInstructions
         {
             throw new DomainValidationException(
                 $"AI agent instructions must be at most {MaxLength} characters; " +
-                $"the supplied instructions have {normalised.Length}. They are not truncated.");
+                $"the supplied instructions have {normalised.Length}. They are not truncated.")
+            {
+                Code = "ai-agents.instructions.too_long",
+            };
         }
 
         foreach (char character in normalised)
@@ -86,7 +92,10 @@ public sealed record AgentInstructions
             {
                 throw new DomainValidationException(
                     "AI agent instructions must not contain control characters other than " +
-                    "tab, carriage return and line feed.");
+                    "tab, carriage return and line feed.")
+                {
+                    Code = "ai-agents.instructions.control_characters",
+                };
             }
         }
 

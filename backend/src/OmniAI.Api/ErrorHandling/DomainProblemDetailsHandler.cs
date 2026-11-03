@@ -149,8 +149,40 @@ internal sealed partial class DomainProblemDetailsHandler(
 
                 return;
 
+            // Phase 37.5a: the throw site names the rule. A site without a code
+            // yet falls through to the generic one ProblemCodes applies.
+            case DomainValidationException { Code: string validationCode }:
+                problem.Extensions["code"] = validationCode;
+
+                return;
+
+            case DomainStateException { Code: string stateCode }:
+                problem.Extensions["code"] = stateCode;
+
+                return;
+
+            // A file refusal names its reason, and the bound it broke where it has
+            // one, so a client can say "more than 300 pages" in the reader's
+            // language without parsing the English sentence for the number.
+            case KnowledgeFileRejectedException rejected:
+                problem.Extensions["code"] = rejected.Code;
+
+                if (rejected.Limit is long limit)
+                {
+                    problem.Extensions["limit"] = limit;
+                }
+
+                return;
+
             default:
                 break;
+        }
+
+        if (AreaCode(exception) is string areaCode)
+        {
+            problem.Extensions["code"] = areaCode;
+
+            return;
         }
 
         if (exception is not EntitlementExceededException entitlement)
@@ -169,6 +201,30 @@ internal sealed partial class DomainProblemDetailsHandler(
             problem.Extensions["periodTo"] = entitlement.Period.To;
         }
     }
+
+    /// <summary>
+    /// The one code an Application refusal type always carries (Phase 37.5a).
+    /// </summary>
+    /// <remarks>
+    /// One per type, because each of these types means one thing. Stale writes
+    /// are not listed: every 412 answers <c>precondition.failed</c> through
+    /// <see cref="ProblemCodes.ApplyFallback"/>, whichever resource it was.
+    /// </remarks>
+    internal static string? AreaCode(Exception exception) => exception switch
+    {
+        AiAgentPageValidationException => "ai-agents.page.invalid",
+        AiTurnValidationException => "ai.message.invalid",
+        KnowledgeDocumentPageValidationException => "knowledge.page.invalid",
+        KnowledgeIndexingInProgressException => "knowledge.indexing.in_progress",
+        KnowledgeDocumentHasNoSourceException => "knowledge.source.missing",
+        WebChatAgentUnusableException => "website-chat.agent.unusable",
+        WebChatTurnInProgressException => "chat.message.in_progress",
+        WebChatTurnAlreadyFailedException => "chat.message.already_failed",
+        WhatsAppPhoneNumberInUseException => "whatsapp.phone_number.in_use",
+        ConversationNotOnWhatsAppException => "whatsapp.conversation.not_on_whatsapp",
+        TenantSlugAlreadyExistsException => "workspace.slug.taken",
+        _ => null,
+    };
 
     /// <summary>
     /// What to write in the log, which may be more than the caller is told.
@@ -389,6 +445,13 @@ internal sealed partial class DomainProblemDetailsHandler(
             StatusCodes.Status409Conflict,
             "Tenant slug already exists",
             conflict.Message),
+
+        // A workspace rename against a version that is no longer current
+        // (Phase 37.5a). 412, like every other stale conditional write.
+        TenantVersionMismatchException staleTenant => (
+            StatusCodes.Status412PreconditionFailed,
+            "Precondition failed",
+            staleTenant.Message),
 
         // The agent is not at the version the caller said it was changing --
         // either because it was superseded long before the request arrived, or

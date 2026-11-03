@@ -644,3 +644,17 @@ this slice. A fake control would hide the gap rather than close it.
     Tenant A route and asserts `404`, never `412`.
 15. `RowVersionTokensTests` asserts the token stays within the base64url alphabet
     for 4096 consecutive values, so it can never break a header.
+
+## Phase 37.5a: the channels an agent answers on
+
+`GET …/ai-agents` items and `GET …/ai-agents/{id}` gain `channels`:
+`[{ kind: "WebChat" | "WhatsApp", id, status }]`, web chat first, each kind in
+creation order. Only the kinds the reader may see are included: website chat with
+`website-chat.view`, WhatsApp with `whatsapp.view`, none with neither. The reader's
+permissions are resolved **once per request** (the same two statements the single
+`ai-agents.view` check made), and then one statement per visible kind reads the
+channels of every agent on the page at once (`ux_web_chat_endpoints_tenant_agent`,
+`ix_whatsapp_connections_agent`), scoped by the workspace. Identity and status only:
+no public key, number, allowlist or credential. The refusals are unchanged (404 for a
+non-member, 403 without `ai-agents.view`). The writes keep their seven fields; only
+the reads carry `channels`. Refusals carry stable codes (`problem-codes.md`).

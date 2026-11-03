@@ -23,7 +23,11 @@
       transparent and the page shows through around the circle.
     -->
     @if (!panelOpen()) {
-      <app-chat-launcher [label]="launcherLabel()" [side]="position()" (pressed)="openPanel()" />
+      <app-chat-launcher
+        [label]="launcherLabel()"
+        [side]="launcherSide()"
+        (pressed)="openPanel()"
+      />
     } @else {
       <app-chat-panel
         class="embed-panel"

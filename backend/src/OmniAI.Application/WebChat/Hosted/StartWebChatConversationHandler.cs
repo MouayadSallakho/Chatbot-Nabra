@@ -94,7 +94,13 @@ public sealed class StartWebChatConversationHandler(
 
         return new PublicWebChatView(
             endpoint.AiAgentName,
-            IsServing(endpoint));
+            IsServing(endpoint))
+        {
+            WorkspaceName = endpoint.WorkspaceName,
+            Greeting = endpoint.Widget.Greeting?.Value,
+            AccentColor = endpoint.Widget.Accent.Value,
+            Theme = endpoint.Widget.Theme.ToString(),
+        };
     }
 
     /// <summary>

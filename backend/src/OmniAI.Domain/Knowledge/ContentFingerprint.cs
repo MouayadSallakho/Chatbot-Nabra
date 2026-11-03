@@ -32,7 +32,10 @@ public sealed class ContentFingerprint : IEquatable<ContentFingerprint>
         if (value is null || value.Length != Length)
         {
             throw new DomainValidationException(
-                $"A content fingerprint must be exactly {Length} bytes.");
+                $"A content fingerprint must be exactly {Length} bytes.")
+            {
+                Code = "knowledge.fingerprint.invalid",
+            };
         }
 
         // Copied, so a caller holding the array cannot mutate a stored

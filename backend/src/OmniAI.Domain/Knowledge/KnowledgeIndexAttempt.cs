@@ -106,7 +106,10 @@ public sealed class KnowledgeIndexAttempt
     {
         if (tenantId.IsEmpty)
         {
-            throw new DomainValidationException("An indexing attempt belongs to a workspace.");
+            throw new DomainValidationException("An indexing attempt belongs to a workspace.")
+            {
+                Code = "knowledge.tenant.required",
+            };
         }
 
         return new KnowledgeIndexAttempt(

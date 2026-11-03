@@ -43,7 +43,10 @@ public sealed record KnowledgeContent
     {
         if (string.IsNullOrWhiteSpace(value))
         {
-            throw new DomainValidationException("A knowledge document needs some content.");
+            throw new DomainValidationException("A knowledge document needs some content.")
+            {
+                Code = "knowledge.content.required",
+            };
         }
 
         // Order matters: fold first, then trim, so a document ending in "\r\n"
@@ -55,7 +58,10 @@ public sealed record KnowledgeContent
 
         if (normalised.Length == 0)
         {
-            throw new DomainValidationException("A knowledge document needs some content.");
+            throw new DomainValidationException("A knowledge document needs some content.")
+            {
+                Code = "knowledge.content.required",
+            };
         }
 
         if (normalised.Length > MaxLength)
@@ -63,7 +69,10 @@ public sealed record KnowledgeContent
             throw new DomainValidationException(
                 $"A knowledge document must be at most {MaxLength:N0} characters; " +
                 $"the supplied content has {normalised.Length:N0}. It is not truncated. " +
-                "Split it into separate documents instead.");
+                "Split it into separate documents instead.")
+            {
+                Code = "knowledge.content.too_long",
+            };
         }
 
         foreach (char character in normalised)
@@ -75,7 +84,10 @@ public sealed record KnowledgeContent
             {
                 throw new DomainValidationException(
                     "A knowledge document must not contain control characters other than "
-                    + "tab and line feed.");
+                    + "tab and line feed.")
+                {
+                    Code = "knowledge.content.control_characters",
+                };
             }
         }
 

@@ -77,19 +77,28 @@ public sealed class WhatsAppCustomerIdentity
         if (tenantId.IsEmpty)
         {
             throw new DomainValidationException(
-                "A WhatsApp customer identity must belong to a workspace.");
+                "A WhatsApp customer identity must belong to a workspace.")
+            {
+                Code = "whatsapp.customer_identity.invalid",
+            };
         }
 
         if (customerId.IsEmpty)
         {
             throw new DomainValidationException(
-                "A WhatsApp customer identity must point at a customer.");
+                "A WhatsApp customer identity must point at a customer.")
+            {
+                Code = "whatsapp.customer_identity.invalid",
+            };
         }
 
         if (createdAt == default)
         {
             throw new DomainValidationException(
-                "A WhatsApp customer identity needs the instant it was first seen.");
+                "A WhatsApp customer identity needs the instant it was first seen.")
+            {
+                Code = "whatsapp.customer_identity.invalid",
+            };
         }
 
         return new WhatsAppCustomerIdentity(
@@ -113,7 +122,10 @@ public sealed class WhatsAppCustomerIdentity
         if (customerId.IsEmpty)
         {
             throw new DomainValidationException(
-                "A WhatsApp customer identity must point at a customer.");
+                "A WhatsApp customer identity must point at a customer.")
+            {
+                Code = "whatsapp.customer_identity.invalid",
+            };
         }
 
         CustomerId = customerId;

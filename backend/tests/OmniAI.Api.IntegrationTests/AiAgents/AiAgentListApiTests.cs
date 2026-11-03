@@ -132,8 +132,9 @@ public sealed class AiAgentListApiTests(AiAgentApiFixture api) : IClassFixture<A
 
         JsonElement item = body.RootElement.GetProperty("items")[0];
 
+        // Phase 37.5a added the channels the reader may see; still no instructions.
         Assert.Equal(
-            ["id", "tenantId", "name", "status", "createdAt", "updatedAt"],
+            ["id", "tenantId", "name", "status", "createdAt", "updatedAt", "channels"],
             item.EnumerateObject().Select(field => field.Name));
 
         Assert.Equal(agentId, item.GetProperty("id").GetGuid());

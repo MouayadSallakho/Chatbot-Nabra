@@ -55,6 +55,7 @@ internal static class KnowledgeFileSignature
         {
             throw new KnowledgeFileRejectedException(
                 KnowledgeFileRejection.Unreadable,
+                KnowledgeFileRefusals.Empty,
                 "That file is empty.");
         }
 
@@ -84,10 +85,12 @@ internal static class KnowledgeFileSignature
             ".csv" => KnowledgeFileType.Csv,
             ".pdf" or ".docx" => throw new KnowledgeFileRejectedException(
                 KnowledgeFileRejection.TypeMismatch,
+                KnowledgeFileRefusals.TypeMismatch,
                 $"That file is named like a {extension.TrimStart('.').ToUpperInvariant()} but is "
                 + "not one. Check the file and try again."),
             _ => throw new KnowledgeFileRejectedException(
                 KnowledgeFileRejection.UnsupportedType,
+                KnowledgeFileRefusals.UnsupportedType,
                 "That kind of file is not supported. Upload a PDF, DOCX, TXT or CSV."),
         };
     }
@@ -140,6 +143,7 @@ internal static class KnowledgeFileSignature
 
         throw new KnowledgeFileRejectedException(
             KnowledgeFileRejection.TypeMismatch,
+            KnowledgeFileRefusals.TypeMismatch,
             $"That file is a {expected.TrimStart('.').ToUpperInvariant()} but is named "
             + $"\"{extension}\". Rename it and try again.");
     }
@@ -163,6 +167,7 @@ internal static class KnowledgeFileSignature
         {
             throw new KnowledgeFileRejectedException(
                 KnowledgeFileRejection.Unreadable,
+                KnowledgeFileRefusals.NotUtf8,
                 "That file is not valid UTF-8 text. Save it as UTF-8 and try again.");
         }
     }

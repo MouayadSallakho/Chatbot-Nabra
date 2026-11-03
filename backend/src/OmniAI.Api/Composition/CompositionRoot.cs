@@ -59,6 +59,7 @@ using OmniAI.Application.WebChat.UpdateWebChatWidget;
 using OmniAI.Application.WebChat;
 using OmniAI.Application.WhatsApp;
 using OmniAI.Application.Tenants.GetTenantById;
+using OmniAI.Application.Tenants.RenameTenant;
 using OmniAI.Application.Tenants.ListMyTenants;
 using OmniAI.Application.Tenants;
 using OmniAI.Infrastructure.DependencyInjection;
@@ -281,6 +282,7 @@ internal static class CompositionRoot
         // request's DbContext and therefore its unit of work.
         services.AddScoped<CreateTenantHandler>();
         services.AddScoped<GetTenantByIdHandler>();
+        services.AddScoped<RenameTenantHandler>();
         services.AddScoped<ListMyTenantsHandler>();
 
         // The two halves of the authorization boundary. The guard answers "does

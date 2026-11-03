@@ -251,29 +251,44 @@ public sealed class WebChatSession
     {
         if (conversationId.IsEmpty)
         {
-            throw new DomainValidationException("A web chat session must name a conversation.");
+            throw new DomainValidationException("A web chat session must name a conversation.")
+            {
+                Code = "chat.session.invalid",
+            };
         }
 
         if (tenantId.IsEmpty)
         {
-            throw new DomainValidationException("A web chat session must belong to a workspace.");
+            throw new DomainValidationException("A web chat session must belong to a workspace.")
+            {
+                Code = "chat.session.invalid",
+            };
         }
 
         if (endpointId.IsEmpty)
         {
-            throw new DomainValidationException("A web chat session must name an endpoint.");
+            throw new DomainValidationException("A web chat session must name an endpoint.")
+            {
+                Code = "chat.session.invalid",
+            };
         }
 
         if (aiAgentId.IsEmpty)
         {
-            throw new DomainValidationException("A web chat session must name an AI agent.");
+            throw new DomainValidationException("A web chat session must name an AI agent.")
+            {
+                Code = "chat.session.invalid",
+            };
         }
 
         ArgumentNullException.ThrowIfNull(accessTokenHash);
 
         if (createdAt == default)
         {
-            throw new DomainValidationException("The creation instant must be a real point in time.");
+            throw new DomainValidationException("The creation instant must be a real point in time.")
+            {
+                Code = "chat.session.invalid",
+            };
         }
 
         // A session that expires when or before it opens would be a credential
@@ -282,7 +297,10 @@ public sealed class WebChatSession
         if (expiresAt <= createdAt)
         {
             throw new DomainValidationException(
-                "A web chat session must expire after it was created.");
+                "A web chat session must expire after it was created.")
+            {
+                Code = "chat.session.invalid",
+            };
         }
 
         // Mode and origin are one fact, not two. An embedded session that does not
@@ -291,13 +309,19 @@ public sealed class WebChatSession
         if (mode == WebChatClientMode.Embedded && embeddedOrigin is null)
         {
             throw new DomainValidationException(
-                "An embedded web chat session must record the website it was opened from.");
+                "An embedded web chat session must record the website it was opened from.")
+            {
+                Code = "chat.session.invalid",
+            };
         }
 
         if (mode == WebChatClientMode.Hosted && embeddedOrigin is not null)
         {
             throw new DomainValidationException(
-                "A hosted web chat session has no embedding website.");
+                "A hosted web chat session has no embedding website.")
+            {
+                Code = "chat.session.invalid",
+            };
         }
 
         return new WebChatSession(

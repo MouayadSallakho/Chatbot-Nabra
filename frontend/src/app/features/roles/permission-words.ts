@@ -25,6 +25,10 @@ const PERMISSIONS: Readonly<Record<string, PermissionText>> = {
     label: $localize`:@@permission.workspace.view:View workspace`,
     description: $localize`:@@permission.workspace.view.description:See the workspace's name and status.`,
   },
+  'workspace.manage': {
+    label: $localize`:@@permission.workspace.manage:Manage workspace`,
+    description: $localize`:@@permission.workspace.manage.description:Change the workspace's settings, such as its name, which visitors see on its public chat.`,
+  },
   'ai-agents.view': {
     label: $localize`:@@permission.aiAgents.view:View AI agents`,
     description: $localize`:@@permission.aiAgents.view.description:See the workspace's AI agents and read their instructions.`,

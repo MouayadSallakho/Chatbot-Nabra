@@ -1,6 +1,7 @@
 using OmniAI.Application.AiAgents.Persistence;
 using OmniAI.Application.Authorization;
 using OmniAI.Application.Tenants;
+using OmniAI.Domain.AiAgents;
 using OmniAI.Domain.Authorization;
 using OmniAI.Domain.Tenants;
 
@@ -16,13 +17,19 @@ namespace OmniAI.Application.AiAgents.ListAiAgents;
 /// surface invented before its first real requirement is a surface that has to
 /// be supported before anybody knows whether it was right.
 /// </remarks>
-public sealed class ListAiAgentsHandler(IAiAgentRepository agents, TenantAuthorizer authorizer)
+public sealed class ListAiAgentsHandler(
+    IAiAgentRepository agents,
+    TenantAuthorizer authorizer,
+    IAiAgentChannelReader channels)
 {
     private readonly IAiAgentRepository _agents =
         agents ?? throw new ArgumentNullException(nameof(agents));
 
     private readonly TenantAuthorizer _authorizer =
         authorizer ?? throw new ArgumentNullException(nameof(authorizer));
+
+    private readonly IAiAgentChannelReader _channels =
+        channels ?? throw new ArgumentNullException(nameof(channels));
 
     /// <summary>Reads the page.</summary>
     /// <returns>
@@ -90,15 +97,54 @@ public sealed class ListAiAgentsHandler(IAiAgentRepository agents, TenantAuthori
         // already proved they belong here, so telling them their own workspace had
         // vanished would be a lie, and telling them which permission is missing is
         // something they can act on.
-        if (!await _authorizer
-            .RequireAsync(tenantId, PlatformPermissions.AiAgentsView, cancellationToken)
-            .ConfigureAwait(false))
+        //
+        // Phase 37.5a: the reader's permissions are resolved once, with the same
+        // two statements the single check made, because they also decide which
+        // channel kinds each agent may show. The refusals are unchanged.
+        IReadOnlyList<PermissionCode>? held = await _authorizer
+            .EffectivePermissionsAsync(tenantId, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (held is null)
         {
             throw TenantNotFoundException.ForId(tenantId.Value);
         }
 
-        return await _agents
+        if (!held.Contains(PlatformPermissions.AiAgentsView))
+        {
+            throw PermissionDeniedException.ForPermission(PlatformPermissions.AiAgentsView);
+        }
+
+        AiAgentPage listed = await _agents
             .ListAsync(tenantId, page, pageSize, cancellationToken)
             .ConfigureAwait(false);
+
+        AiAgentChannelKinds visible = AiAgentChannelVisibility.For(held);
+
+        if (listed.Items.Count == 0 || visible == AiAgentChannelKinds.None)
+        {
+            return listed;
+        }
+
+        // Only the channels the reader may see, for every agent on the page at
+        // once: one statement per visible kind, never one per agent.
+        IReadOnlyDictionary<AiAgentId, IReadOnlyList<AiAgentChannelView>> channels = await _channels
+            .ListAsync(
+                tenantId,
+                [.. listed.Items.Select(item => AiAgentId.From(item.Id))],
+                visible,
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        return listed with
+        {
+            Items =
+            [
+                .. listed.Items.Select(item =>
+                    channels.TryGetValue(AiAgentId.From(item.Id), out IReadOnlyList<AiAgentChannelView>? found)
+                        ? item with { Channels = found }
+                        : item),
+            ],
+        };
     }
 }

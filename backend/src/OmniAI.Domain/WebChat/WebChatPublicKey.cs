@@ -66,7 +66,10 @@ public readonly record struct WebChatPublicKey
         if (string.IsNullOrWhiteSpace(value) || value.Length != Length)
         {
             throw new DomainValidationException(
-                $"A web chat public key must be exactly {Length} characters.");
+                $"A web chat public key must be exactly {Length} characters.")
+            {
+                Code = "website-chat.public_key.invalid",
+            };
         }
 
         foreach (char character in value)
@@ -74,7 +77,10 @@ public readonly record struct WebChatPublicKey
             if (!char.IsAsciiLetterOrDigit(character) && character is not ('-' or '_'))
             {
                 throw new DomainValidationException(
-                    "A web chat public key must contain only base64url characters.");
+                    "A web chat public key must contain only base64url characters.")
+                {
+                    Code = "website-chat.public_key.invalid",
+                };
             }
         }
 

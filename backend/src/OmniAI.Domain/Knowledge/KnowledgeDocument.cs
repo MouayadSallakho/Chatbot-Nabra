@@ -138,7 +138,10 @@ public sealed class KnowledgeDocument
     {
         if (tenantId.IsEmpty)
         {
-            throw new DomainValidationException("A knowledge document must belong to a workspace.");
+            throw new DomainValidationException("A knowledge document must belong to a workspace.")
+            {
+                Code = "knowledge.tenant.required",
+            };
         }
 
         ArgumentNullException.ThrowIfNull(title);
@@ -245,7 +248,10 @@ public sealed class KnowledgeDocument
     {
         if (IsEnabled)
         {
-            throw new DomainStateException("This knowledge document is already enabled.");
+            throw new DomainStateException("This knowledge document is already enabled.")
+            {
+                Code = "knowledge.document.already_enabled",
+            };
         }
 
         IsEnabled = true;
@@ -258,7 +264,10 @@ public sealed class KnowledgeDocument
     {
         if (!IsEnabled)
         {
-            throw new DomainStateException("This knowledge document is already disabled.");
+            throw new DomainStateException("This knowledge document is already disabled.")
+            {
+                Code = "knowledge.document.already_disabled",
+            };
         }
 
         IsEnabled = false;
@@ -271,7 +280,10 @@ public sealed class KnowledgeDocument
         if (instant < UpdatedAt)
         {
             throw new DomainValidationException(
-                "A knowledge document cannot be updated at an instant before its last update.");
+                "A knowledge document cannot be updated at an instant before its last update.")
+            {
+                Code = "knowledge.instant.invalid",
+            };
         }
 
         UpdatedAt = instant;
@@ -282,7 +294,10 @@ public sealed class KnowledgeDocument
         if (instant == default)
         {
             throw new DomainValidationException(
-                $"The instant a knowledge document was {what} is required.");
+                $"The instant a knowledge document was {what} is required.")
+            {
+                Code = "knowledge.instant.invalid",
+            };
         }
 
         return instant.ToUniversalTime();

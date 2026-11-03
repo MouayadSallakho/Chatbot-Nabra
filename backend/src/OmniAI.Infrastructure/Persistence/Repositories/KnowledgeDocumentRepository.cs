@@ -87,6 +87,24 @@ internal sealed class KnowledgeDocumentRepository(
                 _context.KnowledgeSources
                     .Where(source => source.KnowledgeDocumentId == candidate.Id)
                     .Select(source => (KnowledgeFileType?)source.FileType)
+                    .FirstOrDefault(),
+                // Phase 37.5a: the file's size and the last indexing outcome, in
+                // the same statement for the same reason. Each is an indexed
+                // probe per row of the page (ux_knowledge_sources_document,
+                // ix_knowledge_index_attempts_document), never a query per row.
+                _context.KnowledgeSources
+                    .Where(source => source.KnowledgeDocumentId == candidate.Id)
+                    .Select(source => (long?)source.ByteLength)
+                    .FirstOrDefault(),
+                _context.KnowledgeIndexAttempts
+                    .Where(attempt => attempt.DocumentId == candidate.Id && attempt.TenantId == tenantId)
+                    .OrderByDescending(attempt => attempt.StartedAt)
+                    .ThenByDescending(attempt => attempt.Id)
+                    .Select(attempt => new KnowledgeIndexAttemptView(
+                        attempt.Status,
+                        attempt.FailureCode,
+                        attempt.StartedAt,
+                        attempt.CompletedAt))
                     .FirstOrDefault()))
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
@@ -226,7 +244,9 @@ internal sealed class KnowledgeDocumentRepository(
         DateTimeOffset UpdatedAt,
         DateTimeOffset? IndexedAt,
         byte[] ContentFingerprint,
-        KnowledgeFileType? SourceFileType)
+        KnowledgeFileType? SourceFileType,
+        long? SourceByteLength,
+        KnowledgeIndexAttemptView? LastIndexAttempt)
     {
         public KnowledgeDocumentSummary ToSummary(EmbeddingProfileId profile) =>
             new(
@@ -239,7 +259,11 @@ internal sealed class KnowledgeDocumentRepository(
                 CreatedAt,
                 UpdatedAt,
                 IndexedAt,
-                SourceFileType);
+                SourceFileType)
+            {
+                SourceByteLength = SourceByteLength,
+                LastIndexAttempt = LastIndexAttempt,
+            };
 
         private KnowledgeReadiness Readiness(EmbeddingProfileId profile)
         {

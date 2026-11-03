@@ -113,7 +113,10 @@ internal static class MetaIdentifier
             throw new DomainValidationException(
                 string.Create(
                     CultureInfo.InvariantCulture,
-                    $"A {what} must be between 1 and {maxLength} digits."));
+                    $"A {what} must be between 1 and {maxLength} digits."))
+            {
+                Code = "whatsapp.identifier.invalid",
+            };
         }
 
         return value!.Trim();

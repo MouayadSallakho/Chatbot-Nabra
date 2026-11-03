@@ -10,6 +10,12 @@ namespace OmniAI.Api.WebChat;
 /// appearance settings. Deliberately no workspace id, no agent id, no endpoint id,
 /// no knowledge and no credential: a launcher and a panel need none of them, and a
 /// value that never reaches the browser is a value that cannot leak from it.
+/// <para>
+/// Phase 37.5a adds the workspace's display name (owner decision D-3), so a
+/// visitor knows whose chat it is, and <c>launcherPosition</c> may also be
+/// <c>Start</c> or <c>End</c>, which the loader resolves from the host page's
+/// direction.
+/// </para>
 /// </remarks>
 public sealed record EmbeddedChatConfigResponse(
     string AgentName,
@@ -17,7 +23,8 @@ public sealed record EmbeddedChatConfigResponse(
     string? Greeting,
     string AccentColor,
     string LauncherPosition,
-    string Theme);
+    string Theme,
+    string WorkspaceName);
 
 /// <summary>
 /// A started embedded conversation.

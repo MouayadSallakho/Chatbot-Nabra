@@ -126,7 +126,10 @@ public sealed partial class KnowledgeChunker(KnowledgeChunkingPolicy? policy = n
         {
             throw new DomainValidationException(string.Create(
                 CultureInfo.InvariantCulture,
-                $"This document would be split into {pieces.Count} pieces, and at most {_policy.MaxChunks} are allowed. Nothing was indexed and nothing was truncated. Split it into separate documents instead."));
+                $"This document would be split into {pieces.Count} pieces, and at most {_policy.MaxChunks} are allowed. Nothing was indexed and nothing was truncated. Split it into separate documents instead."))
+            {
+                Code = "knowledge.index.too_many_chunks",
+            };
         }
 
         KnowledgeChunk[] chunks = new KnowledgeChunk[pieces.Count];

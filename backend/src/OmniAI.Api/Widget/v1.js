@@ -138,7 +138,9 @@
    * through the corners of the frame. */
   style.display = 'block';
 
-  var position = 'right';
+  /* The configured corner, as the iframe reported it: Left, Right, Start or End.
+   * Start and End are resolved against the page on every layout (see corner). */
+  var position = 'Right';
   var open = false;
 
   /* The repeating handshake, while it is running. */
@@ -165,6 +167,48 @@
   }
 
   /*
+   * The direction the host page reads in: its own <html dir> when it declares
+   * one, else the direction the browser computed for it. Anything but rtl is
+   * left-to-right, which is what a page with no direction at all is.
+   */
+  function pageDirection() {
+    var declared = (document.documentElement.getAttribute('dir') || '').toLowerCase();
+
+    if (declared === 'rtl' || declared === 'ltr') {
+      return declared;
+    }
+
+    var computed = window.getComputedStyle
+      ? window.getComputedStyle(document.documentElement).direction
+      : '';
+
+    return computed === 'rtl' ? 'rtl' : 'ltr';
+  }
+
+  /*
+   * The physical corner the configured position means on this page (Phase 37.5a).
+   *
+   * Left and Right are corners already, exactly as before. Start is the corner
+   * where the page's text starts and End where it ends, so one workspace's
+   * launcher sits in the same reading position on its English and its Arabic
+   * site. Resolved on every layout, so a page that switches language in place
+   * moves the launcher with it.
+   */
+  function corner() {
+    if (position === 'Left') {
+      return 'left';
+    }
+
+    if (position === 'Start' || position === 'End') {
+      var rtl = pageDirection() === 'rtl';
+
+      return (position === 'Start') === rtl ? 'right' : 'left';
+    }
+
+    return 'right';
+  }
+
+  /*
    * Applies the one layout that matches the current state.
    *
    * Called on every state change and on resize, so rotating a phone or opening
@@ -173,7 +217,7 @@
    */
   function layout() {
     var small = compact();
-    var side = position === 'left' ? 'left' : 'right';
+    var side = corner();
     var other = side === 'left' ? 'right' : 'left';
 
     style[other] = 'auto';
@@ -256,9 +300,11 @@
     if (data.type === READY) {
       stopHandshake();
 
-      /* The only field the loader reads from the iframe, and it is one of two
+      /* The only field the loader reads from the iframe, and it is one of four
        * words. Anything else is ignored and the default stands. */
-      position = data.position === 'Left' ? 'left' : 'right';
+      position = data.position === 'Left' || data.position === 'Start' || data.position === 'End'
+        ? data.position
+        : 'Right';
       layout();
       sendViewport();
 

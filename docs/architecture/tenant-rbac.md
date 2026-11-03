@@ -984,3 +984,24 @@ undefined and must be decided before, not during, that work.
 - Global platform-admin authorisation
 - Audit and security-event pipeline
 - Localisation of catalogue labels and descriptions
+
+## Phase 37.5a: `workspace.manage`
+
+A new capability in the Workspace group: **Manage workspace** — "Change the
+workspace's settings, such as its name, which visitors see on its public chat."
+It guards `PUT /api/tenants/{id}/name` (owner decision D-3) and, from Phase 37.6,
+the workspace time zone.
+
+- **The Owner holds it with no data step**, because the Owner's authority is
+  `PlatformPermissions.AllCodes`, read when the question is asked.
+- **It implies nothing and nothing implies it**, like every other code:
+  `workspace.view` does not confer it, and it does not confer `workspace.view`.
+- **A custom role can be granted it** through the role editor like any other code;
+  the delegation rule applies (you can only give what you hold).
+- The role editor words it by code in both languages
+  (`frontend/src/app/features/roles/permission-words.ts`):
+  «إدارة مساحة العمل» — «تغيير إعدادات مساحة العمل، مثل اسمها الذي يراه الزوار في الدردشة العامة.»
+
+| Use case | Requires |
+| --- | --- |
+| `RenameTenant` | `workspace.manage` |

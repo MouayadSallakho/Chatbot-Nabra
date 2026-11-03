@@ -62,12 +62,12 @@ public sealed class AiAgentPermissionTests
     {
         (InMemoryAiAgentRepository agents, _) = Seed();
 
-        ListAiAgentsHandler allowed = new(agents, With(PlatformPermissions.AiAgentsView));
+        ListAiAgentsHandler allowed = new(agents, With(PlatformPermissions.AiAgentsView), InMemoryAiAgentChannelReader.None);
 
         Assert.Single((await allowed.HandleAsync(
             new ListAiAgentsQuery(Workspace.Value, null, null))).Items);
 
-        ListAiAgentsHandler refused = new(agents, With(PlatformPermissions.AiAgentsEdit));
+        ListAiAgentsHandler refused = new(agents, With(PlatformPermissions.AiAgentsEdit), InMemoryAiAgentChannelReader.None);
 
         await Assert.ThrowsAsync<PermissionDeniedException>(() => refused.HandleAsync(
             new ListAiAgentsQuery(Workspace.Value, null, null)));
@@ -78,12 +78,12 @@ public sealed class AiAgentPermissionTests
     {
         (InMemoryAiAgentRepository agents, AiAgent agent) = Seed();
 
-        GetAiAgentByIdHandler allowed = new(agents, With(PlatformPermissions.AiAgentsView));
+        GetAiAgentByIdHandler allowed = new(agents, With(PlatformPermissions.AiAgentsView), InMemoryAiAgentChannelReader.None);
 
         Assert.NotNull(await allowed.HandleAsync(
             new GetAiAgentByIdQuery(Workspace.Value, agent.Id.Value)));
 
-        GetAiAgentByIdHandler refused = new(agents, With(PlatformPermissions.AiAgentsCreate));
+        GetAiAgentByIdHandler refused = new(agents, With(PlatformPermissions.AiAgentsCreate), InMemoryAiAgentChannelReader.None);
 
         await Assert.ThrowsAsync<PermissionDeniedException>(() => refused.HandleAsync(
             new GetAiAgentByIdQuery(Workspace.Value, agent.Id.Value)));
@@ -203,11 +203,11 @@ public sealed class AiAgentPermissionTests
             new PreviewAiAgentCommand(Workspace.Value, agent.Id.Value, "Hello")));
 
         await Assert.ThrowsAsync<PermissionDeniedException>(
-            () => new ListAiAgentsHandler(agents, previewOnly)
+            () => new ListAiAgentsHandler(agents, previewOnly, InMemoryAiAgentChannelReader.None)
                 .HandleAsync(new ListAiAgentsQuery(Workspace.Value, null, null)));
 
         await Assert.ThrowsAsync<PermissionDeniedException>(
-            () => new GetAiAgentByIdHandler(agents, previewOnly)
+            () => new GetAiAgentByIdHandler(agents, previewOnly, InMemoryAiAgentChannelReader.None)
                 .HandleAsync(new GetAiAgentByIdQuery(Workspace.Value, agent.Id.Value)));
 
         await Assert.ThrowsAsync<PermissionDeniedException>(

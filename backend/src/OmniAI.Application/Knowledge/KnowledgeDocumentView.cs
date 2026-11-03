@@ -57,6 +57,17 @@ public sealed record KnowledgeDocumentView(
             document.IndexedAt,
             source is null ? null : KnowledgeSourceView.From(source));
     }
+
+    /// <summary>
+    /// The most recent indexing attempt, or <see langword="null"/> when none was
+    /// ever made (Phase 37.5a, row 15).
+    /// </summary>
+    /// <remarks>
+    /// Filled only by the single-document read. A write's response leaves it unset
+    /// rather than claiming "never attempted", so the API publishes it on the read
+    /// and nowhere else.
+    /// </remarks>
+    public KnowledgeIndexAttemptView? LastIndexAttempt { get; init; }
 }
 
 /// <summary>
@@ -103,4 +114,40 @@ public sealed record KnowledgeDocumentSummary(
             document.IndexedAt,
             source?.FileType);
     }
+
+    /// <summary>
+    /// The size of the file this document came from, in bytes, or
+    /// <see langword="null"/> for a typed document (Phase 37.5a, row 16).
+    /// </summary>
+    public long? SourceByteLength { get; init; }
+
+    /// <summary>
+    /// The most recent indexing attempt, or <see langword="null"/> when none was
+    /// ever made (Phase 37.5a, row 15).
+    /// </summary>
+    public KnowledgeIndexAttemptView? LastIndexAttempt { get; init; }
 }
+
+/// <summary>
+/// What the most recent indexing attempt on a document did (Phase 37.5a, row 15).
+/// </summary>
+/// <remarks>
+/// <para>
+/// <strong>The outcome, not a new readiness.</strong> Readiness stays derived from
+/// the document and the running profile, exactly as before. This says what the
+/// last press of "Index" did, which readiness cannot: a document that "needs an
+/// index" because its attempt failed looks the same as one nobody tried.
+/// <see cref="KnowledgeIndexAttemptStatus.Started"/> means indexing is running
+/// now; <see cref="KnowledgeIndexAttemptStatus.Unknown"/> means the process doing
+/// it stopped before it could say.
+/// </para>
+/// <para>
+/// <see cref="FailureCode"/> is one of <see cref="KnowledgeIndexAttemptFailures"/>
+/// and never a provider's message.
+/// </para>
+/// </remarks>
+public sealed record KnowledgeIndexAttemptView(
+    KnowledgeIndexAttemptStatus Status,
+    string? FailureCode,
+    DateTimeOffset StartedAt,
+    DateTimeOffset? CompletedAt);

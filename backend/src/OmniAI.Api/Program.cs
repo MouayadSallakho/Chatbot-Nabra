@@ -5,6 +5,7 @@ using OmniAI.Api.Authorization;
 using OmniAI.Api.Composition;
 using OmniAI.Api.Conversations;
 using OmniAI.Api.Customers;
+using OmniAI.Api.ErrorHandling;
 using OmniAI.Api.Analytics;
 using OmniAI.Api.Billing;
 using OmniAI.Api.Plans;
@@ -23,8 +24,11 @@ WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 // OpenAPI describes the HTTP surface that the Angular admin application consumes.
 builder.Services.AddOpenApi();
 
-// Problem Details is the single, uniform error contract for the whole API.
-builder.Services.AddProblemDetails();
+// Problem Details is the single, uniform error contract for the whole API. Every
+// correctable refusal carries a stable code (Phase 37.5a): the throw site names it
+// where it can, and this hook gives the rest the generic one. See ProblemCodes.
+builder.Services.AddProblemDetails(options =>
+    options.CustomizeProblemDetails = context => ProblemCodes.ApplyFallback(context.ProblemDetails));
 
 // Persistence, authentication, use cases and error translation. See CompositionRoot.
 builder.Services.AddOmniAi(builder.Configuration, builder.Environment);

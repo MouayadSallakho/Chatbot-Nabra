@@ -30,9 +30,15 @@ public sealed record WebChatEndpointRow(
 /// <strong>Assembled inside the data layer so a public caller never causes two
 /// lookups whose results could disagree.</strong> It carries the agent's display
 /// name and status and nothing else about the agent — no instructions, no
-/// identity beyond what the runtime needs, and no workspace detail. The tenant id
-/// is present because the server must know which workspace it is acting for; it
-/// is never published.
+/// identity beyond what the runtime needs. The tenant id is present because the
+/// server must know which workspace it is acting for; it is never published.
+/// <para>
+/// <strong>Phase 37.5a (owner decision D-3) adds two things a visitor already
+/// sees or should:</strong> the workspace's display name, so a visitor knows whose
+/// chat it is, and the widget's appearance, which the embedded read already
+/// published and the hosted page now shows too. Nothing else about the workspace
+/// is read: no slug, status, plan, member or other endpoint.
+/// </para>
 /// </remarks>
 public sealed record PublicWebChatEndpoint(
     WebChatEndpointId Id,
@@ -40,7 +46,14 @@ public sealed record PublicWebChatEndpoint(
     AiAgentId AiAgentId,
     string AiAgentName,
     AiAgentStatus AiAgentStatus,
-    WebChatEndpointStatus Status);
+    WebChatEndpointStatus Status)
+{
+    /// <summary>The workspace's display name, as its owner set it.</summary>
+    public string WorkspaceName { get; init; } = string.Empty;
+
+    /// <summary>The endpoint's appearance: greeting, accent, corner and theme.</summary>
+    public WebChatWidgetSettings Widget { get; init; } = WebChatWidgetSettings.Default;
+}
 
 /// <summary>
 /// Storing and reading website chat endpoints.

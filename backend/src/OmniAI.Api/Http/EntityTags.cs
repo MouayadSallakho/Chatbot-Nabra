@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Primitives;
 using OmniAI.Application.Concurrency;
+using OmniAI.Api.ErrorHandling;
 
 namespace OmniAI.Api.Http;
 
@@ -187,11 +188,13 @@ internal static class EntityTags
                 "This operation requires an If-Match header carrying the entity tag from the " +
                 "ETag response header of the resource you read. It prevents an edit based on " +
                 "an out-of-date view from silently overwriting somebody else's change.",
-            statusCode: StatusCodes.Status428PreconditionRequired);
+            statusCode: StatusCodes.Status428PreconditionRequired,
+            extensions: new Dictionary<string, object?> { [ProblemCodes.Member] = ProblemCodes.PreconditionRequired });
 
     private static IResult Malformed(string detail) =>
         Results.Problem(
             title: "Invalid If-Match header",
             detail: detail,
-            statusCode: StatusCodes.Status400BadRequest);
+            statusCode: StatusCodes.Status400BadRequest,
+            extensions: new Dictionary<string, object?> { [ProblemCodes.Member] = ProblemCodes.IfMatchInvalid });
 }

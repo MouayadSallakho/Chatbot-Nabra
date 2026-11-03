@@ -1,8 +1,11 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Storage;
 using Npgsql;
+using OmniAI.Application.Concurrency;
 using OmniAI.Application.Tenants;
 using OmniAI.Application.Tenants.Persistence;
+using OmniAI.Domain.Security;
 using OmniAI.Domain.Tenants;
 
 namespace OmniAI.Infrastructure.Persistence.Repositories;
@@ -136,6 +139,60 @@ internal sealed class TenantRepository(OmniAiDbContext context) : ITenantReposit
             throw TenantSlugAlreadyExistsException.ForSlug(workspace.Tenant.Slug.Value, failure);
         }
     }
+
+    public async Task<Versioned<Tenant>?> FindVersionedAsync(
+        TenantId id,
+        CancellationToken cancellationToken = default)
+    {
+        Tenant? tenant = await FindByIdAsync(id, cancellationToken).ConfigureAwait(false);
+
+        return tenant is null ? null : new Versioned<Tenant>(tenant, CurrentVersion(tenant));
+    }
+
+    public async Task<ConcurrencyToken> RenameAsync(
+        Tenant tenant,
+        ConcurrencyToken expected,
+        SecurityEvent audit,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(tenant);
+        ArgumentNullException.ThrowIfNull(audit);
+
+        // The conditional write, exactly as for agents and roles: PostgreSQL tests
+        // the row against the version the caller saw, not the one this request
+        // loaded. A tag this platform did not mint cannot match any row.
+        if (!RowVersionTokens.TryDecode(expected, out uint expectedRowVersion))
+        {
+            throw TenantVersionMismatchException.ForTenant(tenant.Id.Value);
+        }
+
+        RowVersion(tenant).OriginalValue = expectedRowVersion;
+
+        // The audit record joins the same SaveChanges, so the UPDATE and the INSERT
+        // commit in one transaction: a stale tag writes neither.
+        _context.Set<SecurityEvent>().Add(audit);
+
+        try
+        {
+            await _context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (DbUpdateConcurrencyException failure)
+        {
+            _context.Entry(audit).State = EntityState.Detached;
+
+            throw TenantVersionMismatchException.ForTenant(tenant.Id.Value, failure);
+        }
+
+        _context.Entry(audit).State = EntityState.Detached;
+
+        return CurrentVersion(tenant);
+    }
+
+    private ConcurrencyToken CurrentVersion(Tenant tenant) =>
+        RowVersionTokens.Encode(RowVersion(tenant).CurrentValue);
+
+    private PropertyEntry<Tenant, uint> RowVersion(Tenant tenant) =>
+        _context.Entry(tenant).Property<uint>(PersistenceSchema.XminConcurrencyToken);
 
     private static bool IsSlugUniqueViolation(DbUpdateException failure) =>
         failure.InnerException is PostgresException postgres

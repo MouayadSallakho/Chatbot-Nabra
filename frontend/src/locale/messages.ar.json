@@ -1793,6 +1793,8 @@
     "roles.area.count": "مُنح {$granted} من {$total}",
     "permission.workspace.view": "عرض مساحة العمل",
     "permission.workspace.view.description": "الاطلاع على اسم مساحة العمل وحالتها.",
+    "permission.workspace.manage": "إدارة مساحة العمل",
+    "permission.workspace.manage.description": "تغيير إعدادات مساحة العمل، مثل اسمها الذي يراه الزوار في الدردشة العامة.",
     "permission.aiAgents.view": "عرض وكلاء الذكاء الاصطناعي",
     "permission.aiAgents.view.description": "الاطلاع على وكلاء الذكاء الاصطناعي في مساحة العمل وقراءة تعليماتهم.",
     "permission.aiAgents.create": "إنشاء وكلاء ذكاء اصطناعي",

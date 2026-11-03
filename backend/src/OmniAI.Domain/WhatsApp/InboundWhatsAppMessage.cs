@@ -21,6 +21,9 @@ public readonly record struct InboundWhatsAppMessageId
     public static InboundWhatsAppMessageId From(Guid value) =>
         value == Guid.Empty
             ? throw new DomainValidationException("Inbound message id must not be an empty GUID.")
+                {
+                    Code = "whatsapp.inbound.invalid",
+                }
             : new InboundWhatsAppMessageId(value);
 
     public override string ToString() => Value.ToString("D", CultureInfo.InvariantCulture);
@@ -173,7 +176,10 @@ public sealed class InboundWhatsAppMessage
 
         if (body.Length == 0)
         {
-            throw new DomainValidationException("An inbound text message must carry text.");
+            throw new DomainValidationException("An inbound text message must carry text.")
+            {
+                Code = "whatsapp.inbound.invalid",
+            };
         }
 
         if (body.Length > MaxTextLength)
@@ -181,7 +187,10 @@ public sealed class InboundWhatsAppMessage
             throw new DomainValidationException(
                 string.Create(
                     CultureInfo.InvariantCulture,
-                    $"An inbound text message must be {MaxTextLength} characters or fewer."));
+                    $"An inbound text message must be {MaxTextLength} characters or fewer."))
+            {
+                Code = "whatsapp.inbound.invalid",
+            };
         }
 
         return new InboundWhatsAppMessage(

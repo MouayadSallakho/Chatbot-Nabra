@@ -63,6 +63,7 @@ internal static class DocxTextReader
         return text.Length == 0
             ? throw new KnowledgeFileRejectedException(
                 KnowledgeFileRejection.NoText,
+                KnowledgeFileRefusals.NoText,
                 "No text was found in that document. If its content is images, this platform "
                 + "cannot read it — there is no text recognition.")
             : text;
@@ -99,7 +100,9 @@ internal static class DocxTextReader
                 {
                     throw new KnowledgeFileRejectedException(
                         KnowledgeFileRejection.TooMuchContent,
-                        "That document contains too many parts to read safely.");
+                        KnowledgeFileRefusals.ArchiveTooLarge,
+                        "That document contains too many parts to read safely.",
+                        limit: policy.MaxArchiveEntries);
                 }
 
                 long declared = 0;
@@ -112,7 +115,9 @@ internal static class DocxTextReader
                     {
                         throw new KnowledgeFileRejectedException(
                             KnowledgeFileRejection.TooMuchContent,
-                            "That document expands to more content than this platform will read.");
+                            KnowledgeFileRefusals.ArchiveTooLarge,
+                            "That document expands to more content than this platform will read.",
+                            limit: policy.MaxArchiveExpandedBytes);
                     }
 
                     // A single entry claiming an implausible ratio is the shape
@@ -122,6 +127,7 @@ internal static class DocxTextReader
                     {
                         throw new KnowledgeFileRejectedException(
                             KnowledgeFileRejection.TooMuchContent,
+                            KnowledgeFileRefusals.Damaged,
                             "That document could not be read safely. It may be damaged.");
                     }
                 }
@@ -170,8 +176,10 @@ internal static class DocxTextReader
                 {
                     throw new KnowledgeFileRejectedException(
                         KnowledgeFileRejection.TooMuchContent,
+                        KnowledgeFileRefusals.TooManyCharacters,
                         $"That document holds more than {policy.MaxExtractedCharacters:N0} "
-                        + "characters of text. Split it into smaller documents.");
+                        + "characters of text. Split it into smaller documents.",
+                        limit: policy.MaxExtractedCharacters);
                 }
             }
 
@@ -229,6 +237,7 @@ internal static class DocxTextReader
     private static KnowledgeFileRejectedException Malformed() =>
         new(
             KnowledgeFileRejection.Unreadable,
+            KnowledgeFileRefusals.Damaged,
             "That Word document could not be read. It may be damaged, or saved in a format this "
             + "platform does not support — re-save it as .docx and try again.");
 }

@@ -266,7 +266,8 @@ public sealed class AiAgentEndpointsTests(AiAgentApiFixture api) : IClassFixture
     [Fact]
     public async Task The_response_body_carries_no_concurrency_or_persistence_metadata()
     {
-        // The version travels in a header. Seven fields, and no xmin, version,
+        // The version travels in a header. Seven fields, plus (Phase 37.5a) the
+        // channels the reader may see on this read, and no xmin, version,
         // rowVersion, transaction id, provider, model or external identifier.
         using HttpClient client = await api.CreateSignedInClientAsync();
         (Guid tenantId, Guid agentId, _) = await ArrangeAsync(client);
@@ -282,7 +283,7 @@ public sealed class AiAgentEndpointsTests(AiAgentApiFixture api) : IClassFixture
         ];
 
         Assert.Equal(
-            ["createdAt", "id", "instructions", "name", "status", "tenantId", "updatedAt"],
+            ["channels", "createdAt", "id", "instructions", "name", "status", "tenantId", "updatedAt"],
             properties);
 
         foreach (string forbidden in (string[])["xmin", "version", "rowVersion", "etag", "transactionId"])

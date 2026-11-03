@@ -1,4 +1,5 @@
 using OmniAI.Domain.Knowledge;
+using OmniAI.Domain.Tenants;
 
 namespace OmniAI.Application.Knowledge.Persistence;
 
@@ -41,5 +42,18 @@ public interface IKnowledgeIndexAttemptStore
         string failureCode,
         bool alert,
         DateTimeOffset now,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// The document's most recent attempt by start time, or <see langword="null"/>
+    /// when it was never indexed (Phase 37.5a, row 15).
+    /// </summary>
+    /// <remarks>
+    /// Scoped by the workspace as well as the document, so an id from another
+    /// workspace finds nothing.
+    /// </remarks>
+    Task<KnowledgeIndexAttemptView?> FindLatestAsync(
+        TenantId tenantId,
+        KnowledgeDocumentId documentId,
         CancellationToken cancellationToken = default);
 }

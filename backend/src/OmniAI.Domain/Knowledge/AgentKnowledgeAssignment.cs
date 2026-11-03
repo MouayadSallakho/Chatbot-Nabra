@@ -61,24 +61,36 @@ public sealed class AgentKnowledgeAssignment
         if (tenantId.IsEmpty)
         {
             throw new DomainValidationException(
-                "A knowledge assignment must belong to a workspace.");
+                "A knowledge assignment must belong to a workspace.")
+            {
+                Code = "knowledge.assignment.invalid",
+            };
         }
 
         if (aiAgentId.IsEmpty)
         {
-            throw new DomainValidationException("A knowledge assignment must name an AI agent.");
+            throw new DomainValidationException("A knowledge assignment must name an AI agent.")
+            {
+                Code = "knowledge.assignment.invalid",
+            };
         }
 
         if (knowledgeDocumentId.IsEmpty)
         {
             throw new DomainValidationException(
-                "A knowledge assignment must name a knowledge document.");
+                "A knowledge assignment must name a knowledge document.")
+            {
+                Code = "knowledge.assignment.invalid",
+            };
         }
 
         if (assignedAt == default)
         {
             throw new DomainValidationException(
-                "The instant a knowledge document was assigned is required.");
+                "The instant a knowledge document was assigned is required.")
+            {
+                Code = "knowledge.assignment.invalid",
+            };
         }
 
         return new AgentKnowledgeAssignment(

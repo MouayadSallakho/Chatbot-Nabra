@@ -3,6 +3,7 @@ using Npgsql;
 using OmniAI.Application.Knowledge;
 using OmniAI.Application.Knowledge.Persistence;
 using OmniAI.Domain.Knowledge;
+using OmniAI.Domain.Tenants;
 using OmniAI.Infrastructure.Notifications;
 using OmniAI.Infrastructure.Persistence;
 using OmniAI.Infrastructure.Reliability;
@@ -150,4 +151,24 @@ internal sealed class KnowledgeIndexAttemptStore(OmniAiDbContext context) : IKno
 
         return settled;
     }
+
+    public async Task<KnowledgeIndexAttemptView?> FindLatestAsync(
+        TenantId tenantId,
+        KnowledgeDocumentId documentId,
+        CancellationToken cancellationToken = default) =>
+        // ix_knowledge_index_attempts_document finds the document's few rows; the
+        // newest by start wins, and the version-7 id breaks a tie in the same
+        // order, so two reads never disagree about which attempt is "last".
+        await _context.KnowledgeIndexAttempts
+            .AsNoTracking()
+            .Where(attempt => attempt.DocumentId == documentId && attempt.TenantId == tenantId)
+            .OrderByDescending(attempt => attempt.StartedAt)
+            .ThenByDescending(attempt => attempt.Id)
+            .Select(attempt => new KnowledgeIndexAttemptView(
+                attempt.Status,
+                attempt.FailureCode,
+                attempt.StartedAt,
+                attempt.CompletedAt))
+            .FirstOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
 }

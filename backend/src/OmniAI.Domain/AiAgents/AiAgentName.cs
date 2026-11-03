@@ -56,7 +56,10 @@ public sealed record AiAgentName
     {
         if (string.IsNullOrWhiteSpace(value))
         {
-            throw new DomainValidationException("AI agent name is required.");
+            throw new DomainValidationException("AI agent name is required.")
+            {
+                Code = "ai-agents.name.required",
+            };
         }
 
         string normalised = value.Trim();
@@ -65,7 +68,10 @@ public sealed record AiAgentName
         {
             throw new DomainValidationException(
                 $"AI agent name must be at most {MaxLength} characters; " +
-                $"the supplied name has {normalised.Length}. It is not truncated.");
+                $"the supplied name has {normalised.Length}. It is not truncated.")
+            {
+                Code = "ai-agents.name.too_long",
+            };
         }
 
         // Control characters serve no purpose in a display name -- including line
@@ -78,7 +84,10 @@ public sealed record AiAgentName
             if (char.IsControl(character))
             {
                 throw new DomainValidationException(
-                    "AI agent name must not contain control characters.");
+                    "AI agent name must not contain control characters.")
+                {
+                    Code = "ai-agents.name.control_characters",
+                };
             }
         }
 

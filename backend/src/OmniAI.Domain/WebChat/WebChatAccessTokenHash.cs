@@ -47,7 +47,10 @@ public sealed class WebChatAccessTokenHash : IEquatable<WebChatAccessTokenHash>
         if (value.Length != Length)
         {
             throw new DomainValidationException(
-                $"A web chat access token hash must be exactly {Length} bytes.");
+                $"A web chat access token hash must be exactly {Length} bytes.")
+            {
+                Code = "chat.access_token.invalid",
+            };
         }
 
         return new WebChatAccessTokenHash(value.ToArray());

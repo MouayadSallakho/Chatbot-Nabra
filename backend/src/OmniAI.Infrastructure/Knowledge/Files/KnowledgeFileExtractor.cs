@@ -40,8 +40,10 @@ internal sealed class KnowledgeFileExtractor(KnowledgeFilePolicy policy) : IKnow
         {
             throw new KnowledgeFileRejectedException(
                 KnowledgeFileRejection.TooLarge,
+                KnowledgeFileRefusals.TooLarge,
                 $"That file is larger than {_policy.MaxFileMegabytes} MB. Split it into smaller "
-                + "documents, or upload the part that matters.");
+                + "documents, or upload the part that matters.",
+                limit: _policy.MaxFileBytes);
         }
 
         KnowledgeFileType type = KnowledgeFileSignature.Identify(upload);
@@ -54,6 +56,7 @@ internal sealed class KnowledgeFileExtractor(KnowledgeFilePolicy policy) : IKnow
             KnowledgeFileType.Csv => CsvTextReader.Read(ReadPlainText(upload.Content), _policy),
             _ => throw new KnowledgeFileRejectedException(
                 KnowledgeFileRejection.UnsupportedType,
+                KnowledgeFileRefusals.UnsupportedType,
                 "That kind of file is not supported. Upload a PDF, DOCX, TXT or CSV."),
         };
 
@@ -65,8 +68,10 @@ internal sealed class KnowledgeFileExtractor(KnowledgeFilePolicy policy) : IKnow
         {
             throw new KnowledgeFileRejectedException(
                 KnowledgeFileRejection.TooMuchContent,
+                KnowledgeFileRefusals.TooManyCharacters,
                 $"That file holds more than {_policy.MaxExtractedCharacters:N0} characters of "
-                + "text. Split it into smaller documents.");
+                + "text. Split it into smaller documents.",
+                limit: _policy.MaxExtractedCharacters);
         }
 
         return new KnowledgeExtraction(text, type);
@@ -95,6 +100,7 @@ internal sealed class KnowledgeFileExtractor(KnowledgeFilePolicy policy) : IKnow
         {
             throw new KnowledgeFileRejectedException(
                 KnowledgeFileRejection.TypeMismatch,
+                KnowledgeFileRefusals.TypeMismatch,
                 "That file is named like text but contains binary data. Upload a PDF, DOCX, TXT "
                 + "or CSV.");
         }

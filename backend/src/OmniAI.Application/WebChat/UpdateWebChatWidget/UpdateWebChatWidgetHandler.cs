@@ -101,8 +101,11 @@ public sealed class UpdateWebChatWidgetHandler(
             string.IsNullOrWhiteSpace(command.AccentColor)
                 ? WebChatAccentColor.Default
                 : WebChatAccentColor.Create(command.AccentColor),
-            Read<WebChatLauncherPosition>(command.LauncherPosition, "launcher position"),
-            Read<WebChatTheme>(command.Theme, "widget theme"));
+            Read<WebChatLauncherPosition>(
+                command.LauncherPosition,
+                "launcher position",
+                "website-chat.launcher_position.invalid"),
+            Read<WebChatTheme>(command.Theme, "widget theme", "website-chat.theme.invalid"));
 
     /// <summary>
     /// Reads the intended list of websites, reporting which line is wrong.
@@ -123,7 +126,10 @@ public sealed class UpdateWebChatWidgetHandler(
         {
             throw new DomainValidationException(
                 $"A website chat widget may be allowed on at most "
-                + $"{WebChatEndpoint.MaxAllowedOrigins} websites; {supplied.Count} were supplied.");
+                + $"{WebChatEndpoint.MaxAllowedOrigins} websites; {supplied.Count} were supplied.")
+            {
+                Code = "website-chat.origin.too_many",
+            };
         }
 
         List<WebChatOrigin> origins = new(supplied.Count);
@@ -137,7 +143,10 @@ public sealed class UpdateWebChatWidgetHandler(
 
             if (!WebChatOrigin.TryCreate(candidate, out WebChatOrigin origin, out string problem))
             {
-                throw new DomainValidationException($"'{candidate.Trim()}': {problem}");
+                throw new DomainValidationException($"'{candidate.Trim()}': {problem}")
+                {
+                    Code = "website-chat.origin.invalid",
+                };
             }
 
             origins.Add(origin);
@@ -154,7 +163,7 @@ public sealed class UpdateWebChatWidgetHandler(
     /// <c>ignoreCase</c> on a parse that also checks the result is defined cannot
     /// let an ordinal through disguised as a name.
     /// </remarks>
-    private static TValue Read<TValue>(string? value, string what)
+    private static TValue Read<TValue>(string? value, string what, string code)
         where TValue : struct, Enum
     {
         if (string.IsNullOrWhiteSpace(value))
@@ -166,7 +175,10 @@ public sealed class UpdateWebChatWidgetHandler(
             || !Enum.IsDefined(parsed))
         {
             throw new DomainValidationException(
-                $"'{value.Trim()}' is not a recognised {what}.");
+                $"'{value.Trim()}' is not a recognised {what}.")
+            {
+                Code = code,
+            };
         }
 
         return parsed;

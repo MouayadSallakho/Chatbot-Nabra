@@ -507,6 +507,22 @@ never read, list or search it.
 | PUT | `.../ai-agents/{a}/knowledge` | `knowledge.manage` + `ai-agents.edit` + agent `If-Match` |
 | POST | `.../ai-agents/{a}/knowledge/search` | `knowledge.view` + `ai-agents.view` |
 
+**Phase 37.5a: what the last attempt did, and how large the file was.** The list
+items and `GET …/knowledge/{id}` carry `lastIndexAttempt`: `{ status, failureCode,
+startedAt, completedAt }`, or `null` when the document was never indexed. `status` is
+`Started` (indexing now), `Succeeded`, `Failed` or `Unknown` (the process stopped before
+it could say); `failureCode` is one of `KnowledgeIndexAttemptFailures`
+(`provider_unavailable`, `provider_timeout`, `provider_response_invalid`,
+`quota_exhausted`, `document_changed`, `cancelled`, `interrupted`, `indexing_error`) and
+never a provider's message. The newest attempt by start time wins (the version-7 id
+breaks a tie). Readiness is unchanged and still derived. The list items also carry
+`sourceByteLength` (the uploaded file's size, `null` for typed text). Both come from the
+list's single statement, as per-row probes on `ix_knowledge_index_attempts_document` and
+`ux_knowledge_sources_document`, so a page costs the same statements whatever its length.
+The writes keep their shape: only the reads carry `lastIndexAttempt`, so a write never
+claims "never attempted" for a document that was. Refusals carry stable codes
+(`problem-codes.md`).
+
 **Indexing requires `If-Match` because indexing is a write** — it replaces the
 chunk set and moves the version. Missing → 428, stale → 412, success → a new ETag.
 Nothing is retried automatically.

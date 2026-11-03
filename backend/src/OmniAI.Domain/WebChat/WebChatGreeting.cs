@@ -55,7 +55,10 @@ public sealed record WebChatGreeting
         {
             throw new DomainValidationException(
                 $"A greeting must be at most {MaxLength} characters; the supplied greeting has "
-                + $"{normalised.Length}. It is not truncated.");
+                + $"{normalised.Length}. It is not truncated.")
+            {
+                Code = "website-chat.greeting.too_long",
+            };
         }
 
         foreach (char character in normalised)
@@ -66,7 +69,10 @@ public sealed record WebChatGreeting
             if (char.IsControl(character) && character is not '\n')
             {
                 throw new DomainValidationException(
-                    "A greeting must not contain control characters other than line feed.");
+                    "A greeting must not contain control characters other than line feed.")
+                {
+                    Code = "website-chat.greeting.control_characters",
+                };
             }
         }
 
