@@ -207,10 +207,11 @@ internal sealed class ReportWorld(PostgresTestDatabase database)
         ReportType type = ReportType.ChannelUsage,
         ReportFormat format = ReportFormat.Csv,
         UserId? requester = null,
-        DateTimeOffset? at = null)
+        DateTimeOffset? at = null,
+        UserLanguage language = UserLanguage.English)
     {
         ReportExecution execution = ReportExecution.Request(
-            Tenant, type, format, September, requester ?? Owner, Guid.NewGuid(), at ?? DateTimeOffset.UtcNow);
+            Tenant, type, format, September, requester ?? Owner, Guid.NewGuid(), at ?? DateTimeOffset.UtcNow, language);
 
         await using OmniAiDbContext context = Context();
 

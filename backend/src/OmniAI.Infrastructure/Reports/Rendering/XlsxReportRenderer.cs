@@ -29,6 +29,13 @@ namespace OmniAI.Infrastructure.Reports.Rendering;
 /// sits beside the currency it is in. Header rows are bold and frozen, columns are
 /// sized to their content within limits.
 /// </para>
+/// <para>
+/// <strong>An Arabic workbook opens right to left (Phase 37.7).</strong> Every sheet
+/// is marked with the sheet view's <c>rightToLeft</c> flag, so column A is on the
+/// right and Excel lays the sheet out the way an Arabic reader expects; the summary
+/// labels and the sheet names are Arabic. Number and date formats are the same as
+/// in English. An English workbook carries no new attribute at all.
+/// </para>
 /// </remarks>
 internal sealed class XlsxReportRenderer : IReportRenderer
 {
@@ -62,9 +69,12 @@ internal sealed class XlsxReportRenderer : IReportRenderer
 
             Sheets sheets = part.Workbook.AppendChild(new Sheets());
 
+            ReportWording words = document.Wording;
+            bool rtl = words.IsRightToLeft;
+
             uint sheetId = 1;
 
-            AddSheet(part, sheets, sheetId++, "Summary", SummaryRows(document), [34, 60], frozen: false);
+            AddSheet(part, sheets, sheetId++, SheetName(words["Summary"]), SummaryRows(document), [34, 60], frozen: false, rtl);
 
             foreach (ReportTable table in document.Tables)
             {
@@ -77,7 +87,8 @@ internal sealed class XlsxReportRenderer : IReportRenderer
                     SheetName(table.Name),
                     TableRows(table),
                     Widths(table),
-                    frozen: true);
+                    frozen: true,
+                    rtl);
             }
 
             part.Workbook.Save();
@@ -90,18 +101,19 @@ internal sealed class XlsxReportRenderer : IReportRenderer
 
     private static IEnumerable<Row> SummaryRows(ReportDocument document)
     {
+        ReportWording words = document.Wording;
         uint index = 1;
 
         yield return RowOf(index++, TextCell(document.Title, StyleTitle));
 
         if (document.WorkspaceName is not null)
         {
-            yield return RowOf(index++, TextCell("Workspace", StyleHeader), TextCell(document.WorkspaceName));
+            yield return RowOf(index++, TextCell(words["Workspace"], StyleHeader), TextCell(document.WorkspaceName));
         }
 
-        yield return RowOf(index++, TextCell($"Period start ({document.Period.TimeZone})", StyleHeader), DateCell(document.Period.FromDate));
-        yield return RowOf(index++, TextCell($"Period end ({document.Period.TimeZone}, inclusive)", StyleHeader), DateCell(document.Period.LastDate));
-        yield return RowOf(index++, TextCell("Generated (UTC)", StyleHeader), InstantCell(document.GeneratedAt));
+        yield return RowOf(index++, TextCell(words.PeriodStart(document.Period.TimeZone), StyleHeader), DateCell(document.Period.FromDate));
+        yield return RowOf(index++, TextCell(words.PeriodEnd(document.Period.TimeZone), StyleHeader), DateCell(document.Period.LastDate));
+        yield return RowOf(index++, TextCell(words["Generated (UTC)"], StyleHeader), InstantCell(document.GeneratedAt));
 
         index++;
 
@@ -137,7 +149,8 @@ internal sealed class XlsxReportRenderer : IReportRenderer
         string name,
         IEnumerable<Row> rows,
         IReadOnlyList<double> widths,
-        bool frozen)
+        bool frozen,
+        bool rightToLeft)
     {
         WorksheetPart part = workbook.AddNewPart<WorksheetPart>();
 
@@ -145,7 +158,7 @@ internal sealed class XlsxReportRenderer : IReportRenderer
 
         if (frozen)
         {
-            worksheet.Append(new SheetViews(new SheetView(
+            SheetView view = new(
                 new Pane
                 {
                     VerticalSplit = 1D,
@@ -155,7 +168,19 @@ internal sealed class XlsxReportRenderer : IReportRenderer
                 })
             {
                 WorkbookViewId = 0U,
-            }));
+            };
+
+            // Phase 37.7: set only for Arabic, so an English sheet's XML is unchanged.
+            if (rightToLeft)
+            {
+                view.RightToLeft = true;
+            }
+
+            worksheet.Append(new SheetViews(view));
+        }
+        else if (rightToLeft)
+        {
+            worksheet.Append(new SheetViews(new SheetView { RightToLeft = true, WorkbookViewId = 0U }));
         }
 
         worksheet.Append(new Columns(widths.Select((width, index) => new Column
@@ -267,7 +292,7 @@ internal sealed class XlsxReportRenderer : IReportRenderer
         _ => 12,
     };
 
-    /// <summary>Sheet names are fixed by the builder; this only enforces Excel's own rules.</summary>
+    /// <summary>Sheet names are fixed by the builder (in either language); this only enforces Excel's own rules.</summary>
     private static string SheetName(string name)
     {
         string cleaned = new([.. name.Where(character => "[]:*?/\\".IndexOf(character, StringComparison.Ordinal) < 0)]);

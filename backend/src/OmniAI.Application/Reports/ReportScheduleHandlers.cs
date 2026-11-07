@@ -1,5 +1,6 @@
 using OmniAI.Application.Authorization;
 using OmniAI.Application.Concurrency;
+using OmniAI.Application.Security;
 using OmniAI.Application.Tenants.Persistence;
 using OmniAI.Domain;
 using OmniAI.Domain.Authorization;
@@ -10,6 +11,7 @@ using OmniAI.Domain.Users;
 namespace OmniAI.Application.Reports;
 
 /// <summary>A schedule as the API publishes it.</summary>
+/// <param name="Language">The language its reports are written in, <c>en</c> or <c>ar</c> (Phase 37.7).</param>
 public sealed record ReportScheduleView(
     Guid Id,
     string Name,
@@ -24,9 +26,14 @@ public sealed record ReportScheduleView(
     DateTimeOffset UpdatedAt,
     string? DisabledReason,
     ReportExecutionView? LastExecution,
-    bool CanEdit);
+    bool CanEdit,
+    string Language);
 
 /// <summary>Create a schedule, or replace one's editable fields.</summary>
+/// <param name="Language">
+/// The language its reports are written in (Phase 37.7). On create, absent means
+/// the creator's own language, else English; on edit, absent keeps the schedule's.
+/// </param>
 public sealed record SaveReportScheduleCommand(
     Guid TenantId,
     Guid? ScheduleId,
@@ -35,7 +42,8 @@ public sealed record SaveReportScheduleCommand(
     string? Format,
     string? Frequency,
     bool? Enabled,
-    ConcurrencyToken Expected);
+    ConcurrencyToken Expected,
+    UserLanguage? Language = null);
 
 /// <summary>Switch a schedule on or off.</summary>
 public sealed record SetReportScheduleEnabledCommand(
@@ -71,6 +79,7 @@ public sealed class ReportScheduleHandlers(
     IReportScheduleStore schedules,
     ReportOptions options,
     IWorkspaceTimeZones timeZones,
+    IAccountDirectory accounts,
     TimeProvider clock)
 {
     private readonly TenantAuthorizer _authorizer =
@@ -83,6 +92,8 @@ public sealed class ReportScheduleHandlers(
 
     private readonly IWorkspaceTimeZones _timeZones =
         timeZones ?? throw new ArgumentNullException(nameof(timeZones));
+
+    private readonly IAccountDirectory _accounts = accounts ?? throw new ArgumentNullException(nameof(accounts));
 
     private readonly TimeProvider _clock = clock ?? throw new ArgumentNullException(nameof(clock));
 
@@ -157,6 +168,12 @@ public sealed class ReportScheduleHandlers(
             throw new ReportScheduleLimitException();
         }
 
+        UserId creator = _authorizer.RequireCurrentUser();
+
+        // Phase 37.7: the language the creator chose, else their own, else English.
+        UserLanguage language = command.Language
+            ?? UserLanguages.OrDefault(await _accounts.FindLanguageAsync(creator, cancellationToken).ConfigureAwait(false));
+
         ReportSchedule schedule = ReportSchedule.Create(
             workspace,
             command.Name,
@@ -164,9 +181,10 @@ public sealed class ReportScheduleHandlers(
             format,
             frequency,
             command.Enabled ?? true,
-            _authorizer.RequireCurrentUser(),
+            creator,
             _clock.GetUtcNow(),
-            await _timeZones.OfAsync(workspace, cancellationToken).ConfigureAwait(false));
+            await _timeZones.OfAsync(workspace, cancellationToken).ConfigureAwait(false),
+            language);
 
         await _schedules.AddAsync(schedule, cancellationToken).ConfigureAwait(false);
 
@@ -215,7 +233,8 @@ public sealed class ReportScheduleHandlers(
             command.Enabled ?? stored.Value.Enabled,
             _authorizer.RequireCurrentUser(),
             _clock.GetUtcNow(),
-            await _timeZones.OfAsync(workspace, cancellationToken).ConfigureAwait(false));
+            await _timeZones.OfAsync(workspace, cancellationToken).ConfigureAwait(false),
+            command.Language);
 
         await _schedules.UpdateAsync(stored.Value, command.Expected, cancellationToken).ConfigureAwait(false);
 
@@ -329,7 +348,8 @@ public sealed class ReportScheduleHandlers(
             record.LastExecution is ReportExecution last
                 ? ReportHandlers.View(new ReportExecutionRecord(last, schedule.Name, null, null), held, viewer, now)
                 : null,
-            ReportCatalog.Holds(held, ReportCatalog.ToSchedule(schedule.Type)));
+            ReportCatalog.Holds(held, ReportCatalog.ToSchedule(schedule.Type)),
+            UserLanguages.Code(schedule.Language));
     }
 
     private async Task<IReadOnlyList<PermissionCode>?> RequireAsync(

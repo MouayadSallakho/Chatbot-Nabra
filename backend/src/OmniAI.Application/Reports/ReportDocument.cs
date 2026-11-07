@@ -1,4 +1,5 @@
 using OmniAI.Domain.Reports;
+using OmniAI.Domain.Users;
 
 namespace OmniAI.Application.Reports;
 
@@ -94,6 +95,10 @@ public sealed record ReportTable(
 /// every table.
 /// </para>
 /// </remarks>
+/// <param name="Language">
+/// The language the document is worded in (Phase 37.7). The renderers word their
+/// own labels in it, and an Arabic document is laid out right to left.
+/// </param>
 public sealed record ReportDocument(
     ReportType Type,
     string Title,
@@ -102,8 +107,12 @@ public sealed record ReportDocument(
     DateTimeOffset GeneratedAt,
     IReadOnlyList<ReportFact> Summary,
     IReadOnlyList<ReportTable> Tables,
-    IReadOnlyList<string> Notes)
+    IReadOnlyList<string> Notes,
+    UserLanguage Language = UserLanguage.English)
 {
+    /// <summary>How the renderers word their own labels for this document.</summary>
+    public ReportWording Wording => ReportWording.For(Language);
+
     public ReportTable Primary => Tables[0];
 
     /// <summary>Every table row in the document: what the export bound is measured against.</summary>

@@ -146,6 +146,39 @@ public sealed class ReportScheduleTests(PostgresTestDatabase database) : IClassF
         Assert.Equal(new DateTimeOffset(2026, 9, 28, 0, 0, 0, TimeSpan.Zero), advanced.NextRunAt);
     }
 
+    /// <remarks>
+    /// Phase 37.7: a scheduled occurrence is written in its schedule's language,
+    /// whatever its owner's own language is, and the worker claims it with that
+    /// language.
+    /// </remarks>
+    [Fact]
+    public async Task A_scheduled_occurrence_runs_in_its_schedule_s_language()
+    {
+        ReportWorld world = await ReportWorld.CreateAsync(database);
+        UserId owner = await world.MemberAsync(Scheduler);
+        ReportSchedule arabic = await AddAsync(world, LongAgo, owner, language: UserLanguage.Arabic);
+        ReportSchedule english = await AddAsync(world, LongAgo, owner);
+
+        await RunAsync(new DateTimeOffset(2026, 9, 24, 12, 0, 0, TimeSpan.Zero));
+
+        await using OmniAiDbContext context = database.CreateContext();
+
+        ReportExecution arabicOccurrence = await context.ReportExecutions.AsNoTracking()
+            .SingleAsync(execution => execution.ScheduleId == arabic.Id);
+        ReportExecution englishOccurrence = await context.ReportExecutions.AsNoTracking()
+            .SingleAsync(execution => execution.ScheduleId == english.Id);
+
+        Assert.Equal(UserLanguage.Arabic, arabicOccurrence.Language);
+        Assert.Equal(UserLanguage.English, englishOccurrence.Language);
+        Assert.Equal(UserLanguage.Arabic, (await context.ReportSchedules.AsNoTracking().SingleAsync(candidate => candidate.Id == arabic.Id)).Language);
+
+        IReadOnlyList<ClaimedReportExecution> claimed = await new ReportExecutionStore(context)
+            .ClaimAsync(500, 3, TimeSpan.FromMinutes(10), DateTimeOffset.UtcNow);
+
+        Assert.Equal(UserLanguage.Arabic, claimed.Single(candidate => candidate.Id == arabicOccurrence.Id).Language);
+        Assert.Equal(UserLanguage.English, claimed.Single(candidate => candidate.Id == englishOccurrence.Id).Language);
+    }
+
     [Fact]
     public async Task Repeating_an_occurrence_never_queues_it_twice()
     {
@@ -233,7 +266,8 @@ public sealed class ReportScheduleTests(PostgresTestDatabase database) : IClassF
         DateTimeOffset createdAt,
         UserId? owner = null,
         ReportType type = ReportType.ChannelUsage,
-        bool enabled = true)
+        bool enabled = true,
+        UserLanguage language = UserLanguage.English)
     {
         ReportSchedule schedule = ReportSchedule.Create(
             world.Tenant,
@@ -243,7 +277,8 @@ public sealed class ReportScheduleTests(PostgresTestDatabase database) : IClassF
             ReportFrequency.Weekly,
             enabled,
             owner ?? world.Owner,
-            createdAt);
+            createdAt,
+            language: language);
 
         await using OmniAiDbContext context = database.CreateContext();
 

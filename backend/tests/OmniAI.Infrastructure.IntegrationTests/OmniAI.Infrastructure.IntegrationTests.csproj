@@ -51,6 +51,14 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!--
+      Phase 37.7: report files captured from the 37.6 code before anything changed.
+      ReportGoldenFileTests proves English files still match them exactly.
+    -->
+    <None Include="Reports\Golden\**\*" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Using Include="Xunit" />
   </ItemGroup>
 

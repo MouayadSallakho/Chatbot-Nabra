@@ -52,6 +52,12 @@ Measured in the worktree at `ce4ac51` (2026-10-18):
 `many`), 100-102 other. `formatRange(21, 40)` returns a bare `21–40` with **no** bidi marks;
 `style: 'percent'` returns `42‎%‎` with left-to-right marks.
 
+**Server-written files (Phase 37.7).** Report files (CSV, Excel, PDF) are
+written in the requester's or the schedule's language by the backend, with the
+same glossary and decision 3 (Western digits, Gregorian calendar). How each format
+reads right to left is in `reports-exports-scheduling.md` §7, "Report files in
+the reader's language".
+
 ## 1. Requirements
 
 | # | Requirement | Acceptance check |

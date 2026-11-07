@@ -1,0 +1,4 @@
+﻿Provider,Model,Operation,Calls,Estimated provider cost,Currency,Unrated calls
+OpenAi,gpt-4.1-mini,Text generation,280,1.234567,USD,0
+OpenAi,text-embedding-3-small,Embedding,124,0.5,EUR,0
+DevelopmentStandIn,local-stand-in,Embedding,6,,,6

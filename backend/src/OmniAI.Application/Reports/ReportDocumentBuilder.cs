@@ -5,6 +5,7 @@ using OmniAI.Domain.Ai;
 using OmniAI.Domain.Conversations;
 using OmniAI.Domain.Reports;
 using OmniAI.Domain.Tenants;
+using OmniAI.Domain.Users;
 
 namespace OmniAI.Application.Reports;
 
@@ -17,6 +18,11 @@ namespace OmniAI.Application.Reports;
 /// <see cref="WorkspaceAnalytics"/>, read through the same reader the dashboard
 /// uses, or a field of <see cref="CustomerActivityRow"/>, counted over the same
 /// base sets. This class chooses columns and labels; it never counts.
+/// </para>
+/// <para>
+/// <strong>It words nothing itself (Phase 37.7).</strong> Every phrase goes through
+/// <see cref="ReportWording"/>, keyed by its English, so an English report says
+/// exactly what it said before and an Arabic one says it in Arabic.
 /// </para>
 /// <para>
 /// <strong>It spends nothing.</strong> No provider is called to write a summary,
@@ -41,6 +47,11 @@ public sealed class ReportDocumentBuilder(
     private readonly ICustomerActivityReader _customers =
         customers ?? throw new ArgumentNullException(nameof(customers));
 
+    /// <param name="language">
+    /// The language the report is worded in (Phase 37.7): its title, labels, headings,
+    /// notes and the platform's own cell values. Figures, dates and stored names are
+    /// the same in every language.
+    /// </param>
     /// <exception cref="ReportTooLargeException">The report would carry more than <paramref name="rowLimit"/> rows.</exception>
     public async Task<ReportDocument> BuildAsync(
         TenantId tenantId,
@@ -49,10 +60,13 @@ public sealed class ReportDocumentBuilder(
         string? workspaceName,
         DateTimeOffset generatedAt,
         int rowLimit,
+        UserLanguage language = UserLanguage.English,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(period);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(rowLimit);
+
+        ReportWording w = ReportWording.For(language);
 
         // The report's own zone, kept on its execution (Phase 37.6): the same local
         // days the dashboard would count in that zone.
@@ -75,7 +89,7 @@ public sealed class ReportDocumentBuilder(
                 throw new ReportTooLargeException();
             }
 
-            document = CustomerActivity(rows, period, workspaceName, generatedAt);
+            document = CustomerActivity(rows, period, workspaceName, generatedAt, w);
         }
         else
         {
@@ -90,13 +104,13 @@ public sealed class ReportDocumentBuilder(
 
             document = type switch
             {
-                ReportType.ConversationActivity => ConversationActivity(read, period, workspaceName, generatedAt),
-                ReportType.ChannelUsage => ChannelUsage(read, period, workspaceName, generatedAt),
-                ReportType.AiHumanHandling => AiHumanHandling(read, period, workspaceName, generatedAt),
-                ReportType.AgentActivity => AgentActivity(read, period, workspaceName, generatedAt),
-                ReportType.ProviderUsage => ProviderUsage(read, period, workspaceName, generatedAt),
-                ReportType.ProviderCost => ProviderCost(read, period, workspaceName, generatedAt),
-                ReportType.WhatsAppDelivery => WhatsAppDelivery(read, period, workspaceName, generatedAt),
+                ReportType.ConversationActivity => ConversationActivity(read, period, workspaceName, generatedAt, w),
+                ReportType.ChannelUsage => ChannelUsage(read, period, workspaceName, generatedAt, w),
+                ReportType.AiHumanHandling => AiHumanHandling(read, period, workspaceName, generatedAt, w),
+                ReportType.AgentActivity => AgentActivity(read, period, workspaceName, generatedAt, w),
+                ReportType.ProviderUsage => ProviderUsage(read, period, workspaceName, generatedAt, w),
+                ReportType.ProviderCost => ProviderCost(read, period, workspaceName, generatedAt, w),
+                ReportType.WhatsAppDelivery => WhatsAppDelivery(read, period, workspaceName, generatedAt, w),
                 _ => throw new ArgumentOutOfRangeException(nameof(type), type, null),
             };
         }
@@ -112,7 +126,7 @@ public sealed class ReportDocumentBuilder(
     // ------------------------------------------------------------- the reports
 
     private static ReportDocument ConversationActivity(
-        WorkspaceAnalytics read, ReportPeriod period, string? workspace, DateTimeOffset at)
+        WorkspaceAnalytics read, ReportPeriod period, string? workspace, DateTimeOffset at, ReportWording w)
     {
         AnalyticsSummary summary = read.Summary;
         AnalyticsSnapshot now = read.Current;
@@ -122,26 +136,27 @@ public sealed class ReportDocumentBuilder(
             period,
             workspace,
             at,
+            w,
             [
-                Fact("Conversations started", summary.ConversationsStarted),
-                Fact("Customer messages", summary.CustomerMessages),
-                Fact("AI messages", summary.AiMessages),
-                Fact("Human messages", summary.HumanMessages),
-                Fact("System messages", summary.SystemMessages),
-                Fact("Open conversations (current snapshot)", now.OpenConversations),
-                Fact("Open, handled by AI (current snapshot)", now.OpenHandledByAi),
-                Fact("Open, handled by a person (current snapshot)", now.OpenHandledByHuman),
+                Fact(w["Conversations started"], summary.ConversationsStarted),
+                Fact(w["Customer messages"], summary.CustomerMessages),
+                Fact(w["AI messages"], summary.AiMessages),
+                Fact(w["Human messages"], summary.HumanMessages),
+                Fact(w["System messages"], summary.SystemMessages),
+                Fact(w["Open conversations (current snapshot)"], now.OpenConversations),
+                Fact(w["Open, handled by AI (current snapshot)"], now.OpenHandledByAi),
+                Fact(w["Open, handled by a person (current snapshot)"], now.OpenHandledByHuman),
             ],
             [
                 Table(
-                    "Daily activity",
-                    "Daily activity",
+                    w["Daily activity"],
+                    w["Daily activity"],
                     [
-                        Column(DateHeader(period), ReportValueKind.Date),
-                        Column("Conversations started", ReportValueKind.Count),
-                        Column("Customer messages", ReportValueKind.Count),
-                        Column("AI messages", ReportValueKind.Count),
-                        Column("Human messages", ReportValueKind.Count),
+                        Column(w.DateHeader(period.TimeZone), ReportValueKind.Date),
+                        Column(w["Conversations started"], ReportValueKind.Count),
+                        Column(w["Customer messages"], ReportValueKind.Count),
+                        Column(w["AI messages"], ReportValueKind.Count),
+                        Column(w["Human messages"], ReportValueKind.Count),
                     ],
                     read.DailyActivity
                         .OrderBy(day => day.Date)
@@ -153,13 +168,13 @@ public sealed class ReportDocumentBuilder(
                             ReportValue.Count(day.HumanMessages)))),
             ],
             [
-                "Snapshot figures describe the workspace at the moment the report was generated, not the period.",
-                NoText,
+                w["Snapshot figures describe the workspace at the moment the report was generated, not the period."],
+                w[NoText],
             ]);
     }
 
     private static ReportDocument ChannelUsage(
-        WorkspaceAnalytics read, ReportPeriod period, string? workspace, DateTimeOffset at)
+        WorkspaceAnalytics read, ReportPeriod period, string? workspace, DateTimeOffset at, ReportWording w)
     {
         // Website and WhatsApp always appear, used or not: they are the channels
         // this platform implements. Anything else appears only if it was used.
@@ -175,7 +190,7 @@ public sealed class ReportDocumentBuilder(
                 AnalyticsChannel? row = read.Channels.FirstOrDefault(channel => channel.Channel == kind);
 
                 return Row(
-                    ReportValue.Text(ChannelLabel(kind)),
+                    ReportValue.Text(w.Channel(kind)),
                     ReportValue.Count(row?.ConversationsStarted ?? 0),
                     ReportValue.Count(row?.CustomerMessages ?? 0),
                     ReportValue.Count(row?.AiMessages ?? 0),
@@ -188,31 +203,32 @@ public sealed class ReportDocumentBuilder(
             period,
             workspace,
             at,
+            w,
             [
-                Fact("Conversations started", read.Summary.ConversationsStarted),
-                Fact("Customer messages", read.Summary.CustomerMessages),
+                Fact(w["Conversations started"], read.Summary.ConversationsStarted),
+                Fact(w["Customer messages"], read.Summary.CustomerMessages),
             ],
             [
                 new ReportTable(
-                    "Channels",
-                    "Activity by channel",
+                    w["Channels"],
+                    w["Activity by channel"],
                     [
-                        Column("Channel", ReportValueKind.Text),
-                        Column("Conversations started", ReportValueKind.Count),
-                        Column("Customer messages", ReportValueKind.Count),
-                        Column("AI messages", ReportValueKind.Count),
-                        Column("Human messages", ReportValueKind.Count),
+                        Column(w["Channel"], ReportValueKind.Text),
+                        Column(w["Conversations started"], ReportValueKind.Count),
+                        Column(w["Customer messages"], ReportValueKind.Count),
+                        Column(w["AI messages"], ReportValueKind.Count),
+                        Column(w["Human messages"], ReportValueKind.Count),
                     ],
                     rows),
             ],
             [
-                "A message is attributed to the channel of the conversation it belongs to.",
-                NoText,
+                w["A message is attributed to the channel of the conversation it belongs to."],
+                w[NoText],
             ]);
     }
 
     private static ReportDocument AiHumanHandling(
-        WorkspaceAnalytics read, ReportPeriod period, string? workspace, DateTimeOffset at)
+        WorkspaceAnalytics read, ReportPeriod period, string? workspace, DateTimeOffset at, ReportWording w)
     {
         AnalyticsAiOperations turns = read.AiOperations;
         AnalyticsSnapshot now = read.Current;
@@ -222,22 +238,23 @@ public sealed class ReportDocumentBuilder(
             period,
             workspace,
             at,
+            w,
             [
-                Fact("AI replies", read.Summary.AiMessages),
-                Fact("Human replies", read.Summary.HumanMessages),
-                Fact("AI turns attempted", turns.Attempts),
-                Fact("AI turns completed", turns.Completed),
-                Fact("AI turns failed", turns.Failed),
-                Fact("AI turns still in progress", turns.InProgress),
+                Fact(w["AI replies"], read.Summary.AiMessages),
+                Fact(w["Human replies"], read.Summary.HumanMessages),
+                Fact(w["AI turns attempted"], turns.Attempts),
+                Fact(w["AI turns completed"], turns.Completed),
+                Fact(w["AI turns failed"], turns.Failed),
+                Fact(w["AI turns still in progress"], turns.InProgress),
             ],
             [
                 Table(
-                    "Daily replies",
-                    "Replies by day",
+                    w["Daily replies"],
+                    w["Replies by day"],
                     [
-                        Column(DateHeader(period), ReportValueKind.Date),
-                        Column("AI replies", ReportValueKind.Count),
-                        Column("Human replies", ReportValueKind.Count),
+                        Column(w.DateHeader(period.TimeZone), ReportValueKind.Date),
+                        Column(w["AI replies"], ReportValueKind.Count),
+                        Column(w["Human replies"], ReportValueKind.Count),
                     ],
                     read.DailyActivity
                         .OrderBy(day => day.Date)
@@ -246,53 +263,54 @@ public sealed class ReportDocumentBuilder(
                             ReportValue.Count(day.AiMessages),
                             ReportValue.Count(day.HumanMessages)))),
                 new ReportTable(
-                    "Current handling",
-                    "Open conversations by handling (current snapshot)",
+                    w["Current handling"],
+                    w["Open conversations by handling (current snapshot)"],
                     [
-                        Column("Handled by", ReportValueKind.Text),
-                        Column("Open conversations", ReportValueKind.Count),
+                        Column(w["Handled by"], ReportValueKind.Text),
+                        Column(w["Open conversations"], ReportValueKind.Count),
                     ],
                     [
-                        Row(ReportValue.Text("AI"), ReportValue.Count(now.OpenHandledByAi)),
-                        Row(ReportValue.Text("A person"), ReportValue.Count(now.OpenHandledByHuman)),
+                        Row(ReportValue.Text(w["AI"]), ReportValue.Count(now.OpenHandledByAi)),
+                        Row(ReportValue.Text(w["A person"]), ReportValue.Count(now.OpenHandledByHuman)),
                     ]),
             ],
             [
-                "Open-conversation figures are a snapshot at the moment the report was generated, not the period.",
-                "An AI turn is one attempt to answer a customer; it is counted when it started.",
-                NoText,
+                w["Open-conversation figures are a snapshot at the moment the report was generated, not the period."],
+                w["An AI turn is one attempt to answer a customer; it is counted when it started."],
+                w[NoText],
             ]);
     }
 
     private static ReportDocument CustomerActivity(
-        IReadOnlyList<CustomerActivityRow> rows, ReportPeriod period, string? workspace, DateTimeOffset at) =>
+        IReadOnlyList<CustomerActivityRow> rows, ReportPeriod period, string? workspace, DateTimeOffset at, ReportWording w) =>
         Document(
             ReportType.CustomerActivity,
             period,
             workspace,
             at,
-            [Fact("Active customers", rows.Count)],
+            w,
+            [Fact(w["Active customers"], rows.Count)],
             [
                 Table(
-                    "Customers",
-                    "Active customers",
+                    w["Customers"],
+                    w["Active customers"],
                     [
-                        Column("Customer ID", ReportValueKind.Text),
-                        Column("Customer", ReportValueKind.Text),
-                        Column("Channels", ReportValueKind.Text),
-                        Column("Conversations active", ReportValueKind.Count),
-                        Column("Conversations started", ReportValueKind.Count),
-                        Column("Customer messages", ReportValueKind.Count),
-                        Column("First activity (UTC)", ReportValueKind.Instant),
-                        Column("Last activity (UTC)", ReportValueKind.Instant),
+                        Column(w["Customer ID"], ReportValueKind.Text),
+                        Column(w["Customer"], ReportValueKind.Text),
+                        Column(w["Channels"], ReportValueKind.Text),
+                        Column(w["Conversations active"], ReportValueKind.Count),
+                        Column(w["Conversations started"], ReportValueKind.Count),
+                        Column(w["Customer messages"], ReportValueKind.Count),
+                        Column(w["First activity (UTC)"], ReportValueKind.Instant),
+                        Column(w["Last activity (UTC)"], ReportValueKind.Instant),
                     ],
                     rows
                         .OrderByDescending(row => row.LastActivityAt)
                         .ThenByDescending(row => row.CustomerId.Value)
                         .Select(row => Row(
                             ReportValue.Text(row.CustomerId.ToString()),
-                            ReportValue.Text(CustomerLabels.For(row.DisplayName, row.Channels)),
-                            ReportValue.Text(string.Join(", ", row.Channels.OrderBy(kind => kind).Select(ChannelLabel))),
+                            ReportValue.Text(w.Customer(row.DisplayName, row.Channels)),
+                            ReportValue.Text(w.Channels(row.Channels.OrderBy(kind => kind))),
                             ReportValue.Count(row.ConversationsActive),
                             ReportValue.Count(row.ConversationsStarted),
                             ReportValue.Count(row.CustomerMessages),
@@ -300,34 +318,35 @@ public sealed class ReportDocumentBuilder(
                             ReportValue.Instant(row.LastActivityAt)))),
             ],
             [
-                "A customer is active if a message was sent or a conversation was started in one of their conversations during the period.",
-                "Customers are canonical: records combined by a merge appear once.",
-                "No phone number, WhatsApp identifier, email address or chat credential is included.",
-                NoText,
+                w["A customer is active if a message was sent or a conversation was started in one of their conversations during the period."],
+                w["Customers are canonical: records combined by a merge appear once."],
+                w["No phone number, WhatsApp identifier, email address or chat credential is included."],
+                w[NoText],
             ]);
 
     private static ReportDocument AgentActivity(
-        WorkspaceAnalytics read, ReportPeriod period, string? workspace, DateTimeOffset at) =>
+        WorkspaceAnalytics read, ReportPeriod period, string? workspace, DateTimeOffset at, ReportWording w) =>
         Document(
             ReportType.AgentActivity,
             period,
             workspace,
             at,
-            [Fact("AI agents with activity", read.Agents.Count)],
+            w,
+            [Fact(w["AI agents with activity"], read.Agents.Count)],
             [
                 Table(
-                    "AI agents",
-                    "Activity by AI agent",
+                    w["AI agents"],
+                    w["Activity by AI agent"],
                     [
-                        Column("AI agent ID", ReportValueKind.Text),
-                        Column("AI agent", ReportValueKind.Text),
-                        Column("Conversations started", ReportValueKind.Count),
-                        Column("Customer messages", ReportValueKind.Count),
-                        Column("AI replies", ReportValueKind.Count),
-                        Column("Human replies in its conversations", ReportValueKind.Count),
+                        Column(w["AI agent ID"], ReportValueKind.Text),
+                        Column(w["AI agent"], ReportValueKind.Text),
+                        Column(w["Conversations started"], ReportValueKind.Count),
+                        Column(w["Customer messages"], ReportValueKind.Count),
+                        Column(w["AI replies"], ReportValueKind.Count),
+                        Column(w["Human replies in its conversations"], ReportValueKind.Count),
                     ],
                     read.Agents.Select(agent => Row(
-                        ReportValue.Text(agent.AiAgentId.ToString("D", CultureInfo.InvariantCulture)),
+                        ReportValue.Text(agent.AiAgentId.ToString(w["D"], CultureInfo.InvariantCulture)),
                         ReportValue.Text(agent.Name),
                         ReportValue.Count(agent.ConversationsStarted),
                         ReportValue.Count(agent.CustomerMessages),
@@ -335,13 +354,13 @@ public sealed class ReportDocumentBuilder(
                         ReportValue.Count(agent.HumanMessages)))),
             ],
             [
-                "Ordered by conversations started, then customer messages, then name, then id.",
-                "Human replies are counted in the conversations an agent was handling; they are not work the agent did.",
-                NoText,
+                w["Ordered by conversations started, then customer messages, then name, then id."],
+                w["Human replies are counted in the conversations an agent was handling; they are not work the agent did."],
+                w[NoText],
             ]);
 
     private static ReportDocument ProviderUsage(
-        WorkspaceAnalytics read, ReportPeriod period, string? workspace, DateTimeOffset at)
+        WorkspaceAnalytics read, ReportPeriod period, string? workspace, DateTimeOffset at, ReportWording w)
     {
         AnalyticsAiUsage usage = read.AiUsage;
 
@@ -350,57 +369,58 @@ public sealed class ReportDocumentBuilder(
             period,
             workspace,
             at,
+            w,
             [
-                Fact("Provider calls", usage.Calls),
-                Fact("Text generation calls", usage.GenerationCalls),
-                Fact("Embedding calls", usage.EmbeddingCalls),
-                Fact("Generation input tokens", usage.GenerationInputTokens),
-                Fact("Generation cached input tokens", usage.GenerationCachedInputTokens),
-                Fact("Generation output tokens", usage.GenerationOutputTokens),
-                Fact("Generation reasoning tokens", usage.GenerationReasoningTokens),
-                Fact("Embedding input tokens", usage.EmbeddingInputTokens),
+                Fact(w["Provider calls"], usage.Calls),
+                Fact(w["Text generation calls"], usage.GenerationCalls),
+                Fact(w["Embedding calls"], usage.EmbeddingCalls),
+                Fact(w["Generation input tokens"], usage.GenerationInputTokens),
+                Fact(w["Generation cached input tokens"], usage.GenerationCachedInputTokens),
+                Fact(w["Generation output tokens"], usage.GenerationOutputTokens),
+                Fact(w["Generation reasoning tokens"], usage.GenerationReasoningTokens),
+                Fact(w["Embedding input tokens"], usage.EmbeddingInputTokens),
             ],
             [
                 Table(
-                    "Models",
-                    "Calls by provider, model and operation",
+                    w["Models"],
+                    w["Calls by provider, model and operation"],
                     [
-                        Column("Provider", ReportValueKind.Text),
-                        Column("Model", ReportValueKind.Text),
-                        Column("Operation", ReportValueKind.Text),
-                        Column("Calls", ReportValueKind.Count),
-                        Column("Input tokens", ReportValueKind.Count),
-                        Column("Output tokens", ReportValueKind.Count),
+                        Column(w["Provider"], ReportValueKind.Text),
+                        Column(w["Model"], ReportValueKind.Text),
+                        Column(w["Operation"], ReportValueKind.Text),
+                        Column(w["Calls"], ReportValueKind.Count),
+                        Column(w["Input tokens"], ReportValueKind.Count),
+                        Column(w["Output tokens"], ReportValueKind.Count),
                     ],
                     read.Models.Select(model => Row(
                         ReportValue.Text(model.Provider),
                         ReportValue.Text(model.Model),
-                        ReportValue.Text(OperationLabel(model.OperationType)),
+                        ReportValue.Text(w.Operation(model.OperationType)),
                         ReportValue.Count(model.Calls),
                         ReportValue.Count(model.InputTokens),
                         ReportValue.Count(model.OutputTokens)))),
                 new ReportTable(
-                    "Outcomes",
-                    "Call outcomes",
+                    w["Outcomes"],
+                    w["Call outcomes"],
                     [
-                        Column("Outcome", ReportValueKind.Text),
-                        Column("Calls", ReportValueKind.Count),
+                        Column(w["Outcome"], ReportValueKind.Text),
+                        Column(w["Calls"], ReportValueKind.Count),
                     ],
                     [
-                        Row(ReportValue.Text("Succeeded"), ReportValue.Count(usage.Succeeded)),
-                        Row(ReportValue.Text("Failed"), ReportValue.Count(usage.Failed)),
-                        Row(ReportValue.Text("Unknown (dispatched, outcome not established)"), ReportValue.Count(usage.Unresolved)),
+                        Row(ReportValue.Text(w["Succeeded"]), ReportValue.Count(usage.Succeeded)),
+                        Row(ReportValue.Text(w["Failed"]), ReportValue.Count(usage.Failed)),
+                        Row(ReportValue.Text(w["Unknown (dispatched, outcome not established)"]), ReportValue.Count(usage.Unresolved)),
                     ]),
             ],
             [
-                "Calls are real provider requests, counted when they were dispatched.",
-                "Tokens are the providers' own reported figures; a call whose usage was not reported adds nothing.",
-                NoText,
+                w["Calls are real provider requests, counted when they were dispatched."],
+                w["Tokens are the providers' own reported figures; a call whose usage was not reported adds nothing."],
+                w[NoText],
             ]);
     }
 
     private static ReportDocument ProviderCost(
-        WorkspaceAnalytics read, ReportPeriod period, string? workspace, DateTimeOffset at)
+        WorkspaceAnalytics read, ReportPeriod period, string? workspace, DateTimeOffset at, ReportWording w)
     {
         AnalyticsAiUsage usage = read.AiUsage;
 
@@ -409,38 +429,39 @@ public sealed class ReportDocumentBuilder(
             period,
             workspace,
             at,
+            w,
             [
-                Fact("Currencies", usage.RatedCost.Count),
-                Fact("Unrated calls", usage.UnratedCalls),
+                Fact(w["Currencies"], usage.RatedCost.Count),
+                Fact(w["Unrated calls"], usage.UnratedCalls),
             ],
             [
                 Table(
-                    "Models",
-                    "Estimated provider cost by model",
+                    w["Models"],
+                    w["Estimated provider cost by model"],
                     [
-                        Column("Provider", ReportValueKind.Text),
-                        Column("Model", ReportValueKind.Text),
-                        Column("Operation", ReportValueKind.Text),
-                        Column("Calls", ReportValueKind.Count),
-                        Column("Estimated provider cost", ReportValueKind.Money),
-                        Column("Currency", ReportValueKind.Text),
-                        Column("Unrated calls", ReportValueKind.Count),
+                        Column(w["Provider"], ReportValueKind.Text),
+                        Column(w["Model"], ReportValueKind.Text),
+                        Column(w["Operation"], ReportValueKind.Text),
+                        Column(w["Calls"], ReportValueKind.Count),
+                        Column(w["Estimated provider cost"], ReportValueKind.Money),
+                        Column(w["Currency"], ReportValueKind.Text),
+                        Column(w["Unrated calls"], ReportValueKind.Count),
                     ],
                     read.Models.Select(model => Row(
                         ReportValue.Text(model.Provider),
                         ReportValue.Text(model.Model),
-                        ReportValue.Text(OperationLabel(model.OperationType)),
+                        ReportValue.Text(w.Operation(model.OperationType)),
                         ReportValue.Count(model.Calls),
                         ReportValue.Money(model.EstimatedCost),
                         ReportValue.Text(model.Currency),
                         ReportValue.Count(model.UnratedCalls)))),
                 Table(
-                    "By currency",
-                    "Estimated provider cost by currency",
+                    w["By currency"],
+                    w["Estimated provider cost by currency"],
                     [
-                        Column("Currency", ReportValueKind.Text),
-                        Column("Estimated provider cost", ReportValueKind.Money),
-                        Column("Rated calls", ReportValueKind.Count),
+                        Column(w["Currency"], ReportValueKind.Text),
+                        Column(w["Estimated provider cost"], ReportValueKind.Money),
+                        Column(w["Rated calls"], ReportValueKind.Count),
                     ],
                     usage.RatedCost
                         .OrderBy(cost => cost.Currency, StringComparer.Ordinal)
@@ -450,29 +471,29 @@ public sealed class ReportDocumentBuilder(
                             ReportValue.Count(cost.Calls)))),
             ],
             [
-                "Estimated provider cost is internal operational accounting of what AI providers were used for. "
-                + "It is not billing, and nothing in it is charged to anyone.",
-                "Currencies are never added together and nothing is converted: each currency has its own total.",
-                "A model with no cost shown was either not rated, or rated in more than one currency.",
-                "Unrated calls succeeded but had no configured rate. They are real usage, not free.",
+                w["Estimated provider cost is internal operational accounting of what AI providers were used for. "
+                    + "It is not billing, and nothing in it is charged to anyone."],
+                w["Currencies are never added together and nothing is converted: each currency has its own total."],
+                w["A model with no cost shown was either not rated, or rated in more than one currency."],
+                w["Unrated calls succeeded but had no configured rate. They are real usage, not free."],
             ]);
     }
 
     private static ReportDocument WhatsAppDelivery(
-        WorkspaceAnalytics read, ReportPeriod period, string? workspace, DateTimeOffset at)
+        WorkspaceAnalytics read, ReportPeriod period, string? workspace, DateTimeOffset at, ReportWording w)
     {
         AnalyticsWhatsAppDelivery delivery = read.WhatsAppDelivery
             ?? new AnalyticsWhatsAppDelivery(0, 0, 0, 0, 0, 0, 0);
 
         (string Status, long Count)[] statuses =
         [
-            ("Pending", delivery.Pending),
-            ("Sending", delivery.Sending),
-            ("Sent", delivery.Sent),
-            ("Delivered", delivery.Delivered),
-            ("Read", delivery.Read),
-            ("Failed", delivery.Failed),
-            ("Unknown", delivery.Unknown),
+            (w["Pending"], delivery.Pending),
+            (w["Sending"], delivery.Sending),
+            (w["Sent"], delivery.Sent),
+            (w["Delivered"], delivery.Delivered),
+            (w["Read"], delivery.Read),
+            (w["Failed"], delivery.Failed),
+            (w["Unknown"], delivery.Unknown),
         ];
 
         return Document(
@@ -480,23 +501,24 @@ public sealed class ReportDocumentBuilder(
             period,
             workspace,
             at,
-            [Fact("Outbound WhatsApp messages", statuses.Sum(status => status.Count))],
+            w,
+            [Fact(w["Outbound WhatsApp messages"], statuses.Sum(status => status.Count))],
             [
                 Table(
-                    "Delivery status",
-                    "Outbound messages by delivery status",
+                    w["Delivery status"],
+                    w["Outbound messages by delivery status"],
                     [
-                        Column("Status", ReportValueKind.Text),
-                        Column("Messages", ReportValueKind.Count),
+                        Column(w["Status"], ReportValueKind.Text),
+                        Column(w["Messages"], ReportValueKind.Count),
                     ],
                     statuses.Select(status => Row(
                         ReportValue.Text(status.Status),
                         ReportValue.Count(status.Count)))),
             ],
             [
-                "Messages are counted by when they were queued, at the status they have now.",
-                "Unknown means a send was interrupted and it cannot be established whether it arrived.",
-                NoText,
+                w["Messages are counted by when they were queued, at the status they have now."],
+                w["Unknown means a send was interrupted and it cannot be established whether it arrived."],
+                w[NoText],
             ]);
     }
 
@@ -507,29 +529,22 @@ public sealed class ReportDocumentBuilder(
         ReportPeriod period,
         string? workspace,
         DateTimeOffset generatedAt,
+        ReportWording w,
         IReadOnlyList<ReportFact> summary,
         IReadOnlyList<ReportTable> tables,
         IReadOnlyList<string> notes) =>
         new(
             type,
-            ReportCatalog.For(type).Title,
+            w.Title(type),
             workspace,
             period,
             generatedAt.ToUniversalTime(),
             summary,
             tables,
-            [
-                string.Create(
-                    CultureInfo.InvariantCulture,
-                    $"Period: {period.FromDate:yyyy-MM-dd} to {period.LastDate:yyyy-MM-dd} inclusive, in {period.TimeZone} whole days."),
-                .. notes,
-            ]);
+            [w.PeriodNote(period), .. notes],
+            w.Language);
 
     private static ReportFact Fact(string label, long value) => new(label, ReportValue.Count(value));
-
-    /// <summary>The day column names the zone its dates are local dates of (Phase 37.6).</summary>
-    private static string DateHeader(ReportPeriod period) =>
-        string.Create(CultureInfo.InvariantCulture, $"Date ({period.TimeZone})");
 
     private static ReportColumn Column(string header, ReportValueKind kind) => new(header, kind);
 
@@ -541,17 +556,4 @@ public sealed class ReportDocumentBuilder(
         IReadOnlyList<ReportColumn> columns,
         IEnumerable<IReadOnlyList<ReportValue>> rows) =>
         new(name, title, columns, [.. rows]);
-
-    private static string ChannelLabel(ChannelKind channel) => channel switch
-    {
-        ChannelKind.WebChat => "Website",
-        _ => channel.ToString(),
-    };
-
-    private static string OperationLabel(AiOperationType operation) => operation switch
-    {
-        AiOperationType.TextGeneration => "Text generation",
-        AiOperationType.Embedding => "Embedding",
-        _ => operation.ToString(),
-    };
 }

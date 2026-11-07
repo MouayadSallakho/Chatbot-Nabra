@@ -10,6 +10,7 @@ added the guarantee that every correctable refusal carries a code, and the codes
 the knowledge, agent, channel and workspace areas (row 28a). Phase 37.5b named the
 codes of roles, invitations, team and billing (row 28b). Phase 37.6 added the
 workspace time zone's code and the analytics comparison's (rows 31 and 34).
+Phase 37.7 reused `language.unsupported` for the report and schedule `language`.
 
 ## Accounts (Phase 37.3)
 
@@ -24,7 +25,7 @@ workspace time zone's code and the analytics comparison's (rows 31 and 34).
 | `auth.reset.invalid` | 400 | `POST /api/auth/password/reset` | The reset link cannot be used: malformed, altered, expired or already used token, or an unknown account. One code and one body for all of them |
 | `auth.throttled` | 429 | `login`, `password/forgot`, `password/reset`, `GET /api/auth/session` (37.5b) | Too many failed sign-ins (for `login`, only failures count) or too many reset requests. `Retry-After` says, in whole seconds, when to try again; the body names no limit, window or address |
 | `auth.throttle.unavailable` | 503 | `login`, `password/forgot`, `password/reset`, `GET /api/auth/session` (37.5b) | The rate limiter could not decide (store unreachable, or the client's network could not be established), so the request was refused rather than served unlimited |
-| `language.unsupported` | 400 | `register`, `login`, `invitations/accept`, `POST …/invitations`, `PUT /api/me/language` | `language` is not `"en"` or `"ar"` |
+| `language.unsupported` | 400 | `register`, `login`, `invitations/accept`, `POST …/invitations`, `PUT /api/me/language`; from Phase 37.7 also `POST …/reports`, `POST …/reports/schedules`, `PUT …/reports/schedules/{id}` (checked before membership) | `language` is not `"en"` or `"ar"` |
 
 When Identity reports several errors at once, `code` is the first and `codes` lists
 them all, in order, for a form that shows each rule next to its field.

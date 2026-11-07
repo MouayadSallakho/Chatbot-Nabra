@@ -9,21 +9,34 @@ namespace OmniAI.Api.Reports;
 /// Generated once per intended report by the client. Repeating it returns the
 /// same execution instead of queuing another.
 /// </param>
+/// <param name="Language">
+/// Optional (Phase 37.7): <c>en</c> or <c>ar</c>, the language the file is written
+/// in. Absent or <c>null</c>: the requester's own language, else <c>en</c>.
+/// Anything else is <c>400 language.unsupported</c>.
+/// </param>
 internal sealed record RequestReportRequest(
     string? ReportType,
     string? Format,
     string? Range,
     DateOnly? From,
     DateOnly? To,
-    Guid? ClientRequestId);
+    Guid? ClientRequestId,
+    string? Language = null);
 
 /// <summary>Create a schedule, or replace one's editable fields.</summary>
+/// <param name="Language">
+/// Optional (Phase 37.7): <c>en</c> or <c>ar</c>, the language every occurrence is
+/// written in. On create, absent or <c>null</c> means the creator's own language,
+/// else <c>en</c>; on edit, it keeps the schedule's language. Anything else is
+/// <c>400 language.unsupported</c>.
+/// </param>
 internal sealed record SaveReportScheduleRequest(
     string? Name,
     string? ReportType,
     string? Format,
     string? Frequency,
-    bool? Enabled);
+    bool? Enabled,
+    string? Language = null);
 
 internal sealed record SetReportScheduleEnabledRequest(bool? Enabled);
 
@@ -123,7 +136,11 @@ internal sealed record ReportExecutionResponse(
 
     // Phase 37.6: the IANA zone periodFrom, periodTo and periodLastDay are local
     // dates of. UTC for every execution made before 37.6.
-    string TimeZone)
+    string TimeZone,
+
+    // Phase 37.7: "en" or "ar", the language the file is written in. "en" for
+    // every execution made before 37.7.
+    string Language)
 {
     public static ReportExecutionResponse From(ReportExecutionView view)
     {
@@ -150,7 +167,8 @@ internal sealed record ReportExecutionResponse(
             view.ByteLength,
             view.ExpiresAt,
             view.CanDownload,
-            view.TimeZone);
+            view.TimeZone,
+            view.Language);
     }
 }
 
@@ -188,7 +206,11 @@ internal sealed record ReportScheduleResponse(
     DateTimeOffset UpdatedAt,
     string? DisabledReason,
     ReportExecutionResponse? LastExecution,
-    bool CanEdit)
+    bool CanEdit,
+
+    // Phase 37.7: "en" or "ar", the language its reports are written in. "en" for
+    // every schedule made before 37.7.
+    string Language)
 {
     public static ReportScheduleResponse From(ReportScheduleView view)
     {
@@ -209,7 +231,8 @@ internal sealed record ReportScheduleResponse(
             view.UpdatedAt,
             view.DisabledReason,
             view.LastExecution is null ? null : ReportExecutionResponse.From(view.LastExecution),
-            view.CanEdit);
+            view.CanEdit,
+            view.Language);
     }
 }
 

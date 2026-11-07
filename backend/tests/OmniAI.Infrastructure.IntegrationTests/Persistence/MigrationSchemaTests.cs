@@ -96,8 +96,8 @@ public sealed class MigrationSchemaTests(PostgresTestDatabase database)
         // Phase 35 added exactly one; Phase 37.3 added the four the approved plan
         // lists for it (M1, M3, M2, M2a), in that order; Phase 37.4 the three it
         // lists (M6, M4, M5), in the plan's order; Phase 37.6 the two it lists
-        // (M7, M8).
-        Assert.Equal(11, applied.Length);
+        // (M7, M8); Phase 37.7 the two it lists (M9, M10).
+        Assert.Equal(13, applied.Length);
         Assert.EndsWith("_ProductionReadinessHardening", applied[1], StringComparison.Ordinal);
         Assert.EndsWith("_AddUserLanguage", applied[2], StringComparison.Ordinal);
         Assert.EndsWith("_AddSecurityEvents", applied[3], StringComparison.Ordinal);
@@ -108,6 +108,27 @@ public sealed class MigrationSchemaTests(PostgresTestDatabase database)
         Assert.EndsWith("_AddConversationReads", applied[8], StringComparison.Ordinal);
         Assert.EndsWith("_AddWorkspaceTimeZone", applied[9], StringComparison.Ordinal);
         Assert.EndsWith("_AddReportExecutionTimeZone", applied[10], StringComparison.Ordinal);
+        Assert.EndsWith("_AddReportExecutionLanguage", applied[11], StringComparison.Ordinal);
+        Assert.EndsWith("_AddReportScheduleLanguage", applied[12], StringComparison.Ordinal);
+    }
+
+    /// <remarks>
+    /// Phase 37.7 (M9, M10): each report execution and each schedule carries the
+    /// language of its file, exactly as the approved plan describes the columns:
+    /// <c>varchar(8) NOT NULL DEFAULT 'en'</c>, so every row made before reads
+    /// English, which is what it was.
+    /// </remarks>
+    [Theory]
+    [InlineData("report_executions")]
+    [InlineData("report_schedules")]
+    public async Task Report_language_is_a_required_short_code_defaulting_to_english(string table)
+    {
+        object? definition = await database.ExecuteScalarAsync(
+            "SELECT data_type || '/' || character_maximum_length || '/' || is_nullable || '/' || column_default "
+            + "FROM information_schema.columns "
+            + $"WHERE table_schema = 'public' AND table_name = '{table}' AND column_name = 'language'");
+
+        Assert.Equal("character varying/8/NO/'en'::character varying", definition as string);
     }
 
     /// <remarks>

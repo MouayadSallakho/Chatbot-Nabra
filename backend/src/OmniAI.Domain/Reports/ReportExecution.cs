@@ -87,6 +87,18 @@ public sealed class ReportExecution
     /// </remarks>
     public WorkspaceTimeZone TimeZone { get; private set; } = WorkspaceTimeZone.Utc;
 
+    /// <summary>
+    /// The language the report's file is written in (Phase 37.7, M9).
+    /// </summary>
+    /// <remarks>
+    /// Decided when the report is asked for and kept: the request's own language,
+    /// else the requester's, else English; a scheduled occurrence takes its
+    /// schedule's. Changing a person's language later does not change a report
+    /// already asked for. Executions made before 37.7 read English, which is what
+    /// they were.
+    /// </remarks>
+    public UserLanguage Language { get; private set; } = UserLanguage.English;
+
     public ReportExecutionStatus Status { get; }
 
     /// <summary>
@@ -134,14 +146,15 @@ public sealed class ReportExecution
         ReportPeriod period,
         UserId requestedBy,
         Guid clientRequestId,
-        DateTimeOffset requestedAt)
+        DateTimeOffset requestedAt,
+        UserLanguage language = UserLanguage.English)
     {
         if (clientRequestId == Guid.Empty)
         {
             throw new DomainValidationException("A report request needs a client request id.");
         }
 
-        return New(tenantId, type, format, period, requestedBy, clientRequestId, null, requestedAt);
+        return New(tenantId, type, format, period, requestedBy, clientRequestId, null, requestedAt, language);
     }
 
     /// <summary>One occurrence of a schedule.</summary>
@@ -160,7 +173,8 @@ public sealed class ReportExecution
             schedule.OwnerUserId,
             null,
             schedule.Id,
-            requestedAt);
+            requestedAt,
+            schedule.Language);
     }
 
     private static ReportExecution New(
@@ -171,7 +185,8 @@ public sealed class ReportExecution
         UserId requestedBy,
         Guid? clientRequestId,
         ReportScheduleId? scheduleId,
-        DateTimeOffset requestedAt)
+        DateTimeOffset requestedAt,
+        UserLanguage language)
     {
         ArgumentNullException.ThrowIfNull(period);
 
@@ -188,6 +203,11 @@ public sealed class ReportExecution
         if (!Enum.IsDefined(format))
         {
             throw new DomainValidationException("That report format is not recognised.");
+        }
+
+        if (!Enum.IsDefined(language))
+        {
+            throw new DomainValidationException("A report is written in English or Arabic.");
         }
 
         return new ReportExecution(
@@ -210,14 +230,20 @@ public sealed class ReportExecution
             expiredAt: null)
         {
             TimeZone = period.TimeZone,
+            Language = language,
         };
     }
 
     /// <summary>Whether a repeated request asks for the same report as this one.</summary>
-    public bool SameRequestAs(ReportType type, ReportFormat format, ReportPeriod period) =>
+    /// <param name="language">
+    /// The language the repeat named, if it named one (Phase 37.7). A repeat that
+    /// names none asks for whatever the first request settled on.
+    /// </param>
+    public bool SameRequestAs(ReportType type, ReportFormat format, ReportPeriod period, UserLanguage? language = null) =>
         Type == type
         && Format == format
         && PeriodFrom == period.From
         && PeriodTo == period.To
-        && TimeZone == period.TimeZone;
+        && TimeZone == period.TimeZone
+        && (language is null || Language == language);
 }

@@ -33,6 +33,16 @@ namespace OmniAI.Infrastructure.Reports.Rendering;
 /// is fetched, so a report renders identically in the Linux container and on a
 /// developer's machine.
 /// </para>
+/// <para>
+/// <strong>Two kinds of line (Phase 37.7).</strong> By default a line takes its
+/// direction from its first strong character, as an isolate does: that is how
+/// every value is drawn, so a Latin name, an e-mail address or a number inside an
+/// Arabic report keeps its own order, and every line of an English report is drawn
+/// exactly as before. An Arabic report's own words (titles, labels, headings,
+/// notes) are drawn with <c>rightToLeft</c>, a right-to-left paragraph, so a label
+/// such as «التاريخ (بتوقيت Asia/Riyadh)» keeps its parentheses and the zone name
+/// where an Arabic reader expects them.
+/// </para>
 /// </remarks>
 internal sealed class PdfText : IDisposable
 {
@@ -44,7 +54,7 @@ internal sealed class PdfText : IDisposable
     private readonly SKShaper _regular = new(RegularFace.Value);
     private readonly SKShaper _bold = new(BoldFace.Value);
     private readonly Dictionary<(float Size, bool Bold), SKFont> _fonts = [];
-    private readonly Dictionary<(string Text, float Size, bool Bold), float> _widths = [];
+    private readonly Dictionary<(string Text, float Size, bool Bold, bool RightToLeft), float> _widths = [];
 
     /// <summary>The regular face, for tests that need to compare glyphs.</summary>
     internal static SKTypeface Regular => RegularFace.Value;
@@ -81,7 +91,8 @@ internal sealed class PdfText : IDisposable
     }
 
     /// <summary>The shaped width of a line.</summary>
-    public float Measure(string text, float size, bool bold)
+    /// <param name="rightToLeft">Lay the line out as a right-to-left paragraph (Phase 37.7).</param>
+    public float Measure(string text, float size, bool bold, bool rightToLeft = false)
     {
         string clean = Clean(text);
 
@@ -90,14 +101,14 @@ internal sealed class PdfText : IDisposable
             return 0;
         }
 
-        if (_widths.TryGetValue((clean, size, bold), out float known))
+        if (_widths.TryGetValue((clean, size, bold, rightToLeft), out float known))
         {
             return known;
         }
 
-        float width = Runs(clean, size, bold).Sum(run => run.Shaped.Width);
+        float width = Runs(clean, size, bold, rightToLeft).Sum(run => run.Shaped.Width);
 
-        _widths[(clean, size, bold)] = width;
+        _widths[(clean, size, bold, rightToLeft)] = width;
 
         return width;
     }
@@ -118,7 +129,16 @@ internal sealed class PdfText : IDisposable
     }
 
     /// <summary>Draws a line with its left edge at <paramref name="x"/>.</summary>
-    public void Draw(SKCanvas canvas, string text, float x, float baseline, float size, bool bold, SKColor color)
+    /// <param name="rightToLeft">Lay the line out as a right-to-left paragraph (Phase 37.7).</param>
+    public void Draw(
+        SKCanvas canvas,
+        string text,
+        float x,
+        float baseline,
+        float size,
+        bool bold,
+        SKColor color,
+        bool rightToLeft = false)
     {
         ArgumentNullException.ThrowIfNull(canvas);
 
@@ -134,7 +154,7 @@ internal sealed class PdfText : IDisposable
 
         float advance = 0;
 
-        foreach (ShapedRun run in Runs(clean, size, bold))
+        foreach (ShapedRun run in Runs(clean, size, bold, rightToLeft))
         {
             AddRun(builder, font, run, advance);
             advance += run.Shaped.Width;
@@ -182,17 +202,42 @@ internal sealed class PdfText : IDisposable
     }
 
     /// <summary>
+    /// Draws a line inside a box, against its right edge or its left edge (Phase 37.7).
+    /// </summary>
+    /// <remarks>
+    /// For Arabic reports, where the layout is mirrored: text starts at a box's
+    /// right edge and numbers end at its left edge, the opposite of the English
+    /// layout, rather than each line being placed by its own direction.
+    /// </remarks>
+    public void DrawInBox(
+        SKCanvas canvas,
+        string text,
+        float left,
+        float width,
+        float baseline,
+        float size,
+        bool bold,
+        SKColor color,
+        bool againstRight,
+        bool rightToLeft)
+    {
+        float x = againstRight ? left + width - Measure(text, size, bold, rightToLeft) : left;
+
+        Draw(canvas, text, x, baseline, size, bold, color, rightToLeft);
+    }
+
+    /// <summary>
     /// The line, shortened with an ellipsis if it does not fit.
     /// </summary>
     /// <remarks>
     /// Shortened by whole text elements of the logical string and shaped again, so
     /// an Arabic word is never cut inside a letter and keeps joining correctly.
     /// </remarks>
-    public string Fit(string text, float size, bool bold, float available)
+    public string Fit(string text, float size, bool bold, float available, bool rightToLeft = false)
     {
         string clean = Clean(text);
 
-        if (Measure(clean, size, bold) <= available)
+        if (Measure(clean, size, bold, rightToLeft) <= available)
         {
             return clean;
         }
@@ -203,7 +248,7 @@ internal sealed class PdfText : IDisposable
         {
             string candidate = clean[..boundaries[count]].TrimEnd() + Ellipsis;
 
-            if (Measure(candidate, size, bold) <= available)
+            if (Measure(candidate, size, bold, rightToLeft) <= available)
             {
                 return candidate;
             }
@@ -213,7 +258,7 @@ internal sealed class PdfText : IDisposable
     }
 
     /// <summary>Lines of at most <paramref name="available"/> points, broken at spaces.</summary>
-    public IEnumerable<string> Wrap(string text, float size, bool bold, float available)
+    public IEnumerable<string> Wrap(string text, float size, bool bold, float available, bool rightToLeft = false)
     {
         string line = string.Empty;
 
@@ -221,7 +266,7 @@ internal sealed class PdfText : IDisposable
         {
             string candidate = line.Length == 0 ? word : line + " " + word;
 
-            if (line.Length > 0 && Measure(candidate, size, bold) > available)
+            if (line.Length > 0 && Measure(candidate, size, bold, rightToLeft) > available)
             {
                 yield return line;
                 line = word;
@@ -232,7 +277,7 @@ internal sealed class PdfText : IDisposable
             }
         }
 
-        yield return Fit(line, size, bold, available);
+        yield return Fit(line, size, bold, available, rightToLeft);
     }
 
     /// <summary>
@@ -241,9 +286,11 @@ internal sealed class PdfText : IDisposable
     /// <remarks>
     /// Internal for tests, which assert on the glyphs rather than on a picture.
     /// </remarks>
-    internal IReadOnlyList<ShapedRun> Runs(string clean, float size, bool bold)
+    internal IReadOnlyList<ShapedRun> Runs(string clean, float size, bool bold, bool rightToLeftParagraph = false)
     {
-        BidiInfo bidi = BidiInfo.Create(clean, null);
+        // Phase 37.7: an Arabic report's own words are a right-to-left paragraph;
+        // everything else takes its direction from its first strong character.
+        BidiInfo bidi = BidiInfo.Create(clean, rightToLeftParagraph ? Level.Rtl() : null);
         SKShaper shaper = bold ? _bold : _regular;
         SKFont font = Font(size, bold);
 

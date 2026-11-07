@@ -112,6 +112,56 @@ public sealed class ReportGenerationTests(PostgresTestDatabase database)
         Assert.Empty(Directory.GetFiles(Path.Combine(_root, "incoming")));
     }
 
+    /// <remarks>
+    /// Phase 37.7: an execution asked for in Arabic is claimed with its language and
+    /// written in Arabic, in every type and format, and carries no more than an
+    /// English one does.
+    /// </remarks>
+    [Theory]
+    [MemberData(nameof(Everything))]
+    public async Task An_arabic_execution_is_generated_in_arabic_and_carries_no_secret(ReportType type, ReportFormat format)
+    {
+        ReportWorld world = await ReportWorld.CreateAsync(database);
+        await world.SeedActivityAsync();
+
+        ReportExecution execution = await world.PendingAsync(type, format, language: UserLanguage.Arabic);
+
+        await using (OmniAiDbContext stored = database.CreateContext())
+        {
+            Assert.Equal(UserLanguage.Arabic, (await new ReportExecutionStore(stored).FindAsync(world.Tenant, execution.Id))!.Execution.Language);
+        }
+
+        ReportGenerationResult result = await GenerateAsync(execution);
+
+        Assert.True(result.Outcome == ReportGenerationOutcome.Completed, result.Fault?.ToString());
+
+        await using OmniAiDbContext context = database.CreateContext();
+        ReportArtifact artifact = (await new ReportExecutionStore(context).FindArtifactAsync(world.Tenant, execution.Id))!;
+        string visible = Visible(format, await ReadAsync(artifact.StorageKey));
+
+        // Arabic letters (CSV and workbook) or shaped Arabic glyphs (PDF).
+        Assert.Contains(visible, character => character is (>= '\u0600' and <= '\u06FF') or (>= '\uFB50' and <= '\uFEFC'));
+
+        if (format == ReportFormat.Xlsx)
+        {
+            Assert.Contains("rightToLeft=\"1\"", visible, StringComparison.Ordinal);
+        }
+
+        foreach (string canary in new[]
+        {
+            ReportWorld.MessageCanary,
+            ReportWorld.InstructionsCanary,
+            ReportWorld.KnowledgeCanary,
+            ReportWorld.RawNumberCanary,
+            ReportWorld.PublicKeyCanary,
+            "OPENAI_API_KEY",
+            artifact.StorageKey,
+        })
+        {
+            Assert.DoesNotContain(canary, visible, StringComparison.Ordinal);
+        }
+    }
+
     [Fact]
     public async Task Customer_activity_names_customers_safely_and_counts_their_activity()
     {

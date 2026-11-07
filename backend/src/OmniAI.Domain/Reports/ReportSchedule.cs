@@ -89,6 +89,17 @@ public sealed class ReportSchedule
     /// <summary>Set when the platform switched the schedule off, and why.</summary>
     public string? DisabledReason { get; private set; }
 
+    /// <summary>
+    /// The language every occurrence's file is written in (Phase 37.7, M10).
+    /// </summary>
+    /// <remarks>
+    /// Its creator's language when it was created, unless they chose one, and
+    /// changed only by an edit that names a language. Neither a change of the
+    /// creator's own language nor another member saving the schedule changes it.
+    /// Schedules made before 37.7 read English.
+    /// </remarks>
+    public UserLanguage Language { get; private set; } = UserLanguage.English;
+
     public static ReportSchedule Create(
         TenantId tenantId,
         string? name,
@@ -98,7 +109,8 @@ public sealed class ReportSchedule
         bool enabled,
         UserId createdBy,
         DateTimeOffset now,
-        WorkspaceTimeZone? timeZone = null)
+        WorkspaceTimeZone? timeZone = null,
+        UserLanguage language = UserLanguage.English)
     {
         if (tenantId.IsEmpty)
         {
@@ -106,6 +118,7 @@ public sealed class ReportSchedule
         }
 
         Validate(type, format, frequency);
+        ValidateLanguage(language);
 
         return new ReportSchedule(
             ReportScheduleId.New(),
@@ -120,7 +133,10 @@ public sealed class ReportSchedule
             createdBy,
             now,
             now,
-            disabledReason: null);
+            disabledReason: null)
+        {
+            Language = language,
+        };
     }
 
     /// <summary>
@@ -129,7 +145,8 @@ public sealed class ReportSchedule
     /// <remarks>
     /// The next run is recalculated from now: changing a weekly schedule to a
     /// monthly one must not leave it due next Monday. Boundaries are local days of
-    /// <paramref name="timeZone"/>, the workspace's zone.
+    /// <paramref name="timeZone"/>, the workspace's zone. A <paramref name="language"/>
+    /// of <see langword="null"/> keeps the schedule's language (Phase 37.7).
     /// </remarks>
     public void Update(
         string? name,
@@ -139,9 +156,15 @@ public sealed class ReportSchedule
         bool enabled,
         UserId editor,
         DateTimeOffset now,
-        WorkspaceTimeZone? timeZone = null)
+        WorkspaceTimeZone? timeZone = null,
+        UserLanguage? language = null)
     {
         Validate(type, format, frequency);
+
+        if (language is UserLanguage chosen)
+        {
+            ValidateLanguage(chosen);
+        }
 
         bool rescheduled = frequency != Frequency || (enabled && !Enabled);
 
@@ -152,6 +175,7 @@ public sealed class ReportSchedule
         Enabled = enabled;
         OwnerUserId = editor;
         UpdatedAt = now;
+        Language = language ?? Language;
 
         if (enabled)
         {
@@ -232,6 +256,14 @@ public sealed class ReportSchedule
         if (!Enum.IsDefined(frequency))
         {
             throw new DomainValidationException("A schedule runs weekly or monthly.");
+        }
+    }
+
+    private static void ValidateLanguage(UserLanguage language)
+    {
+        if (!Enum.IsDefined(language))
+        {
+            throw new DomainValidationException("A schedule's reports are written in English or Arabic.");
         }
     }
 

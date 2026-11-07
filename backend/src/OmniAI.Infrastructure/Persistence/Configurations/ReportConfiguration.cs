@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using OmniAI.Domain.Reports;
 using OmniAI.Domain.Tenants;
+using OmniAI.Domain.Users;
 
 namespace OmniAI.Infrastructure.Persistence.Configurations;
 
@@ -76,6 +77,15 @@ internal sealed class ReportExecutionConfiguration : IEntityTypeConfiguration<Re
             .HasConversion(PersistenceConverters.WorkspaceTimeZone)
             .HasMaxLength(WorkspaceTimeZone.MaxLength)
             .HasDefaultValue(WorkspaceTimeZone.Utc)
+            .IsRequired();
+
+        // Phase 37.7 (M9): the language the file is written in. A model default, so
+        // executions made before it read English, which is what they were.
+        builder.Property(execution => execution.Language)
+            .HasColumnName("language")
+            .HasConversion(PersistenceConverters.UserLanguage)
+            .HasMaxLength(UserLanguages.MaxCodeLength)
+            .HasDefaultValue(UserLanguage.English)
             .IsRequired();
 
         builder.Property(execution => execution.Status)
@@ -329,6 +339,16 @@ internal sealed class ReportScheduleConfiguration : IEntityTypeConfiguration<Rep
         builder.Property(schedule => schedule.DisabledReason)
             .HasColumnName("disabled_reason")
             .HasMaxLength(40);
+
+        // Phase 37.7 (M10): the language every occurrence is written in. A model
+        // default, so schedules made before it read English. A new schedule takes
+        // its creator's language: an application rule, not a column default.
+        builder.Property(schedule => schedule.Language)
+            .HasColumnName("language")
+            .HasConversion(PersistenceConverters.UserLanguage)
+            .HasMaxLength(UserLanguages.MaxCodeLength)
+            .HasDefaultValue(UserLanguage.English)
+            .IsRequired();
 
         builder.HasOne<Tenant>()
             .WithMany()

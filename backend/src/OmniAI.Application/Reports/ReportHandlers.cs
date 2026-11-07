@@ -1,5 +1,6 @@
 using System.Globalization;
 using OmniAI.Application.Authorization;
+using OmniAI.Application.Security;
 using OmniAI.Application.Tenants.Persistence;
 using OmniAI.Domain;
 using OmniAI.Domain.Authorization;
@@ -23,6 +24,7 @@ public sealed record ReportCatalogView(
 
 /// <summary>An execution as the API publishes it.</summary>
 /// <param name="TimeZone">The zone its period's days are local days of (Phase 37.6).</param>
+/// <param name="Language">The language its file is written in, <c>en</c> or <c>ar</c> (Phase 37.7).</param>
 public sealed record ReportExecutionView(
     Guid Id,
     ReportType Type,
@@ -43,7 +45,8 @@ public sealed record ReportExecutionView(
     long? ByteLength,
     DateTimeOffset? ExpiresAt,
     bool CanDownload,
-    string TimeZone);
+    string TimeZone,
+    string Language);
 
 /// <summary>One page of executions.</summary>
 public sealed record ReportExecutionPage(
@@ -60,6 +63,10 @@ public sealed record ReportExecutionPage(
 /// <summary>Ask for a report.</summary>
 /// <param name="Range"><c>7d</c>, <c>30d</c>, <c>90d</c>, or <c>custom</c> with both dates.</param>
 /// <param name="To">Exclusive: the first day not covered.</param>
+/// <param name="Language">
+/// The language to write the file in (Phase 37.7). Absent: the requester's own
+/// language, else English.
+/// </param>
 public sealed record RequestReportCommand(
     Guid TenantId,
     string? ReportType,
@@ -67,7 +74,8 @@ public sealed record RequestReportCommand(
     string? Range,
     DateOnly? From,
     DateOnly? To,
-    Guid? ClientRequestId);
+    Guid? ClientRequestId,
+    UserLanguage? Language = null);
 
 /// <summary>A file ready to stream, and what to call it.</summary>
 public sealed record ReportDownload(Stream Content, string ContentType, string FileName, long ByteLength, string Sha256);
@@ -94,12 +102,18 @@ public sealed record ReportDownload(Stream Content, string ContentType, string F
 /// the report covers the days it was asked for even if the zone changes before it
 /// is generated.
 /// </para>
+/// <para>
+/// <strong>So is the language (Phase 37.7).</strong> The request's own
+/// <c>language</c>, else the requester's stored language, else English, settled
+/// when the report is asked for and kept on the execution.
+/// </para>
 /// </remarks>
 public sealed class ReportHandlers(
     TenantAuthorizer authorizer,
     IReportExecutionStore executions,
     IReportArtifactStore artifacts,
     IWorkspaceTimeZones timeZones,
+    IAccountDirectory accounts,
     TimeProvider clock)
 {
     /// <summary>The presets a caller may name instead of two dates.</summary>
@@ -116,6 +130,8 @@ public sealed class ReportHandlers(
 
     private readonly IWorkspaceTimeZones _timeZones =
         timeZones ?? throw new ArgumentNullException(nameof(timeZones));
+
+    private readonly IAccountDirectory _accounts = accounts ?? throw new ArgumentNullException(nameof(accounts));
 
     private readonly TimeProvider _clock = clock ?? throw new ArgumentNullException(nameof(clock));
 
@@ -198,13 +214,19 @@ public sealed class ReportHandlers(
 
         UserId requester = _authorizer.RequireCurrentUser();
 
+        // Phase 37.7: the request's language, else the requester's, else English.
+        UserLanguage language = command.Language
+            ?? UserLanguages.OrDefault(await _accounts.FindLanguageAsync(requester, cancellationToken).ConfigureAwait(false));
+
         (ReportExecution execution, bool created) = await _executions
             .AddOrGetAsync(
-                ReportExecution.Request(tenantId, type, format, period, requester, clientRequestId, now),
+                ReportExecution.Request(tenantId, type, format, period, requester, clientRequestId, now, language),
                 cancellationToken)
             .ConfigureAwait(false);
 
-        if (!created && !execution.SameRequestAs(type, format, period))
+        // A repeat that names a different language asks for a different report;
+        // one that names none asks for the report already settled.
+        if (!created && !execution.SameRequestAs(type, format, period, command.Language))
         {
             throw new ReportRequestConflictException();
         }
@@ -390,7 +412,8 @@ public sealed class ReportHandlers(
             execution.Status == ReportExecutionStatus.Completed ? record.ByteLength : null,
             execution.Status == ReportExecutionStatus.Completed ? record.ExpiresAt : null,
             downloadable,
-            execution.TimeZone.Name);
+            execution.TimeZone.Name,
+            UserLanguages.Code(execution.Language));
     }
 
     /// <summary>Membership, then a base permission; returns everything the caller holds.</summary>

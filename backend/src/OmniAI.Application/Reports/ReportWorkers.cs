@@ -114,6 +114,7 @@ public sealed class ReportGenerator(
                     workspaceName,
                     _clock.GetUtcNow(),
                     _options.RowLimitFor(claimed.Format),
+                    claimed.Language,
                     cancellationToken)
                 .ConfigureAwait(false);
 

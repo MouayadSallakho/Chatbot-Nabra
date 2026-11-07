@@ -197,6 +197,71 @@ letters.
 **Size.** The Linux Skia build embeds the fonts whole rather than as a subset, so
 a PDF is about 0.75 MB before its data. That is well inside the 25 MiB bound.
 
+### Report files in the reader's language (Phase 37.7, D-6)
+
+Every file is written in English or Arabic, chosen when the report is asked for
+and kept on the execution (`report_executions.language`, M9).
+
+**Which language.**
+
+| Report | Language |
+| --- | --- |
+| Asked for in the app or the API | The request's optional `language` (`"en"`/`"ar"`); absent or `null`: the requester's stored `users.language` (37.3); unset: `en` |
+| A scheduled occurrence | Its schedule's `language` (`report_schedules.language`, M10). A schedule takes its creator's language when it is created unless the request names one; only an edit that names a language changes it. Neither the creator changing their own language nor another member saving or switching the schedule changes it |
+| Made before 37.7 | `en` (the column default), which is what it was |
+
+A `language` other than exactly `en` or `ar` is `400 language.unsupported`,
+checked before membership. A repeated `clientRequestId` that names a different
+language is the existing `409` (it asks for a different report); one that names
+none returns the report already settled. The download's file name is the same
+server-built ASCII name in both languages.
+
+**What changes, and what does not.** `ReportWording` (Application) holds every
+phrase the platform writes into a file, keyed by its English, with its Arabic
+written to `frontend/src/locale/GLOSSARY.md` and the words the Arabic screens
+use. In English it returns the key unchanged, so **an English file is
+byte-for-byte what it was before 37.7**: `ReportGoldenFileTests` compares all 24
+type × format files with golden files captured from the 37.6 code before any
+change (CSV byte for byte; workbooks part by part, with the SDK's random
+relationship ids numbered; PDFs byte for byte except the clock-derived `/ID`, with
+the two embedded fonts compared by SHA-256).
+
+| Translated | Unchanged |
+| --- | --- |
+| Title (the Arabic names the report e-mails already use, `NotificationCatalog.ReportName`), labels, column headings, sheet names, notes, the PDF footer | Every number, date and instant, written the same way (Western digits, Gregorian calendar, ISO dates: localisation decision 3) |
+| The platform's own cell values: channel names (`دردشة الموقع`, `واتساب`), operations, outcomes, delivery states, "handled by", and the labels for customers nobody named (`عميل بلا اسم`, `عميل واتساب`, `زائر مجهول`) | Stored data: customer and agent names, providers, models, currency codes, ids |
+| Zone labels: `بالتوقيت العالمي` for UTC, `بتوقيت Asia/Riyadh` otherwise (the IANA name as spelt) | Number formats and cell styles in the workbook; CSV quoting, escaping and the formula-prefix defence |
+
+**Per format.**
+- **CSV:** Arabic headers; UTF-8 with a byte-order mark, as every CSV already
+  was; values written exactly as in English. Channel lists use the Arabic comma.
+- **Excel:** every sheet's view carries `rightToLeft="1"`, so column A is on the
+  right; Arabic sheet names (`الملخص`, then each table's) and headers; the same
+  stylesheet and the same cell types and styles as the English workbook. An
+  English workbook carries no direction attribute at all.
+- **PDF:** the page is mirrored. Title, headings, notes and labels start at the
+  right margin; each label's value sits to its left; table columns run from the
+  right; text cells start at a column's right edge and numbers end at its left
+  edge; the footer has the title on the right and "صفحة n من m" on the left. The
+  report's own words are drawn as right-to-left paragraphs (`PdfText` with
+  `rightToLeft`); every value keeps the direction of its first strong character,
+  as an isolate does, so a Latin name, an e-mail address, an id or a number keeps
+  its own order inside the Arabic page. The same bundled DejaVu font and the same
+  HarfBuzz + `Unicode.Bidi` pipeline shape the Arabic; no font was added.
+
+**Dates inside Arabic sentences.** UAX #9 rule W2 turns digits that follow Arabic
+letters into Arabic numbers, and the hyphens of an ISO date then split it, so
+`2026-10-01` would read `01-10-2026` (in the PDF, in Excel and in a browser).
+`ReportWording` writes every date inside an Arabic sentence between two
+LEFT-TO-RIGHT MARKs (U+200E), which are invisible and keep the date in order in
+every viewer. Dates in their own cell or value need nothing.
+
+**Tests.** `ReportWordingTests` (English identity, Arabic completeness, glossary
+terms, zones, digits), `ArabicReportFileTests` (every type, read back: CSV header
+and encoding; Excel direction, sheet names, headers and unchanged formats; PDF
+text order and page direction), `ReportGoldenFileTests`, the generation and
+schedule tests against PostgreSQL, and `ReportLanguageApiTests`.
+
 ## 8. Report bounds
 
 | Bound | Default | Setting |
@@ -228,6 +293,11 @@ reaches it. Executions made before 37.6 read `UTC`, which is what they were. The
 execution response gains `timeZone`, the zone `periodFrom`, `periodTo` and
 `periodLastDay` are local dates of. A repeated request with the same key and the
 same dates in a different zone is a different report (`409`).
+
+**So is the language (Phase 37.7, M9).** Execution responses (the request's
+`202`, the list, one execution, a schedule's `lastExecution`) gain `language`
+(`"en"`/`"ar"`), and schedule responses gain the schedule's `language` (M10). See
+§7, "Report files in the reader's language".
 
 **Labels.** The period note reads *"in {zone} whole days"*, day columns are headed
 `Date ({zone})`, and the PDF and Excel period lines name the zone. In a UTC
@@ -283,6 +353,9 @@ owner, created/updated, `disabled_reason`, `xmin` version.
   428, stale → 412, no automatic retry. The worker advancing `next_run_at` is a
   version change too.
 - **Delivery.** Into Reports only. No recipients field exists.
+- **Language (Phase 37.7).** `language` (`en`/`ar`): the creator's when created,
+  unless the create names one; kept until an edit names another. Every occurrence
+  is queued with it (the occurrence insert writes it) and generated in it. See §7.
 
 ## 12. Retention
 
@@ -300,6 +373,12 @@ artifact row, so nothing in progress can be touched.
 workspace. Partial unique indexes carry both idempotency keys; a partial index on
 `status IN ('Pending','Running')` serves the claim. No blob, JSON or text columns;
 the row version is PostgreSQL's system `xmin`, not a physical column.
+
+Phase 37.6 added `report_executions.time_zone` (M8). Phase 37.7 added
+`report_executions.language` (M9, `AddReportExecutionLanguage`) and
+`report_schedules.language` (M10, `AddReportScheduleLanguage`): each
+`varchar(8) NOT NULL DEFAULT 'en'`, a model default, so every earlier row reads
+English without a data step. No index: the column is only ever read with its row.
 
 ## 14. UI
 

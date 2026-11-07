@@ -1,8 +1,10 @@
+using OmniAI.Api.Auth;
 using OmniAI.Api.Http;
 using OmniAI.Api.Security;
 using OmniAI.Application.Concurrency;
 using OmniAI.Application.Reports;
 using OmniAI.Domain.Reports;
+using OmniAI.Domain.Users;
 
 namespace OmniAI.Api.Reports;
 
@@ -49,7 +51,7 @@ internal static class ReportEndpoints
             .Produces<ReportCatalogResponse>();
         reports.MapPost("/", RequestAsync)
             .WithName("RequestReport")
-            .WithSummary("Asks for a report; its period is local days of the workspace time zone, kept on the execution.")
+            .WithSummary("Asks for a report; its period is local days of the workspace time zone, kept on the execution. Optional language (en|ar) words the file; absent: the requester's own language, else en (400 language.unsupported otherwise).")
             .Produces<ReportExecutionResponse>(StatusCodes.Status202Accepted);
         reports.MapGet("/executions", ListAsync)
             .WithName("ListReportExecutions")
@@ -59,12 +61,25 @@ internal static class ReportEndpoints
             .Produces<ReportExecutionResponse>();
         reports.MapGet("/executions/{executionId:guid}/download", DownloadAsync).WithName("DownloadReport");
 
-        reports.MapGet("/schedules", ListSchedulesAsync).WithName("ListReportSchedules");
-        reports.MapPost("/schedules", CreateScheduleAsync).WithName("CreateReportSchedule");
-        reports.MapGet("/schedules/{scheduleId:guid}", GetScheduleAsync).WithName("GetReportSchedule");
-        reports.MapPut("/schedules/{scheduleId:guid}", UpdateScheduleAsync).WithName("UpdateReportSchedule");
+        // Phase 37.7: the schedule routes declare their response types too, so the
+        // generated document describes each schedule's language.
+        reports.MapGet("/schedules", ListSchedulesAsync)
+            .WithName("ListReportSchedules")
+            .Produces<ReportScheduleListResponse>();
+        reports.MapPost("/schedules", CreateScheduleAsync)
+            .WithName("CreateReportSchedule")
+            .WithSummary("Creates a schedule. Optional language (en|ar) words every occurrence; absent: the creator's own language, else en (400 language.unsupported otherwise).")
+            .Produces<ReportScheduleResponse>(StatusCodes.Status201Created);
+        reports.MapGet("/schedules/{scheduleId:guid}", GetScheduleAsync)
+            .WithName("GetReportSchedule")
+            .Produces<ReportScheduleResponse>();
+        reports.MapPut("/schedules/{scheduleId:guid}", UpdateScheduleAsync)
+            .WithName("UpdateReportSchedule")
+            .WithSummary("Replaces a schedule's editable fields (If-Match). Optional language (en|ar) changes the language of its reports; absent keeps it.")
+            .Produces<ReportScheduleResponse>();
         reports.MapPut("/schedules/{scheduleId:guid}/enabled", SetScheduleEnabledAsync)
-            .WithName("SetReportScheduleEnabled");
+            .WithName("SetReportScheduleEnabled")
+            .Produces<ReportScheduleResponse>();
 
         return endpoints;
     }
@@ -85,6 +100,13 @@ internal static class ReportEndpoints
         ReportHandlers handlers,
         CancellationToken cancellationToken)
     {
+        // Phase 37.7: checked before membership, so the refusal says nothing about
+        // the workspace.
+        if (!AccountProblems.TryReadLanguage(request?.Language, out UserLanguage? language, out IResult? unsupported))
+        {
+            return unsupported!;
+        }
+
         try
         {
             (ReportExecutionView Execution, bool Created)? result = await handlers
@@ -96,7 +118,8 @@ internal static class ReportEndpoints
                         request?.Range,
                         request?.From,
                         request?.To,
-                        request?.ClientRequestId),
+                        request?.ClientRequestId,
+                        language),
                     cancellationToken)
                 .ConfigureAwait(false);
 
@@ -225,10 +248,15 @@ internal static class ReportEndpoints
         ReportScheduleHandlers handlers,
         CancellationToken cancellationToken)
     {
+        if (!AccountProblems.TryReadLanguage(request?.Language, out UserLanguage? language, out IResult? unsupported))
+        {
+            return unsupported!;
+        }
+
         try
         {
             Versioned<ReportScheduleView>? created = await handlers
-                .CreateAsync(Command(tenantId, null, request, default), cancellationToken)
+                .CreateAsync(Command(tenantId, null, request, default, language), cancellationToken)
                 .ConfigureAwait(false);
 
             if (created is null)
@@ -259,6 +287,11 @@ internal static class ReportEndpoints
         ReportScheduleHandlers handlers,
         CancellationToken cancellationToken)
     {
+        if (!AccountProblems.TryReadLanguage(request?.Language, out UserLanguage? language, out IResult? unsupported))
+        {
+            return unsupported!;
+        }
+
         if (EntityTags.ReadIfMatch(http.Request, out ConcurrencyToken expected) is IResult refusal)
         {
             return refusal;
@@ -269,7 +302,7 @@ internal static class ReportEndpoints
             return Respond(
                 http,
                 await handlers
-                    .UpdateAsync(Command(tenantId, scheduleId, request, expected), cancellationToken)
+                    .UpdateAsync(Command(tenantId, scheduleId, request, expected, language), cancellationToken)
                     .ConfigureAwait(false));
         }
         catch (ReportScheduleVersionMismatchException failure)
@@ -319,7 +352,8 @@ internal static class ReportEndpoints
         Guid tenantId,
         Guid? scheduleId,
         SaveReportScheduleRequest? request,
-        ConcurrencyToken expected) =>
+        ConcurrencyToken expected,
+        UserLanguage? language) =>
         new(
             tenantId,
             scheduleId,
@@ -328,7 +362,8 @@ internal static class ReportEndpoints
             request?.Format,
             request?.Frequency,
             request?.Enabled,
-            expected);
+            expected,
+            language);
 
     private static IResult Respond(HttpContext http, Versioned<ReportScheduleView>? schedule)
     {

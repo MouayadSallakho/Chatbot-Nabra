@@ -6,6 +6,7 @@ using OmniAI.Application.Concurrency;
 using OmniAI.Application.Reports;
 using OmniAI.Domain.Reports;
 using OmniAI.Domain.Tenants;
+using OmniAI.Domain.Users;
 using OmniAI.Infrastructure.Persistence;
 
 namespace OmniAI.Infrastructure.Reports;
@@ -240,12 +241,13 @@ internal sealed class ReportScheduleStore(OmniAiDbContext context) : IReportSche
                 .ExecuteSqlAsync(
                     $"""
                     INSERT INTO report_executions
-                        (id, tenant_id, report_type, format, period_from, period_to, time_zone, status,
+                        (id, tenant_id, report_type, format, period_from, period_to, time_zone, language, status,
                          requested_by, requested_at, client_request_id, schedule_id, attempts)
                     VALUES
                         ({occurrence.Id.Value}, {occurrence.TenantId.Value}, {occurrence.Type.ToString()},
                          {occurrence.Format.ToString()}, {occurrence.PeriodFrom.ToUniversalTime()},
-                         {occurrence.PeriodTo.ToUniversalTime()}, {occurrence.TimeZone.Name}, 'Pending',
+                         {occurrence.PeriodTo.ToUniversalTime()}, {occurrence.TimeZone.Name},
+                         {UserLanguages.Code(occurrence.Language)}, 'Pending',
                          {occurrence.RequestedBy.Value}, {occurrence.RequestedAt.ToUniversalTime()}, NULL,
                          {schedule.Id.Value}, 0)
                     ON CONFLICT (schedule_id, period_from) WHERE schedule_id IS NOT NULL DO NOTHING

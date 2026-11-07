@@ -170,6 +170,7 @@ public sealed record ReportExecutionRecord(
     DateTimeOffset? ExpiresAt);
 
 /// <summary>An execution a worker has claimed, with the token that proves it.</summary>
+/// <param name="Language">The language the file is written in (Phase 37.7).</param>
 public sealed record ClaimedReportExecution(
     ReportExecutionId Id,
     TenantId TenantId,
@@ -178,7 +179,8 @@ public sealed record ClaimedReportExecution(
     ReportPeriod Period,
     UserId RequestedBy,
     Guid ClaimToken,
-    int Attempts);
+    int Attempts,
+    UserLanguage Language = UserLanguage.English);
 
 /// <summary>Report executions and their artifacts, in the database.</summary>
 public interface IReportExecutionStore

@@ -438,6 +438,16 @@ internal static class PersistenceConverters
             language => language == null ? null : Domain.Users.UserLanguages.Code(language.Value),
             code => Domain.Users.UserLanguages.FromStored(code));
 
+    /// <summary>
+    /// A language that is always set, as its stored code (Phase 37.7: report
+    /// executions and schedules). A code this version does not know reads as
+    /// English, the language every report had before.
+    /// </summary>
+    public static readonly ValueConverter<Domain.Users.UserLanguage, string> UserLanguage =
+        new(
+            language => Domain.Users.UserLanguages.Code(language),
+            code => Domain.Users.UserLanguages.FromStored(code) ?? Domain.Users.UserLanguage.English);
+
     public static readonly ValueConverter<TenantId?, Guid?> NullableTenantId =
         new(
             id => id == null ? null : id.Value.Value,

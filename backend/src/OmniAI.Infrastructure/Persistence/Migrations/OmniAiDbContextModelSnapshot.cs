@@ -2000,6 +2000,14 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(8)")
                         .HasColumnName("format");
 
+                    b.Property<string>("Language")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasDefaultValue("en")
+                        .HasColumnName("language");
+
                     b.Property<DateTimeOffset>("PeriodFrom")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("period_from");
@@ -2112,6 +2120,14 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                         .HasMaxLength(16)
                         .HasColumnType("character varying(16)")
                         .HasColumnName("frequency");
+
+                    b.Property<string>("Language")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasDefaultValue("en")
+                        .HasColumnName("language");
 
                     b.Property<string>("Name")
                         .IsRequired()
