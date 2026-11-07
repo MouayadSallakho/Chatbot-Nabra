@@ -408,3 +408,32 @@ control it.
 - Each real rename writes one `workspace.renamed` security event (actor, workspace,
   time; never the names) in the same transaction as the rename.
 - The hosted and embedded chat reads show the new name on their next read.
+
+## Phase 37.6: the workspace time zone (row 34)
+
+The days a workspace counts in, so the Gulf (UTC+3) no longer reads yesterday's
+evening as today.
+
+- `Tenant.TimeZone` is an IANA name (`WorkspaceTimeZone`), stored in
+  `tenants.time_zone varchar(64) NOT NULL DEFAULT 'UTC'` (migration
+  `AddWorkspaceTimeZone`, M7). The default is a model default, so every existing
+  workspace reads `UTC`, exactly the zone it was already counted in; no data step.
+- `GET /api/tenants/{id}` (and the create and rename responses) gain `timeZone`.
+  `GET /api/me/tenants` is unchanged.
+- `PUT /api/tenants/{id}/time-zone` `{ timeZone }` with `If-Match`, guarded by
+  `workspace.manage`, in the rename's order: the name is checked against the
+  runtime's zone database first (the same `400 workspace.time_zone.invalid` for
+  anybody), then membership (`404`) and the permission (`403`), then PostgreSQL's
+  own `pg_timezone_names` (same code), then the version (`428` / `412`). `200` with
+  the workspace and a new `ETag`. Choosing the current zone writes nothing.
+- **Exact spelling only.** The runtime and PostgreSQL both accept a name case-
+  insensitively in places; this platform stores one spelling, the database's own,
+  so every reader, renderer and client is given the same string.
+- **Not a security event.** Nothing about access or identity changes, so no
+  `security_events` row is written.
+- **Reading never fails because of a zone.** A stored name is read without looking
+  its rules up; the rules are resolved when a day is first computed. A name the
+  runtime no longer knows then fails loudly rather than being counted in UTC.
+- What follows the zone and what does not is described in
+  `analytics-usage-foundation.md` §4 and `reports-exports-scheduling.md` §9 and §11.
+  The plan quota's months stay in UTC (`workspace-plans-entitlements-quotas.md`).

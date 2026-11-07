@@ -21,7 +21,7 @@ public sealed class TenantAccessGuardTests
     private static readonly UserId Bob = UserId.New();
 
     private static readonly TenantView Workspace =
-        new(Guid.CreateVersion7(), "Acme Trading", "acme", TenantStatus.Active);
+        new(Guid.CreateVersion7(), "Acme Trading", "acme", TenantStatus.Active, "UTC");
 
     [Fact]
     public async Task A_member_is_admitted()
@@ -58,7 +58,7 @@ public sealed class TenantAccessGuardTests
     [Fact]
     public async Task Membership_of_one_workspace_does_not_admit_another()
     {
-        TenantView other = new(Guid.CreateVersion7(), "Rival", "rival", TenantStatus.Active);
+        TenantView other = new(Guid.CreateVersion7(), "Rival", "rival", TenantStatus.Active, "UTC");
 
         TenantAccessGuard guard = TestAccess.For(Alice, Workspace);
 

@@ -1,6 +1,7 @@
 using OmniAI.Application.Analytics;
 using OmniAI.Application.Authorization;
 using OmniAI.Application.Tests.Security;
+using OmniAI.Application.Tests.Tenants;
 using OmniAI.Domain.Authorization;
 using OmniAI.Domain.Tenants;
 using OmniAI.Domain.Users;
@@ -144,8 +145,9 @@ public sealed class WorkspaceAnalyticsHandlerTests
 
     private static GetWorkspaceAnalyticsHandler HandlerFor(
         IWorkspaceAnalyticsReader reader,
-        TenantAuthorizer authorizer) =>
-        new(reader, authorizer, new FixedTimeProvider(Noon));
+        TenantAuthorizer authorizer,
+        WorkspaceTimeZone? zone = null) =>
+        new(reader, new FixedWorkspaceTimeZones(zone), authorizer, new FixedTimeProvider(Noon));
 }
 
 /// <summary>
@@ -163,6 +165,23 @@ internal sealed class RecordingAnalyticsReader : IWorkspaceAnalyticsReader
     public TenantId? LastTenant { get; private set; }
 
     public AnalyticsWindow? LastWindow { get; private set; }
+
+    public AnalyticsWindow? LastComparisonWindow { get; private set; }
+
+    public Task<AnalyticsComparison> ReadComparisonAsync(
+        TenantId tenantId,
+        AnalyticsWindow window,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(window);
+
+        LastComparisonWindow = window;
+
+        return Task.FromResult(new AnalyticsComparison(
+            new AnalyticsPeriod(window.Label, window.From, window.To, window.DayCount, window.TimeZone.Name),
+            new AnalyticsSummary(0, 0, 0, 0, 0),
+            new AnalyticsAiOperations(0, 0, 0, 0)));
+    }
 
     public Task<WorkspaceAnalytics> ReadAsync(
         TenantId tenantId,
@@ -182,7 +201,7 @@ internal sealed class RecordingAnalyticsReader : IWorkspaceAnalyticsReader
                 window.From,
                 window.To,
                 window.DayCount,
-                AnalyticsWindow.TimeZone),
+                window.TimeZone.Name),
             new AnalyticsSummary(0, 0, 0, 0, 0),
             new AnalyticsSnapshot(0, 0, 0),
             [],
@@ -190,7 +209,8 @@ internal sealed class RecordingAnalyticsReader : IWorkspaceAnalyticsReader
             [],
             new AnalyticsAiOperations(0, 0, 0, 0),
             WhatsAppDelivery: null,
-            new AnalyticsAiUsage(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, []),
-            []));
+            new AnalyticsAiUsage(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, [], []),
+            [],
+            FirstActivityOn: null));
     }
 }

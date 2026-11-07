@@ -175,6 +175,11 @@ a rolling thirty days: a rolling window recovers a little every day, which nobod
 can predict; a calendar month resets on a date somebody can put in a diary.
 Nothing historical is deleted when it resets.
 
+**Still UTC after Phase 37.6.** The workspace time zone moves analytics days,
+report periods and schedules, never these months: the allowance is a contractual
+period, and a workspace changing its zone must not be able to gain or lose part of
+a month by doing so.
+
 ---
 
 ## 8. Both quotas are race-safe, in PostgreSQL

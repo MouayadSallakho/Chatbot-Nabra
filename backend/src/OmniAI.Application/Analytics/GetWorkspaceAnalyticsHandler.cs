@@ -1,11 +1,16 @@
 using OmniAI.Application.Authorization;
+using OmniAI.Application.Tenants.Persistence;
 using OmniAI.Domain.Authorization;
 using OmniAI.Domain.Tenants;
 
 namespace OmniAI.Application.Analytics;
 
 /// <summary>Read one workspace's dashboard.</summary>
-public sealed record GetWorkspaceAnalyticsQuery(Guid TenantId, AnalyticsRange Range);
+/// <param name="ComparePrevious">
+/// Whether to add the period just before, for comparison (<c>compare=previous</c>,
+/// Phase 37.6). Off unless asked for: it costs three more statements.
+/// </param>
+public sealed record GetWorkspaceAnalyticsQuery(Guid TenantId, AnalyticsRange Range, bool ComparePrevious = false);
 
 /// <summary>
 /// The analytics dashboard.
@@ -22,14 +27,24 @@ public sealed record GetWorkspaceAnalyticsQuery(Guid TenantId, AnalyticsRange Ra
 /// buckets and the channel breakdown describe the same period rather than three
 /// periods a few milliseconds apart.
 /// </para>
+/// <para>
+/// <strong>In the workspace's zone (Phase 37.6).</strong> The zone is read after
+/// authorisation, so a non-member learns nothing about it, and the window's days
+/// are local days of it. The previous period, when asked for, is derived from the
+/// same window: adjacent, as many days, and in the same zone.
+/// </para>
 /// </remarks>
 public sealed class GetWorkspaceAnalyticsHandler(
     IWorkspaceAnalyticsReader reader,
+    IWorkspaceTimeZones timeZones,
     TenantAuthorizer authorizer,
     TimeProvider clock)
 {
     private readonly IWorkspaceAnalyticsReader _reader =
         reader ?? throw new ArgumentNullException(nameof(reader));
+
+    private readonly IWorkspaceTimeZones _timeZones =
+        timeZones ?? throw new ArgumentNullException(nameof(timeZones));
 
     private readonly TenantAuthorizer _authorizer =
         authorizer ?? throw new ArgumentNullException(nameof(authorizer));
@@ -56,10 +71,23 @@ public sealed class GetWorkspaceAnalyticsHandler(
             return null;
         }
 
-        AnalyticsWindow window = query.Range.Window(_clock.GetUtcNow());
+        WorkspaceTimeZone zone = await _timeZones.OfAsync(tenantId, cancellationToken).ConfigureAwait(false);
 
-        return await _reader
+        AnalyticsWindow window = query.Range.Window(_clock.GetUtcNow(), zone);
+
+        WorkspaceAnalytics analytics = await _reader
             .ReadAsync(tenantId, window, AnalyticsBreakdown.Dashboard, cancellationToken)
             .ConfigureAwait(false);
+
+        if (!query.ComparePrevious)
+        {
+            return analytics;
+        }
+
+        AnalyticsComparison previous = await _reader
+            .ReadComparisonAsync(tenantId, window.Previous(), cancellationToken)
+            .ConfigureAwait(false);
+
+        return analytics with { Previous = previous };
     }
 }

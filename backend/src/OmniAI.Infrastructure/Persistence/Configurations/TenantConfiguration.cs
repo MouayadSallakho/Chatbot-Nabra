@@ -38,6 +38,15 @@ internal sealed class TenantConfiguration : IEntityTypeConfiguration<Tenant>
             .HasMaxLength(32)
             .IsRequired();
 
+        // Phase 37.6 (M7). A model default, so every existing workspace reads UTC —
+        // exactly the zone it was already counted in — without a data step.
+        builder.Property(tenant => tenant.TimeZone)
+            .HasColumnName("time_zone")
+            .HasConversion(PersistenceConverters.WorkspaceTimeZone)
+            .HasMaxLength(WorkspaceTimeZone.MaxLength)
+            .HasDefaultValue(WorkspaceTimeZone.Utc)
+            .IsRequired();
+
         // The uniqueness the Domain deliberately could not guarantee. Slugs are
         // already canonical lowercase before they reach persistence, so a plain
         // unique index is exact -- no citext extension or lower() expression

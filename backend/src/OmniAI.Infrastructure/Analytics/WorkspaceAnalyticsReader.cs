@@ -28,6 +28,13 @@ namespace OmniAI.Infrastructure.Analytics;
 /// rather than against an in-memory provider that would accept anything.
 /// </para>
 /// <para>
+/// <strong>Two statements are SQL (Phase 37.6).</strong> The usage buckets and the
+/// model breakdown sum token columns of an owned type, which EF translates as a
+/// correlated subquery per sum per group. They are written as one parameterised
+/// <c>GROUP BY</c> each, over the same tenant-and-window predicate, and a test
+/// holds every usage statement to a single read of the table.
+/// </para>
+/// <para>
 /// <strong>The workspace is in every predicate.</strong> Messages and conversation
 /// turns carry no tenant column of their own, so they are reached only by joining
 /// through <c>conversations</c>, which does. There is no path here that reads a
@@ -89,13 +96,11 @@ internal sealed class WorkspaceAnalyticsReader(OmniAiDbContext context)
         (AnalyticsAiUsage usage, IReadOnlyList<AnalyticsModelUsage> models) =
             await ProviderUsageAsync(tenantId, window, breakdown.MaxModels, cancellationToken).ConfigureAwait(false);
 
+        DateOnly? firstActivityOn =
+            await FirstActivityAsync(tenantId, window.TimeZone, cancellationToken).ConfigureAwait(false);
+
         return new WorkspaceAnalytics(
-            new AnalyticsPeriod(
-                window.Label,
-                window.From,
-                window.To,
-                window.DayCount,
-                AnalyticsWindow.TimeZone),
+            Period(window),
             summary,
             current,
             daily,
@@ -108,7 +113,55 @@ internal sealed class WorkspaceAnalyticsReader(OmniAiDbContext context)
             // go looking for the outage behind it.
             delivery.HasAny ? delivery : null,
             usage,
-            models);
+            models,
+            firstActivityOn);
+    }
+
+    /// <remarks>
+    /// The summary and the AI outcomes only, through exactly the methods
+    /// <see cref="ReadAsync"/> uses, so the two periods of a comparison cannot mean
+    /// different things. Three statements.
+    /// </remarks>
+    public async Task<AnalyticsComparison> ReadComparisonAsync(
+        TenantId tenantId,
+        AnalyticsWindow window,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(window);
+
+        AnalyticsSummary summary =
+            await SummaryAsync(tenantId, window, cancellationToken).ConfigureAwait(false);
+
+        AnalyticsAiOperations operations =
+            await AiOperationsAsync(tenantId, window, cancellationToken).ConfigureAwait(false);
+
+        return new AnalyticsComparison(Period(window), summary, operations);
+    }
+
+    private static AnalyticsPeriod Period(AnalyticsWindow window) =>
+        new(window.Label, window.From, window.To, window.DayCount, window.TimeZone.Name);
+
+    /// <summary>
+    /// The local date of the workspace's first conversation (Phase 37.6, row 33).
+    /// </summary>
+    /// <remarks>
+    /// <strong>One <c>min</c>, answered from the index.</strong>
+    /// <c>ix_conversations_tenant_started</c> leads with the workspace and then the
+    /// start instant, so PostgreSQL reads the first entry for this workspace and
+    /// stops. Not limited to the window: it is the workspace's age, not the period's.
+    /// </remarks>
+    private async Task<DateOnly?> FirstActivityAsync(
+        TenantId tenantId,
+        WorkspaceTimeZone timeZone,
+        CancellationToken cancellationToken)
+    {
+        DateTimeOffset? first = await _context.Conversations
+            .AsNoTracking()
+            .Where(conversation => conversation.TenantId == tenantId)
+            .MinAsync(conversation => (DateTimeOffset?)conversation.StartedAt, cancellationToken)
+            .ConfigureAwait(false);
+
+        return first is DateTimeOffset at ? timeZone.DateOf(at) : null;
     }
 
     // ------------------------------------------------------------------ pieces
@@ -175,14 +228,23 @@ internal sealed class WorkspaceAnalyticsReader(OmniAiDbContext context)
     /// The day list comes from the window rather than from the rows, so a quiet
     /// Sunday is a zero instead of a hole in the chart.
     /// </para>
+    /// <para>
+    /// <strong>Local days, cut by PostgreSQL (Phase 37.6).</strong> Each instant is
+    /// turned into a local date with <c>AT TIME ZONE</c> in the workspace's zone, so
+    /// half-hour offsets and the 23- and 25-hour days of a clock change are counted
+    /// correctly. In UTC this is the same date as before.
+    /// </para>
     /// </remarks>
     private async Task<IReadOnlyList<AnalyticsDay>> DailyAsync(
         TenantId tenantId,
         AnalyticsWindow window,
         CancellationToken cancellationToken)
     {
+        string zone = window.TimeZone.Name;
+
         List<DayCount> startedByDay = await Conversations(tenantId, window)
-            .GroupBy(conversation => DateOnly.FromDateTime(conversation.StartedAt.UtcDateTime))
+            .GroupBy(conversation => DateOnly.FromDateTime(
+                TimeZoneInfo.ConvertTimeBySystemTimeZoneId(conversation.StartedAt.UtcDateTime, zone)))
             .Select(group => new DayCount(group.Key, group.Count()))
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
@@ -190,7 +252,8 @@ internal sealed class WorkspaceAnalyticsReader(OmniAiDbContext context)
         List<DaySenderCount> messagesByDay = await Messages(tenantId, window)
             .GroupBy(message => new
             {
-                Day = DateOnly.FromDateTime(message.SentAt.UtcDateTime),
+                Day = DateOnly.FromDateTime(
+                    TimeZoneInfo.ConvertTimeBySystemTimeZoneId(message.SentAt.UtcDateTime, zone)),
                 message.Sender,
             })
             .Select(group => new DaySenderCount(group.Key.Day, group.Key.Sender, group.Count()))
@@ -484,6 +547,12 @@ internal sealed class WorkspaceAnalyticsReader(OmniAiDbContext context)
     /// <strong>Currencies are grouped, never added.</strong> There is no exchange
     /// rate anywhere in this platform, so two currencies produce two totals.
     /// </para>
+    /// <para>
+    /// <strong>Purpose is one more grouping key, not more statements (Phase 37.6).</strong>
+    /// The buckets, the rated cost and the unrated count are each grouped by purpose
+    /// as well, and the headline figures are the sums of those groups. The parts
+    /// therefore add up to the totals by construction.
+    /// </para>
     /// </remarks>
     private async Task<(AnalyticsAiUsage Usage, IReadOnlyList<AnalyticsModelUsage> Models)>
         ProviderUsageAsync(
@@ -496,18 +565,45 @@ internal sealed class WorkspaceAnalyticsReader(OmniAiDbContext context)
 
         // One grouped trip for the headline counts and token sums. Everything is
         // a COUNT or a SUM over one table; nothing is materialised.
-        List<UsageBucket> buckets = await operations
-            .GroupBy(operation => new { operation.OperationType, operation.Status })
-            .Select(group => new UsageBucket(
-                group.Key.OperationType,
-                group.Key.Status,
-                group.Count(),
-                group.Sum(operation => (long?)operation.Usage.InputTokens) ?? 0,
-                group.Sum(operation => (long?)operation.Usage.CachedInputTokens) ?? 0,
-                group.Sum(operation => (long?)operation.Usage.OutputTokens) ?? 0,
-                group.Sum(operation => (long?)operation.Usage.ReasoningTokens) ?? 0))
+        //
+        // Written as SQL (Phase 37.6). The token counts live in the owned Usage
+        // type, and EF translates a sum over an owned column inside a group as one
+        // correlated subquery per sum per group: four extra scans of the window for
+        // every group. Adding the purpose key doubled the groups and made that
+        // visible in the dashboard's latency. Here the columns are summed in one
+        // GROUP BY over the same tenant-and-window predicate, served by
+        // ix_ai_provider_usages_tenant_started, with every value a parameter.
+        List<UsageBucketRow> bucketRows = await _context.Database
+            .SqlQuery<UsageBucketRow>($"""
+                SELECT operation_type AS "OperationType",
+                       purpose AS "Purpose",
+                       status AS "Status",
+                       count(*)::int AS "Calls",
+                       COALESCE(sum(input_tokens), 0)::bigint AS "InputTokens",
+                       COALESCE(sum(cached_input_tokens), 0)::bigint AS "CachedInputTokens",
+                       COALESCE(sum(output_tokens), 0)::bigint AS "OutputTokens",
+                       COALESCE(sum(reasoning_tokens), 0)::bigint AS "ReasoningTokens"
+                  FROM ai_provider_usages
+                 WHERE tenant_id = {tenantId.Value}
+                   AND started_at >= {window.From.ToUniversalTime()}
+                   AND started_at < {window.To.ToUniversalTime()}
+                 GROUP BY operation_type, purpose, status
+                """)
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
+
+        List<UsageBucket> buckets =
+        [
+            .. bucketRows.Select(row => new UsageBucket(
+                Enum.Parse<AiOperationType>(row.OperationType),
+                Enum.Parse<AiUsagePurpose>(row.Purpose),
+                Enum.Parse<AiOperationStatus>(row.Status),
+                row.Calls,
+                row.InputTokens,
+                row.CachedInputTokens,
+                row.OutputTokens,
+                row.ReasoningTokens)),
+        ];
 
         // Rated spend, per currency. Only succeeded operations that carry a cost.
         // Grouped by the stored currency itself, and unwrapped afterwards. A
@@ -515,9 +611,10 @@ internal sealed class WorkspaceAnalyticsReader(OmniAiDbContext context)
         // here would quietly move the whole aggregation into this process.
         List<CurrencyRow> costRows = await operations
             .Where(operation => operation.EstimatedCost != null && operation.Currency != null)
-            .GroupBy(operation => operation.Currency)
+            .GroupBy(operation => new { operation.Purpose, operation.Currency })
             .Select(group => new CurrencyRow(
-                group.Key,
+                group.Key.Purpose,
+                group.Key.Currency,
                 group.Sum(operation => operation.EstimatedCost) ?? 0m,
                 group.Count()))
             .ToListAsync(cancellationToken)
@@ -528,6 +625,7 @@ internal sealed class WorkspaceAnalyticsReader(OmniAiDbContext context)
             .. costRows
                 .Where(row => row.Currency is not null)
                 .Select(row => new CurrencyBucket(
+                    row.Purpose,
                     row.Currency!.Value.Value,
                     row.EstimatedCost,
                     row.Calls)),
@@ -535,11 +633,13 @@ internal sealed class WorkspaceAnalyticsReader(OmniAiDbContext context)
 
         // Spend that could not be priced. Real calls, real tokens, no configured
         // rate -- reported so the rated figure is never mistaken for the whole.
-        int unrated = await operations
+        List<PurposeCount> unrated = await operations
             .Where(operation =>
                 operation.Status == AiOperationStatus.Succeeded
                 && operation.EstimatedCost == null)
-            .CountAsync(cancellationToken)
+            .GroupBy(operation => operation.Purpose)
+            .Select(group => new PurposeCount(group.Key, group.Count()))
+            .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 
         long Calls(Func<UsageBucket, bool> which) =>
@@ -547,6 +647,19 @@ internal sealed class WorkspaceAnalyticsReader(OmniAiDbContext context)
 
         long Tokens(AiOperationType type, Func<UsageBucket, long> which) =>
             buckets.Where(bucket => bucket.OperationType == type).Sum(which);
+
+        // Per currency, the sum over purposes: the same figure one grouping by
+        // currency alone would give, because decimal addition is exact.
+        static IReadOnlyList<AnalyticsRatedCost> Rated(IEnumerable<CurrencyBucket> rows) =>
+        [
+            .. rows
+                .GroupBy(cost => cost.Currency, StringComparer.Ordinal)
+                .OrderBy(group => group.Key, StringComparer.Ordinal)
+                .Select(group => new AnalyticsRatedCost(
+                    group.Key,
+                    group.Sum(cost => cost.EstimatedCost),
+                    group.Sum(cost => (long)cost.Calls))),
+        ];
 
         AnalyticsAiUsage usage = new(
             Calls(_ => true),
@@ -564,17 +677,32 @@ internal sealed class WorkspaceAnalyticsReader(OmniAiDbContext context)
             Tokens(AiOperationType.TextGeneration, bucket => bucket.OutputTokens),
             Tokens(AiOperationType.TextGeneration, bucket => bucket.ReasoningTokens),
             Tokens(AiOperationType.Embedding, bucket => bucket.InputTokens),
-            unrated,
+            unrated.Sum(row => (long)row.Count),
+            Rated(costs),
+
+            // Every purpose, in a fixed order, zeroes included: a breakdown whose
+            // rows come and go with the data cannot be read against last month's.
             [
-                .. costs
-                    .OrderBy(cost => cost.Currency, StringComparer.Ordinal)
-                    .Select(cost => new AnalyticsRatedCost(
-                        cost.Currency,
-                        cost.EstimatedCost,
-                        cost.Calls)),
+                .. Enum.GetValues<AiUsagePurpose>().Select(purpose =>
+                {
+                    List<UsageBucket> mine = [.. buckets.Where(bucket => bucket.Purpose == purpose)];
+
+                    return new AnalyticsPurposeUsage(
+                        purpose,
+                        mine.Sum(bucket => (long)bucket.Calls),
+                        mine.Where(bucket => bucket.Status == AiOperationStatus.Succeeded).Sum(bucket => (long)bucket.Calls),
+                        mine.Where(bucket => bucket.Status == AiOperationStatus.Failed).Sum(bucket => (long)bucket.Calls),
+                        mine
+                            .Where(bucket => bucket.Status is AiOperationStatus.Started or AiOperationStatus.Unknown)
+                            .Sum(bucket => (long)bucket.Calls),
+                        mine.Sum(bucket => bucket.InputTokens),
+                        mine.Sum(bucket => bucket.OutputTokens),
+                        unrated.Where(row => row.Purpose == purpose).Sum(row => (long)row.Count),
+                        Rated(costs.Where(cost => cost.Purpose == purpose)));
+                }),
             ]);
 
-        return (usage, await ModelsAsync(operations, maxModels, cancellationToken).ConfigureAwait(false));
+        return (usage, await ModelsAsync(tenantId, window, operations, maxModels, cancellationToken).ConfigureAwait(false));
     }
 
     /// <remarks>
@@ -591,7 +719,9 @@ internal sealed class WorkspaceAnalyticsReader(OmniAiDbContext context)
     /// answer, not a missing one, and its call and token counts stay exact.
     /// </para>
     /// </remarks>
-    private static async Task<IReadOnlyList<AnalyticsModelUsage>> ModelsAsync(
+    private async Task<IReadOnlyList<AnalyticsModelUsage>> ModelsAsync(
+        TenantId tenantId,
+        AnalyticsWindow window,
         IQueryable<AiProviderUsage> operations,
         int maxModels,
         CancellationToken cancellationToken)
@@ -607,29 +737,43 @@ internal sealed class WorkspaceAnalyticsReader(OmniAiDbContext context)
         // at most an unresolved form and the builds the provider named. Taking
         // the busiest of them leaves the merge below working over a few dozen
         // rows at most.
-        List<ModelRow> rows = await operations
-            .GroupBy(operation => new
-            {
-                operation.Provider,
-                operation.RequestedModel,
-                operation.ResolvedModel,
-                operation.OperationType,
-            })
-            .OrderByDescending(group => group.Count())
-            .Take(maxModelRows)
-            .Select(group => new ModelRow(
-                group.Key.Provider,
-                group.Key.RequestedModel,
-                group.Key.ResolvedModel,
-                group.Key.OperationType,
-                group.Count(),
-                group.Sum(operation => (long?)operation.Usage.InputTokens) ?? 0,
-                group.Sum(operation => (long?)operation.Usage.OutputTokens) ?? 0,
-                group.Count(operation =>
-                    operation.Status == AiOperationStatus.Succeeded
-                    && operation.EstimatedCost == null)))
+        //
+        // Written as SQL for the reason given for the usage buckets (Phase 37.6):
+        // the token sums are over owned columns, which EF would turn into
+        // correlated subqueries per group.
+        List<ModelSqlRow> modelRows = await _context.Database
+            .SqlQuery<ModelSqlRow>($"""
+                SELECT provider AS "Provider",
+                       requested_model AS "RequestedModel",
+                       resolved_model AS "ResolvedModel",
+                       operation_type AS "OperationType",
+                       count(*)::int AS "Calls",
+                       COALESCE(sum(input_tokens), 0)::bigint AS "InputTokens",
+                       COALESCE(sum(output_tokens), 0)::bigint AS "OutputTokens",
+                       (count(*) FILTER (WHERE status = 'Succeeded' AND estimated_cost IS NULL))::int AS "UnratedCalls"
+                  FROM ai_provider_usages
+                 WHERE tenant_id = {tenantId.Value}
+                   AND started_at >= {window.From.ToUniversalTime()}
+                   AND started_at < {window.To.ToUniversalTime()}
+                 GROUP BY provider, requested_model, resolved_model, operation_type
+                 ORDER BY count(*) DESC
+                 LIMIT {maxModelRows}
+                """)
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
+
+        List<ModelRow> rows =
+        [
+            .. modelRows.Select(row => new ModelRow(
+                Enum.Parse<AiProvider>(row.Provider),
+                ModelName.Create(row.RequestedModel),
+                ModelName.CreateOrNull(row.ResolvedModel),
+                Enum.Parse<AiOperationType>(row.OperationType),
+                row.Calls,
+                row.InputTokens,
+                row.OutputTokens,
+                row.UnratedCalls)),
+        ];
 
         if (rows.Count == 0)
         {
@@ -796,6 +940,7 @@ internal sealed class WorkspaceAnalyticsReader(OmniAiDbContext context)
 
     private sealed record UsageBucket(
         AiOperationType OperationType,
+        AiUsagePurpose Purpose,
         AiOperationStatus Status,
         int Calls,
         long InputTokens,
@@ -803,10 +948,52 @@ internal sealed class WorkspaceAnalyticsReader(OmniAiDbContext context)
         long OutputTokens,
         long ReasoningTokens);
 
-    private sealed record CurrencyBucket(string Currency, decimal EstimatedCost, int Calls);
+    private sealed record CurrencyBucket(AiUsagePurpose Purpose, string Currency, decimal EstimatedCost, int Calls);
+
+    /// <summary>A usage bucket as the SQL returns it, enums still by name.</summary>
+    private sealed class UsageBucketRow
+    {
+        public string OperationType { get; init; } = string.Empty;
+
+        public string Purpose { get; init; } = string.Empty;
+
+        public string Status { get; init; } = string.Empty;
+
+        public int Calls { get; init; }
+
+        public long InputTokens { get; init; }
+
+        public long CachedInputTokens { get; init; }
+
+        public long OutputTokens { get; init; }
+
+        public long ReasoningTokens { get; init; }
+    }
+
+    /// <summary>A model grouping as the SQL returns it, before its values are opened.</summary>
+    private sealed class ModelSqlRow
+    {
+        public string Provider { get; init; } = string.Empty;
+
+        public string RequestedModel { get; init; } = string.Empty;
+
+        public string? ResolvedModel { get; init; }
+
+        public string OperationType { get; init; } = string.Empty;
+
+        public int Calls { get; init; }
+
+        public long InputTokens { get; init; }
+
+        public long OutputTokens { get; init; }
+
+        public int UnratedCalls { get; init; }
+    }
+
+    private sealed record PurposeCount(AiUsagePurpose Purpose, int Count);
 
     /// <summary>A grouped row as it comes back, before its value objects are opened.</summary>
-    private sealed record CurrencyRow(CurrencyCode? Currency, decimal EstimatedCost, int Calls);
+    private sealed record CurrencyRow(AiUsagePurpose Purpose, CurrencyCode? Currency, decimal EstimatedCost, int Calls);
 
     /// <inheritdoc cref="CurrencyRow"/>
     private sealed record ModelRow(

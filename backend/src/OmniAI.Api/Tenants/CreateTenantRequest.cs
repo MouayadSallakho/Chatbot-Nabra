@@ -31,3 +31,7 @@ public sealed record CreateTenantRequest(string? Name, string? Slug);
 /// at most 200 characters after trimming, no control characters.
 /// </remarks>
 public sealed record RenameTenantRequest(string? Name);
+
+/// <summary>The body of <c>PUT /api/tenants/{id}/time-zone</c> (Phase 37.6).</summary>
+/// <param name="TimeZone">An IANA name, such as <c>Asia/Riyadh</c>, or <c>UTC</c>.</param>
+public sealed record ChangeTenantTimeZoneRequest(string? TimeZone);

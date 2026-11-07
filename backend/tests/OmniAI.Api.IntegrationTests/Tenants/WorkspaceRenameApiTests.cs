@@ -26,10 +26,13 @@ public sealed class WorkspaceRenameApiTests(WebChatApiFixture fixture)
         Assert.NotNull(read.Headers.ETag);
         Assert.False(read.Headers.ETag!.IsWeak);
 
+        // The four fields of 37.5a, unchanged, plus the workspace time zone that
+        // Phase 37.6 (row 34) added: an additive member, UTC by default.
         JsonElement body = await ReadAsync(read);
         Assert.Equal(
-            ["id", "name", "slug", "status"],
+            ["id", "name", "slug", "status", "timeZone"],
             body.EnumerateObject().Select(property => property.Name).Order(StringComparer.Ordinal));
+        Assert.Equal("UTC", body.GetProperty("timeZone").GetString());
     }
 
     [Fact]

@@ -10,6 +10,10 @@ namespace OmniAI.Api.Tenants;
 /// <param name="Name">The canonical display name.</param>
 /// <param name="Slug">The canonical slug.</param>
 /// <param name="Status">The operational state, as a stable name such as <c>Active</c>.</param>
+/// <param name="TimeZone">
+/// The IANA zone the workspace counts its days in, <c>UTC</c> unless somebody chose
+/// another (Phase 37.6). Analytics days, report periods and schedules follow it.
+/// </param>
 /// <remarks>
 /// The published HTTP contract, and the only thing a client sees. It is a
 /// separate type from <c>TenantView</c> for one concrete reason: <c>Status</c> has
@@ -18,20 +22,20 @@ namespace OmniAI.Api.Tenants;
 /// hold an opinion about JSON, and the wire format cannot drift because someone
 /// changed a read model.
 /// <para>
-/// Four fields, all of them owned by the Domain today. No created or updated
+/// Five fields, all of them owned by the Domain today (<c>TimeZone</c> since Phase 37.6). No created or updated
 /// timestamp, no plan, no subscription, no owner, no channel or AI configuration:
 /// the aggregate has none of those, and publishing a field with nothing behind it
 /// would be a promise this API cannot keep.
 /// </para>
 /// </remarks>
-public sealed record TenantResponse(Guid Id, string Name, string Slug, string Status)
+public sealed record TenantResponse(Guid Id, string Name, string Slug, string Status, string TimeZone)
 {
     /// <summary>Maps an Application read model onto the HTTP contract.</summary>
     internal static TenantResponse From(TenantView view)
     {
         ArgumentNullException.ThrowIfNull(view);
 
-        return new TenantResponse(view.Id, view.Name, view.Slug, Serialise(view.Status));
+        return new TenantResponse(view.Id, view.Name, view.Slug, Serialise(view.Status), view.TimeZone);
     }
 
     /// <summary>

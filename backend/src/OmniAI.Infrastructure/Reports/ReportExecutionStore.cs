@@ -212,7 +212,7 @@ internal sealed class ReportExecutionStore(OmniAiDbContext context) : IReportExe
                      FOR UPDATE SKIP LOCKED
                  )
                 RETURNING id, tenant_id, report_type, format, period_from, period_to,
-                          requested_by, claim_token, attempts
+                          requested_by, claim_token, attempts, time_zone
                 """,
                 cancellationToken)
             .ConfigureAwait(false);
@@ -237,7 +237,8 @@ internal sealed class ReportExecutionStore(OmniAiDbContext context) : IReportExe
                 Enum.Parse<ReportFormat>(reader.GetString(3)),
                 ReportPeriod.FromInstants(
                     reader.GetFieldValue<DateTimeOffset>(4),
-                    reader.GetFieldValue<DateTimeOffset>(5)),
+                    reader.GetFieldValue<DateTimeOffset>(5),
+                    WorkspaceTimeZone.FromStored(reader.GetString(9))),
                 UserId.From(reader.GetGuid(6)),
                 reader.GetGuid(7),
                 reader.GetInt32(8)));

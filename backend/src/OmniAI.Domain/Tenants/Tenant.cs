@@ -34,6 +34,16 @@ public sealed class Tenant
     public TenantStatus Status { get; private set; }
 
     /// <summary>
+    /// The zone the workspace counts its days in (Phase 37.6). <c>UTC</c> until
+    /// somebody holding <c>workspace.manage</c> chooses another.
+    /// </summary>
+    /// <remarks>
+    /// Analytics days, report periods and schedule due times follow it. The plan
+    /// quota does not: its months are contractual and stay in UTC.
+    /// </remarks>
+    public WorkspaceTimeZone TimeZone { get; private set; } = WorkspaceTimeZone.Utc;
+
+    /// <summary>
     /// Registers a new tenant. A fresh identity is generated and the tenant
     /// starts <see cref="TenantStatus.Active"/>: onboarding gates belong to the
     /// use case that admits a tenant, not to the shape of the tenant itself.
@@ -54,6 +64,23 @@ public sealed class Tenant
         ArgumentNullException.ThrowIfNull(name);
 
         Name = name;
+    }
+
+    /// <summary>Changes the zone the workspace counts its days in.</summary>
+    /// <returns>Whether anything changed.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="timeZone"/> is null.</exception>
+    public bool ChangeTimeZone(WorkspaceTimeZone timeZone)
+    {
+        ArgumentNullException.ThrowIfNull(timeZone);
+
+        if (TimeZone == timeZone)
+        {
+            return false;
+        }
+
+        TimeZone = timeZone;
+
+        return true;
     }
 
     /// <summary>

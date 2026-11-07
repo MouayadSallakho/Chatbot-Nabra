@@ -2,6 +2,7 @@ using OmniAI.Api.Http;
 using OmniAI.Api.Security;
 using OmniAI.Application.Concurrency;
 using OmniAI.Application.Tenants;
+using OmniAI.Application.Tenants.ChangeTimeZone;
 using OmniAI.Application.Tenants.CreateTenant;
 using OmniAI.Application.Tenants.GetTenantById;
 using OmniAI.Application.Tenants.RenameTenant;
@@ -66,6 +67,17 @@ internal static class TenantEndpoints
         tenants.MapPut("/{tenantId:guid}/name", RenameTenantAsync)
             .WithName("RenameTenant")
             .WithSummary("Renames the workspace. Requires workspace.manage and If-Match; visitors see the new name at once.")
+            .Produces<TenantResponse>()
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status412PreconditionFailed)
+            .ProducesProblem(StatusCodes.Status428PreconditionRequired);
+
+        // Phase 37.6 (row 34): the zone analytics, reports and schedules count in.
+        tenants.MapPut("/{tenantId:guid}/time-zone", ChangeTimeZoneAsync)
+            .WithName("ChangeTenantTimeZone")
+            .WithSummary("Sets the workspace time zone (an IANA name). Requires workspace.manage and If-Match.")
             .Produces<TenantResponse>()
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status403Forbidden)
@@ -174,5 +186,46 @@ internal static class TenantEndpoints
         http.Response.Headers.ETag = EntityTags.Format(renamed.Version);
 
         return Results.Ok(TenantResponse.From(renamed.Value));
+    }
+
+    /// <summary>
+    /// <c>PUT /api/tenants/{tenantId}/time-zone</c>. Requires <c>If-Match</c> and
+    /// <c>workspace.manage</c>. Returns <c>200</c> with the workspace and its new
+    /// <c>ETag</c> (Phase 37.6, row 34).
+    /// </summary>
+    /// <remarks>
+    /// <c>428</c> without <c>If-Match</c>, <c>412</c> when it is stale,
+    /// <c>400 workspace.time_zone.invalid</c> for a name that is not an IANA zone
+    /// both this runtime and PostgreSQL know, <c>403</c> for a member without the
+    /// permission and <c>404</c> for anybody else. Report schedules still to come
+    /// move to the new zone's next boundary in the same transaction.
+    /// </remarks>
+    private static async Task<IResult> ChangeTimeZoneAsync(
+        HttpContext http,
+        Guid tenantId,
+        ChangeTenantTimeZoneRequest? request,
+        ChangeTenantTimeZoneHandler handler,
+        CancellationToken cancellationToken)
+    {
+        if (EntityTags.ReadIfMatch(http.Request, out ConcurrencyToken expected) is IResult failure)
+        {
+            return failure;
+        }
+
+        Versioned<TenantView>? changed = await handler
+            .HandleAsync(new ChangeTenantTimeZoneCommand(tenantId, request?.TimeZone, expected), cancellationToken)
+            .ConfigureAwait(false);
+
+        if (changed is null)
+        {
+            return Results.Problem(
+                title: "Tenant not found",
+                detail: $"No tenant exists with id '{tenantId}'.",
+                statusCode: StatusCodes.Status404NotFound);
+        }
+
+        http.Response.Headers.ETag = EntityTags.Format(changed.Version);
+
+        return Results.Ok(TenantResponse.From(changed.Value));
     }
 }

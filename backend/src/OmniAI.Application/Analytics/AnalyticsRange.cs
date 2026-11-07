@@ -1,4 +1,5 @@
 using System.Globalization;
+using OmniAI.Domain.Tenants;
 
 namespace OmniAI.Application.Analytics;
 
@@ -90,34 +91,40 @@ public static class AnalyticsRanges
     /// The window a range covers, ending at the given instant.
     /// </summary>
     /// <remarks>
-    /// <strong>Whole UTC days, half-open.</strong> The window runs from midnight
-    /// UTC <em>n-1</em> days before today up to the instant of the request, so the
-    /// first and last buckets are real days rather than fragments of two. It is
-    /// half-open — <c>[from, to)</c> — which is the only boundary rule that counts
-    /// an event exactly once when two adjacent ranges are compared.
+    /// <strong>Whole local days, half-open.</strong> The window runs from the start
+    /// of the local day <em>n-1</em> days before today up to the instant of the
+    /// request, so the first and last buckets are real days rather than fragments of
+    /// two. It is half-open — <c>[from, to)</c> — which is the only boundary rule that
+    /// counts an event exactly once when two adjacent ranges are compared.
     /// <para>
-    /// UTC, deliberately. This platform has no per-workspace timezone yet, and
-    /// inventing one here would make a bucket boundary that no other part of the
-    /// system agrees with. The screen says so rather than leaving it implied.
+    /// The days are the workspace's (Phase 37.6): <paramref name="timeZone"/>, or
+    /// UTC when none is given, which is every workspace's zone until somebody
+    /// chooses another. The response says which zone its days are in.
     /// </para>
     /// </remarks>
-    public static AnalyticsWindow Window(this AnalyticsRange range, DateTimeOffset now)
+    public static AnalyticsWindow Window(
+        this AnalyticsRange range,
+        DateTimeOffset now,
+        WorkspaceTimeZone? timeZone = null)
     {
+        WorkspaceTimeZone zone = timeZone ?? WorkspaceTimeZone.Utc;
         DateTimeOffset utcNow = now.ToUniversalTime();
+        DateOnly today = zone.DateOf(utcNow);
 
-        DateTimeOffset today = new(utcNow.Date, TimeSpan.Zero);
-
-        return new AnalyticsWindow(today.AddDays(-(range.Days() - 1)), utcNow, range);
+        return new AnalyticsWindow(zone.StartOf(today.AddDays(-(range.Days() - 1))), utcNow, range)
+        {
+            TimeZone = zone,
+        };
     }
 }
 
 /// <summary>
 /// The period a dashboard or a report describes.
 /// </summary>
-/// <param name="From">Inclusive start, midnight UTC.</param>
+/// <param name="From">Inclusive start: the start of a local day.</param>
 /// <param name="To">
-/// Exclusive end: the instant the request was served for a dashboard, or a
-/// midnight UTC for a report.
+/// Exclusive end: the instant the request was served for a dashboard, or the start
+/// of a local day for a report.
 /// </param>
 /// <param name="Range">The dashboard preset, or <see langword="null"/> for an explicit report period.</param>
 /// <remarks>
@@ -129,20 +136,59 @@ public static class AnalyticsRanges
 public sealed record AnalyticsWindow(DateTimeOffset From, DateTimeOffset To, AnalyticsRange? Range)
 {
     /// <summary>
-    /// An explicit period of whole UTC days, <c>[from, toExclusive)</c>.
+    /// The zone every bucket boundary is taken in (Phase 37.6). UTC unless the
+    /// workspace chose another.
+    /// </summary>
+    public WorkspaceTimeZone TimeZone { get; init; } = WorkspaceTimeZone.Utc;
+
+    /// <summary>
+    /// An explicit period of whole local days, <c>[from, toExclusive)</c>.
     /// </summary>
     /// <remarks>Bounds are the caller's to enforce; the report period type does.</remarks>
-    public static AnalyticsWindow ForDays(DateOnly from, DateOnly toExclusive)
+    public static AnalyticsWindow ForDays(DateOnly from, DateOnly toExclusive, WorkspaceTimeZone? timeZone = null)
     {
         if (toExclusive <= from)
         {
             throw new ArgumentOutOfRangeException(nameof(toExclusive), "A window must end after it starts.");
         }
 
-        return new AnalyticsWindow(Midnight(from), Midnight(toExclusive), Range: null);
+        WorkspaceTimeZone zone = timeZone ?? WorkspaceTimeZone.Utc;
+
+        return new AnalyticsWindow(zone.StartOf(from), zone.StartOf(toExclusive), Range: null)
+        {
+            TimeZone = zone,
+        };
     }
 
-    /// <summary>How many UTC days the window touches.</summary>
+    /// <summary>
+    /// The window just before this one: as many whole local days, ending where
+    /// this one starts (Phase 37.6, <c>compare=previous</c>).
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <strong>Adjacent and half-open.</strong> Its end is this window's start, so
+    /// an event exactly on the boundary belongs to this window and not to that one,
+    /// and nothing falls between the two.
+    /// </para>
+    /// <para>
+    /// <strong>Whole days, even when this window is not.</strong> A dashboard's
+    /// window ends at the request instant, part-way through today; the previous one
+    /// is the <em>n</em> complete days before it. Counted in local dates, so the
+    /// previous period of a window that crosses a clock change is still
+    /// <em>n</em> days, whatever their length in hours.
+    /// </para>
+    /// </remarks>
+    public AnalyticsWindow Previous()
+    {
+        DateOnly first = TimeZone.DateOf(From);
+
+        return new AnalyticsWindow(TimeZone.StartOf(first.AddDays(-DayCount)), From, Range)
+        {
+            TimeZone = TimeZone,
+        };
+    }
+
+    /// <summary>How many local days the window touches.</summary>
     public int DayCount
     {
         get
@@ -154,14 +200,14 @@ public sealed record AnalyticsWindow(DateTimeOffset From, DateTimeOffset To, Ana
                 return preset.Days();
             }
 
-            DateOnly first = DateOnly.FromDateTime(From.UtcDateTime);
-            DateOnly last = DateOnly.FromDateTime(To.UtcDateTime.AddTicks(-1));
+            DateOnly first = TimeZone.DateOf(From);
+            DateOnly last = TimeZone.DateOf(To.AddTicks(-1));
 
             return last.DayNumber - first.DayNumber + 1;
         }
     }
 
-    /// <summary>Every day in the window, in order, as UTC dates.</summary>
+    /// <summary>Every day in the window, in order, as local dates.</summary>
     /// <remarks>
     /// Produced here rather than inferred from the rows, so a day on which
     /// nothing happened is a zero rather than a gap. A chart with missing days is
@@ -169,7 +215,7 @@ public sealed record AnalyticsWindow(DateTimeOffset From, DateTimeOffset To, Ana
     /// </remarks>
     public IReadOnlyList<DateOnly> Days()
     {
-        DateOnly first = DateOnly.FromDateTime(From.UtcDateTime);
+        DateOnly first = TimeZone.DateOf(From);
 
         return [.. Enumerable.Range(0, DayCount).Select(first.AddDays)];
     }
@@ -177,17 +223,11 @@ public sealed record AnalyticsWindow(DateTimeOffset From, DateTimeOffset To, Ana
     /// <summary>The period as the API publishes it.</summary>
     public string Label => Range?.ToWire() ?? "custom";
 
-    /// <summary>The zone every bucket boundary is taken in.</summary>
-    public static string TimeZone => "UTC";
-
     /// <summary>For diagnostics; never shown to a reader.</summary>
     public override string ToString() =>
         string.Create(
             CultureInfo.InvariantCulture,
-            $"{From:O}..{To:O} ({Label})");
-
-    private static DateTimeOffset Midnight(DateOnly date) =>
-        new(date.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc));
+            $"{From:O}..{To:O} ({Label}, {TimeZone})");
 }
 
 /// <summary>

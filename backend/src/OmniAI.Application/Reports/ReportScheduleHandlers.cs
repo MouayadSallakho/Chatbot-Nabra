@@ -1,5 +1,6 @@
 using OmniAI.Application.Authorization;
 using OmniAI.Application.Concurrency;
+using OmniAI.Application.Tenants.Persistence;
 using OmniAI.Domain;
 using OmniAI.Domain.Authorization;
 using OmniAI.Domain.Reports;
@@ -59,11 +60,17 @@ public sealed record SetReportScheduleEnabledCommand(
 /// version it was made against. A stale one is refused, and the person re-reads —
 /// the platform never merges two people's edits to a schedule on their behalf.
 /// </para>
+/// <para>
+/// <strong>Boundaries are the workspace's local days (Phase 37.6).</strong> A
+/// weekly schedule is due at the start of Monday in the workspace's zone, a monthly
+/// one at the start of the first of the month.
+/// </para>
 /// </remarks>
 public sealed class ReportScheduleHandlers(
     TenantAuthorizer authorizer,
     IReportScheduleStore schedules,
     ReportOptions options,
+    IWorkspaceTimeZones timeZones,
     TimeProvider clock)
 {
     private readonly TenantAuthorizer _authorizer =
@@ -73,6 +80,9 @@ public sealed class ReportScheduleHandlers(
         schedules ?? throw new ArgumentNullException(nameof(schedules));
 
     private readonly ReportOptions _options = options ?? throw new ArgumentNullException(nameof(options));
+
+    private readonly IWorkspaceTimeZones _timeZones =
+        timeZones ?? throw new ArgumentNullException(nameof(timeZones));
 
     private readonly TimeProvider _clock = clock ?? throw new ArgumentNullException(nameof(clock));
 
@@ -155,7 +165,8 @@ public sealed class ReportScheduleHandlers(
             frequency,
             command.Enabled ?? true,
             _authorizer.RequireCurrentUser(),
-            _clock.GetUtcNow());
+            _clock.GetUtcNow(),
+            await _timeZones.OfAsync(workspace, cancellationToken).ConfigureAwait(false));
 
         await _schedules.AddAsync(schedule, cancellationToken).ConfigureAwait(false);
 
@@ -203,7 +214,8 @@ public sealed class ReportScheduleHandlers(
             frequency,
             command.Enabled ?? stored.Value.Enabled,
             _authorizer.RequireCurrentUser(),
-            _clock.GetUtcNow());
+            _clock.GetUtcNow(),
+            await _timeZones.OfAsync(workspace, cancellationToken).ConfigureAwait(false));
 
         await _schedules.UpdateAsync(stored.Value, command.Expected, cancellationToken).ConfigureAwait(false);
 
@@ -245,7 +257,11 @@ public sealed class ReportScheduleHandlers(
             ReportHandlers.RequireAll(held, ReportCatalog.ToSchedule(stored.Value.Type));
         }
 
-        stored.Value.SetEnabled(command.Enabled, _authorizer.RequireCurrentUser(), _clock.GetUtcNow());
+        stored.Value.SetEnabled(
+            command.Enabled,
+            _authorizer.RequireCurrentUser(),
+            _clock.GetUtcNow(),
+            await _timeZones.OfAsync(workspace, cancellationToken).ConfigureAwait(false));
 
         await _schedules.UpdateAsync(stored.Value, command.Expected, cancellationToken).ConfigureAwait(false);
 

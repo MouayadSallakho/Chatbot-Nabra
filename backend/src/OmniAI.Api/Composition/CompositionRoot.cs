@@ -47,6 +47,7 @@ using OmniAI.Application.Conversations.Realtime;
 using OmniAI.Infrastructure.Conversations.Realtime;
 using OmniAI.Infrastructure.Ai.StandIn;
 using OmniAI.Application.Conversations;
+using OmniAI.Application.Tenants.ChangeTimeZone;
 using OmniAI.Application.Tenants.CreateTenant;
 using OmniAI.Application.WebChat.CreateWebChatEndpoint;
 using OmniAI.Application.WebChat.GetWebChatEndpointById;
@@ -283,6 +284,7 @@ internal static class CompositionRoot
         services.AddScoped<CreateTenantHandler>();
         services.AddScoped<GetTenantByIdHandler>();
         services.AddScoped<RenameTenantHandler>();
+        services.AddScoped<ChangeTenantTimeZoneHandler>();
         services.AddScoped<ListMyTenantsHandler>();
 
         // The two halves of the authorization boundary. The guard answers "does

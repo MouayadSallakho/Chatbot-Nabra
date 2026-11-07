@@ -249,6 +249,13 @@ internal static class PersistenceConverters
     public static readonly ValueConverter<TenantName, string> TenantName =
         new(name => name.Value, value => Domain.Tenants.TenantName.Create(value));
 
+    /// <summary>
+    /// The IANA name as stored. Read back without resolving its rules, so loading a
+    /// workspace never fails because of its zone (Phase 37.6).
+    /// </summary>
+    public static readonly ValueConverter<WorkspaceTimeZone, string> WorkspaceTimeZone =
+        new(zone => zone.Name, value => Domain.Tenants.WorkspaceTimeZone.FromStored(value));
+
     public static readonly ValueConverter<TenantSlug, string> TenantSlug =
         new(slug => slug.Value, value => Domain.Tenants.TenantSlug.Create(value));
 

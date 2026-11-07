@@ -66,6 +66,17 @@ public enum AiUsagePurpose
 
     /// <summary>An administrator trying an agent out from the admin application.</summary>
     AgentPreviewGeneration = 4,
+
+    /// <summary>
+    /// An administrator testing what an agent's knowledge retrieves for a question
+    /// (Phase 37.6).
+    /// </summary>
+    /// <remarks>
+    /// Before 37.6 the tester's embeddings were recorded as
+    /// <see cref="ConversationRetrievalEmbedding"/>. Those rows cannot be told apart
+    /// from a live reply's and stay counted there; there is no backfill.
+    /// </remarks>
+    AgentRetrievalTest = 5,
 }
 
 /// <summary>

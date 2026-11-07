@@ -163,7 +163,7 @@ internal static class TestAccess
 
         return For(
             userId,
-            [.. tenantIds.Select(id => new TenantView(id, "Workspace", "workspace", TenantStatus.Active))]);
+            [.. tenantIds.Select(id => new TenantView(id, "Workspace", "workspace", TenantStatus.Active, "UTC"))]);
     }
 
     /// <summary>A guard for a caller who is signed in but belongs to nothing.</summary>

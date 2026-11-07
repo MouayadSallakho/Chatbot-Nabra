@@ -1,3 +1,5 @@
+using OmniAI.Domain.Tenants;
+
 namespace OmniAI.Domain.Reports;
 
 /// <summary>
@@ -5,12 +7,19 @@ namespace OmniAI.Domain.Reports;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <strong>Boundaries, not intervals.</strong> A weekly schedule is due at every
-/// Monday 00:00 UTC and covers the seven days before it; a monthly one is due at
-/// 00:00 UTC on the first of every month and covers the calendar month before
-/// it. A period is always derived from a boundary, never from the instant a
+/// <strong>Boundaries, not intervals.</strong> A weekly schedule is due at the
+/// start of every Monday and covers the seven days before it; a monthly one is due
+/// at the start of the first of every month and covers the calendar month before
+/// it. Both are local days of the workspace's zone (Phase 37.6, <c>UTC</c> unless
+/// chosen). A period is always derived from a boundary, never from the instant a
 /// worker happened to run, so a late or repeated run produces the same period —
 /// and the same occurrence identity — as a punctual one.
+/// </para>
+/// <para>
+/// <strong>Counted in dates, then turned into instants.</strong> The next boundary
+/// is seven local days or one local month on, not 168 hours: a week that contains
+/// a clock change is 167 or 169 hours long, and its boundary is still Monday's
+/// start.
 /// </para>
 /// <para>
 /// <strong>Only completed periods.</strong> The period an occurrence covers ends
@@ -21,11 +30,44 @@ namespace OmniAI.Domain.Reports;
 public static class ReportScheduleCalendar
 {
     /// <summary>The latest boundary at or before <paramref name="now"/>.</summary>
-    public static DateTimeOffset PreviousBoundary(ReportFrequency frequency, DateTimeOffset now)
+    public static DateTimeOffset PreviousBoundary(
+        ReportFrequency frequency,
+        DateTimeOffset now,
+        WorkspaceTimeZone? timeZone = null)
     {
-        DateOnly today = DateOnly.FromDateTime(now.UtcDateTime);
+        WorkspaceTimeZone zone = timeZone ?? WorkspaceTimeZone.Utc;
 
-        DateOnly boundary = frequency switch
+        return zone.StartOf(PreviousBoundaryDate(frequency, zone.DateOf(now)));
+    }
+
+    /// <summary>The first boundary strictly after <paramref name="now"/>.</summary>
+    public static DateTimeOffset NextBoundary(
+        ReportFrequency frequency,
+        DateTimeOffset now,
+        WorkspaceTimeZone? timeZone = null)
+    {
+        WorkspaceTimeZone zone = timeZone ?? WorkspaceTimeZone.Utc;
+        DateOnly previous = PreviousBoundaryDate(frequency, zone.DateOf(now));
+
+        return zone.StartOf(frequency == ReportFrequency.Weekly ? previous.AddDays(7) : previous.AddMonths(1));
+    }
+
+    /// <summary>The completed period an occurrence at <paramref name="boundary"/> covers.</summary>
+    public static ReportPeriod PeriodEndingAt(
+        ReportFrequency frequency,
+        DateTimeOffset boundary,
+        WorkspaceTimeZone? timeZone = null)
+    {
+        WorkspaceTimeZone zone = timeZone ?? WorkspaceTimeZone.Utc;
+        DateOnly end = zone.DateOf(boundary);
+
+        return frequency == ReportFrequency.Weekly
+            ? ReportPeriod.Create(end.AddDays(-7), end, zone)
+            : ReportPeriod.Create(end.AddMonths(-1), end, zone);
+    }
+
+    private static DateOnly PreviousBoundaryDate(ReportFrequency frequency, DateOnly today) =>
+        frequency switch
         {
             // DayOfWeek.Monday is 1; Sunday is 0 and belongs to the week that
             // started six days earlier.
@@ -33,28 +75,4 @@ public static class ReportScheduleCalendar
             ReportFrequency.Monthly => new DateOnly(today.Year, today.Month, 1),
             _ => throw new DomainValidationException("That report frequency is not recognised."),
         };
-
-        return At(boundary);
-    }
-
-    /// <summary>The first boundary strictly after <paramref name="now"/>.</summary>
-    public static DateTimeOffset NextBoundary(ReportFrequency frequency, DateTimeOffset now)
-    {
-        DateTimeOffset previous = PreviousBoundary(frequency, now);
-
-        return frequency == ReportFrequency.Weekly ? previous.AddDays(7) : previous.AddMonths(1);
-    }
-
-    /// <summary>The completed period an occurrence at <paramref name="boundary"/> covers.</summary>
-    public static ReportPeriod PeriodEndingAt(ReportFrequency frequency, DateTimeOffset boundary)
-    {
-        DateOnly end = DateOnly.FromDateTime(boundary.UtcDateTime);
-
-        return frequency == ReportFrequency.Weekly
-            ? ReportPeriod.Create(end.AddDays(-7), end)
-            : ReportPeriod.Create(end.AddMonths(-1), end);
-    }
-
-    private static DateTimeOffset At(DateOnly date) =>
-        new(date.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc));
 }

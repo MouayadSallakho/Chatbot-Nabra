@@ -3,6 +3,7 @@ using OmniAI.Api.Security;
 using OmniAI.Application.Concurrency;
 using OmniAI.Application.Notifications;
 using OmniAI.Domain.Notifications;
+using OmniAI.Domain.Reports;
 
 namespace OmniAI.Api.Notifications;
 
@@ -33,7 +34,11 @@ internal static class NotificationEndpoints
             .RequireAuthorization()
             .AddEndpointFilter<AntiforgeryEndpointFilter>();
 
-        notifications.MapGet("/", ListAsync).WithName("ListNotifications");
+        // Phase 37.6: declared so the generated document describes `parameters`.
+        notifications.MapGet("/", ListAsync)
+            .WithName("ListNotifications")
+            .WithSummary("The caller's own notifications, newest first. Report kinds carry parameters.reportType (a report catalogue code); other kinds null.")
+            .Produces<NotificationPageResponse>();
         notifications.MapGet("/unread-count", UnreadCountAsync).WithName("GetUnreadNotificationCount");
         notifications.MapPost("/{notificationId:guid}/read", MarkReadAsync).WithName("MarkNotificationRead");
         notifications.MapPost("/read-all", MarkAllReadAsync).WithName("MarkAllNotificationsRead");
@@ -179,6 +184,12 @@ internal static class NotificationEndpoints
 }
 
 /// <summary>One notification on the wire: server-written text and an internal route, nothing else.</summary>
+/// <param name="Parameters">
+/// Stable codes the client words the notification from (Phase 37.6, row 25). For
+/// the four report kinds, <c>{ reportType }</c> with the report catalogue's own
+/// codes (<c>ConversationActivity</c>, …); <see langword="null"/> for every other
+/// kind, and for a report notification whose report can no longer be found.
+/// </param>
 public sealed record NotificationResponse(
     Guid Id,
     string Kind,
@@ -188,9 +199,10 @@ public sealed record NotificationResponse(
     string Body,
     string? ActionPath,
     DateTimeOffset CreatedAt,
-    DateTimeOffset? ReadAt)
+    DateTimeOffset? ReadAt,
+    NotificationParametersResponse? Parameters)
 {
-    public static NotificationResponse From(Notification notification)
+    public static NotificationResponse From(Notification notification, ReportType? reportType = null)
     {
         ArgumentNullException.ThrowIfNull(notification);
 
@@ -203,9 +215,14 @@ public sealed record NotificationResponse(
             notification.Body,
             notification.ActionPath,
             notification.CreatedAt,
-            notification.ReadAt);
+            notification.ReadAt,
+            reportType is ReportType type ? new NotificationParametersResponse(type.ToString()) : null);
     }
 }
+
+/// <summary>A report notification's codes (Phase 37.6, row 25).</summary>
+/// <param name="ReportType">The report catalogue's type code, such as <c>ConversationActivity</c>.</param>
+public sealed record NotificationParametersResponse(string ReportType);
 
 public sealed record NotificationPageResponse(
     IReadOnlyList<NotificationResponse> Items,
@@ -219,7 +236,11 @@ public sealed record NotificationPageResponse(
         ArgumentNullException.ThrowIfNull(page);
 
         return new NotificationPageResponse(
-            [.. page.Items.Select(NotificationResponse.From)],
+            [
+                .. page.Items.Select(item => NotificationResponse.From(
+                    item,
+                    page.ReportTypes is { } types && types.TryGetValue(item.Id, out ReportType type) ? type : null)),
+            ],
             page.Page,
             page.PageSize,
             page.TotalCount,

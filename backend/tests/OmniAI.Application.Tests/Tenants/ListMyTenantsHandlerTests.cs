@@ -16,10 +16,10 @@ public sealed class ListMyTenantsHandlerTests
     private static readonly UserId Bob = UserId.New();
 
     private static readonly TenantView Acme =
-        new(Guid.CreateVersion7(), "Acme Trading", "acme", TenantStatus.Active);
+        new(Guid.CreateVersion7(), "Acme Trading", "acme", TenantStatus.Active, "UTC");
 
     private static readonly TenantView Rival =
-        new(Guid.CreateVersion7(), "Rival Trading", "rival", TenantStatus.Active);
+        new(Guid.CreateVersion7(), "Rival Trading", "rival", TenantStatus.Active, "UTC");
 
     [Fact]
     public async Task The_callers_own_workspaces_are_returned()

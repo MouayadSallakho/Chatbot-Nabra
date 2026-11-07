@@ -3,6 +3,7 @@ using OmniAI.Application.Concurrency;
 using OmniAI.Application.Tenants;
 using OmniAI.Domain;
 using OmniAI.Domain.Notifications;
+using OmniAI.Domain.Reports;
 using OmniAI.Domain.Tenants;
 using OmniAI.Domain.Users;
 
@@ -46,10 +47,13 @@ public sealed record SaveNotificationPreferencesCommand(
 public sealed class NotificationHandlers(
     TenantAccessGuard access,
     INotificationStore store,
+    INotificationSources sources,
     IOperationalEmailSender email,
     INotificationRealtime realtime,
     TimeProvider clock)
 {
+    private readonly INotificationSources _sources = sources ?? throw new ArgumentNullException(nameof(sources));
+
     private readonly TenantAccessGuard _access = access ?? throw new ArgumentNullException(nameof(access));
 
     private readonly INotificationStore _store = store ?? throw new ArgumentNullException(nameof(store));
@@ -92,7 +96,37 @@ public sealed class NotificationHandlers(
 
         int unread = await _store.CountUnreadAsync(workspace, me, cancellationToken).ConfigureAwait(false);
 
-        return new NotificationPage(items, number, size, total, unread);
+        // Phase 37.6 (row 25): the report type of each report notification on the
+        // page, so the client names the report by its code rather than reading it
+        // out of the body. One bounded lookup for the page, and none without one.
+        List<Notification> reports =
+        [
+            .. items.Where(item => NotificationKinds.CategoryOf(item.Kind) == NotificationCategory.Reports),
+        ];
+
+        if (reports.Count == 0)
+        {
+            return new NotificationPage(items, number, size, total, unread);
+        }
+
+        IReadOnlyDictionary<NotificationOccurrenceId, ReportType> types = await _sources
+            .ReportTypesOfOccurrencesAsync(
+                workspace,
+                [.. reports.Select(item => item.OccurrenceId).Distinct()],
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        Dictionary<NotificationId, ReportType> byNotification = [];
+
+        foreach (Notification item in reports)
+        {
+            if (types.TryGetValue(item.OccurrenceId, out ReportType type))
+            {
+                byNotification[item.Id] = type;
+            }
+        }
+
+        return new NotificationPage(items, number, size, total, unread, byNotification);
     }
 
     public async Task<int?> UnreadCountAsync(Guid tenantId, CancellationToken cancellationToken = default)

@@ -97,7 +97,8 @@ public sealed class ReportSchedule
         ReportFrequency frequency,
         bool enabled,
         UserId createdBy,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        WorkspaceTimeZone? timeZone = null)
     {
         if (tenantId.IsEmpty)
         {
@@ -114,7 +115,7 @@ public sealed class ReportSchedule
             format,
             frequency,
             enabled,
-            ReportScheduleCalendar.NextBoundary(frequency, now),
+            ReportScheduleCalendar.NextBoundary(frequency, now, timeZone),
             createdBy,
             createdBy,
             now,
@@ -127,7 +128,8 @@ public sealed class ReportSchedule
     /// </summary>
     /// <remarks>
     /// The next run is recalculated from now: changing a weekly schedule to a
-    /// monthly one must not leave it due next Monday.
+    /// monthly one must not leave it due next Monday. Boundaries are local days of
+    /// <paramref name="timeZone"/>, the workspace's zone.
     /// </remarks>
     public void Update(
         string? name,
@@ -136,7 +138,8 @@ public sealed class ReportSchedule
         ReportFrequency frequency,
         bool enabled,
         UserId editor,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        WorkspaceTimeZone? timeZone = null)
     {
         Validate(type, format, frequency);
 
@@ -157,22 +160,61 @@ public sealed class ReportSchedule
 
         if (rescheduled)
         {
-            NextRunAt = ReportScheduleCalendar.NextBoundary(frequency, now);
+            NextRunAt = ReportScheduleCalendar.NextBoundary(frequency, now, timeZone);
         }
     }
 
     /// <summary>Switches the schedule on or off, and makes the editor its owner.</summary>
-    public void SetEnabled(bool enabled, UserId editor, DateTimeOffset now)
+    public void SetEnabled(bool enabled, UserId editor, DateTimeOffset now, WorkspaceTimeZone? timeZone = null)
     {
         if (enabled && !Enabled)
         {
-            NextRunAt = ReportScheduleCalendar.NextBoundary(Frequency, now);
+            NextRunAt = ReportScheduleCalendar.NextBoundary(Frequency, now, timeZone);
             DisabledReason = null;
         }
 
         Enabled = enabled;
         OwnerUserId = editor;
         UpdatedAt = now;
+    }
+
+    /// <summary>
+    /// Moves the next run onto the new zone's calendar, after the workspace's zone
+    /// changed (Phase 37.6).
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <strong>A run already due keeps its time.</strong> The worker has not reached
+    /// it yet; moving it forward would skip a period nobody received. It runs at the
+    /// next pass and covers the period that ended at the new zone's latest boundary.
+    /// </para>
+    /// <para>
+    /// <strong>A run still to come moves to the new zone's next boundary.</strong>
+    /// Monday's start in Riyadh is three hours before Monday's start in UTC, so the
+    /// schedule is due then. Neither the owner nor the last-edited time changes: a
+    /// person did not edit the schedule.
+    /// </para>
+    /// </remarks>
+    /// <returns>Whether the next run moved.</returns>
+    public bool Rezone(WorkspaceTimeZone timeZone, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(timeZone);
+
+        if (NextRunAt <= now)
+        {
+            return false;
+        }
+
+        DateTimeOffset next = ReportScheduleCalendar.NextBoundary(Frequency, now, timeZone);
+
+        if (next == NextRunAt)
+        {
+            return false;
+        }
+
+        NextRunAt = next;
+
+        return true;
     }
 
     private static void Validate(ReportType type, ReportFormat format, ReportFrequency frequency)

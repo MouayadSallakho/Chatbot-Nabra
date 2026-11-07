@@ -70,7 +70,7 @@ public sealed class AnalyticsRangeTests
             AnalyticsRange.ThirtyDays.Window(Noon).From,
             AnalyticsRange.ThirtyDays.Window(elsewhere).From);
 
-        Assert.Equal("UTC", AnalyticsWindow.TimeZone);
+        Assert.Equal("UTC", AnalyticsRange.ThirtyDays.Window(DateTimeOffset.UnixEpoch).TimeZone.Name);
     }
 
     [Fact]

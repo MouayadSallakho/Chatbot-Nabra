@@ -158,6 +158,42 @@ public sealed class ProviderUsageAttributionTests
         Assert.Equal(0, again.Value.EmbeddingCalls);
     }
 
+    /// <remarks>
+    /// Phase 37.6 (row 30): the admin retrieval tester is counted apart from live
+    /// replies. The purpose comes from the caller, and only the two retrieval
+    /// purposes are accepted.
+    /// </remarks>
+    [Fact]
+    public async Task The_retrieval_tester_is_recorded_under_its_own_purpose()
+    {
+        (KnowledgeRetriever retriever, FakeKnowledgeSearchStore store,
+            RecordingEmbeddingGenerator embeddings) = Retrieval();
+
+        store.AddRun(Workspace, Agent, count: 3, textLength: 200);
+
+        await retriever.RetrieveAsync(
+            Workspace, Agent, "Do you deliver on Sundays?", limit: null, AiUsagePurpose.AgentRetrievalTest);
+
+        Assert.Equal(AiUsagePurpose.AgentRetrievalTest, Assert.Single(embeddings.Usages).Purpose);
+    }
+
+    [Theory]
+    [InlineData(AiUsagePurpose.ConversationGeneration)]
+    [InlineData(AiUsagePurpose.KnowledgeIndexEmbedding)]
+    [InlineData(AiUsagePurpose.AgentPreviewGeneration)]
+    public async Task Retrieval_refuses_a_purpose_that_is_not_retrieval_before_spending_anything(AiUsagePurpose purpose)
+    {
+        (KnowledgeRetriever retriever, FakeKnowledgeSearchStore store,
+            RecordingEmbeddingGenerator embeddings) = Retrieval();
+
+        store.AddRun(Workspace, Agent, count: 3, textLength: 200);
+
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
+            retriever.RetrieveAsync(Workspace, Agent, "Do you deliver?", limit: null, purpose));
+
+        Assert.Equal(0, embeddings.Calls);
+    }
+
     private static (KnowledgeRetriever Retriever, FakeKnowledgeSearchStore Store,
         RecordingEmbeddingGenerator Embeddings) Retrieval()
     {

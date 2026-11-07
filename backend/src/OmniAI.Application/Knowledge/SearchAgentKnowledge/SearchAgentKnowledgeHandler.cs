@@ -1,6 +1,7 @@
 using OmniAI.Application.AiAgents.Persistence;
 using OmniAI.Application.Authorization;
 using OmniAI.Domain;
+using OmniAI.Domain.Ai;
 using OmniAI.Domain.AiAgents;
 using OmniAI.Domain.Authorization;
 using OmniAI.Domain.Tenants;
@@ -95,8 +96,10 @@ public sealed class SearchAgentKnowledgeHandler(
             return null;
         }
 
+        // Recorded under its own purpose since Phase 37.6, so testing knowledge is
+        // never counted as answering customers.
         IReadOnlyList<KnowledgeExcerpt> excerpts = await _retriever
-            .RetrieveAsync(tenantId, agentId, question, limit: null, cancellationToken)
+            .RetrieveAsync(tenantId, agentId, question, limit: null, AiUsagePurpose.AgentRetrievalTest, cancellationToken)
             .ConfigureAwait(false);
 
         KnowledgeSearchHit[] hits = new KnowledgeSearchHit[excerpts.Count];

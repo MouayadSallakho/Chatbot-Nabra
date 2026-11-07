@@ -36,7 +36,7 @@ public sealed record AnalyticsSnapshot(
     long OpenHandledByAi,
     long OpenHandledByHuman);
 
-/// <summary>One UTC day.</summary>
+/// <summary>One local day of the workspace's zone (UTC unless chosen, Phase 37.6).</summary>
 public sealed record AnalyticsDay(
     DateOnly Date,
     long ConversationsStarted,
@@ -143,6 +143,10 @@ public sealed record AnalyticsWhatsAppDelivery(
 /// Succeeded calls this deployment has no configured price for. Real spend that
 /// cannot be costed — never shown as free.
 /// </param>
+/// <param name="ByPurpose">
+/// The same calls split by why they were made (Phase 37.6, row 30): one row per
+/// purpose, in a fixed order, zeroes included. The rows add up to the totals.
+/// </param>
 public sealed record AnalyticsAiUsage(
     long Calls,
     long GenerationCalls,
@@ -156,11 +160,41 @@ public sealed record AnalyticsAiUsage(
     long GenerationReasoningTokens,
     long EmbeddingInputTokens,
     long UnratedCalls,
-    IReadOnlyList<AnalyticsRatedCost> RatedCost)
+    IReadOnlyList<AnalyticsRatedCost> RatedCost,
+    IReadOnlyList<AnalyticsPurposeUsage> ByPurpose)
 {
     /// <summary>Whether this workspace called a provider at all in the period.</summary>
     public bool HasAny => Calls > 0;
 }
+
+/// <summary>
+/// One purpose's share of the provider calls (Phase 37.6, row 30).
+/// </summary>
+/// <remarks>
+/// <para>
+/// <strong>The purpose is recorded with every call, so this is a grouping, not an
+/// estimate.</strong> Every row of <c>ai_provider_usages</c> has carried a purpose
+/// since the first schema. The one exception is history: the admin retrieval
+/// tester recorded its question embeddings as
+/// <see cref="AiUsagePurpose.ConversationRetrievalEmbedding"/> until Phase 37.6,
+/// and those rows cannot be told apart from a live reply's, so they stay counted
+/// there. From 37.6 the tester records <see cref="AiUsagePurpose.AgentRetrievalTest"/>.
+/// </para>
+/// <para>
+/// Tokens are summed across operation types: a purpose is either generation or
+/// embedding, so nothing of two kinds is added together.
+/// </para>
+/// </remarks>
+public sealed record AnalyticsPurposeUsage(
+    AiUsagePurpose Purpose,
+    long Calls,
+    long Succeeded,
+    long Failed,
+    long Unresolved,
+    long InputTokens,
+    long OutputTokens,
+    long UnratedCalls,
+    IReadOnlyList<AnalyticsRatedCost> RatedCost);
 
 /// <summary>
 /// Rated spend in one currency.
@@ -193,6 +227,7 @@ public sealed record AnalyticsModelUsage(
     long UnratedCalls);
 
 /// <summary>The period a dashboard describes, as the API publishes it.</summary>
+/// <param name="TimeZone">The IANA zone its days are local days of (Phase 37.6).</param>
 public sealed record AnalyticsPeriod(
     string Range,
     DateTimeOffset From,
@@ -209,6 +244,15 @@ public sealed record AnalyticsPeriod(
 /// token, a ticket or a filename. Agent names are workspace-authored labels an
 /// administrator already reads on every other screen.
 /// </remarks>
+/// <param name="FirstActivityOn">
+/// The local date of the workspace's first conversation, whenever it was, or
+/// <see langword="null"/> when it has none (Phase 37.6, row 33). Not limited to the
+/// period: it is what "since" labels and honest empty states need.
+/// </param>
+/// <param name="Previous">
+/// The period just before this one, for comparison, when the caller asked for it
+/// (Phase 37.6, row 31); otherwise <see langword="null"/>.
+/// </param>
 public sealed record WorkspaceAnalytics(
     AnalyticsPeriod Period,
     AnalyticsSummary Summary,
@@ -219,4 +263,20 @@ public sealed record WorkspaceAnalytics(
     AnalyticsAiOperations AiOperations,
     AnalyticsWhatsAppDelivery? WhatsAppDelivery,
     AnalyticsAiUsage AiUsage,
-    IReadOnlyList<AnalyticsModelUsage> Models);
+    IReadOnlyList<AnalyticsModelUsage> Models,
+    DateOnly? FirstActivityOn,
+    AnalyticsComparison? Previous = null);
+
+/// <summary>
+/// The period just before a dashboard's, with the figures that compare
+/// (Phase 37.6, row 31).
+/// </summary>
+/// <remarks>
+/// <strong>The summary and the AI outcomes, nothing else.</strong> Those are the
+/// period's totals. The "open right now" snapshot has no history to compare
+/// against, so it has no previous value; the plan keeps that outside Phase 37.
+/// </remarks>
+public sealed record AnalyticsComparison(
+    AnalyticsPeriod Period,
+    AnalyticsSummary Summary,
+    AnalyticsAiOperations AiOperations);

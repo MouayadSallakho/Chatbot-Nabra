@@ -77,6 +77,16 @@ public sealed class ReportExecution
 
     public DateTimeOffset PeriodTo { get; }
 
+    /// <summary>
+    /// The zone the period's days were computed in (Phase 37.6).
+    /// </summary>
+    /// <remarks>
+    /// Kept on the execution rather than read from the workspace, so a report keeps
+    /// the days it was asked for after the workspace's zone changes. Executions made
+    /// before 37.6 read <c>UTC</c>, which is what they were.
+    /// </remarks>
+    public WorkspaceTimeZone TimeZone { get; private set; } = WorkspaceTimeZone.Utc;
+
     public ReportExecutionStatus Status { get; }
 
     /// <summary>
@@ -110,7 +120,7 @@ public sealed class ReportExecution
 
     public DateTimeOffset? ExpiredAt { get; }
 
-    public ReportPeriod Period => ReportPeriod.FromInstants(PeriodFrom, PeriodTo);
+    public ReportPeriod Period => ReportPeriod.FromInstants(PeriodFrom, PeriodTo, TimeZone);
 
     public bool IsTerminal => Status is ReportExecutionStatus.Completed
         or ReportExecutionStatus.Failed
@@ -197,10 +207,17 @@ public sealed class ReportExecution
             failedAt: null,
             failureCode: null,
             attempts: 0,
-            expiredAt: null);
+            expiredAt: null)
+        {
+            TimeZone = period.TimeZone,
+        };
     }
 
     /// <summary>Whether a repeated request asks for the same report as this one.</summary>
     public bool SameRequestAs(ReportType type, ReportFormat format, ReportPeriod period) =>
-        Type == type && Format == format && PeriodFrom == period.From && PeriodTo == period.To;
+        Type == type
+        && Format == format
+        && PeriodFrom == period.From
+        && PeriodTo == period.To
+        && TimeZone == period.TimeZone;
 }

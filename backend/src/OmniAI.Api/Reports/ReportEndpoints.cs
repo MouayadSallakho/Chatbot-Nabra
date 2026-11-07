@@ -40,10 +40,23 @@ internal static class ReportEndpoints
             .RequireAuthorization()
             .AddEndpointFilter<AntiforgeryEndpointFilter>();
 
-        reports.MapGet("/catalog", CatalogAsync).WithName("GetReportCatalog");
-        reports.MapPost("/", RequestAsync).WithName("RequestReport");
-        reports.MapGet("/executions", ListAsync).WithName("ListReportExecutions");
-        reports.MapGet("/executions/{executionId:guid}", GetAsync).WithName(GetExecutionRouteName);
+        // Phase 37.6: the response types are declared so the generated document
+        // describes the catalogue's codes, parameters and zone, and each
+        // execution's timeZone.
+        reports.MapGet("/catalog", CatalogAsync)
+            .WithName("GetReportCatalog")
+            .WithSummary("The reports this member may generate, by stable type code, with their parameters by code and the workspace time zone.")
+            .Produces<ReportCatalogResponse>();
+        reports.MapPost("/", RequestAsync)
+            .WithName("RequestReport")
+            .WithSummary("Asks for a report; its period is local days of the workspace time zone, kept on the execution.")
+            .Produces<ReportExecutionResponse>(StatusCodes.Status202Accepted);
+        reports.MapGet("/executions", ListAsync)
+            .WithName("ListReportExecutions")
+            .Produces<ReportExecutionPageResponse>();
+        reports.MapGet("/executions/{executionId:guid}", GetAsync)
+            .WithName(GetExecutionRouteName)
+            .Produces<ReportExecutionResponse>();
         reports.MapGet("/executions/{executionId:guid}/download", DownloadAsync).WithName("DownloadReport");
 
         reports.MapGet("/schedules", ListSchedulesAsync).WithName("ListReportSchedules");

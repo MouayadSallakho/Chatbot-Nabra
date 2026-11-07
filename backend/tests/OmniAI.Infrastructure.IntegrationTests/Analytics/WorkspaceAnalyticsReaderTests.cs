@@ -516,8 +516,22 @@ public sealed class WorkspaceAnalyticsReaderTests(PostgresTestDatabase database)
 
         Assert.NotEmpty(overOperationalTables);
 
+        // Phase 37.6 (row 33) raised this guard deliberately, once: the first
+        // activity date is one min() over the workspace's conversations, answered
+        // from ix_conversations_tenant_started. Every other statement still counts.
+        List<string> minimums =
+        [
+            .. overOperationalTables.Where(statement =>
+                statement.Contains("min(", StringComparison.OrdinalIgnoreCase)
+                && !statement.Contains("count(", StringComparison.OrdinalIgnoreCase)),
+        ];
+
+        string first = Assert.Single(minimums);
+        Assert.Contains("FROM conversations", first, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("GROUP BY", first, StringComparison.OrdinalIgnoreCase);
+
         Assert.All(
-            overOperationalTables,
+            overOperationalTables.Except(minimums),
             statement => Assert.Contains("count(", statement, StringComparison.OrdinalIgnoreCase));
 
         // And no statement drags rows back to be counted here.
@@ -530,7 +544,10 @@ public sealed class WorkspaceAnalyticsReaderTests(PostgresTestDatabase database)
         //
         // Phase 23 added five: the usage buckets, the rated cost per currency,
         // the unrated count, the model breakdown and its costs. Still a constant.
-        Assert.InRange(recorded.Statements.Count, 1, 21);
+        //
+        // Phase 37.6 added one, the first-activity min(). Usage by purpose added
+        // none: purpose is one more grouping key on the three usage statements.
+        Assert.InRange(recorded.Statements.Count, 1, 22);
     }
 
     // ----------------------------------------------------------------- helpers

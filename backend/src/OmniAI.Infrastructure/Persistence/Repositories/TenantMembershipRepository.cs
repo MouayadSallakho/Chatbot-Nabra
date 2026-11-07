@@ -90,7 +90,8 @@ internal sealed class TenantMembershipRepository(OmniAiDbContext context)
                 row.Tenant.Id.Value,
                 row.Tenant.Name.Value,
                 row.Tenant.Slug.Value,
-                row.Tenant.Status))
+                row.Tenant.Status,
+                row.Tenant.TimeZone.Name))
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 }

@@ -69,6 +69,15 @@ internal sealed class ReportExecutionConfiguration : IEntityTypeConfiguration<Re
             .HasColumnType("timestamp with time zone")
             .IsRequired();
 
+        // Phase 37.6 (M8): the zone the period's days were computed in. A model
+        // default, so executions made before it read UTC, which is what they were.
+        builder.Property(execution => execution.TimeZone)
+            .HasColumnName("time_zone")
+            .HasConversion(PersistenceConverters.WorkspaceTimeZone)
+            .HasMaxLength(WorkspaceTimeZone.MaxLength)
+            .HasDefaultValue(WorkspaceTimeZone.Utc)
+            .IsRequired();
+
         builder.Property(execution => execution.Status)
             .HasColumnName("status")
             .HasConversion<string>()

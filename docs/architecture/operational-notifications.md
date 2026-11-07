@@ -181,6 +181,17 @@ on unsafe methods, `Cache-Control: no-store` on reads. None takes a user id.
 Anonymous → 401. Non-member → 404. Another member's or workspace's notification →
 404.
 
+**Parameters (Phase 37.6, row 25).** Each item gains `parameters`: for the four
+report kinds `{ reportType }`, with the report catalogue's own type codes
+(`reports-exports-scheduling.md` §2), so a client names the report in the reader's
+language rather than reading it out of the English body; `null` for every other
+kind. The type is derived, not stored: the occurrence's source is the execution.
+A page costs two bounded reads for it (the occurrences, then their executions),
+and none when the page holds no report notification. A report notification whose
+occurrence or execution is gone reads `null` too; retention removes occurrences and
+notifications on the same schedule, so in practice this is a matter of seconds at
+the end of a notification's life.
+
 ## 9. Email
 
 **Scope.** Transactional operational email that mirrors selected in-app

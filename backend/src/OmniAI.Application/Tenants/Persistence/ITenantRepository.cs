@@ -124,4 +124,28 @@ public interface ITenantRepository
         ConcurrencyToken expected,
         SecurityEvent audit,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Stores the tenant's new time zone if it is still at <paramref name="expected"/>,
+    /// and moves its report schedules onto the new zone's calendar, in one
+    /// transaction (Phase 37.6, row 34).
+    /// </summary>
+    /// <param name="now">The instant the change is made; schedules already due keep their time.</param>
+    /// <returns>The tenant's new version.</returns>
+    /// <exception cref="TenantVersionMismatchException">
+    /// The tenant changed since <paramref name="expected"/> was read. Neither the zone
+    /// nor any schedule was written.
+    /// </exception>
+    /// <remarks>
+    /// <strong>Both or neither.</strong> A zone saved without its schedules moved
+    /// would leave weekly reports due at the old zone's Monday, covering days the
+    /// workspace no longer counts in. The schedules are locked for the length of the
+    /// transaction, so an edit racing the change waits, then finds its version
+    /// stale and is told so.
+    /// </remarks>
+    Task<ConcurrencyToken> ChangeTimeZoneAsync(
+        Tenant tenant,
+        ConcurrencyToken expected,
+        DateTimeOffset now,
+        CancellationToken cancellationToken = default);
 }

@@ -168,6 +168,29 @@ internal sealed class InMemoryTenantRepository : ITenantRepository
         return Task.FromResult(VersionOf(tenant.Id));
     }
 
+    /// <summary>How many times a zone change reached the store (Phase 37.6).</summary>
+    public int TimeZoneChanges { get; private set; }
+
+    public Task<ConcurrencyToken> ChangeTimeZoneAsync(
+        Tenant tenant,
+        ConcurrencyToken expected,
+        DateTimeOffset now,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(tenant);
+
+        TimeZoneChanges++;
+
+        if (VersionOf(tenant.Id) != expected)
+        {
+            throw TenantVersionMismatchException.ForTenant(tenant.Id.Value);
+        }
+
+        _versions[tenant.Id] = _versions.GetValueOrDefault(tenant.Id) + 1;
+
+        return Task.FromResult(VersionOf(tenant.Id));
+    }
+
     /// <summary>Moves a workspace's version on, as a concurrent writer would.</summary>
     public void Touch(TenantId id) => _versions[id] = _versions.GetValueOrDefault(id) + 1;
 

@@ -177,7 +177,19 @@ internal sealed class ReportScheduleStore(OmniAiDbContext context) : IReportSche
                 .ToListAsync(cancellationToken)
                 .ConfigureAwait(false);
 
-            return new DueBatch(_context, transaction, due);
+            // The zones of the workspaces in the batch, in one read (Phase 37.6).
+            List<TenantId> workspaces = [.. due.Select(schedule => schedule.TenantId).Distinct()];
+
+            Dictionary<TenantId, WorkspaceTimeZone> zones = workspaces.Count == 0
+                ? []
+                : await _context.Tenants
+                    .AsNoTracking()
+                    .Where(tenant => workspaces.Contains(tenant.Id))
+                    .Select(tenant => new { tenant.Id, tenant.TimeZone })
+                    .ToDictionaryAsync(row => row.Id, row => row.TimeZone, cancellationToken)
+                    .ConfigureAwait(false);
+
+            return new DueBatch(_context, transaction, due, zones);
         }
         catch
         {
@@ -197,11 +209,19 @@ internal sealed class ReportScheduleStore(OmniAiDbContext context) : IReportSche
     private sealed class DueBatch(
         OmniAiDbContext context,
         IDbContextTransaction transaction,
-        IReadOnlyList<ReportSchedule> schedules) : IDueReportScheduleBatch
+        IReadOnlyList<ReportSchedule> schedules,
+        IReadOnlyDictionary<TenantId, WorkspaceTimeZone> zones) : IDueReportScheduleBatch
     {
         private bool _committed;
 
         public IReadOnlyList<ReportSchedule> Schedules { get; } = schedules;
+
+        public WorkspaceTimeZone TimeZoneOf(ReportSchedule schedule)
+        {
+            ArgumentNullException.ThrowIfNull(schedule);
+
+            return zones.GetValueOrDefault(schedule.TenantId) ?? WorkspaceTimeZone.Utc;
+        }
 
         public async Task<bool> EnqueueAsync(
             ReportSchedule schedule,
@@ -220,13 +240,14 @@ internal sealed class ReportScheduleStore(OmniAiDbContext context) : IReportSche
                 .ExecuteSqlAsync(
                     $"""
                     INSERT INTO report_executions
-                        (id, tenant_id, report_type, format, period_from, period_to, status,
+                        (id, tenant_id, report_type, format, period_from, period_to, time_zone, status,
                          requested_by, requested_at, client_request_id, schedule_id, attempts)
                     VALUES
                         ({occurrence.Id.Value}, {occurrence.TenantId.Value}, {occurrence.Type.ToString()},
                          {occurrence.Format.ToString()}, {occurrence.PeriodFrom.ToUniversalTime()},
-                         {occurrence.PeriodTo.ToUniversalTime()}, 'Pending', {occurrence.RequestedBy.Value},
-                         {occurrence.RequestedAt.ToUniversalTime()}, NULL, {schedule.Id.Value}, 0)
+                         {occurrence.PeriodTo.ToUniversalTime()}, {occurrence.TimeZone.Name}, 'Pending',
+                         {occurrence.RequestedBy.Value}, {occurrence.RequestedAt.ToUniversalTime()}, NULL,
+                         {schedule.Id.Value}, 0)
                     ON CONFLICT (schedule_id, period_from) WHERE schedule_id IS NOT NULL DO NOTHING
                     """,
                     cancellationToken)

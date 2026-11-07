@@ -29,12 +29,18 @@ public sealed class NotificationOptions
 }
 
 /// <summary>A page of one member's notifications, newest first.</summary>
+/// <param name="ReportTypes">
+/// The report type behind each report notification on the page, derived from the
+/// execution its occurrence names (Phase 37.6, row 25). A notification is absent
+/// when it is not about a report, or its report can no longer be found.
+/// </param>
 public sealed record NotificationPage(
     IReadOnlyList<Notification> Items,
     int Page,
     int PageSize,
     int TotalCount,
-    int UnreadCount)
+    int UnreadCount,
+    IReadOnlyDictionary<NotificationId, ReportType>? ReportTypes = null)
 {
     public const int DefaultPageSize = 20;
 
@@ -184,6 +190,20 @@ public interface INotificationSources
     Task<ReportType?> ReportTypeOfOccurrenceAsync(
         TenantId tenantId,
         NotificationOccurrenceId occurrenceId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// The report types behind several report occurrences at once, for one page of
+    /// the notification list (Phase 37.6, row 25).
+    /// </summary>
+    /// <remarks>
+    /// Two bounded reads in the workspace, whatever the page holds: the occurrences'
+    /// sources, then the executions they name. Never one read per notification.
+    /// </remarks>
+    /// <returns>A type for each occurrence whose execution still exists.</returns>
+    Task<IReadOnlyDictionary<NotificationOccurrenceId, ReportType>> ReportTypesOfOccurrencesAsync(
+        TenantId tenantId,
+        IReadOnlyCollection<NotificationOccurrenceId> occurrenceIds,
         CancellationToken cancellationToken = default);
 
     /// <returns>The connection a delivery was sent through; null if it is gone.</returns>

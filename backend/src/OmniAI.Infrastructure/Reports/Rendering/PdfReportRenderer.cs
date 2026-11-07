@@ -126,7 +126,7 @@ internal sealed class PdfReportRenderer : IReportRenderer
         }
 
         layout.Pair(
-            "Period (UTC)",
+            string.Create(CultureInfo.InvariantCulture, $"Period ({document.Period.TimeZone})"),
             string.Create(
                 CultureInfo.InvariantCulture,
                 $"{document.Period.FromDate:yyyy-MM-dd} to {document.Period.LastDate:yyyy-MM-dd} inclusive"),

@@ -1,3 +1,4 @@
+using OmniAI.Api.ErrorHandling;
 using OmniAI.Application.Analytics;
 
 namespace OmniAI.Api.Analytics;
@@ -24,6 +25,9 @@ namespace OmniAI.Api.Analytics;
 /// </remarks>
 internal static class AnalyticsEndpoints
 {
+    /// <summary><c>compare</c> named something other than <c>previous</c> (Phase 37.6).</summary>
+    public const string CompareInvalid = "analytics.compare.invalid";
+
     public static IEndpointRouteBuilder MapAnalyticsEndpoints(this IEndpointRouteBuilder endpoints)
     {
         ArgumentNullException.ThrowIfNull(endpoints);
@@ -34,22 +38,36 @@ internal static class AnalyticsEndpoints
             .RequireAuthorization();
 
         analytics.MapGet("/dashboard", DashboardAsync)
-            .WithName("GetWorkspaceAnalyticsDashboard");
+            .WithName("GetWorkspaceAnalyticsDashboard")
+            .WithSummary("The dashboard, in the workspace's time zone (period.timeZone). Optional compare=previous adds the period just before (400 analytics.compare.invalid for any other value).")
+            .Produces<AnalyticsDashboardResponse>()
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound);
 
         return endpoints;
     }
 
     /// <summary>
-    /// <c>GET /api/tenants/{tenantId}/analytics/dashboard?range=30d</c>.
+    /// <c>GET /api/tenants/{tenantId}/analytics/dashboard?range=30d[&amp;compare=previous]</c>.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// An unrecognised range is a 400 rather than a silent fallback to the
     /// default. Somebody who asked for 45 days and was quietly given 30 would draw
     /// conclusions about a period they did not choose.
+    /// </para>
+    /// <para>
+    /// <c>compare</c> is opt-in (Phase 37.6): absent or empty means no comparison,
+    /// and the response is shaped as before; <c>previous</c> adds the period just
+    /// before; anything else is <c>400 analytics.compare.invalid</c>, checked before
+    /// membership so the answer says nothing about the workspace.
+    /// </para>
     /// </remarks>
     private static async Task<IResult> DashboardAsync(
         Guid tenantId,
         string? range,
+        string? compare,
         GetWorkspaceAnalyticsHandler handler,
         CancellationToken cancellationToken)
     {
@@ -63,8 +81,30 @@ internal static class AnalyticsEndpoints
                 detail: $"Ask for one of: {AnalyticsRanges.Allowed}.");
         }
 
+        bool comparePrevious;
+
+        switch (compare?.Trim().ToLowerInvariant())
+        {
+            case null or "":
+                comparePrevious = false;
+
+                break;
+
+            case "previous":
+                comparePrevious = true;
+
+                break;
+
+            default:
+                return Results.Problem(
+                    statusCode: StatusCodes.Status400BadRequest,
+                    title: "That comparison is not one this platform reads",
+                    detail: "Use compare=previous, or leave compare out.",
+                    extensions: new Dictionary<string, object?> { [ProblemCodes.Member] = CompareInvalid });
+        }
+
         WorkspaceAnalytics? analytics = await handler
-            .HandleAsync(new GetWorkspaceAnalyticsQuery(tenantId, parsed), cancellationToken)
+            .HandleAsync(new GetWorkspaceAnalyticsQuery(tenantId, parsed, comparePrevious), cancellationToken)
             .ConfigureAwait(false);
 
         // Absent rather than forbidden: somebody who is not a member of this

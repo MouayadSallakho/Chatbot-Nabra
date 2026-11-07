@@ -1,6 +1,7 @@
 using OmniAI.Application.Tenants.Persistence;
 using OmniAI.Domain.Authorization;
 using OmniAI.Domain.Reports;
+using OmniAI.Domain.Tenants;
 
 namespace OmniAI.Application.Reports;
 
@@ -229,6 +230,11 @@ public sealed class ReportGenerator(
 /// that was down for three weeks generates the most recent completed period once
 /// and moves on, rather than producing a burst of stale reports.
 /// </para>
+/// <para>
+/// <strong>In the workspace's zone, as it is now (Phase 37.6).</strong> The period
+/// and the next boundary are local days of the zone the workspace has when the
+/// occurrence is queued, and the occurrence keeps that zone.
+/// </para>
 /// </remarks>
 public sealed class ReportScheduleRunner(
     IReportScheduleStore schedules,
@@ -270,16 +276,17 @@ public sealed class ReportScheduleRunner(
                 continue;
             }
 
-            DateTimeOffset boundary = ReportScheduleCalendar.PreviousBoundary(schedule.Frequency, now);
+            WorkspaceTimeZone zone = batch.TimeZoneOf(schedule);
+            DateTimeOffset boundary = ReportScheduleCalendar.PreviousBoundary(schedule.Frequency, now, zone);
 
             await batch
                 .EnqueueAsync(
                     schedule,
                     ReportExecution.ForSchedule(
                         schedule,
-                        ReportScheduleCalendar.PeriodEndingAt(schedule.Frequency, boundary),
+                        ReportScheduleCalendar.PeriodEndingAt(schedule.Frequency, boundary, zone),
                         now),
-                    ReportScheduleCalendar.NextBoundary(schedule.Frequency, now),
+                    ReportScheduleCalendar.NextBoundary(schedule.Frequency, now, zone),
                     cancellationToken)
                 .ConfigureAwait(false);
         }

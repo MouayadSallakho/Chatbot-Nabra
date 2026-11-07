@@ -107,6 +107,7 @@ public static class InfrastructureServiceCollectionExtensions
         });
 
         services.AddScoped<ITenantRepository, TenantRepository>();
+        services.AddScoped<IWorkspaceTimeZones, WorkspaceTimeZones>();
         services.AddScoped<ITenantMembershipRepository, TenantMembershipRepository>();
         services.AddScoped<ITenantRoleRepository, TenantRoleRepository>();
         services.AddScoped<ITenantMemberRepository, TenantMemberRepository>();

@@ -367,5 +367,12 @@ public sealed class CreateTenantHandlerTests
             SecurityEvent audit,
             CancellationToken cancellationToken = default) =>
             throw new NotSupportedException("Creating a workspace never renames one.");
+
+        public Task<ConcurrencyToken> ChangeTimeZoneAsync(
+            Tenant tenant,
+            ConcurrencyToken expected,
+            DateTimeOffset now,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException("Creating a workspace never changes its zone.");
     }
 }

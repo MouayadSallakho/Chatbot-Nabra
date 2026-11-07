@@ -188,6 +188,77 @@ internal sealed class TenantRepository(OmniAiDbContext context) : ITenantReposit
         return CurrentVersion(tenant);
     }
 
+    /// <remarks>
+    /// <para>
+    /// <strong>One transaction, schedules locked first.</strong> The workspace's
+    /// schedules still to come are read <c>FOR UPDATE</c>, moved onto the new zone's
+    /// calendar by the Domain's own rule, and saved in the same <c>SaveChanges</c> as
+    /// the tenant's conditional update. A stale tag rolls everything back.
+    /// </para>
+    /// <para>
+    /// Schedules already due are not read: they keep their time, and the worker
+    /// that claims them skips locked rows, so the two never wait on each other.
+    /// </para>
+    /// </remarks>
+    public async Task<ConcurrencyToken> ChangeTimeZoneAsync(
+        Tenant tenant,
+        ConcurrencyToken expected,
+        DateTimeOffset now,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(tenant);
+
+        if (!RowVersionTokens.TryDecode(expected, out uint expectedRowVersion))
+        {
+            throw TenantVersionMismatchException.ForTenant(tenant.Id.Value);
+        }
+
+        await using IDbContextTransaction transaction = await _context.Database
+            .BeginTransactionAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        List<Domain.Reports.ReportSchedule> schedules = await _context.ReportSchedules
+            .FromSql($"""
+                SELECT report_schedules.*, report_schedules.xmin
+                  FROM report_schedules
+                 WHERE tenant_id = {tenant.Id.Value}
+                   AND next_run_at > {now.ToUniversalTime()}
+                 ORDER BY id
+                 FOR UPDATE
+                """)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        foreach (Domain.Reports.ReportSchedule schedule in schedules)
+        {
+            schedule.Rezone(tenant.TimeZone, now);
+        }
+
+        RowVersion(tenant).OriginalValue = expectedRowVersion;
+
+        try
+        {
+            await _context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (DbUpdateConcurrencyException failure)
+        {
+            await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
+
+            throw TenantVersionMismatchException.ForTenant(tenant.Id.Value, failure);
+        }
+        finally
+        {
+            // Nothing locked here may outlive the transaction it was locked in.
+            foreach (Domain.Reports.ReportSchedule schedule in schedules)
+            {
+                _context.Entry(schedule).State = EntityState.Detached;
+            }
+        }
+
+        return CurrentVersion(tenant);
+    }
+
     private ConcurrencyToken CurrentVersion(Tenant tenant) =>
         RowVersionTokens.Encode(RowVersion(tenant).CurrentValue);
 

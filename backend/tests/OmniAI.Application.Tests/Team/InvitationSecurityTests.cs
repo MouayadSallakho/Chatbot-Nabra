@@ -44,7 +44,7 @@ public sealed class InvitationSecurityTests
     private static readonly DateTimeOffset Now = new(2026, 9, 6, 9, 0, 0, TimeSpan.Zero);
 
     private static readonly TenantView WorkspaceView =
-        new(Workspace, "Acme Trading", "acme", TenantStatus.Active);
+        new(Workspace, "Acme Trading", "acme", TenantStatus.Active, "UTC");
 
     // ------------------------------------------------------------- issuing
 

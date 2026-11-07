@@ -45,4 +45,17 @@ public interface IWorkspaceAnalyticsReader
         AnalyticsWindow window,
         AnalyticsBreakdown breakdown,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// The totals of another window, for a comparison (Phase 37.6, row 31).
+    /// </summary>
+    /// <remarks>
+    /// The same definitions as <see cref="ReadAsync"/>'s summary and AI outcomes,
+    /// over the same base sets, so the two periods cannot mean different things.
+    /// Three statements, whatever the workspace holds.
+    /// </remarks>
+    Task<AnalyticsComparison> ReadComparisonAsync(
+        TenantId tenantId,
+        AnalyticsWindow window,
+        CancellationToken cancellationToken = default);
 }

@@ -110,6 +110,15 @@ public static class ReportCatalog
             Analytics),
     ];
 
+    /// <summary>The code of the period parameter of a report request (Phase 37.6, row 32).</summary>
+    public const string RangeParameter = "range";
+
+    /// <summary>The code of the file-format parameter of a report request (Phase 37.6, row 32).</summary>
+    public const string FormatParameter = "format";
+
+    /// <summary>The <c>range</c> value that means "two explicit dates".</summary>
+    public const string CustomRange = "custom";
+
     public static ReportDefinition For(ReportType type) =>
         All.FirstOrDefault(definition => definition.Type == type)
         ?? throw new ArgumentOutOfRangeException(nameof(type), type, "That report type is not in the catalogue.");

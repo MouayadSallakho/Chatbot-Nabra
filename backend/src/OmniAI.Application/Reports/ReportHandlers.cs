@@ -1,5 +1,6 @@
 using System.Globalization;
 using OmniAI.Application.Authorization;
+using OmniAI.Application.Tenants.Persistence;
 using OmniAI.Domain;
 using OmniAI.Domain.Authorization;
 using OmniAI.Domain.Reports;
@@ -12,13 +13,16 @@ namespace OmniAI.Application.Reports;
 public sealed record ReportCatalogEntry(ReportDefinition Definition, bool CanSchedule);
 
 /// <summary>What the reports catalogue publishes to one member.</summary>
+/// <param name="TimeZone">The zone report periods are counted in: the workspace's (Phase 37.6).</param>
 public sealed record ReportCatalogView(
     IReadOnlyList<ReportCatalogEntry> Reports,
     int MaxRangeDays,
     IReadOnlyList<int> PresetDays,
-    bool StorageConfigured);
+    bool StorageConfigured,
+    string TimeZone);
 
 /// <summary>An execution as the API publishes it.</summary>
+/// <param name="TimeZone">The zone its period's days are local days of (Phase 37.6).</param>
 public sealed record ReportExecutionView(
     Guid Id,
     ReportType Type,
@@ -38,7 +42,8 @@ public sealed record ReportExecutionView(
     string? FailureReason,
     long? ByteLength,
     DateTimeOffset? ExpiresAt,
-    bool CanDownload);
+    bool CanDownload,
+    string TimeZone);
 
 /// <summary>One page of executions.</summary>
 public sealed record ReportExecutionPage(
@@ -83,11 +88,18 @@ public sealed record ReportDownload(Stream Content, string ContentType, string F
 /// at once; a background worker produces the file. Nothing here reads a single
 /// conversation.
 /// </para>
+/// <para>
+/// <strong>Periods are local days of the workspace's zone (Phase 37.6).</strong>
+/// The zone is read when the report is asked for and kept on the execution, so
+/// the report covers the days it was asked for even if the zone changes before it
+/// is generated.
+/// </para>
 /// </remarks>
 public sealed class ReportHandlers(
     TenantAuthorizer authorizer,
     IReportExecutionStore executions,
     IReportArtifactStore artifacts,
+    IWorkspaceTimeZones timeZones,
     TimeProvider clock)
 {
     /// <summary>The presets a caller may name instead of two dates.</summary>
@@ -102,20 +114,27 @@ public sealed class ReportHandlers(
     private readonly IReportArtifactStore _artifacts =
         artifacts ?? throw new ArgumentNullException(nameof(artifacts));
 
+    private readonly IWorkspaceTimeZones _timeZones =
+        timeZones ?? throw new ArgumentNullException(nameof(timeZones));
+
     private readonly TimeProvider _clock = clock ?? throw new ArgumentNullException(nameof(clock));
 
     /// <returns>The catalogue, or <see langword="null"/> for a non-member.</returns>
     /// <remarks>Only the reports this member may actually generate are listed.</remarks>
     public async Task<ReportCatalogView?> CatalogAsync(Guid tenantId, CancellationToken cancellationToken = default)
     {
+        TenantId workspace = TenantId.From(tenantId);
+
         IReadOnlyList<PermissionCode>? held = await RequireAsync(
-                TenantId.From(tenantId), PlatformPermissions.ReportsView, cancellationToken)
+                workspace, PlatformPermissions.ReportsView, cancellationToken)
             .ConfigureAwait(false);
 
         if (held is null)
         {
             return null;
         }
+
+        WorkspaceTimeZone zone = await _timeZones.OfAsync(workspace, cancellationToken).ConfigureAwait(false);
 
         return new ReportCatalogView(
             [
@@ -127,7 +146,8 @@ public sealed class ReportHandlers(
             ],
             ReportPeriod.MaxDays,
             PresetDays,
-            _artifacts.IsConfigured);
+            _artifacts.IsConfigured,
+            zone.Name);
     }
 
     /// <returns>The recorded execution, or <see langword="null"/> for a non-member.</returns>
@@ -168,7 +188,8 @@ public sealed class ReportHandlers(
         }
 
         DateTimeOffset now = _clock.GetUtcNow();
-        ReportPeriod period = ReportRequestParsing.Period(command.Range, command.From, command.To, now);
+        WorkspaceTimeZone zone = await _timeZones.OfAsync(tenantId, cancellationToken).ConfigureAwait(false);
+        ReportPeriod period = ReportRequestParsing.Period(command.Range, command.From, command.To, now, zone);
 
         if (!_artifacts.IsConfigured)
         {
@@ -368,7 +389,8 @@ public sealed class ReportHandlers(
             execution.Status == ReportExecutionStatus.Failed ? ReportFailures.Describe(execution.FailureCode) : null,
             execution.Status == ReportExecutionStatus.Completed ? record.ByteLength : null,
             execution.Status == ReportExecutionStatus.Completed ? record.ExpiresAt : null,
-            downloadable);
+            downloadable,
+            execution.TimeZone.Name);
     }
 
     /// <summary>Membership, then a base permission; returns everything the caller holds.</summary>
@@ -415,10 +437,18 @@ internal static class ReportRequestParsing
     /// <remarks>
     /// An explicit period may include today — the report is then a snapshot of a
     /// day still in progress, stamped with when it was generated — but nothing
-    /// after it.
+    /// after it. Dates are local dates of <paramref name="timeZone"/>, the
+    /// workspace's zone, and so is "today".
     /// </remarks>
-    public static ReportPeriod Period(string? range, DateOnly? from, DateOnly? to, DateTimeOffset now)
+    public static ReportPeriod Period(
+        string? range,
+        DateOnly? from,
+        DateOnly? to,
+        DateTimeOffset now,
+        WorkspaceTimeZone timeZone)
     {
+        ArgumentNullException.ThrowIfNull(timeZone);
+
         string preset = range?.Trim().ToLowerInvariant() ?? string.Empty;
 
         if (preset is "7d" or "30d" or "90d")
@@ -428,7 +458,7 @@ internal static class ReportRequestParsing
                 throw new DomainValidationException("Give either a preset range or two dates, not both.");
             }
 
-            return ReportPeriod.LastDays(int.Parse(preset[..^1], CultureInfo.InvariantCulture), now);
+            return ReportPeriod.LastDays(int.Parse(preset[..^1], CultureInfo.InvariantCulture), now, timeZone);
         }
 
         if (preset is not ("custom" or ""))
@@ -441,14 +471,14 @@ internal static class ReportRequestParsing
             throw new DomainValidationException("A custom range needs both a from and a to date.");
         }
 
-        DateOnly tomorrow = DateOnly.FromDateTime(now.UtcDateTime).AddDays(1);
+        DateOnly tomorrow = timeZone.DateOf(now).AddDays(1);
 
         if (end > tomorrow)
         {
             throw new DomainValidationException("A report period cannot extend into the future.");
         }
 
-        return ReportPeriod.Create(start, end);
+        return ReportPeriod.Create(start, end, timeZone);
     }
 
     private static T Parse<T>(string? value, string refusal)

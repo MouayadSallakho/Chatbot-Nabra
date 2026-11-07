@@ -19,6 +19,16 @@ AI-written summaries.
 
 ## 2. Report catalog and permission matrix
 
+**Codes (Phase 37.6, row 32).** Each entry's `type` (`ConversationActivity`,
+`ChannelUsage`, `AiHumanHandling`, `CustomerActivity`, `AgentActivity`,
+`ProviderUsage`, `ProviderCost`, `WhatsAppDelivery`) is the report's stable
+translation key: a client words the name and description from it, and it never
+changes. Each entry also lists its request `parameters` by code — `{ code: "range",
+values: ["7d","30d","90d","custom"] }` and `{ code: "format", values: [its formats] }`
+— and the catalogue's `timeZone` is the workspace's. The English `title` and
+`description` stay for the current client. Report notifications carry the same
+codes (`operational-notifications.md` §8).
+
 The catalog is code (`OmniAI.Application.Reports.ReportCatalog`), not configuration.
 Three new permissions, none implying another:
 
@@ -204,8 +214,25 @@ one past the bound so "exactly at" and "over" are distinguishable.
 
 ## 9. Determinism and time
 
-UTC whole days, half-open `[from, to)` — the Phase 22 rule. Presets 7/30/90 cover
-the same days as the dashboard presets and end at tomorrow's midnight. Ordering:
+Whole local days of the workspace's zone, half-open `[from, to)` — the Phase 22
+rule, in the zone the dashboard uses (`UTC` unless chosen, Phase 37.6). Presets
+7/30/90 cover the same days as the dashboard presets and end at the start of the
+local tomorrow; an explicit period's dates are local dates, and "the future" is
+judged by the local today.
+
+**The zone is kept on the execution (Phase 37.6, migration
+`AddReportExecutionTimeZone`, M8).** `report_executions.time_zone varchar(64) NOT
+NULL DEFAULT 'UTC'`: an execution is computed, claimed, generated and listed in the
+zone it was asked for, even if the workspace's zone changes before the worker
+reaches it. Executions made before 37.6 read `UTC`, which is what they were. The
+execution response gains `timeZone`, the zone `periodFrom`, `periodTo` and
+`periodLastDay` are local dates of. A repeated request with the same key and the
+same dates in a different zone is a different report (`409`).
+
+**Labels.** The period note reads *"in {zone} whole days"*, day columns are headed
+`Date ({zone})`, and the PDF and Excel period lines name the zone. In a UTC
+workspace every label is exactly what it was. Instants (generated at, first and
+last activity) stay in UTC and say so. Ordering:
 days ascending; channels in fixed order (Website and WhatsApp always listed);
 agents by conversations, customer messages, name, id; models by calls then
 provider/model/operation; customers by last activity then id; currencies
@@ -224,10 +251,22 @@ notes say it is internal accounting, not billing.
 `report_schedules`: name, type, format, Weekly|Monthly, enabled, `next_run_at`,
 owner, created/updated, `disabled_reason`, `xmin` version.
 
-- **Periods from boundaries.** Weekly is due Monday 00:00 UTC and covers the seven
-  days before it; Monthly is due on the 1st 00:00 UTC and covers the previous
-  calendar month. The period is derived from the latest boundary ≤ now, never from
-  when the worker ran — no partial or future period is possible.
+- **Periods from boundaries.** Weekly is due at the start of Monday and covers the
+  seven days before it; Monthly is due at the start of the 1st and covers the
+  previous calendar month. Both are local days of the workspace's zone (Phase 37.6;
+  UTC unless chosen), counted in dates: a week that contains a clock change is 167
+  or 169 hours and still ends at Monday's start. The period is derived from the
+  latest boundary ≤ now, never from when the worker ran — no partial or future
+  period is possible. The occurrence keeps the zone it was queued in.
+- **A change of the workspace zone (Phase 37.6).** In the same transaction as the
+  change, every schedule whose next run is still to come is moved to the new zone's
+  next boundary (Riyadh's Monday is three hours before UTC's). A schedule already
+  due keeps its time and runs at the worker's next pass, covering the period that
+  ended at the new zone's latest boundary, so no period is skipped. Moving the next
+  run changes neither the owner nor the last-edited time, but it is a version
+  change, like the worker's. One consequence is accepted and visible: the first
+  report after a change can overlap the previous one by the difference between the
+  two zones' offsets, and each says its own zone.
 - **Occurrence identity.** Unique `(schedule_id, period_from)`; the insert is
   `ON CONFLICT DO NOTHING`. A crash, a replay or two instances produce one
   execution. Missed occurrences are not replayed one by one: the latest completed

@@ -8,7 +8,8 @@ language, and never shows `detail`. A code, once published, keeps its meaning.
 Phase 37.3 started this list with the account endpoints (D-2, row 6b). Phase 37.5a
 added the guarantee that every correctable refusal carries a code, and the codes of
 the knowledge, agent, channel and workspace areas (row 28a). Phase 37.5b named the
-codes of roles, invitations, team and billing (row 28b).
+codes of roles, invitations, team and billing (row 28b). Phase 37.6 added the
+workspace time zone's code and the analytics comparison's (rows 31 and 34).
 
 ## Accounts (Phase 37.3)
 
@@ -207,6 +208,13 @@ enumerated (`embeddable-web-chat-widget.md` §10). A visitor's own message refus
 | `workspace.slug.taken` | 409 | `POST /api/tenants` | Another workspace already holds this slug |
 | `workspace.slug.invalid` | 400 | `POST /api/tenants` | The slug is missing, the wrong length, or not lowercase letters, digits and single hyphens (Phase 37.5b; one code for every slug rule) |
 | `workspace.id.invalid` | 400 | any | An all-zero workspace id (Phase 37.5b) |
+| `workspace.time_zone.invalid` | 400 | `PUT /api/tenants/{id}/time-zone` | The zone is missing, longer than 64 characters, not an IANA name the runtime's zone database knows, not spelt exactly as that database spells it (`asia/riyadh` is refused), a `posix/` or `right/` alias, or not in PostgreSQL's `pg_timezone_names`. One code for every rule (Phase 37.6, row 34). The first four are checked before membership |
+
+## Analytics (Phase 37.6)
+
+| Code | Status | Where | Meaning |
+| --- | --- | --- | --- |
+| `analytics.compare.invalid` | 400 | `GET …/analytics/dashboard` | `compare` is something other than `previous` (or empty). Checked before membership, so the answer says nothing about the workspace. An unknown `range` keeps its existing generic `validation.failed` |
 
 ## Roles and permissions (Phase 37.5b)
 

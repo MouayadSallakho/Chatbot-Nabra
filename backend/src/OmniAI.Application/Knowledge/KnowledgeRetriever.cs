@@ -65,13 +65,24 @@ public sealed class KnowledgeRetriever(
     /// admin retrieval tester passes its own so somebody diagnosing why an answer
     /// was wrong can see a little further down the ranking than a turn would.
     /// </param>
+    /// <param name="purpose">
+    /// Why the question is embedded, as the caller knows it (Phase 37.6): a live
+    /// reply's retrieval, or the admin retrieval tester. Recorded on the provider
+    /// usage row, so the two are counted apart.
+    /// </param>
     public async Task<IReadOnlyList<KnowledgeExcerpt>> RetrieveAsync(
         TenantId tenantId,
         AiAgentId aiAgentId,
         string? query,
         int? limit = null,
+        AiUsagePurpose purpose = AiUsagePurpose.ConversationRetrievalEmbedding,
         CancellationToken cancellationToken = default)
     {
+        if (purpose is not (AiUsagePurpose.ConversationRetrievalEmbedding or AiUsagePurpose.AgentRetrievalTest))
+        {
+            throw new ArgumentOutOfRangeException(nameof(purpose), purpose, "Retrieval is recorded as a reply's or as a test.");
+        }
+
         if (string.IsNullOrWhiteSpace(query))
         {
             return [];
@@ -96,7 +107,7 @@ public sealed class KnowledgeRetriever(
         IReadOnlyList<EmbeddingVector> vectors = await _embeddings
             .GenerateAsync(
                 [trimmed],
-                AiUsageContext.For(tenantId, AiUsagePurpose.ConversationRetrievalEmbedding),
+                AiUsageContext.For(tenantId, purpose),
                 cancellationToken)
             .ConfigureAwait(false);
 

@@ -101,22 +101,69 @@ Refused rather than clamped: a caller who asked for 45 days and silently receive
 
 ### The window
 
-Whole UTC days, **half-open**: `[midnight UTC n-1 days ago, now)`.
+Whole **local days of the workspace's zone**, **half-open**: `[start of the local
+day n-1 days ago, now)`. The zone is `UTC` unless somebody chose another (Phase
+37.6), and in UTC this is exactly the window it always was.
 
 Half-open is the only boundary rule under which an event is counted exactly once
 when two adjacent periods are compared. Both edges are tested against real rows —
 an event on the first instant is in; one tick earlier is out.
 
-### UTC
+### The workspace time zone (Phase 37.6)
 
-**Decision.** Every bucket boundary is UTC, and the screen says so.
+**Decision.** Every day boundary is a local day of the workspace's zone
+(`tenants.time_zone`, an IANA name, `UTC` by default), and the response says
+which: `period.timeZone`.
 
-**Why.** The platform has no per-workspace timezone setting. Inventing one here
-would produce a day boundary no other part of the system agrees with. The period
-line reads *"30 days to today, counted in UTC"* rather than leaving it implied.
+**How a day is cut.**
+- The window's edges are local midnights turned into instants by the runtime's
+  zone rules (`WorkspaceTimeZone.StartOf`).
+- Each row's local date is computed by PostgreSQL: `CAST(started_at AT TIME ZONE
+  @zone AS date)` in the two daily statements. Nothing is materialised to be
+  bucketed in C#, and there is still no rollup table (§2): stored daily totals
+  would be right only for the zone they were cut in.
+- So every IANA zone is served correctly, including half-hour and 45-minute
+  offsets.
 
-Per-workspace analytics timezones are deferred to whenever workspace timezone
-configuration exists.
+**Daylight saving.**
+- A local day is usually 24 hours, and 23 or 25 on the days clocks change
+  (`Europe/Berlin` on 25 October 2026 runs from 22:00 UTC to 23:00 UTC the next
+  day). The window counts days by date, never by multiples of 24 hours, so no hour
+  is lost or counted twice.
+- Where clocks go forward *at* midnight, that midnight never happens, and the day
+  starts at the first local minute that does. Where they go back across midnight,
+  the day starts at the earlier of the two midnights. Tests check, for every day of
+  2026 in ten zones, that a day's start falls on that day and the instant before it
+  on the day before.
+
+**Changing the setting.**
+- It takes effect on the next read. Analytics stores nothing per zone, so there is
+  nothing to recompute: the same rows are counted again in the new zone.
+- A dashboard read just before and one just after a change describe different
+  local days; each response says its own zone.
+- Reports keep the zone they were computed in, and schedules move to the new zone's
+  calendar (`reports-exports-scheduling.md` §9 and §11).
+- The plan quota's months stay in UTC: they are a contractual period
+  (`workspace-plans-entitlements-quotas.md`).
+
+**The two zone databases.** Window edges use the runtime's tzdata and row dates
+use PostgreSQL's. They agree as long as both carry the same rules for the zone;
+a rule change shipped to one before the other could misplace events within an hour
+of a changed boundary. The time-zone PUT accepts a name only when both know it.
+
+### The previous period (Phase 37.6, row 31)
+
+`compare=previous` adds `previous`: the same number of **whole** local days, ending
+where the current window starts, in the same zone. The two are adjacent and
+half-open, so an event on the boundary is counted once, in the current period.
+The current window ends at the request instant, part-way through today, while the
+previous one is complete; a client that shows a change should say "so far" for
+today.
+
+`previous` carries `period`, `summary` and `aiOperations` only: the period's
+totals. The "open right now" figures (`current`) have no history to compare
+against, which the plan leaves outside Phase 37. It costs three more counting
+statements, read only when asked for.
 
 ### Analytics time is not transcript order
 
@@ -280,6 +327,22 @@ The response carries `period`, `summary`, `current`, `dailyActivity`, `channels`
 workspace that has never sent an outbound WhatsApp message, rather than a row of
 zeroes somebody would go looking for an outage behind.
 
+**Phase 37.6 (additive, opt-in where it changes the work done):**
+
+```
+GET /api/tenants/{tenantId}/analytics/dashboard?range=30d[&compare=previous]
+```
+
+| Member | Meaning |
+| --- | --- |
+| `period.timeZone` | The IANA zone every date in the response is a local date of; `UTC` unless chosen |
+| `firstActivityOn` | `YYYY-MM-DD`, the local date of the workspace's first conversation ever, or `null` with none. One `min(started_at)` from `ix_conversations_tenant_started`. For "since" labels and honest empty states |
+| `aiUsage.byPurpose` | Provider calls by purpose (`provider-usage-cost-accounting.md` §17). Present inside `aiUsage`, which stays `null` without calls |
+| `previous` | Only with `compare=previous`: `{ period, summary, aiOperations }`. Absent otherwise — not `null`, absent — so the existing request's response gains no member it did not ask for |
+
+`compare` other than `previous` (or empty) is `400 analytics.compare.invalid`,
+checked before membership.
+
 ---
 
 ## 9. Privacy
@@ -387,7 +450,9 @@ place to report that an optional summary did not load.
   must be labelled as accounting, not as analytics.
 - **Exports and reports.** No CSV, Excel, PDF, AI-generated or scheduled reports.
   They build on this foundation later.
-- **Per-workspace analytics timezone**, pending workspace timezone configuration.
+- **A comparison on the realtime "open right now" figures** (Phase 37 plan, row
+  31). There is no stored history of open counts to compare against; it would need
+  snapshots.
 - **Hosted versus embedded web chat split**, pending a model that can distinguish
   them at the conversation level.
 - **Retention and archival.** Ranges are bounded to 90 days, so the question of

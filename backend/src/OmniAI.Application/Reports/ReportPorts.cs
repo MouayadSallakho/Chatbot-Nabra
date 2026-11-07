@@ -298,6 +298,12 @@ public interface IDueReportScheduleBatch : IAsyncDisposable
 {
     IReadOnlyList<ReportSchedule> Schedules { get; }
 
+    /// <summary>
+    /// The zone of the schedule's workspace, read with the batch (Phase 37.6);
+    /// UTC if the workspace is gone.
+    /// </summary>
+    WorkspaceTimeZone TimeZoneOf(ReportSchedule schedule);
+
     /// <summary>Queues an occurrence (once per period) and moves the schedule on.</summary>
     /// <returns><see langword="false"/> when this occurrence already existed.</returns>
     Task<bool> EnqueueAsync(

@@ -105,11 +105,14 @@ the workspace and the reason:
 | Call site | Purpose |
 | --- | --- |
 | `CustomerTurnRunner` | `ConversationGeneration` |
-| `KnowledgeRetriever` | `ConversationRetrievalEmbedding` |
+| `KnowledgeRetriever`, called by `CustomerTurnRunner` | `ConversationRetrievalEmbedding` |
+| `KnowledgeRetriever`, called by the admin retrieval tester (`SearchAgentKnowledgeHandler`) | `AgentRetrievalTest` (Phase 37.6) |
 | `IndexKnowledgeDocumentHandler` | `KnowledgeIndexEmbedding` |
 | `PreviewAiAgentHandler` | `AgentPreviewGeneration` |
 
-A fifth call site cannot be added without saying whose money it spends.
+A further call site cannot be added without saying whose money it spends. Since
+Phase 37.6 `KnowledgeRetriever` takes the purpose from its caller, and accepts only
+the two retrieval purposes.
 
 ---
 
@@ -387,3 +390,33 @@ so a real deployment cannot write such a row.
 report's model usage rows, may now also read `DevelopmentStandIn`, but only on a
 Development host running the stand-in. The change is additive, and the current
 frontend shows the model name, not the provider.
+
+## 17. Usage by purpose (Phase 37.6, row 30)
+
+`aiUsage.byPurpose` on the dashboard splits the same calls by why they were made:
+
+```
+[{ purpose, calls, succeeded, failed, unresolved, inputTokens, outputTokens,
+   unratedCalls, ratedCost: [{ currency, estimatedCost, calls }] }]
+```
+
+- **Every purpose, in a fixed order, zeroes included:** `ConversationGeneration`
+  (a reply to a customer), `ConversationRetrievalEmbedding` (finding knowledge for
+  that reply), `KnowledgeIndexEmbedding`, `AgentPreviewGeneration`,
+  `AgentRetrievalTest`. The codes are the stored enum names and never change.
+- **The rows add up to the totals by construction.** Purpose is one more grouping
+  key on the three existing usage statements (buckets, rated cost per currency,
+  unrated count), and the headline figures are the sums of those groups. No
+  statement was added.
+- **Currencies are still never added:** each purpose has its own per-currency list.
+- **Tokens** are summed across operation types, which never mixes kinds: each
+  purpose is either generation or embedding.
+- **No calls, no section.** `aiUsage` stays `null` for a workspace that called no
+  provider in the period, as before; inside a present `aiUsage`, a purpose with no
+  calls is an honest row of zeroes.
+
+**Rows recorded before Phase 37.6.** Every usage row has carried a purpose since
+the first schema, so history is grouped as it was recorded. The one exception is
+the retrieval tester: until 37.6 it recorded its question embedding as
+`ConversationRetrievalEmbedding`, and those rows cannot be told apart from a live
+reply's, so they stay counted there. There is no backfill.

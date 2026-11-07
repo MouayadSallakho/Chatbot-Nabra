@@ -113,6 +113,56 @@ internal sealed class NotificationDirectory(OmniAiDbContext context)
             : null;
     }
 
+    public async Task<IReadOnlyDictionary<NotificationOccurrenceId, ReportType>> ReportTypesOfOccurrencesAsync(
+        TenantId tenantId,
+        IReadOnlyCollection<NotificationOccurrenceId> occurrenceIds,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(occurrenceIds);
+
+        if (occurrenceIds.Count == 0)
+        {
+            return new Dictionary<NotificationOccurrenceId, ReportType>();
+        }
+
+        // The occurrences' sources, then the executions they name: both by primary
+        // key, both in the workspace, both bounded by the page.
+        var sources = await _context.NotificationOccurrences
+            .AsNoTracking()
+            .Where(occurrence => occurrence.TenantId == tenantId && occurrenceIds.Contains(occurrence.Id))
+            .Where(occurrence => occurrence.SourceId != null)
+            .Select(occurrence => new { occurrence.Id, occurrence.SourceId })
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        if (sources.Count == 0)
+        {
+            return new Dictionary<NotificationOccurrenceId, ReportType>();
+        }
+
+        List<ReportExecutionId> executionIds =
+            [.. sources.Select(source => ReportExecutionId.From(source.SourceId!.Value)).Distinct()];
+
+        Dictionary<Guid, ReportType> types = await _context.ReportExecutions
+            .AsNoTracking()
+            .Where(execution => execution.TenantId == tenantId && executionIds.Contains(execution.Id))
+            .Select(execution => new { execution.Id, execution.Type })
+            .ToDictionaryAsync(row => row.Id.Value, row => row.Type, cancellationToken)
+            .ConfigureAwait(false);
+
+        Dictionary<NotificationOccurrenceId, ReportType> result = [];
+
+        foreach (var source in sources)
+        {
+            if (types.TryGetValue(source.SourceId!.Value, out ReportType type))
+            {
+                result[source.Id] = type;
+            }
+        }
+
+        return result;
+    }
+
     public async Task<Guid?> WhatsAppConnectionOfDeliveryAsync(
         TenantId tenantId,
         Guid deliveryId,

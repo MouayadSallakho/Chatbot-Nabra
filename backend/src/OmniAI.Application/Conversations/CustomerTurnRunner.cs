@@ -300,7 +300,13 @@ public sealed class CustomerTurnRunner(
         }
 
         IReadOnlyList<KnowledgeExcerpt> excerpts = await _knowledge
-            .RetrieveAsync(turn.TenantId, turn.Agent.Id, turn.Text, limit: null, cancellationToken)
+            .RetrieveAsync(
+                turn.TenantId,
+                turn.Agent.Id,
+                turn.Text,
+                limit: null,
+                AiUsagePurpose.ConversationRetrievalEmbedding,
+                cancellationToken)
             .ConfigureAwait(false);
 
         IReadOnlyList<GroundingItem> grounding =

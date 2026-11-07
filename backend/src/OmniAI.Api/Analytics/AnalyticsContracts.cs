@@ -1,12 +1,15 @@
 using System.Globalization;
+using System.Text.Json.Serialization;
 using OmniAI.Application.Analytics;
 
 namespace OmniAI.Api.Analytics;
 
 /// <summary>The period a dashboard describes.</summary>
 /// <param name="TimeZone">
-/// Always <c>UTC</c>. Published rather than assumed, because a reader in
-/// Singapore looking at a day bucket needs to know which day it is.
+/// The IANA zone every day of the response is a local day of: the workspace's
+/// zone, <c>UTC</c> unless somebody chose another (Phase 37.6). Published rather
+/// than assumed, because a reader looking at a day bucket needs to know which day
+/// it is.
 /// </param>
 public sealed record AnalyticsPeriodResponse(
     string Range,
@@ -29,8 +32,8 @@ public sealed record AnalyticsSnapshotResponse(
     long OpenHandledByAi,
     long OpenHandledByHuman);
 
-/// <summary>One UTC day.</summary>
-/// <param name="Date">An ISO date, <c>yyyy-MM-dd</c>, in UTC.</param>
+/// <summary>One local day.</summary>
+/// <param name="Date">An ISO date, <c>yyyy-MM-dd</c>, in the period's time zone.</param>
 public sealed record AnalyticsDayResponse(
     string Date,
     long ConversationsStarted,
@@ -88,6 +91,29 @@ public sealed record AnalyticsRatedCostResponse(
     long Calls);
 
 /// <summary>
+/// One purpose's share of the provider calls (Phase 37.6, row 30).
+/// </summary>
+/// <param name="Purpose">
+/// A stable code: <c>ConversationGeneration</c> (a reply to a customer),
+/// <c>ConversationRetrievalEmbedding</c> (finding knowledge for that reply),
+/// <c>KnowledgeIndexEmbedding</c> (indexing a document), <c>AgentPreviewGeneration</c>
+/// (an agent preview) or <c>AgentRetrievalTest</c> (the knowledge retrieval tester).
+/// Retrieval tests made before Phase 37.6 were recorded, and stay counted, as
+/// <c>ConversationRetrievalEmbedding</c>.
+/// </param>
+/// <param name="RatedCost">Per currency, never added across currencies.</param>
+public sealed record AnalyticsPurposeUsageResponse(
+    string Purpose,
+    long Calls,
+    long Succeeded,
+    long Failed,
+    long Unresolved,
+    long InputTokens,
+    long OutputTokens,
+    long UnratedCalls,
+    IReadOnlyList<AnalyticsRatedCostResponse> RatedCost);
+
+/// <summary>
 /// Real calls to AI providers, and what they cost.
 /// </summary>
 /// <remarks>
@@ -95,6 +121,10 @@ public sealed record AnalyticsRatedCostResponse(
 /// customer content, no API key and no provider request or response body appears
 /// here — a model name is a published identifier and nothing else travels.
 /// </remarks>
+/// <param name="ByPurpose">
+/// The same calls by purpose, one row per purpose in a fixed order, zeroes
+/// included; the rows add up to the totals (Phase 37.6).
+/// </param>
 public sealed record AnalyticsAiUsageResponse(
     long Calls,
     long GenerationCalls,
@@ -108,7 +138,21 @@ public sealed record AnalyticsAiUsageResponse(
     long GenerationReasoningTokens,
     long EmbeddingInputTokens,
     long UnratedCalls,
-    IReadOnlyList<AnalyticsRatedCostResponse> RatedCost);
+    IReadOnlyList<AnalyticsRatedCostResponse> RatedCost,
+    IReadOnlyList<AnalyticsPurposeUsageResponse> ByPurpose);
+
+/// <summary>
+/// The period just before the dashboard's, for comparison (Phase 37.6, row 31).
+/// </summary>
+/// <remarks>
+/// As many whole local days, ending where the current period starts, in the same
+/// zone. Only the period's totals: the "open right now" figures have no history to
+/// compare against.
+/// </remarks>
+public sealed record AnalyticsComparisonResponse(
+    AnalyticsPeriodResponse Period,
+    AnalyticsSummaryResponse Summary,
+    AnalyticsAiOperationsResponse AiOperations);
 
 /// <summary>One provider model's share of the spend.</summary>
 public sealed record AnalyticsModelUsageResponse(
@@ -149,25 +193,23 @@ public sealed record AnalyticsDashboardResponse(
     // Null for a workspace that has never called a provider, rather than a block
     // of zeroes: no spend and spend of nothing read very differently.
     AnalyticsAiUsageResponse? AiUsage,
-    IReadOnlyList<AnalyticsModelUsageResponse> Models)
+    IReadOnlyList<AnalyticsModelUsageResponse> Models,
+
+    // Phase 37.6 (row 33): the local date of the first conversation, or null.
+    string? FirstActivityOn,
+
+    // Phase 37.6 (row 31): present only with compare=previous, so a response to
+    // the existing request gains no member it did not ask for.
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    AnalyticsComparisonResponse? Previous)
 {
     public static AnalyticsDashboardResponse From(WorkspaceAnalytics analytics)
     {
         ArgumentNullException.ThrowIfNull(analytics);
 
         return new AnalyticsDashboardResponse(
-            new AnalyticsPeriodResponse(
-                analytics.Period.Range,
-                analytics.Period.From,
-                analytics.Period.To,
-                analytics.Period.Days,
-                analytics.Period.TimeZone),
-            new AnalyticsSummaryResponse(
-                analytics.Summary.ConversationsStarted,
-                analytics.Summary.CustomerMessages,
-                analytics.Summary.AiMessages,
-                analytics.Summary.HumanMessages,
-                analytics.Summary.SystemMessages),
+            PeriodOf(analytics.Period),
+            SummaryOf(analytics.Summary),
             new AnalyticsSnapshotResponse(
                 analytics.Current.OpenConversations,
                 analytics.Current.OpenHandledByAi,
@@ -197,11 +239,7 @@ public sealed record AnalyticsDashboardResponse(
                     agent.AiMessages,
                     agent.HumanMessages)),
             ],
-            new AnalyticsAiOperationsResponse(
-                analytics.AiOperations.Attempts,
-                analytics.AiOperations.Completed,
-                analytics.AiOperations.Failed,
-                analytics.AiOperations.InProgress),
+            OperationsOf(analytics.AiOperations),
             analytics.WhatsAppDelivery is null
                 ? null
                 : new AnalyticsWhatsAppDeliveryResponse(
@@ -226,12 +264,19 @@ public sealed record AnalyticsDashboardResponse(
                     analytics.AiUsage.GenerationReasoningTokens,
                     analytics.AiUsage.EmbeddingInputTokens,
                     analytics.AiUsage.UnratedCalls,
+                    RatedOf(analytics.AiUsage.RatedCost),
                     [
-                        .. analytics.AiUsage.RatedCost.Select(cost =>
-                            new AnalyticsRatedCostResponse(
-                                cost.Currency,
-                                cost.EstimatedCost,
-                                cost.Calls)),
+                        .. analytics.AiUsage.ByPurpose.Select(purpose =>
+                            new AnalyticsPurposeUsageResponse(
+                                purpose.Purpose.ToString(),
+                                purpose.Calls,
+                                purpose.Succeeded,
+                                purpose.Failed,
+                                purpose.Unresolved,
+                                purpose.InputTokens,
+                                purpose.OutputTokens,
+                                purpose.UnratedCalls,
+                                RatedOf(purpose.RatedCost))),
                     ])
                 : null,
             [
@@ -245,6 +290,30 @@ public sealed record AnalyticsDashboardResponse(
                     model.EstimatedCost,
                     model.Currency,
                     model.UnratedCalls)),
-            ]);
+            ],
+            analytics.FirstActivityOn?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+            analytics.Previous is null
+                ? null
+                : new AnalyticsComparisonResponse(
+                    PeriodOf(analytics.Previous.Period),
+                    SummaryOf(analytics.Previous.Summary),
+                    OperationsOf(analytics.Previous.AiOperations)));
     }
+
+    private static AnalyticsPeriodResponse PeriodOf(AnalyticsPeriod period) =>
+        new(period.Range, period.From, period.To, period.Days, period.TimeZone);
+
+    private static AnalyticsSummaryResponse SummaryOf(AnalyticsSummary summary) =>
+        new(
+            summary.ConversationsStarted,
+            summary.CustomerMessages,
+            summary.AiMessages,
+            summary.HumanMessages,
+            summary.SystemMessages);
+
+    private static AnalyticsAiOperationsResponse OperationsOf(AnalyticsAiOperations operations) =>
+        new(operations.Attempts, operations.Completed, operations.Failed, operations.InProgress);
+
+    private static IReadOnlyList<AnalyticsRatedCostResponse> RatedOf(IReadOnlyList<AnalyticsRatedCost> costs) =>
+        [.. costs.Select(cost => new AnalyticsRatedCostResponse(cost.Currency, cost.EstimatedCost, cost.Calls))];
 }

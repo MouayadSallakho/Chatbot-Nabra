@@ -54,7 +54,9 @@ public sealed class ReportDocumentBuilder(
         ArgumentNullException.ThrowIfNull(period);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(rowLimit);
 
-        AnalyticsWindow window = AnalyticsWindow.ForDays(period.FromDate, period.ToExclusiveDate);
+        // The report's own zone, kept on its execution (Phase 37.6): the same local
+        // days the dashboard would count in that zone.
+        AnalyticsWindow window = AnalyticsWindow.ForDays(period.FromDate, period.ToExclusiveDate, period.TimeZone);
 
         // One more than the bound, so "exactly at the limit" and "over it" can be
         // told apart without a second query. Nothing is silently truncated.
@@ -135,7 +137,7 @@ public sealed class ReportDocumentBuilder(
                     "Daily activity",
                     "Daily activity",
                     [
-                        Column("Date (UTC)", ReportValueKind.Date),
+                        Column(DateHeader(period), ReportValueKind.Date),
                         Column("Conversations started", ReportValueKind.Count),
                         Column("Customer messages", ReportValueKind.Count),
                         Column("AI messages", ReportValueKind.Count),
@@ -233,7 +235,7 @@ public sealed class ReportDocumentBuilder(
                     "Daily replies",
                     "Replies by day",
                     [
-                        Column("Date (UTC)", ReportValueKind.Date),
+                        Column(DateHeader(period), ReportValueKind.Date),
                         Column("AI replies", ReportValueKind.Count),
                         Column("Human replies", ReportValueKind.Count),
                     ],
@@ -519,11 +521,15 @@ public sealed class ReportDocumentBuilder(
             [
                 string.Create(
                     CultureInfo.InvariantCulture,
-                    $"Period: {period.FromDate:yyyy-MM-dd} to {period.LastDate:yyyy-MM-dd} inclusive, in UTC whole days."),
+                    $"Period: {period.FromDate:yyyy-MM-dd} to {period.LastDate:yyyy-MM-dd} inclusive, in {period.TimeZone} whole days."),
                 .. notes,
             ]);
 
     private static ReportFact Fact(string label, long value) => new(label, ReportValue.Count(value));
+
+    /// <summary>The day column names the zone its dates are local dates of (Phase 37.6).</summary>
+    private static string DateHeader(ReportPeriod period) =>
+        string.Create(CultureInfo.InvariantCulture, $"Date ({period.TimeZone})");
 
     private static ReportColumn Column(string header, ReportValueKind kind) => new(header, kind);
 

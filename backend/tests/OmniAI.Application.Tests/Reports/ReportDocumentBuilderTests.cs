@@ -183,6 +183,42 @@ public sealed class ReportDocumentBuilderTests
         Assert.Equal("conversation-activity-2026-09-01-to-2026-09-30.xlsx", name);
     }
 
+    // ------------------------------------------------------------- time zones
+
+    [Fact]
+    public async Task A_utc_report_says_utc_exactly_as_before()
+    {
+        FakeAnalytics analytics = new() { Result = Analytics() };
+
+        ReportDocument document = await Build(analytics, ReportType.ConversationActivity);
+
+        Assert.Equal(WorkspaceTimeZone.Utc, analytics.LastWindow!.TimeZone);
+        Assert.Equal("Date (UTC)", document.Tables[0].Columns[0].Header);
+        Assert.Equal(
+            "Period: 2026-09-01 to 2026-09-03 inclusive, in UTC whole days.",
+            document.Notes[0]);
+    }
+
+    /// <remarks>Phase 37.6: the report's own zone reaches the read and every label.</remarks>
+    [Fact]
+    public async Task A_gulf_report_reads_gulf_days_and_says_so()
+    {
+        WorkspaceTimeZone riyadh = WorkspaceTimeZone.Create("Asia/Riyadh");
+        ReportPeriod period = ReportPeriod.Create(new DateOnly(2026, 11, 1), new DateOnly(2026, 11, 4), riyadh);
+        FakeAnalytics analytics = new() { Result = Analytics() };
+
+        ReportDocument document = await new ReportDocumentBuilder(analytics, new FakeCustomers())
+            .BuildAsync(Workspace, ReportType.ConversationActivity, period, "Acme", Generated, 1000);
+
+        Assert.Equal(AnalyticsWindow.ForDays(period.FromDate, period.ToExclusiveDate, riyadh), analytics.LastWindow);
+        Assert.Equal(new DateTimeOffset(2026, 10, 31, 21, 0, 0, TimeSpan.Zero), analytics.LastWindow!.From);
+        Assert.Equal("Date (Asia/Riyadh)", document.Tables[0].Columns[0].Header);
+        Assert.Equal(
+            "Period: 2026-11-01 to 2026-11-03 inclusive, in Asia/Riyadh whole days.",
+            document.Notes[0]);
+        Assert.Equal(riyadh, document.Period.TimeZone);
+    }
+
     // ---------------------------------------------------------------- helpers
 
     private static Task<ReportDocument> Build(
@@ -209,8 +245,9 @@ public sealed class ReportDocumentBuilderTests
             [],
             new AnalyticsAiOperations(0, 0, 0, 0),
             WhatsAppDelivery: null,
-            new AnalyticsAiUsage(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, rated ?? []),
-            [new AnalyticsModelUsage("OpenAi", "test-model", AiOperationType.TextGeneration, 3, 10, 5, null, null, 0)]);
+            new AnalyticsAiUsage(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, rated ?? [], []),
+            [new AnalyticsModelUsage("OpenAi", "test-model", AiOperationType.TextGeneration, 3, 10, 5, null, null, 0)],
+            FirstActivityOn: null);
 
     private sealed class FakeAnalytics : IWorkspaceAnalyticsReader
     {
@@ -219,6 +256,12 @@ public sealed class ReportDocumentBuilderTests
         public AnalyticsWindow? LastWindow { get; private set; }
 
         public AnalyticsBreakdown? LastBreakdown { get; private set; }
+
+        public Task<AnalyticsComparison> ReadComparisonAsync(
+            TenantId tenantId,
+            AnalyticsWindow window,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException("A report never compares periods.");
 
         public Task<WorkspaceAnalytics> ReadAsync(
             TenantId tenantId,

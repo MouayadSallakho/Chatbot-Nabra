@@ -207,6 +207,61 @@ public sealed class ReportRenderingTests
         Assert.DoesNotContain("A?y?", text, StringComparison.Ordinal);
     }
 
+    /// <remarks>Phase 37.6: the period line names the zone its dates are local dates of.</remarks>
+    [Fact]
+    public async Task Pdf_names_the_period_s_time_zone_and_utc_is_unchanged()
+    {
+        ReportDocument gulf = Document() with
+        {
+            Period = ReportPeriod.Create(
+                new DateOnly(2026, 9, 1),
+                new DateOnly(2026, 10, 1),
+                Domain.Tenants.WorkspaceTimeZone.Create("Asia/Riyadh")),
+        };
+
+        string Text(byte[] bytes)
+        {
+            using PdfDocument pdf = PdfDocument.Open(bytes);
+
+            return pdf.GetPage(1).Text.Replace(" ", string.Empty, StringComparison.Ordinal);
+        }
+
+        Assert.Contains("Period(Asia/Riyadh)", Text(await Render(new PdfReportRenderer(), gulf)), StringComparison.Ordinal);
+        Assert.Contains("Period(UTC)", Text(await Render(new PdfReportRenderer(), Document())), StringComparison.Ordinal);
+
+        // Instants are still written in UTC, and say so.
+        Assert.Contains("Generated(UTC)", Text(await Render(new PdfReportRenderer(), gulf)), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Xlsx_names_the_period_s_time_zone_and_utc_is_unchanged()
+    {
+        ReportDocument gulf = Document() with
+        {
+            Period = ReportPeriod.Create(
+                new DateOnly(2026, 9, 1),
+                new DateOnly(2026, 10, 1),
+                Domain.Tenants.WorkspaceTimeZone.Create("Asia/Riyadh")),
+        };
+
+        static List<string> Labels(byte[] bytes)
+        {
+            using MemoryStream stream = new(bytes);
+            using SpreadsheetDocument workbook = SpreadsheetDocument.Open(stream, isEditable: false);
+
+            return [.. Sheet(workbook, "Summary").Descendants<Cell>().Select(cell => cell.InnerText)];
+        }
+
+        List<string> riyadh = Labels(await Render(new XlsxReportRenderer(), gulf));
+        Assert.Contains("Period start (Asia/Riyadh)", riyadh);
+        Assert.Contains("Period end (Asia/Riyadh, inclusive)", riyadh);
+        Assert.Contains("Generated (UTC)", riyadh);
+
+        List<string> utc = Labels(await Render(new XlsxReportRenderer(), Document()));
+        Assert.Contains("Period start (UTC)", utc);
+        Assert.Contains("Period end (UTC, inclusive)", utc);
+    }
+
     // ---------------------------------------------------------------- helpers
 
     internal static ReportDocument Document(int rows = 0)

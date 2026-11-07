@@ -99,8 +99,8 @@ internal sealed class XlsxReportRenderer : IReportRenderer
             yield return RowOf(index++, TextCell("Workspace", StyleHeader), TextCell(document.WorkspaceName));
         }
 
-        yield return RowOf(index++, TextCell("Period start (UTC)", StyleHeader), DateCell(document.Period.FromDate));
-        yield return RowOf(index++, TextCell("Period end (UTC, inclusive)", StyleHeader), DateCell(document.Period.LastDate));
+        yield return RowOf(index++, TextCell($"Period start ({document.Period.TimeZone})", StyleHeader), DateCell(document.Period.FromDate));
+        yield return RowOf(index++, TextCell($"Period end ({document.Period.TimeZone}, inclusive)", StyleHeader), DateCell(document.Period.LastDate));
         yield return RowOf(index++, TextCell("Generated (UTC)", StyleHeader), InstantCell(document.GeneratedAt));
 
         index++;
