@@ -13,27 +13,22 @@ import {
   output,
   signal,
   untracked,
+  viewChild,
 } from '@angular/core';
 import { LocaleFormat } from '@app/core/i18n/locale-format';
 import { pluralMessage } from '@app/core/i18n/plural';
 import { Icon } from '@app/shared/icon/icon';
 import type { WhatsAppConversationFacts } from '@app/features/channels/whatsapp-api';
-import type { ConversationHandling, TranscriptMessage } from '../conversations-api';
+import type {
+  ConversationHandling,
+  TranscriptEvent,
+  TranscriptMessage,
+} from '../conversations-api';
 import { deliveryWord, senderWord } from '../conversation-words';
 import { TranscriptRow, transcriptRows } from '../transcript-rows';
 
-/**
- * How many messages are drawn at first, and how many more each "earlier" step
- * adds. Measured in Phase 36.6 on a 232-message conversation (production
- * build, 4x CPU throttling, see the phase report): scrolling stays at one
- * frame per 17 ms either way, and laying out a step costs about the same
- * whether it adds 50 bubbles or 80, so the window mainly keeps the opening DOM
- * small (100 bubbles rather than 230). `content-visibility` was tried and
- * rejected: it made every scrolled frame about four times slower.
- */
-export const TRANSCRIPT_WINDOW = 100;
-
-export const TRANSCRIPT_STEP = 50;
+/** How far above the view the start of what is loaded may come before more is read, in px. */
+const EARLIER_MARGIN = 400;
 
 /** How close to the end still counts as "reading the newest messages", in px. */
 const AT_END_SLACK = 48;
@@ -45,18 +40,19 @@ let nextId = 0;
  *
  * <strong>Who spoke is said three ways.</strong> The bubble's voice tint
  * (neutral for the customer, Lagoon for the AI, Ember for a person), a speaker
- * line with a word and a glyph, and the side it sits on. Day separators and
- * handoff dividers come from the messages themselves (`transcriptRows`).
+ * line with a word and a glyph, and the side it sits on. Day separators come from
+ * the messages, and dividers only from the server's events (`transcriptRows`).
  *
  * <strong>Nothing yanks the reader.</strong> New messages settle in at the end
  * (220 ms). A reader at the end stays at the end; one who has scrolled up keeps
  * their place and is told how many arrived (`unseenChange`), and the
- * conversation offers a way down. Earlier messages revealed above keep the
- * view where it was.
+ * conversation offers a way down. Earlier messages added above keep the view
+ * where it was.
  *
- * <strong>Long conversations stay light.</strong> Only the newest
- * `TRANSCRIPT_WINDOW` messages are drawn; earlier ones are a button away,
- * already loaded, so revealing them is instant and needs no request.
+ * <strong>It opens at the newest messages, and reads older ones as the reader
+ * goes up.</strong> Coming within `EARLIER_MARGIN` of the start of what is loaded
+ * asks for the page before it, and the button does the same from the keyboard.
+ * The conversation screen does the reading; this component says when.
  *
  * Message text is plain text, interpolated, with `dir="auto"` so each message
  * takes its own direction: an Arabic message reads right to left on an English
@@ -89,6 +85,17 @@ export class ConversationTranscript {
   readonly agentName = input<string | null>(null);
   readonly whatsApp = input<WhatsAppConversationFacts | null>(null);
 
+  /** What the server says happened between the messages, in transcript order. */
+  readonly events = input<readonly TranscriptEvent[]>([]);
+
+  /** Whether the server has messages before the first one here. */
+  readonly hasEarlier = input(false);
+
+  readonly loadingEarlier = input(false);
+
+  /** Why the last read of earlier messages failed, in words; null when it did not. */
+  readonly earlierFailure = input<string | null>(null);
+
   /** True when the conversation fills the screen and this transcript is its own scroll region. */
   readonly scrollRegion = input(false);
 
@@ -98,47 +105,63 @@ export class ConversationTranscript {
   /** How many messages arrived below the reader's view since they last reached the end. */
   readonly unseenChange = output<number>();
 
-  /** How many of the loaded messages are drawn, counted from the newest. */
-  protected readonly windowSize = signal(TRANSCRIPT_WINDOW);
-
-  protected readonly hiddenCount = computed(() =>
-    Math.max(0, this.messages().length - this.windowSize()),
-  );
+  /** The reader reached the start of what is loaded, or pressed the button. */
+  readonly earlierRequested = output<void>();
 
   protected readonly rows = computed<readonly TranscriptRow[]>(() =>
-    transcriptRows(this.messages().slice(this.hiddenCount()), this.format.language),
+    transcriptRows(this.messages(), this.events(), this.format.language),
   );
 
   /** Ids that arrived after the first read, so only they settle in. */
   protected readonly fresh = signal<ReadonlySet<string>>(new Set());
 
   /**
-   * The AI is answering and the customer spoke last, so a reply is owed.
-   *
-   * Shown as a fact, not a guess: the admin API carries no record of a failed
-   * AI turn (a failed turn writes no message), so this does not claim one
-   * failed -- it says no reply exists, and what happens when the AI cannot
-   * answer.
+   * The AI is answering, the customer spoke last, and no failure is recorded for
+   * that message: a reply is still owed. A failed turn says so with its own divider.
    */
   protected readonly awaitingAi = computed(() => {
     const last = this.messages().at(-1);
 
-    return this.handling() === 'Ai' && last?.sender === 'Customer';
+    return (
+      this.handling() === 'Ai' &&
+      last?.sender === 'Customer' &&
+      !this.events().some(
+        (event) => event.kind === 'AiTurnFailed' && event.afterSequence === last.sequence,
+      )
+    );
   });
 
   /** The polite announcement for messages that arrived while the reader is here. */
   protected readonly announcement = signal('');
 
+  private readonly earlierEdge = viewChild<ElementRef<HTMLElement>>('earlierEdge');
+
   private known = new Set<string>();
+  private knownEvents = new Set<string>();
   private knownFor: string | null = null;
+  private oldest = 0;
+  private newest = 0;
   private unseen = 0;
+  private observer: IntersectionObserver | null = null;
 
   constructor() {
     effect(() => {
       const id = this.conversationId();
       const messages = this.messages();
+      const events = this.events();
 
-      untracked(() => this.absorb(id, messages));
+      untracked(() => this.absorb(id, messages, events));
+    });
+
+    // Which element scrolls depends on the width, and the observer is tied to it.
+    effect(() => {
+      this.scrollRegion();
+
+      untracked(() => {
+        if (this.observer) {
+          afterNextRender(() => this.watchEarlierEdge(), { injector: this.injector });
+        }
+      });
     });
 
     // Reaching the end clears the count; both possible scrollers are watched,
@@ -156,6 +179,7 @@ export class ConversationTranscript {
     inject(DestroyRef).onDestroy(() => {
       own.removeEventListener('scroll', onScroll);
       main?.removeEventListener('scroll', onScroll);
+      this.observer?.disconnect();
     });
   }
 
@@ -167,19 +191,11 @@ export class ConversationTranscript {
     this.setUnseen(0);
   }
 
-  /** Draws the next set of earlier messages, keeping the view where it was. */
-  protected showEarlier(): void {
-    const scroller = this.scroller();
-    const fromEnd = scroller.scrollHeight - scroller.scrollTop;
-
-    this.windowSize.update((size) => size + TRANSCRIPT_STEP);
-
-    afterNextRender(
-      () => {
-        scroller.scrollTop = scroller.scrollHeight - fromEnd;
-      },
-      { injector: this.injector },
-    );
+  /** Asks for the page before what is loaded, once at a time. */
+  protected requestEarlier(): void {
+    if (this.hasEarlier() && !this.loadingEarlier()) {
+      this.earlierRequested.emit();
+    }
   }
 
   protected speaker(message: TranscriptMessage): string {
@@ -231,43 +247,96 @@ export class ConversationTranscript {
   }
 
   /**
-   * Takes in a new set of messages: a first read, or a re-read.
+   * Takes in what the conversation screen now holds: a first read, or a change.
    *
    * A different conversation (or the first read of one) starts over: nothing
-   * settles in, and the view goes to the newest message. A re-read compares
-   * against what was already on screen; what is new settles in, and the view
-   * follows only if the reader was at the end.
+   * settles in, and the view goes to the newest message. After that, an earlier
+   * page keeps the reader where they were, and what is new settles in, with the
+   * view following only if the reader was at the end.
    */
-  private absorb(conversationId: string, messages: readonly TranscriptMessage[]): void {
+  private absorb(
+    conversationId: string,
+    messages: readonly TranscriptMessage[],
+    events: readonly TranscriptEvent[],
+  ): void {
     if (this.knownFor !== conversationId || this.known.size === 0) {
       this.knownFor = conversationId;
       this.known = new Set(messages.map((message) => message.id));
-      this.windowSize.set(TRANSCRIPT_WINDOW);
+      this.knownEvents = new Set(events.map((event) => event.id));
+      this.oldest = messages.at(0)?.sequence ?? 0;
+      this.newest = messages.at(-1)?.sequence ?? 0;
       this.fresh.set(new Set());
       this.setUnseen(0);
 
       if (messages.length > 0) {
-        afterNextRender(() => this.scrollToEnd(), { injector: this.injector });
+        // In this order: the view must be at the end before the edge is first
+        // measured, or opening a conversation would read the page before it.
+        afterNextRender(
+          () => {
+            this.scrollToEnd();
+            this.watchEarlierEdge();
+          },
+          { injector: this.injector },
+        );
       }
 
       return;
     }
 
-    const arrived = messages.filter((message) => !this.known.has(message.id));
+    const added = messages.filter((message) => !this.known.has(message.id));
+    const earlier = added.filter((message) => message.sequence < this.oldest);
+    const arrived = added.filter((message) => message.sequence >= this.oldest);
+    const dividerAtEnd = events.some(
+      (event) => !this.knownEvents.has(event.id) && event.afterSequence >= this.newest,
+    );
 
-    if (arrived.length === 0) {
-      return;
-    }
-
-    const follow = this.atEnd();
-
-    for (const message of arrived) {
+    for (const message of added) {
       this.known.add(message.id);
     }
 
-    // The window grows by what arrived, so nothing above the reader is dropped
-    // from the screen while they read: the view stays exactly where it was.
-    this.windowSize.update((size) => size + arrived.length);
+    for (const event of events) {
+      this.knownEvents.add(event.id);
+    }
+
+    this.oldest = messages.at(0)?.sequence ?? this.oldest;
+    this.newest = messages.at(-1)?.sequence ?? this.newest;
+
+    if (earlier.length > 0) {
+      this.keepPlaceAbove();
+    }
+
+    if (arrived.length > 0) {
+      this.settleIn(arrived);
+    } else if (dividerAtEnd && this.atEnd()) {
+      afterNextRender(() => this.scrollToEnd(), { injector: this.injector });
+    }
+  }
+
+  /**
+   * Holds the reader's place while earlier messages go in above them.
+   *
+   * The distance from the bottom does not change when rows are added at the top, so
+   * it is what is put back. `overflow-anchor: none` keeps the browser from also
+   * compensating. Read here, before the rows render, on whichever element scrolls.
+   */
+  private keepPlaceAbove(): void {
+    const scroller = this.scroller();
+    const fromEnd = scroller.scrollHeight - scroller.scrollTop;
+
+    this.announcement.set($localize`:@@transcript.earlier.loaded:Earlier messages loaded.`);
+
+    afterNextRender(
+      () => {
+        scroller.scrollTop = scroller.scrollHeight - fromEnd;
+        this.watchEarlierEdge();
+      },
+      { injector: this.injector },
+    );
+  }
+
+  private settleIn(arrived: readonly TranscriptMessage[]): void {
+    const follow = this.atEnd();
+
     this.fresh.set(new Set(arrived.map((message) => message.id)));
     this.announce(arrived);
 
@@ -282,6 +351,33 @@ export class ConversationTranscript {
       },
       { injector: this.injector },
     );
+  }
+
+  /**
+   * Watches the start of what is loaded against the element that scrolls.
+   *
+   * A fresh observer each time, because an observer reports only changes: the edge
+   * may still be in range after a short page, and a new one reports where it is now.
+   * A failed read is not repeated by this; it waits for the reader to try again.
+   */
+  private watchEarlierEdge(): void {
+    this.observer?.disconnect();
+
+    const edge = this.earlierEdge()?.nativeElement;
+
+    if (!edge || typeof IntersectionObserver === 'undefined') {
+      return;
+    }
+
+    this.observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting) && this.earlierFailure() === null) {
+          this.requestEarlier();
+        }
+      },
+      { root: this.scroller(), rootMargin: `${EARLIER_MARGIN}px 0px 0px 0px` },
+    );
+    this.observer.observe(edge);
   }
 
   private announce(arrived: readonly TranscriptMessage[]): void {

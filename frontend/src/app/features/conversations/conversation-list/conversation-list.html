@@ -113,9 +113,10 @@
       }
 
       <!--
-        A list of links, one per conversation. Each row says who is answering
-        (the voice chip: glyph and word), where it is happening, when it last
-        moved, the last message and who wrote it, and who it is routed to.
+        A list of links, one per conversation. Each row leads with the customer
+        and when it last moved, then the last message and who wrote it, then who
+        is answering (the voice chip: glyph and word), where it is happening, and
+        who it is routed to.
       -->
       <ul
         class="conversation-rows"
@@ -136,11 +137,9 @@
               [attr.data-testid]="'conversation-' + row.conversation.id"
             >
               <span class="row-top">
-                <app-voice-chip
-                  [voice]="row.conversation.handling === 'Human' ? 'human' : 'ai'"
-                  size="sm"
-                />
-                <app-channel-badge [channel]="row.conversation.channel" />
+                <span class="row-customer" data-testid="row-customer">
+                  <app-customer-label [customer]="row.conversation.customer" />
+                </span>
                 <time
                   class="row-time"
                   [attr.datetime]="row.conversation.lastActivityAt"
@@ -158,20 +157,23 @@
                 }
               </span>
 
-              @if (row.conversation.assignedTo || row.waiting) {
-                <span class="row-bottom">
-                  @if (row.waiting) {
-                    <span class="badge badge-warning badge-sm" i18n="@@inbox.waiting"
-                      >Waiting for the team</span
-                    >
-                  }
-                  @if (row.conversation.assignedTo; as member) {
-                    <span class="row-assigned" i18n="@@inbox.assignedTo"
-                      >Assigned to <bdi dir="ltr">{{ member.email }}</bdi></span
-                    >
-                  }
-                </span>
-              }
+              <span class="row-bottom">
+                <app-voice-chip
+                  [voice]="row.conversation.handling === 'Human' ? 'human' : 'ai'"
+                  size="sm"
+                />
+                <app-channel-badge [channel]="row.conversation.channel" />
+                @if (row.waiting) {
+                  <span class="badge badge-warning badge-sm" i18n="@@inbox.waiting"
+                    >Waiting for the team</span
+                  >
+                }
+                @if (row.conversation.assignedTo; as member) {
+                  <span class="row-assigned" i18n="@@inbox.assignedTo"
+                    >Assigned to <bdi dir="ltr">{{ member.email }}</bdi></span
+                  >
+                }
+              </span>
             </a>
           </li>
         }

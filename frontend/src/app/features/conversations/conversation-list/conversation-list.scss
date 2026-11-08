@@ -68,6 +68,15 @@
   }
 }
 
+.row-customer {
+  flex: 1 1 0;
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: var(--text-body-strong);
+}
+
 .row-top,
 .row-bottom {
   display: flex;
@@ -103,7 +112,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font: var(--text-body-strong);
+  font: var(--text-body);
 }
 
 .row-assigned {

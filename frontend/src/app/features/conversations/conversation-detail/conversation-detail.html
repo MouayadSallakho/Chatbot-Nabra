@@ -78,7 +78,9 @@
 
         <div class="conversation-title-row">
           <div class="conversation-title-text">
-            <h1 id="conversation-title" class="conversation-title" tabindex="-1">{{ title() }}</h1>
+            <h1 id="conversation-title" class="conversation-title" tabindex="-1">
+              <app-customer-label [customer]="current.customer" />
+            </h1>
             <p class="conversation-meta">{{ meta() }}</p>
           </div>
 
@@ -179,7 +181,11 @@
 
         <p class="visually-hidden" role="status">{{ handoffAnnouncement() }}</p>
 
-        <app-voice-track class="conversation-track" [messages]="messages()" [partial]="hasMore()" />
+        <app-voice-track
+          class="conversation-track"
+          [messages]="messages()"
+          [partial]="hasEarlier()"
+        />
 
         @if (actionFailure(); as error) {
           @if (error.kind === 'stale') {
@@ -228,6 +234,11 @@
       <app-conversation-transcript
         [conversationId]="current.id"
         [messages]="messages()"
+        [events]="events()"
+        [hasEarlier]="hasEarlier()"
+        [loadingEarlier]="loadingEarlier()"
+        [earlierFailure]="earlierFailure()"
+        (earlierRequested)="loadEarlier()"
         [handling]="current.handling"
         [agentName]="current.agentName"
         [whatsApp]="whatsAppFacts()"
@@ -246,21 +257,6 @@
             <app-icon name="chevron-down" [strokeWidth]="1.75" />
             <span>{{ unseenText() }}</span>
           </button>
-        }
-
-        @if (hasMore()) {
-          <div class="transcript-more">
-            <button
-              type="button"
-              class="btn btn-secondary btn-sm"
-              [class.btn-loading]="loadingMore()"
-              [disabled]="loadingMore()"
-              (click)="loadMore()"
-              i18n="@@conversation.loadNewer"
-            >
-              Load newer messages
-            </button>
-          </div>
         }
 
         @if (canReply()) {

@@ -4,14 +4,15 @@ import { ChannelBadge } from '@app/shared/channel/channel-badge';
 import type { WhatsAppConversationFacts } from '@app/features/channels/whatsapp-api';
 import type { ConversationDetail, WorkspaceMember } from '../conversations-api';
 import { messagesPhrase, statusWord } from '../conversation-words';
+import { CustomerLabel } from '../customer-label';
 
 /**
  * The facts beside a conversation: who it is with, who it is routed to, which
  * AI agent serves it, and when it started and last moved.
  *
- * <strong>Only what the API says.</strong> The conversation response names no
- * customer, so this panel shows the channel and, for WhatsApp, the masked
- * number the server sends -- never a name guessed from the transcript.
+ * <strong>Only what the API says.</strong> The customer as the server names them,
+ * the channel, and for WhatsApp the masked number the server sends -- never a name
+ * guessed from the transcript.
  *
  * <strong>Assignment is routing.</strong> Choosing a colleague changes at once
  * (as it always has; it is a conditional write and a stale one is refused),
@@ -20,7 +21,7 @@ import { messagesPhrase, statusWord } from '../conversation-words';
 @Component({
   selector: 'app-conversation-context',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ChannelBadge],
+  imports: [ChannelBadge, CustomerLabel],
   templateUrl: './conversation-context.html',
   styleUrl: './conversation-context.scss',
 })
@@ -66,6 +67,20 @@ export class ConversationContext {
     return current && !offered.some((member) => member.userId === current.userId)
       ? [current, ...offered]
       : offered;
+  });
+
+  /**
+   * The masked number to show beside the customer's name. Null when the label
+   * above it is already that number: an unnamed WhatsApp customer.
+   */
+  protected readonly maskedNumber = computed(() => {
+    const customer = this.conversation().customer;
+
+    if (customer !== null && customer.displayName === null) {
+      return null;
+    }
+
+    return customer?.reference ?? this.whatsApp()?.customerReference ?? null;
   });
 
   protected onChange(event: Event): void {

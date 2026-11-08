@@ -1,13 +1,14 @@
 // On a short screen the transcript is part of the page and the content area
 // scrolls it. Filling the screen (every width from 1280px, and a tall phone) it
-// is its own scrolling region between the header and the composer. Scroll
-// anchoring keeps the reader's place when content above them changes size;
-// the component handles the rest (see `showEarlier`).
+// is its own scrolling region between the header and the composer. The
+// component keeps the reader's place when earlier messages go in above them
+// (`keepPlaceAbove`), so the browser's own scroll anchoring is off here: both
+// compensating would move the view twice, whichever element is scrolling.
 :host {
   display: block;
   padding: var(--space-4) var(--page-gutter) var(--space-6);
   background-color: var(--surface-page);
-  overflow-anchor: auto;
+  overflow-anchor: none;
 }
 
 :host-context(.conversation.is-panes) {
@@ -116,6 +117,11 @@
   margin-block: var(--space-2);
 }
 
+// The rule says the kind of event; the words say what happened.
+.transcript-failed {
+  --handoff-color: var(--danger-fg);
+}
+
 // The platform talking about the conversation, not somebody in it: centred,
 // small, no bubble.
 .transcript-note {
@@ -141,8 +147,23 @@
 
 .transcript-earlier {
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
   margin-block-end: var(--space-4);
+}
+
+.transcript-earlier-failed {
+  margin: 0;
+  color: var(--danger-fg);
+  font: var(--text-small);
+  text-align: center;
+}
+
+.transcript-start {
+  margin: 0;
+  color: var(--text-muted);
+  font: var(--text-caption);
 }
 
 .transcript-empty {

@@ -83,13 +83,17 @@
   gap: var(--space-2) var(--space-4);
 }
 
+// Takes the room the tools leave, so a long facts line wraps under the title
+// instead of pushing the tools onto a row of their own.
 .conversation-title-text {
+  flex: 1 1 12rem;
   min-inline-size: 0;
 }
 
 .conversation-title {
   font: var(--text-section-title);
   font-stretch: var(--heading-stretch, 100%);
+  overflow-wrap: anywhere;
 }
 
 .conversation-meta {
@@ -216,11 +220,6 @@
   transform: translateX(calc(var(--direction-flip) * -50%));
   border-radius: var(--radius-pill);
   box-shadow: var(--shadow-overlay);
-}
-
-.transcript-more {
-  display: flex;
-  justify-content: center;
 }
 
 .composer-withheld {

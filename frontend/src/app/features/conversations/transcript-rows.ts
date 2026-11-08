@@ -1,13 +1,13 @@
 import type { AppLanguage } from '@app/core/i18n/language';
 import { formatDate } from '@app/core/i18n/locale-format';
 import { Voice, voiceOf } from '@app/shared/voice/voice';
-import type { TranscriptMessage } from './conversations-api';
+import type { TranscriptEvent, TranscriptMessage } from './conversations-api';
 import { sameDay } from './conversation-words';
 
 /** One line of a rendered transcript. */
 export type TranscriptRow =
   | { readonly kind: 'day'; readonly key: string; readonly label: string }
-  | { readonly kind: 'handoff'; readonly key: string; readonly to: Voice }
+  | { readonly kind: 'event'; readonly key: string; readonly event: TranscriptEvent }
   | {
       readonly kind: 'message';
       readonly key: string;
@@ -15,33 +15,44 @@ export type TranscriptRow =
       readonly voice: Voice | null;
     };
 
+/** The events this build knows how to word. Any other kind is not drawn. */
+const DRAWN_EVENTS: ReadonlySet<string> = new Set(['AiTurnFailed', 'TakenOver', 'ReturnedToAi']);
+
 /**
- * The transcript as rows: messages in ingestion order, with a day separator
- * where the reader's calendar day changes and a handoff divider where the
- * replying voice changes.
+ * The transcript as rows: messages in ingestion order, with a day separator where
+ * the reader's calendar day changes and a divider for what the server says happened.
  *
- * <strong>Every divider comes from the messages themselves.</strong> A divider
- * goes before a reply whose voice (AI or person) differs from the previous
- * reply's -- the same rule the voice track and the Design Lab use. A person
- * can only reply after taking a conversation over, and the AI only answers
- * once it has it back, so an author change is a handoff that really happened.
- * A takeover with no reply after it yet draws nothing: the API has no handoff
- * events, and the transcript does not invent one.
+ * <strong>Every divider is the server's.</strong> Each event is placed after the
+ * message whose sequence is its `afterSequence`. Earlier conversations have no
+ * events, and nothing is inferred for them from who replied.
  *
- * <strong>Order is the server's.</strong> Rows follow the array as given
- * (ingestion order); the timestamps only label days, they never sort.
+ * <strong>Order is the server's.</strong> Rows follow the arrays as given: ingestion
+ * order for messages, `mergeEvents` for events. The timestamps only label days.
  */
 export function transcriptRows(
   messages: readonly TranscriptMessage[],
+  events: readonly TranscriptEvent[],
   language: AppLanguage,
   now: Date = new Date(),
 ): TranscriptRow[] {
   const rows: TranscriptRow[] = [];
+  const drawn = events.filter((event) => DRAWN_EVENTS.has(event.kind));
   const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
   let lastDay: Date | null = null;
-  let lastReplyVoice: Voice | null = null;
+  let next = 0;
+
+  const eventRow = (event: TranscriptEvent): TranscriptRow => ({
+    kind: 'event',
+    key: `event-${event.id}`,
+    event,
+  });
 
   for (const message of messages) {
+    // Everything that happened after an earlier message comes before this one.
+    while (next < drawn.length && drawn[next].afterSequence < message.sequence) {
+      rows.push(eventRow(drawn[next++]));
+    }
+
     const sent = new Date(message.sentAt);
 
     if (!Number.isNaN(sent.getTime()) && (lastDay === null || !sameDay(lastDay, sent))) {
@@ -53,17 +64,11 @@ export function transcriptRows(
       lastDay = sent;
     }
 
-    const voice = voiceOf(message.sender);
+    rows.push({ kind: 'message', key: message.id, message, voice: voiceOf(message.sender) });
+  }
 
-    if (voice !== null) {
-      if (lastReplyVoice !== null && voice !== lastReplyVoice) {
-        rows.push({ kind: 'handoff', key: `handoff-${message.id}`, to: voice });
-      }
-
-      lastReplyVoice = voice;
-    }
-
-    rows.push({ kind: 'message', key: message.id, message, voice });
+  while (next < drawn.length) {
+    rows.push(eventRow(drawn[next++]));
   }
 
   return rows;
@@ -99,6 +104,33 @@ export function mergeMessages(
   }
 
   return [...bySequence.values()].sort((left, right) => left.sequence - right.sequence);
+}
+
+/**
+ * Folds newly read events into what is held, each one once.
+ *
+ * Keyed on `id`, because an event exactly on a forward page's boundary can come
+ * with both pages. In transcript order, oldest first; two events after the same
+ * message keep the order they happened in.
+ */
+export function mergeEvents(
+  current: readonly TranscriptEvent[],
+  incoming: readonly TranscriptEvent[] | null | undefined,
+): readonly TranscriptEvent[] {
+  if (!incoming || incoming.length === 0) {
+    return current;
+  }
+
+  const byId = new Map(current.map((event) => [event.id, event]));
+
+  for (const event of incoming) {
+    byId.set(event.id, event);
+  }
+
+  return [...byId.values()].sort(
+    (left, right) =>
+      left.afterSequence - right.afterSequence || Date.parse(left.at) - Date.parse(right.at),
+  );
 }
 
 /**

@@ -21,6 +21,7 @@ import { PermissionService } from '@app/core/authorization/permission-service';
 import { ConversationRealtime } from '@app/core/realtime/conversation-realtime';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
 import { MediaQueries, mediaQuerySignal } from '@app/core/media/media';
+import { ArabicFonts } from '@app/core/i18n/arabic-fonts';
 import { LocaleFormat } from '@app/core/i18n/locale-format';
 import { pluralMessage } from '@app/core/i18n/plural';
 import { NavigationHistory } from '@app/core/navigation/navigation-history';
@@ -34,6 +35,7 @@ import { channelWord } from '@app/shared/channel/channel-badge';
 import {
   ConversationDetail as Conversation,
   ConversationsApi,
+  TranscriptEvent,
   TranscriptMessage,
   TranscriptPage,
   WorkspaceMember,
@@ -42,26 +44,18 @@ import { InboxState } from '../inbox-state';
 import { ConversationTranscript } from '../conversation-transcript/conversation-transcript';
 import { ConversationComposer } from '../conversation-composer/conversation-composer';
 import { ConversationContext } from '../conversation-context/conversation-context';
-import {
-  conversationTitle,
-  handlingSentence,
-  messagesPhrase,
-  statusWord,
-} from '../conversation-words';
-import { mergeMessages, refreshCursor } from '../transcript-rows';
+import { CustomerLabel } from '../customer-label';
+import { handlingSentence, messagesPhrase, statusWord } from '../conversation-words';
+import { mergeEvents, mergeMessages, refreshCursor } from '../transcript-rows';
 
-/** Messages per transcript read: the server's maximum. */
+/** Messages in the first window, and in each earlier page after it. */
+export const TRANSCRIPT_WINDOW = 40;
+
+/** Messages per forward read, when catching up: the server's maximum. */
 export const MESSAGE_PAGE = 200;
 
-/**
- * How many pages a first read follows before it stops and offers the rest.
- *
- * The transcript is read forward from its first message (the API pages only
- * that way), so reaching the newest messages of a very long conversation means
- * reading through it. Fifty pages is ten thousand messages; past that the
- * reader is offered the next ones rather than the screen reading without end.
- */
-export const MAX_FIRST_READ_PAGES = 50;
+/** How many forward pages one catch-up follows: ten thousand messages. */
+export const MAX_CATCH_UP_PAGES = 50;
 
 /**
  * One conversation, worked from the inbox.
@@ -72,10 +66,9 @@ export const MAX_FIRST_READ_PAGES = 50;
  * one voice to the other (320 ms, instant under reduced motion), and the voice
  * track under it shows the real sequence of reply authors.
  *
- * <strong>The transcript is read in ingestion order, to its end.</strong> The
- * API pages forward from the first message, never by time; the screen follows
- * the pages so the newest messages and the composer are what the reader sees,
- * and a re-read continues from (just before) the end of what is on screen.
+ * <strong>The transcript opens at its newest page.</strong> Forty messages, deep
+ * links included. Older pages come as the reader goes up, and a re-read continues
+ * from (just before) the end of what is on screen. Pages stay in ingestion order.
  *
  * <strong>Live updates carry an identifier, and this screen re-reads.</strong>
  * Nothing is appended from a realtime payload, because there is no payload: the
@@ -102,6 +95,7 @@ export const MAX_FIRST_READ_PAGES = 50;
     ConversationTranscript,
     ConversationComposer,
     ConversationContext,
+    CustomerLabel,
   ],
   templateUrl: './conversation-detail.html',
   styleUrl: './conversation-detail.scss',
@@ -115,6 +109,7 @@ export class ConversationDetail {
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly injector = inject(Injector);
   private readonly format = inject(LocaleFormat);
+  private readonly arabicFonts = inject(ArabicFonts);
   private readonly router = inject(Router);
   private readonly history = inject(NavigationHistory);
   private readonly inbox = inject(InboxState, { optional: true });
@@ -138,13 +133,15 @@ export class ConversationDetail {
   protected readonly failure = signal<ApiError | null>(null);
   protected readonly conversation = signal<Conversation | null>(null);
   protected readonly messages = signal<readonly TranscriptMessage[]>([]);
-  protected readonly loadingMore = signal(false);
+  protected readonly events = signal<readonly TranscriptEvent[]>([]);
+  protected readonly loadingEarlier = signal(false);
+  protected readonly earlierFailure = signal<string | null>(null);
 
   /** The version a handoff or an assignment must present back. */
   private readonly version = signal<string | null>(null);
 
-  /** Where the next page continues from, or null once the end has been read. */
-  protected readonly cursor = signal<number | null>(null);
+  /** Where the page before what is loaded ends, or null at the start of the conversation. */
+  private readonly previousCursor = signal<number | null>(null);
 
   protected readonly assignees = signal<readonly WorkspaceMember[]>([]);
   protected readonly working = signal(false);
@@ -155,7 +152,7 @@ export class ConversationDetail {
   protected readonly canHandoff = computed(() => this.permissions.has('conversations.handoff'));
   protected readonly canAssign = computed(() => this.permissions.has('conversations.assign'));
 
-  protected readonly hasMore = computed(() => this.cursor() !== null);
+  protected readonly hasEarlier = computed(() => this.previousCursor() !== null);
 
   /** Whether a person is answering this conversation. */
   protected readonly isHuman = computed(() => this.conversation()?.handling === 'Human');
@@ -171,12 +168,6 @@ export class ConversationDetail {
 
   /** Said once, politely, when who is answering changes while the reader is here. */
   protected readonly handoffAnnouncement = signal('');
-
-  protected readonly title = computed(() => {
-    const current = this.conversation();
-
-    return current ? conversationTitle(channelWord(current.channel)) : this.fallbackTitle;
-  });
 
   protected readonly fallbackTitle = $localize`:@@conversation.heading:Conversation`;
 
@@ -194,6 +185,7 @@ export class ConversationDetail {
     const started = this.format.date(current.startedAt, 'dateTime');
 
     return [
+      channelWord(current.channel),
       $localize`:@@conversation.meta.started:Started ${started}:date:`,
       messagesPhrase(this.format.language, current.messageCount),
       statusWord(current.status),
@@ -293,6 +285,9 @@ export class ConversationDetail {
     this.actionFailure.set(null);
     this.sweep.set(null);
     this.unseen.set(0);
+    this.previousCursor.set(null);
+    this.loadingEarlier.set(false);
+    this.earlierFailure.set(null);
 
     try {
       await this.read(tenantId, id, { replaceTranscript: true });
@@ -336,14 +331,17 @@ export class ConversationDetail {
     id: string,
     options: { replaceTranscript: boolean },
   ): Promise<void> {
-    // The first transcript page does not depend on the conversation's facts, so
-    // on a first read the two are asked for together rather than one after the
-    // other (Phase 36.11). If the facts fail, that failure is the one reported.
-    const firstPage = options.replaceTranscript
-      ? firstValueFrom(this.api.messages(tenantId, id, null, MESSAGE_PAGE))
+    // The newest page does not depend on the conversation's facts, so on a first
+    // read the two are asked for together rather than one after the other (Phase
+    // 36.11). If the facts fail, that failure is the one reported.
+    const newest = options.replaceTranscript
+      ? firstValueFrom(this.api.newestMessages(tenantId, id, TRANSCRIPT_WINDOW))
       : null;
 
-    firstPage?.catch(() => undefined);
+    newest?.then(
+      (page) => this.arabicFonts.notice(page.items.map((message) => message.text)),
+      () => undefined,
+    );
 
     const detail: Versioned<Conversation> = await firstValueFrom(this.api.get(tenantId, id));
 
@@ -351,45 +349,33 @@ export class ConversationDetail {
       return;
     }
 
+    this.arabicFonts.notice([detail.value.customer?.displayName]);
     this.adopt(detail, { announce: !options.replaceTranscript });
 
-    if (options.replaceTranscript) {
-      // From the first message forward, page after page, to the newest.
-      let all: readonly TranscriptMessage[] = [];
-      let after: number | null = null;
-
-      for (let pages = 0; pages < MAX_FIRST_READ_PAGES; pages++) {
-        const page: TranscriptPage =
-          pages === 0 && firstPage
-            ? await firstPage
-            : await firstValueFrom(this.api.messages(tenantId, id, after, MESSAGE_PAGE));
-
-        all = mergeMessages(all, page.items);
-        after = page.nextCursor;
-
-        if (after === null) {
-          break;
-        }
-      }
+    if (newest) {
+      const page = await newest;
 
       if (id !== this.conversationId()) {
         return;
       }
 
-      this.messages.set(all);
-      this.cursor.set(after);
+      this.messages.set(page.items);
+      this.events.set(mergeEvents([], page.events));
+      this.previousCursor.set(page.previousCursor ?? null);
     } else {
       // From a little before the end of what is on screen: what arrived since,
       // plus a short overlap for a message that committed late.
       let after = refreshCursor(this.messages());
       let incoming: readonly TranscriptMessage[] = [];
+      let incomingEvents: readonly TranscriptEvent[] = [];
 
-      for (let pages = 0; pages < MAX_FIRST_READ_PAGES; pages++) {
+      for (let pages = 0; pages < MAX_CATCH_UP_PAGES; pages++) {
         const page: TranscriptPage = await firstValueFrom(
           this.api.messages(tenantId, id, after, MESSAGE_PAGE),
         );
 
         incoming = mergeMessages(incoming, page.items);
+        incomingEvents = mergeEvents(incomingEvents, page.events);
         after = page.nextCursor;
 
         if (after === null) {
@@ -402,6 +388,7 @@ export class ConversationDetail {
       }
 
       this.messages.update((current) => mergeMessages(current, incoming));
+      this.events.update((current) => mergeEvents(current, incomingEvents));
     }
 
     await this.readWhatsApp(tenantId, id);
@@ -453,32 +440,37 @@ export class ConversationDetail {
     }
   }
 
-  /**
-   * Continues past the first read's limit (only a conversation of more than
-   * ten thousand messages ever needs this).
-   */
-  protected async loadMore(): Promise<void> {
+  /** Reads the page before what is loaded: the reader is going up. */
+  protected async loadEarlier(): Promise<void> {
     const tenantId = this.workspace.tenantId();
-    const after = this.cursor();
+    const before = this.previousCursor();
     const id = this.conversationId();
 
-    if (!tenantId || after === null || this.loadingMore()) {
+    if (!tenantId || before === null || this.loadingEarlier()) {
       return;
     }
 
-    this.loadingMore.set(true);
+    this.loadingEarlier.set(true);
+    this.earlierFailure.set(null);
 
     try {
-      const page: TranscriptPage = await firstValueFrom(
-        this.api.messages(tenantId, id, after, MESSAGE_PAGE),
+      const page = await firstValueFrom(
+        this.api.earlierMessages(tenantId, id, before, TRANSCRIPT_WINDOW),
       );
 
-      this.messages.update((current) => mergeMessages(current, page.items));
-      this.cursor.set(page.nextCursor);
+      if (id === this.conversationId()) {
+        this.messages.update((current) => mergeMessages(current, page.items));
+        this.events.update((current) => mergeEvents(current, page.events));
+        this.previousCursor.set(page.previousCursor ?? null);
+      }
     } catch (error) {
-      this.actionFailure.set(toApiError(error));
+      if (id === this.conversationId()) {
+        this.earlierFailure.set(toApiError(error).message);
+      }
     } finally {
-      this.loadingMore.set(false);
+      if (id === this.conversationId()) {
+        this.loadingEarlier.set(false);
+      }
     }
   }
 

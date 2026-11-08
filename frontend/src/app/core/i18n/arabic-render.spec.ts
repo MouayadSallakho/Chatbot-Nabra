@@ -169,6 +169,80 @@ describe('Arabic renders', () => {
     expect(text(root.querySelector('.handoff-divider'))).toBe('استلم أحد أعضاء الفريق المحادثة');
     expect(text(root.querySelector('[data-testid="entry-language"]'))).toBe('English العربية');
   });
+
+  describe('the inbox (Phase 38.2a)', () => {
+    const customer = {
+      id: 'p1',
+      displayName: null,
+      labelCode: 'AnonymousVisitor',
+      reference: null,
+      shortCode: '7KQ2MX',
+    };
+
+    async function label(over: object): Promise<HTMLElement> {
+      const { CustomerLabel } = await import('@app/features/conversations/customer-label');
+      const fixture = TestBed.createComponent(CustomerLabel);
+
+      fixture.componentRef.setInput('customer', { ...customer, ...over });
+      fixture.detectChanges();
+
+      return fixture.nativeElement as HTMLElement;
+    }
+
+    it('names an unnamed customer in Arabic, with the code left to right', async () => {
+      const visitor = await label({});
+
+      expect(text(visitor)).toBe('زائر 7KQ2MX');
+      expect(visitor.querySelector('bdi')?.getAttribute('dir')).toBe('ltr');
+      expect(text(await label({ labelCode: 'WhatsAppCustomer', reference: '••••1234' }))).toBe(
+        'عميل واتساب ••••1234',
+      );
+      expect(text(await label({ labelCode: 'UnnamedCustomer' }))).toBe('عميل 7KQ2MX');
+    });
+
+    it('writes the dividers and the start of the conversation in Arabic', async () => {
+      const { ConversationTranscript } =
+        await import('@app/features/conversations/conversation-transcript/conversation-transcript');
+      const fixture = TestBed.createComponent(ConversationTranscript);
+      const at = '2026-10-18T10:00:00Z';
+      const actor = { userId: 'u1', email: 'sam@acme.test' };
+
+      fixture.componentRef.setInput('conversationId', 'c1');
+      fixture.componentRef.setInput('handling', 'Human');
+      fixture.componentRef.setInput('messages', [
+        { id: 'm1', sender: 'Customer', text: 'مرحبا', sentAt: at, sequence: 1, sentBy: null },
+      ]);
+      fixture.componentRef.setInput('events', [
+        { id: 'e1', kind: 'AiTurnFailed', at, afterSequence: 1, actor: null, reason: 'x' },
+        { id: 'e2', kind: 'TakenOver', at, afterSequence: 1, actor, reason: null },
+        { id: 'e3', kind: 'ReturnedToAi', at, afterSequence: 1, actor, reason: null },
+      ]);
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      const root = fixture.nativeElement as HTMLElement;
+      const event = (kind: string) =>
+        text(root.querySelector(`[data-testid="transcript-event-${kind}"]`));
+
+      expect(event('AiTurnFailed')).toBe('تعذّر على الذكاء الاصطناعي الرد');
+      expect(event('TakenOver')).toBe('استلام المحادثة: sam@acme.test');
+      expect(event('ReturnedToAi')).toBe('إعادة المحادثة إلى الذكاء الاصطناعي: sam@acme.test');
+      expect(text(root.querySelector('[data-testid="transcript-start"]'))).toBe('بداية المحادثة');
+    });
+
+    it('words the inbox refusals in Arabic, by their codes', async () => {
+      const { CONVERSATION_PROBLEM_WORDS } =
+        await import('@app/features/conversations/conversation-problems');
+
+      expect(CONVERSATION_PROBLEM_WORDS['transcript.cursor.conflict']).toBe(
+        'تعذّر تحميل هذه الرسائل. أعد تحميل الصفحة وحاول مرة أخرى.',
+      );
+      expect(CONVERSATION_PROBLEM_WORDS['whatsapp.message.required']).toBe(
+        'اكتب رسالة قبل إرسالها.',
+      );
+    });
+  });
+
   describe('the password-reset pages (Phase 37.3)', () => {
     async function render<T>(component: Type<T>): Promise<HTMLElement> {
       const { provideHttpClient } = await import('@angular/common/http');

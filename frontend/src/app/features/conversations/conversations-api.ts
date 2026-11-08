@@ -24,6 +24,21 @@ export interface WorkspaceMember {
   readonly email: string;
 }
 
+/**
+ * Who a conversation is with, as the server names them (Phase 37.4).
+ *
+ * `labelCode` is deliberately a string: a code this build does not know yet still
+ * gets a sensible label (`customer-label.ts`). `reference` is a masked WhatsApp
+ * number, on WhatsApp conversations only. `shortCode` is a label, never a key.
+ */
+export interface ConversationCustomer {
+  readonly id: string;
+  readonly displayName: string | null;
+  readonly labelCode: string;
+  readonly reference: string | null;
+  readonly shortCode: string;
+}
+
 /** One conversation, in the list. */
 export interface ConversationSummary {
   readonly id: string;
@@ -37,6 +52,7 @@ export interface ConversationSummary {
   readonly lastMessagePreview: string | null;
   readonly lastMessageSender: MessageSender | null;
   readonly assignedTo: WorkspaceMember | null;
+  readonly customer: ConversationCustomer | null;
 }
 
 /** A page of conversations. */
@@ -58,6 +74,7 @@ export interface ConversationDetail {
   readonly agentName: string | null;
   readonly messageCount: number;
   readonly assignedTo: WorkspaceMember | null;
+  readonly customer: ConversationCustomer | null;
 }
 
 /** One message in a transcript. */
@@ -78,10 +95,32 @@ export interface TranscriptMessage {
   readonly sentBy: WorkspaceMember | null;
 }
 
-/** A page of a transcript. */
+/**
+ * Something that happened in a conversation between two messages (Phase 37.4).
+ *
+ * `kind` is `AiTurnFailed`, `TakenOver` or `ReturnedToAi`, kept a string so a kind
+ * added later is ignored rather than breaking the transcript. `actor` is null for a
+ * failed turn. History starts at Phase 37.4: earlier handoffs have no event.
+ */
+export interface TranscriptEvent {
+  readonly id: string;
+  readonly kind: string;
+  readonly at: string;
+  /** The event sits after the message with this sequence. */
+  readonly afterSequence: number;
+  readonly actor: WorkspaceMember | null;
+  readonly reason: string | null;
+}
+
+/** A page of a transcript, ascending inside the page. */
 export interface TranscriptPage {
   readonly items: readonly TranscriptMessage[];
+  /** For the next `after`, or null at the newest end. */
   readonly nextCursor: number | null;
+  /** For the next `before`, or null when nothing is earlier. */
+  readonly previousCursor?: number | null;
+  /** Present because this client always asks with `include=events`. */
+  readonly events?: readonly TranscriptEvent[] | null;
 }
 
 /**
@@ -201,7 +240,26 @@ export class ConversationsApi {
       .pipe(map(withEntityTag));
   }
 
-  /** A page of the transcript, continuing after a cursor. */
+  /** The newest page of the transcript: where every transcript opens. */
+  newestMessages(
+    tenantId: string,
+    conversationId: string,
+    limit: number,
+  ): Observable<TranscriptPage> {
+    return this.transcript(tenantId, conversationId, `tail=true&limit=${limit}`);
+  }
+
+  /** The page just before a sequence: the `previousCursor` of the last page read. */
+  earlierMessages(
+    tenantId: string,
+    conversationId: string,
+    before: number,
+    limit: number,
+  ): Observable<TranscriptPage> {
+    return this.transcript(tenantId, conversationId, `before=${before}&limit=${limit}`);
+  }
+
+  /** A page of the transcript, continuing forwards after a cursor. */
   messages(
     tenantId: string,
     conversationId: string,
@@ -210,8 +268,17 @@ export class ConversationsApi {
   ): Observable<TranscriptPage> {
     const cursor = after === null ? '' : `&after=${after}`;
 
+    return this.transcript(tenantId, conversationId, `limit=${limit}${cursor}`);
+  }
+
+  /** Every transcript read asks for the events in its span. */
+  private transcript(
+    tenantId: string,
+    conversationId: string,
+    query: string,
+  ): Observable<TranscriptPage> {
     return this.http.get<TranscriptPage>(
-      `/api/tenants/${tenantId}/conversations/${conversationId}/messages?limit=${limit}${cursor}`,
+      `/api/tenants/${tenantId}/conversations/${conversationId}/messages?${query}&include=events`,
     );
   }
 }

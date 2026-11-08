@@ -1,6 +1,8 @@
 import { Routes } from '@angular/router';
 import { MediaQueries } from '@app/core/media/media';
+import { provideProblemWords } from '@app/core/problems/problem-words';
 import { WhatsAppApi } from '@app/features/channels/whatsapp-api';
+import { CONVERSATION_PROBLEM_WORDS } from './conversation-problems';
 import { ConversationsApi } from './conversations-api';
 import { InboxState } from './inbox-state';
 
@@ -25,7 +27,12 @@ import { InboxState } from './inbox-state';
 export const conversationRoutes: Routes = [
   {
     path: '',
-    providers: [ConversationsApi, WhatsAppApi, InboxState],
+    providers: [
+      ConversationsApi,
+      WhatsAppApi,
+      InboxState,
+      provideProblemWords(CONVERSATION_PROBLEM_WORDS),
+    ],
     data: { panes: MediaQueries.inbox },
     loadComponent: () =>
       import('./conversation-inbox/conversation-inbox').then((m) => m.ConversationInbox),

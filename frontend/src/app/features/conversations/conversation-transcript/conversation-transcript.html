@@ -5,19 +5,46 @@
     This conversation has no messages. Somebody opened the chat and did not say anything.
   </p>
 } @else {
-  @if (hiddenCount() > 0) {
-    <div class="transcript-earlier">
+  <!--
+    The start of what is loaded, watched against the scroller: older messages are
+    read as the reader comes near it. The button is the same action from the
+    keyboard. It stays the same element through loading and a failure, so focus
+    is not lost, which is why it is aria-disabled rather than disabled.
+  -->
+  <div #earlierEdge class="transcript-earlier" data-testid="earlier-edge">
+    @if (hasEarlier()) {
+      @if (earlierFailure(); as failure) {
+        <p class="transcript-earlier-failed" role="status" data-testid="earlier-failed">
+          <span i18n="@@transcript.earlier.failed">Could not load earlier messages.</span>
+          {{ failure }}
+        </p>
+      }
       <button
         type="button"
         class="btn btn-secondary btn-sm"
-        (click)="showEarlier()"
+        [class.btn-loading]="loadingEarlier()"
+        [attr.aria-busy]="loadingEarlier() || null"
+        [attr.aria-disabled]="loadingEarlier() || null"
+        (click)="requestEarlier()"
         data-testid="show-earlier"
-        i18n="@@transcript.showEarlier"
       >
-        Show earlier messages
+        <span class="btn-label">
+          @if (earlierFailure()) {
+            <span i18n="@@inbox.tryAgain"> Try again </span>
+          } @else {
+            <span i18n="@@transcript.showEarlier">Show earlier messages</span>
+          }
+        </span>
+        @if (loadingEarlier()) {
+          <span class="spinner" aria-hidden="true"></span>
+        }
       </button>
-    </div>
-  }
+    } @else {
+      <p class="transcript-start" data-testid="transcript-start" i18n="@@transcript.start">
+        Start of the conversation
+      </p>
+    }
+  </div>
 
   <!--
     In ingestion order, oldest first: the order this platform received the
@@ -32,16 +59,38 @@
             <h3>{{ row.label }}</h3>
           </li>
         }
-        @case ('handoff') {
+        @case ('event') {
+          <!-- From the server (include=events). A word always says what happened. -->
           <li
             class="handoff-divider"
-            [class.handoff-to-human]="row.to === 'human'"
-            [class.handoff-to-ai]="row.to === 'ai'"
+            [class.handoff-to-human]="row.event.kind === 'TakenOver'"
+            [class.handoff-to-ai]="row.event.kind === 'ReturnedToAi'"
+            [class.transcript-failed]="row.event.kind === 'AiTurnFailed'"
+            [attr.data-testid]="'transcript-event-' + row.event.kind"
           >
-            @if (row.to === 'human') {
-              <span i18n="@@transcript.handoff.toPerson">A person took over</span>
-            } @else {
-              <span i18n="@@transcript.handoff.toAi">Back with the AI</span>
+            @switch (row.event.kind) {
+              @case ('AiTurnFailed') {
+                <span i18n="@@transcript.event.aiFailed">The AI could not reply</span>
+              }
+              @case ('TakenOver') {
+                @if (row.event.actor; as actor) {
+                  <span i18n="@@transcript.event.takenOver"
+                    ><bdi dir="ltr" translate="no">{{ actor.email }}</bdi> took over</span
+                  >
+                } @else {
+                  <span i18n="@@transcript.handoff.toPerson">A person took over</span>
+                }
+              }
+              @case ('ReturnedToAi') {
+                @if (row.event.actor; as actor) {
+                  <span i18n="@@transcript.event.returned"
+                    ><bdi dir="ltr" translate="no">{{ actor.email }}</bdi> returned it to the
+                    AI</span
+                  >
+                } @else {
+                  <span i18n="@@transcript.handoff.toAi">Back with the AI</span>
+                }
+              }
             }
           </li>
         }
@@ -112,10 +161,7 @@
 
     @if (awaitingAi()) {
       <li class="transcript-tail" data-testid="awaiting-ai">
-        <span i18n="@@transcript.awaitingAi"
-          >The AI has not replied to the last message. When it cannot answer, nothing is sent to the
-          customer and nothing appears here.</span
-        >
+        <span i18n="@@transcript.awaitingAi">The AI has not replied to the last message yet.</span>
       </li>
     }
   </ol>

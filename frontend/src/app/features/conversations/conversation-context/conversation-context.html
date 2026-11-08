@@ -2,8 +2,11 @@
 
 <section class="context-section" aria-labelledby="context-customer">
   <h3 id="context-customer" class="context-heading" i18n="@@conversation.customer">Customer</h3>
+  <p class="context-value" data-testid="context-customer">
+    <app-customer-label [customer]="conversation().customer" />
+  </p>
   <app-channel-badge [channel]="conversation().channel" />
-  @if (whatsApp(); as facts) {
+  @if (maskedNumber(); as number) {
     <!--
       Masked by the server and never sent in full. Enough to recognise who you
       are talking to; not a contact list, and not a phone number in a
@@ -11,7 +14,7 @@
     -->
     <p class="context-value">
       <span class="visually-hidden" i18n="@@conversation.maskedNumber">Masked number, </span
-      ><bdi dir="ltr">{{ facts.customerReference }}</bdi>
+      ><bdi dir="ltr" translate="no">{{ number }}</bdi>
     </p>
   }
 </section>

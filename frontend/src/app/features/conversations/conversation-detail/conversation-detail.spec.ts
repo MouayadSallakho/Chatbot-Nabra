@@ -10,6 +10,7 @@ import { LOCAL_STORAGE } from '@app/core/storage/local-storage';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
 import { memoryStorage, permissionApiGranting } from '@app/testing/test-doubles';
 import { WhatsAppApi } from '@app/features/channels/whatsapp-api';
+import { ArabicFonts } from '@app/core/i18n/arabic-fonts';
 import { ConversationsApi } from '../conversations-api';
 import { ConversationDetail } from './conversation-detail';
 
@@ -18,8 +19,10 @@ describe('ConversationDetail', () => {
   const conversationId = '22222222-2222-7222-8222-222222222222';
 
   const detailUrl = `/api/tenants/${tenantId}/conversations/${conversationId}`;
-  // The server's largest page: a first read follows the pages to the newest message.
-  const messagesUrl = `${detailUrl}/messages?limit=200`;
+  // Every transcript opens at its newest forty messages, with what happened in them.
+  const messagesUrl = `${detailUrl}/messages?tail=true&limit=40&include=events`;
+  // A re-read continues forwards, from a little before the end of what is on screen.
+  const catchUpUrl = `${detailUrl}/messages?limit=200&include=events`;
 
   let fixture: ComponentFixture<ConversationDetail>;
   let http: HttpTestingController;
@@ -54,6 +57,13 @@ describe('ConversationDetail', () => {
     agentName: 'Concierge',
     messageCount: 2,
     assignedTo: null,
+    customer: {
+      id: 'p1',
+      displayName: null,
+      labelCode: 'AnonymousVisitor',
+      reference: null,
+      shortCode: '7KQ2MX',
+    },
   };
 
   const humanDetail = { ...detail, handling: 'Human' };
@@ -175,29 +185,240 @@ describe('ConversationDetail', () => {
     expect(host().querySelector('script')).toBeNull();
   });
 
-  it('reads every page to the newest message, in one continuous order', async () => {
-    // The API pages forward from the first message, so the screen follows the
-    // pages itself: the newest messages are what the reader needs to see.
+  it('heads the conversation with the customer, and keeps the channel in the facts under it', async () => {
     await mount('conversations.view');
 
     http.expectOne(detailUrl).flush(detail, tagged(detail));
     await settle();
+    http.expectOne(messagesUrl).flush({ items: [], nextCursor: null, previousCursor: null });
+    await settle();
+
+    const heading = host().querySelector('h1');
+
+    expect(heading?.textContent?.replace(/\s+/g, ' ').trim()).toBe('Visitor 7KQ2MX');
+    expect(host().querySelector('.conversation-meta')?.textContent).toContain('Website chat');
+  });
+
+  describe('reading backwards', () => {
+    const earlierUrl = (before: number) =>
+      `${detailUrl}/messages?before=${before}&limit=40&include=events`;
+
+    async function opened(): Promise<void> {
+      await mount('conversations.view');
+      http.expectOne(detailUrl).flush(detail, tagged(detail));
+      await settle();
+      http.expectOne(messagesUrl).flush({
+        items: [message('m3', 'Customer', 'Newest', 30)],
+        nextCursor: null,
+        previousCursor: 30,
+        events: [],
+      });
+      await settle();
+    }
+
+    const showEarlier = () =>
+      host().querySelector<HTMLButtonElement>('[data-testid="show-earlier"]');
+
+    it('reads the page before, by the previous cursor, until there is none', async () => {
+      await opened();
+
+      showEarlier()!.click();
+      await settle();
+
+      http.expectOne(earlierUrl(30)).flush({
+        items: [message('m2', 'AiAgent', 'Middle', 20)],
+        nextCursor: 30,
+        previousCursor: 20,
+        events: [],
+      });
+      await settle();
+
+      expect(bubbles()).toEqual(['Middle', 'Newest']);
+
+      showEarlier()!.click();
+      await settle();
+
+      http.expectOne(earlierUrl(20)).flush({
+        items: [message('m1', 'Customer', 'Oldest', 10)],
+        nextCursor: 20,
+        previousCursor: null,
+        events: [],
+      });
+      await settle();
+
+      expect(bubbles()).toEqual(['Oldest', 'Middle', 'Newest']);
+      expect(showEarlier()).toBeNull();
+      expect(text()).toContain('Start of the conversation');
+    });
+
+    it('asks once for a page, however many times it is asked', async () => {
+      await opened();
+
+      showEarlier()!.click();
+      showEarlier()!.click();
+      await settle();
+
+      http
+        .expectOne(earlierUrl(30))
+        .flush({ items: [], nextCursor: 30, previousCursor: null, events: [] });
+      await settle();
+    });
+
+    it('offers to try again after a failure, and keeps what is on screen', async () => {
+      await opened();
+
+      showEarlier()!.click();
+      await settle();
+      http
+        .expectOne(earlierUrl(30))
+        .flush({ title: 'Boom' }, { status: 500, statusText: 'Server Error' });
+      await settle();
+
+      expect(bubbles()).toEqual(['Newest']);
+      expect(host().querySelector('[data-testid="earlier-failed"]')).not.toBeNull();
+
+      showEarlier()!.click();
+      await settle();
+      http.expectOne(earlierUrl(30)).flush({
+        items: [message('m2', 'AiAgent', 'Middle', 20)],
+        nextCursor: 30,
+        previousCursor: null,
+        events: [],
+      });
+      await settle();
+
+      expect(bubbles()).toEqual(['Middle', 'Newest']);
+      expect(host().querySelector('[data-testid="earlier-failed"]')).toBeNull();
+    });
+
+    it('tells the voice track only part of the transcript is loaded', async () => {
+      await mount('conversations.view');
+      http.expectOne(detailUrl).flush(detail, tagged(detail));
+      await settle();
+      http.expectOne(messagesUrl).flush({
+        items: [message('m3', 'AiAgent', 'Newest', 30)],
+        nextCursor: null,
+        previousCursor: 30,
+        events: [],
+      });
+      await settle();
+
+      expect(text()).toContain('Replies in the messages loaded so far');
+
+      showEarlier()!.click();
+      await settle();
+      http
+        .expectOne(earlierUrl(30))
+        .flush({ items: [], nextCursor: 30, previousCursor: null, events: [] });
+      await settle();
+
+      expect(text()).toContain('Replies so far');
+    });
+  });
+
+  describe('what happened, from the server', () => {
+    const failed = {
+      id: 'e1',
+      kind: 'AiTurnFailed',
+      at: '2026-09-07T10:00:00Z',
+      afterSequence: 10,
+      actor: null,
+      reason: 'generation_failed',
+    };
+    const took = {
+      id: 'e2',
+      kind: 'TakenOver',
+      at: '2026-09-07T10:01:00Z',
+      afterSequence: 10,
+      actor: { userId: 'u1', email: 'sam@acme.test' },
+      reason: null,
+    };
+    const dividers = () =>
+      [...host().querySelectorAll('.handoff-divider')].map((node) =>
+        node.textContent?.replace(/\s+/g, ' ').trim(),
+      );
+
+    it('draws the events of the first window', async () => {
+      await mount('conversations.view');
+      http.expectOne(detailUrl).flush(detail, tagged(detail));
+      await settle();
+      http.expectOne(messagesUrl).flush({
+        items: [message('m1', 'Customer', 'Hello', 10)],
+        nextCursor: null,
+        previousCursor: null,
+        events: [failed, took],
+      });
+      await settle();
+
+      expect(dividers()).toEqual(['The AI could not reply', 'sam@acme.test took over']);
+    });
+
+    it('draws an event once when a re-read serves it again, and adds a new one', async () => {
+      await mount('conversations.view');
+      http.expectOne(detailUrl).flush(detail, tagged(detail));
+      await settle();
+      http.expectOne(messagesUrl).flush({
+        items: [message('m1', 'Customer', 'Hello', 10)],
+        nextCursor: null,
+        previousCursor: null,
+        events: [failed],
+      });
+      await settle();
+
+      notify!(conversationId);
+      await settle();
+      http.expectOne(detailUrl).flush(detail, tagged(detail));
+      await settle();
+      http.expectOne(catchUpUrl).flush({
+        items: [message('m1', 'Customer', 'Hello', 10)],
+        nextCursor: null,
+        previousCursor: null,
+        events: [failed, took],
+      });
+      await settle();
+
+      expect(dividers()).toEqual(['The AI could not reply', 'sam@acme.test took over']);
+    });
+
+    it('invents no divider for a conversation from before events existed', async () => {
+      await mount('conversations.view');
+      http.expectOne(detailUrl).flush(detail, tagged(detail));
+      await settle();
+      http.expectOne(messagesUrl).flush({
+        items: [
+          message('m1', 'AiAgent', 'From the AI', 10),
+          message('m2', 'HumanAgent', 'From a person', 11, {
+            userId: 'u1',
+            email: 'sam@acme.test',
+          }),
+        ],
+        nextCursor: null,
+        previousCursor: null,
+        events: [],
+      });
+      await settle();
+
+      expect(dividers()).toEqual([]);
+    });
+  });
+
+  it('starts the Arabic font as soon as the newest page holds Arabic', async () => {
+    await mount('conversations.view');
+
+    const notice = vi.spyOn(TestBed.inject(ArabicFonts), 'notice');
 
     http.expectOne(messagesUrl).flush({
-      items: [message('m1', 'Customer', 'Page one', 10)],
-      nextCursor: 10,
-    });
-    await settle();
-
-    // The cursor is the stored ingestion sequence, not a page number.
-    http.expectOne(`${detailUrl}/messages?limit=200&after=10`).flush({
-      items: [message('m2', 'AiAgent', 'Page two', 11)],
+      items: [message('m1', 'Customer', 'مرحبا', 10)],
       nextCursor: null,
+      previousCursor: null,
+      events: [],
     });
     await settle();
 
-    expect(bubbles()).toEqual(['Page one', 'Page two']);
-    expect(button('Load newer messages')).toBeUndefined();
+    expect(notice).toHaveBeenCalledWith(['مرحبا']);
+
+    http.expectOne(detailUrl).flush(detail, tagged(detail));
+    await settle();
   });
 
   it('shows a conversation with no messages as empty rather than broken', async () => {
@@ -268,7 +489,7 @@ describe('ConversationDetail', () => {
     http.expectOne(detailUrl).flush(detail, tagged(detail));
     await settle();
 
-    http.expectOne(messagesUrl).flush({
+    http.expectOne(catchUpUrl).flush({
       items: [message('m1', 'Customer', 'First', 10), message('m2', 'AiAgent', 'Newer', 11)],
       nextCursor: null,
     });
@@ -496,7 +717,7 @@ describe('ConversationDetail', () => {
     http.expectOne(detailUrl).flush(detail, tagged(detail));
     await settle();
 
-    http.expectOne(messagesUrl).flush({
+    http.expectOne(catchUpUrl).flush({
       items: [
         message('m1', 'Customer', 'First', 10),
         message('m2', 'HumanAgent', 'On it', 11, { userId: 'u1', email: 'sam@acme.test' }),

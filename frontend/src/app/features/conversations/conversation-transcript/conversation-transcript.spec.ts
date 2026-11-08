@@ -1,10 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import type { TranscriptMessage } from '../conversations-api';
-import {
-  ConversationTranscript,
-  TRANSCRIPT_STEP,
-  TRANSCRIPT_WINDOW,
-} from './conversation-transcript';
+import type { TranscriptEvent, TranscriptMessage } from '../conversations-api';
+import { ConversationTranscript } from './conversation-transcript';
 
 describe('ConversationTranscript', () => {
   let fixture: ComponentFixture<ConversationTranscript>;
@@ -42,6 +38,68 @@ describe('ConversationTranscript', () => {
 
   const host = (): HTMLElement => fixture.nativeElement as HTMLElement;
   const bubbles = () => [...host().querySelectorAll<HTMLElement>('li.bubble')];
+  const testId = <T extends HTMLElement = HTMLElement>(id: string) =>
+    host().querySelector<T>(`[data-testid="${id}"]`);
+
+  const event = (over: Partial<TranscriptEvent> & { kind: string }): TranscriptEvent => ({
+    id: `e-${over.kind}`,
+    at: '2026-10-18T10:00:00Z',
+    afterSequence: 1,
+    actor: over.kind === 'AiTurnFailed' ? null : { userId: 'u1', email: 'sam@acme.test' },
+    reason: null,
+    ...over,
+  });
+
+  /**
+   * A scroller jsdom cannot measure: as tall as its rows, so the height changes at
+   * the moment a real browser's would, when the new rows render.
+   */
+  function measure(element: HTMLElement, rowHeight: number, scrollTop: number): void {
+    Object.defineProperty(element, 'scrollHeight', {
+      configurable: true,
+      get: () => element.querySelectorAll('li').length * rowHeight,
+    });
+    Object.defineProperty(element, 'clientHeight', { configurable: true, value: 500 });
+    element.scrollTop = scrollTop;
+  }
+
+  /** Stands in for the browser's observer, so a test can say the edge came into range. */
+  class FakeObserver {
+    static instances: FakeObserver[] = [];
+
+    readonly observed: Element[] = [];
+    disconnected = false;
+
+    constructor(
+      readonly callback: (entries: { isIntersecting: boolean }[]) => void,
+      readonly options: IntersectionObserverInit,
+    ) {
+      FakeObserver.instances.push(this);
+    }
+
+    observe(element: Element): void {
+      this.observed.push(element);
+    }
+
+    disconnect(): void {
+      this.disconnected = true;
+    }
+
+    static latest(): FakeObserver {
+      return FakeObserver.instances[FakeObserver.instances.length - 1];
+    }
+
+    fire(isIntersecting = true): void {
+      this.callback([{ isIntersecting }]);
+    }
+  }
+
+  beforeEach(() => {
+    FakeObserver.instances = [];
+    vi.stubGlobal('IntersectionObserver', FakeObserver);
+  });
+
+  afterEach(() => vi.unstubAllGlobals());
 
   it('lets only a message that arrived while the reader is here settle in', async () => {
     await mount([message(1), message(2, 'AiAgent')]);
@@ -71,38 +129,198 @@ describe('ConversationTranscript', () => {
     expect(bubbles().some((bubble) => bubble.classList.contains('is-fresh'))).toBe(false);
   });
 
-  it('draws the newest messages of a long conversation, and the earlier ones on request', async () => {
-    const total = TRANSCRIPT_WINDOW + TRANSCRIPT_STEP + 30;
-    const long = Array.from({ length: total }, (_, index) => message(index + 1));
-    const showEarlier = () =>
-      host().querySelector<HTMLButtonElement>('[data-testid="show-earlier"]');
-
-    await mount(long);
-
-    expect(bubbles()).toHaveLength(TRANSCRIPT_WINDOW);
-    expect(bubbles().at(-1)?.textContent).toContain(`Message ${total}`);
-
-    showEarlier()!.click();
-    await settle();
-
-    expect(bubbles()).toHaveLength(TRANSCRIPT_WINDOW + TRANSCRIPT_STEP);
-
-    showEarlier()!.click();
-    await settle();
-
-    expect(bubbles()).toHaveLength(total);
-    expect(showEarlier()).toBeNull();
+  it('draws every message it holds, with no window of its own', () => {
+    return mount(Array.from({ length: 120 }, (_, index) => message(index + 1))).then(() => {
+      expect(bubbles()).toHaveLength(120);
+    });
   });
 
-  it('says plainly that no AI reply exists, without claiming one failed', async () => {
-    // The admin API records no failed turn, so the note states what is known:
-    // there is no reply, and a failed AI turn sends nothing.
+  describe('going up', () => {
+    let requested: number;
+
+    async function mountLong(hasEarlier = true): Promise<void> {
+      await mount([message(41), message(42)]);
+      requested = 0;
+      fixture.componentInstance.earlierRequested.subscribe(() => requested++);
+      fixture.componentRef.setInput('hasEarlier', hasEarlier);
+      await settle();
+    }
+
+    it('reads nothing just by opening, because the view goes to the end first', async () => {
+      await mountLong();
+
+      expect(requested).toBe(0);
+      expect(FakeObserver.latest().observed).toContain(testId('earlier-edge'));
+    });
+
+    it('asks for the page before when the edge comes within 400 px', async () => {
+      await mountLong();
+
+      expect(FakeObserver.latest().options.rootMargin).toBe('400px 0px 0px 0px');
+
+      FakeObserver.latest().fire();
+
+      expect(requested).toBe(1);
+    });
+
+    it('asks nothing while the edge is out of range', async () => {
+      await mountLong();
+
+      FakeObserver.latest().fire(false);
+
+      expect(requested).toBe(0);
+    });
+
+    it('does not ask again while a page is being read', async () => {
+      await mountLong();
+      fixture.componentRef.setInput('loadingEarlier', true);
+      await settle();
+
+      FakeObserver.latest().fire();
+      testId<HTMLButtonElement>('show-earlier')!.click();
+
+      expect(requested).toBe(0);
+    });
+
+    it('offers the same read from the keyboard', async () => {
+      await mountLong();
+
+      testId<HTMLButtonElement>('show-earlier')!.click();
+
+      expect(requested).toBe(1);
+    });
+
+    it('keeps the same button through loading, so focus is not dropped', async () => {
+      await mountLong();
+
+      const button = testId<HTMLButtonElement>('show-earlier')!;
+
+      fixture.componentRef.setInput('loadingEarlier', true);
+      await settle();
+
+      expect(testId('show-earlier')).toBe(button);
+      expect(button.disabled).toBe(false);
+      expect(button.getAttribute('aria-disabled')).toBe('true');
+      expect(button.getAttribute('aria-busy')).toBe('true');
+      expect(button.querySelector('.spinner')).not.toBeNull();
+    });
+
+    it('says why a page failed, and waits for the reader instead of trying again', async () => {
+      await mountLong();
+      fixture.componentRef.setInput('earlierFailure', 'Nabra could not be reached.');
+      await settle();
+
+      expect(testId('earlier-failed')?.textContent).toContain('Could not load earlier messages.');
+      expect(testId('earlier-failed')?.textContent).toContain('Nabra could not be reached.');
+      expect(testId('show-earlier')?.textContent).toContain('Try again');
+
+      FakeObserver.latest().fire();
+      expect(requested).toBe(0);
+
+      testId<HTMLButtonElement>('show-earlier')!.click();
+      expect(requested).toBe(1);
+    });
+
+    it('says where the conversation starts once nothing is earlier', async () => {
+      await mountLong(false);
+
+      expect(testId('transcript-start')?.textContent).toContain('Start of the conversation');
+      expect(testId('show-earlier')).toBeNull();
+    });
+
+    it('keeps the reader where they were when earlier messages go in above', async () => {
+      await mount([message(41), message(42)]);
+
+      const scroller = host();
+
+      // The host scrolls by itself here (see `scroller()`).
+      vi.spyOn(window, 'getComputedStyle').mockReturnValue({
+        overflowY: 'auto',
+      } as CSSStyleDeclaration);
+      // A day row and two bubbles, 400 px each: the reader is 900 px from the end.
+      measure(scroller, 400, 300);
+
+      fixture.componentRef.setInput('messages', [
+        message(39),
+        message(40),
+        message(41),
+        message(42),
+      ]);
+      await settle();
+
+      // Five rows now: still 900 px from the end.
+      expect(scroller.scrollTop).toBe(1100);
+      vi.restoreAllMocks();
+    });
+
+    it('neither announces nor animates earlier messages as new', async () => {
+      await mount([message(41), message(42)]);
+      const unseen: number[] = [];
+
+      fixture.componentInstance.unseenChange.subscribe((count) => unseen.push(count));
+      fixture.componentRef.setInput('messages', [message(40), message(41), message(42)]);
+      await settle();
+
+      expect(bubbles().some((bubble) => bubble.classList.contains('is-fresh'))).toBe(false);
+      expect(unseen).toEqual([]);
+      expect(host().querySelector('[aria-live="polite"]')?.textContent).toContain(
+        'Earlier messages loaded.',
+      );
+    });
+
+    it('looks at the edge again after a page, in case it is still in range', async () => {
+      await mountLong();
+
+      const before = FakeObserver.instances.length;
+
+      fixture.componentRef.setInput('messages', [message(40), message(41), message(42)]);
+      await settle();
+
+      expect(FakeObserver.instances.length).toBe(before + 1);
+    });
+
+    it('stops watching when it goes away', async () => {
+      await mountLong();
+
+      const observer = FakeObserver.latest();
+
+      fixture.destroy();
+
+      expect(observer.disconnected).toBe(true);
+    });
+  });
+
+  it('still treats a message arriving at the end as new', async () => {
+    await mount([message(1), message(2)]);
+
+    fixture.componentRef.setInput('messages', [message(1), message(2), message(3)]);
+    await settle();
+
+    expect(bubbles().map((bubble) => bubble.classList.contains('is-fresh'))).toEqual([
+      false,
+      false,
+      true,
+    ]);
+  });
+
+  it('says plainly when no AI reply exists yet', async () => {
     await mount([message(1), message(2, 'AiAgent'), message(3)], 'Ai');
 
-    const note = host().querySelector('[data-testid="awaiting-ai"]');
+    expect(testId('awaiting-ai')?.textContent).toContain(
+      'The AI has not replied to the last message yet.',
+    );
+  });
 
-    expect(note?.textContent).toContain('The AI has not replied to the last message');
-    expect(note?.textContent).not.toContain('failed');
+  it('leaves that note out when the server says the turn failed', async () => {
+    await mount([message(1), message(2, 'AiAgent'), message(3)], 'Ai');
+
+    fixture.componentRef.setInput('events', [event({ kind: 'AiTurnFailed', afterSequence: 3 })]);
+    await settle();
+
+    expect(testId('awaiting-ai')).toBeNull();
+    expect(testId('transcript-event-AiTurnFailed')?.textContent).toContain(
+      'The AI could not reply',
+    );
   });
 
   it('adds no note while a person is answering, or once the AI has replied', async () => {
@@ -129,13 +347,80 @@ describe('ConversationTranscript', () => {
     );
   });
 
-  it('draws a handoff divider where a person took over from the AI', async () => {
-    await mount([message(1), message(2, 'AiAgent'), message(3), message(4, 'HumanAgent')]);
+  describe('dividers from the server', () => {
+    it('names who took over, with the address isolated', async () => {
+      await mount([message(1)]);
+      fixture.componentRef.setInput('events', [event({ kind: 'TakenOver' })]);
+      await settle();
 
-    const divider = host().querySelector('.handoff-divider');
+      const divider = testId('transcript-event-TakenOver');
+      const email = divider?.querySelector('bdi');
 
-    expect(divider?.textContent).toContain('A person took over');
-    expect(divider?.classList.contains('handoff-to-human')).toBe(true);
+      expect(divider?.textContent?.replace(/\s+/g, ' ').trim()).toBe('sam@acme.test took over');
+      expect(divider?.classList.contains('handoff-to-human')).toBe(true);
+      expect(email?.getAttribute('dir')).toBe('ltr');
+      expect(email?.getAttribute('translate')).toBe('no');
+    });
+
+    it('names who handed it back', async () => {
+      await mount([message(1)]);
+      fixture.componentRef.setInput('events', [event({ kind: 'ReturnedToAi' })]);
+      await settle();
+
+      const divider = testId('transcript-event-ReturnedToAi');
+
+      expect(divider?.textContent?.replace(/\s+/g, ' ').trim()).toBe(
+        'sam@acme.test returned it to the AI',
+      );
+      expect(divider?.classList.contains('handoff-to-ai')).toBe(true);
+    });
+
+    it('still says what happened when the actor is not known', async () => {
+      await mount([message(1)]);
+      fixture.componentRef.setInput('events', [
+        event({ kind: 'TakenOver', actor: null }),
+        event({ kind: 'ReturnedToAi', actor: null }),
+      ]);
+      await settle();
+
+      expect(testId('transcript-event-TakenOver')?.textContent).toContain('A person took over');
+      expect(testId('transcript-event-ReturnedToAi')?.textContent).toContain('Back with the AI');
+    });
+
+    it('marks a failed turn in words and in the rule, never by colour alone', async () => {
+      await mount([message(1)]);
+      fixture.componentRef.setInput('events', [event({ kind: 'AiTurnFailed' })]);
+      await settle();
+
+      const divider = testId('transcript-event-AiTurnFailed');
+
+      expect(divider?.textContent).toContain('The AI could not reply');
+      expect(divider?.classList.contains('transcript-failed')).toBe(true);
+    });
+
+    it('invents no divider for a conversation with no events', async () => {
+      await mount([message(1), message(2, 'AiAgent'), message(3), message(4, 'HumanAgent')]);
+
+      expect(host().querySelector('.handoff-divider')).toBeNull();
+    });
+
+    it('keeps the view at the end when a divider lands there', async () => {
+      await mount([message(1)]);
+
+      const scroller = host();
+
+      vi.spyOn(window, 'getComputedStyle').mockReturnValue({
+        overflowY: 'auto',
+      } as CSSStyleDeclaration);
+      // A day row and a bubble, 500 px each, with the view at the end.
+      measure(scroller, 500, 500);
+
+      fixture.componentRef.setInput('events', [event({ kind: 'TakenOver' })]);
+      await settle();
+
+      expect(scroller.scrollTop).toBe(1500);
+      vi.restoreAllMocks();
+    });
   });
 
   it('is a named region the keyboard can reach while it scrolls by itself, and nothing extra otherwise', async () => {

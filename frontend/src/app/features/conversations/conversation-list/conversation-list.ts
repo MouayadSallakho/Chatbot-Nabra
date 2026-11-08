@@ -17,6 +17,7 @@ import { ConversationRealtime } from '@app/core/realtime/conversation-realtime';
 import { PermissionService } from '@app/core/authorization/permission-service';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
 import { MediaQueries, mediaQuerySignal } from '@app/core/media/media';
+import { ArabicFonts } from '@app/core/i18n/arabic-fonts';
 import { LocaleFormat } from '@app/core/i18n/locale-format';
 import { EmptyState } from '@app/shared/empty-state/empty-state';
 import { PageHeader } from '@app/shared/page-header/page-header';
@@ -26,6 +27,7 @@ import { PAGE_QUERY_PARAM, initialPage } from '@app/shared/pagination/page-query
 import { VoiceChip } from '@app/shared/voice/voice-chip';
 import { ChannelBadge } from '@app/shared/channel/channel-badge';
 import { ConversationSummary, ConversationsApi } from '../conversations-api';
+import { CustomerLabel } from '../customer-label';
 import { InboxState } from '../inbox-state';
 import { sameDay, senderWord } from '../conversation-words';
 
@@ -41,8 +43,7 @@ interface ConversationRow {
 
   /**
    * A person is answering and the customer wrote last: somebody on the team
-   * owes a reply, because in this mode the AI never answers. The only
-   * attention marker the API's data supports; there is no unread state.
+   * owes a reply, because in this mode the AI never answers.
    */
   readonly waiting: boolean;
 }
@@ -54,10 +55,10 @@ interface ConversationRow {
  * conversation and marks which one that is; below that it is the page. Its
  * heading is the page's `h1` only when no conversation is open.
  *
- * <strong>Honest rows.</strong> Each row says what the API knows: the last
- * message and who wrote it, the channel, who is answering, who it is routed
- * to, when it last moved. There is no customer name (the list response carries
- * none), no unread count and no client-side search or filter (D22).
+ * <strong>Honest rows.</strong> Each row leads with who the customer is, then
+ * says what the API knows: the last message and who wrote it, the channel, who
+ * is answering, who it is routed to, when it last moved. There is no client-side
+ * search or filter (D22).
  *
  * <strong>Live, without jumps.</strong> A realtime notice re-reads the page in
  * place: rows keep their elements (tracked by id), nothing flips back to
@@ -66,7 +67,16 @@ interface ConversationRow {
 @Component({
   selector: 'app-conversation-list',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, PageHeader, EmptyState, Icon, Pagination, VoiceChip, ChannelBadge],
+  imports: [
+    RouterLink,
+    PageHeader,
+    EmptyState,
+    Icon,
+    Pagination,
+    VoiceChip,
+    ChannelBadge,
+    CustomerLabel,
+  ],
   templateUrl: './conversation-list.html',
   styleUrl: './conversation-list.scss',
 })
@@ -78,6 +88,7 @@ export class ConversationList implements OnInit {
   private readonly destroyRef = inject(DestroyRef);
   private readonly router = inject(Router);
   private readonly format = inject(LocaleFormat);
+  private readonly arabicFonts = inject(ArabicFonts);
   private readonly inbox = inject(InboxState, { optional: true });
 
   /** The open conversation, marked in the list. */
@@ -253,6 +264,9 @@ export class ConversationList implements OnInit {
         return;
       }
 
+      this.arabicFonts.notice(
+        page.items.flatMap((row) => [row.lastMessagePreview, row.customer?.displayName]),
+      );
       this.conversations.set(page.items);
       this.total.set(page.total);
       this.loaded.set(true);

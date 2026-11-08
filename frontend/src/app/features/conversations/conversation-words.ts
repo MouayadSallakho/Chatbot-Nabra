@@ -61,11 +61,6 @@ export function messagesPhrase(language: AppLanguage, count: number): string {
   });
 }
 
-/** The heading of one conversation: the channel it is on, never a guessed name. */
-export function conversationTitle(channelWord: string): string {
-  return $localize`:@@conversation.title:${channelWord}:channel: conversation`;
-}
-
 /**
  * Whether two instants fall on the same calendar day for this reader.
  *

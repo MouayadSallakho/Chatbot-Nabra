@@ -4,6 +4,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { TenantApi } from '@app/core/api/tenant-api';
 import { PermissionApi } from '@app/core/authorization/permission-api';
+import { ArabicFonts } from '@app/core/i18n/arabic-fonts';
 import { LOCAL_STORAGE } from '@app/core/storage/local-storage';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
 import { memoryStorage, permissionApiGranting } from '@app/testing/test-doubles';
@@ -27,6 +28,13 @@ describe('ConversationList', () => {
     messageCount: preview ? 2 : 0,
     lastMessagePreview: preview,
     lastMessageSender: preview ? 'AiAgent' : null,
+    customer: {
+      id: `p-${id}`,
+      displayName: null,
+      labelCode: 'AnonymousVisitor',
+      reference: null,
+      shortCode: '7KQ2MX',
+    },
   });
 
   async function mount(...permissions: string[]): Promise<void> {
@@ -75,6 +83,56 @@ describe('ConversationList', () => {
     );
 
   afterEach(() => http.verify());
+
+  it('leads every row with the customer, name or label', async () => {
+    await mount('conversations.view');
+
+    http.expectOne(url).flush({
+      items: [
+        {
+          ...conversation('c1', 'We close at six.', '2026-09-07T12:00:00Z'),
+          customer: {
+            id: 'p1',
+            displayName: 'Lina Haddad',
+            labelCode: 'Named',
+            reference: null,
+            shortCode: 'AB12CD',
+          },
+        },
+        conversation('c2', 'Certainly.', '2026-09-07T11:00:00Z'),
+      ],
+      page: 1,
+      pageSize: 20,
+      total: 2,
+    });
+    await settle();
+
+    const names = rows().map((row) =>
+      row.querySelector('[data-testid="row-customer"]')?.textContent?.replace(/\s+/g, ' ').trim(),
+    );
+
+    expect(names).toEqual(['Lina Haddad', 'Visitor 7KQ2MX']);
+    // First in the row, before the message and the chips.
+    expect(
+      rows()[0].firstElementChild?.querySelector('[data-testid="row-customer"]'),
+    ).not.toBeNull();
+  });
+
+  it('starts the Arabic font when a first read holds Arabic', async () => {
+    await mount('conversations.view');
+
+    const notice = vi.spyOn(TestBed.inject(ArabicFonts), 'notice');
+
+    http.expectOne(url).flush({
+      items: [conversation('c1', 'مرحبا', '2026-09-07T12:00:00Z')],
+      page: 1,
+      pageSize: 20,
+      total: 1,
+    });
+    await settle();
+
+    expect(notice).toHaveBeenCalledWith(['مرحبا', null]);
+  });
 
   it('lists conversations in the order the server returned them', async () => {
     // Most recently active first, decided by the server so paging stays stable.
