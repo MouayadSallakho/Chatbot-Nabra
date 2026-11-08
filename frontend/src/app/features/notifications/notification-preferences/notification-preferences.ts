@@ -4,18 +4,31 @@ import {
   ElementRef,
   Injector,
   afterNextRender,
+  computed,
+  effect,
   inject,
   signal,
+  viewChild,
 } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { ActivatedRoute } from '@angular/router';
 import { HasUnsavedChanges, protectUnsavedChanges } from '@app/core/navigation/unsaved-changes';
 import { categoryWord } from '@app/core/notifications/notification-words';
 import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
 import { ApiError, toApiError } from '@app/core/api/api-error';
+import { PermissionService } from '@app/core/authorization/permission-service';
+import { LocaleFormat } from '@app/core/i18n/locale-format';
 import { EmailPreferences, NotificationApi } from '@app/core/notifications/notification-api';
+import { DesktopAlerts } from '@app/core/sounds/desktop-alerts';
+import { Sounds } from '@app/core/sounds/sounds';
+import { SoundSettings } from '@app/core/sounds/sound-settings';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
 import { PageHeader } from '@app/shared/page-header/page-header';
 import { NotificationsNav } from '../notifications-nav';
+
+/** The fragment the account menu's "Sound and alert settings" link opens. */
+const BROWSER_SECTION = 'in-this-browser';
 
 /** One category, as the member reads it. */
 interface Category {
@@ -47,6 +60,12 @@ export class NotificationPreferencesPage implements HasUnsavedChanges {
   private readonly workspace = inject(WorkspaceContextService);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly injector = inject(Injector);
+  private readonly route = inject(ActivatedRoute);
+  private readonly permissions = inject(PermissionService);
+  private readonly format = inject(LocaleFormat);
+  private readonly sounds = inject(Sounds);
+  private readonly soundSettings = inject(SoundSettings);
+  private readonly desktopAlerts = inject(DesktopAlerts);
 
   protected readonly categories: readonly Category[] = [
     {
@@ -90,6 +109,7 @@ export class NotificationPreferencesPage implements HasUnsavedChanges {
   protected readonly saveFailure = signal<ApiError | null>(null);
   protected readonly emailConfigured = signal(true);
   protected readonly announcement = signal('');
+  protected readonly browserAnnouncement = signal('');
   private etag: string | null = null;
 
   /** Whether the switches differ from what is stored, mirrored for the guard and the note. */
@@ -103,6 +123,76 @@ export class NotificationPreferencesPage implements HasUnsavedChanges {
     // The tab being closed or reloaded is the other way unsaved choices are lost.
     protectUnsavedChanges(() => this.dirty());
     void this.load();
+
+    // Reached from the account menu: after the email form has its height, so the
+    // section does not move away from under the reader. Focus is a heading's, so
+    // the screen reader says where they have arrived.
+    effect(() => {
+      if (this.fragment() === BROWSER_SECTION && !this.loading() && this.canHearSounds()) {
+        afterNextRender(
+          () => {
+            const heading = this.browserHeading()?.nativeElement;
+
+            heading?.focus({ preventScroll: true });
+            heading?.scrollIntoView({ block: 'start' });
+          },
+          { injector: this.injector },
+        );
+      }
+    });
+  }
+
+  // --- In this browser ------------------------------------------------------
+
+  /** Sounds are about the inbox, so only somebody who can read it is offered them. */
+  protected readonly canHearSounds = computed(() => this.permissions.has('conversations.view'));
+
+  protected readonly soundsOn = this.soundSettings.enabled;
+  protected readonly volume = this.soundSettings.volume;
+  protected readonly volumeText = computed(() => this.format.percent(this.volume() / 100));
+
+  protected readonly desktopSupported = this.desktopAlerts.supported;
+  protected readonly desktopRefused = signal(this.desktopAlerts.blocked());
+  protected readonly desktopOn = computed(
+    () => this.soundSettings.desktopAlerts() && !this.desktopRefused(),
+  );
+
+  private readonly fragment = toSignal(this.route.fragment, { initialValue: null });
+  private readonly browserHeading = viewChild<ElementRef<HTMLElement>>('browserHeading');
+
+  protected setVolume(event: Event): void {
+    this.soundSettings.setVolume((event.target as HTMLInputElement).valueAsNumber);
+  }
+
+  protected async playTest(): Promise<void> {
+    this.browserAnnouncement.set('');
+
+    if (await this.sounds.test()) {
+      this.browserAnnouncement.set(
+        $localize`:@@notificationPreferences.testSoundPlayed:Test sound played.`,
+      );
+    }
+  }
+
+  /**
+   * Turns desktop alerts on or off.
+   *
+   * `preventDefault` hands the checkbox's state to the signal, so a refusal leaves
+   * the switch off without it flickering on first. The browser's prompt is asked
+   * for right here, inside the person's own click.
+   */
+  protected async toggleDesktop(event: Event): Promise<void> {
+    event.preventDefault();
+
+    if (this.desktopOn()) {
+      this.desktopAlerts.disable();
+
+      return;
+    }
+
+    const answer = await this.desktopAlerts.enable();
+
+    this.desktopRefused.set(answer === 'refused');
   }
 
   /** Asked by the route guard. */

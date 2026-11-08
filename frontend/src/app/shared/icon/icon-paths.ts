@@ -21,6 +21,9 @@
  */
 export const ICON_PATHS = {
   // --- Navigation ----------------------------------------------------------
+  /** Sounds: a speaker and one wave. */
+  volume: ['M4 10v4h3l5 4V6l-5 4H4z', 'M16 9.5a3.5 3.5 0 0 1 0 5'],
+
   /** Overview: a four-panel dashboard. */
   overview: ['M4 4h6v6H4z', 'M14 4h6v6h-6z', 'M14 14h6v6h-6z', 'M4 14h6v6H4z'],
 

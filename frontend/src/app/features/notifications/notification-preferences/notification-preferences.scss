@@ -24,14 +24,16 @@
 }
 
 // A switch drawn from the native checkbox, so keyboard use, the checked state and
-// the accessible role all stay the browser's.
+// the accessible role all stay the browser's. Larger than the `.switch` primitive
+// it builds on: that class is also what keeps the global checkbox rule (16px) off.
 .category-switch {
   appearance: none;
   position: relative;
   flex: none;
   inline-size: 40px;
-  block-size: 22px;
-  // Optical alignment of the 22px switch with the label's first line.
+  // 24px: the smallest target allowed (WCAG 2.2, 2.5.8).
+  block-size: 24px;
+  // Optical alignment of the switch with the label's first line.
   margin: var(--gap-hairline) 0 0;
   border: 1px solid var(--border-control);
   border-radius: var(--radius-pill);
@@ -42,7 +44,7 @@
   &::after {
     content: '';
     position: absolute;
-    inset-block-start: 2px;
+    inset-block-start: 3px;
     inset-inline-start: 2px;
     inline-size: 16px;
     block-size: 16px;
@@ -64,6 +66,15 @@
   &:focus-visible {
     outline: var(--focus-ring-width) solid var(--focus-ring);
     outline-offset: var(--focus-ring-offset);
+  }
+
+  // A finger gets a 44px target without the switch having to look any bigger.
+  @media (pointer: coarse) {
+    &::before {
+      content: '';
+      position: absolute;
+      inset: -10px 0;
+    }
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -90,4 +101,46 @@
 .category + .category {
   padding-block-start: var(--space-4);
   border-block-start: 1px solid var(--border-subtle);
+}
+
+.browser-section {
+  // Lands clear of the page's top edge when the account menu opens it.
+  scroll-margin-block-start: var(--space-4);
+}
+
+.browser-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.browser-note {
+  margin-block: var(--space-2) 0;
+}
+
+.browser-alerts {
+  padding-block-start: var(--space-4);
+  border-block-start: 1px solid var(--border-subtle);
+}
+
+.volume {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.volume-range {
+  inline-size: 100%;
+  // A comfortable target, on touch as well; the browser draws the track inside it.
+  min-block-size: 44px;
+  accent-color: var(--action);
+}
+
+.volume-value {
+  min-inline-size: 3em;
+  font: var(--text-small);
+  color: var(--text-secondary);
+  text-align: end;
+  font-variant-numeric: tabular-nums;
 }

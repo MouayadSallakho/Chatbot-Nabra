@@ -5,6 +5,10 @@ import { provideRouter } from '@angular/router';
 import { TenantApi } from '@app/core/api/tenant-api';
 import { PermissionApi } from '@app/core/authorization/permission-api';
 import { NotificationPreferences } from '@app/core/notifications/notification-api';
+import { APP_LANGUAGE } from '@app/core/i18n/language';
+import { DesktopAlerts } from '@app/core/sounds/desktop-alerts';
+import { SoundSettings } from '@app/core/sounds/sound-settings';
+import { Sounds } from '@app/core/sounds/sounds';
 import { LOCAL_STORAGE } from '@app/core/storage/local-storage';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
 import { memoryStorage, permissionApiGranting } from '@app/testing/test-doubles';
@@ -26,11 +30,14 @@ describe('NotificationPreferencesPage', () => {
   let fixture: ComponentFixture<NotificationPreferencesPage>;
   let http: HttpTestingController;
 
-  async function mount(stored: NotificationPreferences = defaults): Promise<void> {
+  async function mount(
+    stored: NotificationPreferences = defaults,
+    permissions: readonly string[] = [],
+  ): Promise<void> {
     TestBed.configureTestingModule({
       imports: [NotificationPreferencesPage],
       providers: [
-        { provide: PermissionApi, useValue: permissionApiGranting() },
+        { provide: PermissionApi, useValue: permissionApiGranting(...permissions) },
         provideRouter([]),
         provideHttpClient(),
         provideHttpClientTesting(),
@@ -184,5 +191,230 @@ describe('NotificationPreferencesPage', () => {
     await mount({ ...defaults, emailConfigured: false });
 
     expect(host().querySelector('[data-testid="email-unavailable"]')).not.toBeNull();
+  });
+
+  describe('in this browser (Phase 38.1b)', () => {
+    const VIEW = ['conversations.view'];
+    const section = (): HTMLElement | null =>
+      host().querySelector('[data-testid="in-this-browser"]');
+    const byTest = <T extends HTMLElement>(id: string): T | null =>
+      host().querySelector<T>(`[data-testid="${id}"]`);
+
+    let test: ReturnType<typeof vi.fn>;
+    let enable: ReturnType<typeof vi.fn>;
+    let disable: ReturnType<typeof vi.fn>;
+    let supported: boolean;
+    let blocked: boolean;
+
+    function fakes(language: 'en' | 'ar' = 'en'): void {
+      test = vi.fn(async () => true);
+      enable = vi.fn(async () => 'on');
+      disable = vi.fn();
+      TestBed.configureTestingModule({
+        providers: [
+          { provide: APP_LANGUAGE, useValue: language },
+          { provide: Sounds, useValue: { test } },
+          {
+            provide: DesktopAlerts,
+            useValue: { supported, blocked: () => blocked, enable, disable },
+          },
+        ],
+      });
+    }
+
+    beforeEach(() => {
+      supported = true;
+      blocked = false;
+    });
+
+    it('is not offered to a member who cannot read conversations', async () => {
+      fakes();
+      await mount();
+
+      expect(section()).toBeNull();
+    });
+
+    it('is a named section, outside the email form and its unsaved-changes guard', async () => {
+      fakes();
+      await mount(defaults, VIEW);
+
+      expect(section()?.closest('form')).toBeNull();
+      expect(section()?.getAttribute('aria-labelledby')).toBe('browser-heading');
+      expect(host().querySelector('h2#browser-heading')?.textContent?.trim()).toBe(
+        'In this browser',
+      );
+
+      const volume = byTest<HTMLInputElement>('sound-volume')!;
+
+      volume.value = '40';
+      volume.dispatchEvent(new Event('input'));
+      await settle();
+
+      expect(fixture.componentInstance.hasUnsavedChanges()).toBe(false);
+    });
+
+    it('shows the volume, stores a change at once, and names it in words', async () => {
+      fakes();
+      await mount(defaults, VIEW);
+
+      const volume = byTest<HTMLInputElement>('sound-volume')!;
+
+      expect(volume.value).toBe('70');
+      expect(volume.getAttribute('aria-valuetext')).toBe('70%');
+      expect(host().querySelector(`label[for="${volume.id}"]`)?.textContent?.trim()).toBe('Volume');
+
+      volume.value = '40';
+      volume.dispatchEvent(new Event('input'));
+      await settle();
+
+      expect(TestBed.inject(SoundSettings).volume()).toBe(40);
+      expect(byTest('sound-volume-value')?.textContent?.trim()).toBe('40%');
+    });
+
+    it('shows the percentage in Arabic too', async () => {
+      fakes('ar');
+      await mount(defaults, VIEW);
+
+      const text = byTest('sound-volume-value')?.textContent?.trim();
+
+      expect(text).toContain('70');
+      expect(byTest('sound-volume')?.getAttribute('aria-valuetext')).toBe(text);
+    });
+
+    it('plays the test sound and announces it politely', async () => {
+      fakes();
+      await mount(defaults, VIEW);
+
+      byTest<HTMLButtonElement>('sound-test')?.click();
+      await settle();
+
+      expect(test).toHaveBeenCalledTimes(1);
+      expect(byTest('sound-test-announcement')?.getAttribute('aria-live')).toBe('polite');
+      expect(byTest('sound-test-announcement')?.textContent).toContain('Test sound played');
+    });
+
+    it('says nothing, and shows no error, when no sound could be played', async () => {
+      fakes();
+      test.mockResolvedValue(false);
+      await mount(defaults, VIEW);
+
+      byTest<HTMLButtonElement>('sound-test')?.click();
+      await settle();
+
+      expect(byTest('sound-test-announcement')?.textContent?.trim()).toBe('');
+      expect(section()?.querySelector('.alert')).toBeNull();
+    });
+
+    it('says when sounds are off, and how to turn them on', async () => {
+      fakes();
+      await mount(defaults, VIEW);
+
+      expect(byTest('sounds-off-note')).toBeNull();
+
+      TestBed.inject(SoundSettings).setEnabled(false);
+      await settle();
+
+      expect(byTest('sounds-off-note')?.textContent).toContain('account menu');
+    });
+
+    it('asks for permission from the click, and turns on when granted', async () => {
+      fakes();
+      enable.mockImplementation(async () => {
+        TestBed.inject(SoundSettings).setDesktopAlerts(true);
+
+        return 'on';
+      });
+      await mount(defaults, VIEW);
+
+      const toggle = byTest<HTMLInputElement>('desktop-alerts')!;
+
+      expect(toggle.checked).toBe(false);
+      expect(toggle.getAttribute('role')).toBe('switch');
+      expect(enable).not.toHaveBeenCalled();
+
+      toggle.click();
+      // Synchronously, inside the click: nothing is awaited before the prompt.
+      expect(enable).toHaveBeenCalledTimes(1);
+
+      await settle();
+
+      expect(toggle.checked).toBe(true);
+    });
+
+    it('stays off after a refusal and says how to allow it', async () => {
+      fakes();
+      enable.mockResolvedValue('refused');
+      await mount(defaults, VIEW);
+
+      const toggle = byTest<HTMLInputElement>('desktop-alerts')!;
+
+      toggle.click();
+      await settle();
+
+      expect(toggle.checked).toBe(false);
+      expect(byTest('desktop-refused')?.textContent).toContain("browser's settings");
+    });
+
+    it('turns off without asking the browser anything', async () => {
+      fakes();
+      await mount(defaults, VIEW);
+      TestBed.inject(SoundSettings).setDesktopAlerts(true);
+      await settle();
+
+      byTest<HTMLInputElement>('desktop-alerts')?.click();
+      await settle();
+
+      expect(disable).toHaveBeenCalledTimes(1);
+      expect(enable).not.toHaveBeenCalled();
+    });
+
+    it('reads a browser that already blocks alerts as off, with the note', async () => {
+      blocked = true;
+      fakes();
+      await mount(defaults, VIEW);
+      TestBed.inject(SoundSettings).setDesktopAlerts(true);
+      await settle();
+
+      expect(byTest<HTMLInputElement>('desktop-alerts')?.checked).toBe(false);
+      expect(byTest('desktop-refused')).not.toBeNull();
+    });
+
+    it('disables the switch and says why where alerts do not exist', async () => {
+      supported = false;
+      fakes();
+      await mount(defaults, VIEW);
+
+      expect(byTest<HTMLInputElement>('desktop-alerts')?.disabled).toBe(true);
+      expect(byTest('desktop-unsupported')).not.toBeNull();
+    });
+
+    it('still offers the section when the email preferences could not load', async () => {
+      fakes();
+      TestBed.configureTestingModule({
+        imports: [NotificationPreferencesPage],
+        providers: [
+          { provide: PermissionApi, useValue: permissionApiGranting(...VIEW) },
+          provideRouter([]),
+          provideHttpClient(),
+          provideHttpClientTesting(),
+          { provide: LOCAL_STORAGE, useValue: memoryStorage() },
+          { provide: TenantApi, useValue: { get: () => undefined, create: () => undefined } },
+        ],
+      });
+      await TestBed.inject(WorkspaceContextService).adopt({
+        id: tenantId,
+        name: 'Acme Trading',
+        slug: 'acme',
+        status: 'Active',
+      });
+      http = TestBed.inject(HttpTestingController);
+      fixture = TestBed.createComponent(NotificationPreferencesPage);
+      await settle();
+
+      http.expectOne(url).flush(null, { status: 500, statusText: 'Server Error' });
+      await settle();
+
+      expect(section()).not.toBeNull();
+    });
   });
 });

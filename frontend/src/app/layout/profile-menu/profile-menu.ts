@@ -12,6 +12,9 @@ import { THEME_LABELS, THEME_PREFERENCES, ThemePreference } from '@app/core/them
 import { Icon } from '@app/shared/icon/icon';
 import { IconName } from '@app/shared/icon/icon-paths';
 import { Menu } from '@app/shared/menu/menu';
+import { PermissionService } from '@app/core/authorization/permission-service';
+import { Sounds } from '@app/core/sounds/sounds';
+import { SoundSettings } from '@app/core/sounds/sound-settings';
 
 const THEME_ICONS: Readonly<Record<ThemePreference, IconName>> = {
   system: 'monitor',
@@ -53,6 +56,9 @@ export class ProfileMenu {
   private readonly theme = inject(ThemeService);
 
   private readonly languageService = inject(LanguageService);
+  private readonly permissions = inject(PermissionService);
+  private readonly sounds = inject(Sounds);
+  private readonly soundSettings = inject(SoundSettings);
 
   protected readonly preference = this.theme.preference;
 
@@ -104,6 +110,22 @@ export class ProfileMenu {
       ? $localize`:@@account.menuLabelFor:${this.initials()}:initials:: Account menu for ${this.email()}:email:`
       : $localize`:@@account.menuLabel:Account menu`,
   );
+
+  /** Sounds are about the inbox, so only somebody who can read it is offered them. */
+  protected readonly canHearSounds = computed(() => this.permissions.has('conversations.view'));
+
+  protected readonly soundsOn = this.soundSettings.enabled;
+
+  protected toggleSounds(): void {
+    const on = !this.soundsOn();
+
+    this.soundSettings.setEnabled(on);
+
+    if (on) {
+      // This click is the gesture the browser wants before it allows audio.
+      this.sounds.unlock();
+    }
+  }
 
   protected selectTheme(preference: ThemePreference): void {
     this.theme.select(preference);

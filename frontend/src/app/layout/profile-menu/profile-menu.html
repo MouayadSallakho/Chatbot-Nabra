@@ -85,6 +85,37 @@
     <span i18n="@@account.notificationPreferences">Notification preferences</span>
   </a>
 
+  <!--
+    A switch and a link, not a volume slider: a menu may hold only menu items, so
+    the volume and the test sound live on the page the link opens (38.0 §3.7).
+  -->
+  @if (canHearSounds()) {
+    <button
+      type="button"
+      class="menu-item"
+      role="menuitemcheckbox"
+      data-testid="sounds-switch"
+      [attr.aria-checked]="soundsOn()"
+      (click)="toggleSounds()"
+    >
+      <app-icon name="volume" [strokeWidth]="1.75" />
+      <span i18n="@@account.sounds">Sounds</span>
+      @if (soundsOn()) {
+        <app-icon class="menu-check" name="check" [strokeWidth]="2" />
+      }
+    </button>
+    <a
+      class="menu-item"
+      role="menuitem"
+      routerLink="/notifications/preferences"
+      fragment="in-this-browser"
+      data-testid="sound-settings"
+    >
+      <app-icon name="settings" [strokeWidth]="1.75" />
+      <span i18n="@@account.soundSettings">Sound and alert settings</span>
+    </a>
+  }
+
   @if (canSwitchWorkspace()) {
     <button type="button" class="menu-item" role="menuitem" (click)="workspaceSwitched.emit()">
       <app-icon name="switch" [strokeWidth]="1.75" />

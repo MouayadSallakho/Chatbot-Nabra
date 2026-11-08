@@ -8,7 +8,11 @@ import { LOCAL_STORAGE } from '@app/core/storage/local-storage';
 import { PAGE_RELOAD } from '@app/core/i18n/language-service';
 import { LANGUAGE_STORAGE_KEY } from '@app/core/i18n/language';
 import { ThemeService } from '@app/core/theme/theme-service';
-import { FakeMediaMatcher, memoryStorage } from '@app/testing/test-doubles';
+import { PermissionApi } from '@app/core/authorization/permission-api';
+import { PermissionService } from '@app/core/authorization/permission-service';
+import { SoundSettings } from '@app/core/sounds/sound-settings';
+import { Sounds } from '@app/core/sounds/sounds';
+import { FakeMediaMatcher, memoryStorage, permissionApiGranting } from '@app/testing/test-doubles';
 import { ProfileMenu } from './profile-menu';
 
 describe('ProfileMenu', () => {
@@ -148,6 +152,83 @@ describe('ProfileMenu', () => {
 
       expect(line()?.getAttribute('role')).toBe('presentation');
       expect(line()?.tagName).toBe('P');
+    });
+  });
+
+  describe('sounds (Phase 38.1b)', () => {
+    const switchItem = (): HTMLButtonElement | null =>
+      root().querySelector('[data-testid="sounds-switch"]');
+    const settingsLink = (): HTMLAnchorElement | null =>
+      root().querySelector('[data-testid="sound-settings"]');
+
+    let unlock: ReturnType<typeof vi.fn>;
+
+    async function withPermission(...codes: string[]): Promise<void> {
+      unlock = vi.fn();
+      TestBed.configureTestingModule({
+        providers: [
+          { provide: PermissionApi, useValue: permissionApiGranting(...codes) },
+          { provide: Sounds, useValue: { unlock } },
+        ],
+      });
+      await render();
+      await TestBed.inject(PermissionService).load('t1');
+      await open();
+    }
+
+    it('offers nothing to a member who cannot read conversations', async () => {
+      await withPermission();
+
+      expect(switchItem()).toBeNull();
+      expect(settingsLink()).toBeNull();
+    });
+
+    it('is a real menu checkbox, on by default', async () => {
+      await withPermission('conversations.view');
+
+      expect(switchItem()?.getAttribute('role')).toBe('menuitemcheckbox');
+      expect(switchItem()?.getAttribute('aria-checked')).toBe('true');
+      expect(switchItem()?.textContent?.trim()).toBe('Sounds');
+    });
+
+    it('turns off without touching the audio', async () => {
+      await withPermission('conversations.view');
+
+      switchItem()?.click();
+
+      expect(TestBed.inject(SoundSettings).enabled()).toBe(false);
+      expect(unlock).not.toHaveBeenCalled();
+    });
+
+    it('turning on is the gesture that unlocks the audio', async () => {
+      await withPermission('conversations.view');
+      TestBed.inject(SoundSettings).setEnabled(false);
+
+      switchItem()?.click();
+
+      expect(TestBed.inject(SoundSettings).enabled()).toBe(true);
+      expect(unlock).toHaveBeenCalledTimes(1);
+    });
+
+    it('shows the check only while sounds are on, and aria-checked says the same', async () => {
+      await withPermission('conversations.view');
+      expect(switchItem()?.querySelector('.menu-check')).not.toBeNull();
+
+      TestBed.inject(SoundSettings).setEnabled(false);
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      expect(switchItem()?.querySelector('.menu-check')).toBeNull();
+      expect(switchItem()?.getAttribute('aria-checked')).toBe('false');
+    });
+
+    it('links to the section where the volume and the test sound are', async () => {
+      await withPermission('conversations.view');
+
+      expect(settingsLink()?.getAttribute('role')).toBe('menuitem');
+      expect(settingsLink()?.getAttribute('href')).toBe(
+        '/notifications/preferences#in-this-browser',
+      );
     });
   });
 

@@ -26,6 +26,8 @@ import { Topbar } from '@app/layout/topbar/topbar';
 import { NavigationHistory } from '@app/core/navigation/navigation-history';
 import { RouteFocus } from '@app/core/navigation/route-focus';
 import { CommandPalette } from '@app/layout/command-palette/command-palette';
+import { WorkspaceRealtime } from '@app/core/realtime/workspace-realtime';
+import { Sounds } from '@app/core/sounds/sounds';
 import { isApplePlatform, isPaletteShortcut } from '@app/layout/command-palette/shortcut';
 
 /**
@@ -155,6 +157,14 @@ export class AppShell {
     // Puts focus on each new page's heading, so a keyboard or screen reader
     // user arrives at the page rather than staying on the link they followed.
     inject(RouteFocus);
+
+    // The page's one realtime connection: it follows the workspace from here on.
+    inject(WorkspaceRealtime).start();
+
+    // After first render, so the sound code never competes with the first paint.
+    const sounds = inject(Sounds);
+
+    afterNextRender(() => sounds.start());
 
     // A new page starts at the top. The scrolling region is the shell's main
     // element rather than the document, which is also why Angular's own scroll

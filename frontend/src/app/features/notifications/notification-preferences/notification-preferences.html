@@ -74,7 +74,7 @@
                 <input
                   type="checkbox"
                   role="switch"
-                  class="form-check-input category-switch"
+                  class="switch category-switch"
                   [id]="'email-' + category.key"
                   [formControlName]="category.key"
                   [attr.aria-describedby]="'email-' + category.key + '-description'"
@@ -139,6 +139,134 @@
           </div>
         </div>
       </form>
+    }
+
+    <!--
+      Outside the form on purpose: these belong to this browser, not the account,
+      and each takes effect as it is made, so nothing here is "unsaved".
+    -->
+    @if (canHearSounds()) {
+      <section
+        id="in-this-browser"
+        class="card form-section browser-section"
+        aria-labelledby="browser-heading"
+        data-testid="in-this-browser"
+      >
+        <div class="card-header">
+          <div>
+            <h2
+              #browserHeading
+              id="browser-heading"
+              class="form-section-title"
+              tabindex="-1"
+              i18n="@@notificationPreferences.browserHeading"
+            >
+              In this browser
+            </h2>
+            <p class="form-section-lede" i18n="@@notificationPreferences.browserLede">
+              These apply only to this browser, and take effect as soon as you change them.
+            </p>
+          </div>
+        </div>
+
+        <div class="card-body browser-body">
+          @if (!soundsOn()) {
+            <p
+              class="guidance"
+              data-testid="sounds-off-note"
+              i18n="@@notificationPreferences.soundsOff"
+            >
+              Sounds are off. You can turn them on from the account menu.
+            </p>
+          }
+
+          <div class="volume">
+            <label class="category-label" for="sound-volume" i18n="@@notificationPreferences.volume"
+              >Volume</label
+            >
+            <input
+              id="sound-volume"
+              class="volume-range"
+              type="range"
+              min="0"
+              max="100"
+              step="5"
+              data-testid="sound-volume"
+              [value]="volume()"
+              [attr.aria-valuetext]="volumeText()"
+              (input)="setVolume($event)"
+            />
+            <output for="sound-volume" class="volume-value" data-testid="sound-volume-value">{{
+              volumeText()
+            }}</output>
+          </div>
+
+          <div>
+            <button
+              type="button"
+              class="btn btn-secondary"
+              data-testid="sound-test"
+              (click)="playTest()"
+              i18n="@@notificationPreferences.testSound"
+            >
+              Play a test sound
+            </button>
+            <p class="visually-hidden" aria-live="polite" data-testid="sound-test-announcement">
+              {{ browserAnnouncement() }}
+            </p>
+          </div>
+
+          <div class="category browser-alerts">
+            <input
+              type="checkbox"
+              role="switch"
+              class="switch category-switch"
+              id="desktop-alerts"
+              aria-describedby="desktop-alerts-description"
+              data-testid="desktop-alerts"
+              [checked]="desktopOn()"
+              [disabled]="!desktopSupported"
+              (click)="toggleDesktop($event)"
+            />
+            <div class="category-text">
+              <label
+                class="category-label"
+                for="desktop-alerts"
+                i18n="@@notificationPreferences.desktopAlerts"
+                >Desktop alerts</label
+              >
+              <p
+                class="category-description"
+                id="desktop-alerts-description"
+                i18n="@@notificationPreferences.desktopAlertsDescription"
+              >
+                Show an alert on your computer when Nabra is in the background. It names the
+                customer and the reason, never what they wrote. Your browser asks for your
+                permission the first time.
+              </p>
+              @if (!desktopSupported) {
+                <p
+                  class="category-description"
+                  data-testid="desktop-unsupported"
+                  i18n="@@notificationPreferences.desktopUnsupported"
+                >
+                  This browser cannot show desktop alerts.
+                </p>
+              } @else if (desktopRefused()) {
+                <p
+                  class="alert alert-warning browser-note"
+                  role="status"
+                  data-testid="desktop-refused"
+                  i18n="@@notificationPreferences.desktopRefused"
+                >
+                  Your browser is not allowing alerts from Nabra. To turn them on, allow
+                  notifications for this site in your browser's settings, then try again.
+                </p>
+              }
+            </div>
+          </div>
+        </div>
+      </section>
     }
   </div>
 </div>

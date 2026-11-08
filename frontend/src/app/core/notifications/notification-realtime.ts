@@ -1,130 +1,36 @@
-import { DestroyRef, Injectable, NgZone, inject, signal } from '@angular/core';
-import type { HubConnection } from '@microsoft/signalr';
-import { ADMIN_RECONNECT_POLICY } from '@app/core/realtime/reconnect-policy';
-
-/** The one notification event the platform pushes. Its payload is a workspace id. */
-const NOTIFICATIONS_CHANGED = 'notificationsChanged';
-
-/** The same authenticated workspace hub the inbox uses. */
-const WORKSPACE_HUB = '/hubs/workspace-inbox';
+import { Injectable, inject } from '@angular/core';
+import { WorkspaceRealtime } from '@app/core/realtime/workspace-realtime';
 
 /**
- * Live notice that the signed-in member's notifications changed.
+ * The bell's view of the page's one realtime connection (`WorkspaceRealtime`).
  *
  * <strong>Structural only.</strong> What arrives is "something changed in this
- * workspace" and nothing else — no title, no body, no count. The listener
- * re-reads through the authorised HTTP API, which stays the only source of
- * what a notification says.
- *
- * <strong>The same hub, its own subscription.</strong> It connects to the
- * Phase 19 workspace hub with the session the rest of the application uses, and
- * asks to join the member's own group. Membership is the only requirement, so a
- * member who may not read conversations still hears about their notifications.
- *
- * <strong>Losing the connection is not an error.</strong> SignalR reconnects on
- * its own; until it does, the bell is a few seconds stale and still correct,
- * and the next page load or panel open reads the truth.
- *
- * <strong>Loaded when needed.</strong> The bell is in every page's shell, so the
- * SignalR client is imported on first use rather than statically — it stays out
- * of the initial bundle and arrives after the page has rendered.
+ * workspace" and nothing else: no title, no body, no count. The listener re-reads
+ * through the authorised HTTP API, which stays the only source of what a
+ * notification says.
  */
 @Injectable({ providedIn: 'root' })
 export class NotificationRealtime {
-  private readonly zone = inject(NgZone);
-  private readonly destroyRef = inject(DestroyRef);
+  private readonly owner = inject(WorkspaceRealtime);
 
-  private connection: HubConnection | null = null;
-  private tenantId: string | null = null;
-  private listener: (() => void) | null = null;
+  private unsubscribe: (() => void) | null = null;
 
   /** Whether updates are arriving. False means stale-but-correct, never broken. */
-  readonly live = signal(false);
+  readonly live = this.owner.notificationsLive;
 
-  constructor() {
-    this.destroyRef.onDestroy(() => void this.stop());
-  }
-
-  /** Listens to one workspace. Calling it for another workspace moves the subscription. */
+  /** Listens to one workspace. A later call replaces the listener. */
   listen(tenantId: string, onChanged: () => void): void {
-    this.listener = onChanged;
-
-    if (this.tenantId !== tenantId) {
-      void this.restart(tenantId);
-    }
+    this.unsubscribe?.();
+    this.unsubscribe = this.owner.onNotifications(() => {
+      if (this.owner.tenantId() === tenantId) {
+        onChanged();
+      }
+    });
   }
 
+  /** Stops listening. The connection itself follows the workspace, not this listener. */
   async stop(): Promise<void> {
-    const connection = this.connection;
-
-    this.connection = null;
-    this.tenantId = null;
-    this.live.set(false);
-
-    if (connection && String(connection.state) !== 'Disconnected') {
-      try {
-        await connection.stop();
-      } catch {
-        // Stopping a socket that is already gone is not worth reporting.
-      }
-    }
-  }
-
-  private async restart(tenantId: string): Promise<void> {
-    await this.stop();
-
-    this.tenantId = tenantId;
-
-    let connection: HubConnection;
-
-    try {
-      const signalr = await import('@microsoft/signalr');
-
-      if (this.tenantId !== tenantId) {
-        // The workspace changed while the client was loading.
-        return;
-      }
-
-      connection = new signalr.HubConnectionBuilder()
-        .withUrl(WORKSPACE_HUB)
-        .withAutomaticReconnect(ADMIN_RECONNECT_POLICY)
-        .configureLogging(signalr.LogLevel.Warning)
-        .build();
-    } catch {
-      // No document to resolve the hub against (a test runner, a server render):
-      // no live updates, and nothing else changes.
-      return;
-    }
-
-    connection.on(NOTIFICATIONS_CHANGED, () => {
-      this.zone.run(() => this.listener?.());
-    });
-
-    connection.onreconnected(() => {
-      void this.subscribe(connection, tenantId);
-      // Anything that happened while disconnected is fetched now.
-      this.zone.run(() => this.listener?.());
-    });
-
-    connection.onreconnecting(() => this.zone.run(() => this.live.set(false)));
-    connection.onclose(() => this.zone.run(() => this.live.set(false)));
-
-    this.connection = connection;
-
-    try {
-      await this.zone.runOutsideAngular(() => connection.start());
-      await this.subscribe(connection, tenantId);
-    } catch {
-      this.zone.run(() => this.live.set(false));
-    }
-  }
-
-  private async subscribe(connection: HubConnection, tenantId: string): Promise<void> {
-    try {
-      await connection.invoke('SubscribeNotifications', tenantId);
-      this.zone.run(() => this.live.set(true));
-    } catch {
-      this.zone.run(() => this.live.set(false));
-    }
+    this.unsubscribe?.();
+    this.unsubscribe = null;
   }
 }

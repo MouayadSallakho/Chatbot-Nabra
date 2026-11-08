@@ -1,115 +1,70 @@
 import { TestBed } from '@angular/core/testing';
-import type { HubConnectionBuilder } from '@microsoft/signalr';
-import { ConversationRealtime, HUB_CONNECTION_BUILDER } from './conversation-realtime';
+import { signal } from '@angular/core';
+import { ConversationRealtime } from './conversation-realtime';
+import { WorkspaceRealtime } from './workspace-realtime';
 
-// A stand-in for the SignalR client: the test is about how many connections
-// the service opens and who hears about a change, not about the transport.
-const built: FakeConnection[] = [];
-
-class FakeConnection {
-  state = 'Disconnected';
-  readonly handlers = new Map<string, (...args: unknown[]) => void>();
-  readonly invoked: unknown[][] = [];
-
-  on(name: string, handler: (...args: unknown[]) => void): void {
-    this.handlers.set(name, handler);
-  }
-
-  onreconnected(): void {}
-  onreconnecting(): void {}
-  onclose(): void {}
-
-  async start(): Promise<void> {
-    this.state = 'Connected';
-  }
-
-  async stop(): Promise<void> {
-    this.state = 'Disconnected';
-  }
-
-  async invoke(...args: unknown[]): Promise<void> {
-    this.invoked.push(args);
-  }
-}
-
-/**
- * A stand-in for SignalR's builder, handed to the service through its
- * injection token. Not a module mock: specs share one module registry in this
- * runner, so a `vi.mock` of `@microsoft/signalr` depended on which spec loaded
- * the service first (Phase 36.7, revision 1).
- */
-class FakeBuilder {
-  withUrl(): this {
-    return this;
-  }
-
-  withAutomaticReconnect(): this {
-    return this;
-  }
-
-  configureLogging(): this {
-    return this;
-  }
-
-  build(): FakeConnection {
-    const connection = new FakeConnection();
-
-    built.push(connection);
-
-    return connection;
-  }
-}
-
+/** The facade: which workspace a screen hears, and what `live` reads. */
 describe('ConversationRealtime', () => {
-  const tenant = '11111111-1111-7111-8111-111111111111';
+  let owner: FakeOwner;
+
+  class FakeOwner {
+    current: string | null = 't1';
+    listeners = new Set<(id: string | null) => void>();
+    conversationsLive = signal(true);
+
+    tenantId(): string | null {
+      return this.current;
+    }
+
+    onConversation(listener: (id: string | null) => void): () => void {
+      this.listeners.add(listener);
+
+      return () => this.listeners.delete(listener);
+    }
+
+    fire(id: string | null): void {
+      for (const listener of this.listeners) {
+        listener(id);
+      }
+    }
+  }
 
   beforeEach(() => {
-    built.length = 0;
+    owner = new FakeOwner();
     TestBed.configureTestingModule({
-      providers: [
-        {
-          provide: HUB_CONNECTION_BUILDER,
-          useValue: () => new FakeBuilder() as unknown as HubConnectionBuilder,
-        },
-      ],
+      providers: [{ provide: WorkspaceRealtime, useValue: owner }],
     });
   });
 
-  const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
+  it('passes on the events of the workspace the screen asked about', () => {
+    const heard: (string | null)[] = [];
 
-  it('shares one connection between screens that listen in the same tick', async () => {
-    // The inbox's list and its open conversation subscribe together.
-    const realtime = TestBed.inject(ConversationRealtime);
-    const heard: string[] = [];
+    TestBed.inject(ConversationRealtime).listen('t1', (id) => heard.push(id));
+    owner.fire('c1');
+    owner.fire(null);
 
-    realtime.listen(tenant, (id) => heard.push(`list:${id}`));
-    realtime.listen(tenant, (id) => heard.push(`detail:${id}`));
-    await settle();
-
-    expect(built).toHaveLength(1);
-    expect(built[0].invoked).toEqual([['Subscribe', tenant]]);
-    expect(realtime.live()).toBe(true);
-
-    built[0].handlers.get('conversationChanged')!('c1');
-
-    expect(heard).toEqual(['list:c1', 'detail:c1']);
+    expect(heard).toEqual(['c1', null]);
   });
 
-  it('closes the connection when the last screen stops listening', async () => {
+  it('hears nothing of another workspace, during a switch', () => {
+    const heard: (string | null)[] = [];
+
+    TestBed.inject(ConversationRealtime).listen('t1', (id) => heard.push(id));
+    owner.current = 't2';
+    owner.fire('c1');
+
+    expect(heard).toEqual([]);
+  });
+
+  it('stops listening when told, and reads the connection state from its owner', () => {
     const realtime = TestBed.inject(ConversationRealtime);
-    const stopList = realtime.listen(tenant, () => undefined);
-    const stopDetail = realtime.listen(tenant, () => undefined);
+    const stop = realtime.listen('t1', () => undefined);
 
-    await settle();
-    stopDetail();
-    await settle();
+    expect(owner.listeners.size).toBe(1);
+    expect(realtime.live()).toBe(true);
 
-    expect(built[0].state).toBe('Connected');
+    stop();
 
-    stopList();
-    await settle();
-
-    expect(built[0].state).toBe('Disconnected');
-    expect(realtime.live()).toBe(false);
+    expect(owner.listeners.size).toBe(0);
   });
 });
