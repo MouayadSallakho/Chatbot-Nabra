@@ -1,5 +1,6 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { HttpHeaders } from '@angular/common/http';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { LOCAL_STORAGE } from '@app/core/storage/local-storage';
@@ -12,8 +13,8 @@ import { Login } from './login';
  * The sign-in screen.
  *
  * As well as the sign-in flow, these assert what the screen must never do: keep
- * the password, store a token, or improve on the server's deliberately
- * uninformative refusal.
+ * the password, store a token, or say more than the deliberately uninformative
+ * refusal does.
  */
 describe('Login', () => {
   const account = { id: '11111111-1111-1111-1111-111111111111', email: 'ada@example.test' };
@@ -23,6 +24,7 @@ describe('Login', () => {
   let http: HttpTestingController;
   let storage: Storage;
   let navigatedTo: unknown[] | null;
+  let clockIsFake = false;
 
   beforeEach(() => {
     navigatedTo = null;
@@ -67,6 +69,14 @@ describe('Login', () => {
    * not been issued yet when the test looks for it.
    */
   async function settle(): Promise<void> {
+    if (clockIsFake) {
+      fixture.detectChanges();
+      await vi.advanceTimersByTimeAsync(0);
+      fixture.detectChanges();
+
+      return;
+    }
+
     fixture.detectChanges();
     await fixture.whenStable();
     await new Promise((resolve) => setTimeout(resolve, 0));
@@ -175,10 +185,10 @@ describe('Login', () => {
     expect(navigatedTo).toEqual(['/', 'workspace']);
   });
 
-  it('shows the backend refusal verbatim and stays put', async () => {
+  it('words a wrong sign-in by its code and stays put', async () => {
     // The server answers a wrong password, an unknown address and a locked
-    // account with one sentence, so this form cannot be used to discover which
-    // addresses are registered. Re-wording it here would undo that.
+    // account with one code, so this form cannot be used to discover which
+    // addresses are registered.
     await fill(account.email, 'wrong-password');
 
     submit().click();
@@ -189,12 +199,13 @@ describe('Login', () => {
     http
       .expectOne('/api/auth/login')
       .flush(
-        { title: 'Sign-in failed', detail: 'The email address or password is incorrect.' },
+        { title: 'Sign-in failed', detail: 'Server English.', code: 'auth.credentials.invalid' },
         { status: 401, statusText: 'Unauthorized' },
       );
     await settle();
 
     expect(host().textContent).toContain('The email address or password is incorrect.');
+    expect(host().textContent).not.toContain('Server English');
     expect(navigatedTo).toBeNull();
   });
 
@@ -209,7 +220,7 @@ describe('Login', () => {
     http
       .expectOne('/api/auth/login')
       .flush(
-        { title: 'Sign-in failed', detail: 'The email address or password is incorrect.' },
+        { title: 'Sign-in failed', detail: 'Server English.', code: 'auth.credentials.invalid' },
         { status: 401, statusText: 'Unauthorized' },
       );
     await settle();
@@ -285,6 +296,175 @@ describe('Login', () => {
     await settle();
 
     expect(host().textContent).toContain('could not be reached');
+  });
+
+  describe('when too many attempts were made (Phase 38.1a)', () => {
+    const failureBox = () => host().querySelector('[data-testid="sign-in-failure"]');
+    const announcer = () => host().querySelector('[data-testid="sign-in-wait-announcer"]');
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+      clockIsFake = true;
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+      clockIsFake = false;
+    });
+
+    /** Sends a sign-in and answers 429 with the given wait. */
+    async function throttle(retryAfter: string): Promise<void> {
+      await fill(account.email, password);
+
+      submit().click();
+      await settle();
+
+      await answerToken();
+
+      http.expectOne('/api/auth/login').flush(
+        { title: 'Too many requests', detail: 'Server English.', code: 'auth.throttled' },
+        {
+          status: 429,
+          statusText: 'Too Many Requests',
+          headers: new HttpHeaders({ 'Retry-After': retryAfter }),
+        },
+      );
+      await settle();
+    }
+
+    async function advance(ms: number): Promise<void> {
+      await vi.advanceTimersByTimeAsync(ms);
+      fixture.detectChanges();
+    }
+
+    it('says when to try again and keeps the button disabled', async () => {
+      await throttle('900');
+
+      expect(failureBox()?.textContent?.trim()).toBe('Too many attempts. Try again in 15 minutes.');
+      expect(submit().disabled).toBe(true);
+    });
+
+    it('speaks through the polite region, not an alert that would interrupt', async () => {
+      await throttle('900');
+
+      expect(failureBox()?.getAttribute('role')).toBeNull();
+      expect(announcer()?.getAttribute('role')).toBe('status');
+      expect(announcer()?.textContent?.trim()).toBe('Too many attempts. Try again in 15 minutes.');
+    });
+
+    it('changes what it says at most once a minute, never every second', async () => {
+      await throttle('900');
+
+      await advance(59_000);
+      expect(announcer()?.textContent?.trim()).toBe('Too many attempts. Try again in 15 minutes.');
+
+      await advance(1_000);
+      expect(announcer()?.textContent?.trim()).toBe('Too many attempts. Try again in 14 minutes.');
+      expect(failureBox()?.textContent?.trim()).toBe('Too many attempts. Try again in 14 minutes.');
+      expect(submit().disabled).toBe(true);
+    });
+
+    it('counts down in seconds under a minute', async () => {
+      await throttle('90');
+
+      expect(failureBox()?.textContent?.trim()).toBe('Too many attempts. Try again in 2 minutes.');
+
+      await advance(60_000);
+
+      expect(failureBox()?.textContent?.trim()).toBe('Too many attempts. Try again in 30 seconds.');
+    });
+
+    it('re-enables the button and says so when the wait is over', async () => {
+      await throttle('30');
+
+      await advance(30_000);
+
+      expect(submit().disabled).toBe(false);
+      expect(failureBox()).toBeNull();
+      expect(host().querySelector('[data-testid="sign-in-wait-over"]')?.textContent?.trim()).toBe(
+        'You can try signing in again now.',
+      );
+      expect(announcer()?.textContent?.trim()).toBe('You can try signing in again now.');
+    });
+
+    it('sends nothing while the wait lasts, even from the keyboard', async () => {
+      await throttle('900');
+      await fill(account.email, password);
+
+      host().querySelector('form')!.dispatchEvent(new Event('submit'));
+      await settle();
+
+      http.expectNone('/api/auth/csrf');
+      http.expectNone('/api/auth/login');
+    });
+
+    it('gives no countdown without a usable Retry-After, and leaves the button alone', async () => {
+      await fill(account.email, password);
+
+      submit().click();
+      await settle();
+
+      await answerToken();
+
+      http
+        .expectOne('/api/auth/login')
+        .flush({ code: 'auth.throttled' }, { status: 429, statusText: 'Too Many Requests' });
+      await settle();
+
+      expect(failureBox()?.textContent?.trim()).toBe(
+        'Too many attempts. Wait a moment and try again.',
+      );
+      expect(failureBox()?.getAttribute('role')).toBe('alert');
+      expect(submit().disabled).toBe(false);
+    });
+  });
+
+  it('says signing in is unavailable on a 503, and leaves the form usable', async () => {
+    await fill(account.email, password);
+
+    submit().click();
+    await settle();
+
+    await answerToken();
+
+    http
+      .expectOne('/api/auth/login')
+      .flush({ code: 'auth.throttle.unavailable' }, { status: 503, statusText: 'Unavailable' });
+    await settle();
+
+    expect(host().querySelector('[data-testid="sign-in-failure"]')?.textContent?.trim()).toBe(
+      'Signing in is unavailable for a moment. Nothing was changed. Try again shortly.',
+    );
+    expect(submit().disabled).toBe(false);
+  });
+
+  it('marks the fields a refusal named, in its own words, until they are edited', async () => {
+    await fill(account.email, password);
+
+    submit().click();
+    await settle();
+
+    await answerToken();
+
+    http.expectOne('/api/auth/login').flush(
+      {
+        code: 'validation.failed',
+        errors: { email: ['The English the reader must never see.'] },
+      },
+      { status: 400, statusText: 'Bad Request' },
+    );
+    await settle();
+
+    expect(host().querySelector('#email-error')?.textContent?.trim()).toBe(
+      'Enter the email address you signed up with.',
+    );
+    expect(host().textContent).not.toContain('never see');
+
+    emailBox().value = 'other@example.test';
+    emailBox().dispatchEvent(new Event('input'));
+    await settle();
+
+    expect(host().querySelector('#email-error')).toBeNull();
   });
 
   it('offers a way to a new password beside the password field (Phase 37.3)', () => {

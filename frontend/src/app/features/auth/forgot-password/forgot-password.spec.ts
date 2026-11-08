@@ -164,9 +164,7 @@ describe('ForgotPassword', () => {
 
     const alert = host().querySelector('[role="alert"]');
 
-    expect(alert?.textContent?.trim()).toBe(
-      'Too many requests have been made. Wait a while before trying again.',
-    );
+    expect(alert?.textContent?.trim()).toBe('Too many attempts. Try again in 15 minutes.');
     // Still the form, not the confirmation: nothing is on its way.
     expect(host().querySelector('h1')?.textContent?.trim()).toBe('Reset your password');
     expect(host().querySelector('[data-testid="forgot-password-sent"]')).toBeNull();

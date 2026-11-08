@@ -7,6 +7,7 @@ import {
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { InvitationHandoff } from '@app/core/invitations/invitation-handoff';
+import { SessionWatch } from '@app/core/auth/session-watch';
 import { LOCAL_STORAGE } from '@app/core/storage/local-storage';
 import { memoryStorage } from '@app/testing/test-doubles';
 import { ResetPassword } from './reset-password';
@@ -240,7 +241,7 @@ describe('ResetPassword', () => {
       await settle();
     });
 
-    it('sends the link and the password, and then says every other session was signed out', async () => {
+    it('sends the link and the password, and then says they can sign in now', async () => {
       const request = await send();
 
       expect(request.method).toBe('POST');
@@ -253,7 +254,7 @@ describe('ResetPassword', () => {
       const done = host().querySelector('[data-testid="reset-password-done"]');
       expect(done?.getAttribute('role')).toBe('status');
       expect(done?.textContent?.trim()).toBe(
-        'Every other session on this account has been signed out. Sign in with your new password.',
+        'You can sign in now with your new password. Every other session on this account has been signed out.',
       );
       expect(host().querySelector('a[href="/sign-in"]')?.textContent?.trim()).toBe('Sign in');
       expect(document.activeElement).toBe(host().querySelector('h1'));
@@ -293,6 +294,7 @@ describe('ResetPassword', () => {
       expect(heading()).toBe('Set a new password');
       const error = host().querySelector('#password-error');
       expect(error?.getAttribute('role')).toBe('alert');
+      expect(error?.querySelectorAll('.field-error')).toHaveLength(1);
       expect(error?.textContent?.trim()).toBe('Use at least 12 characters.');
       expect(passwordBox().getAttribute('aria-describedby')).toBe('password-hint password-error');
       expect(document.activeElement).toBe(passwordBox());
@@ -308,7 +310,7 @@ describe('ResetPassword', () => {
       expect(heading()).toBe('Your password has been changed');
     });
 
-    it('names every password problem the server lists, in its own words for unknown rules', async () => {
+    it('lists every password problem the server names, one per line', async () => {
       await send();
 
       answer(400, {
@@ -317,9 +319,11 @@ describe('ResetPassword', () => {
       });
       await settle();
 
-      expect(host().querySelector('#password-error')?.textContent?.trim()).toBe(
-        'Use at least 12 characters. This password cannot be used. Choose a different one.',
-      );
+      expect(
+        [...host().querySelectorAll('#password-error .field-error')].map((line) =>
+          line.textContent?.trim(),
+        ),
+      ).toEqual(['Use at least 12 characters.', 'Use more different characters.']);
     });
 
     it("clears the server's verdict once the password is edited", async () => {
@@ -342,7 +346,7 @@ describe('ResetPassword', () => {
       await settle();
 
       expect(host().querySelector('.alert-danger')?.textContent?.trim()).toBe(
-        'Too many requests have been made. Wait a while before trying again.',
+        'Too many attempts. Wait a moment and try again.',
       );
       expect(heading()).toBe('Set a new password');
     });
@@ -384,6 +388,42 @@ describe('ResetPassword', () => {
       expect(stored).not.toContain(token);
       expect(window.sessionStorage.length).toBe(0);
     });
+  });
+
+  describe('while a link is held (Phase 38.1a)', () => {
+    it('keeps the session watch from moving the page, and lets go once it is spent', async () => {
+      openLinkWith(`#uid=${userId}&token=${token}`);
+
+      await mount();
+
+      const hold = vi.spyOn(TestBed.inject(SessionWatch), 'holdRedirect');
+
+      await settle();
+      TestBed.tick();
+
+      expect(hold).not.toHaveBeenCalledWith(false);
+
+      await send();
+      answer(204);
+      await settle();
+
+      expect(hold).toHaveBeenLastCalledWith(false);
+    });
+  });
+
+  it('marks the new password when the server names that field, in its own words', async () => {
+    openLinkWith(`#uid=${userId}&token=${token}`);
+
+    await mount();
+    await send();
+
+    answer(400, { code: 'validation.failed', errors: { newPassword: ['Never shown.'] } });
+    await settle();
+
+    expect(host().querySelector('#password-error')?.textContent?.trim()).toBe(
+      'Use at least 12 characters.',
+    );
+    expect(text()).not.toContain('Never shown');
   });
 
   it('takes up a second link opened in the same tab', async () => {

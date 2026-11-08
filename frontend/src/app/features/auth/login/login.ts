@@ -1,10 +1,13 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ApiError } from '@app/core/api/api-error';
 import { AuthService } from '@app/core/auth/auth-service';
 import { SESSION_ENDED } from '@app/core/auth/session-expiry-interceptor';
 import { FORGOT_PASSWORD_PATH, REGISTER_PATH } from '@app/core/auth/auth-guard';
+import { APP_LANGUAGE } from '@app/core/i18n/language';
+import { THROTTLED_CODE, throttledMessage } from '@app/core/problems/core-problems';
+import { refusedFields } from '@app/core/problems/field-problems';
 import {
   ACCEPT_INVITATION_PATH,
   InvitationHandoff,
@@ -15,20 +18,30 @@ import { HOME_PATH } from '@app/layout/navigation';
 import { Icon } from '@app/shared/icon/icon';
 import { EntryFrame } from '@app/layout/entry-frame/entry-frame';
 
+/** The fields of this form, by the names the server uses for them too. */
+const FIELDS = ['email', 'password'] as const;
+type Field = (typeof FIELDS)[number];
+
+/** The least time between two announcements of how long is left. */
+const ANNOUNCE_EVERY_MS = 60_000;
+
 /**
- * The sign-in screen.
+ *  * The sign-in screen.
  *
  * <strong>The password is never held.</strong> It lives in a form control until
  * submit, goes into the request body, and the control is cleared on failure.
  * Nothing writes it to a signal, a field, `localStorage`, `sessionStorage` or a
  * log, and nothing reads it back.
  *
- * <strong>The failure message is the server's own, verbatim.</strong> The
- * backend answers a wrong password, an unknown address and a locked account with
- * one deliberately uninformative sentence, so that this form cannot be used to
- * discover which addresses are registered. Re-wording it here — "no account with
- * that email", say — would undo that on the client side, so this screen shows
- * exactly what it was given.
+ * <strong>One sentence for every wrong answer.</strong> The backend answers a
+ * wrong password, an unknown address and a locked account with one code, so that
+ * this form cannot be used to discover which addresses are registered. The words
+ * for that code say nothing more, in either language.
+ *
+ * <strong>Being refused for too many attempts names the wait.</strong> The button
+ * stays disabled until it has passed, counted on this device from the moment of
+ * the answer. The time left is announced politely and at most once a minute: a
+ * screen reader reading out every second would make the page unusable.
  */
 @Component({
   selector: 'app-login',
@@ -42,6 +55,7 @@ export class Login {
   private readonly workspace = inject(WorkspaceContextService);
   private readonly invitations = inject(InvitationHandoff);
   private readonly router = inject(Router);
+  private readonly language = inject(APP_LANGUAGE);
 
   /**
    * Whether the reader arrived here because their session ended mid-task, as
@@ -60,6 +74,23 @@ export class Login {
   protected readonly failure = signal<ApiError | null>(null);
   protected readonly passwordVisible = signal(false);
 
+  /** Fields a refusal named, until the reader edits them. */
+  protected readonly refused = signal<ReadonlySet<Field>>(new Set());
+
+  /** Whether the button is held back because too many attempts were made. */
+  protected readonly waiting = signal(false);
+
+  /** The wait has just ended, and nothing has been tried since. */
+  protected readonly waitOver = signal(false);
+
+  /** What the always-present polite live region is saying. */
+  protected readonly waitAnnouncement = signal('');
+
+  protected readonly waitOverText = $localize`:@@signIn.waitOver:You can try signing in again now.`;
+
+  private waitEndsAt = 0;
+  private waitTimer: ReturnType<typeof setTimeout> | undefined;
+
   private readonly submitAttempted = signal(false);
 
   protected readonly form = new FormGroup({
@@ -73,6 +104,10 @@ export class Login {
     }),
   });
 
+  constructor() {
+    inject(DestroyRef).onDestroy(() => clearTimeout(this.waitTimer));
+  }
+
   /**
    * Whether a field's error belongs on screen yet.
    *
@@ -80,10 +115,19 @@ export class Login {
    * required field invalid while somebody is typing its first character is
    * accurate and reads as nagging.
    */
-  protected showError(field: 'email' | 'password'): boolean {
+  protected showError(field: Field): boolean {
     const control = this.form.controls[field];
 
-    return control.invalid && (control.touched || this.submitAttempted());
+    return (
+      (control.invalid && (control.touched || this.submitAttempted())) || this.refused().has(field)
+    );
+  }
+
+  /** A refusal is about the value it judged, so editing the field clears it. */
+  protected fieldEdited(field: Field): void {
+    if (this.refused().has(field)) {
+      this.refused.update((fields) => new Set([...fields].filter((name) => name !== field)));
+    }
   }
 
   /**
@@ -101,7 +145,7 @@ export class Login {
 
     // Guards against a double submit as well as an invalid one: without it a
     // fast second click sends a second sign-in and can produce two navigations.
-    if (this.form.invalid || this.submitting()) {
+    if (this.form.invalid || this.submitting() || this.waiting()) {
       this.form.markAllAsTouched();
 
       return;
@@ -109,6 +153,9 @@ export class Login {
 
     this.submitting.set(true);
     this.failure.set(null);
+    this.refused.set(new Set());
+    this.waitOver.set(false);
+    this.waitAnnouncement.set('');
 
     try {
       await this.auth.login({
@@ -139,7 +186,11 @@ export class Login {
         this.workspace.isReady() ? HOME_PATH : WORKSPACE_SETUP_PATH,
       ]);
     } catch (error) {
-      this.failure.set(error as ApiError);
+      const failure = error as ApiError;
+
+      this.failure.set(failure);
+      this.refused.set(refusedFields(failure, FIELDS));
+      this.beginWait(failure);
 
       // The password is wrong, or the account is locked, or it does not exist.
       // Whichever it was, this copy is no longer wanted: leaving it in the field
@@ -149,5 +200,41 @@ export class Login {
     } finally {
       this.submitting.set(false);
     }
+  }
+
+  /** Holds the button back until `Retry-After` has passed. */
+  private beginWait(failure: ApiError): void {
+    if (failure.code !== THROTTLED_CODE || !failure.retryAfterSeconds) {
+      return;
+    }
+
+    this.waitEndsAt = Date.now() + failure.retryAfterSeconds * 1000;
+    this.waiting.set(true);
+    this.waitAnnouncement.set(failure.message);
+    this.scheduleNextUpdate(failure.retryAfterSeconds * 1000);
+  }
+
+  private scheduleNextUpdate(remainingMs: number): void {
+    clearTimeout(this.waitTimer);
+    this.waitTimer = setTimeout(() => this.updateWait(), Math.min(ANNOUNCE_EVERY_MS, remainingMs));
+  }
+
+  private updateWait(): void {
+    const remainingMs = this.waitEndsAt - Date.now();
+
+    if (remainingMs <= 0) {
+      this.waiting.set(false);
+      this.failure.set(null);
+      this.waitOver.set(true);
+      this.waitAnnouncement.set(this.waitOverText);
+
+      return;
+    }
+
+    const message = throttledMessage(Math.ceil(remainingMs / 1000), this.language);
+
+    this.failure.update((failure) => failure && { ...failure, message });
+    this.waitAnnouncement.set(message);
+    this.scheduleNextUpdate(remainingMs);
   }
 }

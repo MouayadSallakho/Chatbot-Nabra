@@ -6,7 +6,7 @@ import { AppLanguage } from '@app/core/i18n/language';
 /**
  * The signed-in account, as the backend publishes it.
  *
- * Two fields, because two are published. There is deliberately no password
+ * These fields, because these are published. There is deliberately no password
  * hash, no security stamp, no lockout state and no role — the backend does not
  * send them, and a client type with a field the server never fills is a promise
  * nobody keeps.
@@ -14,6 +14,18 @@ import { AppLanguage } from '@app/core/i18n/language';
 export interface AuthenticatedUser {
   readonly id: string;
   readonly email: string;
+
+  /**
+   * The language the server writes this account's emails in. Null reads as
+   * English: that is the server's own rule for an account that never chose.
+   */
+  readonly language?: string | null;
+}
+
+/** The answer to "is anybody signed in", which is never a 401. */
+export interface SessionAnswer {
+  readonly authenticated: boolean;
+  readonly user: AuthenticatedUser | null;
 }
 
 /** What registering and signing in both take. */
@@ -119,6 +131,15 @@ export class AuthApi {
   /** Ends the session. The browser drops the cookie the server clears. */
   logout(): Observable<void> {
     return this.http.post<void>('/api/auth/logout', null);
+  }
+
+  /**
+   * Whether this browser is signed in, and as whom. 200 either way, so a signed-out
+   * page logs nothing. Limited per network: ask on page load and on focus, never
+   * on a timer.
+   */
+  session(): Observable<SessionAnswer> {
+    return this.http.get<SessionAnswer>('/api/auth/session');
   }
 
   /** Who this browser is signed in as. 401 when it is not. */

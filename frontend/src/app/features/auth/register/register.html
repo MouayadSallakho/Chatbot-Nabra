@@ -11,7 +11,7 @@
   @if (failure(); as error) {
     <div class="alert alert-danger auth-alert" role="alert">
       <app-icon name="alert" [strokeWidth]="1.75" />
-      <span dir="auto">{{ error.message }}</span>
+      <span>{{ error.message }}</span>
     </div>
   }
 
@@ -27,6 +27,7 @@
         type="email"
         dir="ltr"
         formControlName="email"
+        (input)="fieldEdited('email')"
         autocomplete="username"
         inputmode="email"
         autocapitalize="off"
@@ -61,10 +62,13 @@
           class="input"
           [type]="passwordVisible() ? 'text' : 'password'"
           formControlName="password"
+          (input)="fieldEdited('password')"
           autocomplete="new-password"
-          [attr.aria-invalid]="showError('password') ? 'true' : null"
+          [attr.aria-invalid]="passwordProblems().length || showError('password') ? 'true' : null"
           [attr.aria-describedby]="
-            showError('password') ? 'password-hint password-error' : 'password-hint'
+            passwordProblems().length || showError('password')
+              ? 'password-hint password-error'
+              : 'password-hint'
           "
         />
         <button
@@ -88,7 +92,17 @@
         stronger and easier to remember.
       -->
       <p class="field-hint" id="password-hint">{{ passwordHint }}</p>
-      @if (showError('password')) {
+      @if (passwordProblems().length) {
+        <!-- The server's verdict, translated from its codes, one line per broken rule. -->
+        <div id="password-error" role="alert" data-testid="password-problems">
+          @for (problem of passwordProblems(); track problem) {
+            <p class="field-error">
+              <app-icon name="alert" [strokeWidth]="1.75" />
+              <span>{{ problem }}</span>
+            </p>
+          }
+        </div>
+      } @else if (showError('password')) {
         <p class="field-error" id="password-error" role="alert">
           <app-icon name="alert" [strokeWidth]="1.75" />
           <span>{{ passwordError }}</span>

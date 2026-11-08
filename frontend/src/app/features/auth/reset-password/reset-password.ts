@@ -6,12 +6,11 @@ import {
   Injector,
   OnInit,
   afterNextRender,
-  computed,
+  effect,
   inject,
   signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { HttpErrorResponse } from '@angular/common/http';
 import {
   AbstractControl,
   FormControl,
@@ -31,10 +30,13 @@ import { filter, fromEvent } from 'rxjs';
 import { toApiError } from '@app/core/api/api-error';
 import { AuthService } from '@app/core/auth/auth-service';
 import { FORGOT_PASSWORD_PATH, LOGIN_PATH } from '@app/core/auth/auth-guard';
+import { PASSWORD_MIN_LENGTH } from '@app/core/auth/password-policy';
+import { SessionWatch } from '@app/core/auth/session-watch';
+import { passwordProblemLines } from '@app/core/problems/core-problems';
+import { refusedFields } from '@app/core/problems/field-problems';
 import { InvitationHandoff } from '@app/core/invitations/invitation-handoff';
 import { Icon } from '@app/shared/icon/icon';
 import { EntryFrame } from '@app/layout/entry-frame/entry-frame';
-import { PASSWORD_MIN_LENGTH } from '../password-policy';
 import { describeResetFailure } from '../password-reset-failure';
 
 /**
@@ -56,12 +58,6 @@ interface ResetLink {
 /** Bad, expired or already used link, or an unknown account: one code for all of them. */
 const RESET_INVALID_CODE = 'auth.reset.invalid';
 
-/** The prefix of the codes for a password the policy refuses. */
-const PASSWORD_CODE_PREFIX = 'auth.password.';
-
-/** The policy's only rule today: the length. */
-const PASSWORD_TOO_SHORT_CODE = 'auth.password.too_short';
-
 /** Whether a fragment carries any part of a reset link. */
 function carriesLink(hash: string): boolean {
   return /(^|[#&])(uid|token)=/.test(hash);
@@ -73,38 +69,6 @@ function passwordsMatch(group: AbstractControl): ValidationErrors | null {
   const confirmation = group.get('confirmation')?.value;
 
   return confirmation && password !== confirmation ? { mismatch: true } : null;
-}
-
-/**
- * Every `auth.password.*` code on a refusal, once each.
- *
- * Read from the raw response because the server may name several (`codes`)
- * besides the first (`code`), and the reader should see every one at once
- * rather than fix them one round trip at a time. Only strings with the expected
- * prefix are kept, so a malformed body cannot put anything else on screen.
- */
-function passwordCodes(failure: unknown): readonly string[] {
-  if (!(failure instanceof HttpErrorResponse) || failure.status !== 400) {
-    return [];
-  }
-
-  const body: unknown = failure.error;
-
-  if (typeof body !== 'object' || body === null) {
-    return [];
-  }
-
-  const { code, codes } = body as { code?: unknown; codes?: unknown };
-  const all: unknown[] = [code, ...(Array.isArray(codes) ? codes : [])];
-
-  return [
-    ...new Set(
-      all.filter(
-        (value): value is string =>
-          typeof value === 'string' && value.startsWith(PASSWORD_CODE_PREFIX),
-      ),
-    ),
-  ];
 }
 
 /**
@@ -143,6 +107,7 @@ export class ResetPassword implements OnInit {
   private readonly destroyRef = inject(DestroyRef);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly injector = inject(Injector);
+  private readonly sessionWatch = inject(SessionWatch);
 
   /** The link being used. Never rendered, stored or logged. */
   private link: ResetLink | null = null;
@@ -166,9 +131,8 @@ export class ResetPassword implements OnInit {
   protected readonly failure = signal<string | null>(null);
   protected readonly passwordVisible = signal(false);
 
-  /** What the server said is wrong with the password, translated, once each. */
+  /** What the server said is wrong with the password, translated, one line per rule. */
   protected readonly passwordProblems = signal<readonly string[]>([]);
-  protected readonly passwordProblemText = computed(() => this.passwordProblems().join(' '));
 
   private readonly submitAttempted = signal(false);
 
@@ -185,6 +149,13 @@ export class ResetPassword implements OnInit {
     },
     { validators: passwordsMatch },
   );
+
+  constructor() {
+    // Somebody signing in from another tab must not cost this page its link,
+    // which lives only in memory.
+    effect(() => this.sessionWatch.holdRedirect(this.holding()));
+    this.destroyRef.onDestroy(() => this.sessionWatch.holdRedirect(false));
+  }
 
   ngOnInit(): void {
     this.begin();
@@ -354,20 +325,14 @@ export class ResetPassword implements OnInit {
       return;
     }
 
-    const codes = passwordCodes(error);
+    const problems = refusedFields(failure, ['newPassword']).has('newPassword')
+      ? [this.passwordError]
+      : passwordProblemLines(failure);
 
     // The link was accepted and the password was not. The link is kept, so the
     // reader can choose another password with it straight away.
-    if (codes.length > 0) {
-      this.passwordProblems.set([
-        ...new Set(
-          codes.map((code) =>
-            code === PASSWORD_TOO_SHORT_CODE
-              ? this.passwordError
-              : $localize`:@@resetPassword.password.refused:This password cannot be used. Choose a different one.`,
-          ),
-        ),
-      ]);
+    if (problems.length > 0) {
+      this.passwordProblems.set(problems);
       this.form.reset();
       this.submitAttempted.set(false);
       this.focusAfterRender('#password');

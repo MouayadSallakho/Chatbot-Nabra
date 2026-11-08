@@ -1,5 +1,6 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { TenantApi } from '@app/core/api/tenant-api';
@@ -49,6 +50,28 @@ describe('AcceptInvitation', () => {
             user: () => (authenticated ? { id: 'u1', email: 'bob@example.test' } : null),
           },
         },
+      ],
+    });
+
+    http = TestBed.inject(HttpTestingController);
+    handoff = TestBed.inject(InvitationHandoff);
+    fixture = TestBed.createComponent(AcceptInvitation);
+    fixture.detectChanges();
+    await settle();
+  }
+
+  /** Mounts with whatever AuthService double the test has already provided. */
+  async function mountWithoutAuthDouble(): Promise<void> {
+    TestBed.configureTestingModule({
+      imports: [AcceptInvitation],
+      providers: [
+        provideRouter([]),
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        TeamApi,
+        { provide: LOCAL_STORAGE, useValue: memoryStorage() },
+        { provide: TenantApi, useValue: { get: () => undefined, create: () => undefined } },
+        { provide: PermissionApi, useValue: permissionApiGranting('*') },
       ],
     });
 
@@ -177,12 +200,14 @@ describe('AcceptInvitation', () => {
 
     await mount(true);
 
-    http
-      .expectOne(acceptUrl)
-      .flush(
-        { title: 'Invitation is for a different account', detail: 'Sent elsewhere.' },
-        { status: 403, statusText: 'Forbidden' },
-      );
+    http.expectOne(acceptUrl).flush(
+      {
+        title: 'Invitation is for a different account',
+        detail: 'Sent elsewhere.',
+        code: 'invitations.account.mismatch',
+      },
+      { status: 403, statusText: 'Forbidden' },
+    );
     await settle();
 
     openLinkWith(`#token=${token}`);
@@ -266,6 +291,30 @@ describe('AcceptInvitation', () => {
     expect(handoff.peek()).toBeNull();
   });
 
+  it('goes ahead by itself once the session watch finds a sign-in from another tab', async () => {
+    openLinkWith(`#token=${token}`);
+
+    const signedIn = signal(false);
+
+    TestBed.configureTestingModule({
+      providers: [
+        {
+          provide: AuthService,
+          useValue: { isAuthenticated: signedIn, user: () => null },
+        },
+      ],
+    });
+    await mountWithoutAuthDouble();
+
+    expect(text()).toContain('Sign in');
+    http.expectNone(acceptUrl);
+
+    signedIn.set(true);
+    await settle();
+
+    expect(http.expectOne(acceptUrl).request.body).toEqual({ token, language: 'en' });
+  });
+
   it('says plainly when the invitation was written to a different account', async () => {
     openLinkWith(`#token=${token}`);
 
@@ -275,6 +324,7 @@ describe('AcceptInvitation', () => {
       {
         title: 'Invitation is for a different account',
         detail: 'This invitation was sent to a different account.',
+        code: 'invitations.account.mismatch',
       },
       { status: 403, statusText: 'Forbidden' },
     );

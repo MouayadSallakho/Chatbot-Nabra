@@ -6,13 +6,18 @@ import { toApiError } from '@app/core/api/api-error';
 /**
  * How far the answer to "is anybody signed in" has got.
  *
- * `unknown` is a real state and not a placeholder: before the first `/me`
- * answers, this application genuinely does not know, and it must not guess. A
+ * `unknown` is a real state and not a placeholder: before the first session
+ * check answers, this application genuinely does not know, and it must not guess. A
  * client that assumed anonymous would flash the sign-in screen at somebody who
  * is signed in; one that assumed authenticated would flash the admin at somebody
  * who is not.
  */
 export type AuthStatus = 'unknown' | 'authenticated' | 'anonymous';
+
+/** What one session check found out. */
+export type SessionCheck =
+  | { readonly outcome: 'answered'; readonly user: AuthenticatedUser | null }
+  | { readonly outcome: 'unavailable'; readonly retryAfterSeconds?: number };
 
 /**
  * Who is signed in, for the whole application.
@@ -39,6 +44,9 @@ export class AuthService {
   /** The antiforgery renewal in flight, shared by everybody who asks meanwhile. */
   private renewing: Promise<void> | null = null;
 
+  /** How long the startup session check was told to wait, when it was refused. */
+  startupRetryAfterSeconds: number | undefined;
+
   /** How far resolution has got. */
   readonly status = this.state.asReadonly();
 
@@ -52,9 +60,8 @@ export class AuthService {
    * Prepares a visitors' page (the hosted chat, the widget): the anti-forgery
    * token their writes need, and nothing about a session (Phase 36.9).
    *
-   * A visitor has no account, so asking `/me` could only ever answer 401, and
-   * on a customer's website that 401 sat in the website's console on every
-   * page view.
+   * A visitor has no account, so there is no session to ask about, and a
+   * customer's website should not carry this application's requests for one.
    */
   async prepareVisitor(): Promise<void> {
     try {
@@ -70,36 +77,68 @@ export class AuthService {
   /**
    * Asks the server who this browser is, once, at startup.
    *
+   * <strong>`/api/auth/session`, so a signed-out page logs no 401.</strong> When
+   * it cannot answer (429, 503, no reply), `/api/auth/me` decides exactly as it
+   * always did, so a throttled network still lets signed-in people in.
+   *
    * <strong>The antiforgery token and the session are asked for together</strong>
-   * (Phase 36.11; one after the other before). `/me` is a read and needs no
-   * token. The token is still awaited before this returns, so the first sign-in
-   * attempt is never rejected for want of one. A failure there is not fatal: if
-   * the backend is unreachable, both calls fail and the application settles on
-   * `anonymous` -- which shows the sign-in screen, where the next failure can be
-   * reported in terms somebody can act on. Settling on `unknown` instead would
-   * leave the loading state on screen forever.
+   * (Phase 36.11). The token is still awaited before this returns, so the first
+   * sign-in attempt is never rejected for want of one. A failure there is not
+   * fatal: if the backend is unreachable, the calls fail and the application
+   * settles on `anonymous` -- which shows the sign-in screen, where the next
+   * failure can be reported in terms somebody can act on. Settling on `unknown`
+   * instead would leave the loading state on screen forever.
    */
   async restore(): Promise<AuthStatus> {
     // Nothing to report if it fails. A backend that cannot issue a token also
-    // cannot answer /me, so that call produces the state and the screen after it
-    // produces the message.
+    // cannot answer the session check, so that produces the state and the screen
+    // after it produces the message.
     const token = firstValueFrom(this.api.csrf()).catch(() => undefined);
+    const check = await this.checkSession();
 
-    try {
-      this.account.set(await firstValueFrom(this.api.me()));
-      this.state.set('authenticated');
-    } catch {
-      // 401 is the ordinary answer for a browser that is not signed in, and a
-      // transport failure is answered the same way: in both cases there is no
-      // usable session, and the sign-in screen is where somebody can do
-      // something about it.
-      this.account.set(null);
-      this.state.set('anonymous');
+    if (check.outcome === 'answered') {
+      this.adoptAnswer(check.user);
+    } else {
+      this.startupRetryAfterSeconds = check.retryAfterSeconds;
+      await this.restoreFromMe();
     }
 
     await token;
 
     return this.state();
+  }
+
+  /**
+   * Asks whether this browser is signed in, without changing what this service
+   * believes. Never throws.
+   */
+  async checkSession(): Promise<SessionCheck> {
+    try {
+      const answer = await firstValueFrom(this.api.session());
+
+      return { outcome: 'answered', user: answer.authenticated ? answer.user : null };
+    } catch (failure) {
+      return { outcome: 'unavailable', retryAfterSeconds: toApiError(failure).retryAfterSeconds };
+    }
+  }
+
+  /** Takes on what a session check found. */
+  adoptAnswer(user: AuthenticatedUser | null): void {
+    this.account.set(user);
+    this.state.set(user ? 'authenticated' : 'anonymous');
+  }
+
+  /** The startup check when the session check could not answer. */
+  private async restoreFromMe(): Promise<void> {
+    try {
+      this.adoptAnswer(await firstValueFrom(this.api.me()));
+    } catch {
+      // 401 is the ordinary answer for a browser that is not signed in, and a
+      // transport failure is answered the same way: in both cases there is no
+      // usable session, and the sign-in screen is where somebody can do
+      // something about it.
+      this.adoptAnswer(null);
+    }
   }
 
   /**

@@ -11,7 +11,7 @@
  * while adding very little, and a longer passphrase is both stronger and easier
  * to remember.
  *
- * Shared by registration and setting a new password, so the two can never
- * disagree with each other.
+ * Shared by registration, setting a new password and the words for a refused
+ * password, so the three can never disagree with each other.
  */
 export const PASSWORD_MIN_LENGTH = 12;

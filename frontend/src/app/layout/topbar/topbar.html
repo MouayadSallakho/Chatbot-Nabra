@@ -84,6 +84,7 @@
     <app-notification-bell />
     <app-profile-menu
       [email]="userEmail()"
+      [emailLanguage]="userEmailLanguage()"
       [workspaceName]="workspaceName()"
       [canSwitchWorkspace]="canSwitchWorkspace()"
       (workspaceSwitched)="workspaceSwitched.emit()"

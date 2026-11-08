@@ -124,6 +124,11 @@ export class AppShell {
 
   /** The address of the signed-in account. Real, and the only account field shown. */
   protected readonly userEmail = computed(() => this.auth.user()?.email ?? '');
+  protected readonly userEmailLanguage = computed(() => {
+    const user = this.auth.user();
+
+    return user ? (user.language ?? null) : undefined;
+  });
 
   /** Whether there is another workspace to switch to. */
   protected readonly canSwitchWorkspace = this.workspace.hasChoice;

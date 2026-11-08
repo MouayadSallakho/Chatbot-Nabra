@@ -73,6 +73,9 @@
         }
       </button>
     }
+    @if (emailLanguageLine(); as line) {
+      <p class="menu-note" role="presentation" data-testid="account-email-language">{{ line }}</p>
+    }
   </div>
 
   <hr class="menu-separator" role="separator" />

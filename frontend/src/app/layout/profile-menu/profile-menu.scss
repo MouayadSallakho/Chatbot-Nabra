@@ -88,6 +88,15 @@
   color: var(--text-secondary);
 }
 
+// The read-only line under the language choices: which language the account's
+// emails are written in.
+.menu-note {
+  margin: 0;
+  padding: var(--space-1) var(--space-3) var(--space-2);
+  color: var(--text-muted);
+  font: var(--text-caption);
+}
+
 .menu-check {
   margin-inline-start: auto;
   color: var(--text-primary);

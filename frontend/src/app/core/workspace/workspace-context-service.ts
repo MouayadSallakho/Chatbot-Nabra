@@ -163,7 +163,7 @@ export class WorkspaceContextService {
    *
    * Only when this browser already holds a selection, which it keeps only while
    * somebody is signed in: the list of workspaces and that workspace's
-   * permissions are then read at the same time as `/api/auth/me`, instead of one
+   * permissions are then read at the same time as the session check, instead of one
    * after the other once it has answered. A deep link into the inbox used to wait
    * for four requests in a row before the page could even be chosen. Returns
    * null, and sends nothing, when there is no selection to go on.

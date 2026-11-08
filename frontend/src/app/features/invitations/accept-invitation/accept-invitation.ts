@@ -4,8 +4,10 @@ import {
   DestroyRef,
   OnInit,
   computed,
+  effect,
   inject,
   signal,
+  untracked,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import {
@@ -90,6 +92,16 @@ export class AcceptInvitation implements OnInit {
   protected readonly workspaceInitial = computed(
     () => Array.from(this.workspaceName()?.trim() ?? '')[0]?.toLocaleUpperCase() ?? '',
   );
+
+  constructor() {
+    // Signed in from another tab while this page waited: the session watch has
+    // adopted it, so the invitation can go ahead as it would after any sign-in.
+    effect(() => {
+      if (this.auth.isAuthenticated() && untracked(this.state) === 'needsAccount') {
+        void this.proceed();
+      }
+    });
+  }
 
   ngOnInit(): void {
     this.begin();
@@ -238,9 +250,7 @@ export class AcceptInvitation implements OnInit {
       this.workspaceName.set(accepted.name);
       this.state.set('accepted');
     } catch (error) {
-      const failure = toApiError(error);
-
-      this.failure.set(this.explain(failure));
+      this.failure.set(toApiError(error));
       this.state.set('failed');
 
       // A refused invitation is refused for good: used, withdrawn, expired, or
@@ -248,30 +258,6 @@ export class AcceptInvitation implements OnInit {
       // cannot succeed.
       this.handoff.clear();
     }
-  }
-
-  /**
-   * Says what to do next, for the one refusal whose shared copy misleads.
-   *
-   * A `403` here is not the usual "your roles do not include this": the reader
-   * is not being refused inside a workspace they belong to, they are being told
-   * this link was written to somebody else's address. The shared copy would send
-   * them to an administrator, who cannot help — the remedy is theirs, and it is
-   * to come back as the invited account.
-   *
-   * The address is still never named. Repeating it would turn a forwarded link
-   * into a way to learn a colleague's email, which is exactly what refusing the
-   * acceptance is protecting.
-   */
-  private explain(failure: ApiError): ApiError {
-    if (failure.kind !== 'forbidden') {
-      return failure;
-    }
-
-    return {
-      ...failure,
-      message: $localize`:@@invitation.otherAccount:This invitation was sent to a different account. Sign out and open the link again as the address it was sent to.`,
-    };
   }
 
   /** Into the workspace they just joined. */

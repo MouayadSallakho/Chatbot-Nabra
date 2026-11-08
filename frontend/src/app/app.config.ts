@@ -20,13 +20,7 @@ import { WorkspaceContextService } from '@app/core/workspace/workspace-context-s
 import { PUBLIC_SURFACE_PATH } from '@app/core/i18n/language';
 import { warmRoute } from '@app/core/navigation/route-warmup';
 import { readsAhead } from '@app/core/auth/session-probe';
-import {
-  FORGOT_PASSWORD_PATH,
-  LOGIN_PATH,
-  REGISTER_PATH,
-  RESET_PASSWORD_PATH,
-} from '@app/core/auth/auth-guard';
-import { ACCEPT_INVITATION_PATH } from '@app/core/invitations/invitation-handoff';
+import { SIGNED_OUT_PATHS, SessionWatch } from '@app/core/auth/session-watch';
 import { routes } from './app.routes';
 
 export const appConfig: ApplicationConfig = {
@@ -65,7 +59,7 @@ export const appConfig: ApplicationConfig = {
     //
     // <strong>This is what removes the flicker.</strong> Without it the router
     // would run its guards against an unknown authentication state, show the
-    // sign-in screen, then correct itself once /me answered -- so every reload
+    // sign-in screen, then correct itself once the session check answered -- so every reload
     // would flash a login form at somebody who was already signed in. The
     // initializer costs two requests before first paint; the markup in
     // index.html covers that moment with a real loading state rather than a
@@ -73,9 +67,7 @@ export const appConfig: ApplicationConfig = {
     //
     // <strong>Not on the visitors' pages</strong> (Phase 36.9). The hosted chat
     // and the widget have no session to restore and no link into the admin, so
-    // they get only the anti-forgery token their writes need. On a customer's
-    // website the /me question was a 401 in that website's console on every
-    // page view.
+    // they get only the anti-forgery token their writes need.
     provideAppInitializer(async () => {
       const auth = inject(AuthService);
 
@@ -86,6 +78,7 @@ export const appConfig: ApplicationConfig = {
       }
 
       const workspace = inject(WorkspaceContextService);
+      const sessionWatch = inject(SessionWatch);
 
       // A browser that holds a workspace selection was signed in, so the
       // workspace reads and the page's code are started now, alongside the
@@ -93,15 +86,7 @@ export const appConfig: ApplicationConfig = {
       // (Phase 36.11). Nothing started here is used unless the session is
       // confirmed.
       const path = inject(DOCUMENT).location.pathname;
-      const prefetch = readsAhead(path, [
-        LOGIN_PATH,
-        REGISTER_PATH,
-        FORGOT_PASSWORD_PATH,
-        RESET_PASSWORD_PATH,
-        ACCEPT_INVITATION_PATH,
-      ])
-        ? workspace.prefetch()
-        : null;
+      const prefetch = readsAhead(path, SIGNED_OUT_PATHS) ? workspace.prefetch() : null;
 
       if (prefetch) {
         warmRoute(routes, path);
@@ -112,6 +97,8 @@ export const appConfig: ApplicationConfig = {
         // workspace screen explains an unreachable backend.
         await workspace.load(prefetch);
       }
+
+      sessionWatch.start();
     }),
     provideRouter(
       routes,

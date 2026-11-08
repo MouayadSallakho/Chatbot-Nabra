@@ -225,6 +225,126 @@ describe('toApiError', () => {
     });
   });
 
+  describe('worded by code (Phase 38.1a)', () => {
+    /** A refusal carrying a code, as every 400, 409, 412 and 422 now does. */
+    function coded(
+      status: number,
+      body: object,
+      headers?: Record<string, string>,
+    ): HttpErrorResponse {
+      return new HttpErrorResponse({
+        status,
+        url: '/api/auth/login',
+        error: { type: 'about:blank', title: 'A title', ...body },
+        headers: new HttpHeaders(headers),
+      });
+    }
+
+    afterEach(() => {
+      document.documentElement.lang = '';
+    });
+
+    it('takes the words from the catalogue rather than from the server', () => {
+      const error = toApiError(
+        coded(401, { code: 'auth.credentials.invalid', detail: 'Some English from the server.' }),
+      );
+
+      expect(error.message).toBe('The email address or password is incorrect.');
+    });
+
+    it('reads every rule the server named, and only strings', () => {
+      const error = toApiError(
+        coded(400, {
+          code: 'auth.password.too_short',
+          codes: ['auth.password.too_short', 'auth.password.requires_digit', 7, null],
+        }),
+      );
+
+      expect(error.codes).toEqual(['auth.password.too_short', 'auth.password.requires_digit']);
+    });
+
+    it('carries the bound a value broke', () => {
+      expect(toApiError(coded(422, { code: 'x', limit: 64 })).limit).toBe(64);
+    });
+
+    it.each([['64'], [-1], [Number.NaN], [null]])('refuses a limit of %o', (limit) => {
+      expect(toApiError(coded(422, { code: 'x', limit })).limit).toBeUndefined();
+    });
+
+    it('puts Retry-After into the words', () => {
+      const error = toApiError(coded(429, { code: 'auth.throttled' }, { 'Retry-After': '900' }));
+
+      expect(error.retryAfterSeconds).toBe(900);
+      expect(error.message).toBe('Too many attempts. Try again in 15 minutes.');
+    });
+
+    it('says signing in is unavailable on auth.throttle.unavailable', () => {
+      const error = toApiError(coded(503, { code: 'auth.throttle.unavailable' }));
+
+      expect(error.message).toContain('Signing in is unavailable for a moment');
+    });
+
+    it('takes the field names of an errors map, and never its messages', () => {
+      const error = toApiError(
+        coded(400, {
+          code: 'validation.failed',
+          errors: { Email: ['The English the reader must never see.'], password: ['More.'] },
+        }),
+      );
+
+      expect(error.fields).toEqual(['Email', 'password']);
+      expect(JSON.stringify(error)).not.toContain('never see');
+    });
+
+    it('takes no fields from a body without an errors map', () => {
+      expect(toApiError(coded(400, { code: 'x' })).fields).toBeUndefined();
+    });
+
+    it('keeps the generic words for a code nobody registered, in English keeping the detail', () => {
+      // The screens not yet moved say what they said before, until 38.5.
+      expect(toApiError(coded(409, { code: 'knowledge.x', detail: 'Server words.' })).message).toBe(
+        'Server words.',
+      );
+    });
+
+    describe('on an Arabic page', () => {
+      beforeEach(() => {
+        document.documentElement.lang = 'ar';
+      });
+
+      it.each([
+        [400, 'Some of the details were rejected'],
+        [404, 'no longer exists'],
+        [409, 'not available for this item'],
+        [410, 'no longer available'],
+        [413, 'too large'],
+        [415, 'not one of the formats'],
+        [422, 'No usable text'],
+      ])('never shows the server detail on a %i', (status, generic) => {
+        const error = toApiError(
+          coded(status, { code: 'area.unknown', detail: 'Server English.' }),
+        );
+
+        expect(error.message).not.toContain('Server English');
+        expect(error.message).toContain(generic);
+      });
+
+      it('never shows the detail of a refusal with no code either', () => {
+        const error = toApiError(problem(409, 'Server English.'));
+
+        expect(error.message).not.toContain('Server English');
+      });
+
+      it('still words a known code', () => {
+        const error = toApiError(
+          coded(401, { code: 'auth.credentials.invalid', detail: 'Server English.' }),
+        );
+
+        expect(error.message).toBe('The email address or password is incorrect.');
+      });
+    });
+  });
+
   it('survives something that is not an HTTP failure at all', () => {
     expect(toApiError(new Error('boom')).kind).toBe('unknown');
     expect(toApiError(undefined).kind).toBe('unknown');

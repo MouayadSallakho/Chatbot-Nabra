@@ -90,7 +90,7 @@ export const sessionExpiryInterceptor: HttpInterceptorFn = (request, next) => {
         failure instanceof HttpErrorResponse &&
         failure.status === 401 &&
         !OWN_401_IS_MEANINGFUL.some((route) => request.url.startsWith(route)) &&
-        // A read sent before the session was confirmed: `/me` speaks for it.
+        // A read sent before the session was confirmed: the session check speaks for it.
         !request.context.get(SESSION_PROBE)
       ) {
         auth.markSignedOut();

@@ -109,6 +109,48 @@ describe('ProfileMenu', () => {
     expect(root().textContent).toContain('Switch workspace');
   });
 
+  describe('the line about emails (Phase 38.1a)', () => {
+    const line = (): HTMLElement | null =>
+      root().querySelector('[data-testid="account-email-language"]');
+
+    async function withLanguage(language: string | null | undefined): Promise<void> {
+      await render();
+      fixture.componentRef.setInput('emailLanguage', language);
+      await open();
+    }
+
+    it('says which language the account is emailed in', async () => {
+      await withLanguage('en');
+
+      expect(line()?.textContent?.trim()).toBe('Emails in English');
+    });
+
+    it('says Arabic for an Arabic account', async () => {
+      await withLanguage('ar');
+
+      expect(line()?.textContent?.trim()).toBe('Emails in Arabic');
+    });
+
+    it('reads a null language as English, the server rule', async () => {
+      await withLanguage(null);
+
+      expect(line()?.textContent?.trim()).toBe('Emails in English');
+    });
+
+    it('says nothing when there is no account to ask about', async () => {
+      await withLanguage(undefined);
+
+      expect(line()).toBeNull();
+    });
+
+    it('is a read-only line, not one more item in the arrow-key order', async () => {
+      await withLanguage('en');
+
+      expect(line()?.getAttribute('role')).toBe('presentation');
+      expect(line()?.tagName).toBe('P');
+    });
+  });
+
   describe('language', () => {
     let reloads: number;
 

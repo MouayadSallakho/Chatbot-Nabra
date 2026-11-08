@@ -11,9 +11,15 @@ import {
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
 import { WORKSPACE_SETUP_PATH } from '@app/core/workspace/workspace-guard';
 import { APP_LANGUAGE } from '@app/core/i18n/language';
+import { PASSWORD_MIN_LENGTH } from '@app/core/auth/password-policy';
+import { passwordProblemLines } from '@app/core/problems/core-problems';
+import { refusedFields } from '@app/core/problems/field-problems';
 import { Icon } from '@app/shared/icon/icon';
 import { EntryFrame } from '@app/layout/entry-frame/entry-frame';
-import { PASSWORD_MIN_LENGTH } from '../password-policy';
+
+/** The fields of this form, by the names the server uses for them too. */
+const FIELDS = ['email', 'password'] as const;
+type Field = (typeof FIELDS)[number];
 
 /**
  * The registration screen.
@@ -56,6 +62,12 @@ export class Register {
   protected readonly failure = signal<ApiError | null>(null);
   protected readonly passwordVisible = signal(false);
 
+  /** One sentence per password rule the server said was broken. */
+  protected readonly passwordProblems = signal<readonly string[]>([]);
+
+  /** Fields a refusal named, until the reader edits them. */
+  protected readonly refused = signal<ReadonlySet<Field>>(new Set());
+
   private readonly submitAttempted = signal(false);
 
   protected readonly form = new FormGroup({
@@ -69,10 +81,23 @@ export class Register {
     }),
   });
 
-  protected showError(field: 'email' | 'password'): boolean {
+  protected showError(field: Field): boolean {
     const control = this.form.controls[field];
 
-    return control.invalid && (control.touched || this.submitAttempted());
+    return (
+      (control.invalid && (control.touched || this.submitAttempted())) || this.refused().has(field)
+    );
+  }
+
+  /** A refusal is about the value it judged, so editing the field clears it. */
+  protected fieldEdited(field: Field): void {
+    if (this.refused().has(field)) {
+      this.refused.update((fields) => new Set([...fields].filter((name) => name !== field)));
+    }
+
+    if (field === 'password' && this.passwordProblems().length > 0) {
+      this.passwordProblems.set([]);
+    }
   }
 
   protected togglePassword(): void {
@@ -90,6 +115,8 @@ export class Register {
 
     this.submitting.set(true);
     this.failure.set(null);
+    this.passwordProblems.set([]);
+    this.refused.set(new Set());
 
     try {
       await this.auth.register({
@@ -115,9 +142,14 @@ export class Register {
 
       await this.router.navigate(['/', WORKSPACE_SETUP_PATH]);
     } catch (error) {
-      // The backend stays the authority. A taken address and a password that
-      // breaks the policy are reported in its own words rather than re-derived.
-      this.failure.set(error as ApiError);
+      // The backend stays the authority. A password it refused is shown beside
+      // the password, one line per rule; anything else above the form.
+      const failure = error as ApiError;
+      const problems = passwordProblemLines(failure);
+
+      this.passwordProblems.set(problems);
+      this.failure.set(problems.length > 0 ? null : failure);
+      this.refused.set(refusedFields(failure, FIELDS));
       this.form.controls.password.reset();
     } finally {
       this.submitting.set(false);

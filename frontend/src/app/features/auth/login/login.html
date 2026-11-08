@@ -17,16 +17,34 @@
     </div>
   }
 
+  <!--
+    Always present, because a live region only announces a change to something
+    already on the page. It says how long is left at most once a minute.
+  -->
+  <p class="visually-hidden" role="status" data-testid="sign-in-wait-announcer">
+    {{ waitAnnouncement() }}
+  </p>
+
   @if (failure(); as error) {
     <!--
       `role="alert"` so a screen reader hears the refusal without having to go
-      looking for it. The text is the server's own sentence, which deliberately
-      does not say whether the address exists; `dir="auto"` because it arrives in
-      English on an Arabic page too.
+      looking for it. While the button waits, the live region above speaks
+      instead: an alert would interrupt every time the time left changed.
     -->
-    <div class="alert alert-danger auth-alert" role="alert">
+    <div
+      class="alert alert-danger auth-alert"
+      [attr.role]="waiting() ? null : 'alert'"
+      data-testid="sign-in-failure"
+    >
       <app-icon name="alert" [strokeWidth]="1.75" />
-      <span dir="auto">{{ error.message }}</span>
+      <span>{{ error.message }}</span>
+    </div>
+  }
+
+  @if (waitOver()) {
+    <div class="alert alert-info auth-alert" data-testid="sign-in-wait-over">
+      <app-icon name="info" [strokeWidth]="1.75" />
+      <span>{{ waitOverText }}</span>
     </div>
   }
 
@@ -42,6 +60,7 @@
         type="email"
         dir="ltr"
         formControlName="email"
+        (input)="fieldEdited('email')"
         autocomplete="username"
         inputmode="email"
         autocapitalize="off"
@@ -73,6 +92,7 @@
           class="input"
           [type]="passwordVisible() ? 'text' : 'password'"
           formControlName="password"
+          (input)="fieldEdited('password')"
           autocomplete="current-password"
           [attr.aria-invalid]="showError('password') ? 'true' : null"
           [attr.aria-describedby]="showError('password') ? 'password-error' : null"
@@ -110,7 +130,7 @@
     </div>
 
     <div class="auth-actions">
-      <button type="submit" class="btn btn-primary btn-lg" [disabled]="submitting()">
+      <button type="submit" class="btn btn-primary btn-lg" [disabled]="submitting() || waiting()">
         @if (submitting()) {
           <span class="spinner" aria-hidden="true"></span>
           <span class="btn-label" i18n="@@signIn.submitting">Signing in…</span>

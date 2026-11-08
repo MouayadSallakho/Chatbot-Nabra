@@ -1,4 +1,6 @@
 import { HttpErrorResponse } from '@angular/common/http';
+import { pageLanguage } from '@app/core/i18n/language';
+import { problemWording } from '@app/core/problems/problem-words';
 
 /**
  * What went wrong, in terms a screen can act on.
@@ -71,13 +73,25 @@ export interface ApiError {
    */
   readonly code?: string;
 
+  /** Every rule the server named when more than one was broken, `code` included. */
+  readonly codes?: readonly string[];
+
+  /** The bound a refused value broke, in the rule's own unit (bytes, pages, rows). */
+  readonly limit?: number;
+
   /**
-   * A sentence safe to show a reader.
+   * The fields a 400's `errors` map named, and never its messages: those are the
+   * server's English. See `refusedFields`.
+   */
+  readonly fields?: readonly string[];
+
+  /**
+   * A sentence safe to show a reader, in the reader's language.
    *
-   * For the kinds where the backend authors genuine guidance -- a rejected
-   * value, a lifecycle conflict -- this is the server's own `detail`. For
-   * everything else it is our copy, because a 500 or a transport failure has
-   * nothing a reader can act on and its details belong in a log.
+   * Worded by `code` wherever a catalogue knows it (`core/problems/`). Otherwise
+   * our generic copy for the kind. An English page still falls back to the
+   * server's `detail` for a code no catalogue has registered yet, so a screen not
+   * yet moved says what it always said; an Arabic page never does.
    */
   readonly message: string;
 }
@@ -108,7 +122,7 @@ const MESSAGES: Readonly<Record<ApiErrorKind, string>> = {
 };
 
 /**
- * Which statuses carry a `detail` worth showing.
+ * Which statuses carry a `detail` worth showing, on an English page only.
  *
  * The backend writes these for a reader -- "Name must be 120 characters or
  * fewer", "An agent cannot be disabled while it is a draft" -- and they are more
@@ -116,11 +130,9 @@ const MESSAGES: Readonly<Record<ApiErrorKind, string>> = {
  * our own copy, so a server-side fault can never put its internals on screen
  * even if a future handler became careless with them.
  *
- * 401 is on the list for one specific case: a rejected sign-in, where the server
- * sends a single deliberately uninformative sentence that must reach the reader
- * verbatim. Re-wording it here would risk saying more than the server chose to.
- * Our own copy still covers a 401 with no body, which is what an expired session
- * produces.
+ * 401 is on the list for a refusal that carries a sentence and no code. A rejected
+ * sign-in is worded by its code now (`auth.credentials.invalid`), and our own copy
+ * covers a 401 with no body, which is what an expired session produces.
  *
  * 403 is deliberately absent from the list, even though Phase 13 made it a real
  * answer. The server's detail is safe -- it names the permission code and
@@ -165,16 +177,28 @@ export function toApiError(failure: unknown): ApiError {
   const kind: ApiErrorKind = failure.status === 0 ? 'offline' : kindOf(failure.status);
 
   const code = problemCode(failure);
+  const retryAfterSeconds = readRetryAfter(failure);
+  const codes = problemCodes(failure);
+  const limit = problemLimit(failure);
+  const worded =
+    code === undefined
+      ? undefined
+      : problemWording(code, {
+          language: pageLanguage(),
+          retryAfterSeconds,
+          limit,
+          codes: codes ?? [code],
+        });
 
   return {
     kind,
     code,
+    codes,
+    limit,
+    fields: problemFields(failure),
     status: failure.status,
-    retryAfterSeconds: readRetryAfter(failure),
-    // A rejected antiforgery token is not the reader's input being wrong, and
-    // the interceptor has already fetched a fresh one: the honest advice is to
-    // try again, not to check fields that are fine.
-    message: code === 'antiforgery.invalid' ? ANTIFORGERY_MESSAGE : readableMessage(failure, kind),
+    retryAfterSeconds,
+    message: worded ?? readableMessage(failure, kind),
   };
 }
 
@@ -183,9 +207,6 @@ const AI_OPERATION = /\/(preview|index|search|messages)(\?|$)/;
 
 /** A 503 from anything that is not an AI operation. */
 const TEMPORARILY_UNAVAILABLE = $localize`:@@apiError.temporarilyUnavailable:This service is temporarily unavailable. Nothing was changed. Try again in a moment.`;
-
-/** What a reader is told when the page's antiforgery token was out of date. */
-const ANTIFORGERY_MESSAGE = $localize`:@@apiError.antiforgery:This page's security check had expired. Nothing was changed. The check has been renewed, so try again.`;
 
 /**
  * The largest `Retry-After` this client will repeat to a reader.
@@ -278,7 +299,10 @@ function kindOf(status: number): ApiErrorKind {
 }
 
 /**
- * Prefers the server's own wording where it is written for a reader.
+ * The words for a refusal no catalogue has registered.
+ *
+ * On an English page, the server's own `detail` where it is written for a reader.
+ * The `detail` is English, so an Arabic page gets the generic words of the kind.
  *
  * Only `detail` is ever read, and only from a Problem Details body. The rest of
  * the payload -- `type`, `traceId`, `status`, anything a future handler adds --
@@ -294,7 +318,7 @@ function readableMessage(failure: HttpErrorResponse, kind: ApiErrorKind): string
     return TEMPORARILY_UNAVAILABLE;
   }
 
-  if (!DETAIL_IS_USEFUL.has(failure.status)) {
+  if (!DETAIL_IS_USEFUL.has(failure.status) || pageLanguage() === 'ar') {
     return MESSAGES[kind];
   }
 
@@ -328,4 +352,37 @@ function problemCode(failure: HttpErrorResponse): string | undefined {
   const code = (body as { code?: unknown }).code;
 
   return typeof code === 'string' && code.length > 0 ? code : undefined;
+}
+
+/** Every code in a `codes` array, keeping only strings. */
+function problemCodes(failure: HttpErrorResponse): readonly string[] | undefined {
+  const codes = problemBody(failure)?.['codes'];
+
+  return Array.isArray(codes)
+    ? codes.filter((code): code is string => typeof code === 'string' && code.length > 0)
+    : undefined;
+}
+
+/** A finite, non-negative `limit`, or nothing. */
+function problemLimit(failure: HttpErrorResponse): number | undefined {
+  const limit = problemBody(failure)?.['limit'];
+
+  return typeof limit === 'number' && Number.isFinite(limit) && limit >= 0 ? limit : undefined;
+}
+
+/** The names in an `errors` map. Its values are the server's English and stay unread. */
+function problemFields(failure: HttpErrorResponse): readonly string[] | undefined {
+  const errors = problemBody(failure)?.['errors'];
+
+  return typeof errors === 'object' && errors !== null && !Array.isArray(errors)
+    ? Object.keys(errors)
+    : undefined;
+}
+
+function problemBody(failure: HttpErrorResponse): Readonly<Record<string, unknown>> | undefined {
+  const body: unknown = failure.error;
+
+  return typeof body === 'object' && body !== null
+    ? (body as Readonly<Record<string, unknown>>)
+    : undefined;
 }

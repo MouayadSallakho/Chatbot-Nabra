@@ -1,4 +1,4 @@
-import { provideHttpClient } from '@angular/common/http';
+import { HttpHeaders, provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { ApiError } from '@app/core/api/api-error';
@@ -28,26 +28,16 @@ describe('AuthService', () => {
 
   afterEach(() => http.verify());
 
-  /**
-   * Answers the startup pair: the antiforgery bootstrap, then /me.
-   *
-   * The second request is not issued until the first has settled -- the token
-   * has to exist before anything else is asked -- so this yields between them.
-   * Reaching for /me straight after flushing the first would find nothing,
-   * because the continuation has not run yet.
-   */
-  async function answerStartup(me: { status: number; body?: object }): Promise<void> {
+  /** Answers the startup pair: the antiforgery bootstrap and the session check. */
+  async function answerStartup(session: {
+    authenticated: boolean;
+    user?: object | null;
+  }): Promise<void> {
     http.expectOne('/api/auth/csrf').flush(null, { status: 204, statusText: 'No Content' });
 
     await Promise.resolve();
 
-    const request = http.expectOne('/api/auth/me');
-
-    if (me.status === 200) {
-      request.flush(me.body ?? null);
-    } else {
-      request.flush(null, { status: me.status, statusText: 'Unauthorized' });
-    }
+    http.expectOne('/api/auth/session').flush({ user: null, ...session });
   }
 
   /**
@@ -72,11 +62,12 @@ describe('AuthService', () => {
   });
 
   describe('restoring at startup', () => {
+    const yieldOnce = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
+
     it('asks for the token and the session together, and settles only once the token is in', async () => {
-      // Together since Phase 36.11: /me is a read and needs no token, and a
-      // deep link used to wait for one round trip after the other. The token is
-      // still awaited, or the first sign-in attempt would be rejected and the
-      // reader would have to try twice for no visible reason.
+      // Together since Phase 36.11, and the token is still awaited, or the first
+      // sign-in attempt would be rejected and the reader would have to try twice
+      // for no visible reason.
       let settled = false;
       const restoring = auth.restore().then((status) => {
         settled = true;
@@ -86,8 +77,8 @@ describe('AuthService', () => {
 
       const token = http.expectOne('/api/auth/csrf');
 
-      http.expectOne('/api/auth/me').flush(account);
-      await new Promise((resolve) => setTimeout(resolve, 0));
+      http.expectOne('/api/auth/session').flush({ authenticated: true, user: account });
+      await yieldOnce();
 
       expect(settled).toBe(false);
 
@@ -96,31 +87,66 @@ describe('AuthService', () => {
       expect(await restoring).toBe('authenticated');
     });
 
-    it('restores in either order of answers', async () => {
+    it('asks /session, and never /me, when the session check answers', async () => {
       const restoring = auth.restore();
 
-      await answerStartup({ status: 200, body: account });
-
-      expect(await restoring).toBe('authenticated');
-    });
-
-    it('adopts the account the server names', async () => {
-      const restoring = auth.restore();
-
-      await answerStartup({ status: 200, body: account });
+      await answerStartup({ authenticated: false });
       await restoring;
 
-      expect(auth.user()).toEqual(account);
+      http.expectNone('/api/auth/me');
+    });
+
+    it('adopts the account the server names, with its email language', async () => {
+      const restoring = auth.restore();
+
+      await answerStartup({ authenticated: true, user: { ...account, language: 'ar' } });
+      await restoring;
+
+      expect(auth.user()).toEqual({ ...account, language: 'ar' });
       expect(auth.isAuthenticated()).toBe(true);
     });
 
-    it('settles on anonymous when there is no session', async () => {
+    it('settles on anonymous when there is no session, and logs nothing', async () => {
       const restoring = auth.restore();
 
-      await answerStartup({ status: 401 });
+      await answerStartup({ authenticated: false });
 
       expect(await restoring).toBe('anonymous');
       expect(auth.user()).toBeNull();
+    });
+
+    it('falls back to /me when the session check is throttled, so nobody is locked out', async () => {
+      const restoring = auth.restore();
+
+      http.expectOne('/api/auth/csrf').flush(null, { status: 204, statusText: 'No Content' });
+      http.expectOne('/api/auth/session').flush(
+        { code: 'auth.throttled' },
+        {
+          status: 429,
+          statusText: 'Too Many Requests',
+          headers: new HttpHeaders({ 'Retry-After': '120' }),
+        },
+      );
+      await yieldOnce();
+
+      http.expectOne('/api/auth/me').flush(account);
+
+      expect(await restoring).toBe('authenticated');
+      expect(auth.startupRetryAfterSeconds).toBe(120);
+    });
+
+    it('falls back to /me on a 503', async () => {
+      const restoring = auth.restore();
+
+      http.expectOne('/api/auth/csrf').flush(null, { status: 204, statusText: 'No Content' });
+      http
+        .expectOne('/api/auth/session')
+        .flush({ code: 'auth.throttle.unavailable' }, { status: 503, statusText: 'Unavailable' });
+      await yieldOnce();
+
+      http.expectOne('/api/auth/me').flush(null, { status: 401, statusText: 'Unauthorized' });
+
+      expect(await restoring).toBe('anonymous');
     });
 
     it('settles on anonymous when the backend cannot be reached at all', async () => {
@@ -130,7 +156,8 @@ describe('AuthService', () => {
       const restoring = auth.restore();
 
       http.expectOne('/api/auth/csrf').error(new ProgressEvent('error'), { status: 0 });
-      await Promise.resolve();
+      http.expectOne('/api/auth/session').error(new ProgressEvent('error'), { status: 0 });
+      await yieldOnce();
       http.expectOne('/api/auth/me').error(new ProgressEvent('error'), { status: 0 });
 
       expect(await restoring).toBe('anonymous');
@@ -141,7 +168,7 @@ describe('AuthService', () => {
 
       http.expectOne('/api/auth/csrf').error(new ProgressEvent('error'), { status: 0 });
       await Promise.resolve();
-      http.expectOne('/api/auth/me').flush(account);
+      http.expectOne('/api/auth/session').flush({ authenticated: true, user: account });
 
       expect(await restoring).toBe('authenticated');
     });
@@ -183,12 +210,14 @@ describe('AuthService', () => {
 
       await answerToken();
 
-      http
-        .expectOne('/api/auth/login')
-        .flush(
-          { title: 'Sign-in failed', detail: 'The email address or password is incorrect.' },
-          { status: 401, statusText: 'Unauthorized' },
-        );
+      http.expectOne('/api/auth/login').flush(
+        {
+          title: 'Sign-in failed',
+          detail: 'Whatever the server says.',
+          code: 'auth.credentials.invalid',
+        },
+        { status: 401, statusText: 'Unauthorized' },
+      );
 
       const failure = (await signingIn.catch((error: unknown) => error)) as ApiError;
 
@@ -288,21 +317,25 @@ describe('AuthService', () => {
       await registering;
     });
 
-    it('reports the backend words for a taken address', async () => {
+    it('words a taken address by its code', async () => {
       const registering = auth.register({ email: account.email, password });
 
       await answerToken();
 
-      http
-        .expectOne('/api/auth/register')
-        .flush(
-          { title: 'Registration rejected', detail: 'That email address is already in use.' },
-          { status: 400, statusText: 'Bad Request' },
-        );
+      http.expectOne('/api/auth/register').flush(
+        {
+          title: 'Registration rejected',
+          detail: 'Whatever the server says.',
+          code: 'auth.email.taken',
+        },
+        { status: 400, statusText: 'Bad Request' },
+      );
 
       const failure = (await registering.catch((error: unknown) => error)) as ApiError;
 
-      expect(failure.message).toBe('That email address is already in use.');
+      expect(failure.message).toBe(
+        'That email address is already in use. Sign in, or use a different address.',
+      );
       expect(auth.isAuthenticated()).toBe(false);
     });
   });
@@ -364,10 +397,10 @@ describe('AuthService', () => {
     it('exposes no token, no cookie and no credential', async () => {
       const restoring = auth.restore();
 
-      await answerStartup({ status: 200, body: account });
+      await answerStartup({ authenticated: true, user: account });
       await restoring;
 
-      // The account has exactly the two fields the backend publishes.
+      // The account has exactly the fields the backend publishes.
       expect(Object.keys(auth.user() ?? {}).sort()).toEqual(['email', 'id']);
 
       // And nothing on the service is named like a credential.

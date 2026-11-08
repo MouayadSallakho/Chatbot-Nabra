@@ -48,6 +48,16 @@ export function directionOf(language: AppLanguage): 'ltr' | 'rtl' {
 }
 
 /**
+ * The language this page was started in, for code with no injector (the words
+ * for a refused request). `APP_LANGUAGE` is the same answer for everybody else.
+ */
+export function pageLanguage(): AppLanguage {
+  const lang = globalThis.document?.documentElement.lang;
+
+  return isAppLanguage(lang) ? lang : 'en';
+}
+
+/**
  * The language this page was started in.
  *
  * Read from `<html lang>`, which the pre-paint script set from the stored choice

@@ -41,6 +41,12 @@ export class ProfileMenu {
   readonly workspaceName = input('');
   readonly canSwitchWorkspace = input(false);
 
+  /**
+   * The language the server writes this account's emails in. Null reads as
+   * English, the server's own rule; undefined means nobody is signed in to ask about.
+   */
+  readonly emailLanguage = input<string | null | undefined>(undefined);
+
   readonly workspaceSwitched = output<void>();
   readonly signedOut = output<void>();
 
@@ -74,6 +80,19 @@ export class ProfileMenu {
     const letters = parts.length > 1 ? parts[0][0] + parts[1][0] : local.slice(0, 1);
 
     return letters.toUpperCase() || '?';
+  });
+
+  /** "Emails in English": which language the account's emails are written in. */
+  protected readonly emailLanguageLine = computed(() => {
+    const language = this.emailLanguage();
+
+    if (language === undefined) {
+      return null;
+    }
+
+    return language === 'ar'
+      ? $localize`:@@account.emailsInArabic:Emails in Arabic`
+      : $localize`:@@account.emailsInEnglish:Emails in English`;
   });
 
   /**

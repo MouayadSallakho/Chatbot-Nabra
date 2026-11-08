@@ -12,6 +12,7 @@ import { RouterLink } from '@angular/router';
 import { toApiError } from '@app/core/api/api-error';
 import { AuthService } from '@app/core/auth/auth-service';
 import { LOGIN_PATH } from '@app/core/auth/auth-guard';
+import { refusedFields } from '@app/core/problems/field-problems';
 import { InvitationHandoff } from '@app/core/invitations/invitation-handoff';
 import { Icon } from '@app/shared/icon/icon';
 import { EntryFrame } from '@app/layout/entry-frame/entry-frame';
@@ -65,6 +66,9 @@ export class ForgotPassword {
   /** The address the link was asked for, repeated so a typo can be noticed. */
   protected readonly address = signal('');
 
+  /** Whether a refusal named the address, until the reader edits it. */
+  protected readonly refusedEmail = signal(false);
+
   private readonly submitAttempted = signal(false);
 
   protected readonly form = new FormGroup({
@@ -77,7 +81,7 @@ export class ForgotPassword {
   protected showError(): boolean {
     const control = this.form.controls.email;
 
-    return control.invalid && (control.touched || this.submitAttempted());
+    return (control.invalid && (control.touched || this.submitAttempted())) || this.refusedEmail();
   }
 
   protected async submit(): Promise<void> {
@@ -93,6 +97,7 @@ export class ForgotPassword {
 
     this.submitting.set(true);
     this.failure.set(null);
+    this.refusedEmail.set(false);
 
     try {
       await this.auth.forgotPassword(email);
@@ -101,8 +106,11 @@ export class ForgotPassword {
       this.state.set('sent');
       this.focusHeading();
     } catch (error) {
+      const failure = toApiError(error);
+
+      this.refusedEmail.set(refusedFields(failure, ['email']).has('email'));
       this.failure.set(
-        describeResetFailure(toApiError(error), {
+        describeResetFailure(failure, {
           unavailable: $localize`:@@forgotPassword.unavailable:Password reset is temporarily unavailable. Nothing was sent. Try again in a few minutes.`,
           generic: $localize`:@@forgotPassword.failed:Something went wrong, and no link was requested. Try again in a moment.`,
         }),

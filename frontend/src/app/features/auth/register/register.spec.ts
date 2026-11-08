@@ -185,7 +185,7 @@ describe('Register', () => {
     expect(navigatedTo).toEqual(['/', 'workspace']);
   });
 
-  it('reports a taken address in the backend words', async () => {
+  it('words a taken address by its code', async () => {
     await fill(account.email, password);
 
     submit().click();
@@ -196,13 +196,74 @@ describe('Register', () => {
     http
       .expectOne('/api/auth/register')
       .flush(
-        { title: 'Registration rejected', detail: 'That email address is already in use.' },
+        { title: 'Registration rejected', detail: 'Server English.', code: 'auth.email.taken' },
         { status: 400, statusText: 'Bad Request' },
       );
     await settle();
 
-    expect(host().textContent).toContain('That email address is already in use.');
+    expect(host().textContent).toContain(
+      'That email address is already in use. Sign in, or use a different address.',
+    );
+    expect(host().textContent).not.toContain('Server English');
     expect(navigatedTo).toBeNull();
+  });
+
+  it('lists every broken password rule beside the field, one per line', async () => {
+    await fill(account.email, password);
+
+    submit().click();
+    await settle();
+
+    await answerToken();
+
+    http.expectOne('/api/auth/register').flush(
+      {
+        code: 'auth.password.too_short',
+        codes: ['auth.password.too_short', 'auth.password.requires_digit'],
+      },
+      { status: 400, statusText: 'Bad Request' },
+    );
+    await settle();
+
+    const lines = [
+      ...host().querySelectorAll('[data-testid="password-problems"] .field-error'),
+    ].map((line) => line.textContent?.trim());
+
+    expect(lines).toEqual(['Use at least 12 characters.', 'Add at least one digit.']);
+    expect(host().querySelector('[data-testid="password-problems"]')?.getAttribute('role')).toBe(
+      'alert',
+    );
+    expect(passwordBox().getAttribute('aria-describedby')).toBe('password-hint password-error');
+    expect(host().querySelector('.alert-danger')).toBeNull();
+
+    // Editing the password retracts the verdict on the old one.
+    passwordBox().value = 'a-longer-attempt-now';
+    passwordBox().dispatchEvent(new Event('input'));
+    await settle();
+
+    expect(host().querySelector('[data-testid="password-problems"]')).toBeNull();
+  });
+
+  it('marks the address a refusal named, in its own words', async () => {
+    await fill(account.email, password);
+
+    submit().click();
+    await settle();
+
+    await answerToken();
+
+    http
+      .expectOne('/api/auth/register')
+      .flush(
+        { code: 'validation.failed', errors: { Email: ['Never shown.'] } },
+        { status: 400, statusText: 'Bad Request' },
+      );
+    await settle();
+
+    expect(host().querySelector('#email-error')?.textContent?.trim()).toBe(
+      'Enter a valid email address.',
+    );
+    expect(host().textContent).not.toContain('Never shown');
   });
 
   it('clears the password after a rejection', async () => {

@@ -47,6 +47,7 @@ export class Topbar {
 
   /** The address of the signed-in account. */
   readonly userEmail = input('');
+  readonly userEmailLanguage = input<string | null | undefined>(undefined);
 
   /** Whether this account belongs to more than one workspace. */
   readonly canSwitchWorkspace = input(false);
