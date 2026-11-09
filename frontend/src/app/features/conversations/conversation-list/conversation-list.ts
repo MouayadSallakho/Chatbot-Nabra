@@ -10,10 +10,12 @@ import {
   signal,
   untracked,
 } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { ApiError, toApiError } from '@app/core/api/api-error';
 import { ConversationRealtime } from '@app/core/realtime/conversation-realtime';
+import { InboxSignals } from '@app/core/sounds/inbox-signals';
 import { PermissionService } from '@app/core/authorization/permission-service';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
 import { MediaQueries, mediaQuerySignal } from '@app/core/media/media';
@@ -26,13 +28,16 @@ import { Pagination } from '@app/shared/pagination/pagination';
 import { PAGE_QUERY_PARAM, initialPage } from '@app/shared/pagination/page-query';
 import { VoiceChip } from '@app/shared/voice/voice-chip';
 import { ChannelBadge } from '@app/shared/channel/channel-badge';
-import { ConversationSummary, ConversationsApi } from '../conversations-api';
+import { ConversationSummary, ConversationView, ConversationsApi } from '../conversations-api';
 import { CustomerLabel } from '../customer-label';
 import { InboxState } from '../inbox-state';
 import { sameDay, senderWord } from '../conversation-words';
 
 /** Rows per page. One screen of a busy inbox, not the whole history. */
 const PAGE_SIZE = 20;
+
+/** The query parameter the list keeps its view in. */
+const VIEW_QUERY_PARAM = 'view';
 
 /** One row, with what its template shows worked out once per read. */
 interface ConversationRow {
@@ -89,6 +94,8 @@ export class ConversationList implements OnInit {
   private readonly router = inject(Router);
   private readonly format = inject(LocaleFormat);
   private readonly arabicFonts = inject(ArabicFonts);
+  private readonly signals = inject(InboxSignals);
+  private readonly route = inject(ActivatedRoute);
   private readonly inbox = inject(InboxState, { optional: true });
 
   /** The open conversation, marked in the list. */
@@ -110,6 +117,32 @@ export class ConversationList implements OnInit {
 
   /** 1-based, mirrored in `?page=` so Back from a transcript returns here. */
   protected readonly currentPage = signal(initialPage());
+
+  private readonly query = toSignal(this.route.queryParamMap, {
+    initialValue: this.route.snapshot.queryParamMap,
+  });
+
+  /** All, or "Needs a person": kept in `?view=`, like the page. */
+  protected readonly view = computed<ConversationView>(() =>
+    this.query().get(VIEW_QUERY_PARAM) === 'needs-person' ? 'needs-person' : 'all',
+  );
+
+  /** Where a view's link goes: this address, whatever is open, on that view's first page. */
+  protected readonly viewPath = computed(() => {
+    const open = this.selectedId();
+
+    return open === null ? ['/conversations'] : ['/conversations', open];
+  });
+
+  /**
+   * The number beside "Needs a person": this list's own `total` while it shows that
+   * view, and otherwise the shared read's, so the list never costs a read of its own.
+   */
+  protected readonly needsPersonCount = computed(() => {
+    const count = this.view() === 'needs-person' ? this.total() : this.signals.count();
+
+    return count === null ? null : this.format.number(count);
+  });
 
   protected readonly pageSize = PAGE_SIZE;
 
@@ -140,6 +173,24 @@ export class ConversationList implements OnInit {
   });
 
   constructor() {
+    // Following a view's link, or Back to one: the list of that view, from the address.
+    let previousView = this.view();
+
+    effect(() => {
+      const view = this.view();
+
+      if (view !== previousView) {
+        previousView = view;
+        untracked(() => this.switchView());
+      }
+    });
+
+    effect((onCleanup) => {
+      if (this.canView()) {
+        onCleanup(this.signals.showCount());
+      }
+    });
+
     // A change made from this inbox (a takeover, an assignment, a reply) is
     // reflected at once, without waiting for the realtime echo -- and still
     // when the socket is down.
@@ -230,8 +281,16 @@ export class ConversationList implements OnInit {
       return;
     }
 
+    const view = this.view();
+
     try {
-      const page = await firstValueFrom(this.api.list(tenantId, this.currentPage(), this.pageSize));
+      const page = await firstValueFrom(
+        this.api.list(tenantId, this.currentPage(), this.pageSize, view),
+      );
+
+      if (view !== this.view()) {
+        return;
+      }
 
       this.conversations.set(page.items);
       this.total.set(page.total);
@@ -254,8 +313,17 @@ export class ConversationList implements OnInit {
     this.loading.set(true);
     this.failure.set(null);
 
+    const view = this.view();
+
     try {
-      const page = await firstValueFrom(this.api.list(tenantId, this.currentPage(), this.pageSize));
+      const page = await firstValueFrom(
+        this.api.list(tenantId, this.currentPage(), this.pageSize, view),
+      );
+
+      // The reader moved to the other view while this was on its way.
+      if (view !== this.view()) {
+        return;
+      }
 
       // A remembered page past the end goes to the last page that exists.
       if (page.items.length === 0 && page.total > 0 && this.currentPage() > 1) {
@@ -271,10 +339,25 @@ export class ConversationList implements OnInit {
       this.total.set(page.total);
       this.loaded.set(true);
     } catch (error) {
-      this.failure.set(toApiError(error));
+      if (view === this.view()) {
+        this.failure.set(toApiError(error));
+      }
     } finally {
-      this.loading.set(false);
+      if (view === this.view()) {
+        this.loading.set(false);
+      }
     }
+  }
+
+  /** A different list: its own skeleton and its own first read. */
+  private switchView(): void {
+    const page = Number(this.query().get(PAGE_QUERY_PARAM));
+
+    this.currentPage.set(Number.isInteger(page) && page >= 1 ? page : 1);
+    this.conversations.set([]);
+    this.total.set(0);
+    this.loaded.set(false);
+    void this.load();
   }
 
   protected async goTo(page: number): Promise<void> {

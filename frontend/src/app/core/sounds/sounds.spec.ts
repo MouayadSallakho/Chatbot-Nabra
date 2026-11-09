@@ -3,6 +3,7 @@ import { PermissionApi } from '@app/core/authorization/permission-api';
 import { PermissionService } from '@app/core/authorization/permission-service';
 import { LOCAL_STORAGE } from '@app/core/storage/local-storage';
 import { memoryStorage, permissionApiGranting } from '@app/testing/test-doubles';
+import { InboxSignals } from './inbox-signals';
 import { SoundPlayer } from './sound-player';
 import { SoundSettings } from './sound-settings';
 import { Sounds } from './sounds';
@@ -23,14 +24,18 @@ describe('Sounds', () => {
     }
   };
 
+  let signals: { start: ReturnType<typeof vi.fn> };
+
   function create(stored: Record<string, string> = {}): Sounds {
     player = { arm: vi.fn(), request: vi.fn(), unlock: vi.fn(), test: vi.fn(async () => true) };
+    signals = { start: vi.fn() };
 
     TestBed.configureTestingModule({
       providers: [
         { provide: PermissionApi, useValue: permissionApiGranting() },
         { provide: LOCAL_STORAGE, useValue: memoryStorage(stored) },
         { provide: SoundPlayer, useValue: player },
+        { provide: InboxSignals, useValue: signals },
       ],
     });
 
@@ -53,6 +58,21 @@ describe('Sounds', () => {
     await settle();
 
     expect(player.arm).toHaveBeenCalled();
+  });
+
+  it('starts what decides when a sound is due, for a member who can hear them', async () => {
+    create().start();
+    await grant('conversations.view');
+    await settle();
+
+    expect(signals.start).toHaveBeenCalled();
+  });
+
+  it('starts nothing for a member who cannot read conversations', async () => {
+    create().start();
+    await settle();
+
+    expect(signals.start).not.toHaveBeenCalled();
   });
 
   it('prepares nothing with sounds and alerts both off, until one is turned on', async () => {

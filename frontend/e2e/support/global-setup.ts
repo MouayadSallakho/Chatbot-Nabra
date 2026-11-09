@@ -58,8 +58,11 @@ export default async function globalSetup(config: FullConfig): Promise<void> {
 
     await api.storageState({ path: join(stateDir, 'owner.json') });
 
+    const chatKey = await publicKey(api, base, created.id);
+
     process.env['NABRA_E2E_TENANT_ID'] = tenant.id;
-    process.env['NABRA_E2E_CHAT_KEY'] = await publicKey(api, base, created.id);
+    process.env['NABRA_E2E_CHAT_KEY'] = chatKey;
+    process.env['NABRA_E2E_LONG_CONVERSATION'] = await longConversation(api, base, chatKey);
   } finally {
     await api.dispose();
   }
@@ -68,6 +71,65 @@ export default async function globalSetup(config: FullConfig): Promise<void> {
   process.env['NABRA_E2E_PASSWORD'] = password;
   process.env['NABRA_E2E_THROTTLE_EMAIL'] = `e2e.throttle.${runId}@example.test`;
   process.env['NABRA_E2E_STATE_DIR'] = stateDir;
+}
+
+/** More than one window of messages, so the older ones have to be read. */
+const LONG_CONVERSATION_REPLIES = 49;
+
+/**
+ * One conversation longer than a window, built once for the whole run.
+ *
+ * Once, and not per journey: the public chat allows five new conversations per
+ * network every five minutes, and the journeys that need a live visitor use those.
+ * Replies come from a person, because those are not capped per conversation.
+ */
+async function longConversation(
+  api: Awaited<ReturnType<typeof request.newContext>>,
+  base: string,
+  chatKey: string,
+): Promise<string> {
+  const visitor = await request.newContext({ baseURL: BASE_URL });
+
+  try {
+    const started = await post(visitor, `/api/public/webchat/${chatKey}/conversations`, {});
+    const { conversationId } = await started.json();
+    const path = `${base}/conversations/${conversationId}`;
+
+    await post(visitor, `/api/public/webchat/conversations/${conversationId}/messages`, {
+      clientMessageId: crypto.randomUUID(),
+      text: 'Opening message',
+    });
+    await untilAiHasReplied(api, path);
+
+    await post(api, `${path}/take-over`, {}, ifMatch(await api.get(path)));
+
+    for (let reply = 1; reply <= LONG_CONVERSATION_REPLIES; reply++) {
+      await post(api, `${path}/messages`, {
+        clientMessageId: crypto.randomUUID(),
+        text: `Reply number ${reply}`,
+      });
+    }
+
+    return conversationId;
+  } finally {
+    await visitor.dispose();
+  }
+}
+
+/** So the transcript has stopped growing before a person takes over. */
+async function untilAiHasReplied(
+  api: Awaited<ReturnType<typeof request.newContext>>,
+  path: string,
+): Promise<void> {
+  for (let attempt = 0; attempt < 80; attempt++) {
+    if ((await (await api.get(path)).json()).messageCount >= 2) {
+      return;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+
+  throw new Error('The AI stand-in did not reply. Is it switched on?');
 }
 
 function ifMatch(response: { headers(): Record<string, string> }): Record<string, string> {

@@ -4,6 +4,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { TenantApi } from '@app/core/api/tenant-api';
 import { PermissionApi } from '@app/core/authorization/permission-api';
+import { InboxSignals } from '@app/core/sounds/inbox-signals';
 import { LOCAL_STORAGE } from '@app/core/storage/local-storage';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
 import { memoryStorage, permissionApiGranting } from '@app/testing/test-doubles';
@@ -78,6 +79,20 @@ describe('ConversationComposer', () => {
   });
 
   afterEach(() => http.verify());
+
+  it("tells the inbox signals a reply is this browser's own, before it is sent", async () => {
+    await mount();
+
+    const own = vi.spyOn(TestBed.inject(InboxSignals), 'ownAction');
+
+    await write('On it.');
+    sendButton().click();
+    await settle();
+
+    expect(own).toHaveBeenCalledWith(first);
+    http.expectOne(replyUrl(first)).flush(stored('On it.'));
+    await settle();
+  });
 
   it('adds a line on Enter and sends on Ctrl+Enter', async () => {
     await mount();

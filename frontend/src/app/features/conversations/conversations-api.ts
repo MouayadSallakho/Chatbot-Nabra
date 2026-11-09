@@ -53,7 +53,12 @@ export interface ConversationSummary {
   readonly lastMessageSender: MessageSender | null;
   readonly assignedTo: WorkspaceMember | null;
   readonly customer: ConversationCustomer | null;
+  /** Newer messages than this member has read. A member with no marker reads as unread. */
+  readonly unread: boolean;
 }
+
+/** Which conversations a list shows. */
+export type ConversationView = 'all' | 'needs-person';
 
 /** A page of conversations. */
 export interface ConversationPage {
@@ -75,6 +80,8 @@ export interface ConversationDetail {
   readonly messageCount: number;
   readonly assignedTo: WorkspaceMember | null;
   readonly customer: ConversationCustomer | null;
+  /** How far this member has read; null when they have never been marked. */
+  readonly lastReadSequence: number | null;
 }
 
 /** One message in a transcript. */
@@ -145,10 +152,24 @@ export class ConversationsApi {
   private readonly http = inject(HttpClient);
 
   /** One page of conversations, most recently active first. */
-  list(tenantId: string, page = 1, pageSize = 20): Observable<ConversationPage> {
+  list(
+    tenantId: string,
+    page = 1,
+    pageSize = 20,
+    view: ConversationView = 'all',
+  ): Observable<ConversationPage> {
+    const filter = view === 'needs-person' ? '&filter=needs-person' : '';
+
     return this.http.get<ConversationPage>(
-      `/api/tenants/${tenantId}/conversations?page=${page}&pageSize=${pageSize}`,
+      `/api/tenants/${tenantId}/conversations?page=${page}&pageSize=${pageSize}${filter}`,
     );
+  }
+
+  /** Says this member has read up to a sequence. It only moves forward, so no `If-Match`. */
+  markRead(tenantId: string, conversationId: string, sequence: number): Observable<void> {
+    return this.http.post<void>(`/api/tenants/${tenantId}/conversations/${conversationId}/read`, {
+      sequence,
+    });
   }
 
   /** One conversation, with the version a change must present back. */

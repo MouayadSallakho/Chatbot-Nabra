@@ -2,6 +2,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
 import { provideRouter } from '@angular/router';
 import { TenantApi } from '@app/core/api/tenant-api';
 import { PermissionApi } from '@app/core/authorization/permission-api';
@@ -11,7 +12,10 @@ import { WorkspaceContextService } from '@app/core/workspace/workspace-context-s
 import { memoryStorage, permissionApiGranting } from '@app/testing/test-doubles';
 import { WhatsAppApi } from '@app/features/channels/whatsapp-api';
 import { ArabicFonts } from '@app/core/i18n/arabic-fonts';
-import { ConversationsApi } from '../conversations-api';
+import { InboxSignals } from '@app/core/sounds/inbox-signals';
+import { ConversationsApi, TranscriptMessage } from '../conversations-api';
+import { ConversationComposer } from '../conversation-composer/conversation-composer';
+import { ConversationTranscript } from '../conversation-transcript/conversation-transcript';
 import { ConversationDetail } from './conversation-detail';
 
 describe('ConversationDetail', () => {
@@ -64,6 +68,7 @@ describe('ConversationDetail', () => {
       reference: null,
       shortCode: '7KQ2MX',
     },
+    lastReadSequence: null,
   };
 
   const humanDetail = { ...detail, handling: 'Human' };
@@ -399,6 +404,210 @@ describe('ConversationDetail', () => {
       await settle();
 
       expect(dividers()).toEqual([]);
+    });
+  });
+
+  describe('marking it read', () => {
+    const readUrl = `${detailUrl}/read`;
+
+    async function opened(body: object = detail): Promise<void> {
+      await mount('conversations.view');
+      http.expectOne(detailUrl).flush(body, tagged(body));
+      await settle();
+      http.expectOne(messagesUrl).flush({
+        items: [message('m1', 'Customer', 'Hello', 10)],
+        nextCursor: null,
+        previousCursor: null,
+        events: [],
+      });
+      await settle();
+    }
+
+    const transcript = () =>
+      fixture.debugElement.query(By.directive(ConversationTranscript))
+        .componentInstance as ConversationTranscript;
+
+    it('sends the newest sequence once it has really been seen', async () => {
+      await opened();
+
+      transcript().newestSeen.emit(10);
+      await settle();
+
+      const sent = http.expectOne(readUrl);
+
+      expect(sent.request.method).toBe('POST');
+      expect(sent.request.body).toEqual({ sequence: 10 });
+      sent.flush(null, { status: 204, statusText: 'No Content' });
+      await settle();
+    });
+
+    it('sends nothing the marker already covers', async () => {
+      await opened({ ...detail, lastReadSequence: 10 });
+
+      transcript().newestSeen.emit(10);
+      await settle();
+
+      http.expectNone(readUrl);
+    });
+
+    it('sends nothing twice for the same sequence once it has been accepted', async () => {
+      await opened();
+
+      transcript().newestSeen.emit(10);
+      await settle();
+      http.expectOne(readUrl).flush(null, { status: 204, statusText: 'No Content' });
+      await settle();
+
+      transcript().newestSeen.emit(10);
+      await settle();
+
+      http.expectNone(readUrl);
+    });
+
+    it('says nothing on a failure, and sends again at the next sighting', async () => {
+      await opened();
+
+      transcript().newestSeen.emit(10);
+      await settle();
+      http.expectOne(readUrl).flush({ title: 'Boom' }, { status: 500, statusText: 'Server Error' });
+      await settle();
+
+      expect(host().querySelector('[role="alert"]')).toBeNull();
+
+      transcript().newestSeen.emit(10);
+      await settle();
+      http.expectOne(readUrl).flush(null, { status: 204, statusText: 'No Content' });
+      await settle();
+    });
+
+    it('sends a newer sighting after the one in flight, not beside it', async () => {
+      await opened();
+
+      transcript().newestSeen.emit(10);
+      await settle();
+      transcript().newestSeen.emit(11);
+      await settle();
+
+      const first = http.expectOne(readUrl);
+
+      expect(first.request.body).toEqual({ sequence: 10 });
+      first.flush(null, { status: 204, statusText: 'No Content' });
+      await settle();
+
+      const second = http.expectOne(readUrl);
+
+      expect(second.request.body).toEqual({ sequence: 11 });
+      second.flush(null, { status: 204, statusText: 'No Content' });
+      await settle();
+    });
+
+    it('sends nothing for a reply this member just wrote: the server marked it', async () => {
+      await mount('conversations.view', 'conversations.reply');
+      http.expectOne(detailUrl).flush(humanDetail, tagged(humanDetail));
+      await settle();
+      http
+        .expectOne(messagesUrl)
+        .flush({ items: [], nextCursor: null, previousCursor: null, events: [] });
+      await settle();
+
+      const composer = fixture.debugElement.query(By.directive(ConversationComposer))
+        .componentInstance as ConversationComposer;
+
+      composer.sent.emit(message('m9', 'HumanAgent', 'Mine', 20) as TranscriptMessage);
+      await settle();
+
+      transcript().newestSeen.emit(20);
+      await settle();
+
+      http.expectNone(readUrl);
+    });
+  });
+
+  describe('what it tells the inbox signals', () => {
+    const failed = {
+      id: 'e1',
+      kind: 'AiTurnFailed',
+      at: '2026-09-07T10:00:00Z',
+      afterSequence: 10,
+      actor: null,
+      reason: 'generation_failed',
+    };
+
+    it('says which conversation is open, and when it no longer is', async () => {
+      await mount('conversations.view');
+
+      const viewing = vi.spyOn(TestBed.inject(InboxSignals), 'viewing');
+
+      http.expectOne(detailUrl).flush(detail, tagged(detail));
+      await settle();
+      http
+        .expectOne(messagesUrl)
+        .flush({ items: [], nextCursor: null, previousCursor: null, events: [] });
+      await settle();
+
+      fixture.destroy();
+
+      expect(viewing).toHaveBeenCalledWith(null);
+    });
+
+    it('calls a first read history and a re-read live', async () => {
+      await mount('conversations.view');
+
+      const read = vi.spyOn(TestBed.inject(InboxSignals), 'transcriptRead');
+
+      http.expectOne(detailUrl).flush(detail, tagged(detail));
+      await settle();
+      http.expectOne(messagesUrl).flush({
+        items: [message('m1', 'Customer', 'Hello', 10)],
+        nextCursor: null,
+        previousCursor: null,
+        events: [failed],
+      });
+      await settle();
+
+      expect(read).toHaveBeenLastCalledWith(
+        expect.objectContaining({ id: conversationId }),
+        [failed],
+        false,
+      );
+
+      notify!(conversationId);
+      await settle();
+      http.expectOne(detailUrl).flush(detail, tagged(detail));
+      await settle();
+      http.expectOne(catchUpUrl).flush({
+        items: [message('m1', 'Customer', 'Hello', 10)],
+        nextCursor: null,
+        previousCursor: null,
+        events: [failed],
+      });
+      await settle();
+
+      expect(read).toHaveBeenLastCalledWith(
+        expect.objectContaining({ id: conversationId }),
+        [failed],
+        true,
+      );
+    });
+
+    it("counts a takeover as this browser's own action, before it is sent", async () => {
+      await mount('conversations.view', 'conversations.handoff');
+
+      const own = vi.spyOn(TestBed.inject(InboxSignals), 'ownAction');
+
+      http.expectOne(detailUrl).flush(detail, tagged(detail));
+      await settle();
+      http
+        .expectOne(messagesUrl)
+        .flush({ items: [], nextCursor: null, previousCursor: null, events: [] });
+      await settle();
+
+      button('Take over')!.click();
+      await settle();
+
+      expect(own).toHaveBeenCalledWith(conversationId);
+      http.expectOne(`${detailUrl}/take-over`).flush(humanDetail, tagged(humanDetail, '"v2"'));
+      await settle();
     });
   });
 

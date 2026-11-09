@@ -72,7 +72,7 @@
               </ng-template>
 
               @if (item.link; as link) {
-                <a class="attention-target" [routerLink]="link">
+                <a class="attention-target" [routerLink]="link" [queryParams]="item.linkQuery">
                   <ng-container [ngTemplateOutlet]="rowContent" />
                   <app-icon class="attention-arrow" name="chevron-end" [strokeWidth]="1.75" />
                 </a>

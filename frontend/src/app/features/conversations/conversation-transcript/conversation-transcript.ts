@@ -30,6 +30,9 @@ import { TranscriptRow, transcriptRows } from '../transcript-rows';
 /** How far above the view the start of what is loaded may come before more is read, in px. */
 const EARLIER_MARGIN = 400;
 
+/** How long the newest message must stay in view before it counts as read, in ms. */
+export const SEEN_HOLD_MS = 1_000;
+
 /** How close to the end still counts as "reading the newest messages", in px. */
 const AT_END_SLACK = 48;
 
@@ -108,6 +111,12 @@ export class ConversationTranscript {
   /** The reader reached the start of what is loaded, or pressed the button. */
   readonly earlierRequested = output<void>();
 
+  /** The newest message has really been seen: its sequence. */
+  readonly newestSeen = output<number>();
+
+  /** The newest message, marked so it can be watched. */
+  protected readonly newestId = computed(() => this.messages().at(-1)?.id ?? null);
+
   protected readonly rows = computed<readonly TranscriptRow[]>(() =>
     transcriptRows(this.messages(), this.events(), this.format.language),
   );
@@ -144,6 +153,11 @@ export class ConversationTranscript {
   private unseen = 0;
   private observer: IntersectionObserver | null = null;
 
+  private newestObserver: IntersectionObserver | null = null;
+  private newestInView = false;
+  private seenTimer: ReturnType<typeof setTimeout> | null = null;
+  private seenFor: number | null = null;
+
   constructor() {
     effect(() => {
       const id = this.conversationId();
@@ -173,6 +187,12 @@ export class ConversationTranscript {
     };
     const main = this.document.getElementById('main-content');
     const own = this.host.nativeElement;
+    const view = this.document.defaultView;
+    const onAttention = (): void => this.checkSeen();
+
+    this.document.addEventListener('visibilitychange', onAttention);
+    view?.addEventListener('focus', onAttention);
+    view?.addEventListener('blur', onAttention);
 
     own.addEventListener('scroll', onScroll, { passive: true });
     main?.addEventListener('scroll', onScroll, { passive: true });
@@ -180,6 +200,11 @@ export class ConversationTranscript {
       own.removeEventListener('scroll', onScroll);
       main?.removeEventListener('scroll', onScroll);
       this.observer?.disconnect();
+      this.newestObserver?.disconnect();
+      this.stopSeenTimer();
+      this.document.removeEventListener('visibilitychange', onAttention);
+      view?.removeEventListener('focus', onAttention);
+      view?.removeEventListener('blur', onAttention);
     });
   }
 
@@ -274,6 +299,7 @@ export class ConversationTranscript {
         afterNextRender(
           () => {
             this.scrollToEnd();
+            this.watchNewest();
             this.watchEarlierEdge();
           },
           { injector: this.injector },
@@ -348,6 +374,8 @@ export class ConversationTranscript {
         } else {
           this.setUnseen(this.unseen + arrived.length);
         }
+
+        this.watchNewest();
       },
       { injector: this.injector },
     );
@@ -378,6 +406,82 @@ export class ConversationTranscript {
       { root: this.scroller(), rootMargin: `${EARLIER_MARGIN}px 0px 0px 0px` },
     );
     this.observer.observe(edge);
+  }
+
+  /**
+   * Watches the newest message against the element that scrolls.
+   *
+   * Reached the end, not merely opened: a conversation scrolled away from its newest
+   * messages is not read. A message taller than the view can never be half visible,
+   * so filling half the view counts too.
+   */
+  private watchNewest(): void {
+    this.newestObserver?.disconnect();
+    this.setNewestInView(false);
+
+    const newest = this.host.nativeElement.querySelector('[data-newest]');
+
+    if (!newest || typeof IntersectionObserver === 'undefined') {
+      return;
+    }
+
+    this.newestObserver = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[entries.length - 1];
+        const roomy = (entry.rootBounds?.height ?? Number.POSITIVE_INFINITY) / 2;
+
+        this.setNewestInView(
+          entry.isIntersecting &&
+            (entry.intersectionRatio >= 0.5 || entry.intersectionRect.height >= roomy),
+        );
+      },
+      { root: this.scroller(), threshold: [0, 0.1, 0.25, 0.5] },
+    );
+    this.newestObserver.observe(newest);
+  }
+
+  private setNewestInView(inView: boolean): void {
+    this.newestInView = inView;
+    this.checkSeen();
+  }
+
+  /**
+   * Starts or stops the wait that turns "in view" into "read".
+   *
+   * The newest message in view, the tab on screen and the window focused, held for a
+   * second. Anything less is not somebody having looked at it, and once any of the
+   * three lapses, the next sighting counts again.
+   */
+  private checkSeen(): void {
+    const looking =
+      this.newestInView && this.document.visibilityState === 'visible' && this.document.hasFocus();
+
+    if (!looking) {
+      this.stopSeenTimer();
+      this.seenFor = null;
+
+      return;
+    }
+
+    if (this.seenTimer === null) {
+      this.seenTimer = setTimeout(() => {
+        this.seenTimer = null;
+
+        const sequence = this.messages().at(-1)?.sequence;
+
+        if (sequence !== undefined && sequence !== this.seenFor) {
+          this.seenFor = sequence;
+          this.newestSeen.emit(sequence);
+        }
+      }, SEEN_HOLD_MS);
+    }
+  }
+
+  private stopSeenTimer(): void {
+    if (this.seenTimer !== null) {
+      clearTimeout(this.seenTimer);
+      this.seenTimer = null;
+    }
   }
 
   private announce(arrived: readonly TranscriptMessage[]): void {

@@ -230,6 +230,23 @@ describe('Arabic renders', () => {
       expect(text(root.querySelector('[data-testid="transcript-start"]'))).toBe('بداية المحادثة');
     });
 
+    it('writes the needs-a-person words in Arabic', async () => {
+      const { customerLabelPlain } = await import('@app/features/conversations/customer-label');
+
+      expect(customerLabelPlain(customer)).toBe('زائر 7KQ2MX');
+      expect(CATALOGUE.translations['inbox.view.needsPerson']).toBe('بحاجة إلى الفريق');
+      expect(CATALOGUE.translations['inbox.needsPerson.empty.heading']).toBe(
+        'لا أحد بانتظار الفريق',
+      );
+      expect(CATALOGUE.translations['inbox.unread']).toBe('غير مقروءة');
+      expect(CATALOGUE.translations['overview.attention.needsPerson.two']).toBe(
+        'محادثتان بحاجة إلى الفريق',
+      );
+      expect(CATALOGUE.translations['overview.attention.needsPerson.many']).toBe(
+        '{$count} محادثة بحاجة إلى الفريق',
+      );
+    });
+
     it('words the inbox refusals in Arabic, by their codes', async () => {
       const { CONVERSATION_PROBLEM_WORDS } =
         await import('@app/features/conversations/conversation-problems');

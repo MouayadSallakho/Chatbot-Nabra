@@ -1,10 +1,13 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { Router, provideRouter } from '@angular/router';
 import { TenantApi } from '@app/core/api/tenant-api';
 import { PermissionApi } from '@app/core/authorization/permission-api';
 import { ArabicFonts } from '@app/core/i18n/arabic-fonts';
+import { ConversationRealtime } from '@app/core/realtime/conversation-realtime';
+import { InboxSignals } from '@app/core/sounds/inbox-signals';
 import { LOCAL_STORAGE } from '@app/core/storage/local-storage';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
 import { memoryStorage, permissionApiGranting } from '@app/testing/test-doubles';
@@ -17,6 +20,16 @@ describe('ConversationList', () => {
 
   let fixture: ComponentFixture<ConversationList>;
   let http: HttpTestingController;
+  let released: number;
+  let signals: { count: ReturnType<typeof signal<number | null>>; showCount: () => () => void };
+
+  beforeEach(() => {
+    released = 0;
+    signals = {
+      count: signal<number | null>(null),
+      showCount: () => () => released++,
+    };
+  });
 
   const conversation = (id: string, preview: string | null, lastActivityAt: string) => ({
     id,
@@ -47,6 +60,7 @@ describe('ConversationList', () => {
         { provide: LOCAL_STORAGE, useValue: memoryStorage() },
         { provide: TenantApi, useValue: { get: () => undefined, create: () => undefined } },
         { provide: PermissionApi, useValue: permissionApiGranting(...permissions) },
+        { provide: InboxSignals, useValue: signals },
       ],
     });
 
@@ -82,7 +96,194 @@ describe('ConversationList', () => {
       candidate.textContent?.includes(label),
     );
 
+  let changed: ((id: string | null) => void) | null = null;
+
+  const realtimeStub = () => ({
+    live: signal(true),
+    listen: (_tenant: string, callback: (id: string | null) => void) => {
+      changed = callback;
+
+      return () => undefined;
+    },
+  });
+
   afterEach(() => http.verify());
+
+  describe('the needs-a-person view', () => {
+    const viewUrl = `${url}&filter=needs-person`;
+    const emptyPage = { items: [], page: 1, pageSize: 20, total: 0 };
+    const link = (id: string) => host().querySelector<HTMLElement>(`[data-testid="${id}"]`)!;
+    const count = () => host().querySelector('[data-testid="needs-person-count"]');
+
+    async function goToView(view: string | null): Promise<void> {
+      await TestBed.inject(Router).navigate([], { queryParams: { view } });
+      await settle();
+    }
+
+    it('offers both views as links, and says which one this is', async () => {
+      await mount('conversations.view');
+      http.expectOne(url).flush(emptyPage);
+      await settle();
+
+      expect(link('view-all').getAttribute('aria-current')).toBe('true');
+      expect(link('view-needs-person').hasAttribute('aria-current')).toBe(false);
+      expect(link('view-needs-person').getAttribute('href')).toContain('view=needs-person');
+    });
+
+    it('shows the shared count beside its name, and costs no read of its own', async () => {
+      signals.count.set(125);
+      await mount('conversations.view');
+      http.expectOne(url).flush(emptyPage);
+      await settle();
+
+      expect(count()?.textContent).toBe('125');
+    });
+
+    it('shows no number until one is known', async () => {
+      await mount('conversations.view');
+      http.expectOne(url).flush(emptyPage);
+      await settle();
+
+      expect(count()).toBeNull();
+    });
+
+    it('shows a count of zero as a zero', async () => {
+      signals.count.set(0);
+      await mount('conversations.view');
+      http.expectOne(url).flush(emptyPage);
+      await settle();
+
+      expect(count()?.textContent).toBe('0');
+    });
+
+    it('reads the filtered list when the address says so, its count from that total', async () => {
+      await mount('conversations.view');
+      http.expectOne(url).flush(emptyPage);
+      await settle();
+
+      await goToView('needs-person');
+
+      http.expectOne(viewUrl).flush({
+        items: [conversation('c1', 'Help', '2026-09-07T12:00:00Z')],
+        page: 1,
+        pageSize: 20,
+        total: 3,
+      });
+      await settle();
+
+      expect(link('view-needs-person').getAttribute('aria-current')).toBe('true');
+      expect(count()?.textContent).toBe('3');
+      expect(rows()).toHaveLength(1);
+    });
+
+    it('is calm about nobody waiting', async () => {
+      await mount('conversations.view');
+      http.expectOne(url).flush(emptyPage);
+      await settle();
+
+      await goToView('needs-person');
+      http.expectOne(viewUrl).flush(emptyPage);
+      await settle();
+
+      expect(host().querySelector('[data-testid="needs-person-empty"]')?.textContent).toContain(
+        'Nobody is waiting for a person',
+      );
+      expect(text()).not.toContain('No conversations yet');
+    });
+
+    it('goes back to the full list on Back, without mixing the two', async () => {
+      await mount('conversations.view');
+      http.expectOne(url).flush(emptyPage);
+      await settle();
+
+      await goToView('needs-person');
+      http.expectOne(viewUrl).flush(emptyPage);
+      await settle();
+
+      await goToView(null);
+      http.expectOne(url).flush(emptyPage);
+      await settle();
+
+      expect(link('view-all').getAttribute('aria-current')).toBe('true');
+    });
+
+    it('drops an answer for the view the reader has left', async () => {
+      await mount('conversations.view');
+
+      const first = http.expectOne(url);
+
+      await goToView('needs-person');
+
+      first.flush({
+        items: [conversation('stale', 'Old', '2026-09-07T12:00:00Z')],
+        page: 1,
+        pageSize: 20,
+        total: 1,
+      });
+      http.expectOne(viewUrl).flush(emptyPage);
+      await settle();
+
+      expect(rows()).toHaveLength(0);
+    });
+
+    it('re-reads the view it is showing', async () => {
+      TestBed.configureTestingModule({
+        providers: [{ provide: ConversationRealtime, useValue: realtimeStub() }],
+      });
+      await mount('conversations.view');
+      http.expectOne(url).flush(emptyPage);
+      await settle();
+      await goToView('needs-person');
+      http.expectOne(viewUrl).flush(emptyPage);
+      await settle();
+
+      changed!('c1');
+      await settle();
+
+      http.expectOne(viewUrl).flush(emptyPage);
+      await settle();
+    });
+
+    it('asks to be shown the count only for somebody who can read conversations, and lets go', async () => {
+      await mount('conversations.view');
+      http.expectOne(url).flush(emptyPage);
+      await settle();
+
+      fixture.destroy();
+
+      expect(released).toBe(1);
+    });
+
+    it('offers no views to somebody who cannot read conversations', async () => {
+      await mount();
+      await settle();
+
+      expect(host().querySelector('[data-testid="view-all"]')).toBeNull();
+    });
+  });
+
+  describe('unread', () => {
+    it('marks an unread row with a dot that has a name, and a heavier name', async () => {
+      await mount('conversations.view');
+      http.expectOne(url).flush({
+        items: [
+          { ...conversation('c1', 'Hi', '2026-09-07T12:00:00Z'), unread: true },
+          { ...conversation('c2', 'Hi', '2026-09-07T11:00:00Z'), unread: false },
+        ],
+        page: 1,
+        pageSize: 20,
+        total: 2,
+      });
+      await settle();
+
+      const [unread, read] = rows();
+
+      expect(unread.querySelector('[data-testid="row-unread"]')?.textContent).toBe('Unread');
+      expect(unread.querySelector('.row-customer')?.classList.contains('is-unread')).toBe(true);
+      expect(read.querySelector('[data-testid="row-unread"]')).toBeNull();
+      expect(read.querySelector('.row-customer')?.classList.contains('is-unread')).toBe(false);
+    });
+  });
 
   it('leads every row with the customer, name or label', async () => {
     await mount('conversations.view');

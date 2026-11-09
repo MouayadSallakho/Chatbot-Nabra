@@ -36,6 +36,7 @@ export class Sounds {
           (this.settings.enabled() || this.settings.desktopAlerts())
         ) {
           void this.load().then((player) => player?.arm());
+          void this.startSignals();
         }
       },
       { injector: this.injector },
@@ -55,6 +56,17 @@ export class Sounds {
   /** Plays the test sound. True when it was heard. */
   async test(): Promise<boolean> {
     return (await this.load())?.test() ?? false;
+  }
+
+  /** What decides when a sound is due. A lazy chunk too, and its absence is silence. */
+  private async startSignals(): Promise<void> {
+    try {
+      const { InboxSignals } = await import('./inbox-signals');
+
+      this.injector.get(InboxSignals).start();
+    } catch {
+      // A chunk that did not arrive: no sounds, and the screen still says it all.
+    }
   }
 
   private load(): Promise<SoundPlayer | null> {

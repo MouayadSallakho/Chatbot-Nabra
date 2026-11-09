@@ -2131,6 +2131,21 @@
     "transcript.event.returned": "إعادة المحادثة إلى الذكاء الاصطناعي: {$START_TAG_BDI}{$INTERPOLATION}{$CLOSE_TAG_BDI}",
     "inbox.customer.visitor": "زائر",
     "inbox.customer.whatsApp": "عميل واتساب",
-    "inbox.customer.unnamed": "عميل"
+    "inbox.customer.unnamed": "عميل",
+    "inbox.view.label": "طرق عرض المحادثات",
+    "inbox.view.all": "الكل",
+    "inbox.view.needsPerson": "بحاجة إلى الفريق",
+    "inbox.needsPerson.empty.heading": "لا أحد بانتظار الفريق",
+    "inbox.needsPerson.empty.body": "تظهر المحادثة هنا حين ينتظر عميل ردًّا من أحد أعضاء الفريق.",
+    "inbox.unread": "غير مقروءة",
+    "inbox.alert.newMessage": "رسالة جديدة",
+    "overview.attention.needsPerson.zero": "لا توجد محادثات بحاجة إلى الفريق",
+    "overview.attention.needsPerson.one": "محادثة واحدة بحاجة إلى الفريق",
+    "overview.attention.needsPerson.two": "محادثتان بحاجة إلى الفريق",
+    "overview.attention.needsPerson.few": "{$count} محادثات بحاجة إلى الفريق",
+    "overview.attention.needsPerson.many": "{$count} محادثة بحاجة إلى الفريق",
+    "overview.attention.needsPerson.other": "{$count} محادثة بحاجة إلى الفريق",
+    "overview.attention.needsPerson.detail": "كتب العميل آخر رسالة وينتظر ردًّا من أحد أعضاء الفريق.",
+    "overview.action.needsPerson": "فتح القائمة"
   }
 }

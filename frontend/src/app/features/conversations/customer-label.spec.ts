@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import type { ConversationCustomer } from './conversations-api';
-import { CustomerLabel, customerLabel } from './customer-label';
+import { CustomerLabel, customerLabel, customerLabelPlain } from './customer-label';
 
 describe('customerLabel', () => {
   const customer = (overrides: Partial<ConversationCustomer>): ConversationCustomer => ({
@@ -67,6 +67,28 @@ describe('customerLabel', () => {
 
   it('says only "Customer" for a conversation with no customer on it', () => {
     expect(customerLabel(null)).toEqual({ kind: 'label', word: 'Customer', code: null });
+  });
+});
+
+describe('customerLabelPlain', () => {
+  const customer: ConversationCustomer = {
+    id: 'c1',
+    displayName: null,
+    labelCode: 'AnonymousVisitor',
+    reference: null,
+    shortCode: '7KQ2MX',
+  };
+
+  it('writes the word and the code as one line', () => {
+    expect(customerLabelPlain(customer)).toBe('Visitor 7KQ2MX');
+  });
+
+  it('writes a name as it is', () => {
+    expect(customerLabelPlain({ ...customer, displayName: 'Lina' })).toBe('Lina');
+  });
+
+  it('writes only the word when there is no customer', () => {
+    expect(customerLabelPlain(null)).toBe('Customer');
   });
 });
 

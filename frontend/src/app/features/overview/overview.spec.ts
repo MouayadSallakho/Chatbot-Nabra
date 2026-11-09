@@ -4,6 +4,7 @@ import { provideRouter } from '@angular/router';
 import { NEVER, of, throwError } from 'rxjs';
 import { PermissionService } from '@app/core/authorization/permission-service';
 import { NotificationCenter } from '@app/core/notifications/notification-center';
+import { InboxSignals } from '@app/core/sounds/inbox-signals';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
 import { AnalyticsApi, AnalyticsDashboard } from '@app/features/analytics/analytics-api';
 import { BillingApi, WorkspaceBilling } from '@app/features/billing/billing-api';
@@ -110,6 +111,7 @@ describe('Overview', () => {
     plan?: PlanUsage | 'fail';
     billing?: WorkspaceBilling;
     unread?: number;
+    needsPerson?: number;
   }) {
     const granted = new Set(options.granted ?? ['analytics.view', 'billing.view']);
 
@@ -118,6 +120,13 @@ describe('Overview', () => {
         provideRouter([]),
         { provide: PermissionService, useValue: { has: (code: string) => granted.has(code) } },
         { provide: NotificationCenter, useValue: { unread: signal(options.unread ?? 0) } },
+        {
+          provide: InboxSignals,
+          useValue: {
+            count: signal(options.needsPerson ?? null),
+            showCount: () => () => undefined,
+          },
+        },
         {
           provide: WorkspaceContextService,
           useValue: { tenantId: () => 'tenant-1', tenant: () => ({ name: 'Acme Trading' }) },
@@ -159,6 +168,32 @@ describe('Overview', () => {
     await fixture.whenStable();
     fixture.detectChanges();
   }
+
+  describe('conversations that need a person', () => {
+    const conversations = ['analytics.view', 'billing.view', 'conversations.view'];
+
+    it('adds one row, from the shared count, that opens that view', async () => {
+      await render({ granted: conversations, needsPerson: 3 });
+      const row = host().querySelector('[data-testid="attention-needs-person"]');
+
+      expect(row?.textContent).toContain('3 conversations need a person');
+      expect(row?.querySelector('a')?.getAttribute('href')).toBe(
+        '/conversations?view=needs-person',
+      );
+    });
+
+    it('adds nothing when nobody is waiting', async () => {
+      await render({ granted: conversations, needsPerson: 0 });
+
+      expect(host().querySelector('[data-testid="attention-needs-person"]')).toBeNull();
+    });
+
+    it('adds nothing for somebody who cannot read conversations', async () => {
+      await render({ needsPerson: 3 });
+
+      expect(host().querySelector('[data-testid="attention-needs-person"]')).toBeNull();
+    });
+  });
 
   it('says plainly when nothing needs attention', async () => {
     await render({});

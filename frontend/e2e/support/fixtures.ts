@@ -45,6 +45,17 @@ export function e2eWorkspace(): { tenantId: string; chatKey: string } {
   return { tenantId, chatKey };
 }
 
+/** The run's conversation that is longer than one window. */
+export function e2eLongConversation(): string {
+  const id = process.env['NABRA_E2E_LONG_CONVERSATION'];
+
+  if (!id) {
+    throw new Error('Global setup did not provide the long conversation.');
+  }
+
+  return id;
+}
+
 /** The direction a page in this language must have. */
 export function directionOf(language: 'en' | 'ar'): 'ltr' | 'rtl' {
   return language === 'ar' ? 'rtl' : 'ltr';

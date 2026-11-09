@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import type { TranscriptEvent, TranscriptMessage } from '../conversations-api';
-import { ConversationTranscript } from './conversation-transcript';
+import { ConversationTranscript, SEEN_HOLD_MS } from './conversation-transcript';
 
 describe('ConversationTranscript', () => {
   let fixture: ComponentFixture<ConversationTranscript>;
@@ -287,6 +287,172 @@ describe('ConversationTranscript', () => {
       fixture.destroy();
 
       expect(observer.disconnected).toBe(true);
+    });
+  });
+
+  describe('seeing the newest message', () => {
+    let seen: number[];
+    let visibility: DocumentVisibilityState;
+    let focused: boolean;
+
+    beforeEach(() => {
+      seen = [];
+      visibility = 'visible';
+      focused = true;
+      vi.spyOn(document, 'visibilityState', 'get').mockImplementation(() => visibility);
+      vi.spyOn(document, 'hasFocus').mockImplementation(() => focused);
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+      vi.restoreAllMocks();
+    });
+
+    /** The observer of the newest row: the one before the edge's. */
+    const newestObserver = (): FakeObserver =>
+      FakeObserver.instances[FakeObserver.instances.length - 2];
+
+    const inView = (ratio = 0.6, height = 40) =>
+      newestObserver().callback([
+        {
+          isIntersecting: ratio > 0,
+          intersectionRatio: ratio,
+          intersectionRect: { height },
+          rootBounds: { height: 600 },
+        } as unknown as { isIntersecting: boolean },
+      ]);
+
+    async function opened(): Promise<void> {
+      await mount([message(1), message(2)]);
+      fixture.componentInstance.newestSeen.subscribe((sequence) => seen.push(sequence));
+      vi.useFakeTimers();
+    }
+
+    it('watches the newest row against the element that scrolls', async () => {
+      await opened();
+
+      expect(newestObserver().observed[0]).toBe(bubbles().at(-1));
+    });
+
+    it('counts after a second in view', async () => {
+      await opened();
+      inView();
+
+      await vi.advanceTimersByTimeAsync(SEEN_HOLD_MS - 1);
+      expect(seen).toEqual([]);
+
+      await vi.advanceTimersByTimeAsync(1);
+      expect(seen).toEqual([2]);
+    });
+
+    it('does not count a row less than half visible', async () => {
+      await opened();
+      inView(0.3);
+
+      await vi.advanceTimersByTimeAsync(SEEN_HOLD_MS * 2);
+
+      expect(seen).toEqual([]);
+    });
+
+    it('counts a message taller than the view once it fills half of it', async () => {
+      await opened();
+      inView(0.2, 400);
+
+      await vi.advanceTimersByTimeAsync(SEEN_HOLD_MS);
+
+      expect(seen).toEqual([2]);
+    });
+
+    it('does not count when it scrolled away before the second was up', async () => {
+      await opened();
+      inView();
+      await vi.advanceTimersByTimeAsync(SEEN_HOLD_MS / 2);
+
+      inView(0);
+      await vi.advanceTimersByTimeAsync(SEEN_HOLD_MS * 2);
+
+      expect(seen).toEqual([]);
+    });
+
+    it('does not count in a hidden tab', async () => {
+      await opened();
+      visibility = 'hidden';
+      inView();
+
+      await vi.advanceTimersByTimeAsync(SEEN_HOLD_MS * 2);
+
+      expect(seen).toEqual([]);
+    });
+
+    it('does not count while another window has the focus', async () => {
+      await opened();
+      focused = false;
+      inView();
+
+      await vi.advanceTimersByTimeAsync(SEEN_HOLD_MS * 2);
+
+      expect(seen).toEqual([]);
+    });
+
+    it('counts once the person comes back to it', async () => {
+      await opened();
+      focused = false;
+      inView();
+      await vi.advanceTimersByTimeAsync(SEEN_HOLD_MS * 2);
+
+      focused = true;
+      window.dispatchEvent(new Event('focus'));
+      await vi.advanceTimersByTimeAsync(SEEN_HOLD_MS);
+
+      expect(seen).toEqual([2]);
+    });
+
+    it('stops the wait when the tab is hidden', async () => {
+      await opened();
+      inView();
+      await vi.advanceTimersByTimeAsync(SEEN_HOLD_MS / 2);
+
+      visibility = 'hidden';
+      document.dispatchEvent(new Event('visibilitychange'));
+      await vi.advanceTimersByTimeAsync(SEEN_HOLD_MS * 2);
+
+      expect(seen).toEqual([]);
+    });
+
+    it('says a sequence once, and again after the person looked away and back', async () => {
+      await opened();
+      inView();
+      await vi.advanceTimersByTimeAsync(SEEN_HOLD_MS * 3);
+
+      expect(seen).toEqual([2]);
+
+      inView(0);
+      inView();
+      await vi.advanceTimersByTimeAsync(SEEN_HOLD_MS);
+
+      expect(seen).toEqual([2, 2]);
+    });
+
+    it('watches the new newest row when a message arrives', async () => {
+      await opened();
+      inView();
+      await vi.advanceTimersByTimeAsync(SEEN_HOLD_MS);
+      vi.useRealTimers();
+
+      fixture.componentRef.setInput('messages', [message(1), message(2), message(3)]);
+      await settle();
+
+      expect(FakeObserver.latest().observed[0]).toBe(bubbles().at(-1));
+    });
+
+    it('stops everything when it goes away', async () => {
+      await opened();
+      inView();
+
+      fixture.destroy();
+      await vi.advanceTimersByTimeAsync(SEEN_HOLD_MS * 2);
+
+      expect(seen).toEqual([]);
     });
   });
 

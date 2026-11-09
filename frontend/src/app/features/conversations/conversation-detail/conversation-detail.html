@@ -239,6 +239,7 @@
         [loadingEarlier]="loadingEarlier()"
         [earlierFailure]="earlierFailure()"
         (earlierRequested)="loadEarlier()"
+        (newestSeen)="markRead($event)"
         [handling]="current.handling"
         [agentName]="current.agentName"
         [whatsApp]="whatsAppFacts()"

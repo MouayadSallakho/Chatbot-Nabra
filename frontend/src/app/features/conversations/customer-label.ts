@@ -43,6 +43,17 @@ export function customerLabel(customer: ConversationCustomer | null): CustomerLa
   }
 }
 
+/** The same words as one string, where no markup can go (a desktop alert's title). */
+export function customerLabelPlain(customer: ConversationCustomer | null): string {
+  const label = customerLabel(customer);
+
+  if (label.kind === 'name') {
+    return label.name;
+  }
+
+  return label.code === null ? label.word : `${label.word} ${label.code}`;
+}
+
 function unnamedWord(): string {
   return $localize`:@@inbox.customer.unnamed:Customer`;
 }

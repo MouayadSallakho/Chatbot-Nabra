@@ -14,6 +14,7 @@ import {
 } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { ApiError, ApiErrorKind, toApiError } from '@app/core/api/api-error';
+import { InboxSignals } from '@app/core/sounds/inbox-signals';
 import { LocaleFormat } from '@app/core/i18n/locale-format';
 import { pluralMessage } from '@app/core/i18n/plural';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
@@ -69,6 +70,7 @@ export class ConversationComposer {
   private readonly workspace = inject(WorkspaceContextService);
   private readonly format = inject(LocaleFormat);
   private readonly inbox = inject(InboxState, { optional: true });
+  private readonly signals = inject(InboxSignals);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly injector = inject(Injector);
 
@@ -183,6 +185,7 @@ export class ConversationComposer {
 
     this.sending.set(true);
     this.failure.set(null);
+    this.signals.ownAction(id);
 
     try {
       const stored = await firstValueFrom(this.api.reply(tenantId, id, draft.key, text));

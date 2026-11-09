@@ -1,9 +1,17 @@
 import { NgTemplateOutlet } from '@angular/common';
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  effect,
+  inject,
+  signal,
+} from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { PermissionService } from '@app/core/authorization/permission-service';
 import { NotificationCenter } from '@app/core/notifications/notification-center';
+import { InboxSignals } from '@app/core/sounds/inbox-signals';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
 import { AnalyticsApi, AnalyticsDashboard } from '@app/features/analytics/analytics-api';
 import {
@@ -45,6 +53,9 @@ export interface AttentionItem {
 
   /** A route to follow, or null when the action is "Try again" in place. */
   readonly link: string | null;
+
+  /** The route's query, when it has one. */
+  readonly linkQuery?: Readonly<Record<string, string>>;
   readonly action: string;
 
   /** A limit's meter, when the item is about one the API returned. */
@@ -90,6 +101,20 @@ function moreLabel(count: number, language: AppLanguage): string {
     few: $localize`:@@overview.attention.more.few:+${n}:count: more`,
     many: $localize`:@@overview.attention.more.many:+${n}:count: more`,
     other: $localize`:@@overview.attention.more.other:+${n}:count: more`,
+  });
+}
+
+/** "3 conversations need a person": a sentence per plural category. */
+function needsPersonTitle(count: number, language: AppLanguage): string {
+  const n = formatNumber(language, count);
+
+  return pluralMessage(language, count, {
+    zero: $localize`:@@overview.attention.needsPerson.zero:No conversations need a person`,
+    one: $localize`:@@overview.attention.needsPerson.one:${n}:count: conversation needs a person`,
+    two: $localize`:@@overview.attention.needsPerson.two:${n}:count: conversations need a person`,
+    few: $localize`:@@overview.attention.needsPerson.few:${n}:count: conversations need a person`,
+    many: $localize`:@@overview.attention.needsPerson.many:${n}:count: conversations need a person`,
+    other: $localize`:@@overview.attention.needsPerson.other:${n}:count: conversations need a person`,
   });
 }
 
@@ -146,6 +171,7 @@ export class Overview {
   private readonly workspace = inject(WorkspaceContextService);
   private readonly permissions = inject(PermissionService);
   private readonly notifications = inject(NotificationCenter);
+  private readonly signals = inject(InboxSignals);
 
   protected readonly workspaceName = computed(() => this.workspace.tenant()?.name ?? '');
 
@@ -232,6 +258,20 @@ export class Overview {
           text: figure,
           valueText: `${figure}. ${state.word}`,
         },
+      });
+    }
+
+    const needsPerson = this.signals.count() ?? 0;
+
+    if (this.canSeeConversations() && needsPerson > 0) {
+      items.push({
+        id: 'needs-person',
+        tone: 'warning',
+        title: needsPersonTitle(needsPerson, language),
+        detail: $localize`:@@overview.attention.needsPerson.detail:A customer wrote last and is waiting for somebody on the team.`,
+        link: '/conversations',
+        linkQuery: { view: 'needs-person' },
+        action: $localize`:@@overview.action.needsPerson:Open the list`,
       });
     }
 
@@ -430,6 +470,13 @@ export class Overview {
   });
 
   constructor() {
+    // The number comes from the inbox's shared read: this page makes none of its own.
+    effect((onCleanup) => {
+      if (this.canSeeConversations()) {
+        onCleanup(this.signals.showCount());
+      }
+    });
+
     void this.load();
   }
 

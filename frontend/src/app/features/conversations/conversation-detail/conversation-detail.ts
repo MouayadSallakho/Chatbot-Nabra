@@ -19,6 +19,7 @@ import { ApiError, toApiError } from '@app/core/api/api-error';
 import { Versioned } from '@app/core/api/versioned';
 import { PermissionService } from '@app/core/authorization/permission-service';
 import { ConversationRealtime } from '@app/core/realtime/conversation-realtime';
+import { InboxSignals } from '@app/core/sounds/inbox-signals';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
 import { MediaQueries, mediaQuerySignal } from '@app/core/media/media';
 import { ArabicFonts } from '@app/core/i18n/arabic-fonts';
@@ -110,6 +111,7 @@ export class ConversationDetail {
   private readonly injector = inject(Injector);
   private readonly format = inject(LocaleFormat);
   private readonly arabicFonts = inject(ArabicFonts);
+  private readonly signals = inject(InboxSignals);
   private readonly router = inject(Router);
   private readonly history = inject(NavigationHistory);
   private readonly inbox = inject(InboxState, { optional: true });
@@ -139,6 +141,13 @@ export class ConversationDetail {
 
   /** The version a handoff or an assignment must present back. */
   private readonly version = signal<string | null>(null);
+
+  /** How far this member has read this conversation. */
+  private lastRead: number | null = null;
+
+  /** Marking is one request at a time; a newer sighting waits its turn. */
+  private marking = false;
+  private markNext: number | null = null;
 
   /** Where the page before what is loaded ends, or null at the start of the conversation. */
   private readonly previousCursor = signal<number | null>(null);
@@ -244,11 +253,15 @@ export class ConversationDetail {
       const id = this.conversationId();
 
       untracked(() => {
+        this.signals.viewing(id);
+
         if (id !== this.loadedFor) {
           void this.load();
         }
       });
     });
+
+    inject(DestroyRef).onDestroy(() => this.signals.viewing(null));
 
     const tenantId = this.workspace.tenantId();
 
@@ -362,6 +375,7 @@ export class ConversationDetail {
       this.messages.set(page.items);
       this.events.set(mergeEvents([], page.events));
       this.previousCursor.set(page.previousCursor ?? null);
+      this.signals.transcriptRead(detail.value, page.events ?? [], false);
     } else {
       // From a little before the end of what is on screen: what arrived since,
       // plus a short overlap for a message that committed late.
@@ -389,6 +403,7 @@ export class ConversationDetail {
 
       this.messages.update((current) => mergeMessages(current, incoming));
       this.events.update((current) => mergeEvents(current, incomingEvents));
+      this.signals.transcriptRead(detail.value, incomingEvents, true);
     }
 
     await this.readWhatsApp(tenantId, id);
@@ -411,6 +426,10 @@ export class ConversationDetail {
 
     this.conversation.set(detail.value);
     this.version.set(detail.etag);
+    this.lastRead =
+      before?.id === detail.value.id
+        ? Math.max(this.lastRead ?? -1, detail.value.lastReadSequence ?? -1)
+        : detail.value.lastReadSequence;
 
     if (changed) {
       this.sweep.set(detail.value.handling === 'Human' ? 'human' : 'ai');
@@ -511,6 +530,52 @@ export class ConversationDetail {
   /** A reply the composer stored: on screen at once, without waiting for the re-read. */
   protected onSent(message: TranscriptMessage): void {
     this.messages.update((current) => mergeMessages(current, [message]));
+    // The server has already marked it read for whoever sent it.
+    this.lastRead = Math.max(this.lastRead ?? -1, message.sequence);
+  }
+
+  /**
+   * The newest message has really been seen.
+   *
+   * Only ever forwards. A failure says nothing: the next sighting sends again.
+   */
+  protected async markRead(sequence: number): Promise<void> {
+    const tenantId = this.workspace.tenantId();
+    const id = this.conversationId();
+
+    if (!tenantId || sequence <= (this.lastRead ?? -1)) {
+      return;
+    }
+
+    if (this.marking) {
+      this.markNext = sequence;
+
+      return;
+    }
+
+    this.marking = true;
+    this.signals.ownAction(id);
+
+    try {
+      await firstValueFrom(this.api.markRead(tenantId, id, sequence));
+
+      if (id === this.conversationId()) {
+        this.lastRead = Math.max(this.lastRead ?? -1, sequence);
+        this.inbox?.touched();
+      }
+    } catch {
+      // An unread dot that lingers is not worth an error over a transcript.
+    } finally {
+      this.marking = false;
+
+      const next = this.markNext;
+
+      this.markNext = null;
+
+      if (next !== null) {
+        void this.markRead(next);
+      }
+    }
   }
 
   protected toggleDetails(): void {
@@ -574,6 +639,7 @@ export class ConversationDetail {
 
     this.working.set(true);
     this.actionFailure.set(null);
+    this.signals.ownAction(this.conversationId());
 
     try {
       const updated = await write(tenantId, version);

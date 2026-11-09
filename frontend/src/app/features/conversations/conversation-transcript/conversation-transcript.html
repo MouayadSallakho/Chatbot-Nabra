@@ -96,7 +96,7 @@
         }
         @case ('message') {
           @if (row.message.sender === 'System') {
-            <li class="transcript-note">
+            <li class="transcript-note" [attr.data-newest]="row.key === newestId() ? '' : null">
               <span class="text-muted">{{ speaker(row.message) }}</span>
               <span class="message-text" dir="auto">{{ row.message.text }}</span>
             </li>
@@ -107,6 +107,7 @@
               [class.bubble-ai]="row.voice === 'ai'"
               [class.bubble-human]="row.voice === 'human'"
               [class.is-fresh]="fresh().has(row.message.id)"
+              [attr.data-newest]="row.key === newestId() ? '' : null"
             >
               <span class="bubble-speaker">
                 @if (row.voice === 'ai') {

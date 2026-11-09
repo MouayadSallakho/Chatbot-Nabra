@@ -53,6 +53,37 @@
       </button>
     </app-page-header>
 
+    <!-- Links, not a tablist: each view is an address, with its own page and Back. -->
+    <nav
+      class="segmented inbox-views"
+      aria-label="Conversation views"
+      i18n-aria-label="@@inbox.view.label"
+    >
+      <a
+        class="segmented-option"
+        [routerLink]="viewPath()"
+        [queryParams]="{ view: null, page: null }"
+        queryParamsHandling="merge"
+        [attr.aria-current]="view() === 'all' ? 'true' : null"
+        data-testid="view-all"
+        i18n="@@inbox.view.all"
+        >All</a
+      >
+      <a
+        class="segmented-option"
+        [routerLink]="viewPath()"
+        [queryParams]="{ view: 'needs-person', page: null }"
+        queryParamsHandling="merge"
+        [attr.aria-current]="view() === 'needs-person' ? 'true' : null"
+        data-testid="view-needs-person"
+      >
+        <span i18n="@@inbox.view.needsPerson">Needs a person</span>
+        @if (needsPersonCount(); as count) {
+          <span class="inbox-view-count" data-testid="needs-person-count">{{ count }}</span>
+        }
+      </a>
+    </nav>
+
     @if (loading() && !loaded()) {
       <div aria-busy="true">
         <p class="visually-hidden" role="status" i18n="@@inbox.loading">Loading conversations…</p>
@@ -87,15 +118,27 @@
         </app-empty-state>
       </div>
     } @else if (total() === 0) {
-      <div class="card">
-        <app-empty-state
-          icon="conversations"
-          heading="No conversations yet"
-          i18n-heading="@@inbox.empty.heading"
-          description="When somebody opens one of this workspace's chat links and says something, the conversation appears here."
-          i18n-description="@@inbox.empty.body"
-        />
-      </div>
+      @if (view() === 'needs-person') {
+        <div class="card" data-testid="needs-person-empty">
+          <app-empty-state
+            icon="conversations"
+            heading="Nobody is waiting for a person"
+            i18n-heading="@@inbox.needsPerson.empty.heading"
+            description="A conversation appears here when a customer is waiting for somebody on the team."
+            i18n-description="@@inbox.needsPerson.empty.body"
+          />
+        </div>
+      } @else {
+        <div class="card">
+          <app-empty-state
+            icon="conversations"
+            heading="No conversations yet"
+            i18n-heading="@@inbox.empty.heading"
+            description="When somebody opens one of this workspace's chat links and says something, the conversation appears here."
+            i18n-description="@@inbox.empty.body"
+          />
+        </div>
+      }
     } @else {
       <!--
         A refresh that fails keeps what is already on screen: the rows the reader
@@ -137,7 +180,17 @@
               [attr.data-testid]="'conversation-' + row.conversation.id"
             >
               <span class="row-top">
-                <span class="row-customer" data-testid="row-customer">
+                <span
+                  class="row-customer"
+                  [class.is-unread]="row.conversation.unread"
+                  data-testid="row-customer"
+                >
+                  @if (row.conversation.unread) {
+                    <!-- A dot and a heavier name, with a word for a screen reader. -->
+                    <span class="row-unread" data-testid="row-unread"
+                      ><span class="visually-hidden" i18n="@@inbox.unread">Unread</span></span
+                    >
+                  }
                   <app-customer-label [customer]="row.conversation.customer" />
                 </span>
                 <time
