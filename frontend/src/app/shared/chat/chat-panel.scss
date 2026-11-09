@@ -21,8 +21,10 @@
   font: var(--text-body);
 }
 
-// The widget: the workspace's colour on the header and Send, its tint on the AI.
-:host(.is-widget) {
+// The widget, and a hosted page with a usable accent: the workspace's colour on
+// the header and Send, its tint on the AI.
+:host(.is-widget),
+:host(.has-accent) {
   --_head-bg: var(--chat-accent);
   --_head-fg: var(--chat-on-accent);
   --_send-bg: var(--chat-accent);
@@ -45,7 +47,8 @@
   color: var(--_head-fg);
 }
 
-:host(.is-widget) .chat-head {
+:host(.is-widget) .chat-head,
+:host(.has-accent) .chat-head {
   border-block-end-color: transparent;
 }
 
@@ -71,7 +74,7 @@
 }
 
 // Muted on Nabra's own header; on an accent it keeps the checked label colour.
-:host(.is-page) .chat-honesty {
+:host(.is-page:not(.has-accent)) .chat-honesty {
   color: var(--text-secondary);
 }
 
@@ -79,7 +82,8 @@
   color: var(--voice-ai-fg);
 }
 
-:host(.is-widget) .chat-honesty-glyph {
+:host(.is-widget) .chat-honesty-glyph,
+:host(.has-accent) .chat-honesty-glyph {
   color: inherit;
 }
 

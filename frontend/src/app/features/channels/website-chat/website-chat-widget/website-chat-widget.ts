@@ -26,6 +26,7 @@ import {
   checkAccent,
   isAccent,
 } from '@app/features/embed/accent-color';
+import { LauncherPosition, physicalSide } from '@app/features/embed/launcher-position';
 import { ChatLauncher } from '@app/shared/chat/chat-launcher';
 import { ChatPanel } from '@app/shared/chat/chat-panel';
 import { Icon } from '@app/shared/icon/icon';
@@ -131,7 +132,7 @@ export class WebsiteChatWidget implements OnInit {
       nonNullable: true,
       validators: [Validators.required, Validators.pattern(ACCENT_PATTERN)],
     }),
-    launcherPosition: new FormControl<'Left' | 'Right'>('Right', { nonNullable: true }),
+    launcherPosition: new FormControl<LauncherPosition>('Right', { nonNullable: true }),
     theme: new FormControl<'System' | 'Light' | 'Dark'>('System', { nonNullable: true }),
   });
 
@@ -155,7 +156,13 @@ export class WebsiteChatWidget implements OnInit {
     return greeting.length > 0 ? greeting : null;
   });
 
-  protected readonly previewSide = computed(() => this.values().launcherPosition);
+  /** `Start` and `End` drawn as they would be on a page in the reader's language. */
+  protected readonly previewSide = computed(() =>
+    physicalSide(this.values().launcherPosition, this.language),
+  );
+
+  /** Heads the preview, as it heads the chat visitors see. */
+  protected readonly workspaceName = computed(() => this.workspace.tenant()?.name ?? '');
   protected readonly previewTheme = computed(() => this.values().theme);
 
   protected readonly launcherLabel = computed(() =>

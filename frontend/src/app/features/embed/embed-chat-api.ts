@@ -2,18 +2,13 @@ import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { ChatMessagePage, ChatTurn, RealtimeTicket } from '@app/features/chat/hosted-chat-api';
+import type { LauncherPosition } from './launcher-position';
 
 /** The header carrying the website the browser reported the widget is on. */
 const ORIGIN_HEADER = 'X-OmniAI-Embed-Origin';
 
 /** The header carrying the conversation credential. Never a cookie. */
 const SESSION_HEADER = 'X-OmniAI-Embed-Session';
-
-/** The corner a workspace chose: a physical one, or one that follows the page's direction. */
-export type LauncherPosition = 'Left' | 'Right' | 'Start' | 'End';
-
-/** Every corner the server may send; anything else falls back to `Right`. */
-export const LAUNCHER_POSITIONS: readonly LauncherPosition[] = ['Left', 'Right', 'Start', 'End'];
 
 /** Where the widget's appearance and availability come from. */
 export interface EmbeddedChatConfig {
@@ -27,6 +22,9 @@ export interface EmbeddedChatConfig {
    */
   readonly launcherPosition: LauncherPosition;
   readonly theme: 'System' | 'Light' | 'Dark';
+
+  /** Whose chat this is, so a visitor knows (Phase 37.5a). */
+  readonly workspaceName: string;
 }
 
 /** A conversation the widget has just started, and the credential that opens it. */

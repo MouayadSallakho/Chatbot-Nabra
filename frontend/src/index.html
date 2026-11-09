@@ -27,11 +27,13 @@
 
       Language: `lang` and `dir` on <html>. They also choose the fonts, because
       every face carries a unicode-range and the Arabic type roles hang off
-      :lang(ar). The customer-facing pages (/chat/ and /embed/) follow the
-      visitor's own browser -- language and light or dark alike -- and never
-      read a choice an admin stored in the same browser. Elsewhere an explicit choice wins, then the browser's first
-      Arabic or English preference, then English. main.ts reads `lang` to decide
-      which catalogue to load.
+      :lang(ar). The customer-facing pages (/chat/ and /embed/) take ?lang=en or
+      ?lang=ar when the link gives one, then follow the visitor's own browser --
+      language and light or dark alike -- and never read or write a choice an
+      admin stored in the same browser. Elsewhere an explicit choice wins and
+      ?lang= means nothing, then the browser's first Arabic or English
+      preference, then English. main.ts reads `lang` to decide which catalogue
+      to load.
 
       It is inline for the same reason: an external file is one more round trip
       during which that flash happens anyway. It is ONE script on purpose: the
@@ -67,7 +69,10 @@
         var lang = 'en';
         try {
           var chosen = null;
-          if (!visitor) {
+          if (visitor) {
+            var linked = /[?&]lang=(en|ar)(?:&|$)/.exec(location.search);
+            chosen = linked ? linked[1] : null;
+          } else {
             try {
               chosen = localStorage.getItem('omniai.lang');
             } catch (_) {

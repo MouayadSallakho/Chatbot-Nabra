@@ -28,11 +28,16 @@ import { AgentKnowledgeSection } from '@app/features/knowledge/agent-knowledge/a
 import { LocalNumberPipe } from '@app/core/i18n/locale-pipes';
 import { ChannelBadge } from '@app/shared/channel/channel-badge';
 import type { WebChatWidget } from '@app/features/channels/website-chat-api';
-import { AgentChannels, AgentChannelUse, channelStatusNote } from '../agent-channels';
+import {
+  AgentChannels,
+  AgentChannelUse,
+  channelStatusNote,
+  visibleChannels,
+} from '../agent-channels';
 import { agentStatusSentence, agentStatusTone, agentStatusWord } from '../agent-words';
 import { AgentPreview, PREVIEW_HEADING } from './agent-preview';
 import { AGENT_LIMITS, CREATED_AGENT_STATE } from '../ai-agent-limits';
-import { AiAgent, AiAgentApi, AiAgentStatus } from '../ai-agent-api';
+import { AiAgent, AiAgentApi, AiAgentChannel, AiAgentStatus } from '../ai-agent-api';
 import { Versioned } from '@app/core/api/versioned';
 
 /** Which save ran into a stale version. */
@@ -122,7 +127,6 @@ export class AgentEditor implements OnInit, HasUnsavedChanges {
 
   /** The channels that use this agent; null while they are being read. */
   protected readonly channelUses = signal<readonly AgentChannelUse[] | null>(null);
-  protected readonly channelsIncomplete = signal(false);
 
   /** The website widget's appearance for this agent, if a website chat uses it. */
   protected readonly widget = signal<WebChatWidget | null>(null);
@@ -265,12 +269,12 @@ export class AgentEditor implements OnInit, HasUnsavedChanges {
       return;
     }
 
-    // Where the agent answers, read beside it and never in its way.
-    void this.loadChannels();
-
     if (this.handedOver) {
-      // Already have the representation and its tag, so nothing is re-read.
+      // Already have the representation and its tag, so nothing is re-read. A
+      // write says nothing about channels, and nothing can use an agent that
+      // did not exist a moment ago.
       this.adopt(this.handedOver);
+      void this.takeChannels([]);
       this.loading.set(false);
 
       return;
@@ -280,31 +284,24 @@ export class AgentEditor implements OnInit, HasUnsavedChanges {
   }
 
   /**
-   * Reads which channels use this agent, then the website widget's look.
+   * Takes the channels the agent read named, then reads the website widget's look.
    *
-   * Neither can block or fail the editor: an unreadable list is said in a
-   * sentence, and a missing widget means the preview shows the default look and
-   * says so.
+   * The look cannot block or fail the editor: a missing widget means the preview
+   * shows the default look and says so.
    */
-  private async loadChannels(): Promise<void> {
-    const tenantId = this.tenantId();
+  private async takeChannels(channels: readonly AiAgentChannel[]): Promise<void> {
+    const uses = visibleChannels(channels);
 
-    if (!this.canSeeChannels() || !tenantId) {
-      this.widgetKnown.set(true);
-
-      return;
-    }
+    this.channelUses.set(uses);
 
     try {
-      const map = await this.channelLookup.load(tenantId);
-      const uses = map.byAgent.get(this.aiAgentId()) ?? [];
+      const tenantId = this.tenantId();
 
-      this.channelUses.set(uses);
-      this.channelsIncomplete.set(map.incomplete);
-      this.widget.set(await this.channelLookup.widgetFor(tenantId, uses));
-    } catch {
-      this.channelUses.set([]);
-      this.channelsIncomplete.set(true);
+      this.widget.set(
+        this.canSeeChannels() && tenantId
+          ? await this.channelLookup.widgetFor(tenantId, uses)
+          : null,
+      );
     } finally {
       this.widgetKnown.set(true);
     }
@@ -316,7 +313,12 @@ export class AgentEditor implements OnInit, HasUnsavedChanges {
     this.loadFailure.set(null);
 
     try {
-      this.adopt(await firstValueFrom(this.api.get(this.tenantId(), this.aiAgentId())));
+      const read = await firstValueFrom(this.api.get(this.tenantId(), this.aiAgentId()));
+
+      this.adopt(read);
+
+      // Beside the agent, never in its way: nothing waits for the widget's look.
+      void this.takeChannels(read.value.channels ?? []);
     } catch (error) {
       this.loadFailure.set(toApiError(error));
       this.agent.set(null);

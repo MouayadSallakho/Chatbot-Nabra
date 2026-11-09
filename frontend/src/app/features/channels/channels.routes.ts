@@ -1,6 +1,8 @@
 import { Routes } from '@angular/router';
 import { unsavedChangesGuard } from '@app/core/navigation/unsaved-changes';
+import { provideProblemWords } from '@app/core/problems/problem-words';
 import { AiAgentApi } from '@app/features/ai-agents/ai-agent-api';
+import { CHANNEL_PROBLEM_WORDS } from './channel-problems';
 import { WebChatAdminApi } from './website-chat-api';
 import { WhatsAppApi } from './whatsapp-api';
 
@@ -21,7 +23,12 @@ import { WhatsAppApi } from './whatsapp-api';
 export const channelRoutes: Routes = [
   {
     path: '',
-    providers: [WebChatAdminApi, WhatsAppApi, AiAgentApi],
+    providers: [
+      WebChatAdminApi,
+      WhatsAppApi,
+      AiAgentApi,
+      provideProblemWords(CHANNEL_PROBLEM_WORDS),
+    ],
     children: [
       {
         path: '',

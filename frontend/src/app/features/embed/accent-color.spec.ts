@@ -3,6 +3,7 @@ import {
   applyAccent,
   checkAccent,
   contrastRatio,
+  pageAccent,
   readableForeground,
 } from './accent-color';
 
@@ -73,6 +74,57 @@ describe('checkAccent', () => {
 
   it('reports the label contrast it guarantees', () => {
     expect(checkAccent('#2e8b57').labelContrast).toBeGreaterThanOrEqual(4.5);
+  });
+});
+
+describe('pageAccent', () => {
+  it('takes an exact #RRGGBB and picks the ink that reads on it', () => {
+    expect(pageAccent('#1D3557')).toEqual({ accent: '#1d3557', foreground: '#ffffff' });
+    expect(pageAccent('#ffe066')).toEqual({ accent: '#ffe066', foreground: '#111827' });
+  });
+
+  it('ignores everything that is not exactly #RRGGBB', () => {
+    for (const invalid of [
+      '',
+      ' #1d3557',
+      '#1d3557 ',
+      '#1d3557\n',
+      '#fff',
+      '#1d35577',
+      '#1d3557ff',
+      '1d3557',
+      'red',
+      'var(--x)',
+      'url(x)',
+      'red;background:url(x)',
+      '#1d355g',
+      null,
+      undefined,
+      42,
+      {},
+    ]) {
+      expect(pageAccent(invalid)).toBeNull();
+    }
+  });
+
+  it('keeps the product look on a colour neither ink reaches 4.5:1 on', () => {
+    // White is 4.25:1 and near-black 4.17:1 on sea green.
+    expect(pageAccent('#2e8b57')).toBeNull();
+  });
+
+  it('never returns a pair under 4.5:1, across the whole colour cube', () => {
+    for (let r = 0; r <= 255; r += 17) {
+      for (let g = 0; g <= 255; g += 17) {
+        for (let b = 0; b <= 255; b += 17) {
+          const value = '#' + [r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('');
+          const accent = pageAccent(value);
+
+          if (accent) {
+            expect(contrastRatio(accent.accent, accent.foreground)).toBeGreaterThanOrEqual(4.5);
+          }
+        }
+      }
+    }
   });
 });
 

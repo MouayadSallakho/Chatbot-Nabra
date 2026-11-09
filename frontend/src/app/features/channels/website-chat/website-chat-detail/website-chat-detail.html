@@ -245,6 +245,30 @@
       </p>
 
       <div class="card card-body link-card">
+        <div class="field chat-language">
+          <label class="field-label" for="chat-page-language" i18n="@@websiteChat.detail.language"
+            >Chat page language</label
+          >
+          <select
+            id="chat-page-language"
+            class="select"
+            aria-describedby="chat-page-language-hint"
+            (change)="chooseChatLanguage($event)"
+            data-testid="chat-language"
+          >
+            <option value="auto" i18n="@@websiteChat.detail.language.auto">Automatic</option>
+            <option value="en" lang="en" dir="ltr">{{ endonyms.en }}</option>
+            <option value="ar" lang="ar" dir="rtl">{{ endonyms.ar }}</option>
+          </select>
+          <p
+            id="chat-page-language-hint"
+            class="field-hint"
+            i18n="@@websiteChat.detail.language.hint"
+          >
+            Automatic follows each visitor's browser. Choosing a language adds it to the link.
+          </p>
+        </div>
+
         <!--
           Shown as text as well as offered to the clipboard. The clipboard can be
           refused by permission or by an insecure context, and somebody who

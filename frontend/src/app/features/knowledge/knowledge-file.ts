@@ -1,6 +1,7 @@
 import type { ApiError } from '@app/core/api/api-error';
 import type { AppLanguage } from '@app/core/i18n/language';
 import { formatNumber } from '@app/core/i18n/locale-format';
+import { hasProblemWording } from '@app/core/problems/problem-words';
 import { sizeLabel } from '@app/features/reports/reports-words';
 import type { KnowledgeFileType } from './knowledge-api';
 import { KNOWLEDGE_FILE_LIMITS } from './knowledge-limits';
@@ -76,28 +77,37 @@ export function fileRefusal(file: File, language: AppLanguage): string | null {
   return null;
 }
 
+/** The upload limit was broken: said once, by the code and by the bare status. */
+export function tooLargeSentence(max: string): string {
+  return $localize`:@@knowledge.upload.serverTooLarge:That file is larger than ${max}:max:, the most Nabra accepts. Nothing was saved.`;
+}
+
+/** The file is not one of the accepted formats: said once, as above. */
+export function unsupportedSentence(): string {
+  const formats = acceptedFormats();
+
+  return $localize`:@@knowledge.upload.serverUnsupported:That file is not a ${formats}:formats: file, so it was not read. Nothing was saved.`;
+}
+
 /**
  * A server refusal of a file, in the reader's language.
  *
- * Too large and unsupported are said in our own words with the real limits
- * (the server's sentences are English only). A file whose content could not be
- * used (422) keeps the server's own sentence in English, which names the
- * reason (a scanned PDF, too many pages); in Arabic it gets one translated
- * sentence covering those reasons, because the server sends no stable code to
- * translate by. Everything else is the shared error copy.
+ * Worded by its `code` wherever the catalogue knows it (`knowledge-problems.ts`),
+ * with the bound it broke. The rest is for an answer with no code this build
+ * knows: too large and unsupported in our own words with the real limits; a file
+ * whose content could not be used keeps the server's sentence in English and gets
+ * one translated sentence in Arabic. Everything else is the shared error copy.
  */
 export function uploadFailure(error: ApiError, language: AppLanguage): string {
+  if (error.code !== undefined && hasProblemWording(error.code)) {
+    return error.message;
+  }
+
   switch (error.kind) {
-    case 'tooLarge': {
-      const max = maxSizeLabel(language);
-
-      return $localize`:@@knowledge.upload.serverTooLarge:That file is larger than ${max}:max:, the most Nabra accepts. Nothing was saved.`;
-    }
-    case 'unsupportedMedia': {
-      const formats = acceptedFormats();
-
-      return $localize`:@@knowledge.upload.serverUnsupported:That file is not a ${formats}:formats: file, so it was not read. Nothing was saved.`;
-    }
+    case 'tooLarge':
+      return tooLargeSentence(maxSizeLabel(language));
+    case 'unsupportedMedia':
+      return unsupportedSentence();
     case 'unprocessable':
       return language === 'en'
         ? error.message

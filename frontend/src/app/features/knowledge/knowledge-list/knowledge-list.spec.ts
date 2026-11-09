@@ -32,6 +32,8 @@ describe('KnowledgeList', () => {
     updatedAt: '2026-09-01T09:00:00+00:00',
     indexedAt: '2026-09-01T10:00:00+00:00',
     sourceFileType: null,
+    sourceByteLength: null,
+    lastIndexAttempt: null,
   };
 
   const unindexed: KnowledgeDocumentSummary = {
@@ -113,14 +115,93 @@ describe('KnowledgeList', () => {
     expect(badges[1].classList).toContain('badge-warning');
   });
 
-  it("says each document's size in characters, with the right plural", async () => {
+  it("says the file's size, and that a typed document has no file", async () => {
     await mount();
 
-    flush([ready, { ...unindexed, contentLength: 1 }]);
+    flush([
+      { ...ready, sourceFileType: 'Pdf', sourceByteLength: 1_536_000 },
+      { ...unindexed, sourceByteLength: null },
+    ]);
     await settle();
 
-    expect(host().textContent).toContain('240 characters');
-    expect(host().textContent).toContain('1 character');
+    const sizes = [...host().querySelectorAll('[data-testid="document-size"]')].map((cell) =>
+      cell.textContent?.trim(),
+    );
+
+    expect(sizes).toEqual(['1.5 MB', 'Typed text']);
+  });
+
+  describe('the newest index attempt', () => {
+    const started = {
+      status: 'Started',
+      failureCode: null,
+      startedAt: '2026-09-02T10:00:00+00:00',
+      completedAt: null,
+    };
+
+    const state = (): string =>
+      host().querySelector('[data-testid="document-state"]')?.textContent?.trim() ?? '';
+    const note = (): string =>
+      host().querySelector('[data-testid="document-attempt"]')?.textContent?.trim() ?? '';
+
+    it('says "Indexing now" while an attempt runs, with its own marker', async () => {
+      await mount();
+
+      flush([{ ...unindexed, lastIndexAttempt: started }]);
+      await settle();
+
+      expect(state()).toBe('Indexing now');
+      expect(host().querySelector('[data-testid="document-state"]')?.classList).toContain(
+        'badge-info',
+      );
+    });
+
+    it('says why the last attempt failed, by its code', async () => {
+      await mount();
+
+      flush([
+        {
+          ...unindexed,
+          lastIndexAttempt: { ...started, status: 'Failed', failureCode: 'quota_exhausted' },
+        },
+      ]);
+      await settle();
+
+      expect(state()).toBe('Indexing failed');
+      expect(note()).toBe('This workspace has used all the AI usage its plan allows.');
+    });
+
+    it('says an attempt stopped when the process could not say how it ended', async () => {
+      await mount();
+
+      flush([{ ...unindexed, lastIndexAttempt: { ...started, status: 'Unknown' } }]);
+      await settle();
+
+      expect(state()).toBe('Indexing stopped');
+      expect(note()).toBe('It stopped before it finished.');
+    });
+
+    it('stays "Indexed" when the last attempt succeeded', async () => {
+      await mount();
+
+      flush([{ ...ready, lastIndexAttempt: { ...started, status: 'Succeeded' } }]);
+      await settle();
+
+      expect(state()).toBe('Indexed');
+      expect(note()).toBe('');
+    });
+
+    it('says honestly that a document was never indexed', async () => {
+      await mount();
+
+      flush([{ ...unindexed, lastIndexAttempt: null }]);
+      await settle();
+
+      expect(state()).toBe('Needs index');
+      expect(host().querySelector('[data-testid="document-never-indexed"]')?.textContent).toContain(
+        'Never indexed',
+      );
+    });
   });
 
   it('keeps a title in its own direction', async () => {

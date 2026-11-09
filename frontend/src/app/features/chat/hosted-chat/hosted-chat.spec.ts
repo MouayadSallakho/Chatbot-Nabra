@@ -70,8 +70,21 @@ describe('HostedChat', () => {
     openAt(publicKey);
     await mount();
 
-    http.expectOne(configUrl).flush({ agentName, available: true });
+    http.expectOne(configUrl).flush(publicRead({ agentName }));
     await settle();
+  }
+
+  /** The public read, with the appearance fields a workspace has by default. */
+  function publicRead(overrides: Record<string, unknown> = {}) {
+    return {
+      agentName: 'Concierge',
+      available: true,
+      workspaceName: 'Northwind Traders',
+      greeting: null,
+      accentColor: '#1d3557',
+      theme: 'System',
+      ...overrides,
+    };
   }
 
   /** Types a message and submits it, answering the lazy start on the way. */
@@ -151,6 +164,139 @@ describe('HostedChat', () => {
     window.sessionStorage.clear();
   });
 
+  // ---- The workspace's own look (Phase 38.3) -----------------------------
+
+  describe("the workspace's look", () => {
+    const panel = (): HTMLElement => host().querySelector('app-chat-panel') as HTMLElement;
+    const root = document.documentElement;
+
+    async function openWith(overrides: Record<string, unknown>): Promise<void> {
+      openAt(publicKey);
+      await mount();
+      http.expectOne(configUrl).flush(publicRead(overrides));
+      await settle();
+    }
+
+    beforeEach(() => root.setAttribute('data-theme', 'light'));
+    afterEach(() => root.removeAttribute('data-theme'));
+
+    it("heads the chat with the workspace's name, as text", async () => {
+      await openWith({ workspaceName: '<img src=x onerror=alert(1)>' });
+
+      const title = host().querySelector('[data-testid="chat-title"]');
+
+      expect(title?.textContent).toContain('<img src=x onerror=alert(1)>');
+      expect(title?.querySelector('img')).toBeNull();
+    });
+
+    it("shows the workspace's greeting, as its own words", async () => {
+      await openWith({ greeting: 'Hello from Northwind.' });
+
+      expect(host().querySelector('[data-testid="chat-greeting"]')?.textContent).toContain(
+        'Hello from Northwind.',
+      );
+    });
+
+    it('wears a valid accent with the ink that reads on it', async () => {
+      await openWith({ accentColor: '#FFE066' });
+
+      expect(panel().style.getPropertyValue('--chat-accent')).toBe('#ffe066');
+      expect(panel().style.getPropertyValue('--chat-on-accent')).toBe('#111827');
+      expect(panel().classList).toContain('has-accent');
+      expect(host().querySelector('app-brand-mark')).toBeNull();
+    });
+
+    it.each(['red;background:url(x)', '#fff', ' #1d3557', 'var(--x)', '#2e8b57'])(
+      'keeps the product look for the accent %s, silently',
+      async (accentColor) => {
+        await openWith({ accentColor });
+
+        expect(panel().style.getPropertyValue('--chat-accent')).toBe('');
+        expect(panel().getAttribute('style') ?? '').not.toContain('url');
+        expect(panel().classList).not.toContain('has-accent');
+        expect(host().querySelector('app-brand-mark')).not.toBeNull();
+        expect(host().querySelector('[role="alert"]')).toBeNull();
+      },
+    );
+
+    it('applies a configured theme over the system one', async () => {
+      await openWith({ theme: 'Dark' });
+      expect(root.getAttribute('data-theme')).toBe('dark');
+
+      root.setAttribute('data-theme', 'dark');
+      await openWith({ theme: 'Light' });
+      expect(root.getAttribute('data-theme')).toBe('light');
+    });
+
+    it('leaves the system theme alone for System, and for a value it does not know', async () => {
+      root.setAttribute('data-theme', 'dark');
+
+      await openWith({ theme: 'System' });
+      expect(root.getAttribute('data-theme')).toBe('dark');
+
+      await openWith({ theme: 'Sepia' });
+      expect(root.getAttribute('data-theme')).toBe('dark');
+    });
+
+    it('never touches a stored admin theme', async () => {
+      const setItem = vi.spyOn(Storage.prototype, 'setItem');
+
+      await openWith({ theme: 'Dark' });
+
+      expect(setItem.mock.calls.map(([key]) => key)).not.toContain('omniai.theme');
+      setItem.mockRestore();
+    });
+
+    it('draws only the lockup until the read answers, so the chat cannot flash', async () => {
+      openAt(publicKey);
+      await mount();
+
+      expect(host().querySelector('[data-testid="chat-loading"]')).not.toBeNull();
+      expect(host().querySelector('app-chat-panel')).toBeNull();
+
+      http.expectOne(configUrl).flush(publicRead({ theme: 'Dark' }));
+      await settle();
+
+      expect(host().querySelector('[data-testid="chat-loading"]')).toBeNull();
+      expect(root.getAttribute('data-theme')).toBe('dark');
+      expect(host().querySelectorAll('h1').length).toBe(1);
+    });
+
+    it('shows its failure in the panel when the read fails', async () => {
+      openAt(publicKey);
+      await mount();
+
+      http
+        .expectOne(configUrl)
+        .flush({ title: 'Not found' }, { status: 404, statusText: 'Not Found' });
+      await settle();
+
+      expect(host().querySelector('[data-testid="chat-loading"]')).toBeNull();
+      expect(host().querySelector('[data-testid="chat-failed"]')).not.toBeNull();
+    });
+
+    it('words a refused message by its code', async () => {
+      await openWith({});
+
+      await sendFirst('Hello');
+
+      http.expectOne(messagesUrl).flush(
+        {
+          title: 'Too long',
+          detail: 'The English sentence from the server.',
+          code: 'chat.message.too_long',
+        },
+        { status: 400, statusText: 'Bad Request' },
+      );
+      await settle();
+      http.expectOne(messagesUrl).flush({ items: [], nextCursor: null, handling: 'Ai' });
+      await settle();
+
+      expect(alertText()).toContain('This message is too long');
+      expect(alertText()).not.toContain('The English sentence');
+    });
+  });
+
   // ---- Opening the page creates nothing --------------------------------
 
   it('reads the endpoint and starts no conversation on arrival', async () => {
@@ -160,7 +306,7 @@ describe('HostedChat', () => {
     // any request beyond the config read fails this test.
     await open('Night desk');
 
-    expect(text()).toContain('Night desk');
+    expect(text()).toContain('Northwind Traders');
     expect(text()).toContain('Ask anything to start the conversation.');
   });
 
@@ -289,7 +435,7 @@ describe('HostedChat', () => {
     openAt(publicKey);
     await mount();
 
-    http.expectOne(configUrl).flush({ agentName: 'Concierge', available: true });
+    http.expectOne(configUrl).flush(publicRead());
     await settle();
 
     // The transcript is read for the remembered id. The browser attaches the
@@ -316,7 +462,7 @@ describe('HostedChat', () => {
     openAt(publicKey);
     await mount();
 
-    http.expectOne(configUrl).flush({ agentName: 'Concierge', available: true });
+    http.expectOne(configUrl).flush(publicRead());
     await settle();
 
     http.expectOne(messagesUrl).flush({ items: [], nextCursor: null });
@@ -341,7 +487,7 @@ describe('HostedChat', () => {
     openAt(publicKey);
     await mount();
 
-    http.expectOne(configUrl).flush({ agentName: 'Concierge', available: true });
+    http.expectOne(configUrl).flush(publicRead());
     await settle();
 
     http
@@ -365,7 +511,7 @@ describe('HostedChat', () => {
     openAt(publicKey);
     await mount();
 
-    http.expectOne(configUrl).flush({ agentName: 'Concierge', available: true });
+    http.expectOne(configUrl).flush(publicRead());
     await settle();
 
     http
@@ -391,7 +537,7 @@ describe('HostedChat', () => {
     openAt(publicKey);
     await mount();
 
-    http.expectOne(configUrl).flush({ agentName: 'Concierge', available: true });
+    http.expectOne(configUrl).flush(publicRead());
     await settle();
 
     http.expectOne(messagesUrl).flush({}, { status: 500, statusText: 'Server Error' });
@@ -813,7 +959,7 @@ describe('HostedChat', () => {
     openAt(publicKey);
     await mount();
 
-    http.expectOne(configUrl).flush({ agentName: 'Concierge', available: false });
+    http.expectOne(configUrl).flush(publicRead({ available: false }));
     await settle();
 
     expect(text()).toContain('not available right now');
@@ -916,7 +1062,7 @@ describe('HostedChat', () => {
     openAt(publicKey);
     await mount();
 
-    http.expectOne(configUrl).flush({ agentName: 'Concierge', available: true });
+    http.expectOne(configUrl).flush(publicRead());
     await settle();
 
     http.expectOne(messagesUrl).flush({

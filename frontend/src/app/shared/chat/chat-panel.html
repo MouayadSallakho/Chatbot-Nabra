@@ -5,11 +5,11 @@
   <div class="chat-head-text">
     @if (titleIsHeading()) {
       <h1 class="chat-title" [id]="ids.title" data-testid="chat-title">
-        <bdi>{{ agentName() || defaultTitle }}</bdi>
+        <bdi>{{ title() }}</bdi>
       </h1>
     } @else {
       <p class="chat-title" [id]="ids.title" data-testid="chat-title">
-        <bdi>{{ agentName() || defaultTitle }}</bdi>
+        <bdi>{{ title() }}</bdi>
       </p>
     }
     @if (state() === 'ready') {

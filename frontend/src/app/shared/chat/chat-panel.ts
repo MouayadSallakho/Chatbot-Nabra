@@ -4,6 +4,7 @@ import {
   ElementRef,
   Injector,
   afterNextRender,
+  computed,
   effect,
   inject,
   input,
@@ -40,8 +41,9 @@ let nextPanel = 0;
  * <strong>Two looks, one structure.</strong> In the widget (`variant="widget"`)
  * the header and Send take the workspace's accent from `--chat-accent` and
  * `--chat-on-accent`, set from `accent-color.ts`, and the AI's replies its
- * tint. On the hosted page, which knows no accent, they are Nabra's own: an
- * ink Send and the AI voice's tint.
+ * tint. The hosted page wears the same accent when the workspace has a usable
+ * one (`accented`); without one it is Nabra's own: an ink Send and the AI voice's
+ * tint.
  */
 @Component({
   selector: 'app-chat-panel',
@@ -53,6 +55,7 @@ let nextPanel = 0;
     class: 'chat-panel',
     '[class.is-widget]': 'variant() === "widget"',
     '[class.is-page]': 'variant() === "page"',
+    '[class.has-accent]': 'accented()',
     '[class.is-preview]': 'preview()',
   },
 })
@@ -66,6 +69,13 @@ export class ChatPanel {
   readonly titleIsHeading = input(true);
 
   readonly agentName = input('');
+
+  /** Whose chat this is. Heads the panel when the page knows it. */
+  readonly workspaceName = input('');
+
+  /** On the hosted page: `--chat-accent` and `--chat-on-accent` hold a checked colour. */
+  readonly accented = input(false);
+
   readonly greeting = input<string | null>(null);
   readonly messages = input<readonly ChatMessage[]>([]);
   readonly handling = input<ChatHandling>('Ai');
@@ -118,7 +128,12 @@ export class ChatPanel {
   }
 
   protected readonly closeLabel = $localize`:@@visitor.close:Close chat`;
-  protected readonly defaultTitle = $localize`:@@visitor.defaultTitle:Chat`;
+  private readonly defaultTitle = $localize`:@@visitor.defaultTitle:Chat`;
+
+  /** The workspace's name; the agent's where a page has none to give. */
+  protected readonly title = computed(
+    () => this.workspaceName() || this.agentName() || this.defaultTitle,
+  );
 
   constructor() {
     // Keep the newest message in view as the transcript grows, or while the AI

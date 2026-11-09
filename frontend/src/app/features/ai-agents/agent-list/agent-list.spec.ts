@@ -7,7 +7,6 @@ import { TenantApi } from '@app/core/api/tenant-api';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
 import { memoryStorage, permissionApiGranting } from '@app/testing/test-doubles';
 import { PermissionApi } from '@app/core/authorization/permission-api';
-import { AgentChannelMap, AgentChannelUse, AgentChannels } from '../agent-channels';
 import { AiAgentApi, AiAgentSummary } from '../ai-agent-api';
 import { AgentList } from './agent-list';
 
@@ -23,23 +22,13 @@ describe('AgentList', () => {
       status: 'Draft',
       createdAt: '2026-05-01T09:00:00+00:00',
       updatedAt: '2026-05-01T09:00:00+00:00',
+      channels: [],
       ...overrides,
     };
   }
 
   let fixture: ComponentFixture<AgentList>;
   let http: HttpTestingController;
-
-  /**
-   * Which channels use which agent, as the stand-in for `AgentChannels` answers.
-   * Provided through DI (never a module mock): the join itself is tested in
-   * agent-words.spec.ts.
-   */
-  let channelMap: AgentChannelMap;
-
-  function useOf(channel: AgentChannelUse['channel'], status = 'Active'): AgentChannelUse {
-    return { channel, id: crypto.randomUUID(), status, link: ['/channels'] };
-  }
 
   async function mount(permissions: string | string[] = '*'): Promise<void> {
     TestBed.configureTestingModule({
@@ -51,10 +40,6 @@ describe('AgentList', () => {
         {
           provide: PermissionApi,
           useValue: permissionApiGranting(...([] as string[]).concat(permissions)),
-        },
-        {
-          provide: AgentChannels,
-          useValue: { load: () => Promise.resolve(channelMap), widgetFor: () => null },
         },
         provideRouter([]),
         provideHttpClient(),
@@ -97,9 +82,7 @@ describe('AgentList', () => {
     ...host().querySelectorAll<HTMLAnchorElement>('.agent-list a.data-row'),
   ];
 
-  beforeEach(() => {
-    channelMap = { byAgent: new Map(), visible: true, incomplete: false };
-  });
+  beforeEach(() => {});
 
   afterEach(() => http.verify());
 
@@ -197,14 +180,15 @@ describe('AgentList', () => {
   });
 
   describe('channels', () => {
-    it('names the channels that use each agent, with a channel that is not on said so', async () => {
-      const agent = summary({ status: 'Active' });
+    it('names the channels that use each agent, from the agent read and no other', async () => {
+      const agent = summary({
+        status: 'Active',
+        channels: [
+          { kind: 'WebChat', id: 'w1', status: 'Active' },
+          { kind: 'WhatsApp', id: 'p1', status: 'Draft' },
+        ],
+      });
 
-      channelMap = {
-        byAgent: new Map([[agent.id, [useOf('WebChat'), useOf('WhatsApp', 'Draft')]]]),
-        visible: true,
-        incomplete: false,
-      };
       await mount();
 
       expectList().flush({ items: [agent, summary()], page: 1, pageSize: 20, totalCount: 2 });
@@ -216,17 +200,11 @@ describe('AgentList', () => {
       expect(cells[0].textContent).toContain('WhatsApp');
       expect(cells[0].textContent).toContain('(Draft)');
       expect(cells[1].textContent).toContain('Not on a channel');
-    });
 
-    it('says "Not checked" when a channel list could not be read', async () => {
-      channelMap = { byAgent: new Map(), visible: true, incomplete: true };
-      await mount();
-
-      expectList().flush({ items: [summary()], page: 1, pageSize: 20, totalCount: 1 });
-      await settle();
-
-      expect(host().querySelector('.agent-channels')?.textContent).toContain('Not checked');
-      expect(host().textContent).not.toContain('Not on a channel');
+      // The two reads the screen made before Phase 38.3. `afterEach` would also
+      // fail on an open request, but this names what went away.
+      http.expectNone(`/api/tenants/${tenantId}/website-chat`);
+      http.expectNone(`/api/tenants/${tenantId}/whatsapp/connections`);
     });
 
     it('leaves the column out for somebody who may see no channel', async () => {

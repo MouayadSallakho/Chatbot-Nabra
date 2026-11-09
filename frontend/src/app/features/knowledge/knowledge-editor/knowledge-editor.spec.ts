@@ -59,6 +59,13 @@ describe('KnowledgeEditor', () => {
     indexedAt: '2026-09-01T10:00:00+00:00',
   };
 
+  const attempt = {
+    status: 'Started',
+    failureCode: null,
+    startedAt: '2026-09-02T10:00:00+00:00',
+    completedAt: null,
+  };
+
   let fixture: ComponentFixture<KnowledgeEditor>;
   let http: HttpTestingController;
 
@@ -151,6 +158,88 @@ describe('KnowledgeEditor', () => {
   }
 
   afterEach(() => http.verify());
+
+  describe('the last index attempt, after a reload', () => {
+    const readiness = (): string => query('[data-testid="readiness"]')?.textContent?.trim() ?? '';
+    const sentence = (): string =>
+      query('[data-testid="state-sentence"]')?.textContent?.replace(/\s+/g, ' ').trim() ?? '';
+
+    it('says indexing is running, and how to see the outcome', async () => {
+      await mount({ ...needsIndex, lastIndexAttempt: attempt });
+
+      expect(readiness()).toBe('Indexing now');
+      expect(sentence()).toContain('Reload this page in a moment');
+    });
+
+    it('says why it failed, with the times', async () => {
+      await mount({
+        ...needsIndex,
+        lastIndexAttempt: {
+          ...attempt,
+          status: 'Failed',
+          failureCode: 'provider_timeout',
+          completedAt: '2026-09-02T10:01:00+00:00',
+        },
+      });
+
+      expect(readiness()).toBe('Indexing failed');
+      expect(query('[data-testid="attempt-reason"]')?.textContent).toBe(
+        'The AI provider took too long to answer.',
+      );
+      expect(host().textContent).toContain('Last attempt started');
+      expect(host().textContent).toContain('Last attempt finished');
+    });
+
+    it('gives a failure code this build does not know the general reason', async () => {
+      await mount({
+        ...needsIndex,
+        lastIndexAttempt: { ...attempt, status: 'Failed', failureCode: 'some_future_reason' },
+      });
+
+      expect(query('[data-testid="attempt-reason"]')?.textContent).toBe(
+        'Something went wrong while indexing.',
+      );
+    });
+
+    it('says an attempt stopped before it finished', async () => {
+      await mount({ ...needsIndex, lastIndexAttempt: { ...attempt, status: 'Unknown' } });
+
+      expect(readiness()).toBe('Indexing stopped');
+      expect(sentence()).toContain('stopped before it finished');
+    });
+
+    it('says "Never" when the read says it was never attempted', async () => {
+      await mount({ ...needsIndex, lastIndexAttempt: null });
+
+      expect(query('[data-testid="attempt-started"]')?.textContent).toContain('Never');
+    });
+
+    it('claims nothing about attempts when a write answered without them', async () => {
+      await mount(needsIndex);
+
+      expect(query('[data-testid="attempt-started"]')).toBeNull();
+    });
+
+    it('keeps the attempt it read when a save answers without one', async () => {
+      await mount({
+        ...needsIndex,
+        lastIndexAttempt: { ...attempt, status: 'Failed', failureCode: 'cancelled' },
+      });
+
+      await type(contentBox(), 'Goods may be returned within 60 days.');
+      query<HTMLButtonElement>('[data-testid="save-document"]')!.click();
+      http
+        .expectOne(documentUrl)
+        .flush(
+          { ...needsIndex, content: 'Goods may be returned within 60 days.' },
+          { headers: { ETag: '"v2"' } },
+        );
+      await settle();
+
+      expect(readiness()).toBe('Indexing failed');
+      expect(query('[data-testid="attempt-reason"]')?.textContent).toBe('Indexing was cancelled.');
+    });
+  });
 
   describe('loading', () => {
     it('shows the document and its state', async () => {

@@ -17,6 +17,7 @@ import { EmptyState } from '@app/shared/empty-state/empty-state';
 import { PageHeader } from '@app/shared/page-header/page-header';
 import { ConfirmDialog } from '@app/core/feedback/confirm-dialog';
 import { WebChatAdminApi, WebChatEndpoint, hostedChatUrl } from '../../website-chat-api';
+import { AppLanguage, LANGUAGE_ENDONYMS, isAppLanguage } from '@app/core/i18n/language';
 import { LocalDatePipe } from '@app/core/i18n/locale-pipes';
 import { HasUnsavedChanges, protectUnsavedChanges } from '@app/core/navigation/unsaved-changes';
 import { agentStatusWord } from '@app/features/ai-agents/agent-words';
@@ -72,6 +73,11 @@ export class WebsiteChatDetail implements OnInit, HasUnsavedChanges {
   protected readonly stale = signal(false);
   protected readonly copied = signal(false);
 
+  /** The language the shown link opens in; null follows each visitor's browser. */
+  private readonly chatLanguage = signal<AppLanguage | null>(null);
+
+  protected readonly endonyms = LANGUAGE_ENDONYMS;
+
   /**
    * The widget section, when the reader is allowed to see this endpoint.
    *
@@ -104,8 +110,16 @@ export class WebsiteChatDetail implements OnInit, HasUnsavedChanges {
   protected readonly chatUrl = computed(() => {
     const current = this.endpoint();
 
-    return current ? hostedChatUrl(current.publicKey) : '';
+    return current ? hostedChatUrl(current.publicKey, this.chatLanguage()) : '';
   });
+
+  /** Changes the link that is shown and copied. Nothing is saved. */
+  protected chooseChatLanguage(event: Event): void {
+    const value = (event.target as HTMLSelectElement).value;
+
+    this.chatLanguage.set(isAppLanguage(value) ? value : null);
+    this.copied.set(false);
+  }
 
   /**
    * Whether publishing this link would put a chat online that cannot answer.

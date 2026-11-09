@@ -9,7 +9,7 @@ import { memoryStorage, permissionApiGranting } from '@app/testing/test-doubles'
 import { PermissionApi } from '@app/core/authorization/permission-api';
 import { KnowledgeApi } from '@app/features/knowledge/knowledge-api';
 import type { WebChatWidget } from '@app/features/channels/website-chat-api';
-import { AgentChannelMap, AgentChannels } from '../agent-channels';
+import { AgentChannels } from '../agent-channels';
 import { AiAgent, AiAgentApi } from '../ai-agent-api';
 import { AgentEditor } from './agent-editor';
 
@@ -41,22 +41,19 @@ describe('AgentEditor', () => {
   let http: HttpTestingController;
 
   /**
-   * What the stand-in for `AgentChannels` answers: which channels use this
-   * agent and the website widget's look. Through DI, never a module mock.
+   * What the stand-in for `AgentChannels` answers: the website widget's look.
+   * Through DI, never a module mock.
    */
-  let channelMap: AgentChannelMap;
   let widget: WebChatWidget | null;
 
   const channelsDouble = {
     provide: AgentChannels,
     useValue: {
-      load: () => Promise.resolve(channelMap),
       widgetFor: () => Promise.resolve(widget),
     },
   };
 
   beforeEach(() => {
-    channelMap = { byAgent: new Map(), visible: true, incomplete: false };
     widget = null;
   });
 
@@ -272,25 +269,11 @@ describe('AgentEditor', () => {
       expect(nameBox().getAttribute('dir')).toBe('auto');
     });
 
-    it('says where the agent answers, linking each channel', async () => {
-      channelMap = {
-        byAgent: new Map([
-          [
-            agentId,
-            [
-              {
-                channel: 'WebChat',
-                id: 'w1',
-                status: 'Active',
-                link: ['/channels/website-chat', 'w1'],
-              },
-            ],
-          ],
-        ]),
-        visible: true,
-        incomplete: false,
-      };
-      await mount();
+    it('says where the agent answers, linking each channel, from the agent read', async () => {
+      await mount({ ...draft, channels: [{ kind: 'WebChat', id: 'w1', status: 'Active' }] });
+
+      http.expectNone(`/api/tenants/${tenantId}/website-chat`);
+      http.expectNone(`/api/tenants/${tenantId}/whatsapp/connections`);
 
       const link = query<HTMLAnchorElement>('[data-testid="agent-channels"] a');
 
@@ -313,6 +296,30 @@ describe('AgentEditor', () => {
       expect(query('[data-testid="chat-greeting"]')?.textContent).toContain('Hello from Acme.');
       expect(query('[data-testid="preview-look"]')?.textContent).toContain("website chat's colour");
       expect(query('[data-testid="chat-title"]')?.textContent).toContain('Sales Assistant');
+    });
+
+    it('keeps the channels when a write answers without them', async () => {
+      await mount({ ...draft, channels: [{ kind: 'WebChat', id: 'w1', status: 'Active' }] });
+
+      await type(nameBox(), 'Support Assistant');
+      buttonLabelled('Save name')!.click();
+
+      // A write answers with its seven fields and no `channels`.
+      http
+        .expectOne(`${agentUrl}/name`)
+        .flush({ ...draft, name: 'Support Assistant' }, { headers: { ETag: '"v2"' } });
+      await settle();
+
+      expect(query('[data-testid="agent-channels"] a')?.getAttribute('href')).toBe(
+        '/channels/website-chat/w1',
+      );
+    });
+
+    it('says when no channel uses the agent', async () => {
+      await mount({ ...draft, channels: [] });
+
+      expect(query('[data-testid="agent-channels"]')).toBeNull();
+      expect(host().textContent).toContain('No channel uses this agent yet');
     });
 
     it('says it shows the default look when no website chat uses the agent', async () => {

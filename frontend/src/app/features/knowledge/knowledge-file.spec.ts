@@ -7,6 +7,8 @@ import {
   maxSizeLabel,
   uploadFailure,
 } from './knowledge-file';
+import { registerProblemWords } from '@app/core/problems/problem-words';
+import { KNOWLEDGE_PROBLEM_WORDS } from './knowledge-problems';
 import {
   characterCount,
   knowledgeStateTone,
@@ -66,6 +68,36 @@ describe('knowledge file checks', () => {
     );
     expect(uploadFailure(error('offline', 'offline copy'), 'en')).toBe('offline copy');
   });
+
+  it('says a coded refusal in the catalogue words, whatever its status', () => {
+    registerProblemWords(KNOWLEDGE_PROBLEM_WORDS);
+
+    expect(
+      uploadFailure(
+        {
+          kind: 'unprocessable',
+          status: 422,
+          message: 'From the catalogue.',
+          code: 'knowledge.file.encrypted',
+        },
+        'ar',
+      ),
+    ).toBe('From the catalogue.');
+  });
+
+  it('keeps the old wording for a code nobody has registered', () => {
+    expect(
+      uploadFailure(
+        {
+          kind: 'tooLarge',
+          status: 413,
+          message: 'server words',
+          code: 'knowledge.file.something_new',
+        },
+        'en',
+      ),
+    ).toContain('larger than 10 MB');
+  });
 });
 
 describe('knowledge words', () => {
@@ -74,6 +106,8 @@ describe('knowledge words', () => {
     expect(knowledgeStateWord('NeedsIndex')).toBe('Needs index');
     expect(knowledgeStateWord('Disabled')).toBe('Disabled');
     expect(knowledgeStateWord('Failed')).toBe('Indexing failed');
+    expect(knowledgeStateWord('Indexing')).toBe('Indexing now');
+    expect(knowledgeStateWord('Stopped')).toBe('Indexing stopped');
     // An unknown state is shown, never hidden.
     expect(knowledgeStateWord('Archived')).toBe('Archived');
   });

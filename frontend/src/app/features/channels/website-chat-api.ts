@@ -2,6 +2,8 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable, map } from 'rxjs';
 import { Versioned, withEntityTag } from '@app/core/api/versioned';
+import type { AppLanguage } from '@app/core/i18n/language';
+import type { LauncherPosition } from '@app/features/embed/launcher-position';
 
 /** Where a website chat endpoint stands. */
 export type WebChatEndpointStatus = 'Draft' | 'Active' | 'Disabled';
@@ -29,7 +31,7 @@ export interface WebChatEndpoint {
 export interface WebChatWidget {
   readonly greeting: string | null;
   readonly accentColor: string;
-  readonly launcherPosition: 'Left' | 'Right';
+  readonly launcherPosition: LauncherPosition;
   readonly theme: 'System' | 'Light' | 'Dark';
 }
 
@@ -59,7 +61,7 @@ export interface WebChatWidgetConfiguration {
 export interface UpdateWebChatWidgetRequest {
   readonly greeting: string | null;
   readonly accentColor: string;
-  readonly launcherPosition: 'Left' | 'Right';
+  readonly launcherPosition: LauncherPosition;
   readonly theme: 'System' | 'Light' | 'Dark';
   readonly allowedOrigins: readonly string[];
 }
@@ -163,7 +165,12 @@ export class WebChatAdminApi {
  * does not know what hostname a browser reached it by — behind a proxy it may
  * see something else entirely — so the one place that reliably knows the public
  * origin is the page itself.
+ *
+ * With a language, the page opens in it whatever the visitor's browser prefers
+ * (Phase 38.3); without one it follows the browser.
  */
-export function hostedChatUrl(publicKey: string): string {
-  return `${window.location.origin}/chat/${publicKey}`;
+export function hostedChatUrl(publicKey: string, language: AppLanguage | null = null): string {
+  const address = `${window.location.origin}/chat/${publicKey}`;
+
+  return language === null ? address : `${address}?lang=${language}`;
 }

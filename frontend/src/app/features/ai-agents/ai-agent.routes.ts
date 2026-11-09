@@ -1,8 +1,10 @@
 import { Routes } from '@angular/router';
 import { unsavedChangesGuard } from '@app/core/navigation/unsaved-changes';
+import { provideProblemWords } from '@app/core/problems/problem-words';
 import { WebChatAdminApi } from '@app/features/channels/website-chat-api';
-import { WhatsAppApi } from '@app/features/channels/whatsapp-api';
 import { KnowledgeApi } from '@app/features/knowledge/knowledge-api';
+import { KNOWLEDGE_PROBLEM_WORDS } from '@app/features/knowledge/knowledge-problems';
+import { AGENT_PROBLEM_WORDS } from './agent-problems';
 import { AgentChannels } from './agent-channels';
 import { AiAgentApi } from './ai-agent-api';
 
@@ -21,15 +23,24 @@ import { AiAgentApi } from './ai-agent-api';
  * state, and moving it to the root injector would pull it into the initial
  * bundle for everybody who never opens either area.
  *
- * <strong>The two channel clients are here for one read each</strong> (Phase
- * 36.8): the list and the editor say which channels use an agent, and the
- * preview wears the website chat's real accent. Both are stateless and scoped
- * the same way.
+ * <strong>The website chat client is here for one read</strong>: the preview
+ * wears the website chat's real accent. Which channels use an agent comes with
+ * the agent itself (Phase 38.3), so the two channel lists are no longer read.
+ *
+ * <strong>The knowledge refusals are registered beside the agents' own</strong>,
+ * because the editor's knowledge section can meet them.
  */
 export const aiAgentRoutes: Routes = [
   {
     path: '',
-    providers: [AiAgentApi, KnowledgeApi, WebChatAdminApi, WhatsAppApi, AgentChannels],
+    providers: [
+      AiAgentApi,
+      KnowledgeApi,
+      WebChatAdminApi,
+      AgentChannels,
+      provideProblemWords(AGENT_PROBLEM_WORDS),
+      provideProblemWords(KNOWLEDGE_PROBLEM_WORDS),
+    ],
     children: [
       {
         path: '',

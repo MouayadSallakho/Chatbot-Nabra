@@ -112,6 +112,7 @@
 
         <ul data-testid="documents">
           @for (document of page()!.items; track document.id) {
+            @let state = displayState(document.readiness, document.lastIndexAttempt);
             <li>
               <a
                 class="data-row"
@@ -128,21 +129,34 @@
                 </span>
 
                 <span class="data-row-meta data-cell-end num">
-                  <span class="data-cell-label" i18n="@@knowledge.cell.size">Size:</span
-                  >&nbsp;<span>{{ size(document.contentLength) }}</span>
+                  <span class="data-cell-label" i18n="@@knowledge.cell.size">Size:</span>&nbsp;<span
+                    data-testid="document-size"
+                    >{{ size(document.sourceByteLength) }}</span
+                  >
                 </span>
 
                 <span class="knowledge-state">
-                  <span [class]="'badge ' + stateTone(document.readiness)">{{
-                    stateWord(document.readiness)
+                  <span [class]="'badge ' + stateTone(state)" data-testid="document-state">{{
+                    stateWord(state)
                   }}</span>
-                  @if (document.indexedAt; as indexed) {
+                  @if (attemptNote(state, document.lastIndexAttempt); as note) {
+                    <span class="text-small text-muted" data-testid="document-attempt">{{
+                      note
+                    }}</span>
+                  } @else if (document.indexedAt; as indexed) {
                     <span class="text-small text-muted">
                       <span i18n="@@knowledge.cell.indexedOn">Indexed</span>&nbsp;<time
                         [attr.datetime]="indexed"
                         >{{ indexed | localDate: 'date' }}</time
                       >
                     </span>
+                  } @else if (document.lastIndexAttempt === null) {
+                    <span
+                      class="text-small text-muted"
+                      data-testid="document-never-indexed"
+                      i18n="@@knowledge.cell.neverIndexed"
+                      >Never indexed</span
+                    >
                   }
                 </span>
 

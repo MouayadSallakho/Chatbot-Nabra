@@ -5,11 +5,13 @@ import { firstValueFrom } from 'rxjs';
 import { Tenant, TenantApi } from '@app/core/api/tenant-api';
 import { ApiError, toApiError } from '@app/core/api/api-error';
 import { AuthService } from '@app/core/auth/auth-service';
+import { registerProblemWords } from '@app/core/problems/problem-words';
 import { LOGIN_PATH } from '@app/core/auth/auth-guard';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
 import { HOME_PATH } from '@app/layout/navigation';
 import { Icon } from '@app/shared/icon/icon';
 import { EntryFrame } from '@app/layout/entry-frame/entry-frame';
+import { WORKSPACE_PROBLEM_WORDS } from './workspace-problems';
 
 /** Mirrors the Domain's own tenant rules, for immediate feedback only. */
 const SLUG_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
@@ -76,6 +78,10 @@ export class WorkspaceSetup {
       ],
     }),
   });
+
+  constructor() {
+    registerProblemWords(WORKSPACE_PROBLEM_WORDS);
+  }
 
   /** Whether the account's workspaces could not be loaded at all. */
   protected readonly unreachable = computed(() => this.status() === 'unavailable');

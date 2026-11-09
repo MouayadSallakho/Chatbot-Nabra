@@ -43,5 +43,7 @@ __screenshots__/
 .DS_Store
 Thumbs.db
 
-# End-to-end run state (no passwords; cookies only, deleted after a run)
-/.e2e-state
+# End-to-end run state: signed-in session cookies, no passwords. Global setup
+# writes it to e2e/.e2e-state/ and global teardown deletes it after a run. Matches
+# at any depth, so a run still going can never be swept into a commit.
+.e2e-state/

@@ -29,6 +29,7 @@ describe('EmbedChat', () => {
     accentColor: '#2563eb',
     launcherPosition: 'Right',
     theme: 'System',
+    workspaceName: 'Northwind',
     ...overrides,
   });
 
@@ -351,6 +352,14 @@ describe('EmbedChat', () => {
 
     expect(greeting?.textContent).toContain('Hi — ask us anything.');
     expect(host().querySelector('[data-testid="chat-message"]')).toBeNull();
+  });
+
+  it("heads the panel with the workspace's name, so a visitor knows whose chat it is", async () => {
+    await open({ workspaceName: 'Northwind Traders' });
+
+    expect(host().querySelector('[data-testid="chat-title"]')?.textContent).toContain(
+      'Northwind Traders',
+    );
   });
 
   it('resumes the conversation it remembers, credential and all', async () => {

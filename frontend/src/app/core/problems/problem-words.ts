@@ -54,6 +54,11 @@ export function problemWording(code: string, facts: ProblemFacts): string | unde
   return typeof wording === 'function' ? wording(facts) : wording;
 }
 
+/** Whether a catalogue has registered words for this code. */
+export function hasProblemWording(code: string): boolean {
+  return registry.has(code);
+}
+
 /**
  * Registers an area's refusals when its routes load.
  *

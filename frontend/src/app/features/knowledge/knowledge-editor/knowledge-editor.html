@@ -304,6 +304,20 @@
                   <span i18n="@@knowledge.state.failed.sentence"
                     >The last index request failed, so this document still answers nothing.</span
                   >
+                  @if (failureReason(); as reason) {
+                    {{ ' ' }}<span data-testid="attempt-reason">{{ reason }}</span>
+                  }
+                }
+                @case ('Indexing') {
+                  <span i18n="@@knowledge.state.indexing.sentence"
+                    >Indexing is running. Reload this page in a moment to see how it ended.</span
+                  >
+                }
+                @case ('Stopped') {
+                  <span i18n="@@knowledge.state.stopped.sentence"
+                    >The last attempt stopped before it finished, so this document still needs an
+                    index. Try again.</span
+                  >
                 }
                 @default {
                   <span i18n="@@knowledge.state.needsIndex.sentence"
@@ -332,6 +346,28 @@
                   }
                 </dd>
               </div>
+              @if (attempt() !== undefined) {
+                <div>
+                  <dt i18n="@@knowledge.facts.attemptStarted">Last attempt started</dt>
+                  <dd data-testid="attempt-started">
+                    @if (attempt(); as tried) {
+                      <time [attr.datetime]="tried.startedAt">{{
+                        tried.startedAt | localDate: 'dateTime'
+                      }}</time>
+                    } @else {
+                      <span i18n="@@knowledge.facts.never">Never</span>
+                    }
+                  </dd>
+                </div>
+              }
+              @if (attempt()?.completedAt; as finished) {
+                <div>
+                  <dt i18n="@@knowledge.facts.attemptFinished">Last attempt finished</dt>
+                  <dd>
+                    <time [attr.datetime]="finished">{{ finished | localDate: 'dateTime' }}</time>
+                  </dd>
+                </div>
+              }
             </dl>
 
             @if (lastIndex(); as result) {

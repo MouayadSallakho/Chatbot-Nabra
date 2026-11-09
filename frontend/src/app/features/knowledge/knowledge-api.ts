@@ -38,6 +38,20 @@ export interface KnowledgeSource {
   readonly extractedAt: string;
 }
 
+/**
+ * What the newest index attempt did (Phase 37.5a).
+ *
+ * `status` is `Started` (indexing now), `Succeeded`, `Failed` or `Unknown` (the
+ * process stopped before it could say). `failureCode` is a stable reason, never a
+ * provider's message.
+ */
+export interface KnowledgeIndexAttempt {
+  readonly status: string;
+  readonly failureCode: string | null;
+  readonly startedAt: string;
+  readonly completedAt: string | null;
+}
+
 /** One document, in full. */
 export interface KnowledgeDocument {
   readonly id: string;
@@ -52,6 +66,12 @@ export interface KnowledgeDocument {
 
   /** Null for a document somebody typed. */
   readonly source: KnowledgeSource | null;
+
+  /**
+   * On the reads only. Null means never attempted; absent (a write's answer) says
+   * nothing, so a write can never claim "never attempted" for one that was.
+   */
+  readonly lastIndexAttempt?: KnowledgeIndexAttempt | null;
 }
 
 /** One document as the list publishes it. No content -- see the backend contract. */
@@ -73,6 +93,12 @@ export interface KnowledgeDocumentSummary {
    * list of two hundred rows is not where it needs to be read.
    */
   readonly sourceFileType: KnowledgeFileType | null;
+
+  /** The uploaded file's size in bytes, or null when the document was typed. */
+  readonly sourceByteLength: number | null;
+
+  /** Null means never attempted. */
+  readonly lastIndexAttempt: KnowledgeIndexAttempt | null;
 }
 
 /** One page of documents. */

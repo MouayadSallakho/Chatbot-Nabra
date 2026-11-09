@@ -2,9 +2,9 @@ import { Injectable, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { PermissionService } from '@app/core/authorization/permission-service';
 import { WebChatAdminApi, WebChatWidget } from '@app/features/channels/website-chat-api';
-import { WhatsAppApi } from '@app/features/channels/whatsapp-api';
+import type { AiAgentChannel } from './ai-agent-api';
 
-/** One channel an agent answers on, as the channel lists publish it. */
+/** One channel an agent answers on, ready for a list or a link. */
 export interface AgentChannelUse {
   readonly channel: 'WebChat' | 'WhatsApp';
   readonly id: string;
@@ -14,82 +14,34 @@ export interface AgentChannelUse {
   readonly link: readonly string[];
 }
 
-/** Which channels use which agent, and how much of that could be checked. */
-export interface AgentChannelMap {
-  readonly byAgent: ReadonlyMap<string, readonly AgentChannelUse[]>;
-  /** Whether the reader may see at least one kind of channel. */
-  readonly visible: boolean;
-  /** A channel list the reader may see could not be read, so the map is partial. */
-  readonly incomplete: boolean;
-}
+/** Where each kind of channel is configured. */
+const CHANNEL_PAGES: Readonly<Record<AgentChannelUse['channel'], string>> = {
+  WebChat: '/channels/website-chat',
+  WhatsApp: '/channels/whatsapp',
+};
 
 /**
- * Which channels use each agent, joined on the client (Phase 36.8).
+ * The channels an agent read named, ready to show (Phase 38.3).
  *
- * The agent API does not say where an agent answers; the website chat and
- * WhatsApp lists each name the agent behind every endpoint. Both lists are
- * whole (not paged) and small, so reading them beside a page of agents is two
- * cheap requests. Each is read only with its own permission: somebody who may
- * not see WhatsApp is never told which agent answers on it. A list that fails
- * marks the result incomplete rather than reading as "no channels".
+ * The server includes only the kinds this reader may see. A kind this client does
+ * not know has no page to link to, so it is left out rather than linked nowhere.
  */
+export function visibleChannels(channels: readonly AiAgentChannel[]): readonly AgentChannelUse[] {
+  return channels
+    .filter((channel) => channel.kind in CHANNEL_PAGES)
+    .map((channel) => ({
+      channel: channel.kind,
+      id: channel.id,
+      status: channel.status,
+      link: [CHANNEL_PAGES[channel.kind], channel.id],
+    }));
+}
+
+/** The one channel read the agent screens still make: the widget's look, for the preview. */
 @Injectable()
 export class AgentChannels {
   private readonly webChat = inject(WebChatAdminApi);
-  private readonly whatsApp = inject(WhatsAppApi);
   private readonly permissions = inject(PermissionService);
-
-  async load(tenantId: string): Promise<AgentChannelMap> {
-    const canWebChat = this.permissions.has('website-chat.view');
-    const canWhatsApp = this.permissions.has('whatsapp.view');
-    const uses: AgentChannelUse[] = [];
-    const owners: string[] = [];
-    let incomplete = false;
-
-    const [webChat, whatsApp] = await Promise.allSettled([
-      canWebChat ? firstValueFrom(this.webChat.list(tenantId)) : Promise.resolve([]),
-      canWhatsApp ? firstValueFrom(this.whatsApp.list(tenantId)) : Promise.resolve([]),
-    ]);
-
-    if (webChat.status === 'fulfilled') {
-      for (const endpoint of webChat.value) {
-        owners.push(endpoint.aiAgentId);
-        uses.push({
-          channel: 'WebChat',
-          id: endpoint.id,
-          status: endpoint.status,
-          link: ['/channels/website-chat', endpoint.id],
-        });
-      }
-    } else {
-      incomplete = true;
-    }
-
-    if (whatsApp.status === 'fulfilled') {
-      for (const connection of whatsApp.value) {
-        owners.push(connection.aiAgentId);
-        uses.push({
-          channel: 'WhatsApp',
-          id: connection.id,
-          status: connection.status,
-          link: ['/channels/whatsapp', connection.id],
-        });
-      }
-    } else {
-      incomplete = true;
-    }
-
-    const byAgent = new Map<string, AgentChannelUse[]>();
-
-    uses.forEach((use, index) => {
-      const list = byAgent.get(owners[index]) ?? [];
-
-      list.push(use);
-      byAgent.set(owners[index], list);
-    });
-
-    return { byAgent, visible: canWebChat || canWhatsApp, incomplete };
-  }
 
   /**
    * The widget appearance customers see for this agent, or null.

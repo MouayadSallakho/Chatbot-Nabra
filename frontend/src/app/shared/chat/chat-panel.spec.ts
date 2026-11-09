@@ -30,6 +30,41 @@ describe('ChatPanel', () => {
     ...host().querySelectorAll<HTMLElement>('[data-testid="chat-message"]'),
   ];
 
+  describe('the heading', () => {
+    const title = (): string =>
+      host().querySelector('[data-testid="chat-title"]')?.textContent?.trim() ?? '';
+
+    it("is the workspace's name, isolated from the page's direction", () => {
+      mount({ workspaceName: 'نورثويند' });
+
+      expect(title()).toBe('نورثويند');
+      expect(host().querySelector('[data-testid="chat-title"] bdi')).not.toBeNull();
+    });
+
+    it("is the agent's name where a page has no workspace name to give", () => {
+      mount();
+
+      expect(title()).toBe('Concierge');
+    });
+
+    it('keeps naming the agent on its replies', () => {
+      mount({ workspaceName: 'Northwind', messages: [message('1', 'AiAgent', 'Hello.')] });
+
+      expect(rows()[0].textContent).toContain('Concierge');
+    });
+  });
+
+  it('wears the accent only when told it has been checked', () => {
+    mount({ variant: 'page' });
+
+    expect(host().classList).not.toContain('has-accent');
+
+    fixture.componentRef.setInput('accented', true);
+    fixture.detectChanges();
+
+    expect(host().classList).toContain('has-accent');
+  });
+
   it('tells the three speakers apart by place, marker and word, never by colour alone', () => {
     mount({
       messages: [

@@ -1,6 +1,7 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  DOCUMENT,
   Injector,
   OnInit,
   afterNextRender,
@@ -12,11 +13,16 @@ import {
 import { firstValueFrom } from 'rxjs';
 import { ApiError, toApiError } from '@app/core/api/api-error';
 import { APP_LANGUAGE } from '@app/core/i18n/language';
+import { registerProblemWords } from '@app/core/problems/problem-words';
 import { PublicChatRealtime } from '@app/core/realtime/public-chat-realtime';
+import { BootState } from '@app/core/boot/boot-state';
+import { THEME_ATTRIBUTE } from '@app/core/theme/theme';
+import { PageAccent, pageAccent } from '@app/features/embed/accent-color';
 import { BrandMark } from '@app/shared/brand-mark/brand-mark';
 import { ChatPanel } from '@app/shared/chat/chat-panel';
+import { CHAT_PROBLEM_WORDS } from '@app/shared/chat/chat-problems';
 import { visitorFailure } from '@app/shared/chat/visitor-copy';
-import { ChatHandling, ChatMessage, HostedChatApi } from '../hosted-chat-api';
+import { ChatHandling, ChatMessage, HostedChatApi, HostedChatConfig } from '../hosted-chat-api';
 import { HostedChatSessionStore } from '../hosted-chat-session';
 
 /** The longest message the hosted chat accepts, matching the server's bound. */
@@ -56,14 +62,22 @@ type ChatState = 'opening' | 'unavailable' | 'ready' | 'failed';
  * not licence to poll.
  *
  * <strong>The same chat as the widget</strong> (Phase 36.9): one shared panel,
- * full height, with Nabra's mark in the header. The page knows no accent colour
- * (its public read returns only the agent's name and availability), so it wears
- * Nabra's own look rather than a guess at the workspace's.
+ * full height.
+ *
+ * <strong>The workspace's own look</strong> (Phase 38.3): its name heads the
+ * chat, with its greeting, accent and theme from the public read. An accent that
+ * is invalid, or that no text can be read on, leaves Nabra's own look.
+ *
+ * <strong>No flash of the other theme.</strong> The script in `index.html` paints
+ * the visitor's system theme before anything is known. Only the loading lockup
+ * is on screen until the read answers, and the configured theme is set in the
+ * same task that adopts the answer, so the chat is never drawn in the wrong one.
+ * The theme is not a stored choice: it is never read from or written to storage.
  */
 @Component({
   selector: 'app-hosted-chat',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [BrandMark, ChatPanel],
+  imports: [BootState, BrandMark, ChatPanel],
   templateUrl: './hosted-chat.html',
   styleUrl: './hosted-chat.scss',
 })
@@ -73,10 +87,19 @@ export class HostedChat implements OnInit {
   private readonly realtime = inject(PublicChatRealtime);
   private readonly injector = inject(Injector);
   private readonly language = inject(APP_LANGUAGE);
+  private readonly document = inject(DOCUMENT);
   private readonly panel = viewChild(ChatPanel);
 
   protected readonly state = signal<ChatState>('opening');
   protected readonly agentName = signal('');
+  protected readonly workspaceName = signal('');
+  protected readonly greeting = signal<string | null>(null);
+
+  /** Null keeps Nabra's own look. Checked before it can reach a style. */
+  protected readonly accent = signal<PageAccent | null>(null);
+
+  /** Whether the public read has answered, so the chat can be drawn in its theme. */
+  protected readonly appearanceKnown = signal(false);
   protected readonly messages = signal<readonly ChatMessage[]>([]);
   protected readonly sending = signal(false);
   protected readonly sendFailure = signal<ApiError | null>(null);
@@ -111,6 +134,11 @@ export class HostedChat implements OnInit {
 
   protected readonly canSend = computed(() => this.state() === 'ready' && !this.sending());
 
+  constructor() {
+    // Here rather than on the route: the route is in the startup JavaScript.
+    registerProblemWords(CHAT_PROBLEM_WORDS);
+  }
+
   ngOnInit(): void {
     void this.open();
   }
@@ -138,7 +166,7 @@ export class HostedChat implements OnInit {
     try {
       const config = await firstValueFrom(this.api.config(publicKey));
 
-      this.agentName.set(config.agentName);
+      this.adoptAppearance(config);
 
       if (!config.available) {
         this.state.set('unavailable');
@@ -160,6 +188,19 @@ export class HostedChat implements OnInit {
         failure.kind === 'providerUnavailable' || failure.status === 503 ? 'unavailable' : 'failed',
       );
     }
+  }
+
+  /** Takes on the look the workspace chose, in one task, before the chat is drawn. */
+  private adoptAppearance(config: HostedChatConfig): void {
+    if (config.theme === 'Light' || config.theme === 'Dark') {
+      this.document.documentElement.setAttribute(THEME_ATTRIBUTE, config.theme.toLowerCase());
+    }
+
+    this.agentName.set(config.agentName);
+    this.workspaceName.set(config.workspaceName);
+    this.greeting.set(config.greeting);
+    this.accent.set(pageAccent(config.accentColor));
+    this.appearanceKnown.set(true);
   }
 
   /**

@@ -26,6 +26,7 @@ const INLINE_SCRIPTS = [
 
 interface FakeBrowser {
   readonly path?: string;
+  readonly search?: string;
   readonly stored?: Readonly<Record<string, string>>;
   readonly storageThrows?: boolean;
   readonly languages?: readonly string[];
@@ -64,7 +65,7 @@ function startPage(browser: FakeBrowser = {}): Record<string, string> {
     { documentElement: root },
     storage,
     { matchMedia: () => ({ matches: browser.prefersDark ?? false }) },
-    { pathname: browser.path ?? '/overview' },
+    { pathname: browser.path ?? '/overview', search: browser.search ?? '' },
     { languages, language: languages[0] },
   );
 
@@ -158,6 +159,70 @@ describe('startup contract with src/index.html', () => {
           languages: ['ar'],
         })['dir'],
       ).toBe('rtl');
+    });
+
+    describe('?lang= on a visitor page (Phase 38.3)', () => {
+      it('opens in Arabic, right to left, for an English browser', () => {
+        const page = startPage({ path: '/chat/abc', search: '?lang=ar', languages: ['en-US'] });
+
+        expect(page['lang']).toBe('ar');
+        expect(page['dir']).toBe('rtl');
+      });
+
+      it('opens in English for an Arabic browser', () => {
+        const page = startPage({ path: '/chat/abc', search: '?lang=en', languages: ['ar-SA'] });
+
+        expect(page['lang']).toBe('en');
+        expect(page['dir']).toBe('ltr');
+      });
+
+      it('applies to the widget as well, once its frame address carries it', () => {
+        expect(startPage({ path: '/embed/abc', search: '?lang=ar' })['lang']).toBe('ar');
+      });
+
+      it('finds it among other parameters', () => {
+        expect(startPage({ path: '/chat/abc', search: '?a=1&lang=ar&b=2' })['lang']).toBe('ar');
+      });
+
+      it('ignores anything but exactly en or ar, and follows the browser', () => {
+        for (const search of ['?lang=xx', '?lang=AR', '?lang=', '?lang=arabic', '?xlang=ar']) {
+          expect(startPage({ path: '/chat/abc', search, languages: ['en-US'] })['lang']).toBe('en');
+        }
+
+        expect(
+          startPage({ path: '/chat/abc', search: '?lang=xx', languages: ['ar'] })['lang'],
+        ).toBe('ar');
+      });
+
+      it('means nothing on an admin page', () => {
+        expect(
+          startPage({ path: '/overview', search: '?lang=ar', languages: ['en'] })['lang'],
+        ).toBe('en');
+        expect(
+          startPage({
+            path: '/overview',
+            search: '?lang=ar',
+            stored: { [LANGUAGE_STORAGE_KEY]: 'en' },
+          })['lang'],
+        ).toBe('en');
+      });
+
+      it('still decides when storage throws, and never asks it', () => {
+        expect(
+          startPage({ path: '/chat/abc', search: '?lang=ar', storageThrows: true })['lang'],
+        ).toBe('ar');
+      });
+
+      it('beats a stored admin choice', () => {
+        expect(
+          startPage({
+            path: '/chat/abc',
+            search: '?lang=en',
+            stored: { [LANGUAGE_STORAGE_KEY]: 'ar' },
+            languages: ['ar'],
+          })['lang'],
+        ).toBe('en');
+      });
     });
 
     it('lets the hosted chat and the widget follow the visitor light or dark, never a stored admin theme', () => {

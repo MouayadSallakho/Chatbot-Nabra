@@ -109,6 +109,52 @@ describe('WebsiteChatDetail', () => {
 
   afterEach(() => http.verify());
 
+  describe('the chat page language', () => {
+    const link = (): string =>
+      host().querySelector('[data-testid="chat-link"]')?.textContent?.trim() ?? '';
+
+    async function choose(value: string): Promise<void> {
+      const select = host().querySelector<HTMLSelectElement>('[data-testid="chat-language"]')!;
+
+      select.value = value;
+      select.dispatchEvent(new Event('change'));
+      await settle();
+    }
+
+    beforeEach(async () => {
+      await mount('website-chat.view', 'website-chat.manage');
+      http.expectOne(url).flush(endpoint('Active'), { headers: { ETag: '"v1"' } });
+      await settle();
+      await flushWidget();
+    });
+
+    it('offers Automatic and each language, and starts on Automatic', () => {
+      const select = host().querySelector<HTMLSelectElement>('[data-testid="chat-language"]')!;
+
+      expect([...select.options].map((option) => option.textContent?.trim())).toEqual([
+        'Automatic',
+        'English',
+        'العربية',
+      ]);
+      expect(link()).toMatch(/\/chat\/a+$/);
+    });
+
+    it('adds the language to the link that is shown and opened', async () => {
+      await choose('ar');
+
+      expect(link()).toMatch(/\/chat\/a+\?lang=ar$/);
+      expect(host().querySelector('a[target="_blank"]')?.getAttribute('href')).toMatch(
+        /\?lang=ar$/,
+      );
+
+      await choose('en');
+      expect(link()).toMatch(/\?lang=en$/);
+
+      await choose('auto');
+      expect(link()).not.toContain('lang=');
+    });
+  });
+
   it('shows the hosted chat link so it can be copied', async () => {
     await mount('website-chat.view', 'website-chat.manage');
 

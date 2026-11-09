@@ -130,35 +130,22 @@
                   }}</span>
                 </span>
 
-                @if (!canSeeChannels()) {
-                  <!-- No channel this reader may see: no column at all. -->
-                } @else if (channels(); as map) {
-                  @if (map.visible) {
-                    <span class="agent-channels data-row-meta">
-                      <span class="data-cell-label" i18n="@@agents.cell.channels">Channels:</span>
-                      @for (use of map.byAgent.get(agent.id) ?? []; track use.id) {
-                        <span class="agent-channel">
-                          <app-channel-badge [channel]="use.channel" />
-                          @if (channelNote(use.status); as note) {
-                            <span class="text-small text-muted">({{ note }})</span>
-                          }
-                        </span>
-                      } @empty {
-                        @if (map.incomplete) {
-                          <span class="text-small text-muted" i18n="@@agents.channels.notChecked"
-                            >Not checked</span
-                          >
-                        } @else {
-                          <span class="text-small text-muted" i18n="@@agents.channels.none"
-                            >Not on a channel</span
-                          >
+                <!-- No channel this reader may see: no column at all. -->
+                @if (canSeeChannels()) {
+                  <span class="agent-channels data-row-meta">
+                    <span class="data-cell-label" i18n="@@agents.cell.channels">Channels:</span>
+                    @for (use of channelsOf(agent.channels); track use.id) {
+                      <span class="agent-channel">
+                        <app-channel-badge [channel]="use.channel" />
+                        @if (channelNote(use.status); as note) {
+                          <span class="text-small text-muted">({{ note }})</span>
                         }
-                      }
-                    </span>
-                  }
-                } @else {
-                  <span class="agent-channels" aria-hidden="true">
-                    <span class="skeleton skeleton-text"></span>
+                      </span>
+                    } @empty {
+                      <span class="text-small text-muted" i18n="@@agents.channels.none"
+                        >Not on a channel</span
+                      >
+                    }
                   </span>
                 }
 

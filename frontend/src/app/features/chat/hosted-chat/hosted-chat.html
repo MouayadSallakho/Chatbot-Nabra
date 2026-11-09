@@ -1,26 +1,39 @@
 <!--
-  Content first: the frame, the header and the composer are painted at once,
-  with no splash. While the endpoint is read the panel says so in words.
+  The lockup until the public read answers, so the chat is never drawn in the
+  wrong theme (only the lockup's own background can change, once). After that,
+  the panel in the workspace's look.
 -->
-<main class="chat-page" id="main-content" tabindex="-1">
-  <app-chat-panel
-    class="chat-page-panel"
-    variant="page"
-    [state]="state()"
-    [agentName]="agentName()"
-    [messages]="messages()"
-    [handling]="handling()"
-    [sending]="sending()"
-    [failure]="sendFailure()"
-    [openFailure]="openFailure()?.message ?? null"
-    [canSend]="canSend()"
-    [hasConversation]="hasConversation()"
-    [maxLength]="maxLength"
-    [(draft)]="draft"
-    (send)="send()"
-    (newChat)="startNewConversation()"
-    (retry)="open()"
-  >
-    <app-brand-mark chatBrand class="chat-page-mark" />
-  </app-chat-panel>
-</main>
+@if (state() === 'opening' && !appearanceKnown()) {
+  <app-boot-state data-testid="chat-loading" />
+} @else {
+  <main class="chat-page" id="main-content" tabindex="-1">
+    <app-chat-panel
+      class="chat-page-panel"
+      variant="page"
+      [accented]="accent() !== null"
+      [style.--chat-accent]="accent()?.accent"
+      [style.--chat-on-accent]="accent()?.foreground"
+      [state]="state()"
+      [agentName]="agentName()"
+      [workspaceName]="workspaceName()"
+      [greeting]="greeting()"
+      [messages]="messages()"
+      [handling]="handling()"
+      [sending]="sending()"
+      [failure]="sendFailure()"
+      [openFailure]="openFailure()?.message ?? null"
+      [canSend]="canSend()"
+      [hasConversation]="hasConversation()"
+      [maxLength]="maxLength"
+      [(draft)]="draft"
+      (send)="send()"
+      (newChat)="startNewConversation()"
+      (retry)="open()"
+    >
+      <!-- Nabra's mark belongs to Nabra's own look; a workspace's colour stands alone. -->
+      @if (accent() === null) {
+        <app-brand-mark chatBrand class="chat-page-mark" />
+      }
+    </app-chat-panel>
+  </main>
+}

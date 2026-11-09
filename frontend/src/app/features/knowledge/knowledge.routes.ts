@@ -1,6 +1,8 @@
 import { Routes } from '@angular/router';
 import { unsavedChangesGuard } from '@app/core/navigation/unsaved-changes';
+import { provideProblemWords } from '@app/core/problems/problem-words';
 import { KnowledgeApi } from './knowledge-api';
+import { KNOWLEDGE_PROBLEM_WORDS } from './knowledge-problems';
 
 /**
  * The knowledge screens.
@@ -13,7 +15,7 @@ import { KnowledgeApi } from './knowledge-api';
 export const knowledgeRoutes: Routes = [
   {
     path: '',
-    providers: [KnowledgeApi],
+    providers: [KnowledgeApi, provideProblemWords(KNOWLEDGE_PROBLEM_WORDS)],
     children: [
       {
         path: '',

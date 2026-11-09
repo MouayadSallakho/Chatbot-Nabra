@@ -213,6 +213,26 @@ describe('WorkspaceSetup', () => {
       expect(navigatedTo).toBeNull();
     });
 
+    it('words a coded refusal by its code, never the server sentence', async () => {
+      await typeName('Acme Trading');
+
+      submit().click();
+      await settle();
+
+      http.expectOne('/api/tenants').flush(
+        {
+          title: 'Tenant slug already exists',
+          detail: 'The English sentence from the server.',
+          code: 'workspace.slug.taken',
+        },
+        { status: 409, statusText: 'Conflict' },
+      );
+      await settle();
+
+      expect(host().textContent).toContain('That workspace slug is already taken.');
+      expect(host().textContent).not.toContain('The English sentence');
+    });
+
     it('explains an unreachable backend without blaming the form', async () => {
       await typeName('Acme Trading');
 

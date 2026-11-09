@@ -32,7 +32,7 @@ import {
   KNOWLEDGE_LIMITS,
   UPLOADED_DOCUMENT_STATE,
 } from '../knowledge-limits';
-import { KnowledgeApi, KnowledgeDocument } from '../knowledge-api';
+import { KnowledgeApi, KnowledgeDocument, KnowledgeIndexAttempt } from '../knowledge-api';
 import { LocalDatePipe, LocalNumberPipe } from '@app/core/i18n/locale-pipes';
 import { LocaleFormat } from '@app/core/i18n/locale-format';
 import {
@@ -43,9 +43,10 @@ import {
   uploadFailure,
 } from '../knowledge-file';
 import {
-  KnowledgeDisplayState,
   acceptedFormats,
   characterCount,
+  indexFailureReason,
+  knowledgeDisplayState,
   knowledgeStateTone,
   knowledgeStateWord,
   knowledgeTypeWord,
@@ -85,9 +86,8 @@ type ConflictSource = 'content' | 'index' | 'availability' | 'source';
  *
  * <strong>Layout (Phase 36.8)</strong>: the document on the main side; its
  * state, indexing, availability and source file beside it from 80rem. The
- * state is the API's (`Indexed`, `Needs index`, `Disabled`); "Indexing failed"
- * is shown only after an index request that really failed here, because the
- * API keeps no failed state on a document.
+ * state is the API's (`Indexed`, `Needs index`, `Disabled`), plus what the
+ * newest index attempt adds (Phase 38.3) and an index request that failed here.
  */
 @Component({
   selector: 'app-knowledge-editor',
@@ -160,6 +160,14 @@ export class KnowledgeEditor implements OnInit, HasUnsavedChanges {
 
   /** A reason the chosen replacement was refused before it was ever sent. */
   protected readonly replacementRefusal = signal<string | null>(null);
+
+  /**
+   * What the newest index attempt did, from the last read.
+   *
+   * Null means never attempted. Undefined means this page does not know: a
+   * document handed over by the create page, or just indexed here.
+   */
+  protected readonly attempt = signal<KnowledgeIndexAttempt | null | undefined>(undefined);
 
   /** An index request failed while the reader was here (not a refusal before sending). */
   protected readonly indexFailedNow = signal(false);
@@ -237,15 +245,26 @@ export class KnowledgeEditor implements OnInit, HasUnsavedChanges {
     return source ? fileSize(source.byteLength, this.format.language) : '';
   });
 
-  /** The state the page shows: the API's, or "Failed" right after a failed index here. */
-  protected readonly displayState = computed<KnowledgeDisplayState | null>(() => {
+  /** The state the page shows: the API's and its last attempt, or a failure just now. */
+  protected readonly displayState = computed<string | null>(() => {
     const doc = this.document();
 
     if (!doc) {
       return null;
     }
 
-    return this.indexFailedNow() && doc.readiness === 'NeedsIndex' ? 'Failed' : doc.readiness;
+    return this.indexFailedNow() && doc.readiness === 'NeedsIndex'
+      ? 'Failed'
+      : knowledgeDisplayState(doc.readiness, this.attempt());
+  });
+
+  /** Why the last attempt failed. A failure just now is said by its own alert. */
+  protected readonly failureReason = computed(() => {
+    const attempt = this.attempt();
+
+    return attempt?.status === 'Failed' && !this.indexFailedNow()
+      ? indexFailureReason(attempt.failureCode)
+      : null;
   });
 
   /** How much text the saved document holds. */
@@ -432,6 +451,7 @@ export class KnowledgeEditor implements OnInit, HasUnsavedChanges {
 
       this.document.set(result.value.document);
       this.etag.set(result.etag);
+      this.attempt.set(undefined);
       this.syncFields(result.value.document);
 
       this.lastIndex.set({
@@ -654,6 +674,11 @@ export class KnowledgeEditor implements OnInit, HasUnsavedChanges {
   private adopt(versioned: Versioned<KnowledgeDocument>): void {
     this.document.set(versioned.value);
     this.etag.set(versioned.etag);
+
+    // Only the reads carry it: a write's answer must not read as "never attempted".
+    if (versioned.value.lastIndexAttempt !== undefined) {
+      this.attempt.set(versioned.value.lastIndexAttempt);
+    }
 
     this.syncFields(versioned.value);
   }

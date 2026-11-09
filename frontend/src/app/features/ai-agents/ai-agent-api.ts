@@ -6,6 +6,14 @@ import { Versioned, withEntityTag } from '@app/core/api/versioned';
 /** The lifecycle states the backend publishes, spelled exactly as it spells them. */
 export type AiAgentStatus = 'Draft' | 'Active' | 'Disabled';
 
+/** One channel an agent answers on, exactly as the agent reads publish it. */
+export interface AiAgentChannel {
+  readonly kind: 'WebChat' | 'WhatsApp';
+  readonly id: string;
+  /** The channel's own status (`Draft`, `Active`, `Disabled`), not the agent's. */
+  readonly status: string;
+}
+
 /** One agent, in full. What the detail endpoint returns. */
 export interface AiAgent {
   readonly id: string;
@@ -15,6 +23,12 @@ export interface AiAgent {
   readonly status: AiAgentStatus;
   readonly createdAt: string;
   readonly updatedAt: string;
+
+  /**
+   * Where it answers. On the reads only: a write answers with its seven fields,
+   * so absent says nothing about whether the agent is on a channel.
+   */
+  readonly channels?: readonly AiAgentChannel[];
 }
 
 /** One agent as the list publishes it. No instructions -- see the backend contract. */
@@ -25,6 +39,9 @@ export interface AiAgentSummary {
   readonly status: AiAgentStatus;
   readonly createdAt: string;
   readonly updatedAt: string;
+
+  /** Where it answers. Only the kinds the reader may see are included. */
+  readonly channels: readonly AiAgentChannel[];
 }
 
 /** One page of agents. */

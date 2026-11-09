@@ -170,6 +170,79 @@ describe('Arabic renders', () => {
     expect(text(root.querySelector('[data-testid="entry-language"]'))).toBe('English العربية');
   });
 
+  describe('knowledge and the public chat (Phase 38.3)', () => {
+    it('says a broken file limit in Arabic, with the bound in Western digits', async () => {
+      const { HttpErrorResponse } = await import('@angular/common/http');
+      const { toApiError } = await import('@app/core/api/api-error');
+      const { registerProblemWords } = await import('@app/core/problems/problem-words');
+      const { KNOWLEDGE_PROBLEM_WORDS } =
+        await import('@app/features/knowledge/knowledge-problems');
+
+      registerProblemWords(KNOWLEDGE_PROBLEM_WORDS);
+
+      const refuse = (code: string, limit?: number) =>
+        toApiError(
+          new HttpErrorResponse({
+            status: 422,
+            error: { title: 'Refused', detail: 'The English sentence.', code, limit },
+          }),
+        ).message;
+
+      expect(refuse('knowledge.file.too_many_pages', 500)).toBe(
+        'عدد صفحات الملف أكبر من الحد المسموح به، وهو 500. قسّمه وارفع الجزء المهم منه.',
+      );
+      expect(refuse('knowledge.file.too_large', 10485760)).toContain('10');
+      expect(refuse('knowledge.file.too_large', 10485760)).toContain('أقصى ما تقبله نبرة');
+      expect(refuse('knowledge.file.encrypted')).toBe(
+        'ملف PDF هذا محميّ بكلمة مرور. أزل كلمة المرور ثم ارفعه مرة أخرى.',
+      );
+      expect(refuse('knowledge.file.type_mismatch')).toContain('لا يطابق نوعه');
+    });
+
+    it('says the indexing states and reasons in Arabic', async () => {
+      const { indexFailureReason, knowledgeStateWord } =
+        await import('@app/features/knowledge/knowledge-words');
+
+      expect(knowledgeStateWord('Indexing')).toBe('تجري الفهرسة الآن');
+      expect(knowledgeStateWord('Stopped')).toBe('توقفت الفهرسة');
+      expect(indexFailureReason('provider_timeout')).toBe(
+        'استغرق مزوّد الذكاء الاصطناعي وقتًا أطول من اللازم للرد.',
+      );
+      expect(indexFailureReason(null)).toBe('حدث خطأ أثناء الفهرسة.');
+    });
+
+    it('writes the visitor chat in Arabic: the notice, the placeholder, Send and New chat', async () => {
+      const { ChatPanel } = await import('@app/shared/chat/chat-panel');
+      const fixture = TestBed.createComponent(ChatPanel);
+
+      fixture.componentRef.setInput('workspaceName', 'Northwind');
+      fixture.componentRef.setInput('canSend', true);
+      fixture.componentRef.setInput('hasConversation', true);
+      fixture.componentRef.setInput('failure', {
+        kind: 'unknown',
+        status: 500,
+        message: 'تعذّر الرد على هذه الرسالة.',
+      });
+      fixture.detectChanges();
+      await fixture.whenStable();
+      const root = fixture.nativeElement as HTMLElement;
+
+      expect(text(root.querySelector('[data-testid="chat-title"]'))).toBe('Northwind');
+      expect(text(root.querySelector('.chat-honesty'))).toBe('الإجابات يولّدها الذكاء الاصطناعي.');
+      expect(root.querySelector('textarea')?.getAttribute('placeholder')).toBe('اكتب رسالتك…');
+      expect(text(root.querySelector('[data-testid="chat-send"]'))).toBe('إرسال');
+      expect(text(root.querySelector('[data-testid="chat-new"]'))).toBe('محادثة جديدة');
+      expect(text(root.querySelector('[data-testid="chat-error"]'))).toContain('تعذّر الرد');
+    });
+
+    it('offers the Start and End corners in Arabic', async () => {
+      const ar = CATALOGUE.translations;
+
+      expect(ar['widget.position.start']).toContain('اليمين في الصفحات العربية');
+      expect(ar['widget.position.end']).toContain('اليسار في الصفحات العربية');
+    });
+  });
+
   describe('the inbox (Phase 38.2a)', () => {
     const customer = {
       id: 'p1',

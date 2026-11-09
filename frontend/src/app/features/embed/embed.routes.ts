@@ -1,4 +1,6 @@
 import { Routes } from '@angular/router';
+import { provideProblemWords } from '@app/core/problems/problem-words';
+import { CHAT_PROBLEM_WORDS } from '@app/shared/chat/chat-problems';
 import { EmbedBridge } from './embed-bridge';
 import { EmbedChatApi } from './embed-chat-api';
 import { EmbedSessionStore } from './embed-session';
@@ -22,7 +24,12 @@ export const embedRoutes: Routes = [
   {
     path: ':publicKey',
     title: $localize`:@@title.chat:Chat`,
-    providers: [EmbedChatApi, EmbedSessionStore, EmbedBridge],
+    providers: [
+      EmbedChatApi,
+      EmbedSessionStore,
+      EmbedBridge,
+      provideProblemWords(CHAT_PROBLEM_WORDS),
+    ],
     loadComponent: () => import('./embed-chat/embed-chat').then((m) => m.EmbedChat),
   },
 ];

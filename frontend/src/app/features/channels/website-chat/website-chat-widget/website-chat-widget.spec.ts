@@ -379,7 +379,7 @@ describe('WebsiteChatWidget', () => {
     expect(preview.querySelector('app-chat-launcher.is-left')).not.toBeNull();
     expect(preview.querySelector('h1')).toBeNull();
     expect(stage.hasAttribute('inert')).toBe(true);
-    expect(preview.textContent).toContain('Concierge');
+    expect(preview.textContent).toContain('Acme Trading');
     expect(preview.textContent).toContain('Hello there');
     expect(preview.textContent).toContain('Visitors always see it dark');
 
@@ -389,6 +389,76 @@ describe('WebsiteChatWidget', () => {
     expect(stage.style.getPropertyValue('--chat-accent')).toBe('#ffe066');
     expect(stage.style.getPropertyValue('--chat-on-accent')).toBe('#111827');
     expect(stage.style.getPropertyValue('--chat-accent-edge')).toBe('#111827');
+  });
+
+  it('offers all four corners, and shows a widget already set to Start', async () => {
+    await mount('website-chat.view', 'website-chat.manage');
+
+    http.expectOne(url).flush(
+      configuration({
+        widget: {
+          greeting: null,
+          accentColor: '#2563eb',
+          launcherPosition: 'Start',
+          theme: 'System',
+        },
+      }),
+      { headers: { ETag: '"v1"' } },
+    );
+    await settle();
+
+    const select = host().querySelector<HTMLSelectElement>('#widget-position')!;
+
+    expect([...select.options].map((option) => option.value)).toEqual([
+      'Right',
+      'Left',
+      'Start',
+      'End',
+    ]);
+    expect(select.value).toBe('Start');
+    expect(select.selectedOptions[0].textContent).toContain('right in Arabic pages');
+    // An English page: Start is the left-hand corner.
+    expect(host().querySelector('app-chat-launcher.is-left')).not.toBeNull();
+  });
+
+  it('sends End as End', async () => {
+    await mount('website-chat.view', 'website-chat.manage');
+
+    http.expectOne(url).flush(configuration(), { headers: { ETag: '"v1"' } });
+    await settle();
+
+    const select = host().querySelector<HTMLSelectElement>('#widget-position')!;
+
+    select.value = 'End';
+    select.dispatchEvent(new Event('change'));
+    await settle();
+
+    // An English page: End is the right-hand corner.
+    expect(host().querySelector('app-chat-launcher.is-left')).toBeNull();
+
+    button('Save widget settings')!.click();
+
+    const save = http.expectOne((request) => request.method === 'PUT' && request.url === url);
+
+    expect(save.request.body.launcherPosition).toBe('End');
+    save.flush(configuration(), { headers: { ETag: '"v2"' } });
+    await settle();
+  });
+
+  it("says visitors see the workspace's name, and the preview shows it", async () => {
+    await mount('website-chat.view', 'website-chat.manage');
+    fixture.componentRef.setInput('agentName', 'Concierge');
+
+    http.expectOne(url).flush(configuration(), { headers: { ETag: '"v1"' } });
+    await settle();
+
+    expect(host().querySelector('[data-testid="visitors-see-name"]')?.textContent).toContain(
+      "your workspace's name",
+    );
+    expect(
+      host().querySelector('[data-testid="widget-preview"] [data-testid="chat-title"]')
+        ?.textContent,
+    ).toContain('Acme Trading');
   });
 
   it('checks a colour before it is used, and says what the rules did, in words', async () => {

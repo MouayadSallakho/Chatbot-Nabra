@@ -11,8 +11,11 @@ import { Pagination } from '@app/shared/pagination/pagination';
 import { initialPage, pageRecorder } from '@app/shared/pagination/page-query';
 import { LocalDatePipe } from '@app/core/i18n/locale-pipes';
 import { LocaleFormat } from '@app/core/i18n/locale-format';
+import { fileSize } from '../knowledge-file';
 import {
-  characterCount,
+  TYPED_TEXT,
+  indexAttemptNote,
+  knowledgeDisplayState,
   knowledgeStateTone,
   knowledgeStateWord,
   knowledgeTypeWord,
@@ -27,12 +30,15 @@ import { DEFAULT_PAGE_SIZE, KnowledgeApi, KnowledgeDocumentPage } from '../knowl
  * mutation on every other screen.
  *
  * A tidy library (Phase 36.8): each row says what the document is (written,
- * or read from a PDF, Word, text or CSV file), how much text it holds, its
- * indexing state in exactly the API's words, and when it last changed. Not the
- * content, which the list endpoint does not return -- a workspace with two
- * hundred long documents would otherwise move megabytes to render a column of
- * titles. The size is the text's length in characters, because that is what
- * the list publishes; the source file's bytes are only on the document.
+ * or read from a PDF, Word, text or CSV file), how large the file was, its
+ * indexing state in exactly the API's words, how its newest attempt went (Phase
+ * 38.3), and when it last changed. Not the content, which the list endpoint does
+ * not return -- a workspace with two hundred long documents would otherwise move
+ * megabytes to render a column of titles.
+ *
+ * <strong>It re-reads when the page is loaded, and not on a timer.</strong> The
+ * API publishes no event for indexing, so "Indexing now" stays until the next
+ * read and the page says so on the document.
  */
 @Component({
   selector: 'app-knowledge-list',
@@ -50,6 +56,8 @@ export class KnowledgeList {
   protected readonly stateWord = knowledgeStateWord;
   protected readonly stateTone = knowledgeStateTone;
   protected readonly typeWord = knowledgeTypeWord;
+  protected readonly displayState = knowledgeDisplayState;
+  protected readonly attemptNote = indexAttemptNote;
 
   /** Whether this list is the reader's to see at all. */
   protected readonly canView = computed(() => this.permissions.has('knowledge.view'));
@@ -147,8 +155,10 @@ export class KnowledgeList {
     await this.load();
   }
 
-  /** "1,199 characters", with the right plural form for the reader's language. */
-  protected size(contentLength: number): string {
-    return characterCount(this.format.language, contentLength, this.format.number(contentLength));
+  /** "1.2 MB" in the reader's language, or "Typed text" when no file was uploaded. */
+  protected size(sourceByteLength: number | null): string {
+    return sourceByteLength === null
+      ? TYPED_TEXT
+      : fileSize(sourceByteLength, this.format.language);
   }
 }

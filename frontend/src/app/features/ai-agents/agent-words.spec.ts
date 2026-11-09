@@ -3,8 +3,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { TestBed } from '@angular/core/testing';
 import { PermissionService } from '@app/core/authorization/permission-service';
 import { WebChatAdminApi } from '@app/features/channels/website-chat-api';
-import { WhatsAppApi } from '@app/features/channels/whatsapp-api';
-import { AgentChannels, channelStatusNote } from './agent-channels';
+import { AgentChannels, channelStatusNote, visibleChannels } from './agent-channels';
 import { agentStatusSentence, agentStatusTone, agentStatusWord } from './agent-words';
 
 describe('agent words', () => {
@@ -32,24 +31,47 @@ describe('agent words', () => {
   });
 });
 
-/**
- * Which channels use each agent, joined from the two channel lists. Each list is
- * read only with its own permission, and a failed one marks the result partial.
- */
+describe('visibleChannels', () => {
+  it('links each channel to the page that configures it', () => {
+    expect(
+      visibleChannels([
+        { kind: 'WebChat', id: 'w1', status: 'Active' },
+        { kind: 'WhatsApp', id: 'p1', status: 'Draft' },
+      ]).map((use) => use.link),
+    ).toEqual([
+      ['/channels/website-chat', 'w1'],
+      ['/channels/whatsapp', 'p1'],
+    ]);
+  });
+
+  it('leaves out a kind this build has no page for', () => {
+    expect(visibleChannels([{ kind: 'Telegram', id: 't1', status: 'Active' } as never])).toEqual(
+      [],
+    );
+  });
+});
+
+/** The one channel read left: the widget's look, for the preview. */
 describe('AgentChannels', () => {
   const tenantId = '11111111-1111-1111-1111-111111111111';
+  const web = (id: string, status: string) => ({
+    channel: 'WebChat' as const,
+    id,
+    status,
+    link: ['/channels/website-chat', id],
+  });
+
   let granted: Set<string>;
   let http: HttpTestingController;
   let channels: AgentChannels;
 
   beforeEach(() => {
-    granted = new Set(['website-chat.view', 'whatsapp.view']);
+    granted = new Set(['website-chat.view']);
     TestBed.configureTestingModule({
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
         WebChatAdminApi,
-        WhatsAppApi,
         AgentChannels,
         { provide: PermissionService, useValue: { has: (code: string) => granted.has(code) } },
       ],
@@ -60,56 +82,35 @@ describe('AgentChannels', () => {
 
   afterEach(() => http.verify());
 
-  async function flushLists(webChat: object[] | 'fail', whatsApp: object[]): Promise<void> {
+  it("reads the active website chat's look first", async () => {
+    const pending = channels.widgetFor(tenantId, [web('w1', 'Draft'), web('w2', 'Active')]);
+
     await Promise.resolve();
-    const web = http.match(`/api/tenants/${tenantId}/website-chat`);
-    const wa = http.match(`/api/tenants/${tenantId}/whatsapp/connections`);
+    http
+      .expectOne(`/api/tenants/${tenantId}/website-chat/w2/widget`)
+      .flush({ widget: { accentColor: '#112233' } }, { headers: { ETag: '"v1"' } });
 
-    for (const request of web) {
-      if (webChat === 'fail') {
-        request.flush(null, { status: 500, statusText: 'Error' });
-      } else {
-        request.flush(webChat);
-      }
-    }
-
-    for (const request of wa) {
-      request.flush(whatsApp);
-    }
-  }
-
-  it('groups both kinds of channel under the agent they name', async () => {
-    const pending = channels.load(tenantId);
-
-    await flushLists(
-      [{ id: 'w1', aiAgentId: 'a1', status: 'Active' }],
-      [{ id: 'p1', aiAgentId: 'a1', status: 'Draft' }],
-    );
-
-    const map = await pending;
-
-    expect(map.visible).toBe(true);
-    expect(map.incomplete).toBe(false);
-    expect(map.byAgent.get('a1')?.map((use) => use.channel)).toEqual(['WebChat', 'WhatsApp']);
-    expect(map.byAgent.get('a1')?.[1].link).toEqual(['/channels/whatsapp', 'p1']);
+    expect((await pending)?.accentColor).toBe('#112233');
   });
 
-  it('never reads a channel list the reader may not see', async () => {
-    granted.delete('whatsapp.view');
-
-    const pending = channels.load(tenantId);
-
-    await flushLists([], []);
-    await pending;
-
-    http.expectNone(`/api/tenants/${tenantId}/whatsapp/connections`);
+  it('reads nothing for an agent on no website chat', async () => {
+    expect(await channels.widgetFor(tenantId, [])).toBeNull();
   });
 
-  it('marks the result partial when a list fails, rather than "no channels"', async () => {
-    const pending = channels.load(tenantId);
+  it('reads nothing for somebody who may not see website chat', async () => {
+    granted.clear();
 
-    await flushLists('fail', []);
+    expect(await channels.widgetFor(tenantId, [web('w1', 'Active')])).toBeNull();
+  });
 
-    expect((await pending).incomplete).toBe(true);
+  it('answers null when the look cannot be read', async () => {
+    const pending = channels.widgetFor(tenantId, [web('w1', 'Active')]);
+
+    await Promise.resolve();
+    http
+      .expectOne(`/api/tenants/${tenantId}/website-chat/w1/widget`)
+      .flush(null, { status: 500, statusText: 'Error' });
+
+    expect(await pending).toBeNull();
   });
 });

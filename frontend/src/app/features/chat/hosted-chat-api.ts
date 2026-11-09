@@ -7,6 +7,18 @@ export interface HostedChatConfig {
   readonly agentName: string;
   /** Whether a conversation can be started. False covers every reason. */
   readonly available: boolean;
+
+  /** Whose chat this is. Heads the page. */
+  readonly workspaceName: string;
+
+  /** The workspace's own words, shown before anybody types. */
+  readonly greeting: string | null;
+
+  /** Untrusted until `pageAccent` has checked it. */
+  readonly accentColor: string;
+
+  /** `System`, `Light` or `Dark`. */
+  readonly theme: string;
 }
 
 /** A conversation a visitor has just started. */

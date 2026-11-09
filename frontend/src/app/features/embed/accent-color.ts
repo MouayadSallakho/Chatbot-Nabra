@@ -124,6 +124,40 @@ export function checkAccent(value: string): AccentReport {
   };
 }
 
+/** An accent the hosted chat page may wear, with the text colour that reads on it. */
+export interface PageAccent {
+  readonly accent: string;
+  readonly foreground: string;
+}
+
+/**
+ * The accent for the hosted chat page, or null for the product's own look.
+ *
+ * Stricter than the widget's rules, on purpose (Phase 38.3). Only an exact
+ * `#RRGGBB` is accepted, with nothing trimmed, because this value comes from a
+ * public read and reaches a style. The text is the lighter or the darker ink,
+ * whichever reaches 4.5:1; where neither does, the page keeps Nabra's own look
+ * rather than a label that is merely the least bad. Anything else is ignored
+ * silently: a visitor has nothing to do about a workspace's colour.
+ */
+export function pageAccent(value: unknown): PageAccent | null {
+  if (typeof value !== 'string' || !/^#[0-9A-Fa-f]{6}$/.test(value)) {
+    return null;
+  }
+
+  const onLight = contrastRatio(value, LIGHT_FOREGROUND) ?? 0;
+  const onDark = contrastRatio(value, DARK_FOREGROUND) ?? 0;
+
+  if (Math.max(onLight, onDark) < TEXT_CONTRAST) {
+    return null;
+  }
+
+  return {
+    accent: value.toLowerCase(),
+    foreground: onDark > onLight ? DARK_FOREGROUND : LIGHT_FOREGROUND,
+  };
+}
+
 /**
  * Paints an accent onto an element as custom properties, after checking it.
  *

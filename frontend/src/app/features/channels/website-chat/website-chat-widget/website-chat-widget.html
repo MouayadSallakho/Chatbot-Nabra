@@ -76,6 +76,14 @@
           </div>
 
           <div class="card-body">
+            <p
+              class="text-small text-secondary"
+              data-testid="visitors-see-name"
+              i18n="@@widget.workspaceName.note"
+            >
+              Visitors see your workspace's name at the top of the chat.
+            </p>
+
             <div class="field">
               <label class="field-label" for="widget-greeting" i18n="@@widget.greeting"
                 >Greeting</label
@@ -204,6 +212,12 @@
                 <select id="widget-position" class="select" formControlName="launcherPosition">
                   <option value="Right" i18n="@@widget.position.right">Bottom right</option>
                   <option value="Left" i18n="@@widget.position.left">Bottom left</option>
+                  <option value="Start" i18n="@@widget.position.start">
+                    Start: right in Arabic pages, left in English pages
+                  </option>
+                  <option value="End" i18n="@@widget.position.end">
+                    End: left in Arabic pages, right in English pages
+                  </option>
                 </select>
               </div>
 
@@ -260,6 +274,7 @@
                   [closable]="true"
                   [canSend]="true"
                   [agentName]="agentName()"
+                  [workspaceName]="workspaceName()"
                   [greeting]="previewGreeting()"
                 />
                 <div class="preview-closed">

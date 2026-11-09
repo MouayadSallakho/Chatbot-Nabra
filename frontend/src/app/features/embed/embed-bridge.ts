@@ -1,5 +1,5 @@
 import { Injectable, OnDestroy, signal } from '@angular/core';
-import type { LauncherPosition } from './embed-chat-api';
+import type { LauncherPosition } from './launcher-position';
 
 /** The protocol namespace. Version 1, and the version is part of every name. */
 const PROTOCOL = 'omniai:v1:';

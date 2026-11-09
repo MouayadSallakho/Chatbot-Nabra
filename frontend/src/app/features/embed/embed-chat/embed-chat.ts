@@ -21,13 +21,9 @@ import { ChatPanel } from '@app/shared/chat/chat-panel';
 import { visitorFailure } from '@app/shared/chat/visitor-copy';
 import { DEFAULT_ACCENT, applyAccent } from '../accent-color';
 import { EmbedBridge } from '../embed-bridge';
-import {
-  EmbedChatApi,
-  EmbeddedChatConfig,
-  LAUNCHER_POSITIONS,
-  LauncherPosition,
-} from '../embed-chat-api';
+import { EmbedChatApi, EmbeddedChatConfig } from '../embed-chat-api';
 import { EmbedSessionStore } from '../embed-session';
+import { LAUNCHER_POSITIONS, LauncherPosition, physicalSide } from '../launcher-position';
 
 /** The longest message the widget accepts, matching the server's bound. */
 const MAX_MESSAGE_LENGTH = 4_000;
@@ -94,6 +90,7 @@ export class EmbedChat implements OnInit {
 
   protected readonly state = signal<EmbedState>('connecting');
   protected readonly agentName = signal('');
+  protected readonly workspaceName = signal('');
   protected readonly greeting = signal<string | null>(null);
   protected readonly accent = signal(DEFAULT_ACCENT);
   protected readonly position = signal<LauncherPosition>('Right');
@@ -105,12 +102,9 @@ export class EmbedChat implements OnInit {
    * stands in: at worst the launcher sits 12px off its frame's outer edge and the
    * opening animation starts from the other corner (Phase 37.5a).
    */
-  protected readonly opensFromLeft = computed(() => {
-    const position = this.position();
-    const rtl = this.language === 'ar';
-
-    return position === 'Left' || (position === 'Start' && !rtl) || (position === 'End' && rtl);
-  });
+  protected readonly opensFromLeft = computed(
+    () => physicalSide(this.position(), this.language) === 'Left',
+  );
 
   /** The physical side the shared launcher understands. */
   protected readonly launcherSide = computed<'Left' | 'Right'>(() =>
@@ -468,6 +462,7 @@ export class EmbedChat implements OnInit {
   /** Adopts the appearance the workspace configured. */
   private apply(config: EmbeddedChatConfig): void {
     this.agentName.set(config.agentName);
+    this.workspaceName.set(config.workspaceName);
     this.greeting.set(config.greeting);
     this.accent.set(config.accentColor);
     this.position.set(

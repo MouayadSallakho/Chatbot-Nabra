@@ -10,6 +10,8 @@ import { PermissionApi } from '@app/core/authorization/permission-api';
 import { KnowledgeApi } from '../knowledge-api';
 import { KNOWLEDGE_FILE_LIMITS } from '../knowledge-limits';
 import { KnowledgeUpload } from './knowledge-upload';
+import { KNOWLEDGE_PROBLEM_WORDS } from '../knowledge-problems';
+import { registerProblemWords } from '@app/core/problems/problem-words';
 
 /**
  * The knowledge upload page.
@@ -355,6 +357,33 @@ describe('KnowledgeUpload', () => {
       expect(query('[data-testid="upload-error"]')?.textContent).toContain(
         'no document was created',
       );
+    });
+
+    it('words a refusal by its code, with the bound it broke', async () => {
+      registerProblemWords(KNOWLEDGE_PROBLEM_WORDS);
+      await mount();
+
+      await choose(pdf('long.pdf'));
+
+      uploadButton().click();
+
+      http.expectOne(filesUrl).flush(
+        {
+          title: 'Too many pages',
+          detail: 'The English sentence from the server.',
+          code: 'knowledge.file.too_many_pages',
+          limit: 500,
+        },
+        { status: 422, statusText: 'Unprocessable Content' },
+      );
+
+      await settle();
+
+      const shown = query('[data-testid="upload-error"]')?.textContent;
+
+      expect(shown).toContain('The file has more than 500 pages');
+      expect(shown).not.toContain('The English sentence');
+      expect(shown).toContain('no document was created');
     });
 
     it('reports an unsupported format with the formats it accepts', async () => {
