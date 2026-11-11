@@ -45,6 +45,14 @@ export interface AssignableRole {
 /** Where an invitation stands. */
 export type InvitationStatus = 'Pending' | 'Accepted' | 'Revoked' | 'Expired';
 
+/** Every status, in the order the team page lists them. */
+export const INVITATION_STATUSES: readonly InvitationStatus[] = [
+  'Pending',
+  'Accepted',
+  'Revoked',
+  'Expired',
+];
+
 /** One invitation, as any read publishes it. */
 export interface Invitation {
   readonly id: string;
@@ -145,22 +153,40 @@ export class TeamApi {
       .pipe(map(withEntityTag));
   }
 
-  /** One page of the workspace's invitations. */
-  invitations(tenantId: string, page = 1, pageSize = 20): Observable<InvitationPage> {
+  /**
+   * One page of the workspace's invitations in one status, newest first.
+   *
+   * The status is filtered by the server, and `total` counts that status only
+   * (Phase 37.5b). A waiting invitation past its expiry is read as `Expired`.
+   */
+  invitations(
+    tenantId: string,
+    status: InvitationStatus,
+    page = 1,
+    pageSize = 20,
+  ): Observable<InvitationPage> {
     return this.http.get<InvitationPage>(
-      `/api/tenants/${tenantId}/invitations?page=${page}&pageSize=${pageSize}`,
+      `/api/tenants/${tenantId}/invitations?status=${status}&page=${page}&pageSize=${pageSize}`,
     );
   }
 
-  /** Invites somebody. The only call that ever yields a token. */
+  /**
+   * Invites somebody. The only call that ever yields a token.
+   *
+   * `language` is the language the invitation email is written in. The form
+   * always sends one (the owner's decision, 38.0 §4.3 #4), so the server's own
+   * default never decides it silently.
+   */
   invite(
     tenantId: string,
     email: string,
     roleIds: readonly string[],
+    language: AppLanguage,
   ): Observable<CreatedInvitation> {
     return this.http.post<CreatedInvitation>(`/api/tenants/${tenantId}/invitations`, {
       email,
       roleIds,
+      language,
     });
   }
 

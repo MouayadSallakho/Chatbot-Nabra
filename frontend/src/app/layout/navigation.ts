@@ -186,6 +186,17 @@ export const NAV_ITEMS: readonly NavItem[] = [
     permissions: ['reports.view'],
   },
   {
+    // The workspace's own details (Phase 38.4): its name, which visitors see, and
+    // from 38.5 its time zone. Read by every member with workspace.view (the
+    // owner's decision, 38.0 §4.3 #7e); only workspace.manage changes it.
+    label: $localize`:@@nav.workspaceSettings:Workspace settings`,
+    group: 'Workspace',
+    path: 'workspace-settings',
+    icon: 'settings',
+    implemented: true,
+    permissions: ['workspace.view'],
+  },
+  {
     // Beside Roles rather than inside it: a role is a definition of what may be
     // done, and a team is the people who may do it. They are administered by
     // different permissions and, in a real workspace, often by different people.

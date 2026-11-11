@@ -7,7 +7,9 @@ import { PermissionApi } from '@app/core/authorization/permission-api';
 import { LOCAL_STORAGE } from '@app/core/storage/local-storage';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
 import { memoryStorage, permissionApiGranting } from '@app/testing/test-doubles';
-import { BillingApi, WorkspaceBilling, formatAmount } from '../billing-api';
+import { registerProblemWords } from '@app/core/problems/problem-words';
+import { BillingApi, BillingPlan, WorkspaceBilling, formatAmount } from '../billing-api';
+import { BILLING_PROBLEM_WORDS } from '../billing-problems';
 import { BillingPage } from './billing-page';
 
 /**
@@ -23,6 +25,46 @@ describe('BillingPage', () => {
 
   const monthlyOfferId = '22222222-2222-2222-2222-222222222222';
   const annualOfferId = '33333333-3333-3333-3333-333333333333';
+
+  /** Limits as billing publishes them: `null` is unlimited, never zero. */
+  const freePlan: BillingPlan = {
+    code: 'free',
+    name: 'Free',
+    limits: {
+      members: 3,
+      aiAgents: 1,
+      knowledgeDocuments: 10,
+      webChatEndpoints: 1,
+      whatsAppConnections: 0,
+      monthlyProviderOperations: 1000,
+    },
+  };
+
+  const starterPlan: BillingPlan = {
+    code: 'starter',
+    name: 'Starter',
+    limits: {
+      members: 10,
+      aiAgents: 5,
+      knowledgeDocuments: 200,
+      webChatEndpoints: 3,
+      whatsAppConnections: 1,
+      monthlyProviderOperations: null,
+    },
+  };
+
+  const unlimitedPlan: BillingPlan = {
+    code: 'development',
+    name: 'Development (unlimited)',
+    limits: {
+      members: null,
+      aiAgents: null,
+      knowledgeDocuments: null,
+      webChatEndpoints: null,
+      whatsAppConnections: null,
+      monthlyProviderOperations: null,
+    },
+  };
 
   const forSale: WorkspaceBilling = {
     isManaged: true,
@@ -49,6 +91,8 @@ describe('BillingPage', () => {
         trialDays: 14,
       },
     ],
+    currentPlan: freePlan,
+    fallbackPlan: freePlan,
   };
 
   const subscribed: WorkspaceBilling = {
@@ -65,6 +109,8 @@ describe('BillingPage', () => {
       graceEndsAt: null,
     },
     offers: [],
+    currentPlan: starterPlan,
+    fallbackPlan: freePlan,
   };
 
   const inArrears: WorkspaceBilling = {
@@ -86,6 +132,8 @@ describe('BillingPage', () => {
     currentPlanName: 'Development (unlimited)',
     subscription: null,
     offers: [],
+    currentPlan: unlimitedPlan,
+    fallbackPlan: null,
   };
 
   let fixture: ComponentFixture<BillingPage>;
@@ -139,6 +187,61 @@ describe('BillingPage', () => {
   }
 
   afterEach(() => http.verify());
+
+  describe('plan limits', () => {
+    const cells = (name: string): string[] =>
+      [...host().querySelectorAll(`[data-testid="limit-${name}"] td`)].map(
+        (cell) => cell.textContent?.trim() ?? '',
+      );
+
+    it('shows the plan in effect beside the fallback plan, one row per limit', async () => {
+      await mount('billing.view');
+      await answer(subscribed);
+
+      expect(query('[data-testid="limits-current"]')!.textContent).toContain('Starter');
+      expect(query('[data-testid="limits-current"]')!.textContent).toContain('In effect now');
+      expect(query('[data-testid="limits-fallback"]')!.textContent).toContain('Free');
+      expect(query('[data-testid="limits-fallback"]')!.textContent).toContain('Fallback plan');
+
+      expect(cells('members')).toEqual(['10', '3']);
+      expect(cells('whatsAppConnections')).toEqual(['1', '0']);
+      expect(cells('monthlyProviderOperations')).toEqual(['Unlimited', '1,000']);
+      expect(
+        [...host().querySelectorAll('[data-testid="limits-table"] tbody th')].map((cell) =>
+          cell.firstElementChild?.textContent?.trim(),
+        ),
+      ).toEqual([
+        'Members',
+        'AI agents',
+        'Knowledge documents',
+        'Website chat links',
+        'WhatsApp numbers',
+        'AI provider operations',
+      ]);
+    });
+
+    it('says Unlimited for null, never 0 or a blank, and leaves out a missing fallback', async () => {
+      await mount('billing.view');
+      await answer(unmanaged);
+
+      expect(query('[data-testid="limits-fallback"]')).toBeNull();
+      expect(cells('members')).toEqual(['Unlimited']);
+      expect(
+        [...host().querySelectorAll('[data-testid="limits-table"] td')].every(
+          (cell) => cell.textContent?.trim() === 'Unlimited',
+        ),
+      ).toBe(true);
+      expect(text()).toContain('What this workspace may hold on the plan in effect now.');
+      expect(text()).not.toContain('Fallback plan');
+    });
+
+    it('keeps a limit of zero as a real limit', async () => {
+      await mount('billing.view');
+      await answer(forSale);
+
+      expect(cells('whatsAppConnections')).toEqual(['0', '0']);
+    });
+  });
 
   describe('authorization', () => {
     it('asks for nothing and explains itself without billing.view', async () => {
@@ -239,6 +342,30 @@ describe('BillingPage', () => {
       expect(query<HTMLButtonElement>(`[data-testid="buy-${monthlyOfferId}"]`)!.disabled).toBe(
         false,
       );
+    });
+
+    it('words a coded refusal in its own words, never the server sentence', async () => {
+      registerProblemWords(BILLING_PROBLEM_WORDS);
+      await mount();
+      await answer(forSale);
+
+      query<HTMLButtonElement>(`[data-testid="buy-${monthlyOfferId}"]`)!.click();
+      await settle();
+
+      http.expectOne(`/api/tenants/${tenantId}/billing/checkout`).flush(
+        {
+          title: 'This purchase cannot be started',
+          detail: 'The English sentence from the server.',
+          code: 'billing.checkout.offernotavailable',
+        },
+        { status: 409, statusText: 'Conflict' },
+      );
+      await settle();
+
+      expect(query('[data-testid="action-failure"]')!.textContent).toContain(
+        'That plan has been withdrawn from sale. Nothing was charged.',
+      );
+      expect(text()).not.toContain('The English sentence');
     });
 
     it('says the payment provider failed, not the AI provider', async () => {

@@ -219,7 +219,10 @@ describe('AppShell', () => {
       expect(query('nav[aria-label="Primary"]')).not.toBeNull();
     });
 
-    it('gives every navigation entry a route that resolves', async () => {
+    // Its own time limit: it loads every feature area's lazy chunk in turn (twelve
+    // from Phase 38.4), so its time grows with the navigation. About a second
+    // alone; over the 5-second default once in a loaded parallel run.
+    it('gives every navigation entry a route that resolves', { timeout: 20_000 }, async () => {
       // The guarantee that there are no dead links. Routes are generated from
       // the same array the sidebar renders, and this proves the generation.
       await render('/overview');

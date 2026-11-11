@@ -26,6 +26,14 @@ describe('Sounds', () => {
 
   let signals: { start: ReturnType<typeof vi.fn> };
 
+  /**
+   * Waits until something the lazy chunks lead to has happened. The player and
+   * the signals are dynamic imports; a fixed number of turns raced them once in
+   * a loaded parallel run (Phase 38.4), so a positive case waits on the outcome.
+   */
+  const eventually = (check: () => void): Promise<void> =>
+    vi.waitFor(check, { timeout: 5_000, interval: 10 });
+
   function create(stored: Record<string, string> = {}): Sounds {
     player = { arm: vi.fn(), request: vi.fn(), unlock: vi.fn(), test: vi.fn(async () => true) };
     signals = { start: vi.fn() };
@@ -57,7 +65,7 @@ describe('Sounds', () => {
     await grant('conversations.view');
     await settle();
 
-    expect(player.arm).toHaveBeenCalled();
+    await eventually(() => expect(player.arm).toHaveBeenCalled());
   });
 
   it('starts what decides when a sound is due, for a member who can hear them', async () => {
@@ -65,7 +73,7 @@ describe('Sounds', () => {
     await grant('conversations.view');
     await settle();
 
-    expect(signals.start).toHaveBeenCalled();
+    await eventually(() => expect(signals.start).toHaveBeenCalled());
   });
 
   it('starts nothing for a member who cannot read conversations', async () => {
@@ -85,7 +93,7 @@ describe('Sounds', () => {
     TestBed.inject(SoundSettings).setEnabled(true);
     await settle();
 
-    expect(player.arm).toHaveBeenCalled();
+    await eventually(() => expect(player.arm).toHaveBeenCalled());
   });
 
   it('is silence, not an error, when the player cannot be had', async () => {
@@ -112,7 +120,7 @@ describe('Sounds', () => {
     sounds.unlock();
     await settle();
 
-    expect(player.request).toHaveBeenCalledWith({ sound: 'ai-failed' });
+    await eventually(() => expect(player.request).toHaveBeenCalledWith({ sound: 'ai-failed' }));
     expect(player.unlock).toHaveBeenCalled();
     expect(await sounds.test()).toBe(true);
   });

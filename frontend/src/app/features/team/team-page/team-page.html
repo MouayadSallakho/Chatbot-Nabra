@@ -68,12 +68,6 @@
         <dt i18n="@@team.facts.members">Members</dt>
         <dd>{{ memberTotal() | localNumber }}</dd>
       </div>
-      @if (!invitationsFailure()) {
-        <div>
-          <dt i18n="@@team.facts.waiting">Invitations waiting</dt>
-          <dd>{{ pending().length | localNumber }}</dd>
-        </div>
-      }
     </dl>
 
     <!-- ------------------------------------------------------------ members -->
@@ -160,12 +154,57 @@
         Invitations
       </h2>
 
+      <!--
+        Links, not a tablist: each list is an address, with its own page and
+        Back. Only the open list is read, so only it shows a total.
+      -->
+      <nav
+        class="segmented invitation-views"
+        aria-label="Invitation lists"
+        i18n-aria-label="@@team.invitations.views"
+      >
+        @for (tab of tabs; track tab.status) {
+          <a
+            class="segmented-option"
+            [routerLink]="[]"
+            [queryParams]="{ invitations: tab.slug, invitationsPage: null }"
+            queryParamsHandling="merge"
+            [attr.aria-current]="invitationStatus() === tab.status ? 'true' : null"
+            [attr.data-testid]="'invitations-' + tab.status.toLowerCase()"
+          >
+            <span>{{ tab.label }}</span>
+            @if (
+              invitationStatus() === tab.status &&
+              shownStatus() === tab.status &&
+              !invitationsLoading()
+            ) {
+              <span class="invitation-view-count num" data-testid="invitations-total">{{
+                invitationTotal() | localNumber
+              }}</span>
+            }
+          </a>
+        }
+      </nav>
+
       @if (revokeFailure(); as error) {
         <p class="alert alert-danger" role="alert">{{ error.message }}</p>
       }
 
-      @if (invitationsFailure(); as error) {
-        <div class="card card-body invitation-note">
+      @if (invitationsLoading()) {
+        <div class="data-list invitation-list" aria-busy="true">
+          <p class="visually-hidden" role="status" i18n="@@team.invitations.loading">
+            Loading invitations…
+          </p>
+          @for (row of invitationSkeletonRows; track row) {
+            <div class="data-row data-row-skeleton" aria-hidden="true">
+              <span class="skeleton skeleton-title"></span>
+              <span class="skeleton skeleton-text"></span>
+              <span class="skeleton skeleton-text"></span>
+            </div>
+          }
+        </div>
+      } @else if (invitationsFailure()) {
+        <div class="card card-body invitation-note" data-testid="invitations-failed">
           <span class="badge badge-neutral" i18n="@@team.invitations.notChecked">Not checked</span>
           <span class="text-small text-secondary" i18n="@@team.invitations.failed"
             >Invitations could not be read just now.</span
@@ -180,23 +219,30 @@
           </button>
         </div>
       } @else {
-        <p class="section-note text-small text-secondary" data-testid="waiting-summary">
-          {{ waitingText() }}
-          <span i18n="@@team.invitations.lede"
-            >A link works once, for the address it was sent to, until it expires or is
-            revoked.</span
-          >
+        <p class="section-note text-small text-secondary" data-testid="invitations-summary">
+          {{ summaryText() }}
+          @if (shownStatus() === 'Pending') {
+            <span i18n="@@team.invitations.lede"
+              >A link works once, for the address it was sent to, until it expires or is
+              revoked.</span
+            >
+          }
         </p>
 
-        @if (pending().length > 0) {
-          <div class="data-list invitation-list">
+        @if (invitations().length > 0) {
+          <div class="data-list invitation-list" [attr.aria-busy]="invitationsBusy()">
             <div class="data-list-head" aria-hidden="true">
               <span i18n="@@team.column.invited">Invited</span>
-              <span i18n="@@team.column.joinsWith">Joins with</span>
-              <span i18n="@@team.column.expires">Link expires</span>
+              @if (shownStatus() === 'Pending') {
+                <span i18n="@@team.column.joinsWith">Joins with</span>
+                <span i18n="@@team.column.expires">Link expires</span>
+              } @else {
+                <span i18n="@@team.column.roles">Roles</span>
+                <span i18n="@@team.column.sent">Sent</span>
+              }
             </div>
-            <ul data-testid="pending-invitations">
-              @for (invitation of pending(); track invitation.id) {
+            <ul data-testid="invitations">
+              @for (invitation of invitations(); track invitation.id) {
                 <li>
                   <div
                     class="data-row invitation-row"
@@ -211,22 +257,42 @@
 
                     <span class="data-row-meta">
                       @if (invitation.roles.length === 0) {
-                        <span class="member-no-roles" i18n="@@team.invitation.noRoles"
-                          >No roles: will see the workspace only</span
-                        >
+                        @if (invitation.status === 'Pending') {
+                          <span class="member-no-roles" i18n="@@team.invitation.noRoles"
+                            >No roles: will see the workspace only</span
+                          >
+                        } @else {
+                          <span class="member-no-roles" i18n="@@team.invitation.noRolesPast"
+                            >No roles</span
+                          >
+                        }
                       } @else {
                         <span dir="auto">{{ roleNames(invitation.roles) }}</span>
                       }
                     </span>
 
-                    <span class="data-row-meta invitation-expiry">
-                      <span>{{ expiry(invitation) }}</span>
-                      <time class="text-muted" [attr.datetime]="invitation.expiresAt">{{
-                        invitation.expiresAt | localDate: 'date'
-                      }}</time>
-                    </span>
+                    @if (invitation.status === 'Pending') {
+                      <span class="data-row-meta invitation-expiry">
+                        <span>{{ expiry(invitation) }}</span>
+                        <time class="text-muted" [attr.datetime]="invitation.expiresAt">{{
+                          invitation.expiresAt | localDate: 'date'
+                        }}</time>
+                      </span>
+                    } @else {
+                      <span class="data-row-meta text-small text-muted">
+                        <span i18n="@@team.past.sent">Sent</span>&nbsp;<time
+                          [attr.datetime]="invitation.createdAt"
+                          >{{ invitation.createdAt | localDate: 'date' }}</time
+                        >
+                        @if (invitation.invitedByEmail; as by) {
+                          · <span i18n="@@team.past.by">by</span>&nbsp;<span dir="ltr">{{
+                            by
+                          }}</span>
+                        }
+                      </span>
+                    }
 
-                    @if (canInvite()) {
+                    @if (canInvite() && invitation.status === 'Pending') {
                       <button
                         type="button"
                         class="btn btn-danger-ghost btn-sm invitation-revoke"
@@ -247,50 +313,15 @@
               }
             </ul>
           </div>
-        }
 
-        @if (past().length > 0) {
-          <!--
-            History, folded away: accepted, revoked and expired invitations are
-            answers to "what happened to that invite?", not things to act on.
-          -->
-          <details class="card past-invitations" data-testid="past-invitations">
-            <summary class="past-summary">
-              <app-icon class="past-chevron" name="chevron-down" [strokeWidth]="1.75" />
-              <span i18n="@@team.past.summary">Past invitations</span>
-              <span class="text-muted num">({{ past().length | localNumber }})</span>
-            </summary>
-            <ul class="past-list">
-              @for (invitation of past(); track invitation.id) {
-                <li class="past-row" [attr.data-testid]="'invitation-' + invitation.id">
-                  <span class="member-email" dir="ltr">{{ invitation.email }}</span>
-                  <span class="badge" [class]="statusTone(invitation.status)">{{
-                    statusWord(invitation.status)
-                  }}</span>
-                  <span class="text-small text-muted">
-                    <span i18n="@@team.past.sent">Sent</span>&nbsp;<time
-                      [attr.datetime]="invitation.createdAt"
-                      >{{ invitation.createdAt | localDate: 'date' }}</time
-                    >
-                    @if (invitation.invitedByEmail; as by) {
-                      · <span i18n="@@team.past.by">by</span>&nbsp;<span dir="ltr">{{ by }}</span>
-                    }
-                  </span>
-                </li>
-              }
-            </ul>
-          </details>
-        }
-
-        @if (invitationsTruncated()) {
-          <p
-            class="text-small text-muted"
-            data-testid="invitations-truncated"
-            i18n="@@team.invitations.truncated"
-          >
-            Only the newest {{ invitations().length | localNumber }} of
-            {{ invitationTotal() | localNumber }} invitations are shown.
-          </p>
+          <app-pagination
+            [page]="invitationPage()"
+            [pageSize]="invitationPageSize"
+            [total]="invitationTotal()"
+            items="invitations"
+            [busy]="invitationsBusy()"
+            (pageChange)="goToInvitations($event)"
+          />
         }
       }
     </section>

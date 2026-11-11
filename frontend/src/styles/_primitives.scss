@@ -856,6 +856,31 @@ button.segmented-option {
   }
 }
 
+// The same control with links, where each choice is an address (the inbox's
+// views, the team's invitation lists): the current one carries
+// `aria-current="true"` and is drawn like a pressed option.
+a.segmented-option {
+  text-decoration: none;
+
+  &[aria-current='true'] {
+    background-color: var(--surface-default);
+    color: var(--text-primary);
+    box-shadow: 0 0 0 1px var(--border-control);
+  }
+
+  &:focus-visible {
+    outline: var(--focus-ring-width) solid var(--focus-ring);
+    outline-offset: 1px;
+  }
+
+  @media (forced-colors: active) {
+    &[aria-current='true'] {
+      outline: 2px solid CanvasText;
+      outline-offset: -2px;
+    }
+  }
+}
+
 // -----------------------------------------------------------------------------
 // Tables
 // -----------------------------------------------------------------------------

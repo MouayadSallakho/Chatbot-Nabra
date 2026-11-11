@@ -1,6 +1,8 @@
 import { Routes } from '@angular/router';
 import { unsavedChangesGuard } from '@app/core/navigation/unsaved-changes';
+import { provideProblemWords } from '@app/core/problems/problem-words';
 import { TeamApi } from './team-api';
+import { TEAM_PROBLEM_WORDS } from './team-problems';
 
 /**
  * The team administration screens.
@@ -18,7 +20,7 @@ import { TeamApi } from './team-api';
 export const teamRoutes: Routes = [
   {
     path: '',
-    providers: [TeamApi],
+    providers: [TeamApi, provideProblemWords(TEAM_PROBLEM_WORDS)],
     children: [
       {
         path: '',

@@ -23,6 +23,7 @@ describe('RoleList', () => {
       permissionCount: 2,
       createdAt: '2026-09-01T09:00:00+00:00',
       updatedAt: '2026-09-01T09:00:00+00:00',
+      memberCount: 0,
       ...overrides,
     };
   }
@@ -67,7 +68,8 @@ describe('RoleList', () => {
     fixture.detectChanges();
   }
 
-  const text = (): string => (fixture.nativeElement as HTMLElement).textContent ?? '';
+  const host = (): HTMLElement => fixture.nativeElement as HTMLElement;
+  const text = (): string => host().textContent ?? '';
 
   afterEach(() => http.verify());
 
@@ -79,6 +81,26 @@ describe('RoleList', () => {
 
     expect(text()).toContain('Owner');
     expect(text()).toContain('Support agent');
+  });
+
+  it('says how many members hold each role, live from the server', async () => {
+    await mount('roles.view');
+
+    http
+      .expectOne(rolesUrl)
+      .flush([
+        { ...owner, memberCount: 1 },
+        role({ name: 'Support agent', memberCount: 3 }),
+        role({ name: 'Analyst', memberCount: 0 }),
+      ]);
+    await settle();
+
+    const counts = [...host().querySelectorAll('[data-testid="role-members"]')].map((cell) =>
+      cell.textContent?.trim(),
+    );
+
+    expect(host().querySelector('.data-list-head')!.textContent).toContain('Members');
+    expect(counts).toEqual(['1 member', '3 members', 'No members']);
   });
 
   it('marks the protected role and says it holds everything', async () => {

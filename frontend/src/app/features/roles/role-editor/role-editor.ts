@@ -25,7 +25,13 @@ import { Icon } from '@app/shared/icon/icon';
 import { PageHeader } from '@app/shared/page-header/page-header';
 import { PermissionGroup, groupPermissions } from '../permission-groups';
 import { PermissionPicker } from '../permission-picker/permission-picker';
-import { grantSummary, impactSummary, roleDisplayName } from '../permission-words';
+import {
+  accessChangeSentence,
+  grantSummary,
+  impactSummary,
+  memberCount,
+  roleDisplayName,
+} from '../permission-words';
 import { ROLE_NAME_MAX } from '../role-limits';
 
 /**
@@ -102,6 +108,29 @@ export class RoleEditor implements OnInit, HasUnsavedChanges {
 
   /** The version the next conditional write must present. */
   private readonly version = signal<string | null>(null);
+
+  /**
+   * How many members hold the role, from the last read.
+   *
+   * Kept apart from the role because only a read carries it: a save answers
+   * with the role and no count, and the count it had a moment ago is still the
+   * truth about who holds it.
+   */
+  private readonly holders = signal<number | null>(null);
+
+  /** "3 members", for the facts. */
+  protected readonly holdersText = computed(() => {
+    const count = this.holders();
+
+    return count === null ? null : memberCount(count, this.locale.language);
+  });
+
+  /** "Saving changes access for 3 members.", beside the save while it is pending. */
+  protected readonly reachText = computed(() => {
+    const count = this.holders();
+
+    return count === null ? null : accessChangeSentence(count, this.locale.language);
+  });
 
   /** The permission codes currently ticked, which may differ from what is saved. */
   private readonly selected = signal<ReadonlySet<string>>(new Set());
@@ -421,6 +450,7 @@ export class RoleEditor implements OnInit, HasUnsavedChanges {
   /** Takes on a freshly read or freshly saved role. */
   private adopt(versioned: Versioned<Role>): void {
     this.role.set(versioned.value);
+    this.holders.update((count) => versioned.value.memberCount ?? count);
     this.version.set(versioned.etag);
     this.selected.set(new Set(versioned.value.permissions));
 

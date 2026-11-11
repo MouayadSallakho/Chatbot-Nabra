@@ -64,6 +64,7 @@
       <div class="data-list role-list">
         <div class="data-list-head" aria-hidden="true">
           <span i18n="@@roles.column.role">Role</span>
+          <span i18n="@@roles.column.members">Members</span>
           <span i18n="@@roles.column.permissions">Permissions</span>
           <span i18n="@@roles.column.updated">Last changed</span>
         </div>
@@ -90,6 +91,10 @@
                     <span class="badge badge-plain" i18n="@@roles.custom">Custom</span>
                   }
                 </span>
+
+                <span class="data-row-meta num" data-testid="role-members">{{
+                  membersText(role)
+                }}</span>
 
                 <span class="data-row-meta num">{{ countText(role) }}</span>
 

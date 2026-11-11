@@ -38,10 +38,10 @@ describe('RoleEditor', () => {
     name: 'Support agent',
     type: 'Custom',
     isSystem: false,
-    permissionCount: 1,
     permissions: ['ai-agents.view'],
     createdAt: '2026-09-01T09:00:00+00:00',
     updatedAt: '2026-09-01T09:00:00+00:00',
+    memberCount: 3,
   };
 
   const owner: Role = {
@@ -185,7 +185,6 @@ describe('RoleEditor', () => {
       ...custom,
       name: 'Senior',
       permissions: ['ai-agents.edit', 'ai-agents.lifecycle'],
-      permissionCount: 2,
     };
 
     await mount(senior, 'roles.view', 'roles.manage', 'ai-agents.view');
@@ -322,6 +321,64 @@ describe('RoleEditor', () => {
       { headers: { ETag: '"v2"' } },
     );
     await settle();
+  });
+
+  it('says how many members hold the role, and the reach of a save before it is made', async () => {
+    await mount(custom, ...ManagerWithAgents);
+
+    expect(host().querySelector('[data-testid="role-holders"]')!.textContent).toContain(
+      '3 members',
+    );
+    // Nothing pending, nothing to warn about.
+    expect(host().querySelector('[data-testid="save-reach"]')).toBeNull();
+
+    tick('Edit AI agents')!.click();
+    await settle();
+
+    expect(host().querySelector('[data-testid="save-reach"]')!.textContent).toContain(
+      'Saving changes access for 3 members.',
+    );
+  });
+
+  it('says plainly when nobody holds the role yet', async () => {
+    await mount({ ...custom, memberCount: 0 }, ...ManagerWithAgents);
+
+    tick('Edit AI agents')!.click();
+    await settle();
+
+    expect(host().querySelector('[data-testid="role-holders"]')!.textContent).toContain(
+      'No members',
+    );
+    expect(host().querySelector('[data-testid="save-reach"]')!.textContent).toContain(
+      "No member holds this role yet, so saving changes nobody's access.",
+    );
+  });
+
+  it('keeps the count it read across a save, which answers without one', async () => {
+    await mount(custom, ...ManagerWithAgents);
+
+    tick('Edit AI agents')!.click();
+    await settle();
+    button('Save permissions')!.click();
+    await settle();
+
+    // The writes keep their shape and carry no count (tenant-rbac.md, 37.5b).
+    const withoutCount: Record<string, unknown> = { ...custom };
+
+    delete withoutCount['memberCount'];
+
+    http
+      .expectOne(`${roleUrl}/permissions`)
+      .flush(
+        { ...withoutCount, permissions: ['ai-agents.edit', 'ai-agents.view'] },
+        { headers: { ETag: '"v2"' } },
+      );
+    await settle();
+
+    expect(host().querySelector('[data-testid="role-holders"]')!.textContent).toContain(
+      '3 members',
+    );
+    expect(host().querySelector('[data-testid="save-reach"]')).toBeNull();
   });
 
   it('keeps the reader’s selections when a save is refused as stale', async () => {

@@ -256,6 +256,85 @@
           back.
         </p>
       }
+
+      @if (limitRows().length > 0) {
+        <!--
+          What the plan allows, beside what the workspace would fall back to.
+          Null is said as "Unlimited", never as 0 or a blank.
+        -->
+        <section class="card" aria-labelledby="limits-heading" data-testid="plan-limits">
+          <div class="card-header">
+            <h2 id="limits-heading" class="card-title" i18n="@@billing.limits.heading">
+              Plan limits
+            </h2>
+          </div>
+          <div class="card-body plan-limits">
+            @if (fallbackPlan()) {
+              <p class="text-small text-secondary" i18n="@@billing.limits.lede.fallback">
+                What this workspace may hold on the plan in effect now, and on the fallback plan it
+                moves to if its subscription lapses.
+              </p>
+            } @else {
+              <p class="text-small text-secondary" i18n="@@billing.limits.lede">
+                What this workspace may hold on the plan in effect now.
+              </p>
+            }
+
+            <div
+              class="table-scroll"
+              appScrollRegion="Plan limits table"
+              i18n-appScrollRegion="@@billing.limits.region"
+            >
+              <table class="table" data-testid="limits-table">
+                <caption class="visually-hidden" i18n="@@billing.limits.caption">
+                  Plan limits, by plan
+                </caption>
+                <thead>
+                  <tr>
+                    <th scope="col" i18n="@@billing.limits.column.limit">Limit</th>
+                    <th scope="col" class="numeric" data-testid="limits-current">
+                      <span class="plan-column-name"
+                        ><bdi dir="auto">{{ currentPlan()?.name }}</bdi></span
+                      >
+                      <span class="plan-column-role" i18n="@@billing.plan.inEffect"
+                        >In effect now</span
+                      >
+                    </th>
+                    @if (fallbackPlan(); as fallback) {
+                      <th scope="col" class="numeric" data-testid="limits-fallback">
+                        <span class="plan-column-name"
+                          ><bdi dir="auto">{{ fallback.name }}</bdi></span
+                        >
+                        <span class="plan-column-role" i18n="@@billing.limits.fallback"
+                          >Fallback plan</span
+                        >
+                      </th>
+                    }
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (row of limitRows(); track row.name) {
+                    <tr [attr.data-testid]="'limit-' + row.name">
+                      <th scope="row" class="limit-name">
+                        <span>{{ row.label }}</span>
+                        <span class="limit-description">{{ row.description }}</span>
+                      </th>
+                      <td class="numeric" [class.limit-unlimited]="row.current.unlimited">
+                        {{ row.current.text }}
+                      </td>
+                      @if (row.fallback; as fallback) {
+                        <td class="numeric" [class.limit-unlimited]="fallback.unlimited">
+                          {{ fallback.text }}
+                        </td>
+                      }
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      }
     }
   </div>
 </div>

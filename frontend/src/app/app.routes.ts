@@ -258,6 +258,15 @@ export const routes: Routes = [
           import('@app/features/reports/reports.routes').then((m) => m.reportsRoutes),
       },
       {
+        // The workspace's own settings: its name, and from 38.5 its time zone.
+        // Lazily loaded; every member with workspace.view reads it.
+        path: 'workspace-settings',
+        loadChildren: () =>
+          import('@app/features/workspace-settings/workspace-settings.routes').then(
+            (m) => m.workspaceSettingsRoutes,
+          ),
+      },
+      {
         // Plan and usage. Beside Analytics rather than inside it: it answers a
         // different question -- what this workspace may hold, rather than what it
         // did -- and it is read by people who never open a dashboard.

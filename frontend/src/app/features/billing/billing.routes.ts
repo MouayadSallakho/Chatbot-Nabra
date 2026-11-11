@@ -1,5 +1,7 @@
 import { Routes } from '@angular/router';
+import { provideProblemWords } from '@app/core/problems/problem-words';
 import { BillingApi } from './billing-api';
+import { BILLING_PROBLEM_WORDS } from './billing-problems';
 
 /**
  * The billing screen.
@@ -11,7 +13,7 @@ import { BillingApi } from './billing-api';
 export const billingRoutes: Routes = [
   {
     path: '',
-    providers: [BillingApi],
+    providers: [BillingApi, provideProblemWords(BILLING_PROBLEM_WORDS)],
     children: [
       {
         path: '',

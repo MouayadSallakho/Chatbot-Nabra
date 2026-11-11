@@ -3,6 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { AppLanguage } from '@app/core/i18n/language';
 import { currencyExponent, formatCurrency } from '@app/core/i18n/locale-format';
 import { Observable } from 'rxjs';
+import type { PlanEntitlementName } from '@app/features/plan-usage/plan-usage-api';
 
 /** How often a subscription renews. Two, and no others are sold. */
 export type BillingInterval = 'Monthly' | 'Annual';
@@ -67,6 +68,21 @@ export interface WorkspaceSubscription {
 }
 
 /**
+ * What a plan allows, one bound per capped entitlement.
+ *
+ * <strong>`null` means unlimited,</strong> never zero: a limit of zero is a real
+ * limit that refuses the first one (`workspace-plans-entitlements-quotas.md`).
+ */
+export type BillingPlanLimits = Readonly<Record<PlanEntitlementName, number | null>>;
+
+/** A plan as billing publishes it (Phase 37.5b): its code, its name and its limits. */
+export interface BillingPlan {
+  readonly code: string;
+  readonly name: string;
+  readonly limits: BillingPlanLimits;
+}
+
+/**
  * The billing screen's payload.
  *
  * `isManaged` is false on a deployment that sells nothing; the offer list is
@@ -79,6 +95,16 @@ export interface WorkspaceBilling {
   readonly currentPlanName: string;
   readonly subscription: WorkspaceSubscription | null;
   readonly offers: readonly BillingOffer[];
+
+  /** The plan in effect now, with its limits. */
+  readonly currentPlan: BillingPlan;
+
+  /**
+   * The plan the workspace moves to if its subscription lapses, or null when
+   * there is no usable one. Null covers every such case by design (37.5b), so
+   * the screen leaves the comparison out rather than guessing.
+   */
+  readonly fallbackPlan: BillingPlan | null;
 }
 
 /** Where to send the reader next. Used once, immediately, never stored. */

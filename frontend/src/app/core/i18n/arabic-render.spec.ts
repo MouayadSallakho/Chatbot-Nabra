@@ -333,6 +333,132 @@ describe('Arabic renders', () => {
     });
   });
 
+  describe('workspace, team, roles and billing (Phase 38.4)', () => {
+    it('names the areas by key and counts role holders in Arabic', async () => {
+      const { accessChangeSentence, areaName, memberCount, permissionLabel } =
+        await import('@app/features/roles/permission-words');
+
+      expect(areaName({ groupKey: 'members', group: 'Team members' })).toBe('أعضاء الفريق');
+      expect(areaName({ groupKey: 'workspace', group: 'Workspace' })).toBe('مساحة العمل');
+      // An area this build has no words for keeps the server's English.
+      expect(areaName({ groupKey: 'integrations', group: 'Integrations' })).toBe('Integrations');
+      expect(
+        permissionLabel({
+          code: 'workspace.manage',
+          group: 'Workspace',
+          groupKey: 'workspace',
+          label: 'Manage workspace',
+          description: '',
+        }),
+      ).toBe('إدارة مساحة العمل');
+
+      expect(memberCount(0, 'ar')).toBe('لا أعضاء');
+      expect(memberCount(1, 'ar')).toBe('عضو واحد');
+      expect(memberCount(2, 'ar')).toBe('عضوان');
+      expect(memberCount(3, 'ar')).toBe('3 أعضاء');
+      expect(memberCount(11, 'ar')).toBe('11 عضوًا');
+      expect(accessChangeSentence(3, 'ar')).toBe('سيغيّر الحفظ وصول 3 أعضاء.');
+      expect(accessChangeSentence(0, 'ar')).toBe(
+        'لا يحمل أي عضو هذا الدور بعد، لذا لن يغيّر الحفظ وصول أحد.',
+      );
+    });
+
+    it('says each invitation list and its total in Arabic', async () => {
+      const { invitationStatusWord, invitationSummary } =
+        await import('@app/features/team/team-words');
+
+      expect(invitationStatusWord('Pending')).toBe('بانتظار القبول');
+      expect(invitationSummary('Pending', 2, 'ar')).toBe('دعوتان بانتظار القبول.');
+      expect(invitationSummary('Accepted', 2, 'ar')).toBe('قُبلت دعوتان.');
+      expect(invitationSummary('Revoked', 5, 'ar')).toBe('أُلغيت 5 دعوات.');
+      expect(invitationSummary('Expired', 0, 'ar')).toBe('لم تنتهِ صلاحية أي دعوة.');
+    });
+
+    it('words the team, role, email-address and billing refusals in Arabic, by their codes', async () => {
+      const { HttpErrorResponse } = await import('@angular/common/http');
+      const { toApiError } = await import('@app/core/api/api-error');
+      const { registerProblemWords } = await import('@app/core/problems/problem-words');
+      const { TEAM_PROBLEM_WORDS } = await import('@app/features/team/team-problems');
+      const { ROLE_PROBLEM_WORDS } = await import('@app/features/roles/role-problems');
+      const { BILLING_PROBLEM_WORDS } = await import('@app/features/billing/billing-problems');
+
+      [TEAM_PROBLEM_WORDS, ROLE_PROBLEM_WORDS, BILLING_PROBLEM_WORDS].forEach(registerProblemWords);
+
+      const refuse = (code: string) =>
+        toApiError(
+          new HttpErrorResponse({
+            status: 409,
+            error: { title: 'Refused', detail: 'The English sentence.', code },
+          }),
+        ).message;
+
+      expect(refuse('roles.name.taken')).toBe(
+        'يحمل دور آخر في مساحة العمل هذه الاسم نفسه. اختر اسمًا مختلفًا.',
+      );
+      expect(refuse('invitations.email.already_invited')).toBe(
+        'ما زالت دعوة لهذا العنوان بانتظار القبول. ألغِها أولًا لترسل دعوة جديدة.',
+      );
+      expect(refuse('email.invalid_characters')).toBe(
+        'احذف المسافات أو الأحرف المخفية من عنوان البريد الإلكتروني.',
+      );
+      expect(refuse('entitlement.members.exhausted')).toContain('الحد الأقصى للأعضاء في باقتها');
+      expect(refuse('billing.checkout.offernotavailable')).toBe(
+        'سُحبت هذه الباقة من البيع. لم يُخصم أي مبلغ.',
+      );
+      // A code nobody registered gets the generic words, never the English detail.
+      expect(refuse('roles.something.new')).not.toContain('The English sentence');
+    });
+
+    it('writes the workspace settings in Arabic for a member who reads them', async () => {
+      const { provideHttpClient } = await import('@angular/common/http');
+      const { HttpTestingController, provideHttpClientTesting } =
+        await import('@angular/common/http/testing');
+      const { provideRouter } = await import('@angular/router');
+      const { PermissionApi } = await import('@app/core/authorization/permission-api');
+      const { LOCAL_STORAGE } = await import('@app/core/storage/local-storage');
+      const { WorkspaceContextService } =
+        await import('@app/core/workspace/workspace-context-service');
+      const { memoryStorage, permissionApiGranting } = await import('@app/testing/test-doubles');
+      const { WorkspaceSettingsPage } =
+        await import('@app/features/workspace-settings/workspace-settings-page/workspace-settings-page');
+
+      TestBed.configureTestingModule({
+        providers: [
+          provideRouter([]),
+          provideHttpClient(),
+          provideHttpClientTesting(),
+          { provide: LOCAL_STORAGE, useValue: memoryStorage() },
+          { provide: PermissionApi, useValue: permissionApiGranting('workspace.view') },
+        ],
+      });
+
+      const acme = { id: 't-1', name: 'شركة النور', slug: 'alnoor', status: 'Active' as const };
+
+      await TestBed.inject(WorkspaceContextService).adopt(acme);
+
+      const fixture = TestBed.createComponent(WorkspaceSettingsPage);
+
+      fixture.detectChanges();
+      TestBed.inject(HttpTestingController)
+        .expectOne('/api/tenants/t-1')
+        .flush(acme, { headers: { ETag: '"v1"' } });
+      await fixture.whenStable();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      fixture.detectChanges();
+
+      const root = fixture.nativeElement as HTMLElement;
+
+      expect(text(root.querySelector('h1'))).toBe('إعدادات مساحة العمل');
+      expect(text(root)).toContain('يرى الزوار هذا الاسم في صفحة الدردشة وفي نافذة الدردشة.');
+      expect(text(root.querySelector('[data-testid="settings-read-only"]'))).toBe(
+        'لا يغيّر هذه الإعدادات إلا من يستطيع إدارة مساحة العمل.',
+      );
+      expect(root.querySelector('[data-testid="workspace-name-text"]')?.getAttribute('dir')).toBe(
+        'auto',
+      );
+    });
+  });
+
   describe('the password-reset pages (Phase 37.3)', () => {
     async function render<T>(component: Type<T>): Promise<HTMLElement> {
       const { provideHttpClient } = await import('@angular/common/http');

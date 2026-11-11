@@ -3,11 +3,14 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { TenantApi } from '@app/core/api/tenant-api';
+import { APP_LANGUAGE, AppLanguage } from '@app/core/i18n/language';
+import { registerProblemWords } from '@app/core/problems/problem-words';
 import { PermissionApi } from '@app/core/authorization/permission-api';
 import { LOCAL_STORAGE } from '@app/core/storage/local-storage';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
 import { memoryStorage, permissionApiGranting } from '@app/testing/test-doubles';
 import { AssignableRole, TeamApi } from '../team-api';
+import { TEAM_PROBLEM_WORDS } from '../team-problems';
 import { InviteMember } from './invite-member';
 
 describe('InviteMember', () => {
@@ -34,6 +37,11 @@ describe('InviteMember', () => {
   let http: HttpTestingController;
   let storage: Storage;
 
+  /** The language the sender is using Nabra in; English unless a case says otherwise. */
+  let pageLanguage: AppLanguage = 'en';
+
+  beforeEach(() => (pageLanguage = 'en'));
+
   async function mount(...granted: readonly string[]): Promise<void> {
     storage = memoryStorage();
 
@@ -47,6 +55,7 @@ describe('InviteMember', () => {
         { provide: LOCAL_STORAGE, useValue: storage },
         { provide: TenantApi, useValue: { get: () => undefined, create: () => undefined } },
         { provide: PermissionApi, useValue: permissionApiGranting(...granted) },
+        { provide: APP_LANGUAGE, useValue: pageLanguage },
       ],
     });
 
@@ -111,6 +120,7 @@ describe('InviteMember', () => {
     expect(request.request.body).toEqual({
       email: 'bob@example.test',
       roleIds: ['role-support'],
+      language: 'en',
     });
 
     request.flush(created);
@@ -195,7 +205,11 @@ describe('InviteMember', () => {
 
     const request = http.expectOne(invitationsUrl);
 
-    expect(request.request.body).toEqual({ email: 'bob@example.test', roleIds: [] });
+    expect(request.request.body).toEqual({
+      email: 'bob@example.test',
+      roleIds: [],
+      language: 'en',
+    });
 
     request.flush({ ...created, invitation: { ...created.invitation, roles: [] } });
     await settle();
@@ -250,6 +264,86 @@ describe('InviteMember', () => {
     expect(document.activeElement).toBe(host().querySelector('#invite-created-heading'));
 
     host().remove();
+  });
+
+  it('starts the email language as the language the sender is using, and always sends it', async () => {
+    pageLanguage = 'ar';
+    await mount('members.view', 'members.invite');
+
+    const select = host().querySelector<HTMLSelectElement>('[data-testid="invite-language"]')!;
+
+    expect(select.value).toBe('ar');
+    // Each language is named in itself, marked with its own language and direction.
+    const options = [...select.options].map((option) => [
+      option.value,
+      option.textContent?.trim(),
+      option.lang,
+      option.dir,
+    ]);
+
+    expect(options).toEqual([
+      ['en', 'English', 'en', 'ltr'],
+      ['ar', 'العربية', 'ar', 'rtl'],
+    ]);
+
+    type('bob@example.test');
+    submit();
+    await settle();
+
+    const request = http.expectOne(invitationsUrl);
+
+    expect(request.request.body.language).toBe('ar');
+
+    request.flush(created);
+    await settle();
+
+    expect(host().querySelector('[data-testid="invitation-language"]')!.textContent?.trim()).toBe(
+      'العربية',
+    );
+  });
+
+  it('sends the language chosen on the form', async () => {
+    await mount('members.view', 'members.invite');
+
+    const select = host().querySelector<HTMLSelectElement>('[data-testid="invite-language"]')!;
+
+    select.value = 'ar';
+    select.dispatchEvent(new Event('change'));
+    type('bob@example.test');
+    submit();
+    await settle();
+
+    const request = http.expectOne(invitationsUrl);
+
+    expect(request.request.body).toEqual({
+      email: 'bob@example.test',
+      roleIds: [],
+      language: 'ar',
+    });
+    request.flush(created);
+    await settle();
+  });
+
+  it('words a refusal by its code, never with the server sentence', async () => {
+    registerProblemWords(TEAM_PROBLEM_WORDS);
+    await mount('members.view', 'members.invite');
+
+    type('bob@example.test');
+    submit();
+    await settle();
+
+    http.expectOne(invitationsUrl).flush(
+      {
+        title: 'Conflict',
+        detail: 'The English sentence from the server.',
+        code: 'invitations.email.already_invited',
+      },
+      { status: 409, statusText: 'Conflict' },
+    );
+    await settle();
+
+    expect(text()).toContain('An invitation for this address is still waiting.');
+    expect(text()).not.toContain('The English sentence');
   });
 
   it('shows a conflict in the server’s own words', async () => {

@@ -35,3 +35,14 @@ export function pluralCategory(language: AppLanguage, count: number): PluralCate
 export function pluralMessage(language: AppLanguage, count: number, forms: PluralForms): string {
   return forms[pluralCategory(language, count)];
 }
+
+/**
+ * Like `pluralMessage`, but a count of none always takes the `zero` form.
+ *
+ * English has no zero category, so `pluralMessage` gives "0 members" there; a
+ * sentence that says something different about none ("No member holds this role
+ * yet") needs this instead, in both languages.
+ */
+export function countMessage(language: AppLanguage, count: number, forms: PluralForms): string {
+  return count === 0 ? forms.zero : pluralMessage(language, count, forms);
+}

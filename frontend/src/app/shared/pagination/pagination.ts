@@ -19,6 +19,7 @@ export type PagedItems =
   | 'conversations'
   | 'customers'
   | 'documents'
+  | 'invitations'
   | 'members'
   | 'notifications'
   | 'reports';
@@ -48,6 +49,17 @@ const WORDS: Readonly<Record<PagedItems, PagedItemsWords>> = {
       other: $localize`:@@pager.members.other:of ${n}:count: members`,
     }),
     label: () => $localize`:@@pager.members.label:Member pages`,
+  },
+  invitations: {
+    ofTotal: (n) => ({
+      zero: $localize`:@@pager.invitations.zero:of ${n}:count: invitations`,
+      one: $localize`:@@pager.invitations.one:of ${n}:count: invitation`,
+      two: $localize`:@@pager.invitations.two:of ${n}:count: invitations`,
+      few: $localize`:@@pager.invitations.few:of ${n}:count: invitations`,
+      many: $localize`:@@pager.invitations.many:of ${n}:count: invitations`,
+      other: $localize`:@@pager.invitations.other:of ${n}:count: invitations`,
+    }),
+    label: () => $localize`:@@pager.invitations.label:Invitation pages`,
   },
   aiAgents: {
     ofTotal: (n) => ({

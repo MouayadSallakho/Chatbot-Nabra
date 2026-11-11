@@ -16,6 +16,7 @@ import { ACCEPT_INVITATION_PATH } from '@app/core/invitations/invitation-handoff
 import { PermissionService } from '@app/core/authorization/permission-service';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
 import { LocaleFormat } from '@app/core/i18n/locale-format';
+import { APP_LANGUAGES, AppLanguage, LANGUAGE_ENDONYMS } from '@app/core/i18n/language';
 import { EmptyState } from '@app/shared/empty-state/empty-state';
 import { Icon } from '@app/shared/icon/icon';
 import { PageHeader } from '@app/shared/page-header/page-header';
@@ -71,6 +72,7 @@ export class InviteMember {
     email: string;
     link: string;
     roles: string;
+    language: AppLanguage;
   } | null>(null);
   protected readonly copied = signal(false);
 
@@ -97,11 +99,23 @@ export class InviteMember {
     this.toggle(roleId, (event.target as HTMLInputElement).checked);
   }
 
+  /** The languages an invitation email can be written in, each named in itself. */
+  protected readonly languages = APP_LANGUAGES;
+  protected readonly endonyms = LANGUAGE_ENDONYMS;
+
   protected readonly form = new FormGroup({
     email: new FormControl('', {
       nonNullable: true,
       validators: [Validators.required, Validators.email],
     }),
+
+    /**
+     * The invitation email's language. It starts as the language the sender is
+     * using Nabra in, and is always sent (the owner's decision, 38.0 §4.3 #4), so
+     * the server's own default never decides it silently. Resetting the form
+     * returns it to that language.
+     */
+    language: new FormControl<AppLanguage>(this.locale.language, { nonNullable: true }),
   });
 
   constructor() {
@@ -186,8 +200,14 @@ export class InviteMember {
     this.failure.set(null);
 
     try {
+      const language = this.form.controls.language.value;
       const invitation = await firstValueFrom(
-        this.api.invite(tenantId, this.form.controls.email.value.trim(), [...this.selected()]),
+        this.api.invite(
+          tenantId,
+          this.form.controls.email.value.trim(),
+          [...this.selected()],
+          language,
+        ),
       );
 
       // Built here rather than by the server, because the shape of the link is a
@@ -197,6 +217,7 @@ export class InviteMember {
       this.created.set({
         email: invitation.invitation.email,
         roles: roleList(invitation.invitation.roles, this.locale.language),
+        language,
         link:
           `${window.location.origin}/${ACCEPT_INVITATION_PATH}` +
           `#token=${encodeURIComponent(invitation.token)}`,

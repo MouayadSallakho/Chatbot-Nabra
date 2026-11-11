@@ -46,6 +46,15 @@
 
         <dl class="admin-facts">
           <div>
+            <dt i18n="@@team.invite.created.language">Email language</dt>
+            <dd [attr.lang]="invitation.language" data-testid="invitation-language">
+              <!-- Isolated, so the word keeps its own direction and the cell keeps the page's. -->
+              <bdi [attr.dir]="invitation.language === 'ar' ? 'rtl' : 'ltr'">{{
+                endonyms[invitation.language]
+              }}</bdi>
+            </dd>
+          </div>
+          <div>
             <dt i18n="@@team.invite.created.joinsWith">Joins with</dt>
             <dd>
               @if (invitation.roles) {
@@ -154,6 +163,34 @@
                   {{ emailErrorText() }}
                 </p>
               }
+            </div>
+
+            <div class="field invite-language">
+              <label class="form-label" for="invite-language" i18n="@@team.invite.language"
+                >Invitation email language</label
+              >
+              <!-- Each language named in itself, as the language menu names them. -->
+              <select
+                id="invite-language"
+                class="form-select"
+                formControlName="language"
+                aria-describedby="invite-language-hint"
+                data-testid="invite-language"
+              >
+                @for (language of languages; track language) {
+                  <option
+                    [value]="language"
+                    [attr.lang]="language"
+                    [attr.dir]="language === 'ar' ? 'rtl' : 'ltr'"
+                  >
+                    {{ endonyms[language] }}
+                  </option>
+                }
+              </select>
+              <p id="invite-language-hint" class="form-hint" i18n="@@team.invite.language.hint">
+                When Nabra emails this invitation, it writes the email in this language. It starts
+                as the language you are using now.
+              </p>
             </div>
           </div>
         </section>

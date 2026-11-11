@@ -84,3 +84,41 @@
 .billing-footnote {
   margin: 0;
 }
+
+// Plan limits: the plan in effect beside the fallback plan, one row per limit.
+.plan-limits {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+
+  > p {
+    margin: 0;
+  }
+
+  thead th {
+    white-space: normal;
+    vertical-align: bottom;
+  }
+}
+
+.plan-column-name,
+.plan-column-role {
+  display: block;
+}
+
+.plan-column-name {
+  color: var(--text-primary);
+  font: var(--text-label);
+}
+
+.limit-name {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.limit-description {
+  max-inline-size: 36rem;
+  color: var(--text-muted);
+  font: var(--text-small);
+}

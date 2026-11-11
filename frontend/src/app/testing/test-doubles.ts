@@ -170,78 +170,99 @@ export const EVERY_PERMISSION: readonly PermissionDefinition[] = [
   {
     code: 'workspace.view',
     group: 'Workspace',
+    groupKey: 'workspace',
     label: 'View workspace',
     description: "See the workspace's name and status.",
   },
   {
+    code: 'workspace.manage',
+    group: 'Workspace',
+    groupKey: 'workspace',
+    label: 'Manage workspace',
+    description:
+      "Change the workspace's settings, such as its name, which visitors see on its public chat.",
+  },
+  {
     code: 'ai-agents.view',
     group: 'AI agents',
+    groupKey: 'ai-agents',
     label: 'View AI agents',
     description: "See the workspace's AI agents and read their instructions.",
   },
   {
     code: 'ai-agents.create',
     group: 'AI agents',
+    groupKey: 'ai-agents',
     label: 'Create AI agents',
     description: 'Add a new AI agent to the workspace.',
   },
   {
     code: 'ai-agents.edit',
     group: 'AI agents',
+    groupKey: 'ai-agents',
     label: 'Edit AI agents',
     description: "Change an AI agent's name and instructions.",
   },
   {
     code: 'ai-agents.lifecycle',
     group: 'AI agents',
+    groupKey: 'ai-agents',
     label: 'Activate and disable AI agents',
     description: 'Decide whether an AI agent is live or taken out of service.',
   },
   {
     code: 'ai-agents.preview',
     group: 'AI agents',
+    groupKey: 'ai-agents',
     label: 'Preview AI agents',
     description: 'Try an AI agent out with a test message.',
   },
   {
     code: 'roles.view',
     group: 'Roles and permissions',
+    groupKey: 'roles',
     label: 'View roles',
     description: "See the workspace's roles and which permissions each one grants.",
   },
   {
     code: 'roles.manage',
     group: 'Roles and permissions',
+    groupKey: 'roles',
     label: 'Manage roles',
     description: 'Create custom roles and change their names and permissions.',
   },
   {
     code: 'members.view',
     group: 'Team members',
+    groupKey: 'members',
     label: 'View team members',
     description: 'See who belongs to this workspace and which roles they hold.',
   },
   {
     code: 'members.invite',
     group: 'Team members',
+    groupKey: 'members',
     label: 'Invite team members',
     description: 'Create and revoke invitations.',
   },
   {
     code: 'members.roles.manage',
     group: 'Team members',
+    groupKey: 'members',
     label: 'Assign roles to team members',
     description: 'Decide which roles a member holds.',
   },
   {
     code: 'conversations.view',
     group: 'Conversations',
+    groupKey: 'conversations',
     label: 'View conversations',
     description: 'Read the conversations customers have had with this workspace.',
   },
   {
     code: 'customers.view',
     group: 'Customers',
+    groupKey: 'customers',
     label: 'View customers',
     description:
       'See who this workspace talks to, which channels they use and how much they have ' +
@@ -250,6 +271,7 @@ export const EVERY_PERMISSION: readonly PermissionDefinition[] = [
   {
     code: 'customers.manage',
     group: 'Customers',
+    groupKey: 'customers',
     label: 'Manage customers',
     description:
       'Name a customer, and combine two records that turn out to be the same person. ' +
@@ -258,18 +280,21 @@ export const EVERY_PERMISSION: readonly PermissionDefinition[] = [
   {
     code: 'website-chat.view',
     group: 'Channels',
+    groupKey: 'channels',
     label: 'View website chat',
     description: "See how this workspace's website chat is set up.",
   },
   {
     code: 'website-chat.manage',
     group: 'Channels',
+    groupKey: 'channels',
     label: 'Manage website chat',
     description: 'Create website chat links and decide whether the public can use them.',
   },
   {
     code: 'knowledge.view',
     group: 'Knowledge',
+    groupKey: 'knowledge',
     label: 'View knowledge',
     description:
       "Read the workspace's knowledge documents, see whether each one is indexed, and test " +
@@ -278,6 +303,7 @@ export const EVERY_PERMISSION: readonly PermissionDefinition[] = [
   {
     code: 'knowledge.manage',
     group: 'Knowledge',
+    groupKey: 'knowledge',
     label: 'Manage knowledge',
     description:
       'Write and edit knowledge documents, index them, switch them on and off, and choose ' +
@@ -286,6 +312,7 @@ export const EVERY_PERMISSION: readonly PermissionDefinition[] = [
   {
     code: 'analytics.view',
     group: 'Analytics',
+    groupKey: 'analytics',
     label: 'View analytics',
     description:
       'See how many conversations the workspace handled, how its channels and AI agents are ' +
@@ -294,30 +321,35 @@ export const EVERY_PERMISSION: readonly PermissionDefinition[] = [
   {
     code: 'reports.view',
     group: 'Reports',
+    groupKey: 'reports',
     label: 'View reports',
     description: 'See which reports exist and download generated ones.',
   },
   {
     code: 'reports.generate',
     group: 'Reports',
+    groupKey: 'reports',
     label: 'Generate reports',
     description: 'Export the workspace numbers as CSV, Excel or PDF files.',
   },
   {
     code: 'reports.schedule',
     group: 'Reports',
+    groupKey: 'reports',
     label: 'Schedule reports',
     description: 'Create weekly and monthly reports generated automatically.',
   },
   {
     code: 'billing.view',
     group: 'Billing',
+    groupKey: 'billing',
     label: 'View billing',
     description: "See what this workspace's subscription is, what it costs and when it renews.",
   },
   {
     code: 'billing.manage',
     group: 'Billing',
+    groupKey: 'billing',
     label: 'Manage billing',
     description:
       "Start a subscription and open the payment provider's portal to change payment " +

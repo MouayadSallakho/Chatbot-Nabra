@@ -1,7 +1,7 @@
 import type { AppLanguage } from '@app/core/i18n/language';
 import { formatNumber } from '@app/core/i18n/locale-format';
-import { pluralMessage } from '@app/core/i18n/plural';
-import type { InvitationStatus } from './team-api';
+import { countMessage, pluralMessage } from '@app/core/i18n/plural';
+import { INVITATION_STATUSES, type InvitationStatus } from './team-api';
 
 /**
  * Team's words, written once (Phase 36.10).
@@ -91,4 +91,74 @@ export function expiresIn(iso: string, now: number, language: AppLanguage): stri
     many: $localize`:@@team.expires.many:Expires in ${n}:count: days`,
     other: $localize`:@@team.expires.other:Expires in ${n}:count: days`,
   });
+}
+
+/**
+ * Each status's name in the address (`?invitations=accepted`). Waiting is the
+ * list the page opens on, so its address has no parameter at all.
+ */
+const STATUS_SLUGS: Readonly<Record<InvitationStatus, string | null>> = {
+  Pending: null,
+  Accepted: 'accepted',
+  Revoked: 'revoked',
+  Expired: 'expired',
+};
+
+/** The status an address names; anything unknown is the waiting list. */
+export function invitationStatusFromSlug(slug: string | null): InvitationStatus {
+  return INVITATION_STATUSES.find((status) => STATUS_SLUGS[status] === slug) ?? 'Pending';
+}
+
+/** The address parameter for a status, or null for the waiting list. */
+export function invitationStatusSlug(status: InvitationStatus): string | null {
+  return STATUS_SLUGS[status];
+}
+
+/** The waiting list's own sentence for none, in English as in Arabic. */
+const NONE_WAITING = $localize`:@@team.waiting.zero:No invitations are waiting.`;
+
+/**
+ * The open list's total in words: "3 invitations are waiting to be accepted.",
+ * "10 invitations were accepted.", and a sentence of its own when there are none.
+ */
+export function invitationSummary(
+  status: InvitationStatus,
+  count: number,
+  language: AppLanguage,
+): string {
+  if (status === 'Pending') {
+    return count === 0 ? NONE_WAITING : waitingSummary(count, language);
+  }
+
+  const n = formatNumber(language, count);
+
+  switch (status) {
+    case 'Accepted':
+      return countMessage(language, count, {
+        zero: $localize`:@@team.accepted.zero:No invitation has been accepted yet.`,
+        one: $localize`:@@team.accepted.one:${n}:count: invitation was accepted.`,
+        two: $localize`:@@team.accepted.two:${n}:count: invitations were accepted.`,
+        few: $localize`:@@team.accepted.few:${n}:count: invitations were accepted.`,
+        many: $localize`:@@team.accepted.many:${n}:count: invitations were accepted.`,
+        other: $localize`:@@team.accepted.other:${n}:count: invitations were accepted.`,
+      });
+    case 'Revoked':
+      return countMessage(language, count, {
+        zero: $localize`:@@team.revoked.zero:No invitation has been revoked.`,
+        one: $localize`:@@team.revoked.one:${n}:count: invitation was revoked.`,
+        two: $localize`:@@team.revoked.two:${n}:count: invitations were revoked.`,
+        few: $localize`:@@team.revoked.few:${n}:count: invitations were revoked.`,
+        many: $localize`:@@team.revoked.many:${n}:count: invitations were revoked.`,
+        other: $localize`:@@team.revoked.other:${n}:count: invitations were revoked.`,
+      });
+    case 'Expired':
+      return countMessage(language, count, {
+        zero: $localize`:@@team.expired.zero:No invitation has expired.`,
+        one: $localize`:@@team.expired.one:${n}:count: invitation expired before it was used.`,
+        two: $localize`:@@team.expired.two:${n}:count: invitations expired before they were used.`,
+        few: $localize`:@@team.expired.few:${n}:count: invitations expired before they were used.`,
+        many: $localize`:@@team.expired.many:${n}:count: invitations expired before they were used.`,
+        other: $localize`:@@team.expired.other:${n}:count: invitations expired before they were used.`,
+      });
+  }
 }

@@ -98,6 +98,38 @@ describe('WorkspaceContextService', () => {
     });
   });
 
+  describe('after the server answers with a changed workspace (Phase 38.4)', () => {
+    it('takes on the new name, so the top bar and menu follow without another read', async () => {
+      const service = await create();
+      const loading = service.load();
+
+      respondWith([acme, rival]);
+      await loading;
+      await service.select(acme.id);
+
+      service.refresh({ ...acme, name: 'Acme Holdings' });
+
+      expect(service.tenant()?.name).toBe('Acme Holdings');
+      expect(service.workspaces().map((workspace) => workspace.name)).toEqual([
+        'Acme Holdings',
+        'Rival Trading',
+      ]);
+      http.verify();
+    });
+
+    it('ignores a workspace the account does not belong to', async () => {
+      const service = await create();
+      const loading = service.load();
+
+      respondWith([acme]);
+      await loading;
+
+      service.refresh({ ...rival, name: 'Somebody else' });
+
+      expect(service.workspaces()).toEqual([acme]);
+    });
+  });
+
   describe('when the account has several workspaces', () => {
     it('selects none of them, so the reader chooses', async () => {
       const workspace = await create();

@@ -9,7 +9,7 @@ import { EmptyState } from '@app/shared/empty-state/empty-state';
 import { Icon } from '@app/shared/icon/icon';
 import { LocalDatePipe } from '@app/core/i18n/locale-pipes';
 import { LocaleFormat } from '@app/core/i18n/locale-format';
-import { permissionCount, roleDisplayName } from '../permission-words';
+import { memberCount, permissionCount, roleDisplayName } from '../permission-words';
 import { PageHeader } from '@app/shared/page-header/page-header';
 
 /**
@@ -74,6 +74,11 @@ export class RoleList {
     }
 
     return permissionCount(role.permissionCount, this.locale.language);
+  }
+
+  /** "3 members": how many members hold the role, read live by the server. */
+  protected membersText(role: RoleSummary): string {
+    return memberCount(role.memberCount, this.locale.language);
   }
 
   protected async load(): Promise<void> {

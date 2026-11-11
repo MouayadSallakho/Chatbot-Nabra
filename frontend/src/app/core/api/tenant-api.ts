@@ -1,7 +1,8 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { Observable } from 'rxjs';
+import { Observable, map } from 'rxjs';
 import { probeContext } from '@app/core/auth/session-probe';
+import { Versioned, withEntityTag } from './versioned';
 
 /** The tenant representation the backend publishes. Four fields, no more. */
 export interface Tenant {
@@ -20,9 +21,9 @@ export interface CreateTenantRequest {
 /**
  * The tenant endpoints.
  *
- * Three calls, because three exist. There is still no update and no delete: the
- * backend publishes neither, and a client method that throws 404 is worse than
- * no method at all.
+ * Creating, reading, listing and renaming, because those exist (the rename from
+ * Phase 37.5a). There is no delete: the backend publishes none, and a client
+ * method that throws 404 is worse than no method at all.
  *
  * <strong>Same-origin, relative paths.</strong> Nothing here names a host or a
  * port. In development the Angular dev server proxies `/api` to the local
@@ -48,6 +49,35 @@ export class TenantApi {
    */
   get(tenantId: string): Observable<Tenant> {
     return this.http.get<Tenant>(`/api/tenants/${tenantId}`);
+  }
+
+  /**
+   * Reads one tenant with the version a rename must present.
+   *
+   * The same read as `get`, keeping the `ETag`: the settings page edits the
+   * name, and a save without the tag it was read at would be a lost update.
+   */
+  getVersioned(tenantId: string): Observable<Versioned<Tenant>> {
+    return this.http
+      .get<Tenant>(`/api/tenants/${tenantId}`, { observe: 'response' })
+      .pipe(map(withEntityTag));
+  }
+
+  /**
+   * Renames the workspace, if it is still at the version supplied.
+   *
+   * Needs `workspace.manage`. Always conditional: the server answers 428 to a
+   * rename without `If-Match`, and this method has no shape that omits it.
+   * Visitors see the new name at once, on the chat page and in the widget.
+   */
+  rename(tenantId: string, name: string, version: string): Observable<Versioned<Tenant>> {
+    return this.http
+      .put<Tenant>(
+        `/api/tenants/${tenantId}/name`,
+        { name },
+        { observe: 'response', headers: { 'If-Match': version } },
+      )
+      .pipe(map(withEntityTag));
   }
 
   /**

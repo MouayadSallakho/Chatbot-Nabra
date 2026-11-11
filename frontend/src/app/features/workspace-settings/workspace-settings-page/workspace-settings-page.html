@@ -1,0 +1,178 @@
+<div class="page page-narrow">
+  <app-page-header
+    heading="Workspace settings"
+    i18n-heading="@@workspaceSettings.heading"
+    description="This workspace's own details. Everyone in it can see them."
+    i18n-description="@@workspaceSettings.description"
+  />
+
+  <div class="page-section workspace-settings">
+    @if (!canView()) {
+      <div class="card">
+        <app-empty-state
+          icon="settings"
+          heading="You do not have access to the workspace settings"
+          i18n-heading="@@workspaceSettings.noAccess.heading"
+          description="Seeing this workspace's settings needs a permission your roles do not include. Ask somebody who administers this workspace if you need it."
+          i18n-description="@@workspaceSettings.noAccess.body"
+          data-testid="settings-denied"
+        />
+      </div>
+    } @else if (loading()) {
+      <!-- The shape of the name card that is coming. -->
+      <div class="card card-body admin-skeleton" aria-busy="true">
+        <p class="visually-hidden" role="status" i18n="@@workspaceSettings.loading">
+          Loading the workspace settings…
+        </p>
+        <span class="skeleton skeleton-title" aria-hidden="true"></span>
+        <span class="skeleton skeleton-text" aria-hidden="true"></span>
+        <span class="skeleton skeleton-bar" aria-hidden="true"></span>
+      </div>
+    } @else if (failure(); as error) {
+      <div class="card">
+        <app-empty-state
+          icon="alert"
+          tone="error"
+          heading="Could not load the workspace settings"
+          i18n-heading="@@workspaceSettings.loadFailed"
+          [description]="error.message"
+        >
+          <button
+            stateActions
+            type="button"
+            class="btn btn-secondary btn-sm"
+            (click)="load()"
+            i18n="@@workspaceSettings.tryAgain"
+          >
+            Try again
+          </button>
+        </app-empty-state>
+      </div>
+    } @else if (saved(); as workspace) {
+      @if (stale()) {
+        <!--
+          The workspace was renamed underneath the whole form. The typed name is
+          still in the field; reloading reads the saved one and keeps it there.
+        -->
+        <div class="stale-notice" role="alert" data-testid="settings-stale">
+          <app-icon name="alert" [strokeWidth]="1.75" />
+          <div class="conflict-body">
+            <p class="conflict-title" i18n="@@workspaceSettings.stale.title">
+              This workspace was renamed somewhere else.
+            </p>
+            <p i18n="@@workspaceSettings.stale.body">
+              Your name has not been saved and is still in the field. Reload the latest version to
+              see the saved name; what you typed stays, so you can save it again or change it.
+            </p>
+            <button
+              type="button"
+              class="btn btn-secondary btn-sm"
+              (click)="reloadLatest()"
+              data-testid="settings-reload"
+              i18n="@@workspaceSettings.stale.reload"
+            >
+              Reload latest version
+            </button>
+          </div>
+        </div>
+      }
+
+      <section class="card form-section" aria-labelledby="settings-name-heading">
+        <div class="card-header">
+          <div>
+            <h2
+              id="settings-name-heading"
+              class="form-section-title"
+              i18n="@@workspaceSettings.name.heading"
+            >
+              Name
+            </h2>
+            <p class="form-section-lede" i18n="@@workspaceSettings.name.lede">
+              Visitors see this name on the chat page and the widget.
+            </p>
+          </div>
+        </div>
+
+        <div class="card-body">
+          @if (canManage()) {
+            <form [formGroup]="form" (ngSubmit)="save()" novalidate>
+              <div class="field">
+                <label class="form-label" for="workspace-name" i18n="@@workspaceSettings.name.label"
+                  >Workspace name</label
+                >
+                <input
+                  id="workspace-name"
+                  class="form-control"
+                  type="text"
+                  formControlName="name"
+                  dir="auto"
+                  autocomplete="off"
+                  [attr.aria-invalid]="showNameError()"
+                  [attr.aria-describedby]="
+                    showNameError()
+                      ? 'workspace-name-error'
+                      : dirty()
+                        ? 'workspace-name-saved'
+                        : null
+                  "
+                  data-testid="workspace-name-input"
+                />
+
+                @if (showNameError()) {
+                  <p id="workspace-name-error" class="form-error" role="alert">{{ nameError }}</p>
+                } @else if (dirty()) {
+                  <!-- What is saved now, beside what is typed: the reader decides with both. -->
+                  <p id="workspace-name-saved" class="form-hint" data-testid="saved-name">
+                    <span i18n="@@workspaceSettings.name.saved">Saved name:</span>&nbsp;<bdi>{{
+                      workspace.name
+                    }}</bdi>
+                  </p>
+                }
+              </div>
+
+              @if (saveFailure(); as error) {
+                <p class="alert alert-danger" role="alert" data-testid="settings-failure">
+                  {{ error.message }}
+                </p>
+              }
+
+              <div class="section-actions">
+                @if (dirty()) {
+                  <span class="unsaved-note" aria-live="polite" i18n="@@workspaceSettings.unsaved"
+                    >Unsaved changes</span
+                  >
+                }
+                <button
+                  type="submit"
+                  class="btn btn-primary"
+                  [attr.aria-disabled]="!dirty() || saving() ? 'true' : null"
+                  data-testid="save-name"
+                >
+                  @if (saving()) {
+                    <span i18n="@@workspaceSettings.saving">Saving…</span>
+                  } @else {
+                    <span i18n="@@workspaceSettings.saveName">Save name</span>
+                  }
+                </button>
+              </div>
+            </form>
+          } @else {
+            <!-- Read as text, with who can change it: no disabled field. -->
+            <p class="settings-value" dir="auto" data-testid="workspace-name-text">
+              {{ workspace.name }}
+            </p>
+            <p
+              class="guidance"
+              data-testid="settings-read-only"
+              i18n="@@workspaceSettings.readOnly"
+            >
+              Only people who can manage this workspace can change these.
+            </p>
+          }
+        </div>
+      </section>
+
+      <!-- Phase 38.5 adds the time zone here, as its own section of this page. -->
+    }
+  </div>
+</div>

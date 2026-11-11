@@ -141,6 +141,12 @@
         <dt i18n="@@roles.facts.access">Access</dt>
         <dd data-testid="grant-summary">{{ grantText() }}</dd>
       </div>
+      @if (holdersText(); as holders) {
+        <div>
+          <dt i18n="@@roles.facts.holders">Held by</dt>
+          <dd data-testid="role-holders">{{ holders }}</dd>
+        </div>
+      }
       <div>
         <dt i18n="@@roles.facts.updated">Last changed</dt>
         <dd>
@@ -359,6 +365,17 @@
 
           @if (permissionsFailure(); as error) {
             <p class="alert alert-danger" role="alert">{{ error.message }}</p>
+          }
+
+          @if (permissionsDirty() && reachText(); as reach) {
+            <!--
+              Before the save, not after it: the reach of an edit is worth knowing
+              while it can still be undone.
+            -->
+            <p class="save-reach text-small" data-testid="save-reach">
+              <app-icon name="team" [strokeWidth]="1.75" />
+              <span>{{ reach }}</span>
+            </p>
           }
 
           <div class="section-actions">

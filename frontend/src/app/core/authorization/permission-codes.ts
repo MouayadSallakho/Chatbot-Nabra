@@ -19,6 +19,7 @@
  */
 export type PermissionCode =
   | 'workspace.view'
+  | 'workspace.manage'
   | 'ai-agents.view'
   | 'ai-agents.create'
   | 'ai-agents.edit'
@@ -52,12 +53,17 @@ export type PermissionCode =
  * One capability, as the catalogue endpoint publishes it.
  *
  * `code` is the contract; the rest is what a person needs in order to decide
- * whether to grant it. The role editor renders all four and sends back only the
+ * whether to grant it. The role editor renders all of it and sends back only the
  * code.
+ *
+ * `code` and `groupKey` are stable keys (Phase 37.5b): the screens word a
+ * permission by its code and an area by its key, and keep the English `label`,
+ * `description` and `group` only for a key this build has no words for.
  */
 export interface PermissionDefinition {
   readonly code: string;
   readonly group: string;
+  readonly groupKey: string;
   readonly label: string;
   readonly description: string;
 }

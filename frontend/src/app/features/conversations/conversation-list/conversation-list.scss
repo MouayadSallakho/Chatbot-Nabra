@@ -95,31 +95,10 @@
   }
 }
 
-// The shared segmented control, with links: each view is an address.
+// The shared segmented control, with links (`a.segmented-option` in the
+// primitives): each view is an address.
 .inbox-views {
   margin-block-end: var(--space-3);
-
-  a.segmented-option {
-    text-decoration: none;
-
-    &[aria-current='true'] {
-      background-color: var(--surface-default);
-      color: var(--text-primary);
-      box-shadow: 0 0 0 1px var(--border-control);
-    }
-
-    &:focus-visible {
-      outline: var(--focus-ring-width) solid var(--focus-ring);
-      outline-offset: 1px;
-    }
-
-    @media (forced-colors: active) {
-      &[aria-current='true'] {
-        outline: 2px solid CanvasText;
-        outline-offset: -2px;
-      }
-    }
-  }
 }
 
 .inbox-view-count {

@@ -3,7 +3,7 @@ import { areaName } from './permission-words';
 
 /** One area of the role editor, with the capabilities under it. */
 export interface PermissionGroup {
-  /** The server's group name: stable, used for tracking and element ids. */
+  /** The server's stable `groupKey`, used for tracking and element ids. */
   readonly key: string;
 
   /** The area's name in the reader's language. */
@@ -33,12 +33,12 @@ export function groupPermissions(
   for (const permission of catalogue) {
     const current = groups.at(-1);
 
-    if (current && current.key === permission.group) {
+    if (current && current.key === permission.groupKey) {
       current.permissions.push(permission);
     } else {
       groups.push({
-        key: permission.group,
-        name: areaName(permission.group),
+        key: permission.groupKey,
+        name: areaName(permission),
         permissions: [permission],
       });
     }

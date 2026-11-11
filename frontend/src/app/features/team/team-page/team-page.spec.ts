@@ -1,7 +1,7 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { Router, provideRouter } from '@angular/router';
 import { TenantApi } from '@app/core/api/tenant-api';
 import { PermissionApi } from '@app/core/authorization/permission-api';
 import { LOCAL_STORAGE } from '@app/core/storage/local-storage';
@@ -13,13 +13,14 @@ import {
   permissionApiGranting,
   stubDialogs,
 } from '@app/testing/test-doubles';
-import { Invitation, MemberSummary, TeamApi } from '../team-api';
+import { Invitation, InvitationStatus, MemberSummary, TeamApi } from '../team-api';
 import { TeamPage } from './team-page';
 
 describe('TeamPage', () => {
   const tenantId = '11111111-1111-1111-1111-111111111111';
   const membersUrl = `/api/tenants/${tenantId}/members?page=1&pageSize=20`;
-  const invitationsUrl = `/api/tenants/${tenantId}/invitations?page=1&pageSize=100`;
+  const invitationsUrl = (status: InvitationStatus = 'Pending', page = 1): string =>
+    `/api/tenants/${tenantId}/invitations?status=${status}&page=${page}&pageSize=20`;
 
   const owner: MemberSummary = {
     userId: 'aaaaaaaa-0000-0000-0000-000000000001',
@@ -50,7 +51,19 @@ describe('TeamPage', () => {
   let fixture: ComponentFixture<TeamPage>;
   let http: HttpTestingController;
 
+  /** Mounts the page at an address, as a reload or a shared link would open it. */
+  async function mountAt(url: string, ...granted: readonly string[]): Promise<void> {
+    configure(...granted);
+    await TestBed.inject(Router).navigateByUrl(url);
+    await create();
+  }
+
   async function mount(...granted: readonly string[]): Promise<void> {
+    configure(...granted);
+    await create();
+  }
+
+  function configure(...granted: readonly string[]): void {
     TestBed.configureTestingModule({
       imports: [TeamPage],
       providers: [
@@ -63,7 +76,9 @@ describe('TeamPage', () => {
         { provide: PermissionApi, useValue: permissionApiGranting(...granted) },
       ],
     });
+  }
 
+  async function create(): Promise<void> {
     await TestBed.inject(WorkspaceContextService).adopt({
       id: tenantId,
       name: 'Acme Trading',
@@ -99,14 +114,33 @@ describe('TeamPage', () => {
     flushInvitations(invitations);
   }
 
-  function flushInvitations(invitations: readonly Invitation[]): void {
-    http.expectOne(invitationsUrl).flush({
+  function flushInvitations(
+    invitations: readonly Invitation[],
+    { status = 'Pending', page = 1, total = invitations.length } = {} as {
+      status?: InvitationStatus;
+      page?: number;
+      total?: number;
+    },
+  ): void {
+    http.expectOne(invitationsUrl(status, page)).flush({
       items: invitations,
-      page: 1,
-      pageSize: 100,
-      total: invitations.length,
+      page,
+      pageSize: 20,
+      total,
     });
   }
+
+  const address = (): string => TestBed.inject(Router).url;
+
+  const link = (status: string): HTMLAnchorElement =>
+    host().querySelector<HTMLAnchorElement>(`[data-testid="invitations-${status}"]`)!;
+
+  const pagerButton = (label: string): HTMLButtonElement | undefined =>
+    [
+      ...host().querySelectorAll<HTMLButtonElement>(
+        'section[aria-labelledby="pending-invitations"] app-pagination button',
+      ),
+    ].find((candidate) => (candidate.textContent ?? '').includes(label));
 
   const host = (): HTMLElement => fixture.nativeElement as HTMLElement;
   const text = (): string => host().textContent ?? '';
@@ -141,38 +175,115 @@ describe('TeamPage', () => {
     expect(text()).toContain('No roles: can see the workspace only');
   });
 
-  it('lists waiting invitations, and folds concluded ones away with their state', async () => {
-    // An accepted or revoked invitation is history: kept out of the list of
-    // things to act on, but still findable, each with its state in words.
+  it('opens on the waiting list, filtered and counted by the server', async () => {
     await mount('members.view');
 
-    flush(
-      [owner],
-      [
-        pendingInvitation,
-        { ...pendingInvitation, id: 'accepted', email: 'dave@example.test', status: 'Accepted' },
-        { ...pendingInvitation, id: 'revoked', email: 'erin@example.test', status: 'Revoked' },
-      ],
+    flush([owner], [pendingInvitation]);
+    await settle();
+
+    const list = host().querySelector('[data-testid="invitations"]')!;
+
+    expect(list.textContent).toContain('carol@example.test');
+    expect(list.textContent).toContain('Waiting');
+    expect(link('pending').getAttribute('aria-current')).toBe('true');
+    expect(link('accepted').getAttribute('aria-current')).toBeNull();
+    // Only the open list is read, so only it carries a total.
+    expect(link('pending').querySelector('[data-testid="invitations-total"]')!.textContent).toBe(
+      '1',
+    );
+    expect(link('accepted').querySelector('[data-testid="invitations-total"]')).toBeNull();
+    expect(host().querySelector('[data-testid="invitations-summary"]')!.textContent).toContain(
+      '1 invitation is waiting',
+    );
+  });
+
+  it('opens the list and the page the address names, as after a reload', async () => {
+    await mountAt('/?invitations=accepted&invitationsPage=2', 'members.view');
+
+    http.expectOne(membersUrl).flush({ items: [owner], page: 1, pageSize: 20, total: 1 });
+    flushInvitations(
+      [{ ...pendingInvitation, id: 'accepted', email: 'dave@example.test', status: 'Accepted' }],
+      { status: 'Accepted', page: 2, total: 21 },
     );
     await settle();
 
-    const waiting = host().querySelector('[data-testid="pending-invitations"]')!;
-    const past = host().querySelector('[data-testid="past-invitations"]')!;
+    expect(link('accepted').getAttribute('aria-current')).toBe('true');
+    expect(text()).toContain('dave@example.test');
+    expect(host().querySelector('[data-testid="invitations-summary"]')!.textContent).toContain(
+      '21 invitations were accepted.',
+    );
+    // History is read, not acted on: no Revoke, and when it was sent instead of when it expires.
+    expect(button('Revoke')).toBeUndefined();
+    expect(text()).toContain('Sent');
+    expect(text()).toContain('21–21 of 21 invitations');
+  });
 
-    expect(waiting.textContent).toContain('carol@example.test');
-    expect(waiting.textContent).toContain('Waiting');
-    expect(waiting.textContent).not.toContain('dave@example.test');
-    expect(past.tagName).toBe('DETAILS');
-    expect(past.hasAttribute('open')).toBe(false);
-    expect(past.querySelector('[data-testid="invitation-accepted"]')!.textContent).toContain(
-      'Accepted',
-    );
-    expect(past.querySelector('[data-testid="invitation-revoked"]')!.textContent).toContain(
-      'Revoked',
-    );
-    expect(host().querySelector('[data-testid="waiting-summary"]')!.textContent).toContain(
-      '1 invitation is waiting',
-    );
+  it('treats an address it does not know as the waiting list', async () => {
+    await mountAt('/?invitations=everything&invitationsPage=nope', 'members.view');
+
+    flush([owner], []);
+    await settle();
+
+    expect(link('pending').getAttribute('aria-current')).toBe('true');
+    expect(text()).toContain('No invitations are waiting.');
+  });
+
+  it('follows a list link, keeping the members where they were', async () => {
+    await mountAt('/?page=2', 'members.view');
+
+    http
+      .expectOne(`/api/tenants/${tenantId}/members?page=2&pageSize=20`)
+      .flush({ items: [bob], page: 2, pageSize: 20, total: 21 });
+    flushInvitations([pendingInvitation]);
+    await settle();
+
+    link('revoked').click();
+    await settle();
+
+    // A different list: its own skeleton while it loads, never the last list's rows.
+    expect(host().querySelector('[aria-busy="true"] .data-row-skeleton')).not.toBeNull();
+    expect(text()).not.toContain('carol@example.test');
+
+    flushInvitations([], { status: 'Revoked' });
+    await settle();
+
+    expect(address()).toBe('/?page=2&invitations=revoked');
+    expect(text()).toContain('No invitation has been revoked.');
+    expect(text()).toContain('bob@example.test');
+  });
+
+  it('offers no further invitation page when the list fits on one', async () => {
+    await mount('members.view');
+
+    flush([owner], [pendingInvitation]);
+    await settle();
+
+    const next = pagerButton('Next');
+
+    expect(
+      next === undefined || next.disabled || next.getAttribute('aria-disabled') === 'true',
+    ).toBe(true);
+  });
+
+  it('turns an invitation page without reading the members again', async () => {
+    await mount('members.view');
+
+    http.expectOne(membersUrl).flush({ items: [owner], page: 1, pageSize: 20, total: 1 });
+    flushInvitations([pendingInvitation], { total: 45 });
+    await settle();
+
+    pagerButton('Next')!.click();
+    await settle();
+
+    flushInvitations([{ ...pendingInvitation, id: 'second-page', email: 'zoe@example.test' }], {
+      page: 2,
+      total: 45,
+    });
+    await settle();
+
+    expect(address()).toBe('/?invitationsPage=2');
+    expect(text()).toContain('zoe@example.test');
+    expect(text()).not.toContain('carol@example.test');
   });
 
   it('pages through the members with the page in the address', async () => {
@@ -207,13 +318,14 @@ describe('TeamPage', () => {
     await mount('members.view');
 
     http.expectOne(membersUrl).flush({ items: [owner], page: 1, pageSize: 20, total: 1 });
-    http.expectOne(invitationsUrl).flush('nope', { status: 500, statusText: 'Server Error' });
+    http.expectOne(invitationsUrl()).flush('nope', { status: 500, statusText: 'Server Error' });
     await settle();
 
     expect(text()).toContain('owner@example.test');
     expect(text()).toContain('Invitations could not be read just now.');
     // Never a count of zero for something that was not read.
-    expect(text()).not.toContain('Invitations waiting');
+    expect(host().querySelector('[data-testid="invitations-total"]')).toBeNull();
+    expect(text()).not.toContain('No invitations are waiting');
   });
 
   it('offers inviting only with the invite permission', async () => {
@@ -258,7 +370,8 @@ describe('TeamPage', () => {
       .expectOne(`/api/tenants/${tenantId}/invitations/${pendingInvitation.id}/revoke`)
       .flush(null);
     await settle();
-    // Only the invitations are read again: the members page stays where it was.
+    // Only the waiting list is read again: the invitation now belongs to the
+    // revoked list, and the members page stays where it was.
     flushInvitations([]);
     await settle();
     await settle();
@@ -269,6 +382,37 @@ describe('TeamPage', () => {
         .map((toast) => toast.text),
     ).toContain(`Invitation for ${pendingInvitation.email} revoked.`);
     expect(document.activeElement).toBe(host().querySelector('#pending-invitations'));
+
+    host().remove();
+  });
+
+  it('steps back a page when the last waiting invitation on a later page is revoked', async () => {
+    await mountAt('/?invitationsPage=2', 'members.view', 'members.invite');
+    document.body.append(host());
+
+    http.expectOne(membersUrl).flush({ items: [owner], page: 1, pageSize: 20, total: 1 });
+    flushInvitations([pendingInvitation], { page: 2, total: 21 });
+    await settle();
+
+    stubDialogs(host());
+    button('Revoke')!.click();
+    await settle();
+    answerConfirmation(host());
+    await settle();
+
+    http
+      .expectOne(`/api/tenants/${tenantId}/invitations/${pendingInvitation.id}/revoke`)
+      .flush(null);
+    await settle();
+    flushInvitations([], { page: 2, total: 20 });
+    await settle();
+    await settle();
+
+    flushInvitations([pendingInvitation], { page: 1, total: 20 });
+    await settle();
+
+    expect(address()).toBe('/');
+    expect(text()).toContain('carol@example.test');
 
     host().remove();
   });
@@ -288,7 +432,7 @@ describe('TeamPage', () => {
     await mount('members.view');
 
     http.expectOne(membersUrl).flush('nope', { status: 500, statusText: 'Server Error' });
-    http.expectOne(invitationsUrl).flush('nope', { status: 500, statusText: 'Server Error' });
+    http.expectOne(invitationsUrl()).flush('nope', { status: 500, statusText: 'Server Error' });
     await settle();
 
     expect(text()).toContain('Could not load the team');

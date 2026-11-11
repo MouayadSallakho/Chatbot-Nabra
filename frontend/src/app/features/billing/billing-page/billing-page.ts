@@ -7,7 +7,16 @@ import { EmptyState } from '@app/shared/empty-state/empty-state';
 import { PageHeader } from '@app/shared/page-header/page-header';
 import { LocaleFormat } from '@app/core/i18n/locale-format';
 import { Icon } from '@app/shared/icon/icon';
-import { BillingApi, BillingOffer, WorkspaceBilling, formatAmount } from '../billing-api';
+import { ScrollRegion } from '@app/shared/scroll-region/scroll-region';
+import { entitlementDescription, entitlementLabel } from '@app/features/plan-usage/plan-words';
+import type { PlanEntitlementName } from '@app/features/plan-usage/plan-usage-api';
+import {
+  BillingApi,
+  BillingOffer,
+  BillingPlanLimits,
+  WorkspaceBilling,
+  formatAmount,
+} from '../billing-api';
 import { cadenceWord, trialWords } from '../billing-words';
 import { SubscriptionSummary } from '../subscription-summary/subscription-summary';
 
@@ -47,10 +56,38 @@ interface OfferRow {
  * "what is being paid, and by whom" — a different question, read by different
  * people, behind its own permission.
  */
+/** One plan's bound for one limit, as the reader sees it. */
+interface LimitValue {
+  readonly text: string;
+  readonly unlimited: boolean;
+}
+
+/** One row of the plan limits table. */
+interface LimitRow {
+  readonly name: PlanEntitlementName;
+  readonly label: string;
+  readonly description: string;
+  readonly current: LimitValue;
+  readonly fallback: LimitValue | null;
+}
+
+/** The limits, in the order Plan & usage lists them. */
+const LIMIT_ORDER: readonly PlanEntitlementName[] = [
+  'members',
+  'aiAgents',
+  'knowledgeDocuments',
+  'webChatEndpoints',
+  'whatsAppConnections',
+  'monthlyProviderOperations',
+];
+
+/** The same word Plan & usage uses for a limit that is not there. */
+const UNLIMITED = $localize`:@@plan.unlimited:Unlimited`;
+
 @Component({
   selector: 'app-billing-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [PageHeader, EmptyState, Icon, SubscriptionSummary],
+  imports: [PageHeader, EmptyState, Icon, ScrollRegion, SubscriptionSummary],
   templateUrl: './billing-page.html',
   styleUrl: './billing-page.scss',
 })
@@ -92,6 +129,33 @@ export class BillingPage {
   protected readonly offers = computed<readonly OfferRow[]>(() =>
     (this.billing()?.offers ?? []).map((offer) => this.row(offer)),
   );
+
+  protected readonly currentPlan = computed(() => this.billing()?.currentPlan ?? null);
+
+  protected readonly fallbackPlan = computed(() => this.billing()?.fallbackPlan ?? null);
+
+  /**
+   * One row per limit, in the order Plan & usage lists them: the plan in effect,
+   * and beside it the fallback plan when there is one. `null` is said as
+   * "Unlimited", never as 0 or a blank.
+   */
+  protected readonly limitRows = computed<readonly LimitRow[]>(() => {
+    const current = this.currentPlan();
+
+    if (!current) {
+      return [];
+    }
+
+    const fallback = this.fallbackPlan();
+
+    return LIMIT_ORDER.map((name) => ({
+      name,
+      label: entitlementLabel(name),
+      description: entitlementDescription(name),
+      current: this.limitText(current.limits, name),
+      fallback: fallback ? this.limitText(fallback.limits, name) : null,
+    }));
+  });
 
   constructor() {
     void this.load();
@@ -206,6 +270,15 @@ export class BillingPage {
       // moving between buttons must hear which is which.
       buyLabel: $localize`:@@billing.buy.label:Subscribe to ${plan}:plan:, ${price}:price: ${cadence}:cadence:`,
     };
+  }
+
+  /** A bound in the reader's digits, or "Unlimited" for `null`. */
+  private limitText(limits: BillingPlanLimits, name: PlanEntitlementName): LimitValue {
+    const limit = limits[name];
+
+    return limit === null || limit === undefined
+      ? { text: UNLIMITED, unlimited: true }
+      : { text: this.locale.number(limit), unlimited: false };
   }
 
   /**

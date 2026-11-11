@@ -1,6 +1,8 @@
 import { Routes } from '@angular/router';
 import { unsavedChangesGuard } from '@app/core/navigation/unsaved-changes';
 import { RoleApi } from '@app/core/authorization/role-api';
+import { provideProblemWords } from '@app/core/problems/problem-words';
+import { ROLE_PROBLEM_WORDS } from './role-problems';
 
 /**
  * The role administration screens.
@@ -20,7 +22,7 @@ import { RoleApi } from '@app/core/authorization/role-api';
 export const roleRoutes: Routes = [
   {
     path: '',
-    providers: [RoleApi],
+    providers: [RoleApi, provideProblemWords(ROLE_PROBLEM_WORDS)],
     children: [
       {
         path: '',

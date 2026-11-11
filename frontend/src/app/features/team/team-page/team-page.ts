@@ -5,11 +5,14 @@ import {
   Injector,
   afterNextRender,
   computed,
+  effect,
   inject,
   signal,
+  untracked,
   viewChild,
 } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { ApiError, toApiError } from '@app/core/api/api-error';
 import { AuthService } from '@app/core/auth/auth-service';
@@ -25,34 +28,46 @@ import { PageHeader } from '@app/shared/page-header/page-header';
 import { Pagination } from '@app/shared/pagination/pagination';
 import { initialPage, pageRecorder } from '@app/shared/pagination/page-query';
 import { roleDisplayName } from '@app/features/roles/permission-words';
-import { Invitation, MemberSummary, TeamApi } from '../team-api';
+import {
+  INVITATION_STATUSES,
+  Invitation,
+  InvitationStatus,
+  MemberSummary,
+  TeamApi,
+} from '../team-api';
 import {
   expiresIn,
+  invitationStatusFromSlug,
+  invitationStatusSlug,
   invitationStatusTone,
   invitationStatusWord,
+  invitationSummary,
   roleList,
-  waitingSummary,
 } from '../team-words';
 
 /** Members per page; the server allows up to 100. */
 const MEMBER_PAGE_SIZE = 20;
 
-/**
- * Invitations read at once, the server's maximum. It keeps every invitation a
- * workspace ever issued, newest first, and the page says so when older ones
- * are left out (there is no server-side filter for waiting ones).
- */
-const INVITATION_PAGE_SIZE = 100;
+/** Invitations per page; the server allows up to 100. */
+const INVITATION_PAGE_SIZE = 20;
+
+/** The query parameter the open invitation list is kept in (absent: waiting). */
+const INVITATION_STATUS_PARAM = 'invitations';
+
+/** The query parameter that list's page is kept in, apart from the members' `page`. */
+const INVITATION_PAGE_PARAM = 'invitationsPage';
 
 /**
  * Who is in this workspace, and who has been asked to join (Phase 36.10).
  *
  * <strong>Members and invitations on one page,</strong> because together they
  * answer one question: who has access here. Members page through the server
- * with the page in the address; invitations show the ones still waiting, each
- * with when its link stops working and a Revoke that asks first, and below
- * them, folded away, the past ones (accepted, revoked, expired) with their
- * state as a word and a marker.
+ * with the page in the address. Invitations are four lists (waiting, accepted,
+ * revoked, expired), each filtered and counted by the server (Phase 38.4), with
+ * the open list and its page in the address too (`?invitations=accepted&
+ * invitationsPage=2`), so a reload or a shared link opens the same rows. A
+ * waiting invitation shows when its link stops working and a Revoke that asks
+ * first.
  *
  * <strong>Both need `members.view`, and nothing is fetched without it.</strong>
  * Somebody without the permission gets an explanation and no request is made.
@@ -91,6 +106,15 @@ export class TeamPage {
   protected readonly invitations = signal<readonly Invitation[]>([]);
   protected readonly invitationTotal = signal(0);
   protected readonly invitationsFailure = signal<ApiError | null>(null);
+
+  /** A different list on its way: its own skeleton, not the last list's rows. */
+  protected readonly invitationsLoading = signal(true);
+
+  /** Another page of the same list on its way: the rows stay, marked busy. */
+  protected readonly invitationsBusy = signal(false);
+
+  /** The status the rows on screen belong to. */
+  protected readonly shownStatus = signal<InvitationStatus | null>(null);
   protected readonly revoking = signal<string | null>(null);
   protected readonly revokeFailure = signal<ApiError | null>(null);
 
@@ -104,31 +128,52 @@ export class TeamPage {
 
   private readonly revokeDialog = viewChild.required<ConfirmDialog>('revokeDialog');
 
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
+
+  private readonly query = toSignal(this.route.queryParamMap, {
+    initialValue: this.route.snapshot.queryParamMap,
+  });
+
+  /** The open invitation list, from the address. */
+  protected readonly invitationStatus = computed(() =>
+    invitationStatusFromSlug(this.query().get(INVITATION_STATUS_PARAM)),
+  );
+
+  /** Its page, from the address; anything that is not a page number is page one. */
+  protected readonly invitationPage = computed(() => {
+    const page = Number(this.query().get(INVITATION_PAGE_PARAM));
+
+    return Number.isInteger(page) && page >= 1 ? page : 1;
+  });
+
+  protected readonly invitationPageSize = INVITATION_PAGE_SIZE;
+
+  /** The list and page last asked for, so the same read is never sent twice. */
+  private requested: string | null = null;
+
+  /** The four lists, as links: each is an address, with its own page and Back. */
+  protected readonly tabs = INVITATION_STATUSES.map((status) => ({
+    status,
+    slug: invitationStatusSlug(status),
+    label: invitationStatusWord(status),
+  }));
   protected readonly skeletonRows = [0, 1, 2, 3];
+  protected readonly invitationSkeletonRows = [0, 1];
 
   protected readonly canView = computed(() => this.permissions.has('members.view'));
   protected readonly canInvite = computed(() => this.permissions.has('members.invite'));
 
   protected readonly myId = computed(() => this.auth.user()?.id ?? null);
 
-  /** Invitations somebody could still act on, newest first. */
-  protected readonly pending = computed(() =>
-    this.invitations().filter((invitation) => invitation.status === 'Pending'),
-  );
+  /** The open list's total in words, from the server's filtered `total`. */
+  protected readonly summaryText = computed(() => {
+    const status = this.shownStatus();
 
-  /** Accepted, revoked and expired: history, folded away below. */
-  protected readonly past = computed(() =>
-    this.invitations().filter((invitation) => invitation.status !== 'Pending'),
-  );
-
-  /** Whether some older invitations were not read. */
-  protected readonly invitationsTruncated = computed(
-    () => this.invitationTotal() > this.invitations().length,
-  );
-
-  protected readonly waitingText = computed(() =>
-    waitingSummary(this.pending().length, this.locale.language),
-  );
+    return status === null
+      ? ''
+      : invitationSummary(status, this.invitationTotal(), this.locale.language);
+  });
 
   protected readonly revokeHeading = computed(() => {
     const email = this.revokeTarget()?.email ?? '';
@@ -141,6 +186,20 @@ export class TeamPage {
 
   constructor() {
     void this.load();
+
+    // Following a list's link, Back to one, or turning its page: read what the
+    // address names. The first read is the page's own load, already under way.
+    effect(() => {
+      const key = this.invitationKey(this.invitationStatus(), this.invitationPage());
+
+      untracked(() => {
+        const tenantId = this.workspace.tenantId();
+
+        if (this.requested !== null && this.requested !== key && tenantId) {
+          void this.loadInvitations(tenantId);
+        }
+      });
+    });
   }
 
   protected roleNames(names: readonly string[]): string {
@@ -219,6 +278,17 @@ export class TeamPage {
     }
   }
 
+  /** Moves to another page of the open invitation list, through the address. */
+  protected goToInvitations(page: number): void {
+    const pages = Math.max(1, Math.ceil(this.invitationTotal() / INVITATION_PAGE_SIZE));
+
+    if (page < 1 || page > pages || page === this.invitationPage() || this.invitationsBusy()) {
+      return;
+    }
+
+    this.recordInvitationPage(page);
+  }
+
   protected async retryInvitations(): Promise<void> {
     const tenantId = this.workspace.tenantId();
 
@@ -254,8 +324,14 @@ export class TeamPage {
       await firstValueFrom(this.api.revoke(tenantId, invitation.id));
 
       // Re-read rather than editing the list locally: the server decides what
-      // it is now, and something else may have changed since it loaded.
+      // it is now, and something else may have changed since it loaded. The
+      // invitation now belongs to the revoked list.
       await this.loadInvitations(tenantId);
+
+      // The last row of a later page went: the page before is the nearest one left.
+      if (this.invitations().length === 0 && this.invitationPage() > 1) {
+        this.recordInvitationPage(this.invitationPage() - 1);
+      }
 
       const email = invitation.email;
 
@@ -272,15 +348,67 @@ export class TeamPage {
     }
   }
 
+  /**
+   * Reads the open invitation list's page, as the address names it.
+   *
+   * A different list clears the rows and shows its own skeleton; another page
+   * of the same list keeps the rows on screen, marked busy. A reply that
+   * arrives after the reader has moved on is dropped.
+   */
   private async loadInvitations(tenantId: string): Promise<void> {
-    try {
-      const page = await firstValueFrom(this.api.invitations(tenantId, 1, INVITATION_PAGE_SIZE));
+    const status = this.invitationStatus();
+    const page = this.invitationPage();
+    const key = this.invitationKey(status, page);
 
-      this.invitations.set(page.items);
-      this.invitationTotal.set(page.total);
+    this.requested = key;
+
+    if (this.shownStatus() !== status) {
+      this.invitationsLoading.set(true);
+      this.invitations.set([]);
+    } else {
+      this.invitationsBusy.set(true);
+    }
+
+    try {
+      const read = await firstValueFrom(
+        this.api.invitations(tenantId, status, page, INVITATION_PAGE_SIZE),
+      );
+
+      if (this.requested !== key) {
+        return;
+      }
+
+      this.invitations.set(read.items);
+      this.invitationTotal.set(read.total);
+      this.shownStatus.set(status);
       this.invitationsFailure.set(null);
     } catch (error) {
-      this.invitationsFailure.set(toApiError(error));
+      if (this.requested === key) {
+        this.invitationsFailure.set(toApiError(error));
+      }
+    } finally {
+      if (this.requested === key) {
+        this.invitationsLoading.set(false);
+        this.invitationsBusy.set(false);
+      }
     }
+  }
+
+  private invitationKey(status: InvitationStatus, page: number): string {
+    return `${status}|${page}`;
+  }
+
+  /**
+   * Writes the invitation page into the address, keeping the members' page and
+   * the open list. Replaced rather than pushed: Back leaves the list, it does
+   * not step through every page turned.
+   */
+  private recordInvitationPage(page: number): void {
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { [INVITATION_PAGE_PARAM]: page > 1 ? page : null },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
   }
 }

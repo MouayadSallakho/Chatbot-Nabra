@@ -1,6 +1,6 @@
 import type { AppLanguage } from '@app/core/i18n/language';
 import { formatNumber } from '@app/core/i18n/locale-format';
-import { pluralMessage } from '@app/core/i18n/plural';
+import { countMessage, pluralMessage } from '@app/core/i18n/plural';
 import type { IconName } from '@app/shared/icon/icon-paths';
 import type { PermissionDefinition } from '@app/core/authorization/permission-codes';
 
@@ -11,8 +11,8 @@ import type { PermissionDefinition } from '@app/core/authorization/permission-co
  * contract, its labels and descriptions are prose. The words for the codes
  * this build knows are written here in both languages, by code; a code a later
  * server adds keeps the server's own label and description rather than being
- * hidden or guessed. Areas (the server's `group`) work the same way, by the
- * server's English group name.
+ * hidden or guessed. Areas work the same way, by the server's stable
+ * `groupKey` (Phase 37.5b), with the English `group` as the fallback.
  */
 
 interface PermissionText {
@@ -143,19 +143,19 @@ const PERMISSIONS: Readonly<Record<string, PermissionText>> = {
   },
 };
 
-/** The areas, by the server's English group name. */
+/** The areas, by the server's stable `groupKey`. */
 const AREAS: Readonly<Record<string, string>> = {
-  Workspace: $localize`:@@permission.area.workspace:Workspace`,
-  'AI agents': $localize`:@@permission.area.aiAgents:AI agents`,
-  'Roles and permissions': $localize`:@@permission.area.roles:Roles and permissions`,
-  'Team members': $localize`:@@permission.area.members:Team members`,
-  Conversations: $localize`:@@permission.area.conversations:Conversations`,
-  Customers: $localize`:@@permission.area.customers:Customers`,
-  Channels: $localize`:@@permission.area.channels:Channels`,
-  Knowledge: $localize`:@@permission.area.knowledge:Knowledge`,
-  Analytics: $localize`:@@permission.area.analytics:Analytics`,
-  Reports: $localize`:@@permission.area.reports:Reports`,
-  Billing: $localize`:@@permission.area.billing:Billing`,
+  workspace: $localize`:@@permission.area.workspace:Workspace`,
+  'ai-agents': $localize`:@@permission.area.aiAgents:AI agents`,
+  roles: $localize`:@@permission.area.roles:Roles and permissions`,
+  members: $localize`:@@permission.area.members:Team members`,
+  conversations: $localize`:@@permission.area.conversations:Conversations`,
+  customers: $localize`:@@permission.area.customers:Customers`,
+  channels: $localize`:@@permission.area.channels:Channels`,
+  knowledge: $localize`:@@permission.area.knowledge:Knowledge`,
+  analytics: $localize`:@@permission.area.analytics:Analytics`,
+  reports: $localize`:@@permission.area.reports:Reports`,
+  billing: $localize`:@@permission.area.billing:Billing`,
 };
 
 /** A permission's label in the reader's language; an unknown code keeps the server's. */
@@ -168,9 +168,12 @@ export function permissionDescription(permission: PermissionDefinition): string 
   return PERMISSIONS[permission.code]?.description ?? permission.description;
 }
 
-/** An area's name in the reader's language; an unknown area keeps the server's. */
-export function areaName(group: string): string {
-  return AREAS[group] ?? group;
+/**
+ * An area's name in the reader's language, by its key; an area this build has
+ * no words for keeps the server's English name.
+ */
+export function areaName(permission: Pick<PermissionDefinition, 'group' | 'groupKey'>): string {
+  return AREAS[permission.groupKey] ?? permission.group;
 }
 
 /**
@@ -307,4 +310,35 @@ export function permissionCount(count: number, language: AppLanguage): string {
  */
 export function roleDisplayName(name: string, isSystem: boolean): string {
   return isSystem && name === 'Owner' ? $localize`:@@roles.system.owner:Owner` : name;
+}
+
+/** "3 members", for how many members hold a role. */
+export function memberCount(count: number, language: AppLanguage): string {
+  const n = formatNumber(language, count);
+
+  return countMessage(language, count, {
+    zero: $localize`:@@roles.members.zero:No members`,
+    one: $localize`:@@roles.members.one:${n}:count: member`,
+    two: $localize`:@@roles.members.two:${n}:count: members`,
+    few: $localize`:@@roles.members.few:${n}:count: members`,
+    many: $localize`:@@roles.members.many:${n}:count: members`,
+    other: $localize`:@@roles.members.other:${n}:count: members`,
+  });
+}
+
+/**
+ * "Saving changes access for 3 members.", said beside the save before it is
+ * pressed, so the reach of an edit is known while it can still be undone.
+ */
+export function accessChangeSentence(count: number, language: AppLanguage): string {
+  const n = formatNumber(language, count);
+
+  return countMessage(language, count, {
+    zero: $localize`:@@roles.saveReach.zero:No member holds this role yet, so saving changes nobody's access.`,
+    one: $localize`:@@roles.saveReach.one:Saving changes access for ${n}:count: member.`,
+    two: $localize`:@@roles.saveReach.two:Saving changes access for ${n}:count: members.`,
+    few: $localize`:@@roles.saveReach.few:Saving changes access for ${n}:count: members.`,
+    many: $localize`:@@roles.saveReach.many:Saving changes access for ${n}:count: members.`,
+    other: $localize`:@@roles.saveReach.other:Saving changes access for ${n}:count: members.`,
+  });
 }

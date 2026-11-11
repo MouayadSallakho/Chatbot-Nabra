@@ -23,9 +23,11 @@ import { AuthService } from '@app/core/auth/auth-service';
 import { LOGIN_PATH, REGISTER_PATH } from '@app/core/auth/auth-guard';
 import { APP_LANGUAGE } from '@app/core/i18n/language';
 import { InvitationHandoff } from '@app/core/invitations/invitation-handoff';
+import { registerProblemWords } from '@app/core/problems/problem-words';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
 import { HOME_PATH } from '@app/layout/navigation';
 import { AcceptedInvitation, TeamApi } from '@app/features/team/team-api';
+import { SEAT_PROBLEM_WORDS } from '@app/features/invitations/seat-problems';
 import { EntryFrame } from '@app/layout/entry-frame/entry-frame';
 
 /** What this screen is currently doing. */
@@ -94,6 +96,11 @@ export class AcceptInvitation implements OnInit {
   );
 
   constructor() {
+    // Registered here rather than by a route provider: this page's route is in the
+    // eagerly loaded table, and a provider there would put the words in the
+    // startup JavaScript.
+    registerProblemWords(SEAT_PROBLEM_WORDS);
+
     // Signed in from another tab while this page waited: the session watch has
     // adopted it, so the invitation can go ahead as it would after any sign-in.
     effect(() => {

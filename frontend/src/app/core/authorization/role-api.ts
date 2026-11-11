@@ -12,12 +12,28 @@ export interface RoleSummary {
   readonly permissionCount: number;
   readonly createdAt: string;
   readonly updatedAt: string;
+
+  /** How many members hold the role, counted live (Phase 37.5b). */
+  readonly memberCount: number;
 }
 
 /** One role, with the capabilities it grants. */
-export interface Role extends RoleSummary {
+export interface Role {
+  readonly id: string;
   readonly tenantId: string;
+  readonly name: string;
+  readonly type: 'System' | 'Custom';
+  readonly isSystem: boolean;
   readonly permissions: readonly string[];
+  readonly createdAt: string;
+  readonly updatedAt: string;
+
+  /**
+   * How many members hold the role. On the detail read only: the writes
+   * (create, rename, permissions) keep their shape and carry no count, so a
+   * screen keeps the count it read (`tenant-rbac.md`, Phase 37.5b).
+   */
+  readonly memberCount?: number;
 }
 
 /** What creating a custom role takes. */

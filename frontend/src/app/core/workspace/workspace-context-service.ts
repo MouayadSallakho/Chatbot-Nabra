@@ -224,6 +224,17 @@ export class WorkspaceContextService {
   }
 
   /**
+   * Takes on a workspace the server has just answered with, such as after a
+   * rename, so the top bar and the workspace menu follow without another read.
+   * A workspace the account does not belong to is ignored.
+   */
+  refresh(tenant: Tenant): void {
+    this.available.update((workspaces) =>
+      workspaces.map((workspace) => (workspace.id === tenant.id ? tenant : workspace)),
+    );
+  }
+
+  /**
    * Forgets everything about the current account's workspaces.
    *
    * Called on sign-out and when a session expires. Both the list and the
