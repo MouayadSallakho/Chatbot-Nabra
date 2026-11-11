@@ -94,9 +94,9 @@ describe('KNOWLEDGE_PROBLEM_WORDS', () => {
     expect(toApiError(refusal(code, 422)).message).toContain(words);
   });
 
-  it('keeps an unregistered code on the wording it has today', () => {
+  it('gives an unregistered code the generic words, never the server sentence', () => {
     expect(toApiError(refusal('knowledge.some.future.code', 400)).message).toBe(
-      'The English sentence from the server.',
+      'Some of the details were rejected. Check the highlighted fields and try again.',
     );
   });
 });

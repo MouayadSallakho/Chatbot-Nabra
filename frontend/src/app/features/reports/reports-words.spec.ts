@@ -1,5 +1,14 @@
 import { ReportExecution } from './reports-api';
-import { failureSentence, formatLabel, reportTitle, sizeLabel, statusLabel } from './reports-words';
+import {
+  failureSentence,
+  fileLanguageLabel,
+  formatLabel,
+  knownReportTitle,
+  rangeLabel,
+  reportTitle,
+  sizeLabel,
+  statusLabel,
+} from './reports-words';
 
 /** Reports' words: translated by stable code or type, never guessed for an unknown one. */
 describe('reports words', () => {
@@ -37,5 +46,24 @@ describe('reports words', () => {
     expect(statusLabel('Completed')).toBe('Ready');
     expect(formatLabel('Xlsx')).toBe('Excel (XLSX)');
     expect(formatLabel('Csv')).toBe('CSV');
+  });
+
+  it('words options by their codes, and shows an unknown code as itself (E6)', () => {
+    expect(rangeLabel('7d')).toBe('Last 7 days');
+    expect(rangeLabel('custom')).toBe('Choose dates');
+    expect(rangeLabel('365d')).toBe('365d');
+    expect(formatLabel('Odt')).toBe('Odt');
+  });
+
+  it('names a file language, and shows an unknown code as itself (E8)', () => {
+    expect(fileLanguageLabel('en')).toBe('English file');
+    expect(fileLanguageLabel('ar')).toBe('Arabic file');
+    expect(fileLanguageLabel('fr')).toBe('fr');
+  });
+
+  it('names a report by its code only when it knows the code (E7)', () => {
+    expect(knownReportTitle('ChannelUsage')).toBe('Channel usage');
+    expect(knownReportTitle('FutureReport')).toBeNull();
+    expect(knownReportTitle('toString')).toBeNull();
   });
 });

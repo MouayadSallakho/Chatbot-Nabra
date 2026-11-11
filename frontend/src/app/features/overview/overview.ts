@@ -16,12 +16,15 @@ import { WorkspaceContextService } from '@app/core/workspace/workspace-context-s
 import { AnalyticsApi, AnalyticsDashboard } from '@app/features/analytics/analytics-api';
 import {
   dailyPoints,
+  dataSinceSentence,
   failedDeliveriesTitle,
   failedRepliesTitle,
   messagesSummary,
   senderSeries,
+  summaryChanges,
   unreadTitle,
 } from '@app/features/analytics/analytics-words';
+import { zonePhrase } from '@app/core/i18n/time-zone';
 import { BillingApi, WorkspaceBilling } from '@app/features/billing/billing-api';
 import { PlanUsage, PlanUsageApi } from '@app/features/plan-usage/plan-usage-api';
 import {
@@ -142,9 +145,11 @@ const TONE_BADGES: Readonly<Record<AttentionTone, string>> = {
  *    of the period, so the daily chart is drawn from that and from nothing else.
  *
  * <strong>Every number is the server's.</strong> Nothing is derived beyond a
- * sum, and nothing is trended: the endpoint returns no comparison period, so no
- * "+12% on last week" is shown (D22). Each source is read only with the
- * permission that reveals it, and each fails on its own.
+ * sum and a change against the previous seven days, which the same read
+ * returns (`compare=previous`, Phase 37.6): each week figure says how it moved,
+ * in words, "so far" while today is running. Days are local days of the
+ * workspace's zone. Each source is read only with the permission that reveals
+ * it, and each fails on its own.
  */
 @Component({
   selector: 'app-overview',
@@ -398,6 +403,7 @@ export class Overview {
     }
 
     const days = dashboard.dailyActivity;
+    const changes = summaryChanges(dashboard, this.locale.language);
 
     return [
       {
@@ -406,6 +412,7 @@ export class Overview {
         value: dashboard.summary.conversationsStarted,
         days: days.map((day) => day.conversationsStarted),
         tone: 'neutral' as const,
+        change: changes?.conversations ?? null,
       },
       {
         key: 'customer',
@@ -413,6 +420,7 @@ export class Overview {
         value: dashboard.summary.customerMessages,
         days: days.map((day) => day.customerMessages),
         tone: 'customer' as const,
+        change: changes?.customer ?? null,
       },
       {
         key: 'ai',
@@ -420,6 +428,7 @@ export class Overview {
         value: dashboard.summary.aiMessages,
         days: days.map((day) => day.aiMessages),
         tone: 'ai' as const,
+        change: changes?.ai ?? null,
       },
       {
         key: 'human',
@@ -427,8 +436,23 @@ export class Overview {
         value: dashboard.summary.humanMessages,
         days: days.map((day) => day.humanMessages),
         tone: 'human' as const,
+        change: changes?.human ?? null,
       },
     ];
+  });
+
+  /** "Whole days in Asia/Riyadh time. Data since Mar 3, 2026." */
+  protected readonly weekNote = computed(() => {
+    const dashboard = this.dashboard();
+
+    if (!dashboard) {
+      return '';
+    }
+
+    const zone = zonePhrase(dashboard.period.timeZone);
+    const days = $localize`:@@overview.week.zone:Whole days ${zone}:zone:.`;
+
+    return `${days} ${dataSinceSentence(dashboard.firstActivityOn, this.locale.language)}`;
   });
 
   /** Frequent tasks, each shown only to somebody who may do it. */
@@ -502,7 +526,7 @@ export class Overview {
     // Independent sources, read in parallel; each one's failure is its own.
     await Promise.all([
       this.canSeeNumbers()
-        ? firstValueFrom(this.analytics.dashboard(tenantId, '7d')).then(
+        ? firstValueFrom(this.analytics.dashboard(tenantId, '7d', { compare: true })).then(
             (value) => this.dashboard.set(value),
             () => this.dashboardFailed.set(true),
           )

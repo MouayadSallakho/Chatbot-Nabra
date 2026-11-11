@@ -68,16 +68,19 @@ describe('toApiError', () => {
       expect(error.message).not.toContain('highlighted fields');
     });
 
-    it('uses the backend wording where it is written for a reader', () => {
+    it('never shows the server’s English detail, on an English page either (38.5)', () => {
+      // The owner's decision (38.0 §4.3 #7c): `detail` is never shown, so English
+      // and Arabic readers read the same thing.
       const error = toApiError(problem(400, 'Name must be 120 characters or fewer.'));
 
-      expect(error.message).toBe('Name must be 120 characters or fewer.');
+      expect(error.message).not.toContain('120 characters');
+      expect(error.message).toContain('Some of the details were rejected');
     });
 
-    it('uses the backend wording for a lifecycle refusal', () => {
+    it('words an uncoded lifecycle refusal with the generic words for its kind', () => {
       const error = toApiError(problem(409, 'A draft agent cannot be disabled.'));
 
-      expect(error.message).toBe('A draft agent cannot be disabled.');
+      expect(error.message).toBe('That action is not available for this item right now.');
     });
 
     it('never shows a server fault detail, even when one is present', () => {
@@ -138,7 +141,7 @@ describe('toApiError', () => {
 
       const error = toApiError(failure);
 
-      expect(error.message).toBe('This tenant has no AI agent with that id.');
+      expect(error.message).toBe('That item no longer exists in this workspace.');
       expect(error.message).not.toContain('traceId');
       expect(error.message).not.toContain('00-abc123');
     });
@@ -300,11 +303,26 @@ describe('toApiError', () => {
       expect(toApiError(coded(400, { code: 'x' })).fields).toBeUndefined();
     });
 
-    it('keeps the generic words for a code nobody registered, in English keeping the detail', () => {
-      // The screens not yet moved say what they said before, until 38.5.
-      expect(toApiError(coded(409, { code: 'knowledge.x', detail: 'Server words.' })).message).toBe(
-        'Server words.',
-      );
+    it('gives a code nobody registered the generic words, in English too, and keeps the code', () => {
+      const error = toApiError(coded(409, { code: 'knowledge.x', detail: 'Server words.' }));
+
+      expect(error.message).toBe('That action is not available for this item right now.');
+      expect(error.code).toBe('knowledge.x');
+    });
+
+    it.each([
+      [400, 'Some of the details were rejected'],
+      [401, 'Your session has ended'],
+      [404, 'no longer exists'],
+      [410, 'no longer available'],
+      [413, 'too large'],
+      [415, 'not one of the formats'],
+      [422, 'No usable text'],
+    ])('never shows the server detail on an English %i', (status, generic) => {
+      const error = toApiError(coded(status, { code: 'area.unknown', detail: 'Server English.' }));
+
+      expect(error.message).not.toContain('Server English');
+      expect(error.message).toContain(generic);
     });
 
     describe('on an Arabic page', () => {

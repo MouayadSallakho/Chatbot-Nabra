@@ -126,19 +126,20 @@
                 <label class="field-label" for="report-range" i18n="@@reports.field.period"
                   >Period</label
                 >
+                <!-- The report's own periods, by code (its catalogue parameters). -->
                 <select
                   id="report-range"
                   class="select"
                   formControlName="range"
                   aria-describedby="report-range-hint"
+                  data-testid="report-range"
                 >
-                  <option value="7d" i18n="@@reports.range.7d">Last 7 days</option>
-                  <option value="30d" i18n="@@reports.range.30d">Last 30 days</option>
-                  <option value="90d" i18n="@@reports.range.90d">Last 90 days</option>
-                  <option value="custom" i18n="@@reports.range.custom">Choose dates</option>
+                  @for (range of ranges(); track range) {
+                    <option [value]="range">{{ rangeLabel(range) }}</option>
+                  }
                 </select>
-                <p id="report-range-hint" class="field-hint" i18n="@@reports.range.hint">
-                  Whole days in UTC, including today. At most {{ catalog()?.maxRangeDays }} days.
+                <p id="report-range-hint" class="field-hint" data-testid="report-range-hint">
+                  {{ rangeHint() }}
                 </p>
               </div>
 
@@ -148,7 +149,13 @@
                     <label class="field-label" for="report-from" i18n="@@reports.field.from"
                       >From</label
                     >
-                    <input id="report-from" class="input" type="date" formControlName="from" />
+                    <input
+                      id="report-from"
+                      class="input"
+                      type="date"
+                      formControlName="from"
+                      [attr.max]="today()"
+                    />
                   </div>
                   <div class="field">
                     <label class="field-label" for="report-through" i18n="@@reports.field.through"
@@ -159,6 +166,7 @@
                       class="input"
                       type="date"
                       formControlName="through"
+                      [attr.max]="today()"
                     />
                   </div>
                 </div>
@@ -170,7 +178,25 @@
                   @for (format of formats(); track format) {
                     <label class="segmented-option">
                       <input type="radio" formControlName="format" [value]="format" />
-                      <span>{{ formatLabel(format) }}</span>
+                      <span dir="auto">{{ formatLabel(format) }}</span>
+                    </label>
+                  }
+                </div>
+              </fieldset>
+
+              <!-- The file's language (Phase 38.5, E8): the reader's own by default. -->
+              <fieldset class="field">
+                <legend class="field-label" i18n="@@reports.field.language">File language</legend>
+                <div class="segmented" data-testid="report-language">
+                  @for (language of languages; track language) {
+                    <label class="segmented-option">
+                      <input
+                        type="radio"
+                        formControlName="language"
+                        [value]="language"
+                        [attr.data-testid]="'report-language-' + language"
+                      />
+                      <span>{{ fileLanguageLabel(language) }}</span>
                     </label>
                   }
                 </div>
@@ -239,7 +265,7 @@
               <thead>
                 <tr>
                   <th scope="col" i18n="@@reports.column.report">Report</th>
-                  <th scope="col" i18n="@@reports.column.period">Period (UTC)</th>
+                  <th scope="col" i18n="@@reports.column.periodPlain">Period</th>
                   <th scope="col" i18n="@@reports.column.requested">Requested</th>
                   <th scope="col" i18n="@@reports.column.status">Status</th>
                   <th scope="col">
@@ -258,9 +284,20 @@
                           <span aria-hidden="true">·</span>
                           <span>{{ size(execution.byteLength) }}</span>
                         }
+                        <!-- The file's language, as a small tag (Phase 38.5, E8). -->
+                        <span
+                          class="badge badge-neutral file-language"
+                          [attr.data-testid]="'language-' + execution.language"
+                          >{{ fileLanguageLabel(execution.language) }}</span
+                        >
                       </span>
                     </td>
-                    <td class="nowrap">{{ period(execution) }}</td>
+                    <td class="period">
+                      <span class="nowrap">{{ period(execution) }}</span>
+                      <span class="report-meta" data-testid="period-zone">{{
+                        periodZone(execution)
+                      }}</span>
+                    </td>
                     <td class="requester">
                       <span dir="auto">{{ requester(execution) }}</span>
                       <span class="report-meta">{{ when(execution.requestedAt) }}</span>

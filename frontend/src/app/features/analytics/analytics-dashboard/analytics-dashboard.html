@@ -69,7 +69,13 @@
         </fieldset>
 
         @if (period(); as sentence) {
-          <p class="range-note" data-testid="period">{{ sentence }}</p>
+          <div class="range-notes">
+            <p class="range-note" data-testid="period">{{ sentence }}</p>
+            @if (comparison(); as compared) {
+              <p class="range-note" data-testid="comparison">{{ compared }}</p>
+            }
+            <p class="range-note" data-testid="since">{{ since() }}</p>
+          </div>
         }
       </div>
 
@@ -82,6 +88,7 @@
               <div class="figure">
                 <span class="skeleton skeleton-text"></span>
                 <span class="skeleton figure-skeleton"></span>
+                <span class="skeleton skeleton-text figure-change-skeleton"></span>
               </div>
             }
           </div>
@@ -121,30 +128,27 @@
         >
           <!-- What happened in the period. -->
           <dl class="figures" data-testid="summary">
-            <div class="figure">
-              <dt i18n="@@analytics.figure.conversations">Conversations started</dt>
-              <dd class="figure-value" data-testid="summary-conversations">
-                {{ data.summary.conversationsStarted | localNumber }}
-              </dd>
-            </div>
-            <div class="figure">
-              <dt i18n="@@analytics.figure.customer">Customer messages</dt>
-              <dd class="figure-value" data-testid="summary-customer">
-                {{ data.summary.customerMessages | localNumber }}
-              </dd>
-            </div>
-            <div class="figure">
-              <dt i18n="@@analytics.figure.ai">AI replies</dt>
-              <dd class="figure-value" data-testid="summary-ai">
-                {{ data.summary.aiMessages | localNumber }}
-              </dd>
-            </div>
-            <div class="figure">
-              <dt i18n="@@analytics.figure.team">Replies from the team</dt>
-              <dd class="figure-value" data-testid="summary-human">
-                {{ data.summary.humanMessages | localNumber }}
-              </dd>
-            </div>
+            @for (figure of figures(); track figure.key) {
+              <div class="figure">
+                <dt>{{ figure.label }}</dt>
+                <dd class="figure-value" [attr.data-testid]="figure.testid">
+                  {{ figure.value | localNumber }}
+                </dd>
+                @if (figure.change; as change) {
+                  <!-- The words carry the direction; the glyph only repeats them. -->
+                  <dd
+                    class="figure-change"
+                    [attr.data-direction]="change.direction"
+                    [attr.data-testid]="figure.testid + '-change'"
+                  >
+                    @if (change.glyph) {
+                      <span class="figure-change-glyph" aria-hidden="true">{{ change.glyph }}</span>
+                    }
+                    <span>{{ change.text }}</span>
+                  </dd>
+                }
+              </div>
+            }
           </dl>
           @if (data.summary.systemMessages > 0) {
             <p class="figures-note" i18n="@@analytics.systemMessages">
@@ -191,7 +195,21 @@
             </div>
           </div>
 
-          @if (!hasActivity()) {
+          @if (neverActive()) {
+            <!--
+              A workspace with no conversation ever: nothing to compare and no
+              longer period to try, so it says what will fill this page.
+            -->
+            <div class="card" data-testid="never-active">
+              <app-empty-state
+                icon="analytics"
+                heading="No conversations yet"
+                i18n-heading="@@analytics.never.heading"
+                description="Numbers appear here once customers start conversations on a connected channel. Any provider usage is still reported below."
+                i18n-description="@@analytics.never.body"
+              />
+            </div>
+          } @else if (!hasActivity()) {
             <!--
               The honest empty state. The zeroes above are real; this explains
               them rather than drawing a sample chart nobody can act on.

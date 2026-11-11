@@ -159,7 +159,7 @@ describe('AgentCreate', () => {
     await settle();
   });
 
-  it('reports a rejected value in the backend own words, and stays on the form', async () => {
+  it('reports an uncoded rejected value in our own words, and stays on the form', async () => {
     // A value the client happily accepts and the Domain does not. This is why
     // the frontend does not try to mirror every rule: the backend stays the
     // authority, and its wording is what the reader sees.
@@ -182,7 +182,8 @@ describe('AgentCreate', () => {
       );
     await settle();
 
-    expect(host().textContent).toContain('AI agent name must not be blank.');
+    expect(host().textContent).toContain('Some of the details were rejected');
+    expect(host().textContent).not.toContain('AI agent name must not be blank.');
     expect(navigated).toBeNull();
     // The reader's work is still there to correct.
     expect(nameBox().value).toBe('Nameless');

@@ -346,7 +346,7 @@ describe('InviteMember', () => {
     expect(text()).not.toContain('The English sentence');
   });
 
-  it('shows a conflict in the server’s own words', async () => {
+  it('shows an uncoded conflict in our own words, never the server sentence', async () => {
     await mount('members.view', 'members.invite');
 
     type('bob@example.test');
@@ -362,6 +362,7 @@ describe('InviteMember', () => {
     );
     await settle();
 
-    expect(text()).toContain('already a member of this workspace');
+    expect(text()).toContain('That action is not available for this item right now.');
+    expect(text()).not.toContain('already a member of this workspace');
   });
 });

@@ -527,6 +527,19 @@ export class DesignLab {
       { currency: 'USD', estimatedCost: 3.418275, calls: 360 },
       { currency: 'EUR', estimatedCost: 0.004812, calls: 26 },
     ],
+    byPurpose: [
+      samplePurpose('ConversationGeneration', 300, 1_210_000, 176_000, 9, [
+        { currency: 'USD', estimatedCost: 3.21, calls: 290 },
+      ]),
+      samplePurpose('ConversationRetrievalEmbedding', 60, 410_000, 0, 0, [
+        { currency: 'EUR', estimatedCost: 0.004812, calls: 26 },
+      ]),
+      samplePurpose('KnowledgeIndexEmbedding', 30, 240_000, 0, 3, []),
+      samplePurpose('AgentPreviewGeneration', 18, 74_000, 10_500, 0, [
+        { currency: 'USD', estimatedCost: 0.208275, calls: 18 },
+      ]),
+      samplePurpose('AgentRetrievalTest', 4, 5_000, 0, 0, []),
+    ],
   };
 
   protected readonly sampleModels: readonly AnalyticsModelUsage[] = [
@@ -598,4 +611,26 @@ export class DesignLab {
       $localize`:@@lab.toast.error:Sample: the change could not be saved. Nothing was lost; try again.`,
     );
   }
+}
+
+/** One purpose row for the sample usage card. */
+function samplePurpose(
+  purpose: string,
+  calls: number,
+  inputTokens: number,
+  outputTokens: number,
+  unratedCalls: number,
+  ratedCost: AnalyticsAiUsage['ratedCost'],
+): AnalyticsAiUsage['byPurpose'][number] {
+  return {
+    purpose,
+    calls,
+    succeeded: calls,
+    failed: 0,
+    unresolved: 0,
+    inputTokens,
+    outputTokens,
+    unratedCalls,
+    ratedCost,
+  };
 }

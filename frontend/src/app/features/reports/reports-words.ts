@@ -1,12 +1,6 @@
 import type { AppLanguage } from '@app/core/i18n/language';
 import { formatNumber } from '@app/core/i18n/locale-format';
-import type {
-  ReportExecution,
-  ReportFormat,
-  ReportFrequency,
-  ReportStatus,
-  ReportType,
-} from './reports-api';
+import type { ReportExecution, ReportFrequency, ReportStatus, ReportType } from './reports-api';
 
 /**
  * Reports' words, written once (Phase 36.7).
@@ -19,17 +13,6 @@ import type {
  * server's stable code (`ReportFailures` in the backend).
  */
 
-const TITLES: Readonly<Record<ReportType, string>> = {
-  ConversationActivity: $localize`:@@reports.type.conversationActivity:Conversation activity`,
-  ChannelUsage: $localize`:@@reports.type.channelUsage:Channel usage`,
-  AiHumanHandling: $localize`:@@reports.type.aiHumanHandling:AI and team handling`,
-  CustomerActivity: $localize`:@@reports.type.customerActivity:Customer activity`,
-  AgentActivity: $localize`:@@reports.type.agentActivity:AI agent activity`,
-  ProviderUsage: $localize`:@@reports.type.providerUsage:AI provider usage`,
-  ProviderCost: $localize`:@@reports.type.providerCost:Estimated provider cost`,
-  WhatsAppDelivery: $localize`:@@reports.type.whatsAppDelivery:WhatsApp delivery status`,
-};
-
 const DESCRIPTIONS: Readonly<Record<ReportType, string>> = {
   ConversationActivity: $localize`:@@reports.type.conversationActivity.description:Conversations started and messages sent by customers, the AI and the team, day by day.`,
   ChannelUsage: $localize`:@@reports.type.channelUsage.description:Conversations and messages on each channel the workspace used.`,
@@ -41,10 +24,8 @@ const DESCRIPTIONS: Readonly<Record<ReportType, string>> = {
   WhatsAppDelivery: $localize`:@@reports.type.whatsAppDelivery.description:Where the workspace's outbound WhatsApp messages got to, by delivery status.`,
 };
 
-/** A report's name in the reader's language; an unknown type keeps the server's title. */
-export function reportTitle(type: string, fallback: string): string {
-  return TITLES[type as ReportType] ?? fallback;
-}
+// The names live on their own, so the notification bell can carry them alone.
+export { knownReportTitle, reportTitle } from './report-titles';
 
 /** A report's description in the reader's language; an unknown type keeps the server's. */
 export function reportDescription(type: string, fallback: string): string {
@@ -52,11 +33,12 @@ export function reportDescription(type: string, fallback: string): string {
 }
 
 /**
- * The words for a format, as a person says them. CSV and PDF are the same
- * letters in both languages (and stay left-to-right where they are shown);
- * Excel is a name with its file type.
+ * The words for a format, by its code, as a person says them. CSV and PDF are
+ * the same letters in both languages (and stay left-to-right where they are
+ * shown); Excel is a name with its file type. A code this build does not know
+ * is shown as the code itself, which the screens isolate.
  */
-export function formatLabel(format: ReportFormat): string {
+export function formatLabel(format: string): string {
   switch (format) {
     case 'Xlsx':
       return $localize`:@@reports.format.xlsx:Excel (XLSX)`;
@@ -65,7 +47,38 @@ export function formatLabel(format: ReportFormat): string {
     case 'Pdf':
       return 'PDF';
     default:
-      return String(format).toUpperCase();
+      return format;
+  }
+}
+
+/** A period choice by its code (`range` parameter); an unknown code is shown as itself. */
+export function rangeLabel(range: string): string {
+  switch (range) {
+    case '7d':
+      return $localize`:@@reports.range.7d:Last 7 days`;
+    case '30d':
+      return $localize`:@@reports.range.30d:Last 30 days`;
+    case '90d':
+      return $localize`:@@reports.range.90d:Last 90 days`;
+    case 'custom':
+      return $localize`:@@reports.range.custom:Choose dates`;
+    default:
+      return range;
+  }
+}
+
+/** The languages a report file can be written in, in the order the forms offer them. */
+export const REPORT_LANGUAGES = ['en', 'ar'] as const;
+
+/** "English file" / "Arabic file"; an unknown code is shown as itself. */
+export function fileLanguageLabel(language: string): string {
+  switch (language) {
+    case 'en':
+      return $localize`:@@reports.language.en:English file`;
+    case 'ar':
+      return $localize`:@@reports.language.ar:Arabic file`;
+    default:
+      return language;
   }
 }
 

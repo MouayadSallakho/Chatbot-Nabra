@@ -30,6 +30,10 @@ describe('ReportsPage', () => {
         formats: ['Csv', 'Xlsx', 'Pdf'],
         requiredPermissions: ['reports.generate', 'analytics.view'],
         canSchedule: true,
+        parameters: [
+          { code: 'range', values: ['7d', '30d', '90d', 'custom'] },
+          { code: 'format', values: ['Csv', 'Xlsx', 'Pdf'] },
+        ],
       },
     ],
     maxRangeDays: 366,
@@ -59,6 +63,8 @@ describe('ReportsPage', () => {
     byteLength: 2048,
     expiresAt: '2026-10-31T08:00:02Z',
     canDownload: true,
+    timeZone: 'UTC',
+    language: 'en',
   };
 
   const failed: ReportExecution = {
@@ -159,6 +165,7 @@ describe('ReportsPage', () => {
     expect(link!.getAttribute('href')).toBe(`${base}/executions/${completed.id}/download`);
     expect(link!.getAttribute('aria-label')).toContain('Download Conversation activity');
     expect(link!.getAttribute('aria-label')).toContain('CSV');
+    expect(link!.getAttribute('aria-label')).toContain('English file');
   });
 
   it('states status in words and shows the failure reason, rendering names as text', async () => {
@@ -187,6 +194,8 @@ describe('ReportsPage', () => {
     expect(request.request.body.range).toBe('30d');
     expect(request.request.body.format).toBe('Csv');
     expect(request.request.body.clientRequestId).toMatch(/^[0-9a-f-]{36}$/);
+    // The reader's language, always sent (38.0 §4.3 #4).
+    expect(request.request.body.language).toBe('en');
 
     request.flush({ ...completed, status: 'Pending', canDownload: false });
     await settle();
@@ -227,5 +236,201 @@ describe('ReportsPage', () => {
     await settle();
 
     expect(host().querySelector('[data-testid="no-storage"]')).not.toBeNull();
+  });
+
+  describe('the file language (E8)', () => {
+    it('offers both languages, starting with the one the reader is using', async () => {
+      await mount('reports.view', 'reports.generate', 'analytics.view');
+      await answerInitial([]);
+
+      const english = host().querySelector<HTMLInputElement>('[data-testid="report-language-en"]')!;
+      const arabic = host().querySelector<HTMLInputElement>('[data-testid="report-language-ar"]')!;
+
+      expect(english.checked).toBe(true);
+      expect(arabic.checked).toBe(false);
+      expect(host().querySelector('[data-testid="report-language"]')?.textContent).toContain(
+        'Arabic file',
+      );
+    });
+
+    it('sends the language the reader chose', async () => {
+      await mount('reports.view', 'reports.generate', 'analytics.view');
+      await answerInitial([]);
+
+      host().querySelector<HTMLInputElement>('[data-testid="report-language-ar"]')!.click();
+      host().querySelector<HTMLButtonElement>('[data-testid="generate"]')!.click();
+      await settle();
+
+      const request = http.expectOne(
+        (candidate) => candidate.method === 'POST' && candidate.url === base,
+      );
+
+      expect(request.request.body.language).toBe('ar');
+
+      request.flush({ ...completed, status: 'Pending', language: 'ar' });
+      await settle();
+      http
+        .expectOne((candidate) => candidate.url === `${base}/executions`)
+        .flush(page([{ ...completed, language: 'ar' }]));
+      await settle();
+    });
+
+    it('tags each generated report with its language', async () => {
+      await mount('reports.view', 'reports.generate', 'analytics.view');
+      await answerInitial([completed, { ...failed, language: 'ar' }]);
+
+      expect(host().querySelector('[data-testid="language-en"]')?.textContent?.trim()).toBe(
+        'English file',
+      );
+      expect(host().querySelector('[data-testid="language-ar"]')?.textContent?.trim()).toBe(
+        'Arabic file',
+      );
+    });
+
+    it('shows a language code it does not know as the code', async () => {
+      await mount('reports.view', 'reports.generate', 'analytics.view');
+      await answerInitial([{ ...completed, language: 'fr' }]);
+
+      expect(host().querySelector('[data-testid="language-fr"]')?.textContent?.trim()).toBe('fr');
+    });
+
+    it('words a refused language by its code', async () => {
+      await mount('reports.view', 'reports.generate', 'analytics.view');
+      await answerInitial([]);
+
+      host().querySelector<HTMLButtonElement>('[data-testid="generate"]')!.click();
+      await settle();
+
+      http
+        .expectOne((candidate) => candidate.method === 'POST' && candidate.url === base)
+        .flush(
+          { code: 'language.unsupported', detail: 'Language must be en or ar.' },
+          { status: 400, statusText: 'Bad Request' },
+        );
+      await settle();
+
+      const error = host().querySelector('[data-testid="submit-error"]')?.textContent ?? '';
+
+      expect(error).toContain('That language is not available.');
+      expect(error).not.toContain('Language must be');
+    });
+  });
+
+  describe('options by code (E6)', () => {
+    it('offers only the periods and formats the report lists, worded by code', async () => {
+      await mount('reports.view', 'reports.generate', 'analytics.view');
+
+      http.expectOne(`${base}/catalog`).flush({
+        ...catalog,
+        reports: [
+          {
+            ...catalog.reports[0],
+            parameters: [
+              { code: 'range', values: ['7d', 'custom'] },
+              { code: 'format', values: ['Pdf', 'Odt'] },
+            ],
+          },
+        ],
+      });
+      http.expectOne((request) => request.url === `${base}/executions`).flush(page([]));
+      await settle();
+
+      const options = [
+        ...host().querySelectorAll<HTMLOptionElement>('[data-testid="report-range"] option'),
+      ];
+
+      expect(options.map((option) => option.value)).toEqual(['7d', 'custom']);
+      expect(options.map((option) => option.textContent?.trim())).toEqual([
+        'Last 7 days',
+        'Choose dates',
+      ]);
+      // 30 days is not offered here, so it is not left selected.
+      expect(host().querySelector<HTMLSelectElement>('[data-testid="report-range"]')!.value).toBe(
+        '7d',
+      );
+      // A format this build does not know is shown as its code.
+      expect(host().querySelector('.generate-panel .segmented')?.textContent).toContain('Odt');
+    });
+  });
+
+  describe('the workspace time zone (E2)', () => {
+    it('says the periods are whole days in the workspace zone', async () => {
+      await mount('reports.view', 'reports.generate', 'analytics.view');
+
+      http.expectOne(`${base}/catalog`).flush({ ...catalog, timeZone: 'Asia/Riyadh' });
+      http.expectOne((request) => request.url === `${base}/executions`).flush(page([]));
+      await settle();
+
+      const hint = host().querySelector('[data-testid="report-range-hint"]')?.textContent ?? '';
+
+      expect(hint).toContain('Whole days in');
+      expect(hint).toContain('Asia/Riyadh');
+      expect(hint).toContain('At most 366 days.');
+      expect(hint).not.toContain('UTC');
+    });
+
+    it("names the zone each report was counted in, which may not be today's", async () => {
+      await mount('reports.view', 'reports.generate', 'analytics.view');
+      await answerInitial([completed, { ...failed, timeZone: 'Asia/Riyadh' }]);
+
+      const zones = [...host().querySelectorAll('[data-testid="period-zone"]')].map((zone) =>
+        zone.textContent?.trim(),
+      );
+
+      expect(zones).toEqual(['UTC', '\u2066Asia/Riyadh\u2069 time']);
+      expect(host().querySelector('thead')?.textContent).not.toContain('(UTC)');
+    });
+
+    it('refuses dates after today in the workspace zone, and caps the date fields there', async () => {
+      await mount('reports.view', 'reports.generate', 'analytics.view');
+      await answerInitial([]);
+
+      const component = fixture.componentInstance as unknown as {
+        form: { patchValue(value: object): void };
+      };
+
+      component.form.patchValue({ range: 'custom', from: '2099-01-01', through: '2099-01-02' });
+      await settle();
+
+      expect(host().querySelector('#report-through')?.getAttribute('max')).toMatch(
+        /^\d{4}-\d{2}-\d{2}$/,
+      );
+
+      host().querySelector<HTMLButtonElement>('[data-testid="generate"]')!.click();
+      await settle();
+
+      http.expectNone((candidate) => candidate.method === 'POST');
+      expect(host().querySelector('[data-testid="form-error"]')?.textContent).toContain(
+        'Choose dates up to today',
+      );
+    });
+
+    it('sends the day after the last chosen day as the end, by the calendar', async () => {
+      await mount('reports.view', 'reports.generate', 'analytics.view');
+      await answerInitial([]);
+
+      const component = fixture.componentInstance as unknown as {
+        form: { patchValue(value: object): void };
+      };
+
+      component.form.patchValue({ range: 'custom', from: '2026-10-01', through: '2026-10-31' });
+      await settle();
+      host().querySelector<HTMLButtonElement>('[data-testid="generate"]')!.click();
+      await settle();
+
+      const request = http.expectOne(
+        (candidate) => candidate.method === 'POST' && candidate.url === base,
+      );
+
+      expect(request.request.body.from).toBe('2026-10-01');
+      expect(request.request.body.to).toBe('2026-11-01');
+
+      request.flush({ ...completed, status: 'Pending' });
+      await settle();
+      http
+        .expectOne((candidate) => candidate.url === `${base}/executions`)
+        .flush(page([completed]));
+      await settle();
+    });
   });
 });

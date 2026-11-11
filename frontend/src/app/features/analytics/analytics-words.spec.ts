@@ -1,13 +1,19 @@
 import { AnalyticsDashboard } from './analytics-api';
 import {
   dailyPoints,
+  dataSinceSentence,
   failedRepliesTitle,
+  figureChange,
+  localDay,
   messagesSummary,
+  periodSentence,
   repliesSummary,
-  utcDay,
 } from './analytics-words';
 
-/** The numbers' words: days read as UTC days, the running day marked, sentences from real counts. */
+/**
+ * The numbers' words: days are the workspace's local days, the running day is
+ * marked in the workspace's zone, and sentences come from real counts.
+ */
 describe('analytics words', () => {
   const dashboard = {
     period: {
@@ -42,9 +48,76 @@ describe('analytics words', () => {
     ],
   } as unknown as AnalyticsDashboard;
 
-  it('reads a bucket date as the UTC day it is', () => {
-    expect(utcDay('2026-09-15', 'en', 'longDate')).toBe('September 15, 2026');
-    expect(utcDay('not-a-date', 'en')).toBe('not-a-date');
+  it('writes a bucket date as the day it is, whatever the browser zone', () => {
+    expect(localDay('2026-09-15', 'en', 'longDate')).toBe('September 15, 2026');
+    expect(localDay('not-a-date', 'en')).toBe('not-a-date');
+  });
+
+  it('says the zone the days are counted in, and the time of the read there', () => {
+    expect(periodSentence(dashboard, 'en')).toBe(
+      'Oct 17, 2026 – Oct 18, 2026, whole days in UTC. Today is counted until 7:27 PM.',
+    );
+
+    const riyadh = {
+      ...dashboard,
+      period: { ...dashboard.period, timeZone: 'Asia/Riyadh' },
+    } as AnalyticsDashboard;
+
+    // 19:27 UTC is 22:27 in Riyadh; the id is isolated so it keeps its order in Arabic.
+    expect(periodSentence(riyadh, 'en')).toBe(
+      'Oct 17, 2026 – Oct 18, 2026, whole days in ⁦Asia/Riyadh⁩ time. Today is counted until 10:27 PM.',
+    );
+  });
+
+  it('marks the running day in the workspace zone, not by the UTC date of the read', () => {
+    // 22:30 UTC on the 18th is already the 19th in Riyadh: no bucket is today there.
+    const late = {
+      ...dashboard,
+      period: { ...dashboard.period, to: '2026-10-18T22:30:00+00:00', timeZone: 'Asia/Riyadh' },
+    } as AnalyticsDashboard;
+
+    expect(dailyPoints(late, 'en').map((point) => point.partial)).toEqual([false, false]);
+
+    // Berlin in summer time: 22:00 UTC is midnight there, so this period has ended.
+    const berlin = {
+      ...dashboard,
+      period: { ...dashboard.period, to: '2026-10-17T22:00:00+00:00', timeZone: 'Europe/Berlin' },
+    } as AnalyticsDashboard;
+
+    expect(dailyPoints(berlin, 'en').some((point) => point.partial)).toBe(false);
+  });
+
+  it('words a change against the previous period, never as a bare colour', () => {
+    const running = { soFar: true, earlierData: true };
+    const ended = { soFar: false, earlierData: true };
+
+    expect(figureChange(12, 10, running, 'en')).toEqual({
+      direction: 'up',
+      glyph: '↑',
+      text: 'So far, up 20% on the previous period',
+    });
+    expect(figureChange(9, 10, ended, 'en').text).toBe('Down 10% on the previous period');
+    expect(figureChange(1003, 1000, ended, 'en').text).toBe('Up 0.3% on the previous period');
+    expect(figureChange(5, 5, ended, 'en')).toEqual({
+      direction: 'same',
+      glyph: '=',
+      text: 'The same as the previous period',
+    });
+    expect(figureChange(5, 0, running, 'en')).toEqual({
+      direction: 'none',
+      glyph: '',
+      text: 'None in the previous period',
+    });
+    expect(figureChange(5, 0, { soFar: true, earlierData: false }, 'en').text).toBe(
+      'No earlier data to compare',
+    );
+  });
+
+  it('says how far back the data goes, or that there is none yet', () => {
+    expect(dataSinceSentence('2026-03-03', 'en')).toBe('Data since Mar 3, 2026.');
+    expect(dataSinceSentence(null, 'en')).toBe(
+      'No conversation has started in this workspace yet.',
+    );
   });
 
   it('marks today as still running, and only while it is', () => {

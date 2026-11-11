@@ -432,7 +432,13 @@ describe('Arabic renders', () => {
         ],
       });
 
-      const acme = { id: 't-1', name: 'شركة النور', slug: 'alnoor', status: 'Active' as const };
+      const acme = {
+        id: 't-1',
+        name: 'شركة النور',
+        slug: 'alnoor',
+        status: 'Active' as const,
+        timeZone: 'Asia/Riyadh',
+      };
 
       await TestBed.inject(WorkspaceContextService).adopt(acme);
 
@@ -456,6 +462,118 @@ describe('Arabic renders', () => {
       expect(root.querySelector('[data-testid="workspace-name-text"]')?.getAttribute('dir')).toBe(
         'auto',
       );
+      // The time zone (38.5): its heading in Arabic, its IANA id left to right.
+      expect(text(root.querySelector('#settings-zone-heading'))).toBe('المنطقة الزمنية');
+      expect(text(root.querySelector('[data-testid="time-zone-text"]'))).toBe('Asia/Riyadh');
+      expect(root.querySelector('[data-testid="time-zone-text"]')?.getAttribute('dir')).toBe('ltr');
+    });
+  });
+
+  describe('insights and reports (Phase 38.5)', () => {
+    const LRI = '\u2066';
+    const PDI = '\u2069';
+
+    it('names the zone in Arabic, with the IANA id isolated', async () => {
+      const { zonePhrase, zoneLabel } = await import('@app/core/i18n/time-zone');
+
+      expect(zonePhrase('UTC')).toBe('بالتوقيت العالمي');
+      expect(zonePhrase('Asia/Riyadh')).toBe(`بتوقيت ${LRI}Asia/Riyadh${PDI}`);
+      expect(zoneLabel('UTC')).toBe('بالتوقيت العالمي');
+    });
+
+    it('says the period, the comparison and the data-since line in Arabic, with Western digits', async () => {
+      const { periodSentence, comparisonSentence, dataSinceSentence, figureChange } =
+        await import('@app/features/analytics/analytics-words');
+      const dashboard = {
+        period: {
+          range: '7d',
+          from: '2026-10-11T21:00:00Z',
+          to: '2026-10-18T16:27:00Z',
+          days: 7,
+          timeZone: 'Asia/Riyadh',
+        },
+        dailyActivity: [{ date: '2026-10-12' }, { date: '2026-10-18' }],
+        previous: {
+          period: {
+            range: '7d',
+            from: '2026-10-04T21:00:00Z',
+            to: '2026-10-11T21:00:00Z',
+            days: 7,
+            timeZone: 'Asia/Riyadh',
+          },
+        },
+      } as unknown as import('@app/features/analytics/analytics-api').AnalyticsDashboard;
+
+      const period = periodSentence(dashboard, 'ar');
+
+      expect(period).toContain('أيام كاملة بتوقيت');
+      expect(period).toContain('Asia/Riyadh');
+      expect(period).toContain('يُحسب اليوم حتى');
+      expect(period).not.toMatch(/[٠-٩]/);
+      expect(comparisonSentence(dashboard, 'ar')).toMatch(
+        /^مقارنةً بالفترة من .*5.*2026.* إلى .*11.*2026/,
+      );
+      expect(dataSinceSentence(null, 'ar')).toBe('لم تبدأ أي محادثة في مساحة العمل هذه بعد.');
+      expect(dataSinceSentence('2026-03-03', 'ar')).toMatch(/^البيانات منذ 3 مارس 2026\.$/);
+      // Arabic percentages carry invisible direction marks around the sign.
+      expect(
+        figureChange(12, 10, { soFar: true, earlierData: true }, 'ar').text.replace(
+          /[\u200e\u200f\u061c]/g,
+          '',
+        ),
+      ).toBe('حتى الآن، أعلى بنسبة 20% من الفترة السابقة');
+      expect(figureChange(5, 0, { soFar: true, earlierData: false }, 'ar').text).toBe(
+        'لا بيانات سابقة للمقارنة',
+      );
+    });
+
+    it('names purposes, file languages and report options in Arabic', async () => {
+      const { fileLanguageLabel, rangeLabel } = await import('@app/features/reports/reports-words');
+
+      expect(fileLanguageLabel('ar')).toBe('ملف عربي');
+      expect(fileLanguageLabel('en')).toBe('ملف إنجليزي');
+      expect(rangeLabel('custom')).toBe('اختيار التواريخ');
+    });
+
+    it('names the report in a notification from its code, never from the English body', async () => {
+      const { notificationText } = await import('@app/core/notifications/notification-words');
+      const text = notificationText(
+        {
+          id: 'n1',
+          kind: 'ReportCompleted',
+          category: 'Reports',
+          severity: 'Information',
+          title: 'Your report is ready',
+          body: 'Your “Channel usage” report has finished generating and is ready to download.',
+          actionPath: '/reports',
+          createdAt: '2026-10-19T09:00:00Z',
+          readAt: null,
+          parameters: { reportType: 'ChannelUsage' },
+        },
+        'ar',
+      );
+
+      expect(text.body).toContain('«استخدام القنوات»');
+      expect(text.body).not.toContain('Channel usage');
+    });
+
+    it('words the time-zone refusal in Arabic', async () => {
+      const { HttpErrorResponse } = await import('@angular/common/http');
+      const { toApiError } = await import('@app/core/api/api-error');
+      const { registerProblemWords } = await import('@app/core/problems/problem-words');
+      const { WORKSPACE_PROBLEM_WORDS } =
+        await import('@app/features/workspace-setup/workspace-problems');
+
+      registerProblemWords(WORKSPACE_PROBLEM_WORDS);
+
+      const error = toApiError(
+        new HttpErrorResponse({
+          status: 400,
+          error: { code: 'workspace.time_zone.invalid', detail: 'Unknown time zone.' },
+        }),
+      );
+
+      expect(error.message).toBe('لا تتعرّف نبرة على هذه المنطقة الزمنية. اختر واحدة من القائمة.');
     });
   });
 

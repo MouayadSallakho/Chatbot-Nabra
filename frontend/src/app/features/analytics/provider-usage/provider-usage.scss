@@ -87,3 +87,15 @@
   font: var(--text-small);
   color: var(--text-muted);
 }
+
+// The purpose table's second lines: a cost per currency, and the counts that
+// qualify a row (failed, outcome unknown, not priced), each on its own line.
+.purpose-cost,
+.purpose-meta {
+  display: block;
+}
+
+.purpose-meta {
+  font: var(--text-small);
+  color: var(--text-muted);
+}

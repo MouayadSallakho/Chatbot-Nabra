@@ -88,10 +88,10 @@ export interface ApiError {
   /**
    * A sentence safe to show a reader, in the reader's language.
    *
-   * Worded by `code` wherever a catalogue knows it (`core/problems/`). Otherwise
-   * our generic copy for the kind. An English page still falls back to the
-   * server's `detail` for a code no catalogue has registered yet, so a screen not
-   * yet moved says what it always said; an Arabic page never does.
+   * Worded by `code` wherever a catalogue knows it (`core/problems/`), and
+   * otherwise our generic copy for the kind. The server's `detail` is never
+   * shown, in either language (Phase 38.5; `problem-codes.md`): English and
+   * Arabic readers read the same thing.
    */
   readonly message: string;
 }
@@ -120,42 +120,6 @@ const MESSAGES: Readonly<Record<ApiErrorKind, string>> = {
   offline: $localize`:@@apiError.offline:Nabra could not be reached. Check your connection, then try again.`,
   unknown: $localize`:@@apiError.unknown:Something went wrong. Try again, and contact an administrator if it continues.`,
 };
-
-/**
- * Which statuses carry a `detail` worth showing, on an English page only.
- *
- * The backend writes these for a reader -- "Name must be 120 characters or
- * fewer", "An agent cannot be disabled while it is a draft" -- and they are more
- * useful than anything a generic client could invent. Every other status gets
- * our own copy, so a server-side fault can never put its internals on screen
- * even if a future handler became careless with them.
- *
- * 401 is on the list for a refusal that carries a sentence and no code. A rejected
- * sign-in is worded by its code now (`auth.credentials.invalid`), and our own copy
- * covers a 401 with no body, which is what an expired session produces.
- *
- * 403 is deliberately absent from the list, even though Phase 13 made it a real
- * answer. The server's detail is safe -- it names the permission code and
- * nothing else -- but a permission code is machine vocabulary, and an operator
- * reading "It requires the 'ai-agents.lifecycle' permission" learns less than
- * they do from a sentence telling them to ask an administrator. The code is
- * still in the response for anybody debugging; it simply is not what the screen
- * says.
- *
- * A 403 also never means the resource is missing or the account is broken, and
- * the copy is written to say so: it is a statement about what this person may
- * do, not about whether the thing exists.
- */
-const DETAIL_IS_USEFUL: ReadonlySet<number> = new Set([
-  400, 401, 404, 409, 410,
-
-  // The file-upload refusals, added in Phase 21. Each one is written for the
-  // person who just chose the file -- which format was expected, what the limit
-  // is, that a scanned PDF needs text rather than pixels -- and the generic copy
-  // below would tell them strictly less. They are safe to show: the backend
-  // composes them itself and never puts a parser's own exception into one.
-  413, 415, 422,
-]);
 
 /**
  * Interprets a failed request.
@@ -299,15 +263,12 @@ function kindOf(status: number): ApiErrorKind {
 }
 
 /**
- * The words for a refusal no catalogue has registered.
+ * The words for a refusal no catalogue has registered: our own for its kind.
  *
- * On an English page, the server's own `detail` where it is written for a reader.
- * The `detail` is English, so an Arabic page gets the generic words of the kind.
- *
- * Only `detail` is ever read, and only from a Problem Details body. The rest of
- * the payload -- `type`, `traceId`, `status`, anything a future handler adds --
- * is never shown, and a non-object body is ignored entirely rather than
- * stringified onto the screen.
+ * The server's `detail` is English and is never read (Phase 38.5, the owner's
+ * decision 38.0 §4.3 #7c): a code nobody has worded yet gets the generic words
+ * in both languages, and the code itself stays in `code` for a screen that
+ * branches on it.
  */
 function readableMessage(failure: HttpErrorResponse, kind: ApiErrorKind): string {
   // A 503 names the AI provider only on the calls that use one. Anywhere else --
@@ -316,20 +277,6 @@ function readableMessage(failure: HttpErrorResponse, kind: ApiErrorKind): string
   // be both wrong and alarming.
   if (kind === 'providerUnavailable' && !AI_OPERATION.test(failure.url ?? '')) {
     return TEMPORARILY_UNAVAILABLE;
-  }
-
-  if (!DETAIL_IS_USEFUL.has(failure.status) || pageLanguage() === 'ar') {
-    return MESSAGES[kind];
-  }
-
-  const body: unknown = failure.error;
-
-  if (typeof body === 'object' && body !== null && 'detail' in body) {
-    const detail = (body as { detail?: unknown }).detail;
-
-    if (typeof detail === 'string' && detail.trim().length > 0) {
-      return detail;
-    }
   }
 
   return MESSAGES[kind];

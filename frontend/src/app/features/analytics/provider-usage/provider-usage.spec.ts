@@ -1,5 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { AnalyticsAiUsage, AnalyticsModelUsage } from '../analytics-api';
+import { AnalyticsAiUsage, AnalyticsModelUsage, AnalyticsPurposeUsage } from '../analytics-api';
 import { ProviderUsageCard } from './provider-usage';
 
 /**
@@ -26,7 +26,27 @@ describe('ProviderUsageCard', () => {
     embeddingInputTokens: 0,
     unratedCalls: 0,
     ratedCost: [{ currency: 'USD', estimatedCost: 0.004936, calls: 2 }],
+    byPurpose: [],
   };
+
+  /** One purpose's row, zeroes unless given. */
+  function purpose(
+    code: string,
+    values: Partial<AnalyticsPurposeUsage> = {},
+  ): AnalyticsPurposeUsage {
+    return {
+      purpose: code,
+      calls: 0,
+      succeeded: 0,
+      failed: 0,
+      unresolved: 0,
+      inputTokens: 0,
+      outputTokens: 0,
+      unratedCalls: 0,
+      ratedCost: [],
+      ...values,
+    };
+  }
 
   let fixture: ComponentFixture<ProviderUsageCard>;
 
@@ -141,5 +161,99 @@ describe('ProviderUsageCard', () => {
     // "Not priced" rather than a dash, which reads as zero, or a converted
     // figure, which would need an exchange rate this platform does not have.
     expect(text()).toContain('Not priced');
+  });
+
+  describe('calls by purpose (E5)', () => {
+    const byPurpose: readonly AnalyticsPurposeUsage[] = [
+      // Deliberately out of order: the card keeps the fixed order whatever arrives.
+      purpose('AgentRetrievalTest'),
+      purpose('ConversationGeneration', {
+        calls: 30,
+        succeeded: 27,
+        failed: 2,
+        unresolved: 1,
+        inputTokens: 12_000,
+        outputTokens: 3_400,
+        unratedCalls: 3,
+        ratedCost: [
+          { currency: 'USD', estimatedCost: 0.25, calls: 20 },
+          { currency: 'EUR', estimatedCost: 0.1, calls: 7 },
+        ],
+      }),
+      purpose('KnowledgeIndexEmbedding', { calls: 4, succeeded: 4, inputTokens: 9_000 }),
+      purpose('ConversationRetrievalEmbedding'),
+      purpose('AgentPreviewGeneration', { calls: 1, succeeded: 1, unratedCalls: 1 }),
+    ];
+
+    const rows = (): HTMLTableRowElement[] => [
+      ...(fixture.nativeElement as HTMLElement).querySelectorAll<HTMLTableRowElement>(
+        '[data-testid="ai-purposes"] tbody tr',
+      ),
+    ];
+
+    const cells = (row: HTMLTableRowElement): string[] =>
+      [...row.querySelectorAll('th, td')].map((cell) =>
+        (cell.textContent ?? '').replace(/\s+/g, ' ').trim(),
+      );
+
+    it('lists every purpose in the fixed order, zeroes included', () => {
+      mount({ ...usage, byPurpose });
+
+      expect(rows().map((row) => cells(row)[0])).toEqual([
+        'Replies to customers',
+        'Knowledge searches for replies',
+        'Indexing knowledge documents',
+        'Agent previews',
+        'Knowledge search tests',
+      ]);
+      expect(cells(rows()[4])).toEqual(['Knowledge search tests', '0', '0', '0', '—']);
+    });
+
+    it('shows each currency on its own line and never adds them', () => {
+      mount({ ...usage, byPurpose });
+
+      const cost = rows()[0].querySelectorAll('td')[3];
+      const lines = [...cost.querySelectorAll('.purpose-cost')].map((line) => line.textContent);
+
+      expect(lines).toEqual(['$0.25', '€0.10']);
+      expect(cost.textContent).not.toContain('0.35');
+    });
+
+    it('says unrated calls in words, and failures and unknown outcomes beside the calls', () => {
+      mount({ ...usage, byPurpose });
+
+      expect(rows()[0].querySelector('[data-testid="purpose-unpriced"]')?.textContent).toBe(
+        '3 calls not priced',
+      );
+      expect(rows()[3].querySelector('[data-testid="purpose-unpriced"]')?.textContent).toBe(
+        '1 call not priced',
+      );
+      // A row with only unpriced calls shows no dash beside its sentence.
+      expect(cells(rows()[3])[4]).toBe('1 call not priced');
+      const calls = rows()[0].querySelectorAll('td')[0];
+
+      expect(
+        [...calls.querySelectorAll('.purpose-meta')].map((line) =>
+          line.textContent?.replace(/\s+/g, ' ').trim(),
+        ),
+      ).toEqual(['Failed: 2', 'Outcome unknown: 1']);
+    });
+
+    it('keeps a purpose a later server adds, named by its code, left to right', () => {
+      mount({ ...usage, byPurpose: [...byPurpose, purpose('FutureThing', { calls: 2 })] });
+
+      const last = rows().at(-1)!;
+
+      expect(last.querySelector('bdi')?.getAttribute('dir')).toBe('ltr');
+      expect(cells(last)[0]).toBe('FutureThing');
+    });
+
+    it('has no purpose table without calls', () => {
+      mount(null);
+
+      expect(
+        (fixture.nativeElement as HTMLElement).querySelector('[data-testid="ai-purposes"]'),
+      ).toBeNull();
+    });
   });
 });

@@ -19,12 +19,22 @@ import {
   ReportCatalogEntry,
   ReportFormat,
   ReportFrequency,
+  ReportLanguage,
   ReportSchedule,
   ReportType,
   ReportsApi,
   SaveReportSchedule,
+  parameterValues,
 } from '../reports-api';
-import { formatLabel, frequencyLabel, reportTitle, statusLabel } from '../reports-words';
+import {
+  REPORT_LANGUAGES,
+  fileLanguageLabel,
+  formatLabel,
+  frequencyLabel,
+  reportTitle,
+  statusLabel,
+} from '../reports-words';
+import { DEFAULT_TIME_ZONE, formatInZone, zoneLabel, zonePhrase } from '@app/core/i18n/time-zone';
 import { Icon } from '@app/shared/icon/icon';
 import { HasUnsavedChanges, protectUnsavedChanges } from '@app/core/navigation/unsaved-changes';
 import { ReportsNav } from '../reports-nav/reports-nav';
@@ -42,6 +52,15 @@ import { ScrollRegion } from '@app/shared/scroll-region/scroll-region';
  * <strong>Every change presents the version it was made against.</strong> A
  * schedule edited in another tab since this one loaded is refused, and the page
  * offers to reload it — it never merges two people's edits.
+ *
+ * <strong>Times are the workspace's.</strong> Weekly and monthly boundaries are
+ * local days of the workspace's zone (the catalogue's `timeZone`), so the next
+ * run and the last report are shown as they read there, and the page says which
+ * zone that is.
+ *
+ * <strong>Each schedule keeps its own file language.</strong> A new one starts in
+ * the reader's language; an edit shows and keeps the schedule's own, so a
+ * colleague's save never moves it to theirs (38.0 §4.3 #4).
  */
 @Component({
   selector: 'app-report-schedules',
@@ -69,6 +88,26 @@ export class ReportSchedules implements HasUnsavedChanges {
   protected readonly schedules = signal<readonly ReportSchedule[]>([]);
   protected readonly schedulable = signal<readonly ReportCatalogEntry[]>([]);
 
+  /** The workspace's zone, as the catalogue says it. */
+  protected readonly zone = signal(DEFAULT_TIME_ZONE);
+
+  /** "Days and times on this page are in Asia/Riyadh time." */
+  protected readonly zoneNote = computed(() => {
+    const zone = zonePhrase(this.zone());
+
+    return $localize`:@@schedules.zoneNote:Days and times on this page are ${zone}:zone:.`;
+  });
+
+  /** "Next run (Asia/Riyadh time)". */
+  protected readonly nextRunHeading = computed(() => {
+    const zone = zoneLabel(this.zone());
+
+    return $localize`:@@schedules.column.nextRunZone:Next run (${zone}:zone:)`;
+  });
+
+  protected readonly languages = REPORT_LANGUAGES;
+  protected readonly fileLanguageLabel = fileLanguageLabel;
+
   /** The schedule being edited and the version it was read at; null while creating. */
   protected readonly editing = signal<{ id: string; etag: string } | null>(null);
   protected readonly formOpen = signal(false);
@@ -94,6 +133,7 @@ export class ReportSchedules implements HasUnsavedChanges {
     type: new FormControl<ReportType | ''>('', { nonNullable: true }),
     format: new FormControl<ReportFormat>('Csv', { nonNullable: true }),
     frequency: new FormControl<ReportFrequency>('Weekly', { nonNullable: true }),
+    language: new FormControl<ReportLanguage>(this.locale.language, { nonNullable: true }),
   });
 
   /** A method rather than a computed: the control's validity is not a signal. */
@@ -124,6 +164,8 @@ export class ReportSchedules implements HasUnsavedChanges {
       type: this.schedulable()[0]?.type ?? '',
       format: 'Csv',
       frequency: 'Weekly',
+      // A new schedule starts in the language the reader is using Nabra in.
+      language: this.locale.language,
     });
     this.openForm(null);
   }
@@ -148,6 +190,8 @@ export class ReportSchedules implements HasUnsavedChanges {
         type: versioned.value.type,
         format: versioned.value.format,
         frequency: versioned.value.frequency,
+        // The schedule's own language, kept unless the reader changes it.
+        language: versioned.value.language === 'ar' ? 'ar' : 'en',
       });
       this.openForm(schedule.id);
     } catch (error: unknown) {
@@ -189,6 +233,7 @@ export class ReportSchedules implements HasUnsavedChanges {
       format: value.format,
       frequency: value.frequency,
       enabled: true,
+      language: value.language,
     };
 
     const editing = this.editing();
@@ -306,14 +351,20 @@ export class ReportSchedules implements HasUnsavedChanges {
     })),
   );
 
+  /** A report's formats, by code, as its catalogue entry lists them. */
   protected formatsFor(type: ReportType | ''): readonly ReportFormat[] {
-    return (
-      this.schedulable().find((entry) => entry.type === type)?.formats ?? ['Csv', 'Xlsx', 'Pdf']
-    );
+    const entry = this.schedulable().find((candidate) => candidate.type === type);
+
+    if (!entry) {
+      return ['Csv', 'Xlsx', 'Pdf'];
+    }
+
+    return (parameterValues(entry, 'format') ?? entry.formats) as readonly ReportFormat[];
   }
 
+  /** An instant as it reads in the workspace's zone. */
   protected when(value: string): string {
-    return this.locale.date(value, 'dateTime', 'UTC');
+    return formatInZone(this.locale.language, value, 'dateTime', this.zone());
   }
 
   /** "Edit schedule Weekly channels": the row's buttons name their schedule. */
@@ -346,7 +397,7 @@ export class ReportSchedules implements HasUnsavedChanges {
       case 'Completed': {
         const when = this.when(last.requestedAt);
 
-        return $localize`:@@schedules.last.ready:Ready · ${when}:when: UTC`;
+        return $localize`:@@schedules.last.readyAt:Ready · ${when}:when:`;
       }
       case 'Failed':
         return $localize`:@@schedules.last.failed:Last run failed`;
@@ -383,6 +434,7 @@ export class ReportSchedules implements HasUnsavedChanges {
       ]);
 
       this.schedulable.set(catalog.reports.filter((entry) => entry.canSchedule));
+      this.zone.set(catalog.timeZone);
     } catch (error: unknown) {
       this.failure.set(toApiError(error));
     } finally {

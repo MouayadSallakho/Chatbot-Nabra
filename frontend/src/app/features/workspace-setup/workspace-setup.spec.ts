@@ -195,7 +195,7 @@ describe('WorkspaceSetup', () => {
       expect(navigatedTo).toEqual(['/', 'overview']);
     });
 
-    it('reports a rejected slug in the backend words and stays put', async () => {
+    it('reports an uncoded refusal in our own words and stays put', async () => {
       await typeName('Acme Trading');
 
       submit().click();
@@ -209,7 +209,8 @@ describe('WorkspaceSetup', () => {
         );
       await settle();
 
-      expect(host().textContent).toContain("The slug 'acme-trading' is taken.");
+      expect(host().textContent).toContain('That action is not available for this item right now.');
+      expect(host().textContent).not.toContain("The slug 'acme-trading' is taken.");
       expect(navigatedTo).toBeNull();
     });
 

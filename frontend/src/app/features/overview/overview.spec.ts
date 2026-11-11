@@ -13,7 +13,12 @@ import { Overview } from './overview';
 
 /** A seven-day dashboard in the API's own shape; today (the 18th) is still running. */
 function dashboard(
-  overrides: { failed?: number; whatsappFailed?: number } = {},
+  overrides: {
+    failed?: number;
+    whatsappFailed?: number;
+    previous?: AnalyticsDashboard['previous'];
+    timeZone?: string;
+  } = {},
 ): AnalyticsDashboard {
   const days = ['12', '13', '14', '15', '16', '17', '18'].map((day, index) => ({
     date: `2026-10-${day}`,
@@ -29,7 +34,7 @@ function dashboard(
       from: '2026-10-12T00:00:00+00:00',
       to: '2026-10-18T19:27:49+00:00',
       days: 7,
-      timeZone: 'UTC',
+      timeZone: overrides.timeZone ?? 'UTC',
     },
     summary: {
       conversationsStarted: 12,
@@ -57,6 +62,8 @@ function dashboard(
             failed: overrides.whatsappFailed,
             unknown: 0,
           },
+    firstActivityOn: '2026-09-01',
+    ...(overrides.previous ? { previous: overrides.previous } : {}),
   };
 }
 
@@ -105,6 +112,9 @@ describe('Overview', () => {
       (element) => element.textContent?.trim() ?? '',
     );
 
+  /** What the page asked the analytics endpoint for, call by call. */
+  let dashboardCalls: unknown[][] = [];
+
   async function render(options: {
     granted?: readonly string[];
     dashboard?: AnalyticsDashboard | 'fail' | 'never';
@@ -114,6 +124,8 @@ describe('Overview', () => {
     needsPerson?: number;
   }) {
     const granted = new Set(options.granted ?? ['analytics.view', 'billing.view']);
+
+    dashboardCalls = [];
 
     TestBed.configureTestingModule({
       providers: [
@@ -134,8 +146,8 @@ describe('Overview', () => {
         {
           provide: AnalyticsApi,
           useValue: {
-            dashboard: () =>
-              options.dashboard === 'fail'
+            dashboard: (...args: unknown[]) =>
+              dashboardCalls.push(args) && options.dashboard === 'fail'
                 ? throwError(() => new Error('down'))
                 : options.dashboard === 'never'
                   ? NEVER
@@ -370,8 +382,8 @@ describe('Overview', () => {
     expect(host().querySelectorAll('.chart-column.is-partial').length).toBe(1);
     expect(host().querySelector('[data-testid="chart-partial"]')).not.toBeNull();
 
-    // No comparison is invented: the endpoint returns no previous period.
-    expect(text()).not.toMatch(/%\s*(up|down)|vs\.? last|previous week/i);
+    // No comparison is invented when the server sent no previous period.
+    expect(host().querySelector('.figure-change')).toBeNull();
 
     // Every sparkline's days are in the chart's table, conversations included.
     host().querySelector<HTMLButtonElement>('[data-testid="chart-view-toggle"]')!.click();
@@ -382,6 +394,62 @@ describe('Overview', () => {
     expect(table?.querySelectorAll('tbody tr').length).toBe(7);
     expect(table?.querySelector('thead')?.textContent).toContain('Conversations started');
     expect(table?.textContent).toContain('so far');
+  });
+
+  it('asks for the previous seven days on the same read, and says how each figure moved', async () => {
+    await render({
+      dashboard: dashboard({
+        previous: {
+          period: {
+            range: '7d',
+            from: '2026-10-05T00:00:00+00:00',
+            to: '2026-10-12T00:00:00+00:00',
+            days: 7,
+            timeZone: 'UTC',
+          },
+          summary: {
+            conversationsStarted: 8,
+            customerMessages: 30,
+            aiMessages: 50,
+            humanMessages: 0,
+            systemMessages: 0,
+          },
+          aiOperations: { attempts: 0, completed: 0, failed: 0, inProgress: 0 },
+        },
+      }),
+    });
+
+    expect(dashboardCalls).toEqual([['tenant-1', '7d', { compare: true }]]);
+
+    const change = (key: string): string =>
+      host()
+        .querySelector(`[data-testid="week-${key}-change"] > span:last-child`)
+        ?.textContent?.replace(/\s+/g, ' ')
+        .trim() ?? '';
+
+    expect(change('conversations')).toBe('So far, up 50% on the previous period');
+    expect(change('customer')).toBe('So far, the same as the previous period');
+    expect(change('ai')).toBe('So far, down 50% on the previous period');
+    expect(change('human')).toBe('None in the previous period');
+  });
+
+  it('says which zone the days are in and how far back the data goes', async () => {
+    await render({ dashboard: dashboard({ timeZone: 'Asia/Riyadh' }) });
+
+    expect(host().querySelector('[data-testid="week-note"]')?.textContent).toBe(
+      'Whole days in \u2066Asia/Riyadh\u2069 time. Data since Sep 1, 2026.',
+    );
+  });
+
+  it('keeps the status word beside its glyph at every width (E10)', async () => {
+    await render({ unread: 3 });
+
+    const tone = host().querySelector('.attention-tone')!;
+
+    expect(tone.textContent?.trim()).toBe('For your information');
+    // Not hidden on phones any more: the title gives way instead.
+    expect(tone.querySelector('.visually-hidden-below-md')).toBeNull();
+    expect(host().querySelector('.attention-title')).not.toBeNull();
   });
 
   it('shows no numbers, and asks for none, without analytics.view', async () => {

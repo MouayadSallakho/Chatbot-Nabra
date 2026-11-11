@@ -6,6 +6,12 @@
 
 .delivery-note {
   margin: 0;
+
+  // What a schedule does, then which zone its days and times are in.
+  > div {
+    display: grid;
+    gap: var(--space-2);
+  }
 }
 
 .schedule-form {

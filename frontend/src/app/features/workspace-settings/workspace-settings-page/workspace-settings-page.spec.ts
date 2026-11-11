@@ -8,8 +8,13 @@ import { registerProblemWords } from '@app/core/problems/problem-words';
 import { LOCAL_STORAGE } from '@app/core/storage/local-storage';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
 import { WORKSPACE_PROBLEM_WORDS } from '@app/features/workspace-setup/workspace-problems';
-import { memoryStorage, permissionApiGranting } from '@app/testing/test-doubles';
-import { WorkspaceSettingsPage } from './workspace-settings-page';
+import {
+  answerConfirmation,
+  memoryStorage,
+  permissionApiGranting,
+  stubDialogs,
+} from '@app/testing/test-doubles';
+import { WorkspaceSettingsPage, zoneGroups } from './workspace-settings-page';
 
 /**
  * The workspace settings page (Phase 38.4, D1).
@@ -23,7 +28,16 @@ describe('WorkspaceSettingsPage', () => {
   const tenantUrl = `/api/tenants/${tenantId}`;
   const renameUrl = `${tenantUrl}/name`;
 
-  const acme = { id: tenantId, name: 'Acme Trading', slug: 'acme', status: 'Active' as const };
+  const zoneUrl = `${tenantUrl}/time-zone`;
+  const schedulesUrl = `${tenantUrl}/reports/schedules`;
+
+  const acme = {
+    id: tenantId,
+    name: 'Acme Trading',
+    slug: 'acme',
+    status: 'Active' as const,
+    timeZone: 'UTC',
+  };
 
   let fixture: ComponentFixture<WorkspaceSettingsPage>;
   let http: HttpTestingController;
@@ -158,7 +172,7 @@ describe('WorkspaceSettingsPage', () => {
     await settle();
 
     expect(host().querySelector('[data-testid="settings-stale"]')).not.toBeNull();
-    expect(text()).toContain('This workspace was renamed somewhere else.');
+    expect(text()).toContain('This workspace was changed somewhere else.');
     expect(field().value).toBe('Acme Holdings');
     // verify() proves there was no second PUT.
   });
@@ -347,5 +361,285 @@ describe('WorkspaceSettingsPage', () => {
     await settle();
 
     expect(text()).toContain('Acme Trading');
+  });
+
+  describe('the time zone (E1)', () => {
+    const select = (): HTMLSelectElement =>
+      host().querySelector<HTMLSelectElement>('[data-testid="time-zone-select"]')!;
+    const filter = (): HTMLInputElement =>
+      host().querySelector<HTMLInputElement>('[data-testid="time-zone-filter"]')!;
+    const saveZone = (): HTMLButtonElement =>
+      host().querySelector<HTMLButtonElement>('[data-testid="save-zone"]')!;
+
+    function choose(zone: string): void {
+      select().value = zone;
+      select().dispatchEvent(new Event('change'));
+    }
+
+    function submitZone(): void {
+      host().querySelectorAll('form')[1].dispatchEvent(new Event('submit'));
+    }
+
+    it('offers UTC first, then every zone grouped by region, left to right', async () => {
+      await open('workspace.manage');
+
+      const options = [...select().options];
+      const groups = [...select().querySelectorAll('optgroup')].map((group) => group.label);
+
+      expect(options[0].value).toBe('UTC');
+      expect(select().value).toBe('UTC');
+      expect(select().getAttribute('dir')).toBe('ltr');
+      expect(groups).toContain('Asia');
+      expect(groups).toContain('Europe');
+      expect(options.some((option) => option.value === 'Asia/Riyadh')).toBe(true);
+      expect(text()).toContain(
+        'Days in analytics, report periods and report schedules are counted in this zone.',
+      );
+    });
+
+    it('shortens the list from a city or a region, and says when nothing matches', async () => {
+      await open('workspace.manage');
+
+      filter().value = 'new york';
+      filter().dispatchEvent(new Event('input'));
+      await settle();
+
+      const values = [...select().options].map((option) => option.value);
+
+      expect(values).toContain('America/New_York');
+      expect(values).not.toContain('Asia/Riyadh');
+      // UTC and the saved zone stay, so the field never silently changes.
+      expect(values[0]).toBe('UTC');
+
+      filter().value = 'atlantis';
+      filter().dispatchEvent(new Event('input'));
+      await settle();
+
+      expect(text()).toContain('No time zone matches.');
+    });
+
+    it('saves without asking when the workspace has no schedules, with the version it read', async () => {
+      await open('workspace.manage', 'reports.view');
+
+      choose('Asia/Riyadh');
+      await settle();
+      expect(text()).toContain('Unsaved changes');
+      expect(host().querySelector('[data-testid="saved-zone"]')?.textContent).toContain('UTC');
+      expect(fixture.componentInstance.hasUnsavedChanges()).toBe(true);
+
+      submitZone();
+      await settle();
+
+      http.expectOne(schedulesUrl).flush({ items: [] });
+      await settle();
+
+      const put = http.expectOne(zoneUrl);
+
+      expect(put.request.method).toBe('PUT');
+      expect(put.request.headers.get('If-Match')).toBe('"v1"');
+      expect(put.request.body).toEqual({ timeZone: 'Asia/Riyadh' });
+
+      put.flush({ ...acme, timeZone: 'Asia/Riyadh' }, { headers: { ETag: '"v2"' } });
+      await settle();
+
+      expect(toasts()).toContain('The time zone is now \u2066Asia/Riyadh\u2069.');
+      expect(fixture.componentInstance.hasUnsavedChanges()).toBe(false);
+
+      // The next save, in either section, presents the new version.
+      type('Acme Holdings');
+      await settle();
+      submit();
+      await settle();
+
+      const rename = http.expectOne(renameUrl);
+
+      expect(rename.request.headers.get('If-Match')).toBe('"v2"');
+      rename.flush(
+        { ...acme, name: 'Acme Holdings', timeZone: 'Asia/Riyadh' },
+        {
+          headers: { ETag: '"v3"' },
+        },
+      );
+      await settle();
+
+      // Renaming does not put the zone back.
+      expect(select().value).toBe('Asia/Riyadh');
+    });
+
+    it('asks first when schedules would move, and sends nothing if the reader keeps the zone', async () => {
+      await open('workspace.manage', 'reports.view');
+      stubDialogs(host());
+
+      choose('Asia/Riyadh');
+      await settle();
+      submitZone();
+      await settle();
+
+      http.expectOne(schedulesUrl).flush({ items: [{ id: 's1' }] });
+      await settle();
+
+      const dialog = host().querySelector('dialog[open]');
+
+      expect(dialog?.textContent).toContain('Change the time zone to');
+      expect(dialog?.textContent).toContain('Asia/Riyadh');
+      expect(dialog?.textContent).toContain('Every report schedule moves');
+
+      answerConfirmation(host(), false);
+      await settle();
+
+      // verify() proves no PUT; the choice is still there to save later.
+      expect(select().value).toBe('Asia/Riyadh');
+    });
+
+    it('saves after the reader confirms', async () => {
+      await open('workspace.manage', 'reports.view');
+      stubDialogs(host());
+
+      choose('Europe/Berlin');
+      await settle();
+      submitZone();
+      await settle();
+      http.expectOne(schedulesUrl).flush({ items: [{ id: 's1' }, { id: 's2' }] });
+      await settle();
+
+      answerConfirmation(host());
+      await settle();
+
+      http
+        .expectOne(zoneUrl)
+        .flush({ ...acme, timeZone: 'Europe/Berlin' }, { headers: { ETag: '"v2"' } });
+      await settle();
+
+      expect(toasts()).toContain('The time zone is now \u2066Europe/Berlin\u2069.');
+    });
+
+    it('asks first when it cannot tell whether there are schedules', async () => {
+      await open('workspace.manage');
+      stubDialogs(host());
+
+      choose('Asia/Riyadh');
+      await settle();
+      submitZone();
+      await settle();
+
+      // Without reports.view nothing is read: the dialog asks regardless.
+      expect(host().querySelector('dialog[open]')).not.toBeNull();
+      answerConfirmation(host(), false);
+      await settle();
+    });
+
+    it('keeps the choice when the workspace changed elsewhere, and reloads beside it', async () => {
+      await open('workspace.manage', 'reports.view');
+
+      choose('Asia/Riyadh');
+      await settle();
+      submitZone();
+      await settle();
+      http.expectOne(schedulesUrl).flush({ items: [] });
+      await settle();
+
+      http
+        .expectOne(zoneUrl)
+        .flush({ code: 'precondition.failed' }, { status: 412, statusText: 'Precondition Failed' });
+      await settle();
+
+      expect(host().querySelector('[data-testid="zone-stale"]')).not.toBeNull();
+      expect(select().value).toBe('Asia/Riyadh');
+
+      host().querySelector<HTMLButtonElement>('[data-testid="zone-reload"]')!.click();
+      await settle();
+      http
+        .expectOne(tenantUrl)
+        .flush({ ...acme, timeZone: 'Europe/Berlin' }, { headers: { ETag: '"v5"' } });
+      await settle();
+
+      expect(host().querySelector('[data-testid="zone-stale"]')).toBeNull();
+      expect(select().value).toBe('Asia/Riyadh');
+      expect(host().querySelector('[data-testid="saved-zone"]')?.textContent).toContain(
+        'Europe/Berlin',
+      );
+    });
+
+    it('words workspace.time_zone.invalid by its code, never the server sentence', async () => {
+      registerProblemWords(WORKSPACE_PROBLEM_WORDS);
+      await open('workspace.manage', 'reports.view');
+
+      choose('Asia/Riyadh');
+      await settle();
+      submitZone();
+      await settle();
+      http.expectOne(schedulesUrl).flush({ items: [] });
+      await settle();
+
+      http
+        .expectOne(zoneUrl)
+        .flush(
+          { code: 'workspace.time_zone.invalid', detail: 'Unknown IANA time zone.' },
+          { status: 400, statusText: 'Bad Request' },
+        );
+      await settle();
+
+      const failure = host().querySelector('[data-testid="zone-failure"]')!.textContent ?? '';
+
+      expect(failure).toContain('Nabra does not recognise that time zone.');
+      expect(failure).not.toContain('IANA');
+    });
+
+    it('offers the browser zone as a suggestion that only chooses it', async () => {
+      await open('workspace.manage');
+
+      const suggestion = host().querySelector<HTMLButtonElement>(
+        '[data-testid="time-zone-browser"]',
+      );
+      const browser = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+      if (browser === 'UTC') {
+        // A browser in UTC has nothing to suggest beyond what is saved.
+        expect(suggestion).toBeNull();
+
+        return;
+      }
+
+      suggestion!.click();
+      await settle();
+
+      expect(select().value).toBe(browser);
+      // verify() proves choosing sent nothing.
+    });
+
+    it('shows the zone as text, left to right, to somebody who cannot manage it', async () => {
+      await open();
+
+      expect(host().querySelector('[data-testid="time-zone-select"]')).toBeNull();
+      expect(host().querySelector('[data-testid="save-zone"]')).toBeNull();
+
+      const value = host().querySelector('[data-testid="time-zone-text"]')!;
+
+      expect(value.textContent?.trim()).toBe('UTC');
+      expect(value.getAttribute('dir')).toBe('ltr');
+    });
+
+    it('keeps the save button focusable with nothing to save', async () => {
+      await open('workspace.manage');
+
+      expect(saveZone().disabled).toBe(false);
+      expect(saveZone().getAttribute('aria-disabled')).toBe('true');
+      submitZone();
+      await settle();
+      // verify() proves nothing was sent.
+    });
+  });
+
+  describe('zoneGroups', () => {
+    it('groups by region, keeps zones it must, and drops UTC from the groups', () => {
+      const groups = zoneGroups(['Africa/Cairo', 'Asia/Riyadh', 'Asia/Dubai', 'UTC'], 'riy', [
+        'Etc/Old_Alias',
+      ]);
+
+      expect(groups).toEqual([
+        { region: 'Asia', zones: ['Asia/Riyadh'] },
+        { region: 'Etc', zones: ['Etc/Old_Alias'] },
+      ]);
+    });
   });
 });

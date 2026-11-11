@@ -28,9 +28,9 @@ describe('CONVERSATION_PROBLEM_WORDS', () => {
     expect(error.message).not.toContain('The English sentence');
   });
 
-  it('keeps an unregistered code on the wording it has today', () => {
+  it('gives an unregistered code the generic words, never the server sentence', () => {
     expect(toApiError(refusal('conversations.some.future.code')).message).toBe(
-      'The English sentence from the server.',
+      'Some of the details were rejected. Check the highlighted fields and try again.',
     );
   });
 });

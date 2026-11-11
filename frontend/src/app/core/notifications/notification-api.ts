@@ -24,6 +24,19 @@ export interface AppNotification {
   readonly actionPath: string | null;
   readonly createdAt: string;
   readonly readAt: string | null;
+
+  /**
+   * The facts a client words a notification from (Phase 37.6): for the four
+   * report kinds, the report catalogue's type code; null for every other kind,
+   * and for a report notification whose report is already gone.
+   */
+  readonly parameters?: NotificationParameters | null;
+}
+
+/** What a report notification is about, by code. */
+export interface NotificationParameters {
+  /** A report catalogue `type` (`ConversationActivity`, ...). */
+  readonly reportType: string;
 }
 
 export interface NotificationPage {

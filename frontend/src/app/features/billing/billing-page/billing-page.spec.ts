@@ -336,7 +336,9 @@ describe('BillingPage', () => {
       await settle();
 
       expect(query('[data-testid="action-failure"]')).not.toBeNull();
-      expect(text()).toContain('no longer available');
+      // Uncoded here: the generic words for the kind, never the server sentence.
+      expect(text()).toContain('That action is not available for this item right now.');
+      expect(text()).not.toContain('That offer is no longer available.');
 
       // And the button is usable again, rather than left spinning forever.
       expect(query<HTMLButtonElement>(`[data-testid="buy-${monthlyOfferId}"]`)!.disabled).toBe(

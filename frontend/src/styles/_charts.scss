@@ -421,6 +421,26 @@
   inline-size: 7rem;
 }
 
+// A figure against the previous period (Phase 38.5, E3). The words say the
+// direction; the glyph repeats it, and no colour says whether it is good.
+.figure-change {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-1);
+  font: var(--text-small);
+  color: var(--text-secondary);
+}
+
+.figure-change-glyph {
+  flex: none;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.figure-change-skeleton {
+  inline-size: 8rem;
+}
+
 // -----------------------------------------------------------------------------
 // Forced colours: the system palette replaces the tones, and each series keeps
 // a different system colour so a stack still separates.

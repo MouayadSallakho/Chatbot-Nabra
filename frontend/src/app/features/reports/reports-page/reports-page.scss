@@ -154,9 +154,21 @@ fieldset.field {
 
 .report-meta {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: var(--space-1);
   font: var(--text-small);
   color: var(--text-muted);
+}
+
+// The file's language: a neutral tag, after the format and the size.
+.file-language {
+  margin-inline-start: var(--space-1);
+}
+
+// The period, then the zone it was counted in on its own line.
+.period .report-meta {
+  white-space: nowrap;
 }
 
 // A schedule's name is whatever somebody typed; it wraps rather than widening

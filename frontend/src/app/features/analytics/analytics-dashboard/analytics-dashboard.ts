@@ -14,14 +14,19 @@ import {
   DEFAULT_ANALYTICS_RANGE,
 } from '../analytics-api';
 import {
+  comparisonSentence,
   conversationsSummary,
   dailyPoints,
+  dataSinceSentence,
+  type FigureChange,
+  localDay,
   messagesSummary,
   periodSentence,
   rangeWord,
   repliesSummary,
   senderSeries,
-  utcDay,
+  summaryChanges,
+  type SummaryKey,
 } from '../analytics-words';
 import { ProviderUsageCard } from '../provider-usage/provider-usage';
 import { LocaleFormat } from '@app/core/i18n/locale-format';
@@ -51,9 +56,17 @@ import { VoiceSplit } from '@app/shared/voice/voice-split';
  * and a table behind each chart.
  *
  * <strong>Partial data says so.</strong> The last day of a period is today, and
- * today is not over: it is drawn lighter and labelled "so far". A refresh that
- * fails keeps the figures already on screen and says how old they are, rather
- * than blanking the page or pretending they are new.
+ * today is not over: it is drawn lighter and labelled "so far", and so is each
+ * figure's change against the previous period. A refresh that fails keeps the
+ * figures already on screen and says how old they are, rather than blanking the
+ * page or pretending they are new.
+ *
+ * <strong>Days are the workspace's.</strong> Every day is a local day of the
+ * workspace's time zone, and the page says which zone the response used
+ * (`period.timeZone`, Phase 37.6), never a zone of its own.
+ *
+ * <strong>The comparison rides on the same read</strong> (`compare=previous`):
+ * one request, as before, with the previous period's totals in it.
  *
  * <strong>Provider usage is internal accounting, and lives in its own
  * component.</strong> See {@link ProviderUsageCard}.
@@ -153,6 +166,69 @@ export class AnalyticsDashboardPage {
     const dashboard = this.dashboard();
 
     return dashboard ? periodSentence(dashboard, this.locale.language) : '';
+  });
+
+  /** "Compared with …", the previous period's days. */
+  protected readonly comparison = computed(() => {
+    const dashboard = this.dashboard();
+
+    return dashboard ? comparisonSentence(dashboard, this.locale.language) : null;
+  });
+
+  /** "Data since …", or that no conversation has started yet. */
+  protected readonly since = computed(() => {
+    const dashboard = this.dashboard();
+
+    return dashboard ? dataSinceSentence(dashboard.firstActivityOn, this.locale.language) : '';
+  });
+
+  /** A workspace that has never had a conversation: its own empty state. */
+  protected readonly neverActive = computed(() => this.dashboard()?.firstActivityOn === null);
+
+  private readonly changes = computed(() => {
+    const dashboard = this.dashboard();
+
+    return dashboard ? summaryChanges(dashboard, this.locale.language) : null;
+  });
+
+  /** The four period figures, each with its change when the comparison came back. */
+  protected readonly figures = computed(() => {
+    const summary = this.dashboard()?.summary;
+    const changes = this.changes();
+
+    if (!summary) {
+      return [];
+    }
+
+    const figure = (key: SummaryKey, testid: string, label: string, value: number) => ({
+      key,
+      testid,
+      label,
+      value,
+      change: (changes?.[key] ?? null) as FigureChange | null,
+    });
+
+    return [
+      figure(
+        'conversations',
+        'summary-conversations',
+        $localize`:@@analytics.figure.conversations:Conversations started`,
+        summary.conversationsStarted,
+      ),
+      figure(
+        'customer',
+        'summary-customer',
+        $localize`:@@analytics.figure.customer:Customer messages`,
+        summary.customerMessages,
+      ),
+      figure('ai', 'summary-ai', $localize`:@@analytics.figure.ai:AI replies`, summary.aiMessages),
+      figure(
+        'human',
+        'summary-human',
+        $localize`:@@analytics.figure.team:Replies from the team`,
+        summary.humanMessages,
+      ),
+    ];
   });
 
   protected readonly series = senderSeries();
@@ -405,7 +481,9 @@ export class AnalyticsDashboardPage {
     this.failure.set(null);
 
     try {
-      this.dashboard.set(await firstValueFrom(this.api.dashboard(tenantId, this.range())));
+      this.dashboard.set(
+        await firstValueFrom(this.api.dashboard(tenantId, this.range(), { compare: true })),
+      );
       this.readAt.set(new Date());
     } catch (error) {
       this.failure.set(toApiError(error));
@@ -426,9 +504,10 @@ function initialRange(route: ActivatedRoute): AnalyticsRange {
 }
 
 /**
- * A `yyyy-MM-dd` string as a short day label, read as the UTC day it is.
- * Kept as the page's export for its callers; the words live in `analytics-words`.
+ * A `yyyy-MM-dd` day of the workspace's zone as a short label, written from its
+ * parts. Kept as the page's export for its callers; the words live in
+ * `analytics-words`.
  */
 export function formatDay(date: string, language: AppLanguage = 'en'): string {
-  return utcDay(date, language, 'dayMonth');
+  return localDay(date, language, 'dayMonth');
 }

@@ -57,8 +57,8 @@
         <div class="stale-notice" role="alert" data-testid="settings-stale">
           <app-icon name="alert" [strokeWidth]="1.75" />
           <div class="conflict-body">
-            <p class="conflict-title" i18n="@@workspaceSettings.stale.title">
-              This workspace was renamed somewhere else.
+            <p class="conflict-title" i18n="@@workspaceSettings.stale.changed">
+              This workspace was changed somewhere else.
             </p>
             <p i18n="@@workspaceSettings.stale.body">
               Your name has not been saved and is still in the field. Reload the latest version to
@@ -172,7 +172,177 @@
         </div>
       </section>
 
-      <!-- Phase 38.5 adds the time zone here, as its own section of this page. -->
+      <!-- The time zone (Phase 38.5, E1): the zone every day is counted in. -->
+      <section class="card form-section" aria-labelledby="settings-zone-heading">
+        <div class="card-header">
+          <div>
+            <h2
+              id="settings-zone-heading"
+              class="form-section-title"
+              i18n="@@workspaceSettings.zone.heading"
+            >
+              Time zone
+            </h2>
+            <p class="form-section-lede" i18n="@@workspaceSettings.zone.lede">
+              Days in analytics, report periods and report schedules are counted in this zone.
+            </p>
+          </div>
+        </div>
+
+        <div class="card-body">
+          @if (zoneStale()) {
+            <!-- The workspace changed underneath this section; the choice is kept. -->
+            <div class="stale-notice" role="alert" data-testid="zone-stale">
+              <app-icon name="alert" [strokeWidth]="1.75" />
+              <div class="conflict-body">
+                <p class="conflict-title" i18n="@@workspaceSettings.stale.changed">
+                  This workspace was changed somewhere else.
+                </p>
+                <p i18n="@@workspaceSettings.zone.stale.body">
+                  Your time zone has not been saved and is still selected. Reload the latest version
+                  to see the saved one; your choice stays, so you can save it again or change it.
+                </p>
+                <button
+                  type="button"
+                  class="btn btn-secondary btn-sm"
+                  (click)="reloadLatest()"
+                  data-testid="zone-reload"
+                  i18n="@@workspaceSettings.stale.reload"
+                >
+                  Reload latest version
+                </button>
+              </div>
+            </div>
+          }
+
+          @if (canManage()) {
+            <form [formGroup]="zoneForm" (ngSubmit)="saveZone()" novalidate>
+              <div class="field">
+                <label
+                  class="form-label"
+                  for="time-zone-filter"
+                  i18n="@@workspaceSettings.zone.find"
+                  >Find a time zone</label
+                >
+                <input
+                  id="time-zone-filter"
+                  class="form-control"
+                  type="search"
+                  formControlName="filter"
+                  dir="ltr"
+                  autocomplete="off"
+                  spellcheck="false"
+                  aria-describedby="time-zone-find-hint"
+                  data-testid="time-zone-filter"
+                />
+                <p id="time-zone-find-hint" class="form-hint" aria-live="polite">
+                  @if (zoneFilterEmpty()) {
+                    <span i18n="@@workspaceSettings.zone.noMatch"
+                      >No time zone matches. Try a city or a region, such as Riyadh or Europe.</span
+                    >
+                  } @else {
+                    <span i18n="@@workspaceSettings.zone.findHint"
+                      >Type a city or a region to shorten the list below.</span
+                    >
+                  }
+                </p>
+              </div>
+
+              <div class="field">
+                <label class="form-label" for="time-zone" i18n="@@workspaceSettings.zone.label"
+                  >Time zone</label
+                >
+                <!-- IANA ids, left to right in both languages, like an email address. -->
+                <select
+                  id="time-zone"
+                  class="select"
+                  formControlName="zone"
+                  dir="ltr"
+                  aria-describedby="time-zone-hint"
+                  data-testid="time-zone-select"
+                >
+                  <option [value]="utc">{{ utc }}</option>
+                  @for (group of zoneGroups(); track group.region) {
+                    <optgroup [label]="group.region">
+                      @for (zone of group.zones; track zone) {
+                        <option [value]="zone">{{ zone }}</option>
+                      }
+                    </optgroup>
+                  }
+                </select>
+                <p id="time-zone-hint" class="form-hint" i18n="@@workspaceSettings.zone.hint">
+                  A change counts days in the new zone from the next time a page reads them, and
+                  moves every scheduled report to the next start of a day in the new zone. Reports
+                  already generated keep the zone they were made in.
+                </p>
+
+                @if (zoneDirty() && saved(); as workspace) {
+                  <p class="form-hint" data-testid="saved-zone">
+                    <span i18n="@@workspaceSettings.zone.saved.label">Saved time zone:</span
+                    >&nbsp;<bdi dir="ltr">{{ workspace.timeZone }}</bdi>
+                  </p>
+                }
+
+                @if (suggestBrowserZone() && browserZone; as suggestion) {
+                  <div>
+                    <button
+                      type="button"
+                      class="btn btn-ghost btn-sm"
+                      (click)="useBrowserZone()"
+                      data-testid="time-zone-browser"
+                    >
+                      <span i18n="@@workspaceSettings.zone.useBrowser"
+                        >Use this browser's zone:</span
+                      >&nbsp;<bdi dir="ltr">{{ suggestion }}</bdi>
+                    </button>
+                  </div>
+                }
+              </div>
+
+              @if (zoneFailure(); as error) {
+                <p class="alert alert-danger" role="alert" data-testid="zone-failure">
+                  {{ error.message }}
+                </p>
+              }
+
+              <div class="section-actions">
+                @if (zoneDirty()) {
+                  <span class="unsaved-note" aria-live="polite" i18n="@@workspaceSettings.unsaved"
+                    >Unsaved changes</span
+                  >
+                }
+                <button
+                  type="submit"
+                  class="btn btn-primary"
+                  [attr.aria-disabled]="!zoneDirty() || zoneSaving() ? 'true' : null"
+                  data-testid="save-zone"
+                >
+                  @if (zoneSaving()) {
+                    <span i18n="@@workspaceSettings.saving">Saving…</span>
+                  } @else {
+                    <span i18n="@@workspaceSettings.zone.save">Save time zone</span>
+                  }
+                </button>
+              </div>
+            </form>
+          } @else {
+            <p class="settings-value" dir="ltr" data-testid="time-zone-text">
+              {{ workspace.timeZone }}
+            </p>
+          }
+        </div>
+      </section>
     }
+
+    <app-confirm-dialog
+      #zoneDialog
+      [heading]="zoneDialogHeading()"
+      body="Every report schedule moves to the next start of a day in the new zone, and days in analytics and new reports are counted in it from now on. Reports already generated keep their zone."
+      i18n-body="@@workspaceSettings.zone.confirm.body"
+      confirmLabel="Change time zone"
+      i18n-confirmLabel="@@workspaceSettings.zone.confirm.action"
+      cancelLabel="Keep the current zone"
+      i18n-cancelLabel="@@workspaceSettings.zone.confirm.cancel"
+    />
   </div>
 </div>

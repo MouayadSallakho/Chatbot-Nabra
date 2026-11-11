@@ -12,6 +12,7 @@ describe('notificationText', () => {
     actionPath: '/reports',
     createdAt: '2026-10-19T09:00:00Z',
     readAt: null,
+    parameters: { reportType: 'ConversationActivity' },
   };
 
   it('says a known kind in the client’s own words', () => {
@@ -20,14 +21,34 @@ describe('notificationText', () => {
     expect(text.title).toBe('Your report is ready');
   });
 
-  it('keeps the report’s name from the server’s sentence, as the server wrote it', () => {
-    expect(notificationText(base, 'en').body).toBe(
-      'Your “Conversation activity” report has finished generating and is ready to download.',
+  it('names the report by its catalogue code, in the reader’s words (E7)', () => {
+    const text = notificationText(
+      {
+        ...base,
+        kind: 'ScheduledReportFailed',
+        parameters: { reportType: 'AiHumanHandling' },
+        body: 'A scheduled “AI and human handling” report could not be generated.',
+      },
+      'en',
+    );
+
+    // The report page's own name, not the one inside the server's English.
+    expect(text.body).toBe(
+      'A scheduled “AI and team handling” report could not be generated. Open Reports to see why.',
     );
   });
 
-  it('says the sentence without a name rather than guessing one', () => {
-    const text = notificationText({ ...base, body: 'Your report is ready.' }, 'en');
+  it('never reads the name out of the server’s sentence', () => {
+    const text = notificationText(
+      { ...base, parameters: null, body: 'Your “Conversation activity” report is ready.' },
+      'en',
+    );
+
+    expect(text.body).toBe('Your report has finished generating and is ready to download.');
+  });
+
+  it('says the sentence without a name for a report type it does not know', () => {
+    const text = notificationText({ ...base, parameters: { reportType: 'FutureReport' } }, 'en');
 
     expect(text.body).toBe('Your report has finished generating and is ready to download.');
   });

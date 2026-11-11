@@ -55,10 +55,11 @@
                 <!--
                   Severity is the product's status badge: its glyph's shape and
                   its word as well as its colour (a stop, a triangle, an "i", a
-                  dot). On a phone the word is spoken, the glyph is seen.
+                  dot). The word stays visible at every width (Phase 38.5, E10);
+                  on a phone the title gives way instead.
                 -->
                 <span [class]="'badge attention-tone ' + toneBadges[item.tone]">
-                  <span class="visually-hidden-below-md">{{ toneWords[item.tone] }}</span>
+                  <span>{{ toneWords[item.tone] }}</span>
                 </span>
                 <span class="attention-title">{{ item.title }}</span>
                 @if (item.meter; as meter) {
@@ -171,6 +172,21 @@
                 <div class="figure">
                   <dt>{{ figure.label }}</dt>
                   <dd class="figure-value">{{ figure.value | localNumber }}</dd>
+                  @if (figure.change; as change) {
+                    <!-- The words carry the direction; the glyph only repeats them. -->
+                    <dd
+                      class="figure-change"
+                      [attr.data-direction]="change.direction"
+                      [attr.data-testid]="'week-' + figure.key + '-change'"
+                    >
+                      @if (change.glyph) {
+                        <span class="figure-change-glyph" aria-hidden="true">{{
+                          change.glyph
+                        }}</span>
+                      }
+                      <span>{{ change.text }}</span>
+                    </dd>
+                  }
                   <dd class="figure-shape">
                     <app-sparkline [values]="figure.days" [tone]="figure.tone" />
                   </dd>
@@ -181,6 +197,7 @@
                 <div class="figure" aria-hidden="true">
                   <dt><span class="skeleton skeleton-text figure-skeleton-label"></span></dt>
                   <dd><span class="skeleton figure-skeleton"></span></dd>
+                  <dd><span class="skeleton skeleton-text figure-change-skeleton"></span></dd>
                 </div>
               }
             }
@@ -200,6 +217,7 @@
                 [plotHeight]="140"
               />
             </div>
+            <p class="week-note" data-testid="week-note">{{ weekNote() }}</p>
           } @else {
             <!-- The chart's place, held at its loaded size while the figures arrive. -->
             <div class="card card-body week-chart" aria-hidden="true">

@@ -28,7 +28,13 @@ export interface AnalyticsPeriod {
   readonly to: string;
   readonly days: number;
 
-  /** Always `UTC` in this build. Shown, because a day boundary depends on it. */
+  /**
+   * The workspace's IANA zone, `UTC` unless somebody chose another (Phase
+   * 37.6). Every date in the response is a local date of it, and `from` and
+   * `to` are instants: `from` the start of a local day, `to` the moment of the
+   * read (part-way through today) or, for a previous period, the start of the
+   * current one.
+   */
   readonly timeZone: string;
 }
 
@@ -48,7 +54,7 @@ export interface AnalyticsSnapshot {
   readonly openHandledByHuman: number;
 }
 
-/** One UTC day. `date` is `yyyy-MM-dd`. */
+/** One local day of the workspace's zone. `date` is `yyyy-MM-dd`. */
 export interface AnalyticsDay {
   readonly date: string;
   readonly conversationsStarted: number;
@@ -90,6 +96,26 @@ export interface AnalyticsAiOperations {
   readonly failed: number;
   readonly inProgress: number;
 }
+
+/**
+ * Why a provider call was made (Phase 37.6, `provider-usage-cost-accounting.md`
+ * §17). The stored enum names; they never change.
+ */
+export type AnalyticsPurpose =
+  | 'ConversationGeneration'
+  | 'ConversationRetrievalEmbedding'
+  | 'KnowledgeIndexEmbedding'
+  | 'AgentPreviewGeneration'
+  | 'AgentRetrievalTest';
+
+/** The purposes in the order the server sends them and the screen shows them. */
+export const ANALYTICS_PURPOSES: readonly AnalyticsPurpose[] = [
+  'ConversationGeneration',
+  'ConversationRetrievalEmbedding',
+  'KnowledgeIndexEmbedding',
+  'AgentPreviewGeneration',
+  'AgentRetrievalTest',
+];
 
 /**
  * One currency's estimated provider cost.
@@ -159,6 +185,27 @@ export interface AnalyticsAiUsage {
 
   /** One entry per currency. Empty when nothing could be priced. */
   readonly ratedCost: readonly AnalyticsRatedCost[];
+
+  /**
+   * The same calls by purpose: every purpose, in a fixed order, zeroes
+   * included. The rows add up to the figures above; each has its own
+   * per-currency cost, never added across currencies.
+   */
+  readonly byPurpose: readonly AnalyticsPurposeUsage[];
+}
+
+/** One purpose's share of the provider calls. */
+export interface AnalyticsPurposeUsage {
+  /** An {@link AnalyticsPurpose}; a later server may add one this build does not know. */
+  readonly purpose: string;
+  readonly calls: number;
+  readonly succeeded: number;
+  readonly failed: number;
+  readonly unresolved: number;
+  readonly inputTokens: number;
+  readonly outputTokens: number;
+  readonly unratedCalls: number;
+  readonly ratedCost: readonly AnalyticsRatedCost[];
 }
 
 /**
@@ -195,6 +242,17 @@ export interface AnalyticsWhatsappDelivery {
 }
 
 /**
+ * The period before, for comparison (`compare=previous`, Phase 37.6): the same
+ * number of whole local days, ending where the current period starts, in the
+ * same zone. Only the period's totals; "right now" has no history.
+ */
+export interface AnalyticsComparison {
+  readonly period: AnalyticsPeriod;
+  readonly summary: AnalyticsSummary;
+  readonly aiOperations: AnalyticsAiOperations;
+}
+
+/**
  * One workspace's dashboard.
  *
  * Counts and safe dimensions. No message text, no customer identifier, no
@@ -217,6 +275,24 @@ export interface AnalyticsDashboard {
   readonly models: readonly AnalyticsModelUsage[];
 
   readonly whatsappDelivery: AnalyticsWhatsappDelivery | null;
+
+  /**
+   * The local date of the workspace's first conversation ever, or null when it
+   * has none: "Data since …", and the honest empty state.
+   */
+  readonly firstActivityOn: string | null;
+
+  /** Present only when the comparison was asked for; absent, not null, otherwise. */
+  readonly previous?: AnalyticsComparison;
+}
+
+/** What a dashboard read asks for beyond its period. */
+export interface DashboardOptions {
+  /**
+   * Adds the previous period. Asked only by a screen that shows the comparison:
+   * it costs the server three more counting statements.
+   */
+  readonly compare?: boolean;
 }
 
 /**
@@ -232,10 +308,20 @@ export interface AnalyticsDashboard {
 export class AnalyticsApi {
   private readonly http = inject(HttpClient);
 
-  /** Reads the workspace's dashboard for one bounded period. */
-  dashboard(tenantId: string, range: AnalyticsRange): Observable<AnalyticsDashboard> {
+  /** Reads the workspace's dashboard for one bounded period, and the one before if asked. */
+  dashboard(
+    tenantId: string,
+    range: AnalyticsRange,
+    options: DashboardOptions = {},
+  ): Observable<AnalyticsDashboard> {
+    let params = new HttpParams().set('range', range);
+
+    if (options.compare) {
+      params = params.set('compare', 'previous');
+    }
+
     return this.http.get<AnalyticsDashboard>(`/api/tenants/${tenantId}/analytics/dashboard`, {
-      params: new HttpParams().set('range', range),
+      params,
     });
   }
 }

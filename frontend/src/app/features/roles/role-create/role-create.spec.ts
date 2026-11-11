@@ -275,7 +275,7 @@ describe('RoleCreate', () => {
     expect(text()).toContain('A role name is required.');
   });
 
-  it('shows a name conflict in the server’s own words', async () => {
+  it('shows an uncoded name conflict in our own words, never the server sentence', async () => {
     await mount(...ManagerWithAgents);
 
     type('Support agent');
@@ -291,6 +291,7 @@ describe('RoleCreate', () => {
     );
     await settle();
 
-    expect(text()).toContain('already has a role called');
+    expect(text()).toContain('That action is not available for this item right now.');
+    expect(text()).not.toContain('already has a role called');
   });
 });

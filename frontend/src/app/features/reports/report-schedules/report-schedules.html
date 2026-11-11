@@ -45,12 +45,15 @@
       <!-- What a schedule does, stated once and plainly. -->
       <div class="alert alert-info delivery-note" data-testid="delivery-note">
         <app-icon name="info" [strokeWidth]="1.75" />
-        <p i18n="@@schedules.deliveryNote">
-          Generated reports are available in Reports. The file is never emailed or sent anywhere
-          else; if you turn on Reports in your notification preferences, you get an email that links
-          here. Weekly schedules run every Monday for the previous seven days; monthly schedules run
-          on the first of the month for the previous calendar month. All times are UTC.
-        </p>
+        <div>
+          <p i18n="@@schedules.deliveryNoteZone">
+            Generated reports are available in Reports. The file is never emailed or sent anywhere
+            else; if you turn on Reports in your notification preferences, you get an email that
+            links here. Weekly schedules run every Monday for the previous seven days; monthly
+            schedules run on the first of the month for the previous calendar month.
+          </p>
+          <p data-testid="zone-note">{{ zoneNote() }}</p>
+        </div>
       </div>
 
       @if (failure(); as error) {
@@ -110,7 +113,25 @@
                 @for (format of formatsFor(form.controls.type.value); track format) {
                   <label class="segmented-option">
                     <input type="radio" formControlName="format" [value]="format" />
-                    <span>{{ formatLabel(format) }}</span>
+                    <span dir="auto">{{ formatLabel(format) }}</span>
+                  </label>
+                }
+              </div>
+            </fieldset>
+
+            <!-- The language every report from this schedule is written in (Phase 38.5, E8). -->
+            <fieldset class="field">
+              <legend class="field-label" i18n="@@reports.field.language">File language</legend>
+              <div class="segmented" data-testid="schedule-language">
+                @for (language of languages; track language) {
+                  <label class="segmented-option">
+                    <input
+                      type="radio"
+                      formControlName="language"
+                      [value]="language"
+                      [attr.data-testid]="'schedule-language-' + language"
+                    />
+                    <span>{{ fileLanguageLabel(language) }}</span>
                   </label>
                 }
               </div>
@@ -241,8 +262,9 @@
                 <th scope="col" i18n="@@schedules.field.name">Name</th>
                 <th scope="col" i18n="@@reports.column.report">Report</th>
                 <th scope="col" i18n="@@schedules.column.frequency">Frequency</th>
+                <th scope="col" i18n="@@reports.field.language">File language</th>
                 <th scope="col" i18n="@@reports.column.status">Status</th>
-                <th scope="col" i18n="@@schedules.column.nextRun">Next run (UTC)</th>
+                <th scope="col" data-testid="next-run-heading">{{ nextRunHeading() }}</th>
                 <th scope="col" i18n="@@schedules.column.last">Last report</th>
                 <th scope="col">
                   <span class="visually-hidden" i18n="@@schedules.column.actions">Actions</span>
@@ -258,6 +280,9 @@
                     <span class="format">{{ formatLabel(schedule.format) }}</span>
                   </td>
                   <td class="frequency">{{ frequencyLabel(schedule) }}</td>
+                  <td class="nowrap" [attr.data-testid]="'schedule-language-' + schedule.id">
+                    {{ fileLanguageLabel(schedule.language) }}
+                  </td>
                   <td>
                     <!-- The word is the state; the badge's own glyph and colour repeat it. -->
                     @if (schedule.enabled) {

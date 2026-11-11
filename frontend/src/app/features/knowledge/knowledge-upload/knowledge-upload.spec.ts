@@ -331,7 +331,7 @@ describe('KnowledgeUpload', () => {
       await settle();
     });
 
-    it('reports a file with no readable text in the server words', async () => {
+    it('reports an uncoded file with no readable text in our own words', async () => {
       await mount();
 
       await choose(pdf('scan.pdf'));
@@ -349,7 +349,11 @@ describe('KnowledgeUpload', () => {
 
       await settle();
 
+      // Uncoded here, so the generic words for the kind, never the server sentence.
       expect(query('[data-testid="upload-error"]')?.textContent).toContain(
+        'No usable text could be read from that file.',
+      );
+      expect(query('[data-testid="upload-error"]')?.textContent).not.toContain(
         'No extractable text was found',
       );
 

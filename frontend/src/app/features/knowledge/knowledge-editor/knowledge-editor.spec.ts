@@ -639,7 +639,11 @@ describe('KnowledgeEditor', () => {
       await settle();
 
       expect(contentBox().value).toBe(needsIndex.content);
+      // Uncoded here, so the generic words for the kind, never the server sentence.
       expect(query('[data-testid="replace-error"]')?.textContent).toContain(
+        'No usable text could be read from that file.',
+      );
+      expect(query('[data-testid="replace-error"]')?.textContent).not.toContain(
         'No extractable text was found',
       );
       expect(query('[data-testid="replace-error"]')?.textContent).toContain(

@@ -149,10 +149,11 @@ describe('AgentPreview', () => {
       await settle();
     }
 
-    it('explains a rejected message (400) in the backend words', async () => {
+    it('explains a rejected message (400) in our own words, never the backend sentence', async () => {
       await fail(400, { detail: 'The message must not be empty.' });
 
-      expect(host().textContent).toContain('The message must not be empty.');
+      expect(host().textContent).toContain('Some of the details were rejected');
+      expect(host().textContent).not.toContain('The message must not be empty.');
     });
 
     it('explains an unusable provider answer (502) without naming the provider', async () => {

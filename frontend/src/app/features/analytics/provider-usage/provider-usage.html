@@ -99,6 +99,87 @@
         }
       </section>
     </div>
+
+    <!--
+      The same calls by purpose (Phase 38.5, E5): every purpose, in the server's
+      fixed order, zeroes included. Each row's cost is one line per currency,
+      never a sum of them, and calls no rate covers are said in words.
+    -->
+    @if (purposeRows().length > 0) {
+      <section class="card card-body" aria-labelledby="purposes-heading">
+        <h3 id="purposes-heading" class="usage-cost-title" i18n="@@usage.purposes.heading">
+          Calls by purpose
+        </h3>
+        <p class="usage-cost-note" i18n="@@usage.purposes.note">
+          Why each call was made. Searches from the knowledge test made before this breakdown
+          existed are counted under knowledge searches for replies.
+        </p>
+        <div
+          class="table-scroll"
+          appScrollRegion="Calls by purpose table"
+          i18n-appScrollRegion="@@usage.purposes.region"
+        >
+          <table class="table" data-testid="ai-purposes">
+            <caption class="visually-hidden" i18n="@@usage.purposes.caption">
+              Provider calls by purpose, with estimated cost
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col" i18n="@@usage.purposes.purpose">Purpose</th>
+                <th scope="col" class="numeric" i18n="@@usage.table.calls">Calls</th>
+                <th scope="col" class="numeric" i18n="@@usage.models.input">Input tokens</th>
+                <th scope="col" class="numeric" i18n="@@usage.models.output">Output tokens</th>
+                <th scope="col" class="numeric" i18n="@@usage.models.cost">Estimated cost</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (row of purposeRows(); track row.purpose) {
+                <tr [attr.data-testid]="'purpose-' + row.purpose">
+                  <th scope="row">
+                    @if (purposeName(row.purpose); as name) {
+                      {{ name }}
+                    } @else {
+                      <bdi dir="ltr">{{ row.purpose }}</bdi>
+                    }
+                  </th>
+                  <td class="numeric">
+                    {{ tokens(row.calls) }}
+                    @if (row.failed > 0) {
+                      <span class="purpose-meta"
+                        ><span i18n="@@usage.outcome.failed">Failed</span>:
+                        {{ tokens(row.failed) }}</span
+                      >
+                    }
+                    @if (row.unresolved > 0) {
+                      <span class="purpose-meta"
+                        ><span i18n="@@usage.outcome.unresolved">Outcome unknown</span>:
+                        {{ tokens(row.unresolved) }}</span
+                      >
+                    }
+                  </td>
+                  <td class="numeric">{{ tokens(row.inputTokens) }}</td>
+                  <td class="numeric">{{ tokens(row.outputTokens) }}</td>
+                  <td class="numeric">
+                    @for (rated of row.ratedCost; track rated.currency) {
+                      <span class="purpose-cost" dir="ltr">{{ cost(rated) }}</span>
+                    } @empty {
+                      @if (row.unratedCalls === 0) {
+                        <span aria-hidden="true">—</span>
+                      }
+                    }
+                    @if (row.unratedCalls > 0) {
+                      <span class="purpose-meta" data-testid="purpose-unpriced">{{
+                        unpricedCalls(row.unratedCalls)
+                      }}</span>
+                    }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </section>
+    }
   } @else {
     <div class="card card-body" data-testid="ai-usage-none">
       <p class="usage-none" i18n="@@usage.none">

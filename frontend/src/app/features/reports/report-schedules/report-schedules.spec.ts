@@ -30,6 +30,10 @@ describe('ReportSchedules', () => {
         formats: ['Csv', 'Xlsx', 'Pdf'],
         requiredPermissions: ['reports.generate', 'analytics.view'],
         canSchedule: true,
+        parameters: [
+          { code: 'range', values: ['7d', '30d', '90d', 'custom'] },
+          { code: 'format', values: ['Csv', 'Xlsx', 'Pdf'] },
+        ],
       },
     ],
     maxRangeDays: 366,
@@ -54,6 +58,7 @@ describe('ReportSchedules', () => {
     disabledReason: null,
     lastExecution: null,
     canEdit: true,
+    language: 'en',
   };
 
   let fixture: ComponentFixture<ReportSchedules>;
@@ -159,6 +164,8 @@ describe('ReportSchedules', () => {
     );
 
     expect(save.request.headers.get('If-Match')).toBe('"v1"');
+    // The schedule's own language is kept, not replaced by the editor's.
+    expect(save.request.body.language).toBe('en');
 
     save.flush(
       { title: 'This schedule changed', status: 412 },
@@ -261,5 +268,125 @@ describe('ReportSchedules', () => {
     await settle();
 
     expect(page.hasUnsavedChanges()).toBe(false);
+  });
+
+  describe('the file language (E8)', () => {
+    const owner = ['reports.view', 'reports.generate', 'reports.schedule', 'analytics.view'];
+
+    it('starts a new schedule in the language the reader uses, and sends it', async () => {
+      await mount(...owner);
+      await answerInitial([]);
+
+      host().querySelector<HTMLButtonElement>('[data-testid="new-schedule"]')!.click();
+      await settle();
+
+      expect(
+        host().querySelector<HTMLInputElement>('[data-testid="schedule-language-en"]')!.checked,
+      ).toBe(true);
+
+      const name = host().querySelector<HTMLInputElement>('#schedule-name')!;
+
+      name.value = 'Monthly in Arabic';
+      name.dispatchEvent(new Event('input'));
+      host().querySelector<HTMLInputElement>('[data-testid="schedule-language-ar"]')!.click();
+      host().querySelector<HTMLButtonElement>('[data-testid="save"]')!.click();
+      await settle();
+
+      const create = http.expectOne(
+        (request) => request.method === 'POST' && request.url === `${base}/schedules`,
+      );
+
+      expect(create.request.body).toEqual(
+        expect.objectContaining({ name: 'Monthly in Arabic', language: 'ar' }),
+      );
+
+      create.flush(
+        { ...schedule, name: 'Monthly in Arabic', language: 'ar' },
+        {
+          headers: { ETag: '"v1"' },
+        },
+      );
+      await settle();
+      http.expectOne(`${base}/schedules`).flush({ items: [] });
+      await settle();
+    });
+
+    it('opens an edit in the language of the schedule, whatever the reader uses', async () => {
+      await mount(...owner);
+      await answerInitial([{ ...schedule, language: 'ar' }]);
+
+      host()
+        .querySelector<HTMLButtonElement>('button[aria-label="Edit schedule Weekly channels"]')!
+        .click();
+      await settle();
+      http
+        .expectOne(`${base}/schedules/${schedule.id}`)
+        .flush({ ...schedule, language: 'ar' }, { headers: { ETag: '"v1"' } });
+      await settle();
+
+      expect(
+        host().querySelector<HTMLInputElement>('[data-testid="schedule-language-ar"]')!.checked,
+      ).toBe(true);
+
+      host().querySelector<HTMLButtonElement>('[data-testid="save"]')!.click();
+      await settle();
+
+      const save = http.expectOne((request) => request.method === 'PUT');
+
+      expect(save.request.body.language).toBe('ar');
+
+      save.flush({ ...schedule, language: 'ar' }, { headers: { ETag: '"v2"' } });
+      await settle();
+      http.expectOne(`${base}/schedules`).flush({ items: [{ ...schedule, language: 'ar' }] });
+      await settle();
+    });
+
+    it('lists the file language of each schedule', async () => {
+      await mount(...owner);
+      await answerInitial([{ ...schedule, language: 'ar' }]);
+
+      expect(
+        host()
+          .querySelector(`[data-testid="schedule-language-${schedule.id}"]`)
+          ?.textContent?.trim(),
+      ).toBe('Arabic file');
+    });
+  });
+
+  describe('the workspace time zone (E2)', () => {
+    async function answerIn(zone: string, schedules: readonly ReportSchedule[]): Promise<void> {
+      http.expectOne(`${base}/catalog`).flush({ ...catalog, timeZone: zone });
+      http.expectOne(`${base}/schedules`).flush({ items: schedules });
+      await settle();
+    }
+
+    it('shows the next run as it reads in the workspace zone, and names that zone', async () => {
+      await mount('reports.view', 'analytics.view');
+      // Riyadh's Monday starts at 21:00 UTC on the Sunday.
+      await answerIn('Asia/Riyadh', [{ ...schedule, nextRunAt: '2026-09-27T21:00:00Z' }]);
+
+      const row = host().querySelector(`[data-testid="schedule-${schedule.id}"]`)!;
+
+      expect(row.textContent).toContain('Sep 28, 2026, 12:00 AM');
+      expect(host().querySelector('[data-testid="next-run-heading"]')?.textContent).toContain(
+        'Asia/Riyadh',
+      );
+      expect(host().querySelector('[data-testid="zone-note"]')?.textContent).toContain(
+        'Days and times on this page are in',
+      );
+      expect(text()).not.toContain('UTC');
+    });
+
+    it('keeps "UTC" for a workspace that never chose a zone', async () => {
+      await mount('reports.view', 'analytics.view');
+      await answerIn('UTC', [schedule]);
+
+      expect(host().querySelector('[data-testid="next-run-heading"]')?.textContent?.trim()).toBe(
+        'Next run (UTC)',
+      );
+      expect(host().querySelector('[data-testid="zone-note"]')?.textContent?.trim()).toBe(
+        'Days and times on this page are in UTC.',
+      );
+    });
   });
 });

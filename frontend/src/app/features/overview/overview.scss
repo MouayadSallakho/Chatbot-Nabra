@@ -170,6 +170,14 @@
   margin-block-start: var(--space-4);
 }
 
+// Which zone the days are in, and how far back the data goes. Below the chart,
+// so nothing above it moves when it arrives.
+.week-note {
+  margin-block-start: var(--space-2);
+  font: var(--text-small);
+  color: var(--text-muted);
+}
+
 // -----------------------------------------------------------------------------
 // Shortcuts
 // -----------------------------------------------------------------------------
@@ -227,8 +235,10 @@
   min-block-size: 11.75rem;
 }
 
+// With the change against the previous seven days (38.5), measured at 768 to
+// 1920px: 10.6rem in English, 11.3rem in Arabic.
 .figures[aria-busy='true'] .figure {
-  min-block-size: 7.875rem;
+  min-block-size: 10.875rem;
 }
 
 .week-chart[aria-hidden='true'] {
@@ -240,8 +250,9 @@
     min-block-size: 12.5rem;
   }
 
+  // 12.7rem (Arabic) to 12.9rem (English) at 390px, with the change line.
   .figures[aria-busy='true'] .figure {
-    min-block-size: 9rem;
+    min-block-size: 12.75rem;
   }
 
   .week-chart[aria-hidden='true'] {

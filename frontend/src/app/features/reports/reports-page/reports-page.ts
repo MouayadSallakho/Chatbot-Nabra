@@ -22,15 +22,20 @@ import {
   ReportExecution,
   ReportExecutionPage,
   ReportFormat,
+  ReportLanguage,
   ReportRange,
   ReportRequest,
   ReportType,
   ReportsApi,
+  parameterValues,
   periodLabel,
 } from '../reports-api';
 import {
+  REPORT_LANGUAGES,
   failureSentence,
+  fileLanguageLabel,
   formatLabel,
+  rangeLabel,
   reportDescription,
   reportTitle,
   requesterLabel,
@@ -38,6 +43,13 @@ import {
   statusLabel,
   statusTone,
 } from '../reports-words';
+import {
+  DEFAULT_TIME_ZONE,
+  nextLocalDate,
+  todayIn,
+  zoneLabel,
+  zonePhrase,
+} from '@app/core/i18n/time-zone';
 import { Icon } from '@app/shared/icon/icon';
 import { ReportsNav } from '../reports-nav/reports-nav';
 import { LocaleFormat } from '@app/core/i18n/locale-format';
@@ -46,9 +58,16 @@ import { ScrollRegion } from '@app/shared/scroll-region/scroll-region';
 /**
  * Generate a report, and download the ones already generated.
  *
- * <strong>A form of three choices, not a report builder.</strong> Which report,
- * which period and which format — and the server decides what each report
- * contains. There is no column picker and no filter to type.
+ * <strong>A form of four choices, not a report builder.</strong> Which report,
+ * which period, which format and which language the file is written in — and
+ * the server decides what each report contains. There is no column picker and
+ * no filter to type. The periods and formats offered are the report's own
+ * (its catalogue `parameters`), each worded by its code.
+ *
+ * <strong>Days are the workspace's.</strong> Presets and chosen dates are local
+ * days of the workspace's zone (the catalogue's `timeZone`), "today" is that
+ * zone's today, and each generated report names the zone its period was counted
+ * in, which stays the same if the workspace's zone changes later.
  *
  * <strong>Generating is queued.</strong> Submitting records the request and the
  * list shows it at once as pending. The one report just asked for is checked a
@@ -127,6 +146,26 @@ export class ReportsPage {
     from: new FormControl('', { nonNullable: true }),
     through: new FormControl('', { nonNullable: true }),
     format: new FormControl<ReportFormat>('Csv', { nonNullable: true }),
+    // The language the reader is using Nabra in, always sent (38.0 §4.3 #4).
+    language: new FormControl<ReportLanguage>(this.locale.language, { nonNullable: true }),
+  });
+
+  protected readonly languages = REPORT_LANGUAGES;
+  protected readonly fileLanguageLabel = fileLanguageLabel;
+  protected readonly rangeLabel = rangeLabel;
+
+  /** The workspace's zone, as the catalogue says it. */
+  protected readonly zone = computed(() => this.catalog()?.timeZone ?? DEFAULT_TIME_ZONE);
+
+  /** Today in the workspace's zone: the last day a custom period can include. */
+  protected readonly today = computed(() => todayIn(this.zone()));
+
+  /** "Whole days in Asia/Riyadh time, including today. At most 366 days." */
+  protected readonly rangeHint = computed(() => {
+    const zone = zonePhrase(this.zone());
+    const max = this.locale.number(this.catalog()?.maxRangeDays ?? 366);
+
+    return $localize`:@@reports.range.hintZone:Whole days ${zone}:zone:, including today. At most ${max}:max: days.`;
   });
 
   private readonly selectedType = signal<ReportType | ''>('');
@@ -136,9 +175,24 @@ export class ReportsPage {
     () => this.reports().find((entry) => entry.type === this.selectedType()) ?? null,
   );
 
-  protected readonly formats = computed<readonly ReportFormat[]>(
-    () => this.selected()?.formats ?? ['Csv', 'Xlsx', 'Pdf'],
-  );
+  /** The selected report's formats, by code, as its catalogue entry lists them. */
+  protected readonly formats = computed<readonly ReportFormat[]>(() => {
+    const selected = this.selected();
+
+    if (!selected) {
+      return ['Csv', 'Xlsx', 'Pdf'];
+    }
+
+    return (parameterValues(selected, 'format') ?? selected.formats) as readonly ReportFormat[];
+  });
+
+  /** The selected report's periods, by code: the presets, and "Choose dates" if it offers it. */
+  protected readonly ranges = computed<readonly ReportRange[]>(() => {
+    const selected = this.selected();
+    const values = selected ? parameterValues(selected, 'range') : null;
+
+    return (values ?? ['7d', '30d', '90d', 'custom']) as readonly ReportRange[];
+  });
 
   /**
    * The key for the report being asked for right now.
@@ -173,11 +227,20 @@ export class ReportsPage {
       this.selectedType.set(value.type ?? '');
       this.selectedRange.set(value.range ?? '30d');
 
-      // A format the newly chosen report does not offer is not left selected.
+      // A format or period the newly chosen report does not offer is not left selected.
       const format = value.format;
 
       if (format && !this.formats().includes(format)) {
         this.form.controls.format.setValue(this.formats()[0], { emitEvent: false });
+      }
+
+      const range = value.range;
+
+      if (range && this.ranges().length > 0 && !this.ranges().includes(range)) {
+        const fallback = this.ranges().includes('30d') ? '30d' : this.ranges()[0];
+
+        this.form.controls.range.setValue(fallback, { emitEvent: false });
+        this.selectedRange.set(fallback);
       }
     });
 
@@ -224,7 +287,8 @@ export class ReportsPage {
       format: value.format,
       range: value.range,
       clientRequestId: this.pendingKey,
-      ...(value.range === 'custom' ? { from: value.from, to: nextDay(value.through) } : {}),
+      language: value.language,
+      ...(value.range === 'custom' ? { from: value.from, to: nextLocalDate(value.through) } : {}),
     };
 
     this.submitting.set(true);
@@ -260,17 +324,23 @@ export class ReportsPage {
     return periodLabel(execution.periodFrom, execution.periodLastDay, this.locale.language);
   }
 
+  /** The zone a report's period was counted in: "UTC", or "Asia/Riyadh time". */
+  protected periodZone(execution: ReportExecution): string {
+    return zoneLabel(execution.timeZone);
+  }
+
   protected when(value: string): string {
     return this.locale.date(value, 'dateTime');
   }
 
-  /** A download link's name, spoken in full: which report, which period, which format. */
+  /** A download link's name, spoken in full: which report, which period, which format, which language. */
   protected downloadName(execution: ReportExecution): string {
     const title = this.title(execution);
     const period = this.period(execution);
     const format = formatLabel(execution.format);
+    const language = fileLanguageLabel(execution.language);
 
-    return $localize`:@@reports.download.name:Download ${title}:title:, ${period}:period:, ${format}:format:`;
+    return $localize`:@@reports.download.nameLanguage:Download ${title}:title:, ${period}:period:, ${format}:format:, ${language}:language:`;
   }
 
   private validate(
@@ -293,6 +363,11 @@ export class ReportsPage {
 
     if (through < from) {
       return $localize`:@@reports.error.order:The end date must be on or after the start date.`;
+    }
+
+    // Today is the workspace's today: a period cannot run into its future.
+    if (through > this.today()) {
+      return $localize`:@@reports.error.future:Choose dates up to today. Days are counted in the workspace's time zone.`;
     }
 
     const days =
@@ -408,12 +483,4 @@ export class ReportsPage {
       this.failure.set(toApiError(error));
     }
   }
-}
-
-/** The exclusive end the API wants, from the inclusive end a person picks. */
-function nextDay(date: string): string {
-  const next = new Date(`${date}T00:00:00Z`);
-  next.setUTCDate(next.getUTCDate() + 1);
-
-  return next.toISOString().slice(0, 10);
 }

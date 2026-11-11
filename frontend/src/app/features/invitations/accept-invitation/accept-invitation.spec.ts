@@ -270,7 +270,7 @@ describe('AcceptInvitation', () => {
     expect(text()).toContain('missing its code');
   });
 
-  it('reports a refusal in the server’s own words and forgets the token', async () => {
+  it('reports a refusal in our own words and forgets the token', async () => {
     // Used, withdrawn, expired or written to somebody else -- all refused for
     // good, so keeping the token would offer a retry that cannot succeed.
     openLinkWith(`#token=${token}`);
@@ -287,7 +287,8 @@ describe('AcceptInvitation', () => {
     await settle();
 
     expect(text()).toContain('This invitation cannot be used');
-    expect(text()).toContain('has expired');
+    expect(text()).toContain('This invitation is no longer available.');
+    expect(text()).not.toContain('has expired');
     expect(handoff.peek()).toBeNull();
   });
 

@@ -512,7 +512,8 @@ describe('AgentEditor', () => {
         );
       await settle();
 
-      expect(host().textContent).toContain('This agent cannot be activated right now.');
+      expect(host().textContent).toContain('That action is not available for this item right now.');
+      expect(host().textContent).not.toContain('This agent cannot be activated right now.');
       // Explicitly NOT the stale-version panel: a 409 is not fixed by reloading
       // and re-saving the same request.
       expect(host().textContent).not.toContain('updated somewhere else');

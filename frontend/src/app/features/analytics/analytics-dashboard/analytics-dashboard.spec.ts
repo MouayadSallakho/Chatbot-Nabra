@@ -64,6 +64,7 @@ describe('AnalyticsDashboardPage', () => {
     aiUsage: null,
     models: [],
     whatsappDelivery: null,
+    firstActivityOn: '2026-08-01',
   };
 
   const busy: AnalyticsDashboard = {
@@ -133,6 +134,7 @@ describe('AnalyticsDashboardPage', () => {
       embeddingInputTokens: 52_000,
       unratedCalls: 0,
       ratedCost: [{ currency: 'USD', estimatedCost: 0.384, calls: 38 }],
+      byPurpose: [],
     },
     models: [
       {
@@ -242,6 +244,176 @@ describe('AnalyticsDashboardPage', () => {
 
       request.flush(empty);
       await settle();
+    });
+
+    it('asks for the previous period on the same read, not in a second request', async () => {
+      await mount();
+
+      const request = pending();
+
+      expect(request.request.params.get('compare')).toBe('previous');
+
+      request.flush(empty);
+      await settle();
+    });
+  });
+
+  describe('the comparison with the previous period (E3)', () => {
+    const previous = {
+      period: {
+        range: '30d',
+        from: '2026-07-18T00:00:00+00:00',
+        to: '2026-08-17T00:00:00+00:00',
+        days: 30,
+        timeZone: 'UTC',
+      },
+      summary: {
+        conversationsStarted: 10,
+        customerMessages: 50,
+        aiMessages: 31,
+        humanMessages: 0,
+        systemMessages: 0,
+      },
+      aiOperations: { attempts: 30, completed: 30, failed: 0, inProgress: 0 },
+    } as const;
+
+    it('says how each figure moved, in words, "so far" while today is running', async () => {
+      await mount();
+      await answer({ ...busy, previous });
+
+      const change = (key: string) =>
+        query(`[data-testid="summary-${key}-change"] > span:last-child`)
+          ?.textContent?.replace(/\s+/g, ' ')
+          .trim();
+
+      expect(change('conversations')).toBe('So far, up 20% on the previous period');
+      expect(change('customer')).toBe('So far, down 20% on the previous period');
+      expect(change('ai')).toBe('So far, the same as the previous period');
+      // None the period before, and the workspace was active before: not "no data".
+      expect(change('human')).toBe('None in the previous period');
+
+      const glyph = (key: string) =>
+        query(`[data-testid="summary-${key}-change"] .figure-change-glyph`)?.textContent;
+
+      expect([glyph('conversations'), glyph('customer'), glyph('ai'), glyph('human')]).toEqual([
+        '↑',
+        '↓',
+        '=',
+        undefined,
+      ]);
+    });
+
+    it('keeps the glyph out of the accessible text: the words say the direction', async () => {
+      await mount();
+      await answer({ ...busy, previous });
+
+      const line = query('[data-testid="summary-conversations-change"]')!;
+
+      expect(line.querySelector('.figure-change-glyph')?.getAttribute('aria-hidden')).toBe('true');
+      expect(line.getAttribute('data-direction')).toBe('up');
+      // No tone class: whether a rise is good is not the page's to say.
+      expect(line.className).toBe('figure-change');
+    });
+
+    it('says there is no earlier data when the workspace started in this period', async () => {
+      await mount();
+      await answer({ ...busy, firstActivityOn: '2026-09-01', previous });
+
+      expect(query('[data-testid="summary-human-change"]')?.textContent).toContain(
+        'No earlier data to compare',
+      );
+    });
+
+    it('names the days it compares with', async () => {
+      await mount();
+      await answer({ ...busy, previous });
+
+      expect(query('[data-testid="comparison"]')?.textContent).toBe(
+        'Compared with Jul 18, 2026 – Aug 16, 2026.',
+      );
+    });
+
+    it('drops the "so far" once the period has ended', async () => {
+      await mount();
+      await answer({
+        ...busy,
+        period: { ...busy.period, to: '2026-09-16T00:00:00+00:00' },
+        previous,
+      });
+
+      expect(query('[data-testid="summary-conversations-change"]')?.textContent).toContain(
+        'Up 20% on the previous period',
+      );
+    });
+
+    it('shows no change line when the server sent no previous period', async () => {
+      await mount();
+      await answer(busy);
+
+      expect(query('.figure-change')).toBeNull();
+      expect(query('[data-testid="comparison"]')).toBeNull();
+    });
+  });
+
+  describe('data since (E4)', () => {
+    it('says how far back the data goes', async () => {
+      await mount();
+      await answer(busy);
+
+      expect(query('[data-testid="since"]')?.textContent).toBe('Data since Aug 1, 2026.');
+    });
+
+    it('has its own empty state for a workspace that never had a conversation', async () => {
+      await mount();
+      await answer({ ...empty, firstActivityOn: null });
+
+      expect(query('[data-testid="since"]')?.textContent).toBe(
+        'No conversation has started in this workspace yet.',
+      );
+      expect(query('[data-testid="never-active"]')?.textContent).toContain('No conversations yet');
+      expect(query('[data-testid="empty"]')).toBeNull();
+      // Provider usage is still reported below it.
+      expect(query('[data-testid="ai-usage-none"]')).not.toBeNull();
+    });
+  });
+
+  describe('the workspace time zone (E2)', () => {
+    const riyadh: AnalyticsDashboard = {
+      ...busy,
+      period: {
+        range: '7d',
+        from: '2026-09-08T21:00:00+00:00',
+        // 22:30 UTC on the 15th is 01:30 on the 16th in Riyadh.
+        to: '2026-09-15T22:30:00+00:00',
+        days: 7,
+        timeZone: 'Asia/Riyadh',
+      },
+      dailyActivity: [
+        { ...busy.dailyActivity[0], date: '2026-09-15' },
+        { ...busy.dailyActivity[1], date: '2026-09-16' },
+      ],
+    };
+
+    it('names the workspace zone and the time of day there', async () => {
+      await mount();
+      await answer(riyadh);
+
+      const sentence = query('[data-testid="period"]')?.textContent ?? '';
+
+      expect(sentence).toContain('Sep 15, 2026 – Sep 16, 2026, whole days in');
+      expect(sentence).toContain('Asia/Riyadh');
+      expect(sentence).toContain('Today is counted until 1:30');
+      expect(sentence).not.toContain('UTC');
+    });
+
+    it('marks today in the workspace zone as running, not the UTC today', async () => {
+      await mount();
+      await answer(riyadh);
+
+      const chart = query('[data-testid="messages-chart"]')!;
+
+      expect(chart.querySelectorAll('.chart-column.is-partial').length).toBe(1);
+      expect(chart.querySelectorAll('.chart-column')[1].classList).toContain('is-partial');
     });
   });
 
@@ -763,7 +935,7 @@ describe('AnalyticsDashboardPage', () => {
 });
 
 describe('formatDay', () => {
-  it('reads a bucket date in UTC rather than the browser zone', () => {
+  it('writes a bucket date from its parts rather than in the browser zone', () => {
     // A bare yyyy-MM-dd parsed as local time shifts the label by a day for half
     // the world, which would put a bar under the wrong heading.
     expect(formatDay('2026-09-15')).toContain('15');

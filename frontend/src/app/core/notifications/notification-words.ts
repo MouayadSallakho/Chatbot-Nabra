@@ -1,5 +1,6 @@
 import type { AppLanguage } from '@app/core/i18n/language';
 import { formatPercent } from '@app/core/i18n/locale-format';
+import { knownReportTitle } from '@app/features/reports/report-titles';
 import type { AppNotification, NotificationCategory } from './notification-api';
 
 /**
@@ -9,11 +10,12 @@ import type { AppNotification, NotificationCategory } from './notification-api';
  * in English. The kinds this build knows are written here in both languages;
  * a kind a later server adds keeps the server's own title and body.
  *
- * Report kinds name the report only inside the server's sentence, between
- * curly quotes (“Conversation activity”). That name is taken out and kept as
- * the server wrote it; when it cannot be found the sentence is said without
- * it, never with a guessed one. (A report type on the notification is a
- * backend ask.)
+ * Report kinds name their report by its catalogue code
+ * (`parameters.reportType`, Phase 37.6), worded in the reader's language with
+ * the Reports page's own names. Without a code this build knows (no
+ * parameters, an older report, a new type) the sentence is said without a
+ * name, never with a guessed one, and never with words read out of the
+ * server's English body.
  */
 export interface NotificationText {
   readonly title: string;
@@ -24,35 +26,36 @@ export function notificationText(
   notification: AppNotification,
   language: AppLanguage,
 ): NotificationText {
-  const quoted = /“([^”]{1,120})”/.exec(notification.body)?.[1] ?? null;
+  const reportType = notification.parameters?.reportType;
+  const report = reportType ? knownReportTitle(reportType) : null;
 
   switch (notification.kind) {
     case 'ReportCompleted':
       return {
         title: $localize`:@@notification.reportCompleted.title:Your report is ready`,
-        body: quoted
-          ? $localize`:@@notification.reportCompleted.body:Your “${quoted}:report:” report has finished generating and is ready to download.`
+        body: report
+          ? $localize`:@@notification.reportCompleted.body:Your “${report}:report:” report has finished generating and is ready to download.`
           : $localize`:@@notification.reportCompleted.bodyPlain:Your report has finished generating and is ready to download.`,
       };
     case 'ReportFailed':
       return {
         title: $localize`:@@notification.reportFailed.title:Your report could not be generated`,
-        body: quoted
-          ? $localize`:@@notification.reportFailed.body:Your “${quoted}:report:” report failed. Open Reports to see why.`
+        body: report
+          ? $localize`:@@notification.reportFailed.body:Your “${report}:report:” report failed. Open Reports to see why.`
           : $localize`:@@notification.reportFailed.bodyPlain:Your report failed. Open Reports to see why.`,
       };
     case 'ScheduledReportCompleted':
       return {
         title: $localize`:@@notification.scheduledCompleted.title:Scheduled report ready`,
-        body: quoted
-          ? $localize`:@@notification.scheduledCompleted.body:A scheduled “${quoted}:report:” report has finished generating and is ready to download.`
+        body: report
+          ? $localize`:@@notification.scheduledCompleted.body:A scheduled “${report}:report:” report has finished generating and is ready to download.`
           : $localize`:@@notification.scheduledCompleted.bodyPlain:A scheduled report has finished generating and is ready to download.`,
       };
     case 'ScheduledReportFailed':
       return {
         title: $localize`:@@notification.scheduledFailed.title:Scheduled report generation failed`,
-        body: quoted
-          ? $localize`:@@notification.scheduledFailed.body:A scheduled “${quoted}:report:” report could not be generated. Open Reports to see why.`
+        body: report
+          ? $localize`:@@notification.scheduledFailed.body:A scheduled “${report}:report:” report could not be generated. Open Reports to see why.`
           : $localize`:@@notification.scheduledFailed.bodyPlain:A scheduled report could not be generated. Open Reports to see why.`,
       };
     case 'UsageWarning':

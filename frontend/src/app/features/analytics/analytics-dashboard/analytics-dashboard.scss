@@ -11,6 +11,13 @@
   margin: 0;
 }
 
+// The period, the period it is compared with, and how far back the data goes.
+.range-notes {
+  display: grid;
+  gap: var(--space-1);
+  min-inline-size: 0;
+}
+
 .range-note {
   font: var(--text-small);
   color: var(--text-secondary);
@@ -30,6 +37,16 @@
 
   &.is-refreshing {
     opacity: 0.6;
+  }
+}
+
+// The figures while loading hold about the loaded height with the change line
+// (38.5): 7 to 8.8rem from 768px, 10.2 to 10.5rem at 390px.
+.analytics-skeleton .figure {
+  min-block-size: 8rem;
+
+  @media (max-width: 47.99rem) {
+    min-block-size: 10.25rem;
   }
 }
 

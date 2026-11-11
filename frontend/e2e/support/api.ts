@@ -24,3 +24,28 @@ export async function post(
 
   return response;
 }
+
+/** Sends a replacement the way the app does: antiforgery token, and the caller's `If-Match`. */
+export async function put(
+  api: APIRequestContext,
+  path: string,
+  data: object,
+  headers: Record<string, string>,
+): Promise<APIResponse> {
+  await api.get('/api/auth/csrf');
+
+  const { cookies } = await api.storageState();
+  const token = cookies.find((cookie) => cookie.name === 'XSRF-TOKEN')?.value;
+
+  if (!token) {
+    throw new Error('The API issued no antiforgery token.');
+  }
+
+  const response = await api.put(path, { data, headers: { 'X-XSRF-TOKEN': token, ...headers } });
+
+  if (!response.ok()) {
+    throw new Error(`${path} answered ${response.status()}`);
+  }
+
+  return response;
+}

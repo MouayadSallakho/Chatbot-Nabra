@@ -1,5 +1,11 @@
 import { ChangeDetectionStrategy, Component, computed, input, inject } from '@angular/core';
-import { AnalyticsAiUsage, AnalyticsModelUsage, AnalyticsRatedCost } from '../analytics-api';
+import {
+  ANALYTICS_PURPOSES,
+  AnalyticsAiUsage,
+  AnalyticsModelUsage,
+  AnalyticsPurposeUsage,
+  AnalyticsRatedCost,
+} from '../analytics-api';
 import { LocaleFormat } from '@app/core/i18n/locale-format';
 import { pluralMessage } from '@app/core/i18n/plural';
 import { BarChart } from '@app/shared/charts/bar-chart';
@@ -15,12 +21,11 @@ import { ScrollRegion } from '@app/shared/scroll-region/scroll-region';
  * configured. There is no invoice, no plan, no credit, no quota and no amount
  * due, and no word in this section implies any of them.
  *
- * <strong>By kind of operation, because that is what the API reports.</strong>
- * Each call is recorded with its purpose (answering a customer, searching
- * knowledge, indexing a document, previewing an agent), but the dashboard
- * returns calls and tokens per operation -- generation or embedding -- and per
- * model. That is what is drawn; a purpose breakdown is a backend ask, not a
- * guess made here.
+ * <strong>By kind of operation, by purpose and by model, as the API reports
+ * them.</strong> Calls and tokens per operation (generation or embedding), per
+ * purpose (answering a customer, searching knowledge for that answer, indexing
+ * a document, previewing an agent, testing a search; Phase 37.6) and per model.
+ * Every purpose is listed, in the server's fixed order, zeroes included.
  *
  * <strong>Provider-reported, never estimated.</strong> The token counts are what
  * the provider itself said it processed. A call the provider reported nothing
@@ -237,6 +242,50 @@ export class ProviderUsageCard {
       few: $localize`:@@usage.across.few:estimated across ${n}:count: calls`,
       many: $localize`:@@usage.across.many:estimated across ${n}:count: calls`,
       other: $localize`:@@usage.across.other:estimated across ${n}:count: calls`,
+    });
+  }
+
+  /** The purposes in their fixed order; one a later server adds goes last, named by its code. */
+  protected readonly purposeRows = computed<readonly AnalyticsPurposeUsage[]>(() => {
+    const rows = this.usage()?.byPurpose ?? [];
+    const rank = (purpose: string): number => {
+      const index = (ANALYTICS_PURPOSES as readonly string[]).indexOf(purpose);
+
+      return index === -1 ? ANALYTICS_PURPOSES.length : index;
+    };
+
+    return [...rows].sort((a, b) => rank(a.purpose) - rank(b.purpose));
+  });
+
+  /** A purpose in words; an unknown one keeps its code (shown isolated, left to right). */
+  protected purposeName(purpose: string): string | null {
+    switch (purpose) {
+      case 'ConversationGeneration':
+        return $localize`:@@usage.purpose.conversationGeneration:Replies to customers`;
+      case 'ConversationRetrievalEmbedding':
+        return $localize`:@@usage.purpose.conversationRetrieval:Knowledge searches for replies`;
+      case 'KnowledgeIndexEmbedding':
+        return $localize`:@@usage.purpose.knowledgeIndex:Indexing knowledge documents`;
+      case 'AgentPreviewGeneration':
+        return $localize`:@@usage.purpose.agentPreview:Agent previews`;
+      case 'AgentRetrievalTest':
+        return $localize`:@@usage.purpose.retrievalTest:Knowledge search tests`;
+      default:
+        return null;
+    }
+  }
+
+  /** "3 calls not priced", with every Arabic plural form. */
+  protected unpricedCalls(count: number): string {
+    const n = this.locale.number(count);
+
+    return pluralMessage(this.locale.language, count, {
+      zero: $localize`:@@usage.purpose.unpriced.zero:No call is unpriced`,
+      one: $localize`:@@usage.purpose.unpriced.one:${n}:count: call not priced`,
+      two: $localize`:@@usage.purpose.unpriced.two:${n}:count: calls not priced`,
+      few: $localize`:@@usage.purpose.unpriced.few:${n}:count: calls not priced`,
+      many: $localize`:@@usage.purpose.unpriced.many:${n}:count: calls not priced`,
+      other: $localize`:@@usage.purpose.unpriced.other:${n}:count: calls not priced`,
     });
   }
 
