@@ -376,4 +376,97 @@ public sealed class WebChatWidgetApiTests(WebChatApiFixture fixture)
             HttpStatusCode.BadRequest,
             (await WriteAsync(owner, tenantId, endpointId, Settings(tooMany), tag)).StatusCode);
     }
+
+    // ---- The loader asks for the host page's language (Phase 38.7a, BA-3) ----
+
+    /// <summary>
+    /// The frame address the served loader builds for a host page's
+    /// <c>&lt;html lang&gt;</c>, with the loader's own rule applied.
+    /// </summary>
+    /// <remarks>
+    /// The rule is read out of the script the API actually serves (its
+    /// <c>FRAME_LANGUAGES</c> table, ECMAScript regular expressions) and applied
+    /// with .NET's ECMAScript mode, and the address is checked to be built from it
+    /// and nothing else. The solution has no JavaScript engine; the evidence of
+    /// Phase 38.7a also runs the served file itself, in Node and in Chrome.
+    /// </remarks>
+    [Theory]
+    [InlineData("ar", "ar")]
+    [InlineData("ar-SA", "ar")]
+    [InlineData("AR-eg", "ar")]
+    [InlineData("en-GB", "en")]
+    [InlineData("en", "en")]
+    [InlineData("fr", null)]
+    [InlineData("arabic", null)]
+    [InlineData("", null)]
+    public async Task The_loader_asks_the_frame_for_the_host_pages_language_and_nothing_else(
+        string hostLang,
+        string? expected)
+    {
+        HttpResponseMessage served = await fixture.CreateClient().GetAsync(
+            WebChatApiFixture.Relative("/widget/v1.js"));
+
+        Assert.Equal(HttpStatusCode.OK, served.StatusCode);
+
+        string script = await served.Content.ReadAsStringAsync();
+
+        string? language = null;
+
+        foreach (System.Text.RegularExpressions.Match entry in System.Text.RegularExpressions.Regex.Matches(
+            FrameLanguagesTable(script),
+            @"\['(?<code>[a-z]{2})', /(?<pattern>[^/]+)/i\]"))
+        {
+            if (System.Text.RegularExpressions.Regex.IsMatch(
+                hostLang,
+                entry.Groups["pattern"].Value,
+                System.Text.RegularExpressions.RegexOptions.ECMAScript
+                    | System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+            {
+                language = entry.Groups["code"].Value;
+
+                break;
+            }
+        }
+
+        Assert.Equal(expected, language);
+
+        // The address is the key plus that one word, and nothing else from the page.
+        Assert.Contains(
+            "var frameUrl = origin + '/embed/' + encodeURIComponent(publicKey) + (language ? '?lang=' + language : '');",
+            script,
+            StringComparison.Ordinal);
+        Assert.Contains("var lang = document.documentElement.getAttribute('lang') || '';", script, StringComparison.Ordinal);
+        Assert.Single(System.Text.RegularExpressions.Regex.Matches(script, "frame\\.src = "));
+
+        // Old snippets still work: both attribute names are read, neither is new.
+        Assert.Contains("script.getAttribute('data-nabra-key') || script.getAttribute('data-omniai-key')", script, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task The_loader_is_cached_for_an_hour_and_revalidated_by_its_tag()
+    {
+        // What a customer's site holds: a visitor keeps an older loader for at
+        // most an hour, and then revalidates it for free.
+        HttpClient client = fixture.CreateClient();
+        HttpResponseMessage served = await client.GetAsync(WebChatApiFixture.Relative("/widget/v1.js"));
+
+        Assert.Equal("public, max-age=3600", served.Headers.CacheControl?.ToString());
+        Assert.NotNull(served.Headers.ETag);
+
+        using HttpRequestMessage again = new(HttpMethod.Get, WebChatApiFixture.Relative("/widget/v1.js"));
+        again.Headers.IfNoneMatch.Add(served.Headers.ETag!);
+
+        Assert.Equal(HttpStatusCode.NotModified, (await client.SendAsync(again)).StatusCode);
+    }
+
+    private static string FrameLanguagesTable(string script)
+    {
+        System.Text.RegularExpressions.Match table = System.Text.RegularExpressions.Regex.Match(
+            script,
+            @"var FRAME_LANGUAGES = (?<table>\[.*\]);");
+
+        Assert.True(table.Success, "The loader has no FRAME_LANGUAGES table.");
+
+        return table.Groups["table"].Value;
+    }
 }

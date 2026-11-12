@@ -133,6 +133,24 @@ loader  ──  omniai:v1:viewport {compact} ▶  widget
 widget  ──  omniai:v1:open / close ──────▶  loader
 ```
 
+**The host page's language (Phase 38.7a, BA-3).** The loader adds the host page's
+own `<html lang>` to the frame's address, as one word from a fixed list:
+`?lang=ar` for an Arabic tag (`ar`, `ar-SA`: the rule the frame title already
+uses), `?lang=en` for an English one (`en`, `en-GB`), and nothing for any other
+value or when the page declares none; the frame then follows the visitor's browser,
+as before. Unlike the title, there is no fallback to `navigator.language`: the frame
+already reads the browser itself. The value is a display preference only, and is
+trusted for nothing else; the embedding origin still comes from the handshake
+below. No new attribute is needed, old snippets work unchanged, and nothing else
+from the host page reaches the frame. The frame's pre-paint script already applies
+`?lang=` on `/embed/`.
+
+**Caching.** `/widget/v1.js` is served `Cache-Control: public, max-age=3600` with a
+strong content-derived `ETag`, so a visitor may keep an older loader for at most an
+hour and then revalidates it for a `304`. A site that never reloads keeps it longer
+only in the page it already has open. A visitor with the old loader gets the old
+behaviour: the frame follows their browser.
+
 The handshake repeats every 250 ms for at most 10 s and stops the moment the
 widget answers. The frame's `load` event and the widget's own start-up are not
 ordered with respect to each other — a framework that boots asynchronously can

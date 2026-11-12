@@ -37,6 +37,17 @@ internal static class RealtimeGroups
     /// </remarks>
     internal static string ForMember(Guid tenantId, Guid userId) =>
         string.Create(CultureInfo.InvariantCulture, $"notifications:{tenantId:D}:{userId:D}");
+
+    /// <summary>
+    /// The members of one workspace who may view its knowledge (Phase 38.7a).
+    /// </summary>
+    /// <remarks>
+    /// Its own prefix, apart from <see cref="ForTenant"/>: joining it needs
+    /// <c>knowledge.view</c>, and joining the inbox group needs
+    /// <c>conversations.view</c>, so neither permission can stand in for the other.
+    /// </remarks>
+    internal static string ForKnowledge(Guid tenantId) =>
+        string.Create(CultureInfo.InvariantCulture, $"knowledge:{tenantId:D}");
 }
 
 /// <summary>
@@ -61,4 +72,13 @@ internal static class RealtimeEvents
 
     /// <summary>Structural only: the payload is the workspace id, and the client re-reads.</summary>
     internal const string NotificationsChanged = "notificationsChanged";
+
+    /// <summary>
+    /// "This document's indexing started or settled" (Phase 38.7a, BA-11).
+    /// </summary>
+    /// <remarks>
+    /// Structural only: the payload is the document id, and the client re-reads the
+    /// document through the authorised HTTP read.
+    /// </remarks>
+    internal const string KnowledgeChanged = "knowledgeChanged";
 }

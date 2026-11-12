@@ -35,11 +35,25 @@ public static class KnowledgeIndexAttemptFailures
     /// <summary>The document changed while it was being indexed; the newer version wins.</summary>
     public const string DocumentChanged = "document_changed";
 
-    /// <summary>The requester cancelled; the provider may have received some batches.</summary>
+    /// <summary>
+    /// The requester cancelled; the provider may have received some batches. Since
+    /// Phase 38.7a the HTTP route no longer passes the browser's cancellation, so
+    /// only a caller that runs the handler with its own token records this.
+    /// </summary>
     public const string Cancelled = "cancelled";
 
-    /// <summary>The process stopped mid-attempt, found by the stale-attempt reconciler.</summary>
+    /// <summary>
+    /// The process stopped mid-attempt: found by the stale-attempt reconciler, or
+    /// (Phase 38.7a) settled by the attempt itself when the host shut down.
+    /// </summary>
     public const string Interrupted = "interrupted";
+
+    /// <summary>
+    /// The attempt ran past the server's own time limit for one attempt (Phase
+    /// 38.7a). Not the person's cancellation: nothing was written, and the provider
+    /// may have received some batches. Recorded as Failed, with the alert.
+    /// </summary>
+    public const string TimedOut = "timed_out";
 
     /// <summary>Anything else. The detail is in the server log, never here.</summary>
     public const string IndexingError = "indexing_error";

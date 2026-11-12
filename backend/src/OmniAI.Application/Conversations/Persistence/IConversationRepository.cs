@@ -88,6 +88,17 @@ public sealed record ConversationCustomer(
 /// Whether its newest message is beyond the reader's own read marker, or the
 /// reader has no marker and it has a message (Phase 37.4).
 /// </param>
+/// <param name="TakenOverBy">
+/// Who took it over (Phase 38.7a): the actor of the conversation's newest handling
+/// event (by transcript position, then time, then id) when that event is a
+/// takeover and a person handles the conversation now. <see langword="null"/>
+/// while the AI handles it, and for a takeover from before Phase 37.4, which
+/// recorded no event. Named exactly as the transcript names event actors,
+/// including somebody who has since left the workspace.
+/// </param>
+/// <param name="NeedsPersonReason">
+/// Why it waits on a person, or <see langword="null"/> when it does not (Phase 38.7a).
+/// </param>
 public sealed record ConversationSummary(
     Guid Id,
     ChannelKind Channel,
@@ -101,7 +112,47 @@ public sealed record ConversationSummary(
     MessageSender? LastMessageSender,
     ConversationMessageAuthor? AssignedTo,
     ConversationCustomer? Customer = null,
-    bool Unread = false);
+    bool Unread = false,
+    ConversationMessageAuthor? TakenOverBy = null,
+    NeedsPersonReason? NeedsPersonReason = null)
+{
+    /// <summary>
+    /// Whether it is in <c>filter=needs-person</c>: exactly when it has a reason.
+    /// </summary>
+    public bool NeedsPerson => NeedsPersonReason is not null;
+}
+
+/// <summary>
+/// Why a conversation waits on a person (Phase 38.7a, BA-7): the three branches of
+/// the predicate behind <c>filter=needs-person</c>.
+/// </summary>
+/// <remarks>
+/// <para>
+/// Every reason needs the conversation open and its newest message the
+/// customer's. When two branches hold, <see cref="PersonHandling"/> wins: a person
+/// handles it now, so their reply is what is awaited, whatever happened to the
+/// AI's turn before they took it over. <see cref="AiTurnFailed"/> and
+/// <see cref="ReturnedUnanswered"/> can never hold together: one turn is either
+/// failed or completed.
+/// </para>
+/// <para>
+/// The numbers are what the database statement computes; 0 means none.
+/// </para>
+/// </remarks>
+public enum NeedsPersonReason
+{
+    /// <summary>A person handles it, and the customer wrote last.</summary>
+    PersonHandling = 1,
+
+    /// <summary>The AI's turn for the customer's last message failed.</summary>
+    AiTurnFailed = 2,
+
+    /// <summary>
+    /// It was handed back to the AI before anybody answered the customer's last
+    /// message, which the AI never answers retroactively.
+    /// </summary>
+    ReturnedUnanswered = 3,
+}
 
 /// <summary>Which conversations a list shows.</summary>
 public enum ConversationListFilter
@@ -110,8 +161,8 @@ public enum ConversationListFilter
     All = 0,
 
     /// <summary>
-    /// Open, the customer wrote last, and either a person is handling it or the
-    /// AI's turn for that last message failed (plan D-5).
+    /// Open, the customer wrote last, and one of the <see cref="NeedsPersonReason"/>
+    /// branches holds (plan D-5, widened in 37.4 Revision 1).
     /// </summary>
     NeedsPerson = 1,
 }
@@ -167,6 +218,8 @@ public sealed record ConversationPage(
 /// The reader's own read marker, or <see langword="null"/> when they have never
 /// marked this conversation read (Phase 37.4).
 /// </param>
+/// <param name="TakenOverBy">As on <see cref="ConversationSummary"/> (Phase 38.7a).</param>
+/// <param name="NeedsPersonReason">As on <see cref="ConversationSummary"/> (Phase 38.7a).</param>
 public sealed record ConversationDetail(
     Guid Id,
     ChannelKind Channel,
@@ -179,7 +232,13 @@ public sealed record ConversationDetail(
     ConversationMessageAuthor? AssignedTo,
     ConversationCustomer? Customer = null,
     bool Unread = false,
-    long? LastReadSequence = null);
+    long? LastReadSequence = null,
+    ConversationMessageAuthor? TakenOverBy = null,
+    NeedsPersonReason? NeedsPersonReason = null)
+{
+    /// <summary>As on <see cref="ConversationSummary"/>.</summary>
+    public bool NeedsPerson => NeedsPersonReason is not null;
+}
 
 /// <summary>
 /// Reading conversations, for administrators and for the visitors who own them.

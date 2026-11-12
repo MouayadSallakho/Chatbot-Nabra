@@ -208,6 +208,16 @@ public sealed class CustomerTurnRunner(
                 WasReplay: false);
         }
 
+        // Phase 38.7a (BA-13): the message is stored and the AI is about to be
+        // asked, which can take as long as the provider's timeout. An open inbox
+        // is told now, so it shows the message and that no reply exists yet;
+        // AnswerAsync announces again once the turn settles. Before the request
+        // is built, because building it already calls the embedding provider.
+        // Quietly and with no token: the message is committed, so neither a
+        // broken backplane nor an abandoned request may undo or skip this. A
+        // replay never gets here: both checks above return or refuse first.
+        await Announce(turn, CancellationToken.None).ConfigureAwait(false);
+
         return await AnswerAsync(turn, opened, customer, now, cancellationToken)
             .ConfigureAwait(false);
     }
@@ -252,10 +262,10 @@ public sealed class CustomerTurnRunner(
                 .FailTurnAsync(opened, _clock.GetUtcNow(), CancellationToken.None)
                 .ConfigureAwait(false);
 
-            // The customer's message was committed before the provider was
-            // called, so an open inbox has something new to show even though no
-            // reply exists. Announced once, here, for this attempt: a replay of
-            // the same key is refused before it reaches this point. Quietly, and
+            // The turn is settled as failed, which an open inbox shows. This is
+            // the second announcement of the attempt (the first followed the
+            // stored message, Phase 38.7a); a replay of the same key is refused
+            // before it reaches either. Quietly, and
             // with no token, so neither a broken backplane nor an abandoned
             // request can replace the failure the caller is about to see.
             await Announce(turn, CancellationToken.None).ConfigureAwait(false);

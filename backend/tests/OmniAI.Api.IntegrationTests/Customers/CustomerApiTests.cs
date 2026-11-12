@@ -449,6 +449,59 @@ public sealed class CustomerApiTests(RoleApiFixture fixture) : IClassFixture<Rol
     /// prove that the directory can read rows; this proves that the runtime
     /// creates the row, and creates exactly one.
     /// </remarks>
+    [Fact]
+    public async Task The_directory_labels_each_customer_as_the_inbox_does()
+    {
+        // Phase 38.7a (BA-1): labelCode and shortCode on the directory row and
+        // the detail, equal to what the conversation reads give the same customer.
+        // The English label stays, for older clients and exports.
+        (HttpClient owner, Guid tenantId, _) = await fixture.CreateOwnerAsync();
+        Guid[] customers = await TwoCustomersAsync(owner, tenantId);
+        Guid named = customers[0];
+        Guid unnamed = customers[1];
+
+        (HttpResponseMessage renamed, _) = await RenameAsync(
+            owner, tenantId, named, "Layla", await EtagAsync(owner, tenantId, named));
+
+        Assert.Equal(HttpStatusCode.OK, renamed.StatusCode);
+
+        Dictionary<Guid, JsonElement> inbox = (await ReadAsync(owner, WebChatApiFixture.Relative(
+                $"/api/tenants/{tenantId}/conversations?pageSize=50")))
+            .GetProperty("items").EnumerateArray()
+            .Select(item => item.GetProperty("customer").Clone())
+            .ToDictionary(customer => customer.GetProperty("id").GetGuid());
+
+        Dictionary<Guid, JsonElement> rows = (await ReadAsync(owner, Directory(tenantId)))
+            .GetProperty("items").EnumerateArray()
+            .ToDictionary(item => item.GetProperty("id").GetGuid(), item => item.Clone());
+
+        foreach ((Guid id, string code, string label) in new[]
+        {
+            (named, "Named", "Layla"),
+            (unnamed, "AnonymousVisitor", "Anonymous visitor"),
+        })
+        {
+            JsonElement detail = await ReadAsync(owner, Customer(tenantId, id));
+
+            foreach (JsonElement read in new[] { rows[id], detail })
+            {
+                Assert.Equal(code, read.GetProperty("labelCode").GetString());
+                Assert.Equal(label, read.GetProperty("label").GetString());
+                Assert.Equal(inbox[id].GetProperty("labelCode").GetString(), read.GetProperty("labelCode").GetString());
+                Assert.Equal(inbox[id].GetProperty("shortCode").GetString(), read.GetProperty("shortCode").GetString());
+                Assert.Matches("^[0-9A-HJKMNP-TV-Z]{6}$", read.GetProperty("shortCode").GetString());
+            }
+        }
+
+        // A reader with the directory permission only gets the same fields.
+        HttpClient reader = await fixture.CreateRestrictedMemberAsync(tenantId, View);
+        JsonElement restricted = (await ReadAsync(reader, Directory(tenantId)))
+            .GetProperty("items").EnumerateArray()
+            .Single(item => item.GetProperty("id").GetGuid() == unnamed);
+
+        Assert.Equal(rows[unnamed].GetProperty("shortCode").GetString(), restricted.GetProperty("shortCode").GetString());
+    }
+
     private async Task StartWebChatAsync(HttpClient owner, Guid tenantId, string? name = null)
     {
         (string key, _) = await WebChatApiFixture.PublishChatAsync(

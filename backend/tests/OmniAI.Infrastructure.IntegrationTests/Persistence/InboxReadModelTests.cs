@@ -13,7 +13,8 @@ namespace OmniAI.Infrastructure.IntegrationTests.Persistence;
 /// <summary>
 /// Phase 37.4 reads in PostgreSQL: a fixed number of statements per page, the
 /// branches of "needs a person" an HTTP test cannot reach, and the schema of
-/// migrations M4, M5 and M6.
+/// migrations M4, M5 and M6. Phase 38.7a adds the reason each row carries, and
+/// proves it against the filter on the same rows.
 /// </summary>
 public sealed class InboxReadModelTests(PostgresTestDatabase database)
     : IClassFixture<PostgresTestDatabase>
@@ -34,10 +35,11 @@ public sealed class InboxReadModelTests(PostgresTestDatabase database)
 
         Assert.Equal(small, large);
 
-        // Count, page, customers' names, customers' channels, and the assignee
-        // lookup (which asks once even when nothing is assigned). No WhatsApp
-        // conversation on these pages, so no number lookup.
-        Assert.Equal(5, large);
+        // Count, page, customers' names and customers' channels. Since Phase 38.7a
+        // the assignee and takeover ids come with the page itself, and naming
+        // them asks only when there is somebody to name (nobody here); no
+        // WhatsApp conversation, so no number lookup.
+        Assert.Equal(4, large);
     }
 
     [Fact]
@@ -115,6 +117,104 @@ public sealed class InboxReadModelTests(PostgresTestDatabase database)
         Assert.Equal(open.Id.Value, only.Id);
         Assert.Equal(ConversationHandling.Ai, only.Handling);
         Assert.Equal(1, page.Total);
+    }
+
+    // ---- Why it needs a person (Phase 38.7a, BA-7) -----------------------------
+
+    [Fact]
+    public async Task Each_row_carries_its_reason_and_the_flag_agrees_with_the_filter()
+    {
+        Tenant tenant = await NewTenantAsync();
+
+        Conversation personHandling = WaitingOnAPerson(tenant);
+        Conversation closed = WaitingOnAPerson(tenant);
+        closed.Close(Start.AddMinutes(5));
+        Conversation answered = Conversation.Start(tenant.Id, CustomerId.New(), ChannelKind.WebChat, Start);
+        answered.AddTextMessage(MessageSender.Customer, "Hello", Start.AddMinutes(1));
+        answered.AddTextMessage(MessageSender.AiAgent, "Hi.", Start.AddMinutes(1).AddSeconds(2));
+        Conversation empty = Conversation.Start(tenant.Id, CustomerId.New(), ChannelKind.WebChat, Start);
+        (Conversation returned, ConversationTurn returnedTurn) = LeftUnanswered(tenant);
+        (Conversation returnedThenClosed, ConversationTurn closedTurn) = LeftUnanswered(tenant, "closed-later");
+        returnedThenClosed.Close(Start.AddMinutes(10));
+
+        // The AI's turn failed, and then a person took it over: the person wins.
+        Conversation failedThenTaken = Conversation.Start(tenant.Id, CustomerId.New(), ChannelKind.WebChat, Start);
+        Message asked = failedThenTaken.AddTextMessage(MessageSender.Customer, "Refund?", Start.AddMinutes(1));
+        ConversationTurn failedTurn = ConversationTurn.Begin(
+            failedThenTaken.Id, ClientMessageId.Create("failed-then-taken"), asked.Id, Start.AddMinutes(1));
+        failedTurn.Fail(Start.AddMinutes(1).AddSeconds(5));
+        failedThenTaken.TakeOverByHuman(Start.AddMinutes(2));
+
+        await using (OmniAiDbContext context = database.CreateContext())
+        {
+            foreach (Conversation conversation in new[] { personHandling, closed, answered, empty, returned, returnedThenClosed, failedThenTaken })
+            {
+                context.AddOwner(conversation);
+                context.Conversations.Add(conversation);
+            }
+
+            await context.SaveChangesAsync();
+            context.ConversationTurns.AddRange(returnedTurn, closedTurn, failedTurn);
+            await context.SaveChangesAsync();
+        }
+
+        (Tenant _, Conversation failed) = await ConversationWithFailuresAsync(failures: 1, tenant);
+
+        Dictionary<Guid, NeedsPersonReason?> expected = new()
+        {
+            [personHandling.Id.Value] = NeedsPersonReason.PersonHandling,
+            [closed.Id.Value] = null,
+            [answered.Id.Value] = null,
+            [empty.Id.Value] = null,
+            [returned.Id.Value] = NeedsPersonReason.ReturnedUnanswered,
+            [returnedThenClosed.Id.Value] = null,
+            [failedThenTaken.Id.Value] = NeedsPersonReason.PersonHandling,
+            [failed.Id.Value] = NeedsPersonReason.AiTurnFailed,
+        };
+
+        await using OmniAiDbContext read = database.CreateContext();
+        ConversationRepository repository = new(read);
+
+        ConversationPage all = await repository.ListAsync(tenant.Id, 1, 50, ConversationListFilter.All, Viewer);
+        ConversationPage filtered = await repository.ListAsync(tenant.Id, 1, 50, ConversationListFilter.NeedsPerson, Viewer);
+
+        Assert.Equal(expected.Count, all.Total);
+        Assert.All(all.Items, item => Assert.Equal(expected[item.Id], item.NeedsPersonReason));
+        Assert.All(all.Items, item => Assert.Equal(item.NeedsPersonReason is not null, item.NeedsPerson));
+
+        // The flag and the filter, on the same rows.
+        Assert.True(
+            filtered.Items.Select(item => item.Id).ToHashSet()
+                .SetEquals(all.Items.Where(item => item.NeedsPerson).Select(item => item.Id)),
+            "The flag and the filter disagree.");
+        Assert.Equal(all.Items.Count(item => item.NeedsPerson), filtered.Total);
+        Assert.All(filtered.Items, item => Assert.Equal(expected[item.Id], item.NeedsPersonReason));
+
+        // The detail says the same as the row, for every one of them.
+        foreach (ConversationSummary item in all.Items)
+        {
+            ConversationDetail detail = (await repository.FindAsync(tenant.Id, ConversationId.From(item.Id), Viewer))!.Value;
+
+            Assert.Equal(item.NeedsPersonReason, detail.NeedsPersonReason);
+            Assert.Null(detail.TakenOverBy);
+        }
+    }
+
+    [Fact]
+    public async Task A_takeover_from_before_its_events_existed_names_nobody()
+    {
+        // TakeOverByHuman alone records no event, as before Phase 37.4.
+        Tenant tenant = await NewTenantAsync();
+        Conversation conversation = WaitingOnAPerson(tenant);
+
+        await AddAsync(conversation);
+
+        await using OmniAiDbContext read = database.CreateContext();
+        ConversationSummary row = Assert.Single(
+            (await new ConversationRepository(read).ListAsync(tenant.Id, 1, 20, ConversationListFilter.All, Viewer)).Items);
+
+        Assert.Equal(ConversationHandling.Human, row.Handling);
+        Assert.Null(row.TakenOverBy);
     }
 
     // ---- Schema (M4, M5, M6) --------------------------------------------------
@@ -223,7 +323,9 @@ public sealed class InboxReadModelTests(PostgresTestDatabase database)
     /// Taken over, the customer writes (its turn completes without a reply), and
     /// it is handed back to the AI with nobody having answered.
     /// </summary>
-    private static (Conversation Conversation, ConversationTurn Turn) LeftUnanswered(Tenant tenant)
+    private static (Conversation Conversation, ConversationTurn Turn) LeftUnanswered(
+        Tenant tenant,
+        string clientMessageId = "left-unanswered")
     {
         Conversation conversation = Conversation.Start(tenant.Id, CustomerId.New(), ChannelKind.WebChat, Start);
 
@@ -235,7 +337,7 @@ public sealed class InboxReadModelTests(PostgresTestDatabase database)
 
         ConversationTurn turn = ConversationTurn.Begin(
             conversation.Id,
-            ClientMessageId.Create("left-unanswered"),
+            ClientMessageId.Create(clientMessageId),
             asked.Id,
             Start.AddMinutes(3));
         turn.CompleteWithoutReply(Start.AddMinutes(3).AddSeconds(1));

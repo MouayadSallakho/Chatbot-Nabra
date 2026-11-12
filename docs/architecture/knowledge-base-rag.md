@@ -337,6 +337,33 @@ A provider that is unavailable, times out or answers with nonsense produces a
 status code and nothing else. The content stays saved, the document still reports
 as needing an index, and no chunk of a half-finished set is left behind.
 
+### The attempt does not depend on the browser (Phase 38.7a, BA-10)
+
+`POST …/knowledge/{id}/index` runs the attempt through
+`IndexKnowledgeDocumentHandler.HandleDetachedAsync`: under the **host's shutdown
+token and a server-side deadline**, not the request's token. Closing or reloading
+the tab that pressed Index no longer stops the attempt; it finishes, records its
+outcome, and announces it (BA-11), and the next read shows it. Chosen over a move
+to a background queue because it is the smaller change: the attempt record, the
+single flight (`knowledge.indexing.in_progress`), the alerts, the `If-Match` check
+and the response to a caller who is still there are exactly as before, and the
+stale-attempt reconciler still settles an attempt whose process died.
+
+- **The deadline** (`KnowledgeIndexingLimits.AttemptTimeout`) is the longest the
+  provider work can legitimately take (the embedding timeout times the most
+  batches a document can need: the bound the reliability settings are already
+  validated against) plus two minutes for the index reads and writes. The
+  reconciler's stale threshold must exceed that bound by five minutes, so it never
+  settles an attempt that is still running. With the shipped defaults it is a few
+  minutes; a development machine with the local stand-in finishes in seconds.
+- **How each stop is recorded.** The server's deadline is not the person's
+  cancellation: it settles `Failed` with the new code `timed_out` and raises the
+  operational alert, and a caller still waiting gets the existing **504** "Knowledge
+  indexing timed out". The host shutting down settles `Unknown` / `interrupted`
+  with the alert, which is what the reconciler records for a process that stopped
+  mid-attempt. `cancelled` remains for a caller that runs the handler with its own
+  token; the HTTP route no longer produces it.
+
 ---
 
 ## 9. Retrieval
@@ -513,8 +540,9 @@ startedAt, completedAt }`, or `null` when the document was never indexed. `statu
 `Started` (indexing now), `Succeeded`, `Failed` or `Unknown` (the process stopped before
 it could say); `failureCode` is one of `KnowledgeIndexAttemptFailures`
 (`provider_unavailable`, `provider_timeout`, `provider_response_invalid`,
-`quota_exhausted`, `document_changed`, `cancelled`, `interrupted`, `indexing_error`) and
-never a provider's message. The newest attempt by start time wins (the version-7 id
+`quota_exhausted`, `document_changed`, `cancelled`, `interrupted`, `indexing_error`, and
+from Phase 38.7a `timed_out`, §8) and never a provider's message. A client words a code
+it does not know generically. The newest attempt by start time wins (the version-7 id
 breaks a tie). Readiness is unchanged and still derived. The list items also carry
 `sourceByteLength` (the uploaded file's size, `null` for typed text). Both come from the
 list's single statement, as per-row probes on `ix_knowledge_index_attempts_document` and
@@ -522,6 +550,13 @@ list's single statement, as per-row probes on `ix_knowledge_index_attempts_docum
 The writes keep their shape: only the reads carry `lastIndexAttempt`, so a write never
 claims "never attempted" for a document that was. Refusals carry stable codes
 (`problem-codes.md`).
+
+**Phase 38.7a: a signal when indexing starts and ends (BA-11).** Members who may view
+knowledge can call `SubscribeKnowledge(tenantId)` on the workspace hub
+(`/hubs/workspace-inbox`) and receive `knowledgeChanged(documentId)` when an attempt
+starts and when it settles, including when the stale-attempt reconciler settles it.
+The id is the whole payload; re-read the document. Details:
+`human-handoff-realtime-inbox.md` §9.
 
 **Indexing requires `If-Match` because indexing is a write** — it replaces the
 chunk set and moves the version. Missing → 428, stale → 412, success → a new ETag.

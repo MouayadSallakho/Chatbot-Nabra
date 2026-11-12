@@ -255,6 +255,7 @@ internal static class CompositionRoot
 
         services.AddScoped<IConversationRealtimeNotifier, SignalRConversationNotifier>();
         services.AddScoped<INotificationRealtime, SignalRNotificationRealtime>();
+        services.AddScoped<IKnowledgeRealtimeNotifier, SignalRKnowledgeNotifier>();
 
         // The AI runtime. Infrastructure decides which implementation that is:
         // the OpenAI adapter when a key is configured in the environment, and an

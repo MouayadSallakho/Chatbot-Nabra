@@ -1,4 +1,7 @@
 using Npgsql;
+using OmniAI.Application.Knowledge;
+using OmniAI.Domain.Knowledge;
+using OmniAI.Domain.Tenants;
 using OmniAI.Infrastructure.Knowledge;
 using OmniAI.Infrastructure.Notifications;
 using OmniAI.Infrastructure.Persistence;
@@ -88,10 +91,19 @@ internal sealed class ProviderUsageReconciler(OmniAiDbContext context)
 /// <strong>No automatic retry.</strong> Embedding costs money; a member indexes
 /// again through the normal workflow if they want to.
 /// </para>
+/// <para>
+/// <strong>Each settled attempt is announced</strong> to the workspace's
+/// knowledge viewers (Phase 38.7a, BA-11), after the statement commits, quietly:
+/// an announcement that fails changes nothing that was recorded.
+/// </para>
 /// </remarks>
-internal sealed class KnowledgeAttemptReconciler(OmniAiDbContext context)
+internal sealed class KnowledgeAttemptReconciler(
+    OmniAiDbContext context,
+    IKnowledgeRealtimeNotifier? realtime = null)
 {
     private readonly OmniAiDbContext _context = context ?? throw new ArgumentNullException(nameof(context));
+
+    private readonly IKnowledgeRealtimeNotifier? _realtime = realtime;
 
     /// <returns>How many attempts were settled.</returns>
     public async Task<int> ReconcileAsync(DateTimeOffset startedBefore, DateTimeOffset now, int batchSize, CancellationToken cancellationToken = default)
@@ -131,7 +143,7 @@ internal sealed class KnowledgeAttemptReconciler(OmniAiDbContext context)
                     RETURNING attempt.id, attempt.tenant_id, attempt.document_id, NOT judged.written AS alert
                 )
                 """ + KnowledgeIndexAttemptStore.RecordAlert + """
-                SELECT count(*) FROM settled
+                SELECT tenant_id, document_id FROM settled
                 """,
                 cancellationToken)
             .ConfigureAwait(false);
@@ -139,9 +151,26 @@ internal sealed class KnowledgeAttemptReconciler(OmniAiDbContext context)
         command.Parameters.AddWithValue("now", now.ToUniversalTime());
         command.Parameters.AddWithValue("cutoff", startedBefore.ToUniversalTime());
         command.Parameters.AddWithValue("batch_size", batchSize);
-        command.Parameters.AddWithValue("code", Domain.Knowledge.KnowledgeIndexAttemptFailures.Interrupted);
+        command.Parameters.AddWithValue("code", KnowledgeIndexAttemptFailures.Interrupted);
 
-        return (int)(long)(await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) ?? 0L);
+        List<(Guid Tenant, Guid Document)> settled = [];
+
+        await using (NpgsqlDataReader reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
+        {
+            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            {
+                settled.Add((reader.GetGuid(0), reader.GetGuid(1)));
+            }
+        }
+
+        foreach ((Guid tenant, Guid document) in settled)
+        {
+            await _realtime
+                .AnnounceQuietlyAsync(TenantId.From(tenant), KnowledgeDocumentId.From(document), CancellationToken.None)
+                .ConfigureAwait(false);
+        }
+
+        return settled.Count;
     }
 }
 

@@ -36,6 +36,12 @@ public static class ReliabilityServiceCollectionExtensions
 
         services.Configure<ReliabilityOptions>(configuration.GetSection(ReliabilityOptions.SectionName));
 
+        // Phase 38.7a (BA-10): the server's own limit on an attempt the HTTP route
+        // runs detached from its request. The same bound the stale threshold was
+        // just validated against, plus headroom for the index reads and writes, so
+        // the reconciler never settles an attempt that is still running.
+        services.AddSingleton(KnowledgeIndexingLimits.For(embeddings.Timeout * calls));
+
         services.AddScoped<ProviderUsageReconciler>();
         services.AddScoped<KnowledgeAttemptReconciler>();
         services.AddScoped<ConversationTurnReconciler>();

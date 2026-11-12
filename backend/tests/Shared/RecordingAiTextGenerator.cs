@@ -60,6 +60,12 @@ internal sealed class RecordingAiTextGenerator : IAiTextGenerator
     /// </remarks>
     public bool PretendNullResult { get; set; }
 
+    /// <summary>
+    /// When set, every call waits for this task before it answers, so a test can
+    /// observe what happens while the provider is still being waited on (Phase 38.7a).
+    /// </summary>
+    public Task? HoldUntil { get; set; }
+
     /// <summary>How many times the generator was asked to produce anything.</summary>
     /// <remarks>
     /// The assertion that matters for tenant isolation: a cross-tenant request
@@ -134,6 +140,7 @@ internal sealed class RecordingAiTextGenerator : IAiTextGenerator
         Reply = "I can certainly help you choose.";
         PretendUnavailable = false;
         PretendNullResult = false;
+        HoldUntil = null;
     }
 
     /// <summary>
@@ -154,7 +161,7 @@ internal sealed class RecordingAiTextGenerator : IAiTextGenerator
         }
     }
 
-    public Task<AiTextGenerationResult> GenerateAsync(
+    public async Task<AiTextGenerationResult> GenerateAsync(
         AiTextGenerationRequest request,
         AiUsageContext usage,
         CancellationToken cancellationToken = default)
@@ -183,11 +190,16 @@ internal sealed class RecordingAiTextGenerator : IAiTextGenerator
         // a real network adapter would answer.
         cancellationToken.ThrowIfCancellationRequested();
 
+        if (HoldUntil is Task hold)
+        {
+            await hold.WaitAsync(cancellationToken).ConfigureAwait(false);
+        }
+
         if (PretendUnavailable)
         {
             throw new AiRuntimeUnavailableException();
         }
 
-        return Task.FromResult(PretendNullResult ? null! : AiTextGenerationResult.Create(Reply));
+        return PretendNullResult ? null! : AiTextGenerationResult.Create(Reply);
     }
 }

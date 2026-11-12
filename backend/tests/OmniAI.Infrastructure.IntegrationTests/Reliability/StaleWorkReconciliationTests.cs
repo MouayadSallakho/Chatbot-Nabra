@@ -268,6 +268,74 @@ public sealed class StaleWorkReconciliationTests(PostgresTestDatabase database)
     }
 
     [Fact]
+    public async Task Each_attempt_the_reconciler_settles_is_announced_once_and_a_failing_announcer_changes_nothing()
+    {
+        // Phase 38.7a (BA-11): knowledge viewers hear a stale attempt settle, as
+        // they hear one the request settles. Announced after the statement, and
+        // only for what it settled.
+        TenantId tenant = await _world.WorkspaceAsync();
+        Versioned<KnowledgeDocument> stale = await _world.DocumentAsync(tenant, "Stale policy");
+        Versioned<KnowledgeDocument> fresh = await _world.DocumentAsync(tenant, "Fresh policy");
+        KnowledgeIndexAttempt staleAttempt = await StartAttemptAsync(tenant, stale.Value.Id, DateTimeOffset.UtcNow.AddHours(-2));
+        await StartAttemptAsync(tenant, fresh.Value.Id, DateTimeOffset.UtcNow.AddMinutes(-1));
+
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        AnnouncingNotifier heard = new();
+
+        await using (OmniAiDbContext context = database.CreateContext())
+        {
+            await new KnowledgeAttemptReconciler(context, heard).ReconcileAsync(now.AddMinutes(-30), now, 100);
+        }
+
+        // Other tests' workspaces share this database; only this one is examined.
+        Assert.Equal([(tenant, stale.Value.Id)], heard.Announced.Where(entry => entry.Tenant == tenant));
+
+        // A second pass settles nothing more, so it announces nothing more.
+        await using (OmniAiDbContext context = database.CreateContext())
+        {
+            await new KnowledgeAttemptReconciler(context, heard).ReconcileAsync(now.AddMinutes(-30), now, 100);
+        }
+
+        Assert.Single(heard.Announced, entry => entry.Tenant == tenant);
+        Assert.Equal("Unknown|interrupted", await AttemptStateAsync(staleAttempt.Id));
+
+        // An announcer that throws changes neither the settlement nor the count.
+        Versioned<KnowledgeDocument> another = await _world.DocumentAsync(tenant, "Another policy");
+        KnowledgeIndexAttempt anotherAttempt = await StartAttemptAsync(tenant, another.Value.Id, DateTimeOffset.UtcNow.AddHours(-2));
+
+        await using (OmniAiDbContext context = database.CreateContext())
+        {
+            Assert.True(await new KnowledgeAttemptReconciler(context, new AnnouncingNotifier { Fails = true })
+                .ReconcileAsync(now.AddMinutes(-30), now, 100) >= 1);
+        }
+
+        Assert.Equal("Unknown|interrupted", await AttemptStateAsync(anotherAttempt.Id));
+        Assert.Equal(1L, await AlertCountAsync(tenant, another.Value.Id));
+    }
+
+    private sealed class AnnouncingNotifier : Application.Knowledge.IKnowledgeRealtimeNotifier
+    {
+        public List<(TenantId Tenant, KnowledgeDocumentId Document)> Announced { get; } = [];
+
+        public bool Fails { get; init; }
+
+        public Task KnowledgeChangedAsync(
+            TenantId tenantId,
+            KnowledgeDocumentId documentId,
+            CancellationToken cancellationToken = default)
+        {
+            if (Fails)
+            {
+                throw new InvalidOperationException("backplane down");
+            }
+
+            Announced.Add((tenantId, documentId));
+
+            return Task.CompletedTask;
+        }
+    }
+
+    [Fact]
     public async Task One_knowledge_pass_settles_at_most_one_batch()
     {
         TenantId tenant = await _world.WorkspaceAsync();

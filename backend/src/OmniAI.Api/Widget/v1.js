@@ -56,6 +56,14 @@
    * below the maximum so a site's own modal can still cover it. */
   var LAYER = 2147483000;
 
+  /*
+   * The host page's languages the frame is told about (Phase 38.7a), and the
+   * <html lang> values that mean each: the language itself, alone or with a
+   * region ("ar", "ar-SA", "en", "en-GB"). Any other value, or none, tells the
+   * frame nothing, and it follows the visitor's browser as it always did.
+   */
+  var FRAME_LANGUAGES = [['ar', /^ar(-|$)/i], ['en', /^en(-|$)/i]];
+
   var script = document.currentScript;
 
   if (!script) {
@@ -92,7 +100,8 @@
    * Derived from src rather than configured, so a deployment on any hostname
    * produces a snippet that works there. */
   var origin = new URL(script.src, window.location.href).origin;
-  var frameUrl = origin + '/embed/' + encodeURIComponent(publicKey);
+  var language = frameLanguage();
+  var frameUrl = origin + '/embed/' + encodeURIComponent(publicKey) + (language ? '?lang=' + language : '');
 
   var frame = document.createElement('iframe');
 
@@ -160,6 +169,26 @@
 
     /* "الدردشة": chat. */
     return /^ar(-|$)/i.test(lang) ? '\u0627\u0644\u062F\u0631\u062F\u0634\u0629' : 'Chat';
+  }
+
+  /*
+   * The language to ask the frame for: the host page's own <html lang>, read the
+   * way the title reads it, and only when it is one of FRAME_LANGUAGES (Phase
+   * 38.7a). Unlike the title there is no fallback to the browser's language: an
+   * empty answer adds nothing to the frame's address, and the frame then decides
+   * from the visitor's browser itself. One word, from a fixed list, is all that
+   * reaches the frame from the host page.
+   */
+  function frameLanguage() {
+    var lang = document.documentElement.getAttribute('lang') || '';
+
+    for (var index = 0; index < FRAME_LANGUAGES.length; index += 1) {
+      if (FRAME_LANGUAGES[index][1].test(lang)) {
+        return FRAME_LANGUAGES[index][0];
+      }
+    }
+
+    return '';
   }
 
   function compact() {

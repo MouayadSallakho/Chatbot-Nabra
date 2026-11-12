@@ -65,7 +65,8 @@ internal static class KnowledgeEndpoints
             .WithName("UpdateKnowledgeDocument");
 
         knowledge.MapPost("/{knowledgeDocumentId:guid}/index", IndexAsync)
-            .WithName("IndexKnowledgeDocument");
+            .WithName("IndexKnowledgeDocument")
+            .WithSummary("Indexes one document (If-Match). The attempt runs to its end even if the caller goes away (Phase 38.7a), bounded by the server's own limit (a 504 and the attempt code timed_out when exceeded); its start and end are announced as knowledgeChanged.");
 
         knowledge.MapPost("/{knowledgeDocumentId:guid}/enable", EnableAsync)
             .WithName("EnableKnowledgeDocument");
@@ -171,12 +172,19 @@ internal static class KnowledgeEndpoints
         return Respond(http, updated, knowledgeDocumentId);
     }
 
+    /// <remarks>
+    /// <strong>The attempt does not depend on the browser (Phase 38.7a, BA-10).</strong>
+    /// It runs under the host's shutdown token and the server's own deadline, not
+    /// the request's token, so a reloaded or closed tab no longer stops it: it
+    /// finishes, records its outcome, and announces it. A caller still connected
+    /// gets exactly the answer it got before.
+    /// </remarks>
     private static async Task<IResult> IndexAsync(
         HttpContext http,
         Guid tenantId,
         Guid knowledgeDocumentId,
         IndexKnowledgeDocumentHandler handler,
-        CancellationToken cancellationToken)
+        IHostApplicationLifetime lifetime)
     {
         if (EntityTags.ReadIfMatch(http.Request, out ConcurrencyToken expected) is IResult failure)
         {
@@ -184,9 +192,9 @@ internal static class KnowledgeEndpoints
         }
 
         Versioned<KnowledgeIndexResult>? indexed = await handler
-            .HandleAsync(
+            .HandleDetachedAsync(
                 new IndexKnowledgeDocumentCommand(tenantId, knowledgeDocumentId, expected),
-                cancellationToken)
+                lifetime.ApplicationStopping)
             .ConfigureAwait(false);
 
         if (indexed is null)

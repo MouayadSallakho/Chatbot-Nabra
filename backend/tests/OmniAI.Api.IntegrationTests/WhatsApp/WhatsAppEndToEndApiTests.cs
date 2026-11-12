@@ -181,6 +181,91 @@ public sealed class WhatsAppEndToEndApiTests(WhatsAppApiFixture fixture)
         Assert.Equal(first, await WaitForConversationAsync(owner, tenantId));
     }
 
+    [Fact]
+    public async Task The_directory_labels_a_whatsapp_customer_as_the_inbox_does()
+    {
+        // Phase 38.7a (BA-1): the directory's labelCode and shortCode are the
+        // conversation reads', for a WhatsApp-only customer and, after a merge,
+        // for one who has used two channels.
+        (HttpClient owner, Guid tenantId, _) = await fixture.CreateOwnerAsync();
+
+        string number = WhatsAppApiFixture.Number();
+
+        await WhatsAppApiFixture.ServingAsync(owner, tenantId, number, "Directory label");
+
+        await SendAsync(fixture.CreateClient(), number, "wamid.E2E.LABEL==", "Hello");
+
+        Guid conversationId = await WaitForConversationAsync(owner, tenantId);
+
+        JsonElement inboxCustomer = (await ReadJsonAsync(
+                owner,
+                WebChat.WebChatApiFixture.Relative($"/api/tenants/{tenantId}/conversations/{conversationId}")))
+            .GetProperty("customer");
+        Guid customerId = inboxCustomer.GetProperty("id").GetGuid();
+
+        JsonElement row = await DirectoryRowAsync(owner, tenantId, customerId);
+        JsonElement detail = await ReadJsonAsync(
+            owner,
+            WebChat.WebChatApiFixture.Relative($"/api/tenants/{tenantId}/customers/{customerId}"));
+
+        foreach (JsonElement read in new[] { row, detail })
+        {
+            Assert.Equal("WhatsAppCustomer", read.GetProperty("labelCode").GetString());
+            Assert.Equal(inboxCustomer.GetProperty("labelCode").GetString(), read.GetProperty("labelCode").GetString());
+            Assert.Equal(inboxCustomer.GetProperty("shortCode").GetString(), read.GetProperty("shortCode").GetString());
+            Assert.Equal("WhatsApp customer", read.GetProperty("label").GetString());
+        }
+
+        // A website visitor of the same workspace, merged into the WhatsApp
+        // customer: one record that has used two channels.
+        (string key, _) = await WebChat.WebChatApiFixture.PublishChatAsync(owner, tenantId, "Website");
+        HttpClient visitor = await fixture.CreateVisitorAsync();
+        HttpResponseMessage started = await visitor.PostAsync(
+            WebChat.WebChatApiFixture.Relative($"/api/public/webchat/{key}/conversations"),
+            content: null);
+
+        Assert.Equal(HttpStatusCode.OK, started.StatusCode);
+
+        Guid websiteConversation = JsonDocument.Parse(await started.Content.ReadAsStringAsync())
+            .RootElement.GetProperty("conversationId").GetGuid();
+        Guid websiteCustomer = (await ReadJsonAsync(
+                owner,
+                WebChat.WebChatApiFixture.Relative($"/api/tenants/{tenantId}/conversations/{websiteConversation}")))
+            .GetProperty("customer").GetProperty("id").GetGuid();
+
+        HttpResponseMessage source = await owner.GetAsync(
+            WebChat.WebChatApiFixture.Relative($"/api/tenants/{tenantId}/customers/{websiteCustomer}"));
+        using HttpRequestMessage merge = new(
+            HttpMethod.Post,
+            WebChat.WebChatApiFixture.Relative($"/api/tenants/{tenantId}/customers/{websiteCustomer}/merge"))
+        {
+            Content = System.Net.Http.Json.JsonContent.Create(new { targetCustomerId = customerId }),
+        };
+
+        merge.Headers.TryAddWithoutValidation("If-Match", source.Headers.ETag?.ToString());
+
+        HttpResponseMessage merged = await owner.SendAsync(merge);
+
+        Assert.Equal(HttpStatusCode.OK, merged.StatusCode);
+
+        JsonElement both = await DirectoryRowAsync(owner, tenantId, customerId);
+        JsonElement bothInbox = (await ReadJsonAsync(
+                owner,
+                WebChat.WebChatApiFixture.Relative($"/api/tenants/{tenantId}/conversations/{websiteConversation}")))
+            .GetProperty("customer");
+
+        Assert.Equal("UnnamedCustomer", both.GetProperty("labelCode").GetString());
+        Assert.Equal(bothInbox.GetProperty("labelCode").GetString(), both.GetProperty("labelCode").GetString());
+        Assert.Equal(bothInbox.GetProperty("shortCode").GetString(), both.GetProperty("shortCode").GetString());
+    }
+
+    private static async Task<JsonElement> DirectoryRowAsync(HttpClient owner, Guid tenantId, Guid customerId) =>
+        (await ReadJsonAsync(
+            owner,
+            WebChat.WebChatApiFixture.Relative($"/api/tenants/{tenantId}/customers?pageSize=100")))
+        .GetProperty("items").EnumerateArray()
+        .Single(item => item.GetProperty("id").GetGuid() == customerId);
+
     private static async Task SendAsync(
         HttpClient meta,
         string number,

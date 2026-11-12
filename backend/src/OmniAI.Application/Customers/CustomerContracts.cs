@@ -70,6 +70,14 @@ public sealed record CustomerConversationView(
 /// invented from anything they said.
 /// </param>
 /// <param name="Channels">The channels this customer has actually used.</param>
+/// <param name="LabelCode">
+/// Which label to show when there is no name, by the same rule the conversation
+/// reads use (<c>CustomerLabels.CodeFor</c>, Phase 38.7a).
+/// </param>
+/// <param name="ShortCode">
+/// Six characters that tell unnamed customers apart, the same as on the
+/// conversation reads (<c>CustomerShortCode</c>, Phase 38.7a); never a key.
+/// </param>
 public sealed record CustomerRow(
     Guid Id,
     string? DisplayName,
@@ -77,7 +85,9 @@ public sealed record CustomerRow(
     IReadOnlyList<ChannelKind> Channels,
     int ConversationCount,
     DateTimeOffset? LastActivityAt,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    CustomerLabelCode LabelCode,
+    string ShortCode);
 
 /// <summary>
 /// One page of the directory.
@@ -126,6 +136,8 @@ public sealed record CustomerPage(
 /// Set when this record is a tombstone. A caller that followed an old link is
 /// told which record is canonical rather than being refused.
 /// </param>
+/// <param name="LabelCode">As on <see cref="CustomerRow"/> (Phase 38.7a).</param>
+/// <param name="ShortCode">As on <see cref="CustomerRow"/> (Phase 38.7a).</param>
 public sealed record CustomerView(
     Guid Id,
     string? DisplayName,
@@ -139,7 +151,9 @@ public sealed record CustomerView(
     Guid? MergedIntoCustomerId,
     DateTimeOffset? MergedAt,
     IReadOnlyList<CustomerConversationView> Conversations,
-    bool CanReadConversations);
+    bool CanReadConversations,
+    CustomerLabelCode LabelCode,
+    string ShortCode);
 
 /// <summary>
 /// What a merge did.

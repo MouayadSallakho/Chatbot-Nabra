@@ -62,6 +62,12 @@ internal sealed class RecordingEmbeddingGenerator : ITextEmbeddingGenerator
     /// <summary>Runs inside every call, before any vector is produced.</summary>
     public Action? BeforeCall { get; set; }
 
+    /// <summary>
+    /// When set, every call waits for it (or for its cancellation) before
+    /// answering, so a test can hold an attempt open (Phase 38.7a).
+    /// </summary>
+    public Task? HoldUntil { get; set; }
+
     /// <summary>The attribution every batch was handed, in order.</summary>
     public IReadOnlyList<AiUsageContext> Usages => _usages;
 
@@ -73,9 +79,10 @@ internal sealed class RecordingEmbeddingGenerator : ITextEmbeddingGenerator
         PretendUnavailable = false;
         PretendShortResponse = false;
         BeforeCall = null;
+        HoldUntil = null;
     }
 
-    public Task<IReadOnlyList<EmbeddingVector>> GenerateAsync(
+    public async Task<IReadOnlyList<EmbeddingVector>> GenerateAsync(
         IReadOnlyList<string> inputs,
         AiUsageContext usage,
         CancellationToken cancellationToken = default)
@@ -89,6 +96,11 @@ internal sealed class RecordingEmbeddingGenerator : ITextEmbeddingGenerator
         cancellationToken.ThrowIfCancellationRequested();
 
         BeforeCall?.Invoke();
+
+        if (HoldUntil is Task hold)
+        {
+            await hold.WaitAsync(cancellationToken).ConfigureAwait(false);
+        }
 
         if (PretendUnavailable)
         {
@@ -116,7 +128,7 @@ internal sealed class RecordingEmbeddingGenerator : ITextEmbeddingGenerator
                 Profile.Dimensions));
         }
 
-        return Task.FromResult<IReadOnlyList<EmbeddingVector>>(vectors);
+        return vectors;
     }
 
     /// <summary>

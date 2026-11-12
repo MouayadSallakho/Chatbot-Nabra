@@ -93,7 +93,9 @@ public sealed class CustomerHandlers(
                 row.Channels,
                 row.ConversationCount,
                 row.LastActivityAt,
-                row.CreatedAt))],
+                row.CreatedAt,
+                CustomerLabels.CodeFor(row.DisplayName, row.Channels),
+                CustomerShortCode.For(row.Id)))],
             page,
             pageSize,
             total);
@@ -194,7 +196,9 @@ public sealed class CustomerHandlers(
                 customer.MergedIntoCustomerId?.Value,
                 customer.MergedAt,
                 conversations,
-                canReadConversations),
+                canReadConversations,
+                CustomerLabels.CodeFor(customer.DisplayName, channels),
+                CustomerShortCode.For(customer.Id)),
             found.Version);
     }
 

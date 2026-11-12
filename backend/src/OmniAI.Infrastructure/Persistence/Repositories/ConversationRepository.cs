@@ -48,13 +48,16 @@ internal sealed class ConversationRepository(OmniAiDbContext context) : IConvers
         UserId viewer,
         CancellationToken cancellationToken = default)
     {
-        IQueryable<Conversation> owned = _context.Conversations
-            .AsNoTracking()
-            .Where(conversation => conversation.TenantId == tenantId);
+        IQueryable<HandledConversation> owned = WithHandlingFacts(
+            _context.Conversations
+                .AsNoTracking()
+                .Where(conversation => conversation.TenantId == tenantId));
 
         if (filter == ConversationListFilter.NeedsPerson)
         {
-            owned = NeedingAPerson(owned);
+            // The very expression each row carries as its reason (Phase 38.7a),
+            // so the filter and the flag cannot disagree.
+            owned = owned.Where(handled => handled.Reason != NoReason);
         }
 
         int total = await owned.CountAsync(cancellationToken).ConfigureAwait(false);
@@ -63,57 +66,60 @@ internal sealed class ConversationRepository(OmniAiDbContext context) : IConvers
         // conversations sharing an instant never swap places between pages and
         // hide a row or show one twice.
         var rows = await owned
-            .OrderByDescending(conversation => conversation.LastActivityAt)
-            .ThenByDescending(conversation => conversation.Id)
+            .OrderByDescending(handled => handled.Conversation.LastActivityAt)
+            .ThenByDescending(handled => handled.Conversation.Id)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
-            .Select(conversation => new
+            .Select(handled => new
             {
                 Summary = new ConversationSummary(
-                    conversation.Id.Value,
-                    conversation.Channel,
-                    conversation.Status,
-                    conversation.Handling,
-                    conversation.StartedAt,
-                    conversation.LastActivityAt,
+                    handled.Conversation.Id.Value,
+                    handled.Conversation.Channel,
+                    handled.Conversation.Status,
+                    handled.Conversation.Handling,
+                    handled.Conversation.StartedAt,
+                    handled.Conversation.LastActivityAt,
                     _context.WebChatSessions
-                        .Where(session => session.ConversationId == conversation.Id)
+                        .Where(session => session.ConversationId == handled.Conversation.Id)
                         .Join(
                             _context.AiAgents,
                             session => session.AiAgentId,
                             agent => agent.Id,
                             (session, agent) => agent.Name.Value)
                         .FirstOrDefault(),
-                    conversation.Messages.Count,
+                    handled.Conversation.Messages.Count,
 
                     // The newest message by ingestion order, cut to a preview length.
                     // Read as a correlated subquery so a list of fifty conversations
                     // is one round trip rather than fifty-one, and so no transcript is
                     // loaded to show one line of it.
-                    conversation.Messages
+                    handled.Conversation.Messages
                         .OrderByDescending(message =>
                             EF.Property<long>(message, PersistenceSchema.MessageIngestionSequence))
                         .Select(message => message.Text.Length > PreviewLength
                             ? message.Text.Substring(0, PreviewLength)
                             : message.Text)
                         .FirstOrDefault(),
-                    conversation.Messages
+                    handled.Conversation.Messages
                         .OrderByDescending(message =>
                             EF.Property<long>(message, PersistenceSchema.MessageIngestionSequence))
                         .Select(message => (MessageSender?)message.Sender)
                         .FirstOrDefault(),
 
-                    // The id only. Turning it into a name is a second query, for the
-                    // reason set out on NameAssigneesAsync.
+                    // Ids only, below. Turning them into names is one more query
+                    // for the page, for the reason set out on NameMembersAsync.
                     AssignedTo: null),
-                conversation.CustomerId,
+                handled.Conversation.CustomerId,
+                Assigned = handled.Conversation.AssignedTo,
+                handled.TakenOverBy,
+                handled.Reason,
 
                 // Unread for this reader: two more correlated subqueries in the
                 // same statement, never a query per row.
-                Newest = conversation.Messages.Max(message =>
+                Newest = handled.Conversation.Messages.Max(message =>
                     (long?)EF.Property<long>(message, PersistenceSchema.MessageIngestionSequence)),
                 Read = _context.ConversationReads
-                    .Where(read => read.ConversationId == conversation.Id && read.UserId == viewer)
+                    .Where(read => read.ConversationId == handled.Conversation.Id && read.UserId == viewer)
                     .Select(read => (long?)read.LastReadSequence)
                     .FirstOrDefault(),
             })
@@ -126,57 +132,138 @@ internal sealed class ConversationRepository(OmniAiDbContext context) : IConvers
                 cancellationToken)
             .ConfigureAwait(false);
 
+        IReadOnlyDictionary<Guid, ConversationMessageAuthor> members = await NameMembersAsync(
+                [.. rows.SelectMany(row => new[] { row.Assigned, row.TakenOverBy })],
+                cancellationToken)
+            .ConfigureAwait(false);
+
         List<ConversationSummary> items =
         [
             .. rows.Select(row => row.Summary with
             {
+                AssignedTo = Named(members, row.Assigned),
                 Customer = customers.GetValueOrDefault(row.Summary.Id),
                 Unread = IsUnread(row.Newest, row.Read),
+                TakenOverBy = Named(members, row.TakenOverBy),
+                NeedsPersonReason = ReasonFor(row.Reason),
             }),
         ];
 
-        return new ConversationPage(
-            await NameAssigneesAsync(items, cancellationToken).ConfigureAwait(false),
-            page,
-            pageSize,
-            total);
+        return new ConversationPage(items, page, pageSize, total);
     }
 
     /// <summary>
-    /// The conversations waiting on a person: open, the customer wrote last, and
-    /// one of: a person is handling it; the AI's turn for that last message
-    /// failed; or the AI is handling it but that turn completed without a reply.
+    /// A conversation, with who took it over and why it waits on a person
+    /// computed beside it in the same statement (Phase 38.7a).
+    /// </summary>
+    /// <remarks>
+    /// A nominal type rather than an anonymous one, so the list, its count, its
+    /// filter and the detail all compose over the one projection.
+    /// </remarks>
+    private sealed class HandledConversation
+    {
+        public Conversation Conversation { get; init; } = null!;
+
+        /// <summary>See <see cref="WithHandlingFacts"/>.</summary>
+        public UserId? TakenOverBy { get; init; }
+
+        /// <summary>A <see cref="NeedsPersonReason"/> value, or <see cref="NoReason"/>.</summary>
+        public int Reason { get; init; }
+    }
+
+    /// <summary>The reason of a conversation that waits on nobody.</summary>
+    private const int NoReason = 0;
+
+    private const int PersonHandlingReason = (int)NeedsPersonReason.PersonHandling;
+
+    private const int AiTurnFailedReason = (int)NeedsPersonReason.AiTurnFailed;
+
+    private const int ReturnedUnansweredReason = (int)NeedsPersonReason.ReturnedUnanswered;
+
+    /// <summary>
+    /// Who took each conversation over, and why it waits on a person (Phase 38.7a).
     /// </summary>
     /// <remarks>
     /// <para>
-    /// The third branch widens the plan's D-5 at the owner's request (Phase 37.4,
-    /// Revision 1). A turn completes without a reply only while a person handles
-    /// the conversation; handed back to the AI before anybody answered, that
-    /// message would otherwise wait for ever, because the AI never answers
-    /// retroactively. While a person still handles it the first branch already
-    /// counts it, so the turn test needs no handling condition of its own.
+    /// <strong>The reason is the one definition behind both
+    /// <c>filter=needs-person</c> and the <c>needsPerson</c> flag.</strong> Open,
+    /// the customer wrote last, and one of: a person is handling it
+    /// (<c>PersonHandling</c>); the AI's turn for that last message failed
+    /// (<c>AiTurnFailed</c>); or that turn completed without a reply
+    /// (<c>ReturnedUnanswered</c>). The third branch widens the plan's D-5 at the
+    /// owner's request (Phase 37.4, Revision 1): a turn completes without a reply
+    /// only while a person handles the conversation, and handed back to the AI
+    /// before anybody answered, that message would otherwise wait for ever,
+    /// because the AI never answers retroactively.
     /// </para>
-    /// One predicate over the newest message, reached by the existing
+    /// <para>
+    /// The branches are tested in that order, so <c>PersonHandling</c> wins when a
+    /// person handles a conversation whose last turn also failed or went
+    /// unanswered: their reply is what is awaited now. The two turn branches are
+    /// exclusive, because a turn is failed or completed, never both.
+    /// </para>
+    /// <para>
+    /// One scalar subquery over the newest message, reached by the existing
     /// <c>ix_messages_conversation_ingestion</c> index read backwards, and its turn
     /// by <c>ux_conversation_turns_customer_message</c>. No index is added to
-    /// either table (an analytics test freezes their index sets); the handling
-    /// branch has <c>ix_conversations_tenant_handling_activity</c> (M6).
+    /// either table (an analytics test freezes their index sets).
+    /// </para>
+    /// <para>
+    /// <strong>Who took it over</strong> is the actor of the newest handling event
+    /// (by transcript position, then time, then id), read through
+    /// <c>ix_conversation_handling_events_conversation</c>, when that event is a
+    /// takeover and a person handles the conversation now. A return is newer than
+    /// the takeover it ends, so it answers null, as does a takeover from before
+    /// Phase 37.4, which recorded no event. The workspace is in the predicate as
+    /// well as the conversation.
+    /// </para>
     /// </remarks>
-    private IQueryable<Conversation> NeedingAPerson(IQueryable<Conversation> owned) =>
-        owned.Where(conversation =>
-            conversation.Status == ConversationStatus.Open
-            && conversation.Messages
-                .OrderByDescending(message =>
-                    EF.Property<long>(message, PersistenceSchema.MessageIngestionSequence))
-                .Take(1)
-                .Any(last =>
-                    last.Sender == MessageSender.Customer
-                    && (conversation.Handling == ConversationHandling.Human
-                        || _context.ConversationTurns.Any(turn =>
-                            turn.CustomerMessageId == last.Id
-                            && (turn.Status == ConversationTurnStatus.Failed
-                                || (turn.Status == ConversationTurnStatus.Completed
-                                    && turn.ReplyMessageId == null))))));
+    private IQueryable<HandledConversation> WithHandlingFacts(IQueryable<Conversation> owned) =>
+        owned.Select(conversation => new HandledConversation
+        {
+            Conversation = conversation,
+            TakenOverBy = conversation.Handling == ConversationHandling.Human
+                ? _context.ConversationHandlingEvents
+                    .Where(change =>
+                        change.ConversationId == conversation.Id
+                        && change.TenantId == conversation.TenantId)
+                    .OrderByDescending(change => change.AfterSequence)
+                    .ThenByDescending(change => change.OccurredAt)
+                    .ThenByDescending(change => change.Id)
+                    .Select(change => change.Kind == ConversationHandlingEventKind.TakenOver
+                        ? (UserId?)change.Actor
+                        : null)
+                    .FirstOrDefault()
+                : null,
+            Reason = conversation.Status != ConversationStatus.Open
+                ? NoReason
+                : conversation.Messages
+                    .OrderByDescending(message =>
+                        EF.Property<long>(message, PersistenceSchema.MessageIngestionSequence))
+                    .Select(last => last.Sender != MessageSender.Customer
+                        ? NoReason
+                        : conversation.Handling == ConversationHandling.Human
+                            ? PersonHandlingReason
+                            : _context.ConversationTurns.Any(turn =>
+                                turn.CustomerMessageId == last.Id
+                                && turn.Status == ConversationTurnStatus.Failed)
+                                ? AiTurnFailedReason
+                                : _context.ConversationTurns.Any(turn =>
+                                    turn.CustomerMessageId == last.Id
+                                    && turn.Status == ConversationTurnStatus.Completed
+                                    && turn.ReplyMessageId == null)
+                                    ? ReturnedUnansweredReason
+                                    : NoReason)
+                    .FirstOrDefault(),
+        });
+
+    private static NeedsPersonReason? ReasonFor(int reason) =>
+        reason == NoReason ? null : (NeedsPersonReason)reason;
+
+    private static ConversationMessageAuthor? Named(
+        IReadOnlyDictionary<Guid, ConversationMessageAuthor> members,
+        UserId? member) =>
+        member is UserId id ? members.GetValueOrDefault(id.Value) : null;
 
     /// <summary>
     /// Unread when the newest message is beyond the reader's marker, or the reader
@@ -198,38 +285,41 @@ internal sealed class ConversationRepository(OmniAiDbContext context) : IConvers
         // tracked entry, because this query is deliberately untracked: a list
         // screen reading a hundred conversations should not populate a change
         // tracker it will never save.
-        var row = await _context.Conversations
-            .AsNoTracking()
-            .Where(conversation =>
-                conversation.Id == conversationId && conversation.TenantId == tenantId)
-            .Select(conversation => new
+        var row = await WithHandlingFacts(
+                _context.Conversations
+                    .AsNoTracking()
+                    .Where(conversation =>
+                        conversation.Id == conversationId && conversation.TenantId == tenantId))
+            .Select(handled => new
             {
                 Detail = new ConversationDetail(
-                    conversation.Id.Value,
-                    conversation.Channel,
-                    conversation.Status,
-                    conversation.Handling,
-                    conversation.StartedAt,
-                    conversation.LastActivityAt,
+                    handled.Conversation.Id.Value,
+                    handled.Conversation.Channel,
+                    handled.Conversation.Status,
+                    handled.Conversation.Handling,
+                    handled.Conversation.StartedAt,
+                    handled.Conversation.LastActivityAt,
                     _context.WebChatSessions
-                        .Where(session => session.ConversationId == conversation.Id)
+                        .Where(session => session.ConversationId == handled.Conversation.Id)
                         .Join(
                             _context.AiAgents,
                             session => session.AiAgentId,
                             agent => agent.Id,
                             (session, agent) => agent.Name.Value)
                         .FirstOrDefault(),
-                    conversation.Messages.Count,
+                    handled.Conversation.Messages.Count,
                     AssignedTo: null),
-                Assigned = conversation.AssignedTo,
+                Assigned = handled.Conversation.AssignedTo,
+                handled.TakenOverBy,
+                handled.Reason,
                 Version = EF.Property<uint>(
-                    conversation,
+                    handled.Conversation,
                     PersistenceSchema.XminConcurrencyToken),
-                conversation.CustomerId,
-                Newest = conversation.Messages.Max(message =>
+                handled.Conversation.CustomerId,
+                Newest = handled.Conversation.Messages.Max(message =>
                     (long?)EF.Property<long>(message, PersistenceSchema.MessageIngestionSequence)),
                 Read = _context.ConversationReads
-                    .Where(read => read.ConversationId == conversation.Id && read.UserId == viewer)
+                    .Where(read => read.ConversationId == handled.Conversation.Id && read.UserId == viewer)
                     .Select(read => (long?)read.LastReadSequence)
                     .FirstOrDefault(),
             })
@@ -241,9 +331,10 @@ internal sealed class ConversationRepository(OmniAiDbContext context) : IConvers
             return null;
         }
 
-        ConversationMessageAuthor? assignee = row.Assigned is null
-            ? null
-            : await FindMemberAsync(row.Assigned.Value, cancellationToken).ConfigureAwait(false);
+        IReadOnlyDictionary<Guid, ConversationMessageAuthor> members = await NameMembersAsync(
+                [row.Assigned, row.TakenOverBy],
+                cancellationToken)
+            .ConfigureAwait(false);
 
         IReadOnlyDictionary<Guid, ConversationCustomer> customer = await DescribeCustomersAsync(
                 tenantId,
@@ -254,10 +345,12 @@ internal sealed class ConversationRepository(OmniAiDbContext context) : IConvers
         return new Versioned<ConversationDetail>(
             row.Detail with
             {
-                AssignedTo = assignee,
+                AssignedTo = Named(members, row.Assigned),
                 Customer = customer.GetValueOrDefault(row.Detail.Id),
                 Unread = IsUnread(row.Newest, row.Read),
                 LastReadSequence = row.Read,
+                TakenOverBy = Named(members, row.TakenOverBy),
+                NeedsPersonReason = ReasonFor(row.Reason),
             },
             RowVersionTokens.Encode(row.Version));
     }
@@ -576,7 +669,8 @@ internal sealed class ConversationRepository(OmniAiDbContext context) : IConvers
     }
 
     /// <summary>
-    /// Names the colleague each conversation on this page is routed to.
+    /// Names the colleagues a page of conversations is routed to or taken over by,
+    /// in one query (Phase 38.7a: the takeover joined the assignee).
     /// </summary>
     /// <remarks>
     /// <strong>A second query, for the same reason the transcript authors need
@@ -584,45 +678,31 @@ internal sealed class ConversationRepository(OmniAiDbContext context) : IConvers
     /// nullable value-object id is not translatable: EF Core cannot turn
     /// <c>AssignedTo.Value.Value</c> inside a projection into SQL, and the
     /// failure is a 500 on the first administrator who opens the inbox rather
-    /// than a compile error.
+    /// than a compile error. The ids themselves come with the page's own
+    /// statement.
     /// <para>
-    /// A page where nothing is assigned — which is most pages, most of the time
-    /// — makes no second query at all.
+    /// Named exactly as the transcript names its event actors: the account's
+    /// email, whether or not they are still a member. A page where nobody is
+    /// assigned or has taken over makes no second query at all.
     /// </para>
     /// </remarks>
-    private async Task<IReadOnlyList<ConversationSummary>> NameAssigneesAsync(
-        List<ConversationSummary> items,
+    private async Task<IReadOnlyDictionary<Guid, ConversationMessageAuthor>> NameMembersAsync(
+        IReadOnlyList<UserId?> named,
         CancellationToken cancellationToken)
     {
-        // Value objects throughout, never their unwrapped Guids. A predicate
-        // that reaches inside one -- Contains(conversation.Id.Value) -- is not
-        // translatable, because the value converter maps the whole object to a
-        // column and EF has nothing to map a member of it to. Comparing the
-        // objects themselves is what every other query here already does.
-        List<ConversationId> onThisPage = [.. items.Select(item => ConversationId.From(item.Id))];
-
-        var assignments = await _context.Conversations
-            .AsNoTracking()
-            .Where(conversation =>
-                onThisPage.Contains(conversation.Id) && conversation.AssignedTo != null)
-            .Select(conversation => new
-            {
-                Conversation = conversation.Id.Value,
-                Member = conversation.AssignedTo!.Value.Value,
-            })
-            .ToListAsync(cancellationToken)
-            .ConfigureAwait(false);
-
-        if (assignments.Count == 0)
-        {
-            return items;
-        }
-
         // Users are Identity's table, keyed on a plain Guid, so this one is an
         // ordinary translatable Contains.
-        List<Guid> members = [.. assignments.Select(assignment => assignment.Member).Distinct()];
+        List<Guid> members =
+        [
+            .. named.Where(member => member is not null).Select(member => member!.Value.Value).Distinct(),
+        ];
 
-        Dictionary<Guid, ConversationMessageAuthor> byMember = await _context.Users
+        if (members.Count == 0)
+        {
+            return new Dictionary<Guid, ConversationMessageAuthor>();
+        }
+
+        return await _context.Users
             .AsNoTracking()
             .Where(user => members.Contains(user.Id))
             .ToDictionaryAsync(
@@ -630,29 +710,7 @@ internal sealed class ConversationRepository(OmniAiDbContext context) : IConvers
                 user => new ConversationMessageAuthor(user.Id, user.Email!),
                 cancellationToken)
             .ConfigureAwait(false);
-
-        Dictionary<Guid, ConversationMessageAuthor> byConversation = assignments
-            .Where(assignment => byMember.ContainsKey(assignment.Member))
-            .ToDictionary(
-                assignment => assignment.Conversation,
-                assignment => byMember[assignment.Member]);
-
-        return [.. items.Select(item =>
-            byConversation.TryGetValue(item.Id, out ConversationMessageAuthor? author)
-                ? item with { AssignedTo = author }
-                : item)];
     }
-
-    /// <summary>One member, named.</summary>
-    private async Task<ConversationMessageAuthor?> FindMemberAsync(
-        UserId member,
-        CancellationToken cancellationToken) =>
-        await _context.Users
-            .AsNoTracking()
-            .Where(user => user.Id == member.Value)
-            .Select(user => new ConversationMessageAuthor(user.Id, user.Email!))
-            .FirstOrDefaultAsync(cancellationToken)
-            .ConfigureAwait(false);
 
     /// <summary>
     /// Names the colleague behind each reply a person wrote.

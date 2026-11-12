@@ -321,11 +321,15 @@ internal sealed class KnowledgeIndexHarness
 
     public required RecordingAttemptStore Attempts { get; init; }
 
+    /// <summary>What knowledge viewers were told (Phase 38.7a).</summary>
+    public required RecordingKnowledgeNotifier Announcer { get; init; }
+
     public EmbeddingProfileId Profile => Embeddings.Profile.Id;
 
     public static KnowledgeIndexHarness Build(
         string content = "Goods may be returned in 30 days.",
-        KnowledgeChunkingPolicy? chunking = null)
+        KnowledgeChunkingPolicy? chunking = null,
+        KnowledgeIndexingLimits? limits = null)
     {
         TenantId workspace = TenantId.New();
 
@@ -337,10 +341,12 @@ internal sealed class KnowledgeIndexHarness
         RecordingKnowledgeIndexStore index = new(documents);
         RecordingEmbeddingGenerator embeddings = new();
         RecordingAttemptStore attempts = new();
+        RecordingKnowledgeNotifier announcer = new();
 
         return new KnowledgeIndexHarness
         {
             Attempts = attempts,
+            Announcer = announcer,
             Workspace = workspace,
             Document = document,
             Documents = documents,
@@ -354,7 +360,9 @@ internal sealed class KnowledgeIndexHarness
                 new KnowledgeChunker(chunking),
                 Owner(workspace),
                 new FixedTimeProvider(Noon),
-                attempts),
+                attempts,
+                announcer,
+                limits),
         };
     }
 
@@ -374,6 +382,57 @@ internal sealed class KnowledgeIndexHarness
             (workspace ?? Workspace).Value,
             Document.Id.Value,
             expected ?? Documents.VersionOf(Document)));
+
+    /// <summary>As the HTTP route runs it since Phase 38.7a.</summary>
+    public Task<Versioned<KnowledgeIndexResult>?> IndexDetachedAsync(CancellationToken stopping = default) =>
+        Handler.HandleDetachedAsync(
+            new IndexKnowledgeDocumentCommand(Workspace.Value, Document.Id.Value, Documents.VersionOf(Document)),
+            stopping);
+}
+
+/// <summary>Records knowledge announcements instead of sending them.</summary>
+/// <remarks>The whole payload is a workspace and a document id: there is nothing else to record.</remarks>
+internal sealed class RecordingKnowledgeNotifier : IKnowledgeRealtimeNotifier
+{
+    private readonly List<(TenantId Tenant, KnowledgeDocumentId Document)> _announced = [];
+    private readonly Lock _sync = new();
+
+    public IReadOnlyList<(TenantId Tenant, KnowledgeDocumentId Document)> Announced
+    {
+        get
+        {
+            lock (_sync)
+            {
+                return [.. _announced];
+            }
+        }
+    }
+
+    /// <summary>When set, every announcement throws.</summary>
+    public Exception? Failure { get; set; }
+
+    /// <summary>Runs at each announcement, before it is recorded or fails.</summary>
+    public Action? Observe { get; set; }
+
+    public Task KnowledgeChangedAsync(
+        TenantId tenantId,
+        KnowledgeDocumentId documentId,
+        CancellationToken cancellationToken = default)
+    {
+        Observe?.Invoke();
+
+        if (Failure is not null)
+        {
+            throw Failure;
+        }
+
+        lock (_sync)
+        {
+            _announced.Add((tenantId, documentId));
+        }
+
+        return Task.CompletedTask;
+    }
 }
 
 /// <summary>Records attempt transitions; nothing is persisted.</summary>

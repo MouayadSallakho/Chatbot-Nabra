@@ -47,6 +47,18 @@ public sealed record ConversationCustomerResponse(
 /// Whether its newest message is beyond the reader's own read marker, or the reader
 /// never marked it read and it has a message (Phase 37.4).
 /// </param>
+/// <param name="TakenOverBy">
+/// Who took it over (Phase 38.7a): present while a person handles it and a
+/// takeover event records who, the newest one winning; null in AI mode and for a
+/// takeover from before Phase 37.4. Named as the transcript names event actors.
+/// </param>
+/// <param name="NeedsPerson">
+/// Whether it is in <c>filter=needs-person</c> (Phase 38.7a); always agrees with it.
+/// </param>
+/// <param name="NeedsPersonReason">
+/// <c>PersonHandling</c>, <c>AiTurnFailed</c> or <c>ReturnedUnanswered</c>; null
+/// exactly when <c>needsPerson</c> is false (Phase 38.7a).
+/// </param>
 public sealed record ConversationSummaryResponse(
     Guid Id,
     string Channel,
@@ -60,7 +72,10 @@ public sealed record ConversationSummaryResponse(
     string? LastMessageSender,
     WorkspaceMemberResponse? AssignedTo,
     ConversationCustomerResponse? Customer,
-    bool Unread);
+    bool Unread,
+    WorkspaceMemberResponse? TakenOverBy,
+    bool NeedsPerson,
+    string? NeedsPersonReason);
 
 /// <summary>A page of conversations.</summary>
 public sealed record ConversationPageResponse(
@@ -75,6 +90,9 @@ public sealed record ConversationPageResponse(
 /// <param name="LastReadSequence">
 /// The reader's own read marker, or null when they never marked it read (Phase 37.4).
 /// </param>
+/// <param name="TakenOverBy">As on the list (Phase 38.7a).</param>
+/// <param name="NeedsPerson">As on the list (Phase 38.7a).</param>
+/// <param name="NeedsPersonReason">As on the list (Phase 38.7a).</param>
 public sealed record ConversationDetailResponse(
     Guid Id,
     string Channel,
@@ -87,7 +105,10 @@ public sealed record ConversationDetailResponse(
     WorkspaceMemberResponse? AssignedTo,
     ConversationCustomerResponse? Customer,
     bool Unread,
-    long? LastReadSequence);
+    long? LastReadSequence,
+    WorkspaceMemberResponse? TakenOverBy,
+    bool NeedsPerson,
+    string? NeedsPersonReason);
 
 /// <summary>A reply written by a person.</summary>
 /// <param name="ClientMessageId">
@@ -188,14 +209,14 @@ internal static class ConversationEndpoints
 
         workspace.MapGet("/", ListAsync)
             .WithName("ListTenantConversations")
-            .WithSummary("Lists conversations, most recently active first, with the customer and the reader's unread state. Optional filter=needs-person (400 conversations.filter.invalid for any other value); total counts the filtered set.")
+            .WithSummary("Lists conversations, most recently active first, with the customer, the reader's unread state, who took it over and why it needs a person. Optional filter=needs-person (400 conversations.filter.invalid for any other value), which keeps exactly the rows whose needsPerson is true; total counts the filtered set.")
             .Produces<ConversationPageResponse>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status403Forbidden);
 
         workspace.MapGet("/{conversationId:guid}", GetAsync)
             .WithName("GetTenantConversationById")
-            .WithSummary("Reads one conversation with its ETag, the customer, and the reader's unread state and read marker.")
+            .WithSummary("Reads one conversation with its ETag, the customer, the reader's unread state and read marker, who took it over and why it needs a person.")
             .Produces<ConversationDetailResponse>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status403Forbidden);
 
@@ -268,7 +289,10 @@ internal static class ConversationEndpoints
                     item.LastMessageSender?.ToString(),
                     ToMember(item.AssignedTo),
                     ToCustomer(item.Customer),
-                    item.Unread))],
+                    item.Unread,
+                    ToMember(item.TakenOverBy),
+                    item.NeedsPerson,
+                    item.NeedsPersonReason?.ToString()))],
                 result.Page,
                 result.PageSize,
                 result.Total));
@@ -581,7 +605,10 @@ internal static class ConversationEndpoints
             ToMember(detail.AssignedTo),
             ToCustomer(detail.Customer),
             detail.Unread,
-            detail.LastReadSequence);
+            detail.LastReadSequence,
+            ToMember(detail.TakenOverBy),
+            detail.NeedsPerson,
+            detail.NeedsPersonReason?.ToString());
 
     private static WorkspaceMemberResponse? ToMember(ConversationMessageAuthor? author) =>
         author is null ? null : new WorkspaceMemberResponse(author.UserId, author.Email);

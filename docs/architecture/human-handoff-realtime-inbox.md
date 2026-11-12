@@ -199,8 +199,8 @@ SignalR, with two hubs.
 | --- | --- | --- |
 | Who | signed-in staff | one visitor |
 | Authorised by | the existing session cookie | a short-lived realtime ticket |
-| Group | `tenant:{id}` | `conversation:{id}` |
-| Joining | client asks; server checks membership + `conversations.view` | decided by the ticket; the hub has no callable methods |
+| Group | `tenant:{id}`; `notifications:{tenant}:{member}` (37.3); `knowledge:{id}` (38.7a) | `conversation:{id}` |
+| Joining | client asks; server checks membership + `conversations.view` (`Subscribe`), membership (`SubscribeNotifications`), or membership + `knowledge.view` (`SubscribeKnowledge`, 38.7a) | decided by the ticket; the hub has no callable methods |
 
 **The payload is a conversation id and nothing else.** The temptation is to push
 the new message down the wire and let the client append it, which would be faster
@@ -237,6 +237,40 @@ replay outcome. A replay of the same client message id is refused as already
 failed before it reaches that point, so it is never announced twice. The event is
 the existing `conversationChanged(conversationId)`: no new event, field or
 payload. Before 37.1 the message reached an open inbox only after a reload.
+
+**The customer's message is announced as soon as it is stored (Phase 38.7a,
+BA-13).** On the AI path `CustomerTurnRunner` now announces once more, right
+after `BeginTurnAsync` commits the customer's message and before the provider
+request is built (building it already calls the embedding provider). So an AI
+turn announces twice: *stored*, then *settled* (the reply, or the failure above).
+An open inbox shows the message and that no reply exists yet for as long as the
+provider takes, instead of nothing until the turn ends. The first announcement
+uses `AnnounceQuietlyAsync` with no cancellation token, like the failure path:
+the message is committed, so neither a broken backplane nor an abandoned request
+may skip it or fail the turn. The human path is unchanged: one announcement,
+after the turn is settled without a reply. A replay (settled, failed or in
+progress) and a duplicate refused by the unique index return before this point,
+so they announce nothing. Same event, same groups (the workspace's and the
+conversation's, so the visitor's page re-reads too), same payload.
+
+**Knowledge indexing has its own event (Phase 38.7a, BA-11).**
+`knowledgeChanged(documentId)` goes to `knowledge:{tenantId}` when an index attempt
+starts (its durable record is committed and the single flight is held) and when it
+settles: by the request that ran it, or by the stale-attempt reconciler
+(`KnowledgeAttemptReconciler`, after its statement commits, one announcement per
+settled attempt). The payload is the document id and nothing else; the client
+re-reads `GET …/knowledge/{id}` (or the list), which is where the outcome lives and
+where `knowledge.view` is checked again. Joining needs membership and
+`knowledge.view`: `SubscribeKnowledge(tenantId)`, refused with "No such workspace."
+for an outsider and for a member without the permission alike (it reads the
+three-valued decision, so a missing permission is a refusal, not the hub's generic
+error). `UnsubscribeKnowledge(tenantId)` needs nothing. The group has its own
+prefix, so `conversations.view` and `knowledge.view` never stand in for each other.
+It travels on the same connection as the inbox: one connection per page stays one.
+Announcing never throws (`KnowledgeRealtimeAnnouncements.AnnounceQuietlyAsync`; the
+SignalR notifier also logs and swallows) and never changes an attempt's outcome or
+its response. The existing `Subscribe` is unchanged; a member without
+`conversations.view` still gets the hub's generic error there.
 
 ---
 
@@ -461,3 +495,51 @@ One marker per member per conversation: `last_read_sequence`, `read_at`.
 - The membership key cascades: a marker means nothing once its member has left.
 - **No backfill.** From Phase 37.4 every conversation with a message reads as
   unread for every member until it is opened.
+
+## 15. Phase 38.7a: who handles it, and why it needs a person
+
+Additive fields on every conversation list item and on the detail, under
+`conversations.view` as before; nothing existing changed (contract table in
+`docs/phase-reports/PHASE_38_7A_BACKEND_ASKS_REPORT.md`).
+
+### 15.1 `takenOverBy` (BA-2)
+
+`{ userId, email }`, the shape of `assignedTo`, or `null`.
+
+- Present while **a person handles the conversation** and the conversation's
+  **newest handling event** is a takeover: its actor. "Newest" is by
+  `after_sequence`, then `occurred_at`, then id. A return to the AI is newer than
+  the takeover it ends, so it reads null; a later takeover by somebody else names
+  them.
+- `null` in AI mode, and for a takeover from before Phase 37.4, which recorded no
+  event (§14.1). Nothing is inferred.
+- Named exactly as the transcript names event actors (§14.3): the account's email,
+  including somebody who has since left the workspace.
+- Read in the page's own statement (a correlated subquery through
+  `ix_conversation_handling_events_conversation`, with the workspace in the
+  predicate as well as the conversation); the assignee and the taker are named by
+  one users query for the page, only when there is somebody to name. A page with
+  nobody assigned or taken over now costs four statements, one fewer than before.
+
+### 15.2 `needsPerson` and `needsPersonReason` (BA-7)
+
+`needsPerson` is true exactly when the conversation is in `filter=needs-person`;
+`needsPersonReason` is then one of the three branches of §14.4, else `null`:
+
+| Reason | Branch |
+| --- | --- |
+| `PersonHandling` | a person handles it, and the customer wrote last |
+| `AiTurnFailed` | the AI's turn for the customer's last message failed |
+| `ReturnedUnanswered` | handed back to the AI before anybody answered that message |
+
+**One definition.** A single expression computes the reason beside each
+conversation, and both the filter (`reason <> none`) and the flag read it, so they
+cannot disagree. It is evaluated in the page's statement over the same indexes as
+before (the newest message by `ix_messages_conversation_ingestion` read backwards,
+its turn by `ux_conversation_turns_customer_message`); no index was added to
+`messages` or `conversation_turns`.
+
+**When two branches hold, `PersonHandling` wins**: a person handles the
+conversation now, so their reply is what is awaited, whatever happened to the AI's
+turn before they took it over. The two turn branches cannot both hold: a turn is
+failed or completed, never both.

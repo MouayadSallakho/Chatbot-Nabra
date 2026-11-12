@@ -64,10 +64,13 @@ public sealed class FailedTurnRealtimeApiTests(WebChatApiFixture fixture)
                 await SendAsync(visitor, conversation, "m1", "Anyone there?");
 
             Assert.Equal(HttpStatusCode.ServiceUnavailable, failed.StatusCode);
+
+            // Twice (Phase 38.7a): the stored message, then the failed turn.
+            Assert.True(await inbox.WaitForChangeAsync(conversation.ConversationId, Arrival));
             Assert.True(await inbox.WaitForChangeAsync(conversation.ConversationId, Arrival));
 
             // Repeating the same message is refused as already failed, and is not
-            // announced a second time.
+            // announced again.
             using HttpResponseMessage replayed =
                 await SendAsync(visitor, conversation, "m1", "Anyone there?");
 
@@ -76,6 +79,52 @@ public sealed class FailedTurnRealtimeApiTests(WebChatApiFixture fixture)
         }
         finally
         {
+            fixture.ResetGenerator();
+        }
+    }
+
+    [Fact]
+    public async Task The_stored_message_reaches_an_open_inbox_before_the_ai_answers()
+    {
+        // Phase 38.7a (BA-13): announced once when the message is stored, while
+        // the provider is still being waited on, and again when the reply exists.
+        (HttpClient owner, Guid tenantId, _) = await fixture.CreateOwnerAsync();
+        (string key, _) = await WebChatApiFixture.PublishChatAsync(owner, tenantId, "Waiting");
+
+        await using InboxHubClient inbox = await InboxHubClient.SignInAndConnectAsync(
+            fixture.Application,
+            await AiAgentApiFixture.CurrentEmailAsync(owner));
+
+        Assert.Null(await inbox.InvokeAsync("Subscribe", tenantId));
+
+        TaskCompletionSource provider = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        fixture.ResetGenerator().HoldUntil = provider.Task;
+
+        try
+        {
+            HttpClient visitor = await fixture.CreateVisitorAsync();
+            StartedConversation conversation = await StartAsync(visitor, key);
+
+            Task<HttpResponseMessage> sending =
+                SendAsync(visitor, conversation, "m1", "Is anyone there?");
+
+            Assert.True(await inbox.WaitForChangeAsync(conversation.ConversationId, Arrival));
+            Assert.False(sending.IsCompleted);
+
+            // What the inbox reads now: the customer's message, and no reply.
+            Assert.Equal(["Customer"], await SendersAsync(owner, tenantId, conversation));
+
+            provider.SetResult();
+
+            using HttpResponseMessage answered = await sending;
+
+            Assert.True(answered.IsSuccessStatusCode);
+            Assert.True(await inbox.WaitForChangeAsync(conversation.ConversationId, Arrival));
+            Assert.Equal(["Customer", "AiAgent"], await SendersAsync(owner, tenantId, conversation));
+        }
+        finally
+        {
+            provider.TrySetResult();
             fixture.ResetGenerator();
         }
     }
@@ -185,6 +234,26 @@ public sealed class FailedTurnRealtimeApiTests(WebChatApiFixture fixture)
 
         return await started.Content.ReadFromJsonAsync<StartedConversation>()
             ?? throw new InvalidOperationException("No conversation was returned.");
+    }
+
+    private static async Task<IReadOnlyList<string>> SendersAsync(
+        HttpClient owner,
+        Guid tenantId,
+        StartedConversation conversation)
+    {
+        using HttpResponseMessage read = await owner.GetAsync(WebChatApiFixture.Relative(
+            $"/api/tenants/{tenantId}/conversations/{conversation.ConversationId}/messages"));
+
+        read.EnsureSuccessStatusCode();
+
+        using System.Text.Json.JsonDocument page =
+            System.Text.Json.JsonDocument.Parse(await read.Content.ReadAsStringAsync());
+
+        return
+        [
+            .. page.RootElement.GetProperty("items").EnumerateArray()
+                .Select(item => item.GetProperty("sender").GetString() ?? string.Empty),
+        ];
     }
 
     private static Task<HttpResponseMessage> SendAsync(

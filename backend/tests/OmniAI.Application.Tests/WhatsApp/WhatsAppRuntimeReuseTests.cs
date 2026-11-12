@@ -103,7 +103,8 @@ public sealed class WhatsAppRuntimeReuseTests
     {
         // The same rule as website chat, through the same runner: the
         // customer's words are stored before the provider is called, so the
-        // inbox is told even when no reply exists to send.
+        // inbox is told even when no reply exists to send. Twice since Phase
+        // 38.7a: when the message is stored, and when the turn has failed.
         Scenario scenario = Scenario.Build(
             RecordingGenerator.Failing(() => new AiRuntimeUnavailableException()));
 
@@ -118,7 +119,7 @@ public sealed class WhatsAppRuntimeReuseTests
             () => scenario.Processor.HandleAsync(claimed));
 
         Assert.Equal(
-            before + 1,
+            before + 2,
             scenario.Harness.Announcer.Announced.Count(
                 announced => announced.Conversation == scenario.Conversation.Id));
 

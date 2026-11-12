@@ -107,6 +107,47 @@ internal sealed class WorkspaceInboxHub(TenantAuthorizer authorizer) : Hub
             .ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Asks to hear when a document's indexing starts or settles in this
+    /// workspace (Phase 38.7a, BA-11).
+    /// </summary>
+    /// <remarks>
+    /// Checked as <see cref="Subscribe"/> checks the inbox: membership and
+    /// <c>knowledge.view</c>. Refused with <see cref="Subscribe"/>'s message, "No
+    /// such workspace.", for an outsider and for a member without the permission
+    /// alike: the three-valued decision is read here, so a missing permission is a
+    /// refusal and never the hub's generic error. What arrives is a document id;
+    /// the document and its attempt are read through the authorised HTTP route.
+    /// </remarks>
+    /// <exception cref="HubException">Not a member, or may not view knowledge.</exception>
+    public async Task SubscribeKnowledge(Guid tenantId)
+    {
+        TenantId tenant = TenantId.From(tenantId);
+
+        TenantAccessDecision decision = await _authorizer
+            .AuthorizeAsync(tenant, PlatformPermissions.KnowledgeView, Context.ConnectionAborted)
+            .ConfigureAwait(false);
+
+        if (decision != TenantAccessDecision.Granted)
+        {
+            throw new HubException("No such workspace.");
+        }
+
+        await Groups
+            .AddToGroupAsync(
+                Context.ConnectionId,
+                RealtimeGroups.ForKnowledge(tenantId),
+                Context.ConnectionAborted)
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>Stops hearing a workspace's knowledge events. Needs no authorisation.</summary>
+    public Task UnsubscribeKnowledge(Guid tenantId) =>
+        Groups.RemoveFromGroupAsync(
+            Context.ConnectionId,
+            RealtimeGroups.ForKnowledge(tenantId),
+            Context.ConnectionAborted);
+
     public Task UnsubscribeNotifications(Guid tenantId) =>
         Groups.RemoveFromGroupAsync(
             Context.ConnectionId,

@@ -46,11 +46,17 @@ internal static class CustomerEndpoints
             .RequireAuthorization()
             .AddEndpointFilter<AntiforgeryEndpointFilter>();
 
+        // Phase 38.7a: the two reads declare their bodies, so the document shows
+        // labelCode and shortCode. Metadata only.
         customers.MapGet("/", ListAsync)
-            .WithName("ListCustomers");
+            .WithName("ListCustomers")
+            .WithSummary("Lists the workspace's canonical customers, each with the English label, its labelCode and shortCode (the conversation reads' own).")
+            .Produces<CustomerPageResponse>(StatusCodes.Status200OK);
 
         customers.MapGet("/{customerId:guid}", GetAsync)
-            .WithName(GetCustomerRouteName);
+            .WithName(GetCustomerRouteName)
+            .WithSummary("Reads one customer with its ETag, label, labelCode and shortCode; a merged record names its canonical one.")
+            .Produces<CustomerResponse>(StatusCodes.Status200OK);
 
         // PUT to a named sub-resource rather than a general PATCH on the
         // customer. The label is the only editable field there is, and a generic
@@ -262,6 +268,16 @@ internal sealed record RenameCustomerRequest(string? DisplayName);
 internal sealed record MergeCustomerRequest(Guid? TargetCustomerId);
 
 /// <summary>One directory row.</summary>
+/// <param name="Label">The English label, kept for older clients and exports.</param>
+/// <param name="LabelCode">
+/// <c>Named</c>, <c>WhatsAppCustomer</c>, <c>AnonymousVisitor</c> or
+/// <c>UnnamedCustomer</c>, by the rule the conversation reads use (Phase 38.7a):
+/// the client words the label by this code, in the reader's language.
+/// </param>
+/// <param name="ShortCode">
+/// Six Crockford base32 characters derived from the customer id, equal to the
+/// conversation reads' (Phase 38.7a). A label, never a key.
+/// </param>
 internal sealed record CustomerRowResponse(
     Guid Id,
     string? DisplayName,
@@ -269,7 +285,9 @@ internal sealed record CustomerRowResponse(
     IReadOnlyList<string> Channels,
     int ConversationCount,
     DateTimeOffset? LastActivityAt,
-    DateTimeOffset CreatedAt)
+    DateTimeOffset CreatedAt,
+    string LabelCode,
+    string ShortCode)
 {
     public static CustomerRowResponse From(CustomerRow row)
     {
@@ -282,7 +300,9 @@ internal sealed record CustomerRowResponse(
             [.. row.Channels.Select(channel => channel.ToString())],
             row.ConversationCount,
             row.LastActivityAt,
-            row.CreatedAt);
+            row.CreatedAt,
+            row.LabelCode.ToString(),
+            row.ShortCode);
     }
 }
 
@@ -340,6 +360,8 @@ internal sealed record CustomerConversationResponse(
 }
 
 /// <summary>One customer, in full.</summary>
+/// <param name="LabelCode">As on the directory row (Phase 38.7a).</param>
+/// <param name="ShortCode">As on the directory row (Phase 38.7a).</param>
 internal sealed record CustomerResponse(
     Guid Id,
     string? DisplayName,
@@ -353,7 +375,9 @@ internal sealed record CustomerResponse(
     Guid? MergedIntoCustomerId,
     DateTimeOffset? MergedAt,
     IReadOnlyList<CustomerConversationResponse> Conversations,
-    bool CanReadConversations)
+    bool CanReadConversations,
+    string LabelCode,
+    string ShortCode)
 {
     public static CustomerResponse From(CustomerView customer)
     {
@@ -372,7 +396,9 @@ internal sealed record CustomerResponse(
             customer.MergedIntoCustomerId,
             customer.MergedAt,
             [.. customer.Conversations.Select(CustomerConversationResponse.From)],
-            customer.CanReadConversations);
+            customer.CanReadConversations,
+            customer.LabelCode.ToString(),
+            customer.ShortCode);
     }
 }
 

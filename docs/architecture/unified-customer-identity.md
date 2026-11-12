@@ -235,6 +235,14 @@ that permission. Opening the customer's profile still needs `customers.view`.
 channels each has used (the label rule needs them), and, only when the page has a
 WhatsApp conversation, the numbers. Never a query per row.
 
+**The directory speaks the same label (Phase 38.7a, BA-1).** `GET …/customers` items
+and `GET …/customers/{id}` carry `labelCode` and `shortCode` too, from the same
+`CustomerLabels.CodeFor` (over the channels the customer has used, read exactly as the
+conversation reads read them) and `CustomerShortCode`. So a customer has one code and
+one short code wherever they appear. The English `label` stays, for older clients and
+for exports. Nothing else changed: the same permission (`customers.view`), the same
+statements per page.
+
 ---
 
 ## C10. Future channels follow the same contract

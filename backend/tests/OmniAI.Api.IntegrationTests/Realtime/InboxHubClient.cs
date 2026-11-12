@@ -33,6 +33,7 @@ internal sealed class InboxHubClient : IAsyncDisposable
     private readonly WebSocket _socket;
     private readonly CancellationTokenSource _stop = new();
     private readonly Channel<Guid> _changed = Channel.CreateUnbounded<Guid>();
+    private readonly Channel<Guid> _knowledge = Channel.CreateUnbounded<Guid>();
     private readonly Dictionary<string, TaskCompletionSource<string?>> _pending = [];
     private readonly Lock _sync = new();
     private readonly Task _reader;
@@ -150,6 +151,36 @@ internal sealed class InboxHubClient : IAsyncDisposable
     }
 
     /// <summary>
+    /// Waits for <c>knowledgeChanged</c> naming this document (Phase 38.7a).
+    /// </summary>
+    /// <returns>
+    /// <see langword="true"/> when it arrived within the time allowed. Events for
+    /// other documents are skipped.
+    /// </returns>
+    public Task<bool> WaitForKnowledgeAsync(Guid documentId, TimeSpan within) =>
+        WaitForAsync(_knowledge, documentId, within);
+
+    private static async Task<bool> WaitForAsync(Channel<Guid> events, Guid id, TimeSpan within)
+    {
+        using CancellationTokenSource timeout = new(within);
+
+        try
+        {
+            while (true)
+            {
+                if (await events.Reader.ReadAsync(timeout.Token) == id)
+                {
+                    return true;
+                }
+            }
+        }
+        catch (OperationCanceledException) when (timeout.IsCancellationRequested)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
     /// Whether the server ended this connection within the time given (Phase 37.3).
     /// </summary>
     /// <remarks>
@@ -231,6 +262,10 @@ internal sealed class InboxHubClient : IAsyncDisposable
             // An invocation from the server.
             case 1 when root.GetProperty("target").GetString() == "conversationChanged":
                 _changed.Writer.TryWrite(root.GetProperty("arguments")[0].GetGuid());
+                break;
+
+            case 1 when root.GetProperty("target").GetString() == "knowledgeChanged":
+                _knowledge.Writer.TryWrite(root.GetProperty("arguments")[0].GetGuid());
                 break;
 
             // The completion of one of ours.
