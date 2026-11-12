@@ -1,4 +1,5 @@
 import { Page } from '@playwright/test';
+import { put } from './support/api';
 import { e2eWorkspace, expect, signedInTest as test } from './support/fixtures';
 
 /**
@@ -6,14 +7,16 @@ import { e2eWorkspace, expect, signedInTest as test } from './support/fixtures';
  * holds the version it read, so its save is refused as stale and keeps what was
  * typed; the visitor's chat page shows the new name at once; and the name is put
  * back. Every name keeps the run's "E2E" prefix, so the workspace stays
- * recognisable for removal.
+ * recognisable for removal. If anything fails on the way, the name read at the
+ * start is put back through the API, so no other journey meets a renamed workspace.
  */
 test('a rename in one tab makes the other tab stale, and visitors see the new name', async ({
   page,
   context,
   appLanguage,
 }) => {
-  const { chatKey } = e2eWorkspace();
+  const { tenantId, chatKey } = e2eWorkspace();
+  const workspace = `/api/tenants/${tenantId}`;
 
   /** Presses Save name on a tab and returns the status of the PUT it sent. */
   async function saveOn(tab: Page): Promise<number> {
@@ -38,53 +41,74 @@ test('a rename in one tab makes the other tab stale, and visitors see the new na
     return tab;
   }
 
-  const stale = await anotherTab();
+  /** The workspace's saved name and version, read through the API. */
+  async function saved(): Promise<{ name: string; etag: string }> {
+    const read = await page.request.get(workspace);
 
-  await page.goto('/workspace-settings');
-  await stale.goto('/workspace-settings');
+    return {
+      name: ((await read.json()) as { name: string }).name,
+      etag: read.headers()['etag'] ?? '',
+    };
+  }
 
-  const field = page.getByTestId('workspace-name-input');
-  const original = await field.inputValue();
-  const renamed = `${original} ${appLanguage}`;
+  const original = (await saved()).name;
 
   expect(original).toMatch(/^E2E /);
-  await expect(page.locator('h1')).toHaveCount(1);
 
-  await field.fill(renamed);
-  await expect(page.getByTestId('saved-name')).toContainText(original);
-  expect(await saveOn(page)).toBe(200);
+  try {
+    const stale = await anotherTab();
 
-  await expect(page.locator('.toast-region[role="status"]')).toContainText(renamed);
-  await expect(page.getByTestId('saved-name')).toHaveCount(0);
+    await page.goto('/workspace-settings');
+    await stale.goto('/workspace-settings');
 
-  // The second tab read the old version: its save is refused, its typing kept.
-  const typed = `${original} stale`;
+    const field = page.getByTestId('workspace-name-input');
+    const renamed = `${original} ${appLanguage}`;
 
-  await stale.getByTestId('workspace-name-input').fill(typed);
-  expect(await saveOn(stale)).toBe(412);
+    await expect(field).toHaveValue(original);
+    await expect(page.locator('h1')).toHaveCount(1);
 
-  await expect(stale.getByTestId('settings-stale')).toBeVisible();
-  await expect(stale.getByTestId('workspace-name-input')).toHaveValue(typed);
+    await field.fill(renamed);
+    await expect(page.getByTestId('saved-name')).toContainText(original);
+    expect(await saveOn(page)).toBe(200);
 
-  // Reloading reads the saved name beside what was typed, and keeps the typing.
-  await stale.getByTestId('settings-reload').click();
-  await expect(stale.getByTestId('settings-stale')).toHaveCount(0);
-  await expect(stale.getByTestId('saved-name')).toContainText(renamed);
-  await expect(stale.getByTestId('workspace-name-input')).toHaveValue(typed);
+    await expect(page.locator('.toast-region[role="status"]')).toContainText(renamed);
+    await expect(page.getByTestId('saved-name')).toHaveCount(0);
 
-  // Visitors see the new name on the chat page, at once.
-  const visitor = await anotherTab();
+    // The second tab read the old version: its save is refused, its typing kept.
+    const typed = `${original} stale`;
 
-  await visitor.goto(`/chat/${chatKey}`);
-  await expect(visitor.getByTestId('chat-title')).toContainText(renamed);
+    await stale.getByTestId('workspace-name-input').fill(typed);
+    expect(await saveOn(stale)).toBe(412);
 
-  // Put the name back, from the tab that is current.
-  await field.fill(original);
-  expect(await saveOn(page)).toBe(200);
-  await expect(page.getByTestId('saved-name')).toHaveCount(0);
-  await expect(field).toHaveValue(original);
+    await expect(stale.getByTestId('settings-stale')).toBeVisible();
+    await expect(stale.getByTestId('workspace-name-input')).toHaveValue(typed);
 
-  await visitor.close();
-  // The stale tab still holds unsaved typing; close it without the leave prompt.
-  await stale.close({ runBeforeUnload: false });
+    // Reloading reads the saved name beside what was typed, and keeps the typing.
+    await stale.getByTestId('settings-reload').click();
+    await expect(stale.getByTestId('settings-stale')).toHaveCount(0);
+    await expect(stale.getByTestId('saved-name')).toContainText(renamed);
+    await expect(stale.getByTestId('workspace-name-input')).toHaveValue(typed);
+
+    // Visitors see the new name on the chat page, at once.
+    const visitor = await anotherTab();
+
+    await visitor.goto(`/chat/${chatKey}`);
+    await expect(visitor.getByTestId('chat-title')).toContainText(renamed);
+
+    // Put the name back, from the tab that is current.
+    await field.fill(original);
+    expect(await saveOn(page)).toBe(200);
+    await expect(page.getByTestId('saved-name')).toHaveCount(0);
+    await expect(field).toHaveValue(original);
+
+    await visitor.close();
+    // The stale tab still holds unsaved typing; close it without the leave prompt.
+    await stale.close({ runBeforeUnload: false });
+  } finally {
+    const now = await saved();
+
+    if (now.name !== original) {
+      await put(page.request, `${workspace}/name`, { name: original }, { 'If-Match': now.etag });
+    }
+  }
 });

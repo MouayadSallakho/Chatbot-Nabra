@@ -39,12 +39,16 @@ async function saveZone(page: Page, filter: string, zone: string): Promise<numbe
  * page moves the analytics days, the comparison and the report period hint to
  * the new zone, on the next read and with no other change. The analytics page
  * asks for the comparison on its one dashboard read. The run's workspace is put
- * back to UTC at the end, and again through the API if anything failed first.
+ * on UTC through the API first, back to UTC through the page at the end, and
+ * through the API again if anything failed first.
  */
 test('a time-zone change moves the analytics and report labels to the new zone', async ({
   page,
 }) => {
   try {
+    // Starts from UTC whatever ran before: no journey depends on another.
+    await backToUtc(page);
+
     await page.goto('/workspace-settings');
     await expect(page.locator('h1')).toHaveCount(1);
     await expect(page.getByTestId('time-zone-select')).toHaveValue('UTC');

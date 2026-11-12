@@ -4,10 +4,12 @@ import { e2eAccount, expect, test } from './support/fixtures';
 /**
  * Being refused for too many attempts, against the real limiter.
  *
- * The address is random and has no account. The English project spends the six
- * failures (the limit is 5 per address and network in 15 minutes); the Arabic one
- * reuses that address and is refused at once, adding none.
+ * The address is random and has no account. Whichever project runs first spends
+ * the six attempts it takes (the limit is 5 failures per address and network in 15
+ * minutes; the sixth is refused); the other reuses that address and is refused at
+ * once, adding none. Either one alone, or both in any order, passes.
  */
+const MOST_ATTEMPTS = 6;
 const WRONG_PASSWORD = 'not-the-password-of-anybody';
 
 const WORDS = {
@@ -35,10 +37,9 @@ test('too many failed sign-ins say when to try again and hold the button', async
 
   await page.goto('/sign-in');
 
-  const attempts = appLanguage === 'en' ? 6 : 1;
   let answer: Response | undefined;
 
-  for (let tried = 0; tried < attempts && answer?.status() !== 429; tried++) {
+  for (let tried = 0; tried < MOST_ATTEMPTS && answer?.status() !== 429; tried++) {
     answer = await attempt(page, throttleEmail);
   }
 

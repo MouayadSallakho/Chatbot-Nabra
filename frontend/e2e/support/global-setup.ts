@@ -14,8 +14,8 @@ import { API_READY_URL, BASE_URL, assertLoopback } from './target';
  * teardown deletes it.
  *
  * The account's workspace is named "E2E" plus the run's id, so it can be recognised
- * and removed before launch. It gets an active agent and a website chat, so a
- * journey can have a visitor write in.
+ * and removed before launch. It gets two active agents, each with its own website
+ * chat, so journeys can have a visitor write in.
  */
 export default async function globalSetup(config: FullConfig): Promise<void> {
   assertLoopback(BASE_URL);
@@ -43,25 +43,19 @@ export default async function globalSetup(config: FullConfig): Promise<void> {
     ).json();
     const base = `/api/tenants/${tenant.id}`;
 
-    const agent = await post(api, `${base}/ai-agents`, {
-      name: 'E2E agent',
-      instructions: 'Answer the visitor briefly.',
-    });
-    const agentId = (await agent.json()).id;
+    const chatKey = await agentWithChat(api, base, 'E2E agent');
 
-    await post(api, `${base}/ai-agents/${agentId}/activate`, {}, ifMatch(agent));
-
-    const chat = await post(api, `${base}/website-chat`, { aiAgentId: agentId });
-    const created = await chat.json();
-
-    await post(api, `${base}/website-chat/${created.id}/activate`, {}, ifMatch(chat));
+    // A second chat link, for the journeys where a visitor waits or a person steps
+    // in. The public chat counts new conversations per network *and per link*
+    // (five in five minutes), and the first link's five are already spent by the
+    // journeys above; one link per agent, so a second agent.
+    const handoverChatKey = await agentWithChat(api, base, 'E2E handover agent');
 
     await api.storageState({ path: join(stateDir, 'owner.json') });
 
-    const chatKey = await publicKey(api, base, created.id);
-
     process.env['NABRA_E2E_TENANT_ID'] = tenant.id;
     process.env['NABRA_E2E_CHAT_KEY'] = chatKey;
+    process.env['NABRA_E2E_HANDOVER_CHAT_KEY'] = handoverChatKey;
     process.env['NABRA_E2E_LONG_CONVERSATION'] = await longConversation(api, base, chatKey);
   } finally {
     await api.dispose();
@@ -71,6 +65,28 @@ export default async function globalSetup(config: FullConfig): Promise<void> {
   process.env['NABRA_E2E_PASSWORD'] = password;
   process.env['NABRA_E2E_THROTTLE_EMAIL'] = `e2e.throttle.${runId}@example.test`;
   process.env['NABRA_E2E_STATE_DIR'] = stateDir;
+}
+
+/** An active agent with an active website chat of its own; returns the chat's public key. */
+async function agentWithChat(
+  api: Awaited<ReturnType<typeof request.newContext>>,
+  base: string,
+  name: string,
+): Promise<string> {
+  const agent = await post(api, `${base}/ai-agents`, {
+    name,
+    instructions: 'Answer the visitor briefly.',
+  });
+  const agentId = (await agent.json()).id;
+
+  await post(api, `${base}/ai-agents/${agentId}/activate`, {}, ifMatch(agent));
+
+  const chat = await post(api, `${base}/website-chat`, { aiAgentId: agentId });
+  const created = await chat.json();
+
+  await post(api, `${base}/website-chat/${created.id}/activate`, {}, ifMatch(chat));
+
+  return publicKey(api, base, created.id);
 }
 
 /** More than one window of messages, so the older ones have to be read. */

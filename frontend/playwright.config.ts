@@ -32,8 +32,8 @@ export default defineConfig<AppLanguageOption>({
     trace: 'off',
     screenshot: 'only-on-failure',
   },
-  // In this order: the Arabic throttling journey reuses the address the English
-  // one has already spent its attempts on.
+  // No journey depends on another or on this order (38.6): each one sets up, or
+  // puts back, the state it needs.
   projects: [
     { name: 'en-ltr', use: { locale: 'en-US', appLanguage: 'en' } },
     { name: 'ar-rtl', use: { locale: 'ar-SA', appLanguage: 'ar' } },
