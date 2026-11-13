@@ -29,6 +29,8 @@ describe('CustomerDetail', () => {
     id: customerId,
     displayName: null,
     label: 'WhatsApp customer',
+    labelCode: 'WhatsAppCustomer',
+    shortCode: 'W4T5PQ',
     identities: [{ channel: 'WhatsApp', reference: '••••0123' }],
     channels: ['WhatsApp'],
     conversationCount: 2,
@@ -157,6 +159,8 @@ describe('CustomerDetail', () => {
         identities: [],
         channels: ['WebChat'],
         label: 'Anonymous visitor',
+        labelCode: 'AnonymousVisitor',
+        shortCode: '7KQ2MX',
       });
 
       expect(text()).toContain('No lasting identifier');
@@ -189,6 +193,8 @@ describe('CustomerDetail', () => {
         ...customer,
         displayName: '<script>alert(1)</script>',
         label: '<script>alert(1)</script>',
+        labelCode: 'Named',
+        shortCode: 'S7R1PT',
       });
 
       expect(text()).toContain('<script>alert(1)</script>');
@@ -235,7 +241,13 @@ describe('CustomerDetail', () => {
       expect(request.request.body).toEqual({ displayName: 'Dana Okafor' });
 
       request.flush(
-        { ...customer, displayName: 'Dana Okafor', label: 'Dana Okafor' },
+        {
+          ...customer,
+          displayName: 'Dana Okafor',
+          label: 'Dana Okafor',
+          labelCode: 'Named',
+          shortCode: 'D4N4OK',
+        },
         {
           headers: { ETag: '"8"' },
         },
@@ -283,7 +295,13 @@ describe('CustomerDetail', () => {
     it('clears a name by sending null rather than an empty string', async () => {
       await mount('customers.view', 'customers.manage');
 
-      await answer({ ...customer, displayName: 'Dana Okafor', label: 'Dana Okafor' });
+      await answer({
+        ...customer,
+        displayName: 'Dana Okafor',
+        label: 'Dana Okafor',
+        labelCode: 'Named',
+        shortCode: 'D4N4OK',
+      });
 
       const input = query<HTMLInputElement>('[data-testid="name-input"]')!;
 
@@ -320,6 +338,8 @@ describe('CustomerDetail', () => {
               id: otherId,
               displayName: null,
               label: 'Anonymous visitor',
+              labelCode: 'AnonymousVisitor',
+              shortCode: '7KQ2MX',
               channels: ['WebChat'],
               conversationCount: 1,
               lastActivityAt: null,
@@ -353,6 +373,8 @@ describe('CustomerDetail', () => {
               id: otherId,
               displayName: null,
               label: 'Anonymous visitor',
+              labelCode: 'AnonymousVisitor',
+              shortCode: '7KQ2MX',
               channels: ['WebChat'],
               conversationCount: 1,
               lastActivityAt: null,
@@ -370,9 +392,17 @@ describe('CustomerDetail', () => {
 
       await settle();
 
-      expect(text()).toContain('WhatsApp customer');
-      expect(text()).toContain('Anonymous visitor');
+      // Both named by the server's code, as the inbox names them (BA-1).
+      const confirmation = query<HTMLElement>('[data-testid="merge-confirmation"]')!;
+
+      expect(confirmation.textContent).toContain('WhatsApp customer W4T5PQ');
+      expect(confirmation.textContent).toContain('Visitor 7KQ2MX');
       expect(text()).toContain('combines their channel identities and conversation history');
+
+      const candidate = query<HTMLElement>('[data-testid="candidates"] .candidate-name')!;
+
+      expect(candidate.textContent?.replace(/\s+/g, ' ').trim()).toBe('Visitor 7KQ2MX');
+      expect(candidate.querySelector('bdi')?.getAttribute('dir')).toBe('ltr');
 
       // It asks the reader to assert it, rather than asserting it for them.
       expect(text()).toContain('Confirm that these records belong to the same customer');
@@ -387,7 +417,13 @@ describe('CustomerDetail', () => {
       // an operation that cannot be undone.
       await mount('customers.view', 'customers.manage');
 
-      await answer({ ...customer, channels: ['WebChat'], label: 'Anonymous visitor' });
+      await answer({
+        ...customer,
+        channels: ['WebChat'],
+        label: 'Anonymous visitor',
+        labelCode: 'AnonymousVisitor',
+        shortCode: '7KQ2MX',
+      });
 
       query<HTMLButtonElement>('[data-testid="open-merge"]')!.click();
 
@@ -399,6 +435,8 @@ describe('CustomerDetail', () => {
               id: otherId,
               displayName: null,
               label: 'Anonymous visitor',
+              labelCode: 'AnonymousVisitor',
+              shortCode: '7KQ2MX',
               channels: ['WebChat'],
               conversationCount: 1,
               lastActivityAt: null,
@@ -445,6 +483,8 @@ describe('CustomerDetail', () => {
         ...customer,
         channels: ['WebChat'],
         label: 'Anonymous visitor',
+        labelCode: 'AnonymousVisitor',
+        shortCode: '7KQ2MX',
         createdAt: sameMoment,
       });
 
@@ -458,6 +498,8 @@ describe('CustomerDetail', () => {
               id: otherId,
               displayName: null,
               label: 'Anonymous visitor',
+              labelCode: 'AnonymousVisitor',
+              shortCode: '7KQ2MX',
               channels: ['WebChat'],
               conversationCount: 1,
               lastActivityAt: null,
@@ -492,6 +534,8 @@ describe('CustomerDetail', () => {
               id: otherId,
               displayName: null,
               label: 'Anonymous visitor',
+              labelCode: 'AnonymousVisitor',
+              shortCode: '7KQ2MX',
               channels: ['WebChat'],
               conversationCount: 1,
               lastActivityAt: null,
@@ -586,6 +630,8 @@ describe('CustomerDetail', () => {
               id: customerId,
               displayName: null,
               label: 'WhatsApp customer',
+              labelCode: 'WhatsAppCustomer',
+              shortCode: 'W4T5PQ',
               channels: ['WhatsApp'],
               conversationCount: 2,
               lastActivityAt: null,

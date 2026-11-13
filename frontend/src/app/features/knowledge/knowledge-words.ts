@@ -35,6 +35,9 @@ const FAILURE_REASONS: Readonly<Record<string, string>> = {
   document_changed: $localize`:@@knowledge.failure.document_changed:The document changed while it was being indexed.`,
   cancelled: $localize`:@@knowledge.failure.cancelled:Indexing was cancelled.`,
   interrupted: $localize`:@@knowledge.failure.interrupted:Indexing was interrupted before it finished.`,
+  // The server's own deadline (Phase 38.7a, BA-10): the attempt no longer depends
+  // on the tab that started it, so a slow provider ends it here instead.
+  timed_out: $localize`:@@knowledge.failure.timed_out:Indexing took longer than allowed. Nothing was indexed.`,
   indexing_error: $localize`:@@knowledge.failure.indexing_error:Something went wrong while indexing.`,
 };
 

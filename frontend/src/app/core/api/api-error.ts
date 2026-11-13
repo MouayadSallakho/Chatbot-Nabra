@@ -46,6 +46,11 @@ export type ApiErrorKind =
   /** Anything else, including 500. */
   | 'unknown';
 
+/** The units a refusal's `limit` can be in (`problem-codes.md`, Phase 38.7b). */
+const LIMIT_UNITS = ['bytes', 'pages', 'characters', 'rows', 'columns', 'entries'] as const;
+
+export type LimitUnit = (typeof LIMIT_UNITS)[number];
+
 /** A failed request, interpreted. */
 export interface ApiError {
   readonly kind: ApiErrorKind;
@@ -78,6 +83,12 @@ export interface ApiError {
 
   /** The bound a refused value broke, in the rule's own unit (bytes, pages, rows). */
   readonly limit?: number;
+
+  /**
+   * What `limit` counts, where the server says (Phase 38.7b, BA-12): on every
+   * knowledge file refusal that names a bound. Only the documented units are kept.
+   */
+  readonly limitUnit?: LimitUnit;
 
   /**
    * The fields a 400's `errors` map named, and never its messages: those are the
@@ -144,6 +155,7 @@ export function toApiError(failure: unknown): ApiError {
   const retryAfterSeconds = readRetryAfter(failure);
   const codes = problemCodes(failure);
   const limit = problemLimit(failure);
+  const limitUnit = limit === undefined ? undefined : problemLimitUnit(failure);
   const worded =
     code === undefined
       ? undefined
@@ -151,6 +163,7 @@ export function toApiError(failure: unknown): ApiError {
           language: pageLanguage(),
           retryAfterSeconds,
           limit,
+          limitUnit,
           codes: codes ?? [code],
         });
 
@@ -159,6 +172,7 @@ export function toApiError(failure: unknown): ApiError {
     code,
     codes,
     limit,
+    limitUnit,
     fields: problemFields(failure),
     status: failure.status,
     retryAfterSeconds,
@@ -315,6 +329,13 @@ function problemLimit(failure: HttpErrorResponse): number | undefined {
   const limit = problemBody(failure)?.['limit'];
 
   return typeof limit === 'number' && Number.isFinite(limit) && limit >= 0 ? limit : undefined;
+}
+
+/** `limitUnit`, when it is one of the units the API documents; nothing otherwise. */
+function problemLimitUnit(failure: HttpErrorResponse): LimitUnit | undefined {
+  const unit = problemBody(failure)?.['limitUnit'];
+
+  return LIMIT_UNITS.find((known) => known === unit);
 }
 
 /** The names in an `errors` map. Its values are the server's English and stay unread. */

@@ -3,6 +3,7 @@ import {
   makeEnvironmentProviders,
   provideEnvironmentInitializer,
 } from '@angular/core';
+import type { LimitUnit } from '@app/core/api/api-error';
 import { AppLanguage } from '@app/core/i18n/language';
 import { CORE_PROBLEM_WORDS } from './core-problems';
 
@@ -16,6 +17,9 @@ export interface ProblemFacts {
 
   /** The bound a refused value broke, in the rule's own unit. */
   readonly limit?: number;
+
+  /** What `limit` counts, when the server says (BA-12). */
+  readonly limitUnit?: LimitUnit;
 
   /** Every rule the server named, the first one included. */
   readonly codes: readonly string[];

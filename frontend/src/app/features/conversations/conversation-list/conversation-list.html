@@ -216,9 +216,15 @@
                   size="sm"
                 />
                 <app-channel-badge [channel]="row.conversation.channel" />
-                @if (row.waiting) {
-                  <span class="badge badge-warning badge-sm" i18n="@@inbox.waiting"
-                    >Waiting for the team</span
+                @if (row.reason; as reason) {
+                  <!-- The badge's glyph and the words: never by colour alone. -->
+                  <span class="badge badge-warning badge-sm" data-testid="row-reason">{{
+                    reason
+                  }}</span>
+                }
+                @if (row.conversation.takenOverBy; as member) {
+                  <span class="row-handled" data-testid="row-handled-by" i18n="@@inbox.handledBy"
+                    >Handled by <bdi dir="ltr">{{ member.email }}</bdi></span
                   >
                 }
                 @if (row.conversation.assignedTo; as member) {

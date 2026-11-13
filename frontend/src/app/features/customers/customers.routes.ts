@@ -1,5 +1,7 @@
 import { Routes } from '@angular/router';
 import { unsavedChangesGuard } from '@app/core/navigation/unsaved-changes';
+import { provideProblemWords } from '@app/core/problems/problem-words';
+import { CUSTOMER_PROBLEM_WORDS } from './customer-problems';
 import { CustomersApi } from './customers-api';
 
 /**
@@ -12,7 +14,7 @@ import { CustomersApi } from './customers-api';
 export const customersRoutes: Routes = [
   {
     path: '',
-    providers: [CustomersApi],
+    providers: [CustomersApi, provideProblemWords(CUSTOMER_PROBLEM_WORDS)],
     children: [
       {
         path: '',

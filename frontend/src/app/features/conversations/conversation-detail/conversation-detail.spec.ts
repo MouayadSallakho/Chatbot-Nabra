@@ -787,6 +787,45 @@ describe('ConversationDetail', () => {
     await settle();
   });
 
+  it('says in the heading who took it over, from the write, with the email isolated (BA-2)', async () => {
+    await mount('conversations.view', 'conversations.handoff');
+
+    http.expectOne(detailUrl).flush(detail, tagged(detail, '"v1"'));
+    await settle();
+    http.expectOne(messagesUrl).flush({ items: [], nextCursor: null });
+    await settle();
+
+    // AI mode: nobody is named, and no new words appear.
+    expect(host().querySelector('[data-testid="handled-by"]')).toBeNull();
+
+    button('Take over')!.click();
+    await settle();
+
+    const taken = { ...humanDetail, takenOverBy: { userId: 'u-me', email: 'me@acme.test' } };
+
+    http.expectOne(`${detailUrl}/take-over`).flush(taken, tagged(taken, '"v2"'));
+    await settle();
+
+    const who = host().querySelector('[data-testid="handled-by"]');
+
+    expect(who?.textContent?.replace(/\s+/g, ' ').trim()).toBe('Handled by me@acme.test');
+    expect(who?.querySelector('bdi')?.getAttribute('dir')).toBe('ltr');
+    expect(who?.closest('header')).not.toBeNull();
+  });
+
+  it('names nobody for a person-handled conversation whose taker is not known', async () => {
+    // A takeover from before Phase 37.4 recorded nobody: today's heading, unchanged.
+    await mount('conversations.view');
+
+    http.expectOne(detailUrl).flush(humanDetail, tagged({ ...humanDetail, takenOverBy: null }));
+    await settle();
+    http.expectOne(messagesUrl).flush({ items: [], nextCursor: null });
+    await settle();
+
+    expect(host().querySelector('[data-testid="handled-by"]')).toBeNull();
+    expect(text()).not.toContain('Handled by');
+  });
+
   it('reports a refused precondition and retries nothing', async () => {
     await mount('conversations.view', 'conversations.handoff');
 

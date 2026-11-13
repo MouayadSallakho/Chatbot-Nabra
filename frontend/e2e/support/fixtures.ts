@@ -69,16 +69,62 @@ export async function openVisitor(
   chatKey: string,
   language: 'en' | 'ar',
 ): Promise<{ visitor: Page; close: () => Promise<void> }> {
-  const context = await browser.newContext({
-    baseURL: BASE_URL,
-    locale: language === 'ar' ? 'ar-SA' : 'en-US',
-  });
-  const visitor = await context.newPage();
+  const context = await within(
+    browser.newContext({ baseURL: BASE_URL, locale: language === 'ar' ? 'ar-SA' : 'en-US' }),
+    'opening the visitor',
+  );
+  const close = () => closeWithin(context);
 
-  await visitor.goto(`/chat/${chatKey}?lang=${language}`);
-  await expect(visitor.locator('html')).toHaveAttribute('dir', directionOf(language));
+  try {
+    // `newPage` takes no timeout of its own: a browser that has stopped answering
+    // would otherwise hold the journey past its own limit.
+    const visitor = await within(context.newPage(), 'opening the visitor page');
 
-  return { visitor, close: () => context.close() };
+    await visitor.goto(`/chat/${chatKey}?lang=${language}`, { timeout: STEP_MS });
+    await expect(visitor.locator('html')).toHaveAttribute('dir', directionOf(language));
+
+    return { visitor, close };
+  } catch (error) {
+    await close();
+    throw error;
+  }
+}
+
+/**
+ * The longest any single step of a journey may take (Phase 38.8). A journey's own
+ * limit is 60 seconds; a step that hangs must fail well inside it.
+ */
+export const STEP_MS = 15_000;
+
+/**
+ * Settles a browser call that has no timeout of its own within `STEP_MS`, or fails
+ * the step by name. Nothing a journey awaits may wait without a bound: in 38.7b one
+ * worker sat in `slow-reply` for 1.9 hours on an unbounded close after a failure.
+ */
+export async function within<T>(work: Promise<T>, what: string, ms = STEP_MS): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+
+  try {
+    return await Promise.race([
+      work,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`${what} took longer than ${ms} ms`)), ms);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Closes a context the journey opened itself, waiting at most `STEP_MS`.
+ *
+ * A close is clean-up, run from `finally` after a failure too: if the browser has
+ * stopped answering, the journey ends anyway and reports the failure it had, and the
+ * worker's own browser is closed with the worker.
+ */
+export async function closeWithin(context: { close(): Promise<void> }): Promise<void> {
+  await within(context.close(), 'closing a browser context').catch(() => undefined);
 }
 
 /** The run's conversation that is longer than one window. */

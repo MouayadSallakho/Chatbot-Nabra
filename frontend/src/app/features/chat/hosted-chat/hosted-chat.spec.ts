@@ -1095,4 +1095,113 @@ describe('HostedChat', () => {
     // human mode, so the visitor is told rather than left waiting on an AI.
     expect(text()).toContain('A support team member will reply here.');
   });
+
+  // ---- One message, once (Phase 38.8) ------------------------------------
+  //
+  // Since 38.7a the server announces the customer's message as soon as it is
+  // stored, and this page re-reads on every announcement. The send's own answer
+  // and the re-reads can arrive in either order; every state in between must
+  // show each message exactly once, in the transcript's order.
+
+  describe('one message, once', () => {
+    const asked = turn('When do you close?');
+
+    const ids = (): string[] =>
+      [...host().querySelectorAll('[data-testid="chat-message"]')].map(
+        (row) => `${row.getAttribute('data-sender')}:${row.textContent?.trim()}`,
+      );
+
+    const announce = (): void => {
+      const realtime = TestBed.inject(PublicChatRealtime) as unknown as FakePublicChatRealtime;
+
+      realtime.listens.at(-1)!.onChanged();
+    };
+
+    const reRead = (items: unknown[]) =>
+      http
+        .expectOne({ method: 'GET', url: messagesUrl })
+        .flush({ items, nextCursor: null, handling: 'Ai' });
+
+    const answer = () => http.expectOne({ method: 'POST', url: messagesUrl }).flush(asked);
+
+    it('shows the answer once when it comes before the re-read', async () => {
+      await open();
+      await sendFirst('When do you close?');
+
+      answer();
+      await settle();
+
+      expect(ids()).toEqual([
+        'Customer:You:When do you close?',
+        'AiAgent:ConciergeWe close at six.',
+      ]);
+
+      announce();
+      await settle();
+      reRead([asked.customerMessage, asked.reply]);
+      await settle();
+
+      expect(ids()).toEqual([
+        'Customer:You:When do you close?',
+        'AiAgent:ConciergeWe close at six.',
+      ]);
+    });
+
+    it('shows the stored message once when the re-read comes before the answer', async () => {
+      await open();
+      await sendFirst('When do you close?');
+
+      // "Stored": the message is read while the AI is still answering.
+      announce();
+      await settle();
+      reRead([asked.customerMessage]);
+      await settle();
+
+      expect(ids()).toEqual(['Customer:You:When do you close?']);
+
+      answer();
+      await settle();
+
+      expect(ids()).toEqual([
+        'Customer:You:When do you close?',
+        'AiAgent:ConciergeWe close at six.',
+      ]);
+      expect(composer().value).toBe('');
+    });
+
+    it('adds nothing when the answer replays what the settled re-read showed', async () => {
+      await open();
+      await sendFirst('When do you close?');
+
+      announce();
+      await settle();
+      reRead([asked.customerMessage, asked.reply]);
+      await settle();
+
+      answer();
+      await settle();
+
+      expect(ids()).toEqual([
+        'Customer:You:When do you close?',
+        'AiAgent:ConciergeWe close at six.',
+      ]);
+    });
+
+    it('announces each message once, through one polite list', async () => {
+      await open();
+      await sendFirst('When do you close?');
+
+      announce();
+      await settle();
+      reRead([asked.customerMessage]);
+      await settle();
+      answer();
+      await settle();
+
+      const log = host().querySelectorAll('[aria-live="polite"]');
+
+      expect(log).toHaveLength(1);
+      expect(log[0].querySelectorAll('[data-testid="chat-message"]')).toHaveLength(2);
+    });
+  });
 });

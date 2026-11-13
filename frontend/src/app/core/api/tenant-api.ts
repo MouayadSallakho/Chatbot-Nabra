@@ -19,6 +19,14 @@ export interface Tenant {
  */
 export interface TenantDetails extends Tenant {
   readonly timeZone: string;
+
+  /**
+   * How many report schedules a time-zone change would move now (Phase 38.7b,
+   * BA-9): this workspace's schedules, enabled or not, whose next run is still to
+   * come. Present only for a reader who holds `workspace.manage`; absent, never
+   * zero, for everyone else. Not part of the `ETag`.
+   */
+  readonly scheduleCount?: number;
 }
 
 /** What creating a workspace requires. Everything else the backend decides. */

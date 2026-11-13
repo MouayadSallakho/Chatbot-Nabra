@@ -21,8 +21,10 @@ import {
   isolatedZone,
   supportedZones,
 } from '@app/core/i18n/time-zone';
+import type { AppLanguage } from '@app/core/i18n/language';
+import { LocaleFormat, formatNumber } from '@app/core/i18n/locale-format';
+import { pluralMessage } from '@app/core/i18n/plural';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
-import { ReportsApi } from '@app/features/reports/reports-api';
 import { EmptyState } from '@app/shared/empty-state/empty-state';
 import { Icon } from '@app/shared/icon/icon';
 import { PageHeader } from '@app/shared/page-header/page-header';
@@ -77,6 +79,27 @@ export function zoneGroups(
   return [...groups].map(([region, list]) => ({ region, zones: list }));
 }
 
+/** The question's sentence when the page cannot tell how many schedules move. */
+const ZONE_MOVES_SCHEDULES = $localize`:@@workspaceSettings.zone.confirm.body:Every report schedule moves to the next start of a day in the new zone, and days in analytics and new reports are counted in it from now on. Reports already generated keep their zone.`;
+
+/**
+ * The question's sentence with the count (BA-9), one per plural category so the
+ * Arabic noun and verb agree with the number. Zero never asks, so its form is only
+ * there to be complete.
+ */
+export function schedulesMove(language: AppLanguage, count: number): string {
+  const n = formatNumber(language, count);
+
+  return pluralMessage(language, count, {
+    zero: $localize`:@@workspaceSettings.zone.confirm.count.zero:No scheduled report moves. Days in analytics and new reports are counted in the new zone from now on. Reports already generated keep their zone.`,
+    one: $localize`:@@workspaceSettings.zone.confirm.count.one:${n}:count: scheduled report moves to the next start of a day in the new zone, and days in analytics and new reports are counted in it from now on. Reports already generated keep their zone.`,
+    two: $localize`:@@workspaceSettings.zone.confirm.count.two:${n}:count: scheduled reports move to the next start of a day in the new zone, and days in analytics and new reports are counted in it from now on. Reports already generated keep their zone.`,
+    few: $localize`:@@workspaceSettings.zone.confirm.count.few:${n}:count: scheduled reports move to the next start of a day in the new zone, and days in analytics and new reports are counted in it from now on. Reports already generated keep their zone.`,
+    many: $localize`:@@workspaceSettings.zone.confirm.count.many:${n}:count: scheduled reports move to the next start of a day in the new zone, and days in analytics and new reports are counted in it from now on. Reports already generated keep their zone.`,
+    other: $localize`:@@workspaceSettings.zone.confirm.count.other:${n}:count: scheduled reports move to the next start of a day in the new zone, and days in analytics and new reports are counted in it from now on. Reports already generated keep their zone.`,
+  });
+}
+
 /** "new york" finds "America/New_York". */
 function normalise(text: string): string {
   return text
@@ -104,9 +127,12 @@ function normalise(text: string): string {
  * cannot happen from here (no request has a shape without `If-Match`); if one
  * ever did, it is treated as stale for the same reason.
  *
- * <strong>Changing the time zone moves schedules.</strong> When the workspace
- * has report schedules (or the page cannot tell), saving asks first, because
- * every schedule's next run moves to the new zone's next boundary.
+ * <strong>Changing the time zone moves schedules.</strong> Since Phase 38.8 the
+ * page asks with the count the workspace read gives every manager (BA-9), read
+ * again just before asking because a schedule change does not move the `ETag`.
+ * No schedule to move, no question; otherwise the question says how many move.
+ * When the count cannot be had, it asks without a number, as before. The
+ * schedule list is no longer read for this, so `reports.view` plays no part.
  *
  * <strong>After a save</strong> the workspace list in memory takes the server's
  * answer, so the top bar and the workspace menu follow without another read.
@@ -115,16 +141,15 @@ function normalise(text: string): string {
   selector: 'app-workspace-settings-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [ReactiveFormsModule, PageHeader, EmptyState, Icon, ConfirmDialog],
-  providers: [ReportsApi],
   templateUrl: './workspace-settings-page.html',
   styleUrl: './workspace-settings-page.scss',
 })
 export class WorkspaceSettingsPage implements HasUnsavedChanges {
   private readonly tenants = inject(TenantApi);
-  private readonly reports = inject(ReportsApi);
   private readonly workspace = inject(WorkspaceContextService);
   private readonly permissions = inject(PermissionService);
   private readonly toasts = inject(ToastService);
+  private readonly format = inject(LocaleFormat);
 
   private readonly zoneDialog = viewChild.required<ConfirmDialog>('zoneDialog');
 
@@ -239,6 +264,9 @@ export class WorkspaceSettingsPage implements HasUnsavedChanges {
 
     return $localize`:@@workspaceSettings.zone.confirm.heading:Change the time zone to ${zone}:zone:?`;
   });
+
+  /** What the question says: how many schedules move, or the general sentence. */
+  protected readonly zoneDialogBody = signal(ZONE_MOVES_SCHEDULES);
 
   protected readonly isolated = isolatedZone;
 
@@ -406,8 +434,16 @@ export class WorkspaceSettingsPage implements HasUnsavedChanges {
     this.zoneFailure.set(null);
 
     try {
-      if ((await this.scheduleCount(tenantId)) !== 0 && !(await this.zoneDialog().ask())) {
-        return;
+      const count = await this.scheduleCount(tenantId);
+
+      if (count !== 0) {
+        this.zoneDialogBody.set(
+          count === null ? ZONE_MOVES_SCHEDULES : schedulesMove(this.format.language, count),
+        );
+
+        if (!(await this.zoneDialog().ask())) {
+          return;
+        }
       }
 
       // Read after the dialog: a save in another section meanwhile moved it.
@@ -444,17 +480,19 @@ export class WorkspaceSettingsPage implements HasUnsavedChanges {
   }
 
   /**
-   * How many report schedules this workspace has: 0, a number, or null when the
-   * page cannot tell (no `reports.view`, or the read failed). Only 0 skips the
-   * question.
+   * How many report schedules a change made now would move (BA-9): 0, a number,
+   * or null when the page cannot tell (the read failed, or it carried no count).
+   * Only 0 skips the question.
+   *
+   * A fresh read, for the count alone: its version is not adopted, so a save
+   * still presents the version the reader's choice was made against, and a change
+   * somebody else made meanwhile still meets the stale-version check.
    */
   private async scheduleCount(tenantId: string): Promise<number | null> {
-    if (!this.permissions.has('reports.view')) {
-      return null;
-    }
-
     try {
-      return (await firstValueFrom(this.reports.schedules(tenantId))).length;
+      const count = (await firstValueFrom(this.tenants.getVersioned(tenantId))).value.scheduleCount;
+
+      return typeof count === 'number' && Number.isInteger(count) && count >= 0 ? count : null;
     } catch {
       return null;
     }

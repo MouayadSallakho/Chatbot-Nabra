@@ -10,8 +10,8 @@ export type CustomerLabelText =
  * What the inbox calls a customer.
  *
  * <strong>The server decides, by `labelCode`.</strong> The client no longer works
- * the rule out from channels here; the customers screens still do, until their
- * reads carry the same fields (BA-1). A name somebody chose is shown exactly as
+ * the rule out from channels anywhere: since Phase 38.8 the customers screens read
+ * the same fields and use this helper too (BA-1). A name somebody chose is shown exactly as
  * typed. Without one, a word and something to tell customers apart: the short code,
  * or the masked number on WhatsApp. A code this build does not know reads as a plain
  * customer, and the short code is only ever shown, never used as a key.

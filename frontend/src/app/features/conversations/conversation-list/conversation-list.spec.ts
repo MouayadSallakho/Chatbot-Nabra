@@ -176,6 +176,52 @@ describe('ConversationList', () => {
       expect(rows()).toHaveLength(1);
     });
 
+    it("says each row's reason in words, from the server (BA-7)", async () => {
+      await mount('conversations.view');
+      http.expectOne(url).flush(emptyPage);
+      await settle();
+      await goToView('needs-person');
+
+      const reasoned = (id: string, needsPersonReason: string | null) => ({
+        ...conversation(id, 'Help', '2026-09-07T12:00:00Z'),
+        handling: 'Ai',
+        needsPerson: needsPersonReason !== null,
+        needsPersonReason,
+      });
+
+      http.expectOne(viewUrl).flush({
+        items: [
+          { ...reasoned('c1', 'PersonHandling'), handling: 'Human', lastMessageSender: 'Customer' },
+          reasoned('c2', 'AiTurnFailed'),
+          reasoned('c3', 'ReturnedUnanswered'),
+          reasoned('c4', 'SomethingNewer'),
+          reasoned('c5', null),
+        ],
+        page: 1,
+        pageSize: 20,
+        total: 5,
+      });
+      await settle();
+
+      const reasons = rows().map((row) => {
+        const badge = row.querySelector('[data-testid="row-reason"]');
+
+        // A warning badge: its glyph beside the words, never colour alone.
+        expect(badge?.classList.contains('badge-warning')).toBe(true);
+
+        return badge?.textContent?.trim();
+      });
+
+      expect(reasons).toEqual([
+        'Waiting for the team',
+        'The AI could not reply',
+        'Returned to the AI unanswered',
+        // A reason this build does not know, or none, keeps today's wording.
+        'Waiting for the team',
+        'Waiting for the team',
+      ]);
+    });
+
     it('is calm about nobody waiting', async () => {
       await mount('conversations.view');
       http.expectOne(url).flush(emptyPage);
@@ -511,6 +557,36 @@ describe('ConversationList', () => {
     const waiting = rows().map((row) => row.textContent?.includes('Waiting for the team'));
 
     expect(waiting).toEqual([true, false, false]);
+  });
+
+  it('names who took a conversation over on its row, with the email isolated (BA-2)', async () => {
+    await mount('conversations.view');
+
+    const sam = { userId: 'u-sam', email: 'sam@acme.test' };
+
+    http.expectOne(url).flush({
+      items: [
+        {
+          ...conversation('c1', 'Hi', '2026-09-07T12:00:00Z'),
+          handling: 'Human',
+          takenOverBy: sam,
+        },
+        { ...conversation('c2', 'Hi', '2026-09-07T11:00:00Z'), takenOverBy: null },
+        // An older server, or a takeover from before 37.4: no field, no words.
+        conversation('c3', 'Hi', '2026-09-07T10:00:00Z'),
+      ],
+      page: 1,
+      pageSize: 20,
+      total: 3,
+    });
+    await settle();
+
+    const handled = rows().map((row) => row.querySelector('[data-testid="row-handled-by"]'));
+
+    expect(handled[0]?.textContent?.replace(/\s+/g, ' ').trim()).toBe('Handled by sam@acme.test');
+    expect(handled[0]?.querySelector('bdi')?.getAttribute('dir')).toBe('ltr');
+    expect(handled[1]).toBeNull();
+    expect(handled[2]).toBeNull();
   });
 
   it('names who is answering each conversation in a word, with its glyph', async () => {

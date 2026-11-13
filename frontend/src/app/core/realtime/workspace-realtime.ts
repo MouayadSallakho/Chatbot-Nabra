@@ -42,12 +42,25 @@ export const HUB_CONNECTION_BUILDER = new InjectionToken<() => Promise<HubConnec
  */
 export type ConversationChanged = (conversationId: string | null) => void;
 
+/**
+ * What a knowledge screen is told (Phase 38.8, BA-11): the document whose indexing
+ * started or settled, or `null` after a reconnect, when anything may have changed.
+ */
+export type KnowledgeChanged = (documentId: string | null) => void;
+
 /** One open connection, for one workspace. */
 interface Session {
   readonly tenantId: string;
   connection: HubConnection | null;
   connected: boolean;
   conversationsJoined: boolean;
+  knowledgeJoined: boolean;
+
+  /**
+   * The server refused the knowledge group on a live connection: the member lacks
+   * `knowledge.view` there. Not asked again on this connection to this workspace.
+   */
+  knowledgeRefused: boolean;
 
   /** Group changes run one at a time, so the last wish is the one that lands. */
   queue: Promise<void>;
@@ -69,7 +82,10 @@ interface Session {
  * <strong>The server decides who joins.</strong> The member's own notifications
  * need only membership, so that group is always asked for. The conversation group
  * needs `conversations.view`: it is asked for only while the member holds that
- * permission, and left when they lose it.
+ * permission, and left when they lose it. The knowledge group (Phase 38.8) needs
+ * `knowledge.view`, and is asked for only while a knowledge screen listens: joined
+ * on entering those screens, left on leaving them. A refusal is final for the
+ * connection, because it means the member may not view knowledge there.
  *
  * <strong>It follows the workspace.</strong> The shell starts it once; from then on
  * a chosen workspace opens the connection, another one replaces it, and signing out
@@ -90,10 +106,12 @@ export class WorkspaceRealtime {
 
   private readonly conversationListeners = new Set<ConversationChanged>();
   private readonly notificationListeners = new Set<() => void>();
+  private readonly knowledgeListeners = new Set<KnowledgeChanged>();
 
   private started = false;
   private session: Session | null = null;
   private wantConversations = false;
+  private mayViewKnowledge = false;
 
   /** The previous connection's goodbye: the next one waits for it, so two never overlap. */
   private closing: Promise<void> = Promise.resolve();
@@ -120,12 +138,11 @@ export class WorkspaceRealtime {
         const tenantId = this.workspace.tenantId();
         // Compared with the workspace because a switch keeps the previous
         // workspace's permissions until the new answer arrives.
-        const conversations =
-          tenantId !== null &&
-          this.permissions.tenantId() === tenantId &&
-          this.permissions.has('conversations.view');
+        const current = tenantId !== null && this.permissions.tenantId() === tenantId;
+        const conversations = current && this.permissions.has('conversations.view');
+        const knowledge = current && this.permissions.has('knowledge.view');
 
-        untracked(() => this.apply(tenantId, conversations));
+        untracked(() => this.apply(tenantId, conversations, knowledge));
       },
       { injector: this.injector },
     );
@@ -150,8 +167,36 @@ export class WorkspaceRealtime {
     return () => this.notificationListeners.delete(listener);
   }
 
-  private apply(tenantId: string | null, conversations: boolean): void {
+  /**
+   * Calls back on every knowledge event, and holds the knowledge group while any
+   * listener does. Returns the unsubscribe, which leaves the group with the last one.
+   */
+  onKnowledge(listener: KnowledgeChanged): () => void {
+    this.knowledgeListeners.add(listener);
+    this.reconcileKnowledge();
+
+    return () => {
+      if (this.knowledgeListeners.delete(listener)) {
+        this.reconcileKnowledge();
+      }
+    };
+  }
+
+  private reconcileKnowledge(): void {
+    if (this.session !== null) {
+      void this.reconcile(this.session);
+    }
+  }
+
+  private apply(tenantId: string | null, conversations: boolean, knowledge: boolean): void {
     this.wantConversations = conversations;
+
+    // A permission that has just been granted is worth one more ask.
+    if (knowledge && !this.mayViewKnowledge && this.session !== null) {
+      this.session.knowledgeRefused = false;
+    }
+
+    this.mayViewKnowledge = knowledge;
 
     if (this.session !== null && this.session.tenantId !== tenantId) {
       this.close(this.session);
@@ -174,6 +219,8 @@ export class WorkspaceRealtime {
       connection: null,
       connected: false,
       conversationsJoined: false,
+      knowledgeJoined: false,
+      knowledgeRefused: false,
       queue: Promise.resolve(),
     };
 
@@ -231,9 +278,14 @@ export class WorkspaceRealtime {
       this.zone.run(() => this.callNotificationListeners());
     });
 
+    connection.on('knowledgeChanged', (documentId: string) => {
+      this.tell(this.knowledgeListeners, documentId);
+    });
+
     connection.onreconnecting(() => {
       session.connected = false;
       session.conversationsJoined = false;
+      session.knowledgeJoined = false;
       this.publish(session, false);
     });
 
@@ -242,6 +294,7 @@ export class WorkspaceRealtime {
     connection.onclose(() => {
       session.connected = false;
       session.conversationsJoined = false;
+      session.knowledgeJoined = false;
       this.publish(session, false);
     });
   }
@@ -250,6 +303,7 @@ export class WorkspaceRealtime {
   private async rejoin(session: Session): Promise<void> {
     session.connected = true;
     session.conversationsJoined = false;
+    session.knowledgeJoined = false;
 
     await this.joinGroups(session);
 
@@ -260,6 +314,7 @@ export class WorkspaceRealtime {
     // After joining, not before: an event between the re-read and the join
     // would otherwise be lost as surely as the ones sent during the outage.
     this.tell(this.conversationListeners, null);
+    this.tell(this.knowledgeListeners, null);
     this.zone.run(() => this.callNotificationListeners());
   }
 
@@ -277,38 +332,77 @@ export class WorkspaceRealtime {
     await this.reconcile(session);
   }
 
-  /** Brings the conversation group in line with the member's permission. */
+  /** Brings the conversation and knowledge groups in line with what is wanted now. */
   private reconcile(session: Session): Promise<void> {
     session.queue = session.queue.then(async () => {
-      const connection = session.connection;
-      const want = this.wantConversations;
-
-      if (
-        this.session !== session ||
-        !session.connected ||
-        connection === null ||
-        want === session.conversationsJoined
-      ) {
-        return;
-      }
-
-      try {
-        await connection.invoke(want ? 'Subscribe' : 'Unsubscribe', session.tenantId);
-        session.conversationsJoined = want;
-      } catch {
-        session.conversationsJoined = false;
-      }
-
-      this.zone.run(() => this.hasConversations.set(session.conversationsJoined));
+      await this.reconcileConversations(session);
+      await this.reconcileKnowledgeGroup(session);
     });
 
     return session.queue;
+  }
+
+  /** The conversation group follows the member's permission. */
+  private async reconcileConversations(session: Session): Promise<void> {
+    const connection = session.connection;
+    const want = this.wantConversations;
+
+    if (
+      this.session !== session ||
+      !session.connected ||
+      connection === null ||
+      want === session.conversationsJoined
+    ) {
+      return;
+    }
+
+    try {
+      await connection.invoke(want ? 'Subscribe' : 'Unsubscribe', session.tenantId);
+      session.conversationsJoined = want;
+    } catch {
+      session.conversationsJoined = false;
+    }
+
+    this.zone.run(() => this.hasConversations.set(session.conversationsJoined));
+  }
+
+  /** The knowledge group: while a knowledge screen listens, for a member with `knowledge.view`. */
+  private async reconcileKnowledgeGroup(session: Session): Promise<void> {
+    const connection = session.connection;
+    const want =
+      this.mayViewKnowledge && this.knowledgeListeners.size > 0 && !session.knowledgeRefused;
+
+    if (
+      this.session !== session ||
+      !session.connected ||
+      connection === null ||
+      want === session.knowledgeJoined
+    ) {
+      return;
+    }
+
+    try {
+      await connection.invoke(
+        want ? 'SubscribeKnowledge' : 'UnsubscribeKnowledge',
+        session.tenantId,
+      );
+      session.knowledgeJoined = want;
+    } catch {
+      session.knowledgeJoined = false;
+
+      // Refused on a live connection: no knowledge.view here, so never asked again
+      // on it. A connection that dropped meanwhile asks again when it is back.
+      if (want && String(connection.state) === 'Connected') {
+        session.knowledgeRefused = true;
+      }
+    }
   }
 
   private close(session: Session): void {
     this.session = null;
     session.connected = false;
     session.conversationsJoined = false;
+    session.knowledgeJoined = false;
     this.hasConversations.set(false);
     this.hasNotifications.set(false);
 
@@ -331,11 +425,11 @@ export class WorkspaceRealtime {
     });
   }
 
-  private tell(listeners: Set<ConversationChanged>, conversationId: string | null): void {
+  private tell(listeners: Set<(id: string | null) => void>, id: string | null): void {
     this.zone.run(() => {
       // A copy: a listener may unsubscribe while it is being told.
       for (const listener of [...listeners]) {
-        listener(conversationId);
+        listener(id);
       }
     });
   }

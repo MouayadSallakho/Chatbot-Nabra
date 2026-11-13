@@ -39,8 +39,31 @@ export interface ConversationCustomer {
   readonly shortCode: string;
 }
 
+/**
+ * Why a conversation needs a person, as the server decides it (Phase 38.7a, BA-7).
+ *
+ * The three branches of the `filter=needs-person` predicate. When two hold,
+ * `PersonHandling` wins. The fields below are typed as plain strings so a reason
+ * this build does not know yet still gets today's wording.
+ */
+export type NeedsPersonReason = 'PersonHandling' | 'AiTurnFailed' | 'ReturnedUnanswered';
+
+/** What the server says about who handles a conversation and whether it waits for a person. */
+interface HandlingFacts {
+  /**
+   * The member who took the conversation over, while a person handles it and a
+   * takeover recorded who (Phase 38.7a, BA-2). Null in AI mode, and for a
+   * takeover from before Phase 37.4. Not an assignment: taking over does not assign.
+   */
+  readonly takenOverBy: WorkspaceMember | null;
+  /** Exactly membership in `filter=needs-person`. */
+  readonly needsPerson: boolean;
+  /** One of {@link NeedsPersonReason}, or null when `needsPerson` is false. */
+  readonly needsPersonReason: string | null;
+}
+
 /** One conversation, in the list. */
-export interface ConversationSummary {
+export interface ConversationSummary extends HandlingFacts {
   readonly id: string;
   readonly channel: ConversationChannel;
   readonly status: 'Open' | 'Closed';
@@ -69,7 +92,7 @@ export interface ConversationPage {
 }
 
 /** One conversation's detail. */
-export interface ConversationDetail {
+export interface ConversationDetail extends HandlingFacts {
   readonly id: string;
   readonly channel: ConversationChannel;
   readonly status: 'Open' | 'Closed';
@@ -80,6 +103,8 @@ export interface ConversationDetail {
   readonly messageCount: number;
   readonly assignedTo: WorkspaceMember | null;
   readonly customer: ConversationCustomer | null;
+  /** Newer messages than this member has read (documented on the detail since 37.4). */
+  readonly unread: boolean;
   /** How far this member has read; null when they have never been marked. */
   readonly lastReadSequence: number | null;
 }

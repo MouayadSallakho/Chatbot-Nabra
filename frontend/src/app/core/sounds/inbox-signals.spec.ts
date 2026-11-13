@@ -27,7 +27,9 @@ const row = (id: string, over: object = {}) => ({
   handling: 'Human',
   lastActivityAt: OLD,
   lastMessageSender: 'Customer',
+  messageCount: 1,
   assignedTo: null,
+  takenOverBy: null,
   customer: {
     id: `p-${id}`,
     displayName: null,
@@ -266,7 +268,7 @@ describe('InboxSignals', () => {
       await baseline([row('a', mine)]);
 
       await changed();
-      await answer([row('a', { ...mine, lastActivityAt: NEW })]);
+      await answer([row('a', { ...mine, lastActivityAt: NEW, messageCount: 2 })]);
 
       expect(sounds()).toEqual(['new-message']);
     });
@@ -277,7 +279,7 @@ describe('InboxSignals', () => {
       await baseline([row('a', mine)]);
 
       await changed();
-      await answer([row('a', { ...mine, lastActivityAt: NEW })]);
+      await answer([row('a', { ...mine, lastActivityAt: NEW, messageCount: 2 })]);
 
       expect(sounds()).toEqual([]);
     });
@@ -289,7 +291,7 @@ describe('InboxSignals', () => {
       visible = false;
 
       await changed();
-      await answer([row('a', { ...mine, lastActivityAt: NEW })]);
+      await answer([row('a', { ...mine, lastActivityAt: NEW, messageCount: 2 })]);
 
       expect(sounds()).toEqual(['new-message']);
     });
@@ -306,9 +308,44 @@ describe('InboxSignals', () => {
       });
 
       await changed();
-      await answer([row('a', { ...mine, lastActivityAt: NEW })]);
+      await answer([row('a', { ...mine, lastActivityAt: NEW, messageCount: 2 })]);
 
       expect(sounds()).toEqual([]);
+    });
+
+    it('plays for a conversation I took over, which is not assigned to me (BA-2)', async () => {
+      const takenByMe = { takenOverBy: me };
+
+      create();
+      await baseline([row('a', takenByMe)]);
+
+      await changed();
+      await answer([row('a', { ...takenByMe, lastActivityAt: NEW, messageCount: 2 })]);
+
+      expect(sounds()).toEqual(['new-message']);
+    });
+
+    it('plays once for a message, however many times it is announced', async () => {
+      create();
+      await baseline([row('a', mine)]);
+
+      // Stored: the customer's message.
+      await changed();
+      await answer([row('a', { ...mine, lastActivityAt: NEW, messageCount: 2 })]);
+
+      // Settled, and then an assignment: the row moves twice more, with no new message.
+      await vi.advanceTimersByTimeAsync(READ_GAP_MS);
+      await changed();
+      await answer([
+        row('a', { ...mine, lastActivityAt: '2026-11-08T10:05:11Z', messageCount: 2 }),
+      ]);
+      await vi.advanceTimersByTimeAsync(READ_GAP_MS);
+      await changed();
+      await answer([
+        row('a', { ...mine, lastActivityAt: '2026-11-08T10:06:00Z', messageCount: 2 }),
+      ]);
+
+      expect(sounds()).toEqual(['new-message']);
     });
   });
 
@@ -524,7 +561,7 @@ describe('InboxSignals', () => {
       otherTab.postMessage({
         kind: 'result',
         total: 1,
-        snapshot: { rows: [['a', OLD]], seen: [] },
+        snapshot: { rows: [['a', { at: OLD, count: 1 }]], seen: [] },
         sound: null,
       });
 

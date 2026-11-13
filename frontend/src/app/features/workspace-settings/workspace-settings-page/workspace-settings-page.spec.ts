@@ -31,6 +31,17 @@ describe('WorkspaceSettingsPage', () => {
   const zoneUrl = `${tenantUrl}/time-zone`;
   const schedulesUrl = `${tenantUrl}/reports/schedules`;
 
+  /**
+   * The read the page makes just before asking (BA-9): the count, under a newer
+   * version on purpose, which the page must not adopt.
+   */
+  const countRead = (scheduleCount?: number) =>
+    http
+      .expectOne(tenantUrl)
+      .flush(scheduleCount === undefined ? acme : { ...acme, scheduleCount }, {
+        headers: { ETag: '"v9"' },
+      });
+
   const acme = {
     id: tenantId,
     name: 'Acme Trading',
@@ -418,7 +429,7 @@ describe('WorkspaceSettingsPage', () => {
       expect(text()).toContain('No time zone matches.');
     });
 
-    it('saves without asking when the workspace has no schedules, with the version it read', async () => {
+    it('saves without asking when no schedule would move, with the version it read', async () => {
       await open('workspace.manage', 'reports.view');
 
       choose('Asia/Riyadh');
@@ -430,8 +441,12 @@ describe('WorkspaceSettingsPage', () => {
       submitZone();
       await settle();
 
-      http.expectOne(schedulesUrl).flush({ items: [] });
+      countRead(0);
       await settle();
+
+      // No question, and never the schedule list (BA-9).
+      expect(host().querySelector('dialog[open]')).toBeNull();
+      http.expectNone(schedulesUrl);
 
       const put = http.expectOne(zoneUrl);
 
@@ -466,7 +481,7 @@ describe('WorkspaceSettingsPage', () => {
       expect(select().value).toBe('Asia/Riyadh');
     });
 
-    it('asks first when schedules would move, and sends nothing if the reader keeps the zone', async () => {
+    it('says how many schedules move, asks first, and sends nothing if the reader keeps the zone', async () => {
       await open('workspace.manage', 'reports.view');
       stubDialogs(host());
 
@@ -475,14 +490,16 @@ describe('WorkspaceSettingsPage', () => {
       submitZone();
       await settle();
 
-      http.expectOne(schedulesUrl).flush({ items: [{ id: 's1' }] });
+      countRead(1);
       await settle();
 
       const dialog = host().querySelector('dialog[open]');
 
       expect(dialog?.textContent).toContain('Change the time zone to');
       expect(dialog?.textContent).toContain('Asia/Riyadh');
-      expect(dialog?.textContent).toContain('Every report schedule moves');
+      expect(dialog?.textContent).toContain(
+        '1 scheduled report moves to the next start of a day in the new zone',
+      );
 
       answerConfirmation(host(), false);
       await settle();
@@ -491,29 +508,35 @@ describe('WorkspaceSettingsPage', () => {
       expect(select().value).toBe('Asia/Riyadh');
     });
 
-    it('saves after the reader confirms', async () => {
-      await open('workspace.manage', 'reports.view');
+    it('asks a manager without reports.view with the count, and saves with the version it read', async () => {
+      await open('workspace.manage');
       stubDialogs(host());
 
       choose('Europe/Berlin');
       await settle();
       submitZone();
       await settle();
-      http.expectOne(schedulesUrl).flush({ items: [{ id: 's1' }, { id: 's2' }] });
+      countRead(12);
       await settle();
+
+      expect(host().querySelector('dialog[open]')?.textContent).toContain(
+        '12 scheduled reports move',
+      );
 
       answerConfirmation(host());
       await settle();
 
-      http
-        .expectOne(zoneUrl)
-        .flush({ ...acme, timeZone: 'Europe/Berlin' }, { headers: { ETag: '"v2"' } });
+      const put = http.expectOne(zoneUrl);
+
+      // The count's read is not adopted: the reader chose against "v1".
+      expect(put.request.headers.get('If-Match')).toBe('"v1"');
+      put.flush({ ...acme, timeZone: 'Europe/Berlin' }, { headers: { ETag: '"v2"' } });
       await settle();
 
       expect(toasts()).toContain('The time zone is now \u2066Europe/Berlin\u2069.');
     });
 
-    it('asks first when it cannot tell whether there are schedules', async () => {
+    it('asks without a number when the read carries no count', async () => {
       await open('workspace.manage');
       stubDialogs(host());
 
@@ -521,9 +544,30 @@ describe('WorkspaceSettingsPage', () => {
       await settle();
       submitZone();
       await settle();
+      countRead(undefined);
+      await settle();
 
-      // Without reports.view nothing is read: the dialog asks regardless.
-      expect(host().querySelector('dialog[open]')).not.toBeNull();
+      expect(host().querySelector('dialog[open]')?.textContent).toContain(
+        'Every report schedule moves',
+      );
+      answerConfirmation(host(), false);
+      await settle();
+    });
+
+    it('asks without a number when the count cannot be read', async () => {
+      await open('workspace.manage');
+      stubDialogs(host());
+
+      choose('Asia/Riyadh');
+      await settle();
+      submitZone();
+      await settle();
+      http.expectOne(tenantUrl).flush({}, { status: 503, statusText: 'Service Unavailable' });
+      await settle();
+
+      expect(host().querySelector('dialog[open]')?.textContent).toContain(
+        'Every report schedule moves',
+      );
       answerConfirmation(host(), false);
       await settle();
     });
@@ -535,7 +579,7 @@ describe('WorkspaceSettingsPage', () => {
       await settle();
       submitZone();
       await settle();
-      http.expectOne(schedulesUrl).flush({ items: [] });
+      countRead(0);
       await settle();
 
       http
@@ -568,7 +612,7 @@ describe('WorkspaceSettingsPage', () => {
       await settle();
       submitZone();
       await settle();
-      http.expectOne(schedulesUrl).flush({ items: [] });
+      countRead(0);
       await settle();
 
       http

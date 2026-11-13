@@ -1,5 +1,7 @@
 import { Routes } from '@angular/router';
 import { unsavedChangesGuard } from '@app/core/navigation/unsaved-changes';
+import { provideProblemWords } from '@app/core/problems/problem-words';
+import { REPORT_PROBLEM_WORDS } from './report-problems';
 import { ReportsApi } from './reports-api';
 
 /**
@@ -12,7 +14,7 @@ import { ReportsApi } from './reports-api';
 export const reportsRoutes: Routes = [
   {
     path: '',
-    providers: [ReportsApi],
+    providers: [ReportsApi, provideProblemWords(REPORT_PROBLEM_WORDS)],
     children: [
       {
         path: '',

@@ -5,6 +5,7 @@ import {
   MAX_FAILURE_CHECKS,
   READ_GAP_MS,
   ReadPacer,
+  RowMark,
   SignalInput,
   decideSignals,
 } from './inbox-signal-rules';
@@ -23,8 +24,14 @@ const row = (id: string, over: Partial<ConversationSummary> = {}): ConversationS
   assignedTo: null,
   customer: null,
   unread: true,
+  takenOverBy: null,
+  needsPerson: true,
+  needsPersonReason: 'PersonHandling',
   ...over,
 });
+
+/** What the last read remembered: an older time, and one message fewer than `row` has. */
+const mark = (at: string, count = 1): RowMark => ({ at, count });
 
 describe('decideSignals', () => {
   const OLD = '2026-11-08T10:00:00Z';
@@ -41,7 +48,9 @@ describe('decideSignals', () => {
   });
 
   it('says a conversation entered when its id was not in the set', () => {
-    const decision = decideSignals(input({ previous: new Map([['a', OLD]]), rows: [row('b')] }));
+    const decision = decideSignals(
+      input({ previous: new Map([['a', mark(OLD)]]), rows: [row('b')] }),
+    );
 
     expect(decision.entered?.id).toBe('b');
   });
@@ -54,7 +63,7 @@ describe('decideSignals', () => {
 
   it('says nothing when the set has not changed', () => {
     const rows = [row('a')];
-    const previous = new Map([['a', rows[0].lastActivityAt]]);
+    const previous = new Map([['a', mark(rows[0].lastActivityAt, rows[0].messageCount)]]);
 
     expect(decideSignals(input({ previous, rows }))).toEqual({
       entered: null,
@@ -64,7 +73,7 @@ describe('decideSignals', () => {
   });
 
   describe('a new message', () => {
-    const previous = new Map([['a', OLD]]);
+    const previous = new Map([['a', mark(OLD)]]);
 
     it('is told for my conversation when the customer wrote and it has moved', () => {
       const rows = [row('a', { assignedTo: me })];
@@ -95,8 +104,48 @@ describe('decideSignals', () => {
       expect(decideSignals(input({ previous, rows })).newMessage).toBeNull();
     });
 
-    it('is not told when it has not moved', () => {
-      const rows = [row('a', { assignedTo: me, lastActivityAt: OLD })];
+    it('is not told when it has no new message', () => {
+      // The same count: nothing was written, whatever moved.
+      const rows = [row('a', { assignedTo: me, lastActivityAt: OLD, messageCount: 1 })];
+
+      expect(decideSignals(input({ previous, rows })).newMessage).toBeNull();
+    });
+
+    it('is told for a conversation this member took over (BA-2)', () => {
+      const rows = [row('a', { takenOverBy: me })];
+
+      expect(decideSignals(input({ previous, rows })).newMessage?.id).toBe('a');
+    });
+
+    it('is not told for a conversation somebody else took over', () => {
+      const other = { userId: 'other', email: 'o@example.test' };
+
+      expect(
+        decideSignals(input({ previous, rows: [row('a', { takenOverBy: other })] })).newMessage,
+      ).toBeNull();
+    });
+
+    it('is told once for a message, not again when the turn settles', () => {
+      // Stored: the message arrives (count 2) and the row is read.
+      const stored = row('a', { assignedTo: me, handling: 'Ai' });
+      const first = decideSignals(input({ previous, rows: [stored] }));
+
+      // Settled with a failure: the row moves again, and nothing new was written.
+      const settled = row('a', {
+        assignedTo: me,
+        handling: 'Ai',
+        lastActivityAt: '2026-11-08T10:05:11Z',
+      });
+      const second = decideSignals(
+        input({ previous: new Map([['a', mark(stored.lastActivityAt, 2)]]), rows: [settled] }),
+      );
+
+      expect(first.newMessage?.id).toBe('a');
+      expect(second.newMessage).toBeNull();
+    });
+
+    it('is not told when only the handling changed (an assignment moves the row too)', () => {
+      const rows = [row('a', { assignedTo: me, messageCount: 1 })];
 
       expect(decideSignals(input({ previous, rows })).newMessage).toBeNull();
     });
@@ -117,8 +166,8 @@ describe('decideSignals', () => {
         row('person'),
       ];
       const previous = new Map([
-        ['moved-ai', OLD],
-        ['still-ai', OLD],
+        ['moved-ai', mark(OLD)],
+        ['still-ai', mark(OLD)],
       ]);
 
       expect(decideSignals(input({ previous, rows })).failureChecks.map((r) => r.id)).toEqual([

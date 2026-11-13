@@ -18,6 +18,10 @@ describe('ConversationContext', () => {
     assignedTo: null,
     customer,
     lastReadSequence: null,
+    unread: false,
+    takenOverBy: null,
+    needsPerson: false,
+    needsPersonReason: null,
   });
 
   const whatsApp = (over: Partial<ConversationCustomer>): ConversationCustomer => ({

@@ -635,4 +635,139 @@ describe('Arabic renders', () => {
       expect(text(root.querySelector('a[href="/forgot-password"]'))).toBe('طلب رابط جديد');
     });
   });
+
+  describe('the 38.7 contracts (Phase 38.8)', () => {
+    async function refuse(
+      catalogue: Record<string, unknown>,
+      code: string,
+      status = 400,
+      extra: object = {},
+    ): Promise<string> {
+      const { HttpErrorResponse } = await import('@angular/common/http');
+      const { toApiError } = await import('@app/core/api/api-error');
+      const { registerProblemWords } = await import('@app/core/problems/problem-words');
+
+      registerProblemWords(catalogue as never);
+
+      return toApiError(
+        new HttpErrorResponse({
+          status,
+          error: { title: 'Refused', detail: 'The English sentence.', code, ...extra },
+        }),
+      ).message;
+    }
+
+    it('says why a conversation needs a person, and who took it over, in Arabic', async () => {
+      const { needsPersonWord } = await import('@app/features/conversations/conversation-words');
+
+      expect(needsPersonWord('PersonHandling')).toBe('بانتظار رد الفريق');
+      expect(needsPersonWord('AiTurnFailed')).toBe('تعذّر على الذكاء الاصطناعي الرد');
+      expect(needsPersonWord('ReturnedUnanswered')).toBe(
+        'تمّت إعادتها إلى الذكاء الاصطناعي دون رد',
+      );
+      expect(needsPersonWord('SomethingNewer')).toBe('بانتظار رد الفريق');
+      expect(CATALOGUE.translations['conversation.handledBy']).toBe(
+        'تمّ استلام المحادثة من قِبل {$START_TAG_BDI}{$INTERPOLATION}{$CLOSE_TAG_BDI}',
+      );
+      expect(CATALOGUE.translations['inbox.handledBy']).toBe(
+        'استلام المحادثة: {$START_TAG_BDI}{$INTERPOLATION}{$CLOSE_TAG_BDI}',
+      );
+    });
+
+    it('names a directory customer as the inbox does, in Arabic (BA-1)', async () => {
+      const { asLabelled } = await import('@app/features/customers/customer-words');
+      const { customerLabelPlain } = await import('@app/features/conversations/customer-label');
+      const record = { id: 'p1', displayName: null, shortCode: '7KQ2MX' };
+
+      expect(customerLabelPlain(asLabelled({ ...record, labelCode: 'AnonymousVisitor' }))).toBe(
+        'زائر 7KQ2MX',
+      );
+      expect(customerLabelPlain(asLabelled({ ...record, labelCode: 'WhatsAppCustomer' }))).toBe(
+        'عميل واتساب 7KQ2MX',
+      );
+      expect(customerLabelPlain(asLabelled({ ...record, labelCode: 'UnnamedCustomer' }))).toBe(
+        'عميل 7KQ2MX',
+      );
+    });
+
+    it('says indexing carries on and ends here, and a timed-out attempt, in Arabic', async () => {
+      const { indexFailureReason } = await import('@app/features/knowledge/knowledge-words');
+
+      expect(CATALOGUE.translations['knowledge.state.indexing.live']).toBe(
+        'تجري الفهرسة الآن. تستمر حتى لو غادرت هذه الصفحة، وتظهر النتيجة هنا عند انتهائها.',
+      );
+      expect(indexFailureReason('timed_out')).toBe(
+        'استغرقت الفهرسة وقتًا أطول من المسموح به، فلم يُفهرَس شيء.',
+      );
+    });
+
+    it('counts the files inside a Word document with every Arabic plural form (BA-12)', async () => {
+      const { KNOWLEDGE_PROBLEM_WORDS } =
+        await import('@app/features/knowledge/knowledge-problems');
+      const archive = (limit: number, limitUnit: string) =>
+        refuse(KNOWLEDGE_PROBLEM_WORDS, 'knowledge.file.archive_too_large', 422, {
+          limit,
+          limitUnit,
+        });
+
+      expect(await archive(1, 'entries')).toContain('على أكثر من ملف واحد.');
+      expect(await archive(2, 'entries')).toContain('على أكثر من ملفين.');
+      expect(await archive(3, 'entries')).toContain('على أكثر من 3 ملفات.');
+      expect(await archive(512, 'entries')).toContain('على أكثر من 512 ملفًا.');
+      expect(await archive(500, 'entries')).toContain('على أكثر من 500 ملف.');
+      expect(await archive(67108864, 'bytes')).toContain('يتجاوز حجم مستند Word هذا عند فتحه');
+      expect(await archive(67108864, 'bytes')).toContain('64');
+    });
+
+    it('says how many scheduled reports move, with every Arabic plural form (BA-9)', async () => {
+      const { schedulesMove } =
+        await import('@app/features/workspace-settings/workspace-settings-page/workspace-settings-page');
+
+      expect(schedulesMove('ar', 1)).toMatch(/^ينتقل تقرير مجدول واحد إلى/);
+      expect(schedulesMove('ar', 2)).toMatch(/^ينتقل تقريران مجدولان إلى/);
+      expect(schedulesMove('ar', 3)).toMatch(/^تنتقل 3 تقارير مجدولة إلى/);
+      expect(schedulesMove('ar', 12)).toMatch(/^ينتقل 12 تقريرًا مجدولًا إلى/);
+      expect(schedulesMove('ar', 100)).toMatch(/^ينتقل 100 تقرير مجدول إلى/);
+    });
+
+    it('words the codes 38.7b added in Arabic, by their codes (BA-4)', async () => {
+      const { CONVERSATION_PROBLEM_WORDS } =
+        await import('@app/features/conversations/conversation-problems');
+      const { CUSTOMER_PROBLEM_WORDS } = await import('@app/features/customers/customer-problems');
+      const { NOTIFICATION_PROBLEM_WORDS } =
+        await import('@app/features/notifications/notification-problems');
+      const { REPORT_PROBLEM_WORDS } = await import('@app/features/reports/report-problems');
+
+      expect(
+        await refuse(CONVERSATION_PROBLEM_WORDS, 'conversations.reply.not_taken_over', 409),
+      ).toBe('يردّ الذكاء الاصطناعي على هذه المحادثة. اختر «استلام المحادثة» أولًا، ثم ردّ.');
+      expect(await refuse(CUSTOMER_PROBLEM_WORDS, 'customers.merge.self')).toBe(
+        'لا يمكن دمج عميل مع نفسه. اختر عميلًا آخر.',
+      );
+      expect(await refuse(NOTIFICATION_PROBLEM_WORDS, 'notifications.page.invalid')).toBe(
+        'تعذّر عرض هذه الصفحة من الإشعارات. عد إلى الصفحة الأولى.',
+      );
+      expect(await refuse(REPORT_PROBLEM_WORDS, 'reports.schedule.limit_reached', 409)).toBe(
+        'بلغت مساحة العمل هذه أقصى عدد مسموح به من الجدولات. احذف واحدة قبل إضافة أخرى.',
+      );
+      expect(await refuse(REPORT_PROBLEM_WORDS, 'reports.file.expired', 410)).toBe(
+        'لم يعد ملف هذا التقرير محفوظًا. أنشئ التقرير مرة أخرى.',
+      );
+
+      // Never the server's English, for any code of the four areas.
+      for (const [catalogue, codes] of [
+        [CONVERSATION_PROBLEM_WORDS, Object.keys(CONVERSATION_PROBLEM_WORDS)],
+        [CUSTOMER_PROBLEM_WORDS, Object.keys(CUSTOMER_PROBLEM_WORDS)],
+        [NOTIFICATION_PROBLEM_WORDS, Object.keys(NOTIFICATION_PROBLEM_WORDS)],
+        [REPORT_PROBLEM_WORDS, Object.keys(REPORT_PROBLEM_WORDS)],
+      ] as const) {
+        for (const code of codes) {
+          const said = await refuse(catalogue, code);
+
+          expect(said).not.toContain('The English sentence');
+          expect(said).toMatch(/[؀-ۿ]/);
+        }
+      }
+    });
+  });
 });

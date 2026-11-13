@@ -12,6 +12,7 @@ import {
   stubDialogs,
 } from '@app/testing/test-doubles';
 import { PermissionApi } from '@app/core/authorization/permission-api';
+import { KnowledgeRealtime } from '@app/core/realtime/knowledge-realtime';
 import { KnowledgeApi, KnowledgeDocument } from '../knowledge-api';
 import { KnowledgeEditor } from './knowledge-editor';
 
@@ -69,6 +70,13 @@ describe('KnowledgeEditor', () => {
   let fixture: ComponentFixture<KnowledgeEditor>;
   let http: HttpTestingController;
 
+  /** The page's knowledge events, driven by the test (Phase 38.8, BA-11). */
+  let live: { listening: number; told: ((id: string | null) => void) | null };
+
+  beforeEach(() => {
+    live = { listening: 0, told: null };
+  });
+
   async function mount(document: KnowledgeDocument = needsIndex, etag = '"v1"'): Promise<void> {
     TestBed.configureTestingModule({
       imports: [KnowledgeEditor],
@@ -80,6 +88,17 @@ describe('KnowledgeEditor', () => {
         KnowledgeApi,
         { provide: LOCAL_STORAGE, useValue: memoryStorage() },
         { provide: TenantApi, useValue: { get: () => undefined, create: () => undefined } },
+        {
+          provide: KnowledgeRealtime,
+          useValue: {
+            listen: (_tenant: string, onChanged: (id: string | null) => void) => {
+              live.listening++;
+              live.told = onChanged;
+
+              return () => live.listening--;
+            },
+          },
+        },
       ],
     });
 
@@ -164,11 +183,26 @@ describe('KnowledgeEditor', () => {
     const sentence = (): string =>
       query('[data-testid="state-sentence"]')?.textContent?.replace(/\s+/g, ' ').trim() ?? '';
 
-    it('says indexing is running, and how to see the outcome', async () => {
+    it('says indexing is running, and asks for no reload (BA-10, BA-11)', async () => {
       await mount({ ...needsIndex, lastIndexAttempt: attempt });
 
       expect(readiness()).toBe('Indexing now');
-      expect(sentence()).toContain('Reload this page in a moment');
+      expect(sentence()).toBe(
+        'Indexing is running. It carries on if you leave this page, and the result appears here when it ends.',
+      );
+      expect(sentence()).not.toContain('Reload');
+    });
+
+    it('says an attempt ran past the server deadline (timed_out)', async () => {
+      await mount({
+        ...needsIndex,
+        lastIndexAttempt: { ...attempt, status: 'Failed', failureCode: 'timed_out' },
+      });
+
+      expect(readiness()).toBe('Indexing failed');
+      expect(query('[data-testid="attempt-reason"]')?.textContent).toBe(
+        'Indexing took longer than allowed. Nothing was indexed.',
+      );
     });
 
     it('says why it failed, with the times', async () => {
@@ -238,6 +272,122 @@ describe('KnowledgeEditor', () => {
 
       expect(readiness()).toBe('Indexing failed');
       expect(query('[data-testid="attempt-reason"]')?.textContent).toBe('Indexing was cancelled.');
+    });
+  });
+
+  describe('indexing ends by itself (BA-11)', () => {
+    const readiness = (): string => query('[data-testid="readiness"]')?.textContent?.trim() ?? '';
+    const running = { ...needsIndex, lastIndexAttempt: attempt };
+    const settled = {
+      ...ready,
+      lastIndexAttempt: { ...attempt, status: 'Succeeded', completedAt: '2026-09-02T10:01:00Z' },
+    };
+
+    it('listens while it is open, and stops on leaving', async () => {
+      await mount(running);
+
+      expect(live.listening).toBe(1);
+
+      fixture.destroy();
+
+      expect(live.listening).toBe(0);
+    });
+
+    it('re-reads this document when its attempt settles, and adopts the new version', async () => {
+      await mount(running);
+
+      expect(readiness()).toBe('Indexing now');
+
+      live.told!(documentId);
+      http.expectOne(documentUrl).flush(settled, { headers: { ETag: '"v2"' } });
+      await settle();
+
+      expect(readiness()).toBe('Indexed');
+
+      // The next write presents the version that read carried.
+      await type(contentBox(), 'Goods may be returned within 60 days.');
+      query<HTMLButtonElement>('[data-testid="save-document"]')!.click();
+
+      const save = http.expectOne(documentUrl);
+
+      expect(save.request.headers.get('If-Match')).toBe('"v2"');
+      save.flush(settled, { headers: { ETag: '"v3"' } });
+      await settle();
+    });
+
+    it('ignores another document, and reads again after a reconnect', async () => {
+      await mount(running);
+
+      live.told!('99999999-9999-9999-9999-999999999999');
+      http.expectNone(documentUrl);
+
+      live.told!(null);
+      http.expectOne(documentUrl).flush(settled, { headers: { ETag: '"v2"' } });
+      await settle();
+
+      expect(readiness()).toBe('Indexed');
+    });
+
+    it('keeps unsaved text and the version it was written against', async () => {
+      await mount(running);
+      await type(contentBox(), 'A half-written sentence');
+
+      live.told!(documentId);
+      http
+        .expectOne(documentUrl)
+        .flush({ ...settled, content: 'Somebody else wrote this.' }, { headers: { ETag: '"v2"' } });
+      await settle();
+
+      // The state is the server's; the text in the box is the reader's.
+      expect(readiness()).toBe('Indexed');
+      expect(contentBox().value).toBe('A half-written sentence');
+
+      // A save still meets the stale-version check, so nothing is overwritten quietly.
+      query<HTMLButtonElement>('[data-testid="save-document"]')!.click();
+
+      const save = http.expectOne(documentUrl);
+
+      expect(save.request.headers.get('If-Match')).toBe('"v1"');
+      save.flush({}, { status: 412, statusText: 'Precondition Failed' });
+      await settle();
+
+      expect(contentBox().value).toBe('A half-written sentence');
+    });
+
+    it('leaves its own index request to answer for itself', async () => {
+      await mount();
+
+      query<HTMLButtonElement>('[data-testid="index-button"]')!.click();
+
+      const index = http.expectOne(`${documentUrl}/index`);
+
+      // Started and settled arrive while the request is out: no read beside it.
+      live.told!(documentId);
+      live.told!(documentId);
+      http.expectNone(documentUrl);
+
+      index.flush(
+        { document: ready, chunkCount: 3, embeddingCalls: 1, alreadyCurrent: false },
+        { headers: { ETag: '"v2"' } },
+      );
+      await settle();
+
+      expect(readiness()).toBe('Indexed');
+    });
+
+    it('reads once at a time, and once more for events that arrived meanwhile', async () => {
+      await mount(running);
+
+      live.told!(documentId);
+      live.told!(documentId);
+      live.told!(documentId);
+
+      http.expectOne(documentUrl).flush(running, { headers: { ETag: '"v1"' } });
+      await settle();
+      http.expectOne(documentUrl).flush(settled, { headers: { ETag: '"v2"' } });
+      await settle();
+
+      expect(readiness()).toBe('Indexed');
     });
   });
 

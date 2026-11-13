@@ -25,7 +25,11 @@ export interface AuthenticatedUser {
 /** The answer to "is anybody signed in", which is never a 401. */
 export interface SessionAnswer {
   readonly authenticated: boolean;
-  readonly user: AuthenticatedUser | null;
+  /**
+   * Absent when nobody is signed in: the API writes it only when it has a value
+   * (the OpenAPI document marks it optional since Phase 38.7b).
+   */
+  readonly user?: AuthenticatedUser | null;
 }
 
 /** What registering and signing in both take. */

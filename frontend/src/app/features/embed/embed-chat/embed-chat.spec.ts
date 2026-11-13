@@ -596,4 +596,97 @@ describe('EmbedChat', () => {
     expect(text()).toContain('A support team member will reply here.');
     expect(text()).toContain('A person from the support team joined');
   });
+
+  // ---- One message, once (Phase 38.8) ------------------------------------
+  //
+  // The widget hears "stored" while the AI answers (38.7a) and re-reads. The
+  // send's answer and the re-reads can arrive in either order; every state in
+  // between shows each message exactly once, in the transcript's order.
+
+  describe('one message, once', () => {
+    const asked = message('c1', 'Customer', 'Where is my order?');
+    const answered = message('a1', 'AiAgent', 'It ships tomorrow.');
+
+    const rows = (): string[] =>
+      [...host().querySelectorAll('[data-testid="chat-message"]')].map(
+        (row) =>
+          `${row.getAttribute('data-sender')}:${row.querySelector('.chat-text')?.textContent}`,
+      );
+
+    async function sendFirst(): Promise<void> {
+      await open();
+      await type('Where is my order?');
+      button('Send')!.click();
+      await settle();
+      http
+        .expectOne(`${configUrl}/conversations`)
+        .flush({ conversationId, agentName: 'Concierge', credential });
+      await settle();
+    }
+
+    const announce = (): void => {
+      const realtime = TestBed.inject(PublicChatRealtime) as unknown as FakePublicChatRealtime;
+
+      realtime.listens.at(-1)!.onChanged();
+    };
+
+    const reRead = (items: unknown[]) =>
+      http
+        .expectOne({ method: 'GET', url: messagesUrl })
+        .flush({ items, nextCursor: null, handling: 'Ai' });
+
+    const answer = () =>
+      http
+        .expectOne({ method: 'POST', url: messagesUrl })
+        .flush({ customerMessage: asked, reply: answered, handling: 'Ai' });
+
+    const both = ['Customer:Where is my order?', 'AiAgent:It ships tomorrow.'];
+
+    it('shows the answer once when it comes before the re-read', async () => {
+      await sendFirst();
+
+      answer();
+      await settle();
+
+      expect(rows()).toEqual(both);
+
+      announce();
+      await settle();
+      reRead([asked, answered]);
+      await settle();
+
+      expect(rows()).toEqual(both);
+    });
+
+    it('shows the stored message once when the re-read comes before the answer', async () => {
+      await sendFirst();
+
+      announce();
+      await settle();
+      reRead([asked]);
+      await settle();
+
+      expect(rows()).toEqual(['Customer:Where is my order?']);
+
+      answer();
+      await settle();
+
+      expect(rows()).toEqual(both);
+      expect(composer()!.value).toBe('');
+    });
+
+    it('adds nothing when the answer replays what the settled re-read showed', async () => {
+      await sendFirst();
+
+      announce();
+      await settle();
+      reRead([asked, answered]);
+      await settle();
+
+      answer();
+      await settle();
+
+      expect(rows()).toEqual(both);
+    });
+  });
 });

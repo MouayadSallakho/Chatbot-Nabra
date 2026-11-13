@@ -27,6 +27,8 @@ describe('CustomerList', () => {
         id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
         displayName: null,
         label: 'WhatsApp customer',
+        labelCode: 'WhatsAppCustomer',
+        shortCode: 'W4T5PQ',
         channels: ['WhatsApp'],
         conversationCount: 3,
         lastActivityAt: '2026-09-22T10:00:00+00:00',
@@ -36,6 +38,8 @@ describe('CustomerList', () => {
         id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
         displayName: null,
         label: 'Anonymous visitor',
+        labelCode: 'AnonymousVisitor',
+        shortCode: '7KQ2MX',
         channels: ['WebChat'],
         conversationCount: 1,
         lastActivityAt: null,
@@ -120,8 +124,32 @@ describe('CustomerList', () => {
     await answer(page);
 
     expect(host().querySelectorAll('[data-testid^="customer-"]').length).toBe(2);
-    expect(text()).toContain('WhatsApp customer');
-    expect(text()).toContain('Anonymous visitor');
+
+    // The server's code, worded as the inbox words it (BA-1), the code left to right.
+    const labels = [...host().querySelectorAll('[data-testid="row-label"]')];
+
+    expect(labels.map((label) => label.textContent?.replace(/\s+/g, ' ').trim())).toEqual([
+      'WhatsApp customer W4T5PQ',
+      'Visitor 7KQ2MX',
+    ]);
+    expect(labels[1].querySelector('bdi')?.getAttribute('dir')).toBe('ltr');
+    expect(labels[1].querySelector('bdi')?.getAttribute('translate')).toBe('no');
+  });
+
+  it('shows a name somebody chose exactly, with its initial, and an outline for nobody', async () => {
+    await mount('customers.view');
+    await answer({
+      ...page,
+      items: [{ ...page.items[0], displayName: 'Rania Haddad', labelCode: 'Named' }, page.items[1]],
+    });
+
+    const labels = [...host().querySelectorAll('[data-testid="row-label"]')];
+    const tiles = [...host().querySelectorAll('.customer-tile')];
+
+    expect(labels[0].textContent?.trim()).toBe('Rania Haddad');
+    expect(labels[0].querySelector('bdi')?.getAttribute('dir')).toBe('auto');
+    expect(tiles[0].textContent?.trim()).toBe('R');
+    expect(tiles[1].classList.contains('is-unnamed')).toBe(true);
   });
 
   it('says a channel in words rather than by colour alone', async () => {
@@ -169,6 +197,8 @@ describe('CustomerList', () => {
           ...page.items[0],
           displayName: '<script>alert(1)</script>',
           label: '<script>alert(1)</script>',
+          labelCode: 'Named',
+          shortCode: 'S7R1PT',
         },
       ],
     });

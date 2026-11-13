@@ -12,12 +12,15 @@ import { initialPage, pageRecorder } from '@app/shared/pagination/page-query';
 import { ChannelBadge } from '@app/shared/channel/channel-badge';
 import { LocaleFormat } from '@app/core/i18n/locale-format';
 import { CustomerPage, CustomerRow, CustomersApi } from '../customers-api';
-import { conversationsPhrase, customerName, initialOf } from '../customer-words';
+import { ConversationCustomer } from '@app/features/conversations/conversations-api';
+import { CustomerLabel, customerLabel } from '@app/features/conversations/customer-label';
+import { asLabelled, conversationsPhrase, initialOf } from '../customer-words';
 
 /** One directory row, with what its template shows worked out once per read. */
 interface DirectoryRow {
   readonly customer: CustomerRow;
-  readonly name: string;
+  /** The record in the inbox's label shape: the server's code, the same words (BA-1). */
+  readonly label: ConversationCustomer;
   readonly named: boolean;
   readonly initial: string;
   readonly conversations: string;
@@ -45,7 +48,7 @@ interface DirectoryRow {
 @Component({
   selector: 'app-customer-list',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [PageHeader, EmptyState, RouterLink, Icon, Pagination, ChannelBadge],
+  imports: [PageHeader, EmptyState, RouterLink, Icon, Pagination, ChannelBadge, CustomerLabel],
   templateUrl: './customer-list.html',
   styleUrl: './customer-list.scss',
 })
@@ -89,13 +92,14 @@ export class CustomerList {
 
   protected readonly rows = computed<readonly DirectoryRow[]>(() =>
     (this.page()?.items ?? []).map((customer) => {
-      const name = customerName(customer);
+      const label = asLabelled(customer);
+      const said = customerLabel(label);
 
       return {
         customer,
-        name,
-        named: customer.displayName !== null,
-        initial: customer.displayName !== null ? initialOf(name) : '',
+        label,
+        named: said.kind === 'name',
+        initial: said.kind === 'name' ? initialOf(said.name) : '',
         conversations: conversationsPhrase(this.locale.language, customer.conversationCount),
         activity:
           customer.lastActivityAt === null

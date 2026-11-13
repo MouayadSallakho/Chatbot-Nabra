@@ -24,6 +24,7 @@ import { CHAT_PROBLEM_WORDS } from '@app/shared/chat/chat-problems';
 import { visitorFailure } from '@app/shared/chat/visitor-copy';
 import { ChatHandling, ChatMessage, HostedChatApi, HostedChatConfig } from '../hosted-chat-api';
 import { HostedChatSessionStore } from '../hosted-chat-session';
+import { mergeTurn } from '../merge-turn';
 
 /** The longest message the hosted chat accepts, matching the server's bound. */
 const MAX_MESSAGE_LENGTH = 4_000;
@@ -301,11 +302,10 @@ export class HostedChat implements OnInit {
       // A turn with no reply is a success: a person is handling this
       // conversation and will answer. Appending a placeholder, or showing an
       // error, would both be telling the visitor something untrue.
-      this.messages.update((current) =>
-        turn.reply === null
-          ? [...current, turn.customerMessage]
-          : [...current, turn.customerMessage, turn.reply],
-      );
+      //
+      // Merged by id: the "stored" re-read usually brought the message already
+      // (Phase 38.7a), and appending would show it twice.
+      this.messages.update((current) => mergeTurn(current, turn));
 
       this.draft.set('');
     } catch (error) {

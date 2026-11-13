@@ -309,8 +309,13 @@
                   }
                 }
                 @case ('Indexing') {
-                  <span i18n="@@knowledge.state.indexing.sentence"
-                    >Indexing is running. Reload this page in a moment to see how it ended.</span
+                  <!--
+                    No reload asked for (Phase 38.8): the attempt carries on without
+                    this tab (BA-10), and the page hears when it ends (BA-11).
+                  -->
+                  <span i18n="@@knowledge.state.indexing.live"
+                    >Indexing is running. It carries on if you leave this page, and the result
+                    appears here when it ends.</span
                   >
                 }
                 @case ('Stopped') {

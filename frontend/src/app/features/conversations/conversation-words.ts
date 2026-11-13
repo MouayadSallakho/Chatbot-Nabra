@@ -35,6 +35,26 @@ export function handlingSentence(handling: ConversationHandling): string {
     : $localize`:@@conversation.handling.ai:The AI is answering`;
 }
 
+/**
+ * Why a conversation needs a person (`needsPersonReason`, Phase 38.7a BA-7), as a
+ * row in the needs-a-person view says it. The row shows it in a warning badge, so
+ * the words always sit beside the badge's glyph, never colour alone.
+ *
+ * `PersonHandling` is the case rows could already infer (a person has it and the
+ * customer wrote last), so it keeps that wording. A reason this build does not
+ * know, or none, keeps it too.
+ */
+export function needsPersonWord(reason: string | null): string {
+  switch (reason) {
+    case 'AiTurnFailed':
+      return $localize`:@@inbox.reason.aiFailed:The AI could not reply`;
+    case 'ReturnedUnanswered':
+      return $localize`:@@inbox.reason.returned:Returned to the AI unanswered`;
+    default:
+      return $localize`:@@inbox.waiting:Waiting for the team`;
+  }
+}
+
 /** Open or closed, as a word. Unknown values are shown as sent. */
 export function statusWord(status: string): string {
   switch (status) {

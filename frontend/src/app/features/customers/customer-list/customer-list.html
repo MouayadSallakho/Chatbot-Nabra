@@ -119,9 +119,9 @@
                   <span
                     class="data-row-title customer-name"
                     [class.is-unnamed]="!row.named"
-                    dir="auto"
-                    >{{ row.name }}</span
-                  >
+                    data-testid="row-label"
+                    ><app-customer-label [customer]="row.label"
+                  /></span>
                 </span>
 
                 <span class="customer-channels">

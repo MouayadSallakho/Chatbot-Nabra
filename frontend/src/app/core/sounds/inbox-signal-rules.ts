@@ -24,9 +24,20 @@ export interface SignalDecision {
   readonly failureChecks: readonly ConversationSummary[];
 }
 
+/** What one read remembers of a row: when it last moved, and how many messages it had. */
+export interface RowMark {
+  readonly at: string;
+  readonly count: number;
+}
+
+/** The mark a row leaves for the next read to compare with. */
+export function markOf(row: ConversationSummary): RowMark {
+  return { at: row.lastActivityAt, count: row.messageCount };
+}
+
 export interface SignalInput {
-  /** The set as last read: id → `lastActivityAt`. */
-  readonly previous: ReadonlyMap<string, string>;
+  /** The set as last read: id → its mark. */
+  readonly previous: ReadonlyMap<string, RowMark>;
 
   /** The set as just read, most recently active first. */
   readonly rows: readonly ConversationSummary[];
@@ -48,8 +59,16 @@ export interface SignalInput {
  * Compares one read of the needs-a-person set with the one before.
  *
  * The hub sends only an id, so every sound is decided from authorised reads.
- * "Taken over by me" has no field on a row, and taking over does not assign, so the
- * new-message sound counts only conversations assigned to this member (BA-2).
+ *
+ * <strong>The new-message sound is for this member's conversations:</strong> the
+ * ones assigned to them, and since Phase 38.8 the ones they took over
+ * (`takenOverBy`, BA-2; owner decision 7d kept them silent only until then).
+ * Taking over does not assign, so both are read.
+ *
+ * <strong>One sound per message, not per announcement.</strong> Since 38.7a an AI
+ * turn is announced twice (stored, then settled), and an assignment, a takeover or
+ * a return also moves `lastActivityAt`. The sound therefore needs the row's
+ * message count to have grown since the last read, with the customer writing last.
  */
 export function decideSignals(input: SignalInput): SignalDecision {
   let entered: ConversationSummary | null = null;
@@ -63,16 +82,16 @@ export function decideSignals(input: SignalInput): SignalDecision {
 
     const before = input.previous.get(row.id);
     const isNew = before === undefined;
-    const moved = !isNew && before !== row.lastActivityAt;
+    const moved = !isNew && before.at !== row.lastActivityAt;
+    const grew = !isNew && row.messageCount > before.count;
 
     if (isNew) {
       entered ??= row;
     }
 
     if (
-      moved &&
-      input.me !== null &&
-      row.assignedTo?.userId === input.me &&
+      grew &&
+      isMine(row, input.me) &&
       row.lastMessageSender === 'Customer' &&
       !input.viewing.has(row.id)
     ) {
@@ -90,6 +109,11 @@ export function decideSignals(input: SignalInput): SignalDecision {
   }
 
   return { entered, newMessage, failureChecks };
+}
+
+/** Assigned to this member, or taken over by them. Nobody's when the member is not known. */
+function isMine(row: ConversationSummary, me: string | null): boolean {
+  return me !== null && (row.assignedTo?.userId === me || row.takenOverBy?.userId === me);
 }
 
 /**

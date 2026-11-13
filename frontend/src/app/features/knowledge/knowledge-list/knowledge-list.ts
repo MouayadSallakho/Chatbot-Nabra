@@ -1,8 +1,16 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { ApiError, toApiError } from '@app/core/api/api-error';
 import { PermissionService } from '@app/core/authorization/permission-service';
+import { KnowledgeRealtime } from '@app/core/realtime/knowledge-realtime';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
 import { EmptyState } from '@app/shared/empty-state/empty-state';
 import { Icon } from '@app/shared/icon/icon';
@@ -36,9 +44,11 @@ import { DEFAULT_PAGE_SIZE, KnowledgeApi, KnowledgeDocumentPage } from '../knowl
  * not return -- a workspace with two hundred long documents would otherwise move
  * megabytes to render a column of titles.
  *
- * <strong>It re-reads when the page is loaded, and not on a timer.</strong> The
- * API publishes no event for indexing, so "Indexing now" stays until the next
- * read and the page says so on the document.
+ * <strong>It re-reads when the page is loaded, and when indexing starts or ends,
+ * never on a timer.</strong> Since Phase 38.8 the list hears the workspace's
+ * knowledge event over the page's one connection (BA-11), so "Indexing now" ends
+ * by itself. The event carries an id and nothing else; the list re-reads its page
+ * quietly, keeping the rows on screen, and once more after a reconnect.
  */
 @Component({
   selector: 'app-knowledge-list',
@@ -52,6 +62,12 @@ export class KnowledgeList {
   private readonly workspace = inject(WorkspaceContextService);
   private readonly permissions = inject(PermissionService);
   private readonly format = inject(LocaleFormat);
+  private readonly realtime = inject(KnowledgeRealtime);
+  private readonly destroyRef = inject(DestroyRef);
+
+  /** One live re-read at a time; events meanwhile cause exactly one more. */
+  private liveReading = false;
+  private liveAgain = false;
 
   protected readonly stateWord = knowledgeStateWord;
   protected readonly stateTone = knowledgeStateTone;
@@ -106,6 +122,53 @@ export class KnowledgeList {
 
   constructor() {
     void this.load();
+    this.listen();
+  }
+
+  /** Hears indexing start and end, only for a reader who may view knowledge. */
+  private listen(): void {
+    const tenantId = this.workspace.tenantId();
+
+    if (!tenantId || !this.canView()) {
+      return;
+    }
+
+    const stop = this.realtime.listen(tenantId, () => void this.liveRead());
+
+    this.destroyRef.onDestroy(stop);
+  }
+
+  /**
+   * Re-reads the page in place: no skeletons, and a failure keeps the rows that
+   * were true at the last read (stale-but-correct, as everywhere else).
+   */
+  private async liveRead(): Promise<void> {
+    const tenantId = this.workspace.tenantId();
+
+    if (this.liveReading) {
+      this.liveAgain = true;
+
+      return;
+    }
+
+    if (!tenantId || this.loading()) {
+      return;
+    }
+
+    this.liveReading = true;
+
+    try {
+      do {
+        this.liveAgain = false;
+        this.page.set(
+          await firstValueFrom(this.api.list(tenantId, this.currentPage(), this.pageSize)),
+        );
+      } while (this.liveAgain);
+    } catch {
+      // Leave what is on screen; the next event or visit reads again.
+    } finally {
+      this.liveReading = false;
+    }
   }
 
   protected async load(): Promise<void> {

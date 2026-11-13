@@ -126,6 +126,15 @@
           </span>
           <!-- On a phone the chip says it; the sentence stays for a screen reader. -->
           <span class="handling-sentence visually-hidden-narrow">{{ handlingText() }}</span>
+          <!--
+            Who took it over (Phase 38.8, BA-2). Nothing when nobody is named: AI
+            mode, or a takeover from before Phase 37.4.
+          -->
+          @if (current.takenOverBy; as member) {
+            <span class="handling-who" data-testid="handled-by" i18n="@@conversation.handledBy"
+              >Handled by <bdi dir="ltr">{{ member.email }}</bdi></span
+            >
+          }
 
           @if (canHandoff()) {
             @if (isHuman()) {

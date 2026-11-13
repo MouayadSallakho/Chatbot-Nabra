@@ -78,6 +78,48 @@ describe('KNOWLEDGE_PROBLEM_WORDS', () => {
     );
   });
 
+  describe('the archive limit, with its unit (BA-12)', () => {
+    const archive = (limit?: number, limitUnit?: string) =>
+      toApiError(
+        new HttpErrorResponse({
+          status: 422,
+          error: {
+            title: 'Refused',
+            detail: 'The English sentence from the server.',
+            code: 'knowledge.file.archive_too_large',
+            limit,
+            limitUnit,
+          },
+        }),
+      );
+
+    it('counts the files inside the document', () => {
+      const error = archive(512, 'entries');
+
+      expect(error.limitUnit).toBe('entries');
+      expect(error.message).toBe(
+        'Once opened, this Word document holds more than 512 files. Split it, or save a simpler copy.',
+      );
+      expect(archive(1, 'entries').message).toContain('more than 1 file.');
+    });
+
+    it('says an opened size as a size', () => {
+      expect(archive(67108864, 'bytes').message).toBe(
+        'Once opened, this Word document is larger than 64 MB. Split it, or save a simpler copy.',
+      );
+    });
+
+    it("keeps today's sentence without a unit, or with one it does not know", () => {
+      const today =
+        'This Word document is too large once opened. Split it, or save a simpler copy.';
+
+      expect(archive(512).message).toBe(today);
+      expect(archive(512, 'parsecs').message).toBe(today);
+      expect(archive(512, 'parsecs').limitUnit).toBeUndefined();
+      expect(archive(undefined, 'entries').message).toBe(today);
+    });
+  });
+
   it('still says something true when a bound arrives without its number', () => {
     expect(toApiError(refusal('knowledge.file.too_many_pages', 422)).message).toContain(
       'past one of the limits',

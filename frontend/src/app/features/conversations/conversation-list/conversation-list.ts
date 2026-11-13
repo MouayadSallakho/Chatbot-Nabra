@@ -31,7 +31,7 @@ import { ChannelBadge } from '@app/shared/channel/channel-badge';
 import { ConversationSummary, ConversationView, ConversationsApi } from '../conversations-api';
 import { CustomerLabel } from '../customer-label';
 import { InboxState } from '../inbox-state';
-import { sameDay, senderWord } from '../conversation-words';
+import { needsPersonWord, sameDay, senderWord } from '../conversation-words';
 
 /** Rows per page. One screen of a busy inbox, not the whole history. */
 const PAGE_SIZE = 20;
@@ -47,10 +47,14 @@ interface ConversationRow {
   readonly whenFull: string;
 
   /**
-   * A person is answering and the customer wrote last: somebody on the team
-   * owes a reply, because in this mode the AI never answers.
+   * Why the row waits for a person, in words, or null.
+   *
+   * In the needs-a-person view every row says the server's reason
+   * (`needsPersonReason`, Phase 38.8). Elsewhere a row says so only in the case
+   * it always could: a person is answering and the customer wrote last, because
+   * in that mode the AI never answers.
    */
-  readonly waiting: boolean;
+  readonly reason: string | null;
 }
 
 /**
@@ -158,6 +162,7 @@ export class ConversationList implements OnInit {
 
   protected readonly rows = computed<readonly ConversationRow[]>(() => {
     const now = new Date();
+    const needsPersonView = this.view() === 'needs-person';
 
     return this.conversations().map((conversation) => {
       const last = new Date(conversation.lastActivityAt);
@@ -167,7 +172,11 @@ export class ConversationList implements OnInit {
         sender: senderWord(conversation.lastMessageSender),
         when: this.format.date(last, sameDay(last, now) ? 'time' : 'dayMonth'),
         whenFull: this.format.date(last, 'dateTime'),
-        waiting: conversation.handling === 'Human' && conversation.lastMessageSender === 'Customer',
+        reason: needsPersonView
+          ? needsPersonWord(conversation.needsPersonReason)
+          : conversation.handling === 'Human' && conversation.lastMessageSender === 'Customer'
+            ? needsPersonWord('PersonHandling')
+            : null,
       };
     });
   });

@@ -276,6 +276,120 @@ describe('WorkspaceRealtime', () => {
     expect(realtime.notificationsLive()).toBe(false);
   });
 
+  describe('the knowledge group (Phase 38.8, BA-11)', () => {
+    const KNOWLEDGE = 'knowledge.view';
+
+    const knowledgeCalls = (connection: FakeConnection) =>
+      connection.invoked.filter(([name]) => String(name).includes('Knowledge'));
+
+    it('joins only while a knowledge screen listens, and leaves with the last one', async () => {
+      const { realtime, workspace } = setUp(VIEW, KNOWLEDGE);
+
+      realtime.start();
+      await workspace.adopt(tenant);
+      await settle();
+
+      // On the inbox: no knowledge group.
+      expect(knowledgeCalls(built[0])).toEqual([]);
+
+      const leaveList = realtime.onKnowledge(() => undefined);
+      const leaveEditor = realtime.onKnowledge(() => undefined);
+      await settle();
+
+      expect(knowledgeCalls(built[0])).toEqual([['SubscribeKnowledge', 't1']]);
+
+      leaveList();
+      await settle();
+
+      expect(knowledgeCalls(built[0])).toEqual([['SubscribeKnowledge', 't1']]);
+
+      leaveEditor();
+      await settle();
+
+      expect(knowledgeCalls(built[0])).toEqual([
+        ['SubscribeKnowledge', 't1'],
+        ['UnsubscribeKnowledge', 't1'],
+      ]);
+      // Still one connection: the knowledge group rides on it.
+      expect(built).toHaveLength(1);
+    });
+
+    it('asks nothing for somebody without knowledge.view', async () => {
+      const { realtime, workspace } = setUp(VIEW);
+
+      realtime.start();
+      await workspace.adopt(tenant);
+      realtime.onKnowledge(() => undefined);
+      await settle();
+
+      expect(knowledgeCalls(built[0])).toEqual([]);
+    });
+
+    it('takes a refusal as no permission, and does not ask again', async () => {
+      const { realtime, workspace } = setUp(VIEW, KNOWLEDGE);
+
+      realtime.start();
+      await workspace.adopt(tenant);
+      await settle();
+      built[0].refuse.add('SubscribeKnowledge');
+
+      const leave = realtime.onKnowledge(() => undefined);
+      await settle();
+      leave();
+      realtime.onKnowledge(() => undefined);
+      await settle();
+
+      // Refused calls are not recorded by the fake; nothing else was tried either.
+      expect(knowledgeCalls(built[0])).toEqual([]);
+      built[0].refuse.clear();
+      realtime.onKnowledge(() => undefined);
+      await settle();
+
+      expect(knowledgeCalls(built[0])).toEqual([]);
+    });
+
+    it('tells knowledge listeners about knowledge events only', async () => {
+      const { realtime, workspace } = setUp(VIEW, KNOWLEDGE);
+      const documents: (string | null)[] = [];
+      const conversations: (string | null)[] = [];
+
+      realtime.onKnowledge((id) => documents.push(id));
+      realtime.onConversation((id) => conversations.push(id));
+      realtime.start();
+      await workspace.adopt(tenant);
+      await settle();
+
+      built[0].handlers.get('knowledgeChanged')!('d1');
+      built[0].handlers.get('conversationChanged')!('c1');
+
+      expect(documents).toEqual(['d1']);
+      expect(conversations).toEqual(['c1']);
+    });
+
+    it('after a reconnect joins the knowledge group again, then tells the screen to re-read', async () => {
+      const { realtime, workspace } = setUp(VIEW, KNOWLEDGE);
+      const documents: (string | null)[] = [];
+
+      realtime.onKnowledge((id) => documents.push(id));
+      realtime.start();
+      await workspace.adopt(tenant);
+      await settle();
+
+      const connection = built[0];
+
+      connection.reconnecting();
+      connection.invoked.length = 0;
+      connection.reconnected();
+
+      expect(documents).toEqual([]);
+
+      await settle();
+
+      expect(knowledgeCalls(connection)).toEqual([['SubscribeKnowledge', 't1']]);
+      expect(documents).toEqual([null]);
+    });
+  });
+
   it('changes nothing else when the client cannot be built', async () => {
     built.length = 0;
     TestBed.configureTestingModule({

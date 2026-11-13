@@ -337,8 +337,7 @@
     <app-confirm-dialog
       #zoneDialog
       [heading]="zoneDialogHeading()"
-      body="Every report schedule moves to the next start of a day in the new zone, and days in analytics and new reports are counted in it from now on. Reports already generated keep their zone."
-      i18n-body="@@workspaceSettings.zone.confirm.body"
+      [body]="zoneDialogBody()"
       confirmLabel="Change time zone"
       i18n-confirmLabel="@@workspaceSettings.zone.confirm.action"
       cancelLabel="Keep the current zone"

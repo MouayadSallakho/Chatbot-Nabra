@@ -1,21 +1,48 @@
-import { conversationsPhrase, customerName, initialOf } from './customer-words';
+import { customerLabelPlain } from '@app/features/conversations/customer-label';
+import { asLabelled, conversationsPhrase, initialOf } from './customer-words';
 
-describe('customerName', () => {
-  it('shows a name somebody chose exactly as typed', () => {
-    expect(customerName({ displayName: '  Rania Haddad ', channels: ['WebChat'] })).toBe(
-      '  Rania Haddad ',
+describe('asLabelled', () => {
+  const record = (over: object) => ({
+    id: 'p1',
+    displayName: null,
+    labelCode: 'AnonymousVisitor',
+    shortCode: '7KQ2MX',
+    ...over,
+  });
+
+  it('labels a directory record exactly as the inbox labels the same customer (BA-1)', () => {
+    expect(customerLabelPlain(asLabelled(record({})))).toBe('Visitor 7KQ2MX');
+    expect(customerLabelPlain(asLabelled(record({ labelCode: 'UnnamedCustomer' })))).toBe(
+      'Customer 7KQ2MX',
+    );
+    expect(customerLabelPlain(asLabelled(record({ labelCode: 'SomethingNewer' })))).toBe(
+      'Customer 7KQ2MX',
     );
   });
 
-  // The same rule, in the same order, as the server's CustomerLabels.For, so the
-  // English screen says exactly what the API's label says.
-  it('names an unnamed customer from how they reach the workspace, as the server does', () => {
-    expect(customerName({ displayName: null, channels: ['WhatsApp'] })).toBe('WhatsApp customer');
-    expect(customerName({ displayName: null, channels: ['WebChat'] })).toBe('Anonymous visitor');
-    expect(customerName({ displayName: null, channels: [] })).toBe('Anonymous visitor');
-    expect(customerName({ displayName: null, channels: ['WebChat', 'WhatsApp'] })).toBe(
-      'Unnamed customer',
-    );
+  it('shows a name somebody chose exactly as typed', () => {
+    expect(
+      customerLabelPlain(
+        asLabelled(record({ displayName: '  Rania Haddad ', labelCode: 'Named' })),
+      ),
+    ).toBe('  Rania Haddad ');
+  });
+
+  it('tells an unnamed WhatsApp customer apart by the short code: the directory sends no number', () => {
+    const labelled = asLabelled(record({ labelCode: 'WhatsAppCustomer' }));
+
+    expect(labelled.reference).toBeNull();
+    expect(customerLabelPlain(labelled)).toBe('WhatsApp customer 7KQ2MX');
+  });
+
+  it('keeps the record id, and nothing it was not given', () => {
+    expect(Object.keys(asLabelled(record({}))).sort()).toEqual([
+      'displayName',
+      'id',
+      'labelCode',
+      'reference',
+      'shortCode',
+    ]);
   });
 });
 

@@ -124,6 +124,14 @@
   font: var(--text-body-strong);
 }
 
+// Who took it over: secondary, like the meta line, and free to wrap a long email.
+.handling-who {
+  min-inline-size: 0;
+  color: var(--text-secondary);
+  font: var(--text-small);
+  overflow-wrap: anywhere;
+}
+
 .handling-help {
   margin: calc(-1 * var(--space-1)) 0 0;
   color: var(--text-muted);

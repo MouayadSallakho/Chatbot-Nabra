@@ -6,6 +6,9 @@ import { BASE_URL } from './support/target';
 
 const AI_FAILED = '/sounds/kalimba-ai-failed.v1.wav';
 
+/** The row's reason in the needs-a-person view (BA-7), as each language says it. */
+const AI_COULD_NOT_REPLY = { en: 'The AI could not reply', ar: 'تعذّر على الذكاء الاصطناعي الرد' };
+
 /** A visitor writes in, as a real one would. The stand-in fails on `[[fail]]`. */
 async function say(
   visitor: APIRequestContext,
@@ -20,6 +23,7 @@ async function say(
 
 test('a visitor arrives live, a failed turn is heard, and the count goes up by one', async ({
   page,
+  appLanguage,
 }) => {
   const { chatKey } = e2eWorkspace();
   const visitor = await apiRequest.newContext({ baseURL: BASE_URL });
@@ -65,6 +69,9 @@ test('a visitor arrives live, a failed turn is heard, and the count goes up by o
     await page.getByTestId('view-needs-person').click();
     await expect(page).toHaveURL(/view=needs-person/);
     await expect(row).toBeVisible();
+
+    // The row says why it is there, in words beside the badge's glyph (BA-7).
+    await expect(row.getByTestId('row-reason')).toHaveText(AI_COULD_NOT_REPLY[appLanguage]);
 
     await row.click();
     await expect(page.getByTestId('transcript-event-AiTurnFailed')).toBeVisible();

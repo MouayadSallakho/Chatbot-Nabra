@@ -1,6 +1,7 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  DestroyRef,
   OnInit,
   ElementRef,
   computed,
@@ -20,6 +21,7 @@ import {
 import { ApiError, toApiError } from '@app/core/api/api-error';
 import { ToastService } from '@app/core/feedback/toast-service';
 import { PermissionService } from '@app/core/authorization/permission-service';
+import { KnowledgeRealtime } from '@app/core/realtime/knowledge-realtime';
 import { Versioned } from '@app/core/api/versioned';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
 import { EmptyState } from '@app/shared/empty-state/empty-state';
@@ -88,6 +90,14 @@ type ConflictSource = 'content' | 'index' | 'availability' | 'source';
  * state, indexing, availability and source file beside it from 80rem. The
  * state is the API's (`Indexed`, `Needs index`, `Disabled`), plus what the
  * newest index attempt adds (Phase 38.3) and an index request that failed here.
+ *
+ * <strong>Indexing ends by itself (Phase 38.8, BA-11).</strong> The page hears
+ * when an attempt on this document starts or settles, over the page's one
+ * connection, and re-reads the document. An attempt no longer depends on the tab
+ * that started it (BA-10), so a reload while indexing ends the same way. A live
+ * read never takes the reader's unsaved text or the version it was written
+ * against: with edits in the box only the state is updated, and a save still
+ * meets the stale-version check.
  */
 @Component({
   selector: 'app-knowledge-editor',
@@ -114,6 +124,12 @@ export class KnowledgeEditor implements OnInit, HasUnsavedChanges {
   private readonly toasts = inject(ToastService);
   private readonly router = inject(Router);
   private readonly format = inject(LocaleFormat);
+  private readonly realtime = inject(KnowledgeRealtime);
+  private readonly destroyRef = inject(DestroyRef);
+
+  /** One live re-read at a time; events meanwhile cause exactly one more. */
+  private liveReading = false;
+  private liveAgain = false;
 
   private readonly replaceInput = viewChild<ElementRef<HTMLInputElement>>('replaceInput');
 
@@ -333,6 +349,8 @@ export class KnowledgeEditor implements OnInit, HasUnsavedChanges {
   }
 
   ngOnInit(): void {
+    this.listen();
+
     if (this.handedOver) {
       this.adopt(this.handedOver);
       this.loading.set(false);
@@ -341,6 +359,89 @@ export class KnowledgeEditor implements OnInit, HasUnsavedChanges {
     }
 
     void this.load();
+  }
+
+  /** Hears this document's indexing start and end, for a reader who may view knowledge. */
+  private listen(): void {
+    const tenantId = this.tenantId();
+
+    if (!tenantId || !this.permissions.has('knowledge.view')) {
+      return;
+    }
+
+    const stop = this.realtime.listen(tenantId, (documentId) => {
+      // Null: the connection is back, and anything may have changed meanwhile.
+      if (documentId === null || documentId === this.knowledgeDocumentId()) {
+        void this.liveRead();
+      }
+    });
+
+    this.destroyRef.onDestroy(stop);
+  }
+
+  /**
+   * Re-reads the document after a knowledge event.
+   *
+   * Not while this page's own request is out: its answer is the newer word.
+   * With unsaved edits, only the document's state is taken (readiness, the newest
+   * attempt, when it was indexed); the reader's text and the version it was
+   * written against stay, so nothing they typed is replaced.
+   */
+  private async liveRead(): Promise<void> {
+    if (this.liveReading) {
+      this.liveAgain = true;
+
+      return;
+    }
+
+    if (this.busy()) {
+      return;
+    }
+
+    this.liveReading = true;
+
+    try {
+      do {
+        this.liveAgain = false;
+
+        const fresh = await firstValueFrom(
+          this.api.get(this.tenantId(), this.knowledgeDocumentId()),
+        );
+        const current = this.document();
+
+        if (this.busy()) {
+          return;
+        }
+
+        if (this.dirty() && current) {
+          this.document.set({ ...fresh.value, title: current.title, content: current.content });
+
+          if (fresh.value.lastIndexAttempt !== undefined) {
+            this.attempt.set(fresh.value.lastIndexAttempt);
+          }
+        } else {
+          this.adopt(fresh);
+        }
+
+        // The newest attempt is the truth now, whatever a request here said earlier.
+        this.indexFailedNow.set(false);
+      } while (this.liveAgain);
+    } catch {
+      // Leave what is on screen; the next event or visit reads again.
+    } finally {
+      this.liveReading = false;
+    }
+  }
+
+  /** A request of this page's own is out: its answer will say what changed. */
+  private busy(): boolean {
+    return (
+      this.loading() ||
+      this.saving() ||
+      this.indexing() ||
+      this.replacing() ||
+      this.changingAvailability()
+    );
   }
 
   protected async load(): Promise<void> {

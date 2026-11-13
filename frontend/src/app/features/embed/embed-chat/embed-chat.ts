@@ -16,6 +16,7 @@ import { ApiError, toApiError } from '@app/core/api/api-error';
 import { APP_LANGUAGE } from '@app/core/i18n/language';
 import { PublicChatRealtime } from '@app/core/realtime/public-chat-realtime';
 import { ChatHandling, ChatMessage } from '@app/features/chat/hosted-chat-api';
+import { mergeTurn } from '@app/features/chat/merge-turn';
 import { ChatLauncher } from '@app/shared/chat/chat-launcher';
 import { ChatPanel } from '@app/shared/chat/chat-panel';
 import { visitorFailure } from '@app/shared/chat/visitor-copy';
@@ -308,11 +309,10 @@ export class EmbedChat implements OnInit {
       // A turn with no reply is a success: a person is handling this and will
       // answer. A placeholder bubble, or an error, would each say something
       // untrue to somebody who is waiting.
-      this.messages.update((current) =>
-        turn.reply === null
-          ? [...current, turn.customerMessage]
-          : [...current, turn.customerMessage, turn.reply],
-      );
+      //
+      // Merged by id: the "stored" re-read usually brought the message already
+      // (Phase 38.7a), and appending would show it twice.
+      this.messages.update((current) => mergeTurn(current, turn));
       this.draft.set('');
     } catch (error) {
       this.sendFailure.set(visitorFailure(toApiError(error), 'embed', this.language));

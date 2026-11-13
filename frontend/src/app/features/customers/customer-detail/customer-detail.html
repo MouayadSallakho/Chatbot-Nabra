@@ -67,7 +67,11 @@
     <dl class="customer-facts">
       <div>
         <dt i18n="@@customer.name">Name</dt>
-        <dd data-testid="label" dir="auto">{{ name() }}</dd>
+        <dd data-testid="label">
+          @if (labelled(); as label) {
+            <app-customer-label [customer]="label" />
+          }
+        </dd>
       </div>
       <div>
         <dt i18n="@@customer.firstSeen">First seen</dt>
@@ -295,9 +299,9 @@
                             [attr.data-testid]="'candidate-' + candidate.id"
                           />
                           <span class="candidate-details">
-                            <span class="candidate-name" dir="auto">{{
-                              customerName(candidate)
-                            }}</span>
+                            <span class="candidate-name"
+                              ><app-customer-label [customer]="labelOf(candidate)"
+                            /></span>
                             <!--
                               Two unnamed website visitors both read "Anonymous
                               visitor", so the label alone cannot tell them apart,

@@ -1,32 +1,29 @@
 import type { AppLanguage } from '@app/core/i18n/language';
 import { formatNumber } from '@app/core/i18n/locale-format';
 import { pluralMessage } from '@app/core/i18n/plural';
+import type { ConversationCustomer } from '@app/features/conversations/conversations-api';
 
 /**
- * What to call a customer, in the reader's language.
+ * A directory record in the shape the inbox names customers by (Phase 38.8, BA-1).
  *
- * <strong>A name somebody chose is shown exactly as it was typed.</strong> For a
- * customer with no name the server sends an English label built from how they
- * reach the workspace (`CustomerLabels.For`); this applies the same rule, in
- * the same order, with the words translated -- so an Arabic screen never
- * shows "Anonymous visitor", and which customers are named never changes.
- * Never a name taken from something the customer said.
+ * Since 38.7a the customer reads carry the inbox's `labelCode` and `shortCode`, so
+ * the customers screens use the inbox's label helper (`customer-label.ts`) and no
+ * longer work the rule out from channels. The directory sends no masked WhatsApp
+ * number, so an unnamed WhatsApp customer is told apart by the short code here.
  */
-export function customerName(person: {
+export function asLabelled(person: {
+  readonly id: string;
   readonly displayName: string | null;
-  readonly channels: readonly string[];
-}): string {
-  if (person.displayName !== null) {
-    return person.displayName;
-  }
-
-  if (person.channels.length > 1) {
-    return $localize`:@@customers.unnamed.several:Unnamed customer`;
-  }
-
-  return person.channels.length === 1 && person.channels[0] === 'WhatsApp'
-    ? $localize`:@@customers.unnamed.whatsApp:WhatsApp customer`
-    : $localize`:@@customers.unnamed.visitor:Anonymous visitor`;
+  readonly labelCode: string;
+  readonly shortCode: string;
+}): ConversationCustomer {
+  return {
+    id: person.id,
+    displayName: person.displayName,
+    labelCode: person.labelCode,
+    reference: null,
+    shortCode: person.shortCode,
+  };
 }
 
 /** "1 conversation", "3 conversations", with all six Arabic plural forms. */

@@ -23,7 +23,9 @@ import { HasUnsavedChanges, protectUnsavedChanges } from '@app/core/navigation/u
 import { ChannelBadge, channelWord } from '@app/shared/channel/channel-badge';
 import { VoiceChip } from '@app/shared/voice/voice-chip';
 import { Customer, CustomerRow, CustomersApi } from '../customers-api';
-import { conversationsPhrase, customerName } from '../customer-words';
+import { ConversationCustomer } from '@app/features/conversations/conversations-api';
+import { CustomerLabel, customerLabelPlain } from '@app/features/conversations/customer-label';
+import { asLabelled, conversationsPhrase } from '../customer-words';
 
 /** What tells one record apart from another in the merge step. */
 export interface Distinction {
@@ -54,7 +56,15 @@ export interface Distinction {
 @Component({
   selector: 'app-customer-detail',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [PageHeader, EmptyState, RouterLink, FormsModule, ChannelBadge, VoiceChip],
+  imports: [
+    PageHeader,
+    EmptyState,
+    RouterLink,
+    FormsModule,
+    ChannelBadge,
+    VoiceChip,
+    CustomerLabel,
+  ],
   templateUrl: './customer-detail.html',
   styleUrl: './customer-detail.scss',
 })
@@ -106,11 +116,21 @@ export class CustomerDetail implements OnInit, HasUnsavedChanges {
     () => this.draft().trim() !== (this.customer()?.displayName ?? ''),
   );
 
-  /** The customer's name in the reader's language (see `customerName`). */
-  protected readonly name = computed(() => {
+  /** The customer in the inbox's label shape: the server's code (BA-1), or null before the read. */
+  protected readonly labelled = computed(() => {
     const person = this.customer();
 
-    return person ? customerName(person) : $localize`:@@customers.one:Customer`;
+    return person ? asLabelled(person) : null;
+  });
+
+  /**
+   * The customer's name or label as one string, in the reader's language, where
+   * no markup can go: the page heading and the merge sentence.
+   */
+  protected readonly name = computed(() => {
+    const labelled = this.labelled();
+
+    return labelled ? customerLabelPlain(labelled) : $localize`:@@customers.one:Customer`;
   });
 
   protected readonly description = $localize`:@@customer.description:Who this is to your workspace, how they reach you, and what they have talked about.`;
@@ -263,8 +283,14 @@ export class CustomerDetail implements OnInit, HasUnsavedChanges {
     return $localize`:@@customer.history.count:This customer has ${phrase}:count:.`;
   }
 
+  /** A merge candidate in the inbox's label shape (BA-1). */
+  protected labelOf(row: CustomerRow): ConversationCustomer {
+    return asLabelled(row);
+  }
+
+  /** A merge candidate's name or label as one string, for the merge sentence. */
   protected customerName(row: CustomerRow): string {
-    return customerName(row);
+    return customerLabelPlain(asLabelled(row));
   }
 
   /** Open or closed, as a word, for the history list. */

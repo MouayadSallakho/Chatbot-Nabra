@@ -20,6 +20,11 @@ export default defineConfig<AppLanguageOption>({
   fullyParallel: false,
   retries: 0,
   timeout: 60_000,
+  // Bounds a whole run (Phase 38.8). In 38.7b a worker sat in one journey for 1.9
+  // hours: the journey failed, its clean-up waited on a browser that no longer
+  // answered, and nothing above the journey had a limit. A full run takes about
+  // three and a half minutes.
+  globalTimeout: 15 * 60_000,
   forbidOnly: true,
   globalSetup: './e2e/support/global-setup.ts',
   globalTeardown: './e2e/support/global-teardown.ts',
@@ -31,6 +36,10 @@ export default defineConfig<AppLanguageOption>({
     headless: true,
     trace: 'off',
     screenshot: 'only-on-failure',
+    // Without these an action or a wait for an event has no limit but the journey's
+    // (Playwright's default is none). A step that hangs now fails as itself.
+    actionTimeout: 15_000,
+    navigationTimeout: 20_000,
   },
   // No journey depends on another or on this order (38.6): each one sets up, or
   // puts back, the state it needs.

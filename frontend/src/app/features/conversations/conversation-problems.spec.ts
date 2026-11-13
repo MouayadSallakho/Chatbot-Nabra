@@ -20,6 +20,18 @@ describe('CONVERSATION_PROBLEM_WORDS', () => {
     ['whatsapp.conversation.not_on_whatsapp', 'did not come from WhatsApp'],
     ['whatsapp.message.required', 'Write a message'],
     ['whatsapp.message.too_long', 'longer than WhatsApp allows'],
+    // Phase 38.7b's codes, worded in 38.8.
+    ['conversations.id.invalid', 'This conversation could not be found.'],
+    ['conversations.reply.not_taken_over', 'Choose Take over first, then reply.'],
+    ['conversations.client_message_id.required', 'This reply could not be sent.'],
+    ['conversations.client_message_id.too_long', 'This reply could not be sent.'],
+    ['conversations.client_message_id.invalid', 'This reply could not be sent.'],
+    ['conversations.message.required', 'Write a reply before sending it.'],
+    ['conversations.message.too_long', 'This reply is too long.'],
+    ['conversations.message.control_characters', 'Paste it as plain text'],
+    ['conversations.assignee.not_member', 'not a member of this workspace'],
+    ['conversations.assignee.cannot_reply', 'cannot reply to customers'],
+    ['conversations.closed', 'This conversation is closed'],
   ])('words %s by its code, not by the server sentence', (code, words) => {
     const error = toApiError(refusal(code));
 

@@ -51,6 +51,16 @@ export interface CustomerRow {
    */
   readonly label: string;
 
+  /**
+   * How the server labels a customer with no name, the same code the inbox reads
+   * (Phase 38.7a, BA-1): `Named`, `WhatsAppCustomer`, `AnonymousVisitor` or
+   * `UnnamedCustomer`. A string, so a newer code still gets a sensible label.
+   */
+  readonly labelCode: string;
+
+  /** A short code that tells unnamed customers apart. Shown, never used as a key. */
+  readonly shortCode: string;
+
   readonly channels: readonly CustomerChannel[];
   readonly conversationCount: number;
   readonly lastActivityAt: string | null;
@@ -70,6 +80,9 @@ export interface Customer {
   readonly id: string;
   readonly displayName: string | null;
   readonly label: string;
+  /** As on a directory row (BA-1). */
+  readonly labelCode: string;
+  readonly shortCode: string;
   readonly identities: readonly CustomerIdentity[];
   readonly channels: readonly CustomerChannel[];
   readonly conversationCount: number;

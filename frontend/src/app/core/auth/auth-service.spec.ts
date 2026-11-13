@@ -115,6 +115,18 @@ describe('AuthService', () => {
       expect(auth.user()).toBeNull();
     });
 
+    it('settles on anonymous for the live shape, which leaves user out (OpenAPI, Phase 38.8)', async () => {
+      const restoring = auth.restore();
+
+      http.expectOne('/api/auth/csrf').flush(null, { status: 204, statusText: 'No Content' });
+      await Promise.resolve();
+      // Exactly what GET /api/auth/session answers signed out: no `user` member at all.
+      http.expectOne('/api/auth/session').flush({ authenticated: false });
+
+      expect(await restoring).toBe('anonymous');
+      expect(auth.user()).toBeNull();
+    });
+
     it('falls back to /me when the session check is throttled, so nobody is locked out', async () => {
       const restoring = auth.restore();
 

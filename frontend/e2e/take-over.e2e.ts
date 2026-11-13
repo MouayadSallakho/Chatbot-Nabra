@@ -1,4 +1,10 @@
-import { e2eHandoverChatKey, expect, openVisitor, signedInTest as test } from './support/fixtures';
+import {
+  e2eAccount,
+  e2eHandoverChatKey,
+  expect,
+  openVisitor,
+  signedInTest as test,
+} from './support/fixtures';
 
 const WORDS = {
   en: {
@@ -56,6 +62,12 @@ test('a person takes over and answers, then returns the conversation to the AI',
     await expect(page.locator('#conversation-reply')).toBeFocused();
     await expect(page.getByTestId('transcript-event-TakenOver')).toBeVisible();
 
+    // The heading says who handles it now (BA-2), the address left to right.
+    const handledBy = page.getByTestId('handled-by');
+
+    await expect(handledBy).toContainText(e2eAccount().email);
+    await expect(handledBy.locator('bdi')).toHaveAttribute('dir', 'ltr');
+
     // The person answers; the visitor reads it live, after the line saying a person joined.
     await page.locator('#conversation-reply').fill(words.person);
     await page.getByTestId('send-reply').click();
@@ -68,6 +80,7 @@ test('a person takes over and answers, then returns the conversation to the AI',
 
     await expect(page.getByTestId('take-over')).toBeFocused();
     await expect(page.getByTestId('transcript-event-ReturnedToAi')).toBeVisible();
+    await expect(handledBy).toHaveCount(0);
 
     // The visitor's next message is the AI's to answer again, and the inbox shows it live.
     await visitor.getByTestId('chat-input').fill(words.again);

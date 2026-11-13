@@ -143,6 +143,19 @@
   font: var(--text-body);
 }
 
+// Who took it over (Phase 38.8): one line, the address cut short at the end if it
+// must be. Not a flex box like the line below it, which would squeeze the words
+// into two lines beside a long address in Arabic.
+.row-handled {
+  min-inline-size: 0;
+  max-inline-size: 100%;
+  overflow: hidden;
+  color: var(--text-secondary);
+  font: var(--text-small);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .row-assigned {
   display: inline-flex;
   gap: var(--space-1);

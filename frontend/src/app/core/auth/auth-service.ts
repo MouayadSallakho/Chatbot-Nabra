@@ -116,7 +116,7 @@ export class AuthService {
     try {
       const answer = await firstValueFrom(this.api.session());
 
-      return { outcome: 'answered', user: answer.authenticated ? answer.user : null };
+      return { outcome: 'answered', user: answer.authenticated ? (answer.user ?? null) : null };
     } catch (failure) {
       return { outcome: 'unavailable', retryAfterSeconds: toApiError(failure).retryAfterSeconds };
     }

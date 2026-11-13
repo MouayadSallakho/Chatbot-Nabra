@@ -1,4 +1,5 @@
 import { formatNumber } from '@app/core/i18n/locale-format';
+import { pluralMessage } from '@app/core/i18n/plural';
 import type {
   ProblemCatalogue,
   ProblemFacts,
@@ -16,6 +17,35 @@ function withLimit(sentence: (limit: string) => string): ProblemWording {
 }
 
 /**
+ * A Word document that is too large once opened, with its bound in its unit.
+ *
+ * A count of files takes every Arabic plural form; a size is said the way the
+ * upload limit is ("64 MB"), in the reader's digits.
+ */
+function archiveTooLarge({ limit, limitUnit, language }: ProblemFacts): string {
+  if (limit !== undefined && limitUnit === 'entries') {
+    const n = formatNumber(language, limit);
+
+    return pluralMessage(language, limit, {
+      zero: $localize`:@@problem.knowledge.file.archive_entries.zero:Once opened, this Word document holds more than ${n}:limit: files. Split it, or save a simpler copy.`,
+      one: $localize`:@@problem.knowledge.file.archive_entries.one:Once opened, this Word document holds more than ${n}:limit: file. Split it, or save a simpler copy.`,
+      two: $localize`:@@problem.knowledge.file.archive_entries.two:Once opened, this Word document holds more than ${n}:limit: files. Split it, or save a simpler copy.`,
+      few: $localize`:@@problem.knowledge.file.archive_entries.few:Once opened, this Word document holds more than ${n}:limit: files. Split it, or save a simpler copy.`,
+      many: $localize`:@@problem.knowledge.file.archive_entries.many:Once opened, this Word document holds more than ${n}:limit: files. Split it, or save a simpler copy.`,
+      other: $localize`:@@problem.knowledge.file.archive_entries.other:Once opened, this Word document holds more than ${n}:limit: files. Split it, or save a simpler copy.`,
+    });
+  }
+
+  if (limit !== undefined && limitUnit === 'bytes') {
+    const size = fileSize(limit, language);
+
+    return $localize`:@@problem.knowledge.file.archive_bytes:Once opened, this Word document is larger than ${size}:size:. Split it, or save a simpler copy.`;
+  }
+
+  return $localize`:@@problem.knowledge.file.archive_too_large:This Word document is too large once opened. Split it, or save a simpler copy.`;
+}
+
+/**
  * The knowledge screens' refusals, by the server's stable `code`.
  *
  * Registered by the knowledge routes and the agents' (whose editor hosts the
@@ -26,8 +56,10 @@ function withLimit(sentence: (limit: string) => string): ProblemWording {
  * The bounds read "more than the limit, which is N" in Arabic so that one sentence
  * serves every number: a noun counted by N would change form with it.
  *
- * `knowledge.file.archive_too_large` names no bound, because the server's `limit`
- * may be a count of parts or a number of bytes and does not say which.
+ * `knowledge.file.archive_too_large` names its bound with its unit since Phase 38.8
+ * (BA-12): the server's `limitUnit` says whether `limit` counts the files inside the
+ * document (`entries`) or its opened size (`bytes`). Without a unit, today's
+ * sentence, which names no number.
  */
 export const KNOWLEDGE_PROBLEM_WORDS: ProblemCatalogue = {
   'knowledge.file.multipart_required': $localize`:@@problem.knowledge.file.multipart_required:This file could not be sent. Reload the page and try again.`,
@@ -62,7 +94,7 @@ export const KNOWLEDGE_PROBLEM_WORDS: ProblemCatalogue = {
     (limit) =>
       $localize`:@@problem.knowledge.file.cell_too_long:A cell in the file is longer than ${limit}:limit: characters. Shorten it and upload the file again.`,
   ),
-  'knowledge.file.archive_too_large': $localize`:@@problem.knowledge.file.archive_too_large:This Word document is too large once opened. Split it, or save a simpler copy.`,
+  'knowledge.file.archive_too_large': archiveTooLarge,
   'knowledge.file.name.required': $localize`:@@problem.knowledge.file.name.required:This file has no name. Rename it and upload it again.`,
   'knowledge.file.name.unreadable': $localize`:@@problem.knowledge.file.name.unreadable:This file's name could not be read. Rename it and upload it again.`,
   'knowledge.file.name.too_long': $localize`:@@problem.knowledge.file.name.too_long:This file's name is too long. Shorten it and upload it again.`,
@@ -75,7 +107,7 @@ export const KNOWLEDGE_PROBLEM_WORDS: ProblemCatalogue = {
   'knowledge.content.control_characters': $localize`:@@problem.knowledge.content.control_characters:This text has characters that cannot be saved. Paste it as plain text and try again.`,
   'knowledge.document.already_enabled': $localize`:@@problem.knowledge.document.already_enabled:This document is already in use.`,
   'knowledge.document.already_disabled': $localize`:@@problem.knowledge.document.already_disabled:This document is already out of use.`,
-  'knowledge.indexing.in_progress': $localize`:@@problem.knowledge.indexing.in_progress:This document is being indexed right now, so nothing was sent. Reload in a moment to see how it ended.`,
+  'knowledge.indexing.in_progress': $localize`:@@problem.knowledge.indexing.in_progress:This document is being indexed right now, so nothing was sent. The result appears on this page when it ends.`,
   'knowledge.index.too_many_chunks': $localize`:@@problem.knowledge.index.too_many_chunks:This document is too long to index. Split it into smaller documents.`,
   'knowledge.source.missing': $localize`:@@problem.knowledge.source.missing:This document was written here, so there is no file to replace.`,
   'knowledge.assignment.document_unknown': $localize`:@@problem.knowledge.assignment.document_unknown:One of these documents is no longer in this workspace. Reload the page and choose again.`,

@@ -7,6 +7,7 @@ import { TenantApi } from '@app/core/api/tenant-api';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
 import { memoryStorage, permissionApiGranting } from '@app/testing/test-doubles';
 import { PermissionApi } from '@app/core/authorization/permission-api';
+import { KnowledgeRealtime } from '@app/core/realtime/knowledge-realtime';
 import { KnowledgeApi, KnowledgeDocumentSummary } from '../knowledge-api';
 import { KnowledgeList } from './knowledge-list';
 
@@ -47,6 +48,24 @@ describe('KnowledgeList', () => {
   let fixture: ComponentFixture<KnowledgeList>;
   let http: HttpTestingController;
 
+  /** The page's knowledge events, driven by the test (Phase 38.8, BA-11). */
+  let live: { listening: number; told: ((id: string | null) => void) | null };
+
+  const realtimeStub = () => ({
+    listen: (_tenant: string, onChanged: (id: string | null) => void) => {
+      live.listening++;
+      live.told = onChanged;
+
+      return () => {
+        live.listening--;
+      };
+    },
+  });
+
+  beforeEach(() => {
+    live = { listening: 0, told: null };
+  });
+
   /** Mounts the list. Pass `permissions` to model a restricted reader. */
   async function mount(permissions: readonly string[] = ['*']): Promise<void> {
     TestBed.configureTestingModule({
@@ -59,6 +78,7 @@ describe('KnowledgeList', () => {
         KnowledgeApi,
         { provide: LOCAL_STORAGE, useValue: memoryStorage() },
         { provide: TenantApi, useValue: { get: () => undefined, create: () => undefined } },
+        { provide: KnowledgeRealtime, useValue: realtimeStub() },
       ],
     });
 
@@ -294,6 +314,105 @@ describe('KnowledgeList', () => {
 
     expect(host().textContent).toContain('Could not load knowledge');
     expect(host().textContent).toContain('Try again');
+  });
+
+  describe('indexing ends by itself (BA-11)', () => {
+    const started = {
+      status: 'Started',
+      failureCode: null,
+      startedAt: '2026-09-02T10:00:00+00:00',
+      completedAt: null,
+    };
+    const state = (): string =>
+      host().querySelector('[data-testid="document-state"]')?.textContent?.trim() ?? '';
+
+    it('listens while it is on screen, for a reader who may view knowledge', async () => {
+      await mount(['knowledge.view']);
+      flush([ready]);
+      await settle();
+
+      expect(live.listening).toBe(1);
+
+      fixture.destroy();
+
+      expect(live.listening).toBe(0);
+    });
+
+    it('does not listen for somebody who may not view knowledge', async () => {
+      await mount(['agents.view']);
+
+      expect(live.listening).toBe(0);
+    });
+
+    it('re-reads in place when an attempt settles: "Indexing now" ends without a reload', async () => {
+      await mount(['knowledge.view']);
+      flush([{ ...unindexed, lastIndexAttempt: started }]);
+      await settle();
+
+      expect(state()).toBe('Indexing now');
+
+      live.told!(unindexed.id);
+      await settle();
+
+      // A quiet read: the rows stay, no skeletons.
+      expect(host().querySelector('.skeleton')).toBeNull();
+      expect(state()).toBe('Indexing now');
+
+      flush([
+        { ...ready, id: unindexed.id, lastIndexAttempt: { ...started, status: 'Succeeded' } },
+      ]);
+      await settle();
+
+      expect(state()).toBe('Indexed');
+    });
+
+    it('reads again after a reconnect, when anything may have changed', async () => {
+      await mount(['knowledge.view']);
+      flush([ready]);
+      await settle();
+
+      live.told!(null);
+      await settle();
+
+      flush([ready]);
+      await settle();
+    });
+
+    it('reads once at a time, and once more for events that arrived meanwhile', async () => {
+      await mount(['knowledge.view']);
+      flush([ready]);
+      await settle();
+
+      live.told!('a');
+      await settle();
+      live.told!('b');
+      live.told!('c');
+      await settle();
+
+      // One read out, not three.
+      flush([ready]);
+      await settle();
+
+      // Exactly one more for b and c.
+      flush([ready]);
+      await settle();
+    });
+
+    it('keeps the rows when a live read fails', async () => {
+      await mount(['knowledge.view']);
+      flush([ready]);
+      await settle();
+
+      live.told!(ready.id);
+      await settle();
+      http
+        .expectOne((request) => request.url === knowledgeUrl)
+        .flush({}, { status: 500, statusText: 'Server Error' });
+      await settle();
+
+      expect(host().textContent).toContain('Returns policy');
+      expect(host().textContent).not.toContain('Could not load knowledge');
+    });
   });
 
   it('renders a document title containing markup as text', async () => {

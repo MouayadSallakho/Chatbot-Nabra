@@ -23,7 +23,7 @@ import type {
   TranscriptPage,
 } from '@app/features/conversations/conversations-api';
 import { customerLabelPlain } from '@app/features/conversations/customer-label';
-import { ReadPacer, SignalDecision, decideSignals } from './inbox-signal-rules';
+import { ReadPacer, RowMark, SignalDecision, decideSignals, markOf } from './inbox-signal-rules';
 import type { SoundName, SoundRequest } from './sound-names';
 import { SOUND_PLATFORM, SoundPlatform } from './sound-platform';
 import { SoundSettings } from './sound-settings';
@@ -39,7 +39,7 @@ const FAILED_TURN = 'AiTurnFailed';
 
 /** Everything a tab needs to take over from the one that was reading. */
 interface Snapshot {
-  readonly rows: readonly (readonly [string, string])[];
+  readonly rows: readonly (readonly [string, RowMark])[];
   readonly seen: readonly string[];
 }
 
@@ -265,7 +265,7 @@ class SignalSession {
   private closed = false;
   private wanted = false;
 
-  private previous: Map<string, string> | null = null;
+  private previous: Map<string, RowMark> | null = null;
   private seen = new Set<string>();
   private total: number | null = null;
 
@@ -437,7 +437,7 @@ class SignalSession {
           })
         : null;
 
-    this.previous = new Map(page.items.map((row) => [row.id, row.lastActivityAt]));
+    this.previous = new Map(page.items.map((row) => [row.id, markOf(row)]));
 
     const sound = decision === null ? null : await this.choose(decision);
 
