@@ -46,7 +46,8 @@ internal static class WebChatEndpoints
             .WithName("ListWebChatEndpoints");
 
         workspace.MapPost("/", CreateAsync)
-            .WithName("CreateWebChatEndpoint");
+            .WithName("CreateWebChatEndpoint")
+            .Produces<WebChatEndpointResponse>(StatusCodes.Status201Created);
 
         workspace.MapGet("/{webChatEndpointId:guid}", GetAsync)
             .WithName(GetEndpointRouteName);
@@ -56,10 +57,12 @@ internal static class WebChatEndpoints
         // property edits, and naming them keeps the audit of what was asked for
         // readable.
         workspace.MapPost("/{webChatEndpointId:guid}/activate", ActivateAsync)
-            .WithName("ActivateWebChatEndpoint");
+            .WithName("ActivateWebChatEndpoint")
+            .Produces<WebChatEndpointResponse>(StatusCodes.Status200OK);
 
         workspace.MapPost("/{webChatEndpointId:guid}/disable", DisableAsync)
-            .WithName("DisableWebChatEndpoint");
+            .WithName("DisableWebChatEndpoint")
+            .Produces<WebChatEndpointResponse>(StatusCodes.Status200OK);
 
         // The widget's appearance and the websites it may be embedded on. Inside
         // the same authenticated, antiforgery-checked group as everything else
@@ -69,7 +72,8 @@ internal static class WebChatEndpoints
             .WithName("GetWebChatWidget");
 
         workspace.MapPut("/{webChatEndpointId:guid}/widget", UpdateWidgetAsync)
-            .WithName("UpdateWebChatWidget");
+            .WithName("UpdateWebChatWidget")
+            .Produces<WebChatWidgetConfigurationResponse>(StatusCodes.Status200OK);
 
         return endpoints;
     }

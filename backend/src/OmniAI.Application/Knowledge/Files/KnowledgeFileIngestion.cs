@@ -91,18 +91,36 @@ public sealed class KnowledgeFileRejectedException : Exception
     /// <param name="code">One of <see cref="KnowledgeFileRefusals"/>.</param>
     /// <param name="message">The English sentence for a person.</param>
     /// <param name="limit">The bound, in the rule's own unit, when it has one.</param>
+    /// <param name="limitUnit">
+    /// One of <see cref="KnowledgeFileLimitUnits"/>; required with
+    /// <paramref name="limit"/> and refused without it (Phase 38.7b, BA-12).
+    /// </param>
     public KnowledgeFileRejectedException(
         KnowledgeFileRejection reason,
         string code,
         string message,
-        long? limit = null)
+        long? limit = null,
+        string? limitUnit = null)
         : base(message)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(code);
 
+        // A number without its unit is the ambiguity BA-12 removed: an archive
+        // bound can count entries or bytes. Both or neither, decided here.
+        if ((limit is null) != (limitUnit is null))
+        {
+            throw new ArgumentException("A limit and its unit are given together, or not at all.", nameof(limitUnit));
+        }
+
+        if (limitUnit is not null && !KnowledgeFileLimitUnits.All.Contains(limitUnit))
+        {
+            throw new ArgumentOutOfRangeException(nameof(limitUnit), limitUnit, "Not a published limit unit.");
+        }
+
         Reason = reason;
         Code = code;
         Limit = limit;
+        LimitUnit = limitUnit;
     }
 
     public KnowledgeFileRejection Reason { get; }
@@ -115,6 +133,36 @@ public sealed class KnowledgeFileRejectedException : Exception
     /// entries, as the code says — published as the problem's <c>limit</c>.
     /// </summary>
     public long? Limit { get; }
+
+    /// <summary>
+    /// What <see cref="Limit"/> counts, published as the problem's <c>limitUnit</c>
+    /// beside it (Phase 38.7b, BA-12); <see langword="null"/> exactly when
+    /// <see cref="Limit"/> is.
+    /// </summary>
+    public string? LimitUnit { get; }
+}
+
+/// <summary>
+/// What a refused file's <c>limit</c> counts: the <c>limitUnit</c> member beside it
+/// (Phase 38.7b, BA-12).
+/// </summary>
+/// <remarks>
+/// Kept apart from <see cref="KnowledgeFileRefusals"/>, whose constants are all
+/// problem codes. Listed in <c>docs/architecture/problem-codes.md</c>; a unit, once
+/// published, keeps its meaning.
+/// </remarks>
+public static class KnowledgeFileLimitUnits
+{
+    public const string Bytes = "bytes";
+    public const string Pages = "pages";
+    public const string Characters = "characters";
+    public const string Rows = "rows";
+    public const string Columns = "columns";
+    public const string Entries = "entries";
+
+    /// <summary>Every published unit.</summary>
+    public static IReadOnlySet<string> All { get; } =
+        new HashSet<string>(StringComparer.Ordinal) { Bytes, Pages, Characters, Rows, Columns, Entries };
 }
 
 /// <summary>
@@ -167,7 +215,7 @@ public static class KnowledgeFileRefusals
 
     /// <summary>
     /// A DOCX has too many parts or expands too far (<c>limit</c>: entries or
-    /// bytes, as the detail says). 422.
+    /// bytes, as <c>limitUnit</c> says). 422.
     /// </summary>
     public const string ArchiveTooLarge = "knowledge.file.archive_too_large";
 

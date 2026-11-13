@@ -90,7 +90,8 @@ internal static class AiAgentEndpoints
             .AddEndpointFilter<AntiforgeryEndpointFilter>();
 
         agents.MapPost("/", CreateAsync)
-            .WithName("CreateAiAgent");
+            .WithName("CreateAiAgent")
+            .Produces<AiAgentResponse>(StatusCodes.Status201Created);
 
         agents.MapGet("/", ListAsync)
             .WithName("ListAiAgents")
@@ -112,20 +113,24 @@ internal static class AiAgentEndpoints
         // is what PUT means; a PATCH would need the partial-update semantics this
         // contract deliberately does not define.
         agents.MapPut("/{aiAgentId:guid}/name", RenameAsync)
-            .WithName("RenameAiAgent");
+            .WithName("RenameAiAgent")
+            .Produces<AiAgentResponse>(StatusCodes.Status200OK);
 
         agents.MapPut("/{aiAgentId:guid}/instructions", UpdateInstructionsAsync)
-            .WithName("UpdateAiAgentInstructions");
+            .WithName("UpdateAiAgentInstructions")
+            .Produces<AiAgentResponse>(StatusCodes.Status200OK);
 
         // POST, not PUT: activation and disabling are operations rather than
         // representations. There is nothing to send and nothing at these paths to
         // read back, so modelling them as a state resource would invent a
         // document that does not exist.
         agents.MapPost("/{aiAgentId:guid}/activate", ActivateAsync)
-            .WithName("ActivateAiAgent");
+            .WithName("ActivateAiAgent")
+            .Produces<AiAgentResponse>(StatusCodes.Status200OK);
 
         agents.MapPost("/{aiAgentId:guid}/disable", DisableAsync)
-            .WithName("DisableAiAgent");
+            .WithName("DisableAiAgent")
+            .Produces<AiAgentResponse>(StatusCodes.Status200OK);
 
         // POST rather than GET, even though preview changes nothing on this
         // server. The request carries a body, and the body is the message -- a GET
@@ -133,7 +138,8 @@ internal static class AiAgentEndpoints
         // logs, proxy logs and browser history. Nor is it cacheable: the same
         // message may legitimately produce a different answer each time.
         agents.MapPost("/{aiAgentId:guid}/preview", PreviewAsync)
-            .WithName("PreviewAiAgent");
+            .WithName("PreviewAiAgent")
+            .Produces<AiAgentPreviewResponse>(StatusCodes.Status200OK);
 
         // Knowledge assignment lives under the agent rather than under knowledge,
         // because it is a property of the agent: it is edited on the agent's
@@ -144,10 +150,12 @@ internal static class AiAgentEndpoints
             .WithName("GetAiAgentKnowledge");
 
         agents.MapPut("/{aiAgentId:guid}/knowledge", ReplaceKnowledgeAsync)
-            .WithName("ReplaceAiAgentKnowledge");
+            .WithName("ReplaceAiAgentKnowledge")
+            .Produces<AgentKnowledgeResponse>(StatusCodes.Status200OK);
 
         agents.MapPost("/{aiAgentId:guid}/knowledge/search", SearchKnowledgeAsync)
-            .WithName("SearchAiAgentKnowledge");
+            .WithName("SearchAiAgentKnowledge")
+            .Produces<KnowledgeSearchResponse>(StatusCodes.Status200OK);
 
         return endpoints;
     }

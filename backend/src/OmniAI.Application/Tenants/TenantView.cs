@@ -33,4 +33,17 @@ public sealed record TenantView(Guid Id, string Name, string Slug, TenantStatus 
 
         return new TenantView(tenant.Id.Value, tenant.Name.Value, tenant.Slug.Value, tenant.Status, tenant.TimeZone.Name);
     }
+
+    /// <summary>
+    /// How many report schedules changing the zone now would move (Phase 38.7b,
+    /// BA-9), or <see langword="null"/>.
+    /// </summary>
+    /// <remarks>
+    /// Set only by the workspace read, and only for a caller who holds
+    /// <c>workspace.manage</c>, the one permission that may change the zone.
+    /// Everyone else, and every other read model, carries <see langword="null"/>:
+    /// absent, never zero, so nobody without the permission learns whether the
+    /// workspace has schedules.
+    /// </remarks>
+    public int? ScheduleCount { get; init; }
 }

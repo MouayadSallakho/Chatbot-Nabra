@@ -43,7 +43,8 @@ internal sealed class KnowledgeFileExtractor(KnowledgeFilePolicy policy) : IKnow
                 KnowledgeFileRefusals.TooLarge,
                 $"That file is larger than {_policy.MaxFileMegabytes} MB. Split it into smaller "
                 + "documents, or upload the part that matters.",
-                limit: _policy.MaxFileBytes);
+                limit: _policy.MaxFileBytes,
+                limitUnit: KnowledgeFileLimitUnits.Bytes);
         }
 
         KnowledgeFileType type = KnowledgeFileSignature.Identify(upload);
@@ -71,7 +72,8 @@ internal sealed class KnowledgeFileExtractor(KnowledgeFilePolicy policy) : IKnow
                 KnowledgeFileRefusals.TooManyCharacters,
                 $"That file holds more than {_policy.MaxExtractedCharacters:N0} characters of "
                 + "text. Split it into smaller documents.",
-                limit: _policy.MaxExtractedCharacters);
+                limit: _policy.MaxExtractedCharacters,
+                limitUnit: KnowledgeFileLimitUnits.Characters);
         }
 
         return new KnowledgeExtraction(text, type);

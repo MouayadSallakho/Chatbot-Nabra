@@ -54,7 +54,10 @@ public sealed record CustomerDisplayName
     {
         if (string.IsNullOrWhiteSpace(value))
         {
-            throw new DomainValidationException("A customer name must not be blank.");
+            throw new DomainValidationException("A customer name must not be blank.")
+            {
+                Code = "customers.display_name.required",
+            };
         }
 
         string normalised = value.Trim();
@@ -63,7 +66,10 @@ public sealed record CustomerDisplayName
         {
             throw new DomainValidationException(
                 $"A customer name must be at most {MaxLength} characters; "
-                + $"the supplied name has {normalised.Length}. It is not truncated.");
+                + $"the supplied name has {normalised.Length}. It is not truncated.")
+            {
+                Code = "customers.display_name.too_long",
+            };
         }
 
         // Including line breaks and tabs: this is a single-line label, and
@@ -75,7 +81,10 @@ public sealed record CustomerDisplayName
             if (char.IsControl(character))
             {
                 throw new DomainValidationException(
-                    "A customer name must not contain control characters.");
+                    "A customer name must not contain control characters.")
+                {
+                    Code = "customers.display_name.control_characters",
+                };
             }
         }
 

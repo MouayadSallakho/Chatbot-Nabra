@@ -89,27 +89,42 @@ public sealed class HumanReply
     {
         if (conversationId.IsEmpty)
         {
-            throw new DomainValidationException("A reply must belong to a conversation.");
+            throw new DomainValidationException("A reply must belong to a conversation.")
+            {
+                Code = "conversations.reply.invalid",
+            };
         }
 
         if (tenantId.IsEmpty)
         {
-            throw new DomainValidationException("A reply must belong to a workspace.");
+            throw new DomainValidationException("A reply must belong to a workspace.")
+            {
+                Code = "conversations.reply.invalid",
+            };
         }
 
         if (sender.IsEmpty)
         {
-            throw new DomainValidationException("A reply must name who sent it.");
+            throw new DomainValidationException("A reply must name who sent it.")
+            {
+                Code = "conversations.reply.invalid",
+            };
         }
 
         if (messageId.IsEmpty)
         {
-            throw new DomainValidationException("A reply must name its message.");
+            throw new DomainValidationException("A reply must name its message.")
+            {
+                Code = "conversations.reply.invalid",
+            };
         }
 
         if (sentAt == default)
         {
-            throw new DomainValidationException("The sent instant must be a real point in time.");
+            throw new DomainValidationException("The sent instant must be a real point in time.")
+            {
+                Code = "conversations.instant.invalid",
+            };
         }
 
         return new HumanReply(

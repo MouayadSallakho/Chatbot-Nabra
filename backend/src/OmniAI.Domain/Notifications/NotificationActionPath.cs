@@ -56,5 +56,8 @@ public static class NotificationActionPath
 
     /// <exception cref="DomainValidationException">The path is not an internal route.</exception>
     public static string Require(string path) =>
-        IsValid(path) ? path : throw new DomainValidationException("A notification action must be an internal route.");
+        IsValid(path) ? path : throw new DomainValidationException("A notification action must be an internal route.")
+        {
+            Code = "notifications.action.invalid",
+        };
 }

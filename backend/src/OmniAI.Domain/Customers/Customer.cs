@@ -210,8 +210,7 @@ public sealed class Customer
 
         if (target.Id == Id)
         {
-            throw new CustomerMergeNotAllowedException(
-                "A customer cannot be merged into itself.");
+            throw CustomerMergeNotAllowedException.Self();
         }
 
         if (target.TenantId != TenantId)
@@ -219,7 +218,7 @@ public sealed class Customer
             // Not a validation nicety. Two workspaces' customers are two
             // populations, and a merge across them would move one workspace's
             // conversations under a record the other workspace can read.
-            throw new CustomerMergeNotAllowedException(
+            throw CustomerMergeNotAllowedException.NotInWorkspace(
                 "A customer can only be merged into a customer in the same workspace.");
         }
 
@@ -255,11 +254,17 @@ public sealed class Customer
     private static TenantId RequireTenant(TenantId tenantId) =>
         tenantId.IsEmpty
             ? throw new DomainValidationException("A customer must belong to a workspace.")
+                {
+                    Code = "customers.tenant.required",
+                }
             : tenantId;
 
     private static DateTimeOffset RequireInstant(DateTimeOffset instant) =>
         instant == default
             ? throw new DomainValidationException("A customer timestamp is required.")
+                {
+                    Code = "customers.instant.invalid",
+                }
             : instant;
 }
 
@@ -283,4 +288,24 @@ public sealed class CustomerAlreadyMergedException(CustomerId customerId, Custom
 }
 
 /// <summary>Raised when a merge is refused on its own terms.</summary>
-public sealed class CustomerMergeNotAllowedException(string message) : Exception(message);
+/// <remarks>
+/// Each rule carries its own stable <see cref="Code"/> (Phase 38.7b, BA-4), the
+/// problem response's <c>code</c>.
+/// </remarks>
+public sealed class CustomerMergeNotAllowedException : Exception
+{
+    private CustomerMergeNotAllowedException(string code, string message)
+        : base(message) =>
+        Code = code;
+
+    /// <summary>The stable code, such as <c>customers.merge.self</c>.</summary>
+    public string Code { get; }
+
+    /// <summary>The source and the target are the same record.</summary>
+    public static CustomerMergeNotAllowedException Self() =>
+        new("customers.merge.self", "A customer cannot be merged into itself.");
+
+    /// <summary>The two records are not both customers of one workspace.</summary>
+    public static CustomerMergeNotAllowedException NotInWorkspace(string message) =>
+        new("customers.merge.not_in_workspace", message);
+}

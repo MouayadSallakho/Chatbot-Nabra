@@ -45,7 +45,8 @@ internal static class PdfTextReader
                 KnowledgeFileRefusals.TooManyPages,
                 $"That PDF has {document.NumberOfPages} pages and the limit is "
                 + $"{policy.MaxPdfPages}. Split it into smaller documents.",
-                limit: policy.MaxPdfPages);
+                limit: policy.MaxPdfPages,
+                limitUnit: KnowledgeFileLimitUnits.Pages);
         }
 
         StringBuilder text = new();
@@ -76,7 +77,8 @@ internal static class PdfTextReader
                     KnowledgeFileRefusals.TooManyCharacters,
                     $"That PDF holds more than {policy.MaxExtractedCharacters:N0} characters of "
                     + "text. Split it into smaller documents.",
-                    limit: policy.MaxExtractedCharacters);
+                    limit: policy.MaxExtractedCharacters,
+                    limitUnit: KnowledgeFileLimitUnits.Characters);
             }
         }
 

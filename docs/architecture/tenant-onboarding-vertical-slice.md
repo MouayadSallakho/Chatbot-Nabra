@@ -437,3 +437,31 @@ evening as today.
 - What follows the zone and what does not is described in
   `analytics-usage-foundation.md` §4 and `reports-exports-scheduling.md` §9 and §11.
   The plan quota's months stay in UTC (`workspace-plans-entitlements-quotas.md`).
+
+## Phase 38.7b: how many schedules a zone change moves (BA-9)
+
+The settings page asks before a zone change that moves report schedules. Until
+now it learnt whether there were any by reading the schedule list, which needs
+`reports.view`, so a manager without it was always asked.
+
+- **Where:** `GET /api/tenants/{id}` carries `scheduleCount` (an integer) for a
+  caller who holds `workspace.manage`, the one permission that may change the
+  zone. Chosen over a dry run of `PUT …/time-zone` because the page already reads
+  the workspace for its `ETag` before it saves: no extra round trip, and no write
+  route that sometimes writes nothing.
+- **Absent, not zero, for everybody else**, and on every other response that
+  carries the workspace (create, rename, the zone change itself). A member
+  without `workspace.manage` learns nothing about schedules from it, even one who
+  holds `reports.view`. A non-member gets the read's ordinary `404`.
+- **What it counts** is exactly what `ChangeTimeZoneAsync` locks and re-times:
+  this workspace's schedules, enabled or not, whose next run is still to come.
+  One already due keeps its time and is not counted.
+  (`ITenantRepository.CountSchedulesToRezoneAsync`, the same predicate; a test
+  counts, changes the zone, and checks that exactly the counted ones moved.)
+- **One read of the caller's permissions** answers both questions the read asks
+  (may they see the workspace; may they change its zone). The count is one
+  statement, by workspace (`ix_report_schedules_tenant_name` leads with it), only
+  for a manager.
+- **The `ETag` is unchanged in meaning:** it still names the workspace row a
+  rename or a zone change must match. Adding or editing a schedule changes the
+  count and not the tag, so a client re-reads the workspace before it asks.

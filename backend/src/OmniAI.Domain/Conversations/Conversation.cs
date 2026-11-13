@@ -168,12 +168,18 @@ public sealed class Conversation
     {
         if (tenantId.IsEmpty)
         {
-            throw new DomainValidationException("A conversation must belong to a tenant.");
+            throw new DomainValidationException("A conversation must belong to a tenant.")
+            {
+                Code = "conversations.tenant.required",
+            };
         }
 
         if (customerId.IsEmpty)
         {
-            throw new DomainValidationException("A conversation must belong to a customer.");
+            throw new DomainValidationException("A conversation must belong to a customer.")
+            {
+                Code = "conversations.customer.required",
+            };
         }
 
         RequireDefined(channel, "channel");
@@ -202,7 +208,10 @@ public sealed class Conversation
     {
         if (customerId.IsEmpty)
         {
-            throw new DomainValidationException("A conversation must belong to a customer.");
+            throw new DomainValidationException("A conversation must belong to a customer.")
+            {
+                Code = "conversations.customer.required",
+            };
         }
 
         CustomerId = customerId;
@@ -225,7 +234,10 @@ public sealed class Conversation
         {
             throw new DomainValidationException(
                 "A system-authored message must be added with AddSystemMessage, " +
-                "so that its sender and content type stay consistent.");
+                "so that its sender and content type stay consistent.")
+            {
+                Code = "conversations.sender.invalid",
+            };
         }
 
         return Append(sender, MessageContentType.Text, text, sentAt);
@@ -429,7 +441,10 @@ public sealed class Conversation
 
         if (member.IsEmpty)
         {
-            throw new DomainValidationException("An assignment must name a member.");
+            throw new DomainValidationException("An assignment must name a member.")
+            {
+                Code = "conversations.assignment.invalid",
+            };
         }
 
         DateTimeOffset instant = RequireInstant(assignedAt, "assignment instant");
@@ -498,7 +513,10 @@ public sealed class Conversation
         if (Status != ConversationStatus.Open)
         {
             throw new DomainStateException(
-                $"Cannot {operation} on a closed conversation. Reopen it first.");
+                $"Cannot {operation} on a closed conversation. Reopen it first.")
+            {
+                Code = "conversations.closed",
+            };
         }
     }
 
@@ -525,7 +543,10 @@ public sealed class Conversation
     {
         if (instant == default)
         {
-            throw new DomainValidationException($"The {what} must be a real point in time.");
+            throw new DomainValidationException($"The {what} must be a real point in time.")
+            {
+                Code = "conversations.instant.invalid",
+            };
         }
 
         // Stored in UTC: the instant is what matters, and a single representation
@@ -539,7 +560,10 @@ public sealed class Conversation
         if (!Enum.IsDefined(value))
         {
             throw new DomainValidationException(
-                $"The supplied {what} ({Convert.ToInt32(value, CultureInfo.InvariantCulture)}) is not a recognised value.");
+                $"The supplied {what} ({Convert.ToInt32(value, CultureInfo.InvariantCulture)}) is not a recognised value.")
+            {
+                Code = "conversations.value.invalid",
+            };
         }
     }
 }

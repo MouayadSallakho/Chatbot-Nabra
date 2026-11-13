@@ -151,7 +151,10 @@ public sealed class ReportExecution
     {
         if (clientRequestId == Guid.Empty)
         {
-            throw new DomainValidationException("A report request needs a client request id.");
+            throw new DomainValidationException("A report request needs a client request id.")
+            {
+                Code = "reports.client_request_id.required",
+            };
         }
 
         return New(tenantId, type, format, period, requestedBy, clientRequestId, null, requestedAt, language);
@@ -192,22 +195,34 @@ public sealed class ReportExecution
 
         if (tenantId.IsEmpty)
         {
-            throw new DomainValidationException("A report belongs to a workspace.");
+            throw new DomainValidationException("A report belongs to a workspace.")
+            {
+                Code = "reports.tenant.required",
+            };
         }
 
         if (!Enum.IsDefined(type))
         {
-            throw new DomainValidationException("That report type is not recognised.");
+            throw new DomainValidationException("That report type is not recognised.")
+            {
+                Code = "reports.type.invalid",
+            };
         }
 
         if (!Enum.IsDefined(format))
         {
-            throw new DomainValidationException("That report format is not recognised.");
+            throw new DomainValidationException("That report format is not recognised.")
+            {
+                Code = "reports.format.invalid",
+            };
         }
 
         if (!Enum.IsDefined(language))
         {
-            throw new DomainValidationException("A report is written in English or Arabic.");
+            throw new DomainValidationException("A report is written in English or Arabic.")
+            {
+                Code = "language.unsupported",
+            };
         }
 
         return new ReportExecution(

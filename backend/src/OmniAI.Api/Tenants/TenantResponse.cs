@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using OmniAI.Application.Tenants;
 using OmniAI.Domain.Tenants;
 
@@ -14,6 +15,12 @@ namespace OmniAI.Api.Tenants;
 /// The IANA zone the workspace counts its days in, <c>UTC</c> unless somebody chose
 /// another (Phase 37.6). Analytics days, report periods and schedules follow it.
 /// </param>
+/// <param name="ScheduleCount">
+/// How many report schedules changing the zone now would move (Phase 38.7b, BA-9).
+/// Only on <c>GET /api/tenants/{id}</c>, and only for a caller holding
+/// <c>workspace.manage</c>; absent, never zero or null, for everybody else and on
+/// every other response.
+/// </param>
 /// <remarks>
 /// The published HTTP contract, and the only thing a client sees. It is a
 /// separate type from <c>TenantView</c> for one concrete reason: <c>Status</c> has
@@ -28,14 +35,21 @@ namespace OmniAI.Api.Tenants;
 /// would be a promise this API cannot keep.
 /// </para>
 /// </remarks>
-public sealed record TenantResponse(Guid Id, string Name, string Slug, string Status, string TimeZone)
+public sealed record TenantResponse(
+    Guid Id,
+    string Name,
+    string Slug,
+    string Status,
+    string TimeZone,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    int? ScheduleCount = null)
 {
     /// <summary>Maps an Application read model onto the HTTP contract.</summary>
     internal static TenantResponse From(TenantView view)
     {
         ArgumentNullException.ThrowIfNull(view);
 
-        return new TenantResponse(view.Id, view.Name, view.Slug, Serialise(view.Status), view.TimeZone);
+        return new TenantResponse(view.Id, view.Name, view.Slug, Serialise(view.Status), view.TimeZone, view.ScheduleCount);
     }
 
     /// <summary>

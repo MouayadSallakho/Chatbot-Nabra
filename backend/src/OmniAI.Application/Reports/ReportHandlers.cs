@@ -195,12 +195,18 @@ public sealed class ReportHandlers(
 
         if (!ReportCatalog.For(type).Supports(format))
         {
-            throw new DomainValidationException("That report is not available in that format.");
+            throw new DomainValidationException("That report is not available in that format.")
+            {
+                Code = "reports.format.unsupported",
+            };
         }
 
         if (command.ClientRequestId is not Guid clientRequestId || clientRequestId == Guid.Empty)
         {
-            throw new DomainValidationException("A clientRequestId is required, so a repeated request is not generated twice.");
+            throw new DomainValidationException("A clientRequestId is required, so a repeated request is not generated twice.")
+            {
+                Code = "reports.client_request_id.required",
+            };
         }
 
         DateTimeOffset now = _clock.GetUtcNow();
@@ -261,7 +267,10 @@ public sealed class ReportHandlers(
 
         if (number < 1)
         {
-            throw new DomainValidationException("Page must be 1 or greater.");
+            throw new DomainValidationException("Page must be 1 or greater.")
+            {
+                Code = "reports.page.invalid",
+            };
         }
 
         if (size < 1 || size > ReportExecutionPage.MaxPageSize)
@@ -269,7 +278,10 @@ public sealed class ReportHandlers(
             throw new DomainValidationException(
                 string.Create(
                     CultureInfo.InvariantCulture,
-                    $"Page size must be between 1 and {ReportExecutionPage.MaxPageSize}."));
+                    $"Page size must be between 1 and {ReportExecutionPage.MaxPageSize}."))
+            {
+                Code = "reports.page.invalid",
+            };
         }
 
         (IReadOnlyList<ReportExecutionRecord> items, int total) = await _executions
@@ -446,13 +458,28 @@ public sealed class ReportHandlers(
 internal static class ReportRequestParsing
 {
     public static ReportType Type(string? value) =>
-        Parse<ReportType>(value, "That report type is not in the catalogue.");
+        TryParse(value, out ReportType parsed)
+            ? parsed
+            : throw new DomainValidationException("That report type is not in the catalogue.")
+                {
+                    Code = "reports.type.invalid",
+                };
 
     public static ReportFormat Format(string? value) =>
-        Parse<ReportFormat>(value, "Choose a format: Csv, Xlsx or Pdf.");
+        TryParse(value, out ReportFormat parsed)
+            ? parsed
+            : throw new DomainValidationException("Choose a format: Csv, Xlsx or Pdf.")
+                {
+                    Code = "reports.format.invalid",
+                };
 
     public static ReportFrequency Frequency(string? value) =>
-        Parse<ReportFrequency>(value, "A schedule runs Weekly or Monthly.");
+        TryParse(value, out ReportFrequency parsed)
+            ? parsed
+            : throw new DomainValidationException("A schedule runs Weekly or Monthly.")
+                {
+                    Code = "reports.frequency.invalid",
+                };
 
     /// <summary>
     /// A preset or an explicit period, never both and never neither.
@@ -478,7 +505,10 @@ internal static class ReportRequestParsing
         {
             if (from is not null || to is not null)
             {
-                throw new DomainValidationException("Give either a preset range or two dates, not both.");
+                throw new DomainValidationException("Give either a preset range or two dates, not both.")
+                {
+                    Code = "reports.range.conflict",
+                };
             }
 
             return ReportPeriod.LastDays(int.Parse(preset[..^1], CultureInfo.InvariantCulture), now, timeZone);
@@ -486,37 +516,45 @@ internal static class ReportRequestParsing
 
         if (preset is not ("custom" or ""))
         {
-            throw new DomainValidationException("Range must be 7d, 30d, 90d or custom.");
+            throw new DomainValidationException("Range must be 7d, 30d, 90d or custom.")
+            {
+                Code = "reports.range.invalid",
+            };
         }
 
         if (from is not DateOnly start || to is not DateOnly end)
         {
-            throw new DomainValidationException("A custom range needs both a from and a to date.");
+            throw new DomainValidationException("A custom range needs both a from and a to date.")
+            {
+                Code = "reports.range.dates_required",
+            };
         }
 
         DateOnly tomorrow = timeZone.DateOf(now).AddDays(1);
 
         if (end > tomorrow)
         {
-            throw new DomainValidationException("A report period cannot extend into the future.");
+            throw new DomainValidationException("A report period cannot extend into the future.")
+            {
+                Code = "reports.period.future",
+            };
         }
 
         return ReportPeriod.Create(start, end, timeZone);
     }
 
-    private static T Parse<T>(string? value, string refusal)
+    // Each caller throws its own refusal, so every throw site names its code
+    // (Phase 38.7b, BA-4).
+    private static bool TryParse<T>(string? value, out T parsed)
         where T : struct, Enum
     {
         // Names only. Enum.TryParse would also accept "7" or "1,2", which would let
         // a caller address a value by number that nobody meant to publish.
-        if (string.IsNullOrWhiteSpace(value)
-            || value.Any(character => !char.IsAsciiLetter(character))
-            || !Enum.TryParse(value, ignoreCase: true, out T parsed)
-            || !Enum.IsDefined(parsed))
-        {
-            throw new DomainValidationException(refusal);
-        }
+        parsed = default;
 
-        return parsed;
+        return !string.IsNullOrWhiteSpace(value)
+            && value.All(char.IsAsciiLetter)
+            && Enum.TryParse(value, ignoreCase: true, out parsed)
+            && Enum.IsDefined(parsed);
     }
 }

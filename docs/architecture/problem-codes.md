@@ -11,6 +11,9 @@ the knowledge, agent, channel and workspace areas (row 28a). Phase 37.5b named t
 codes of roles, invitations, team and billing (row 28b). Phase 37.6 added the
 workspace time zone's code and the analytics comparison's (rows 31 and 34).
 Phase 37.7 reused `language.unsupported` for the report and schedule `language`.
+Phase 38.7b (BA-4) named the last areas that still answered the generic codes:
+customers, conversations, notifications, and reports and schedules; and (BA-12) put
+`limitUnit` beside every knowledge file `limit`.
 
 ## Accounts (Phase 37.3)
 
@@ -42,6 +45,79 @@ answer is the same for anybody and says nothing about the workspace.
 | `transcript.include.invalid` | 400 | `GET …/conversations/{id}/messages` | `include` names something other than `events` |
 | `conversations.read.sequence.invalid` | 400 | `POST …/conversations/{id}/read` | `sequence` is missing or negative |
 
+**Replies, handoff and assignment (Phase 38.7b).** These answered `validation.failed`
+or `state.conflict` before. The status of each is unchanged.
+
+| Code | Status | Where | Meaning |
+| --- | --- | --- | --- |
+| `conversations.id.invalid` | 400 | any `…/conversations/{id}` route | An all-zero conversation id |
+| `conversations.reply.not_taken_over` | 409 | `POST …/conversations/{id}/messages` | The AI is answering this conversation. Take it over first, then reply |
+| `conversations.client_message_id.required` | 400 | `POST …/conversations/{id}/messages`; the public chat's message routes | No `clientMessageId` |
+| `conversations.client_message_id.too_long` | 400 | the same | Past the id bound |
+| `conversations.client_message_id.invalid` | 400 | the same | Characters other than letters, digits, hyphens and underscores |
+| `conversations.message.required` | 400 | `POST …/conversations/{id}/messages` | The reply is blank. (The public chat refuses a visitor's blank message first, as `chat.message.required`) |
+| `conversations.message.too_long` | 400 | the same | Past the message bound; never truncated |
+| `conversations.message.control_characters` | 400 | the same | Control characters other than tab, carriage return and line feed |
+| `conversations.assignee.not_member` | 422 | `PUT …/conversations/{id}/assignment` | The person named is not a member of this workspace |
+| `conversations.assignee.cannot_reply` | 422 | the same | The member named holds no permission to reply, so the customer would wait. Give them `conversations.reply` first |
+| `conversations.closed` | 409 | take over, return, assign, reply | The conversation is closed. No route closes a conversation today; the rule is the model's own, named for when one does |
+
+## Customers (Phase 38.7b)
+
+| Code | Status | Where | Meaning |
+| --- | --- | --- | --- |
+| `customers.page.invalid` | 400 | `GET …/customers` | `page` or `pageSize` out of range |
+| `customers.id.invalid` | 400 | any `…/customers/{id}` route | An all-zero customer id |
+| `customers.display_name.too_long` | 400 | `PUT …/customers/{id}/display-name` | Past the name bound (120); never truncated. A blank name is not refused: it clears the name, as before |
+| `customers.display_name.control_characters` | 400 | the same | A name is one line, with no control characters |
+| `customers.merge.target_required` | 400 | `POST …/customers/{id}/merge` | The request names no customer to keep |
+| `customers.merge.self` | 400 | the same | A customer cannot be merged into itself |
+| `customers.merge.not_in_workspace` | 400 | the same | The two records are not both customers of this workspace. The route answers 404 for another workspace's id first, so this is seen only if a record disappears during the merge |
+| `customers.merged` | 409 | rename, merge | The customer was merged into another. The body also carries `customerId` (the one named) and `canonicalCustomerId` (the one to use), as it always did |
+
+## Notifications (Phase 38.7b)
+
+| Code | Status | Where | Meaning |
+| --- | --- | --- | --- |
+| `notifications.page.invalid` | 400 | `GET …/notifications` | `page` or `pageSize` out of range |
+| `notifications.preferences.incomplete` | 400 | `PUT …/notifications/preferences` | Each of `reports`, `usage`, `billing`, `knowledge` and `channelHealth` must say true or false. Checked before membership |
+
+An all-zero notification id on `POST …/notifications/{id}/read` stays a `404`
+("not yours"), as before.
+
+## Reports and schedules (Phase 38.7b)
+
+| Code | Status | Where | Meaning |
+| --- | --- | --- | --- |
+| `reports.type.invalid` | 400 | `POST …/reports`, `POST …/reports/schedules`, `PUT …/reports/schedules/{id}` | Not a report type in the catalogue (names only; a number is refused) |
+| `reports.format.invalid` | 400 | the same | Not `Csv`, `Xlsx` or `Pdf` |
+| `reports.format.unsupported` | 400 | the same | That report is not offered in that format |
+| `reports.frequency.invalid` | 400 | schedule create and update | Not `Weekly` or `Monthly` |
+| `reports.client_request_id.required` | 400 | `POST …/reports` | No `clientRequestId`, so a repeated request could not be told apart |
+| `reports.client_request_id.reused` | 409 | `POST …/reports` | That `clientRequestId` was already used for a different report. Use a new one |
+| `reports.range.invalid` | 400 | `POST …/reports` | `range` is not `7d`, `30d`, `90d` or `custom` |
+| `reports.range.conflict` | 400 | the same | A preset range and dates together |
+| `reports.range.dates_required` | 400 | the same | A custom range without both `from` and `to` |
+| `reports.period.future` | 400 | the same | The period ends after today in the workspace's zone |
+| `reports.period.reversed` | 400 | the same | `to` is before `from` |
+| `reports.period.too_long` | 400 | the same | Longer than the longest period a report covers |
+| `reports.period.too_early` | 400 | the same | Starts before the earliest date reports cover |
+| `reports.page.invalid` | 400 | `GET …/reports/executions` | `page` or `pageSize` out of range |
+| `reports.id.invalid` | 400 | `…/reports/executions/{id}` routes | An all-zero report id |
+| `reports.file.not_ready` | 409 | `GET …/executions/{id}/download` | The report is still being generated |
+| `reports.file.failed` | 409 | the same | The report failed, so there is no file |
+| `reports.file.expired` | 410 | the same | The retention policy removed the file. Generate it again |
+| `reports.file.missing` | 410 | the same | The record says a file exists and report storage does not have it. Generate it again; an operator should look |
+| `reports.schedule.id.invalid` | 400 | `…/reports/schedules/{id}` routes | An all-zero schedule id |
+| `reports.schedule.name.required` | 400 | schedule create and update | A schedule needs a name |
+| `reports.schedule.name.too_long` | 400 | the same | Past the name bound; never truncated |
+| `reports.schedule.name.control_characters` | 400 | the same | No control characters in a name |
+| `reports.schedule.limit_reached` | 409 | `POST …/reports/schedules` | The workspace already has as many schedules as it may |
+| `reports.schedule.enabled_required` | 400 | `PUT …/reports/schedules/{id}/enabled` | The request does not say whether the schedule is on or off |
+
+A report or schedule written in a language other than English or Arabic keeps
+`language.unsupported`, now also at the model's own check.
+
 ## The guarantee (Phase 37.5a)
 
 Every `400`, `409`, `412` and `422` this API writes carries a `code`. The throw site
@@ -57,11 +133,15 @@ and never shows `detail`.
 Tests hold this in place (`ProblemCodeTests`): a source scan fails when a
 `DomainValidationException` or `DomainStateException` in the knowledge, agent,
 channel, role, invitation, team or billing folders (with the workspace, address,
-account and plan value objects they are built from), or a knowledge file refusal,
-has no code; another fails when a published code is missing from this file; and
-HTTP checks prove the codes reach the wire. Areas outside these (customers,
-conversations, notifications, reports) still answer the generic codes for their
-domain rules.
+account and plan value objects they are built from), and from Phase 38.7b the
+customer, conversation, notification and report folders, or a knowledge file
+refusal, has no code; another fails when a 400, 409 or 422 written by the customer,
+conversation, notification or report endpoints themselves has none; another fails
+when a published code is missing from this file; and HTTP checks prove the codes
+reach the wire (`ProblemCodeTests`, `AreaProblemCodeApiTests`). Since Phase 38.7b
+every area names the codes of its own rules. A refusal with no specific code yet
+(for example an unknown analytics `range`) still gets the generic one, and keeps
+it until it is named.
 
 **No `errors` map in these areas.** None of the areas above answers with a
 validation `errors` map (no endpoint returns `ValidationProblem`): each refusal is
@@ -77,6 +157,14 @@ ever answer with `errors`, it keeps that map unchanged and gets `code`
 | `precondition.required` | 428 | A conditional write arrived without `If-Match` |
 | `precondition.if_match.invalid` | 400 | `If-Match` could not be read as exactly one strong entity tag |
 
+**In the OpenAPI document (Phase 38.7b, BA-5).** The `ProblemDetails` schema of
+`/openapi/v1.json` (Development only) lists the extension members this API writes:
+`code`, `codes`, `limit`, `limitUnit` (with its six values), `entitlement`,
+`current`, `periodFrom`, `periodTo`, `traceId`, and the merged customer's
+`customerId` and `canonicalCustomerId`. All are optional: each appears only on the
+refusals this file names. `OpenApiDocumentContractTests` reads the document and
+fails when one goes missing.
+
 ## Knowledge (Phase 37.5a)
 
 **Refused files (row 17).** The status follows the reason exactly as before (413,
@@ -84,6 +172,14 @@ ever answer with `errors`, it keeps that map unchanged and gets `code`
 bound was broken, a numeric `limit` travels beside the code, in the rule's own
 unit, so a client can say "more than 500 pages" in the reader's language without
 reading the English sentence.
+
+**`limitUnit` (Phase 38.7b, BA-12).** Beside every `limit` on a file refusal, and
+only there, `limitUnit` says what the number counts: `bytes`, `pages`, `characters`,
+`rows`, `columns` or `entries`. The two are present together or not at all. It
+matters for `knowledge.file.archive_too_large`, whose `limit` is `entries` for a
+DOCX with too many parts and `bytes` for one that expands too far; for the other
+codes it restates the unit in the table below. An entitlement refusal's `limit` has
+no `limitUnit`: its unit is the entitlement it names.
 
 | Code | Status | `limit` | Meaning |
 | --- | --- | --- | --- |
@@ -103,7 +199,7 @@ reading the English sentence.
 | `knowledge.file.too_many_rows` | 422 | rows | A CSV past the row bound |
 | `knowledge.file.too_many_columns` | 422 | columns | A CSV past the column bound |
 | `knowledge.file.cell_too_long` | 422 | characters | A CSV cell past the cell bound |
-| `knowledge.file.archive_too_large` | 422 | entries or bytes | A DOCX with too many parts, or one that expands too far |
+| `knowledge.file.archive_too_large` | 422 | `entries` or `bytes`, as `limitUnit` says | A DOCX with too many parts, or one that expands too far |
 | `knowledge.file.name.required` | 400 | | The uploaded file has no name |
 | `knowledge.file.name.unreadable` | 400 | | The file name could not be read |
 | `knowledge.file.name.too_long` | 400 | | The file name is past its bound |
@@ -296,6 +392,10 @@ if it does, it is a defect, and the code tells an operator where to look.
 | `team.membership.invalid`, `users.id.invalid`, `accounts.email.invalid` | Team and accounts (37.5b) |
 | `billing.checkout_intent.invalid`, `billing.customer.invalid`, `billing.event.invalid`, `billing.id.invalid`, `billing.offer.invalid`, `billing.provider_reference.invalid`, `billing.price.invalid`, `billing.subscription.invalid` | Billing (37.5b): records built from the provider's answers and the operator's catalogue |
 | `plans.code.invalid`, `plans.name.invalid`, `plans.limit.invalid`, `plans.id.invalid`, `plans.assignment.invalid`, `plans.instant.invalid`, `plans.entitlement.unknown`, `plans.usage.invalid` | Plans (37.5b): the plan definitions behind billing and the entitlements |
+| `customers.tenant.required`, `customers.instant.invalid`, `customers.display_name.required` | Customers (38.7b). `customers.display_name.required` is the name's own rule; the rename route clears a blank name instead of refusing it |
+| `conversations.tenant.required`, `conversations.customer.required`, `conversations.sender.invalid`, `conversations.assignment.invalid`, `conversations.instant.invalid`, `conversations.value.invalid`, `conversations.handling_event.invalid`, `conversations.turn.invalid`, `conversations.turn.settled`, `conversations.reply.invalid`, `conversations.message_id.invalid` | Conversations (38.7b): the transcript, its turns, replies and handling events. `conversations.turn.settled` is the turn's own guard; the chat answers a repeated message with `chat.message.in_progress` or `chat.message.already_failed` first |
+| `notifications.tenant.required`, `notifications.kind.unknown`, `notifications.retention.invalid`, `notifications.text.invalid`, `notifications.action.invalid`, `notifications.id.invalid`, `notifications.occurrence.invalid`, `notifications.email_id.invalid` | Notifications (38.7b): records the platform writes itself. `notifications.id.invalid` is the id's own rule; the route answers 404 for an all-zero id first |
+| `reports.tenant.required`, `reports.artifact.invalid` | Reports (38.7b): executions, schedules and their stored files |
 
 ## Codes that existed before this list
 

@@ -299,7 +299,10 @@ public sealed class ReportScheduleHandlers(
 
         if (!ReportCatalog.For(type).Supports(format))
         {
-            throw new DomainValidationException("That report is not available in that format.");
+            throw new DomainValidationException("That report is not available in that format.")
+            {
+                Code = "reports.format.unsupported",
+            };
         }
 
         return (type, format, frequency);

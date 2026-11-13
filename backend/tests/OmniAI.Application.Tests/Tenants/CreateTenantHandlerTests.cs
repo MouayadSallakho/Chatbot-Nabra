@@ -374,5 +374,11 @@ public sealed class CreateTenantHandlerTests
             DateTimeOffset now,
             CancellationToken cancellationToken = default) =>
             throw new NotSupportedException("Creating a workspace never changes its zone.");
+
+        public Task<int> CountSchedulesToRezoneAsync(
+            TenantId tenantId,
+            DateTimeOffset now,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException("Creating a workspace never counts its schedules.");
     }
 }

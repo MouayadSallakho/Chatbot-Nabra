@@ -86,6 +86,43 @@ public sealed class WorkspaceTimeZoneStoreTests(PostgresTestDatabase database) :
     }
 
     [Fact]
+    public async Task The_schedule_count_is_exactly_what_a_zone_change_moves()
+    {
+        // Phase 38.7b (BA-9): the count the workspace read gives a manager.
+        ReportWorld world = await ReportWorld.CreateAsync(database);
+        ReportWorld elsewhere = await ReportWorld.CreateAsync(database);
+        ReportSchedule upcoming = await AddAsync(world, Wednesday);
+        ReportSchedule due = await AddAsync(world, LongAgo);
+        ReportSchedule switchedOff = await AddAsync(world, Wednesday, enabled: false);
+        await AddAsync(elsewhere, Wednesday);
+
+        DateTimeOffset now = Wednesday.AddHours(1);
+
+        await using (OmniAiDbContext context = database.CreateContext())
+        {
+            // Upcoming and switched off, not the one already due, and nothing
+            // of another workspace.
+            Assert.Equal(2, await new TenantRepository(context).CountSchedulesToRezoneAsync(world.Tenant, now));
+            Assert.Equal(0, await new TenantRepository(context).CountSchedulesToRezoneAsync(TenantId.New(), now));
+        }
+
+        await using (OmniAiDbContext context = database.CreateContext())
+        {
+            TenantRepository tenants = new(context);
+            Versioned<Tenant> stored = (await tenants.FindVersionedAsync(world.Tenant))!;
+            Assert.True(stored.Value.ChangeTimeZone(Riyadh));
+            await tenants.ChangeTimeZoneAsync(stored.Value, stored.Version, now);
+        }
+
+        // The change moved exactly the two it counted.
+        await using OmniAiDbContext check = database.CreateContext();
+
+        Assert.NotEqual(upcoming.NextRunAt, await NextRunAsync(check, upcoming));
+        Assert.NotEqual(switchedOff.NextRunAt, await NextRunAsync(check, switchedOff));
+        Assert.Equal(due.NextRunAt, await NextRunAsync(check, due));
+    }
+
+    [Fact]
     public async Task A_stale_version_writes_neither_the_zone_nor_any_schedule()
     {
         ReportWorld world = await ReportWorld.CreateAsync(database);

@@ -191,6 +191,29 @@ internal sealed class InMemoryTenantRepository : ITenantRepository
         return Task.FromResult(VersionOf(tenant.Id));
     }
 
+    private readonly Dictionary<TenantId, int> _schedulesToRezone = [];
+
+    /// <summary>The instant the last schedule count was asked for (Phase 38.7b).</summary>
+    public DateTimeOffset? ScheduleCountAskedAt { get; private set; }
+
+    /// <summary>Says how many schedules a zone change would move in a workspace.</summary>
+    public InMemoryTenantRepository WithSchedulesToRezone(TenantId id, int count)
+    {
+        _schedulesToRezone[id] = count;
+
+        return this;
+    }
+
+    public Task<int> CountSchedulesToRezoneAsync(
+        TenantId tenantId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken = default)
+    {
+        ScheduleCountAskedAt = now;
+
+        return Task.FromResult(_schedulesToRezone.GetValueOrDefault(tenantId));
+    }
+
     /// <summary>Moves a workspace's version on, as a concurrent writer would.</summary>
     public void Touch(TenantId id) => _versions[id] = _versions.GetValueOrDefault(id) + 1;
 

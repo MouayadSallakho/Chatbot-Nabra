@@ -83,12 +83,18 @@ public sealed class ReportArtifact
 
         if (byteLength <= 0)
         {
-            throw new DomainValidationException("A report file cannot be empty.");
+            throw new DomainValidationException("A report file cannot be empty.")
+            {
+                Code = "reports.artifact.invalid",
+            };
         }
 
         if (retention <= TimeSpan.Zero)
         {
-            throw new DomainValidationException("A report must be kept for a positive period.");
+            throw new DomainValidationException("A report must be kept for a positive period.")
+            {
+                Code = "reports.artifact.invalid",
+            };
         }
 
         return new ReportArtifact(

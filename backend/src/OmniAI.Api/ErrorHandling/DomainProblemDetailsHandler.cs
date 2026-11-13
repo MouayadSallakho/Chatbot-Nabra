@@ -167,6 +167,12 @@ internal sealed partial class DomainProblemDetailsHandler(
 
                 return;
 
+            // Phase 38.7b: the same for an assignee who cannot take a conversation.
+            case ConversationAssigneeIneligibleException ineligible:
+                problem.Extensions["code"] = ineligible.Code;
+
+                return;
+
             // A file refusal names its reason, and the bound it broke where it has
             // one, so a client can say "more than 300 pages" in the reader's
             // language without parsing the English sentence for the number.
@@ -176,6 +182,9 @@ internal sealed partial class DomainProblemDetailsHandler(
                 if (rejected.Limit is long limit)
                 {
                     problem.Extensions["limit"] = limit;
+
+                    // Phase 38.7b (BA-12): what the number counts, always beside it.
+                    problem.Extensions["limitUnit"] = rejected.LimitUnit;
                 }
 
                 return;
@@ -237,6 +246,9 @@ internal sealed partial class DomainProblemDetailsHandler(
         InvitationNoLongerUsableException => "invitations.no_longer_usable",
         InvitationNotForThisAccountException => "invitations.account.mismatch",
         InvitationStatusFilterInvalidException => "invitations.status.invalid",
+
+        // Phase 38.7b: conversations.
+        ConversationNotHandledByHumanException => "conversations.reply.not_taken_over",
         _ => null,
     };
 

@@ -70,7 +70,8 @@ internal static class TeamEndpoints
             .WithName(GetMemberByIdRouteName);
 
         workspace.MapPut("/members/{userId:guid}/roles", ReplaceMemberRolesAsync)
-            .WithName("ReplaceTenantMemberRoles");
+            .WithName("ReplaceTenantMemberRoles")
+            .Produces<MemberResponse>(StatusCodes.Status200OK);
 
         workspace.MapGet("/invitations", ListInvitationsAsync)
             .WithName("ListTenantInvitations")
@@ -81,13 +82,15 @@ internal static class TeamEndpoints
             .ProducesProblem(StatusCodes.Status404NotFound);
 
         workspace.MapPost("/invitations", CreateInvitationAsync)
-            .WithName("CreateTenantInvitation");
+            .WithName("CreateTenantInvitation")
+            .Produces<CreatedInvitationResponse>(StatusCodes.Status201Created);
 
         // POST to a named action rather than DELETE on the invitation, because
         // the invitation is not deleted: it keeps its history, and the record that
         // somebody withdrew it is part of what a workspace can look back at.
         workspace.MapPost("/invitations/{invitationId:guid}/revoke", RevokeInvitationAsync)
-            .WithName("RevokeTenantInvitation");
+            .WithName("RevokeTenantInvitation")
+            .Produces(StatusCodes.Status204NoContent);
 
         // Outside the workspace group, and authenticated rather than membership
         // checked -- the whole point is that the caller is not a member yet.
@@ -96,7 +99,8 @@ internal static class TeamEndpoints
             .WithTags("Team")
             .RequireAuthorization()
             .AddEndpointFilter<AntiforgeryEndpointFilter>()
-            .WithName("AcceptTenantInvitation");
+            .WithName("AcceptTenantInvitation")
+            .Produces<AcceptedInvitationResponse>(StatusCodes.Status200OK);
 
         return endpoints;
     }

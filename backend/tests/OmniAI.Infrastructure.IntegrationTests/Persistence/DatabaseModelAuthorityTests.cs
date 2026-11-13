@@ -123,9 +123,9 @@ public sealed class DatabaseModelAuthorityTests(PostgresTestDatabase database)
         }
 
         NpgsqlConnection.ClearAllPools();
-        await ExecuteAsync(
+        await PostgresTestDatabase.DropDatabaseAsync(
             Environment.GetEnvironmentVariable(ConnectionEnvironmentVariable)!,
-            $"DROP DATABASE IF EXISTS \"{_modelDatabaseName}\" WITH (FORCE)");
+            _modelDatabaseName);
     }
 
     [Fact]

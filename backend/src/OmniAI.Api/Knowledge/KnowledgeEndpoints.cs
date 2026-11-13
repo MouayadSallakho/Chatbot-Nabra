@@ -52,7 +52,8 @@ internal static class KnowledgeEndpoints
             .ProducesProblem(StatusCodes.Status404NotFound);
 
         knowledge.MapPost("/", CreateAsync)
-            .WithName("CreateKnowledgeDocument");
+            .WithName("CreateKnowledgeDocument")
+            .Produces<KnowledgeDocumentResponse>(StatusCodes.Status201Created);
 
         knowledge.MapGet("/{knowledgeDocumentId:guid}", GetByIdAsync)
             .WithName(GetKnowledgeDocumentByIdRouteName)
@@ -62,17 +63,21 @@ internal static class KnowledgeEndpoints
             .ProducesProblem(StatusCodes.Status404NotFound);
 
         knowledge.MapPut("/{knowledgeDocumentId:guid}", UpdateAsync)
-            .WithName("UpdateKnowledgeDocument");
+            .WithName("UpdateKnowledgeDocument")
+            .Produces<KnowledgeDocumentResponse>(StatusCodes.Status200OK);
 
         knowledge.MapPost("/{knowledgeDocumentId:guid}/index", IndexAsync)
             .WithName("IndexKnowledgeDocument")
+            .Produces<KnowledgeIndexResponse>(StatusCodes.Status200OK)
             .WithSummary("Indexes one document (If-Match). The attempt runs to its end even if the caller goes away (Phase 38.7a), bounded by the server's own limit (a 504 and the attempt code timed_out when exceeded); its start and end are announced as knowledgeChanged.");
 
         knowledge.MapPost("/{knowledgeDocumentId:guid}/enable", EnableAsync)
-            .WithName("EnableKnowledgeDocument");
+            .WithName("EnableKnowledgeDocument")
+            .Produces<KnowledgeDocumentResponse>(StatusCodes.Status200OK);
 
         knowledge.MapPost("/{knowledgeDocumentId:guid}/disable", DisableAsync)
-            .WithName("DisableKnowledgeDocument");
+            .WithName("DisableKnowledgeDocument")
+            .Produces<KnowledgeDocumentResponse>(StatusCodes.Status200OK);
 
         return endpoints;
     }

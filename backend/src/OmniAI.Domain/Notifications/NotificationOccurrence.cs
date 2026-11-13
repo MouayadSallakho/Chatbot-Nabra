@@ -78,18 +78,27 @@ public sealed class NotificationOccurrence
     {
         if (tenantId.IsEmpty)
         {
-            throw new DomainValidationException("An occurrence belongs to a workspace.");
+            throw new DomainValidationException("An occurrence belongs to a workspace.")
+            {
+                Code = "notifications.tenant.required",
+            };
         }
 
         if (!Enum.IsDefined(kind))
         {
-            throw new DomainValidationException("That notification kind is not recognised.");
+            throw new DomainValidationException("That notification kind is not recognised.")
+            {
+                Code = "notifications.kind.unknown",
+            };
         }
 
         if (string.IsNullOrWhiteSpace(occurrenceKey) || occurrenceKey.Length > MaxKeyLength)
         {
             throw new DomainValidationException(
-                $"An occurrence key must be between 1 and {MaxKeyLength} characters.");
+                $"An occurrence key must be between 1 and {MaxKeyLength} characters.")
+            {
+                Code = "notifications.occurrence.invalid",
+            };
         }
 
         return new NotificationOccurrence(

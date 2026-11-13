@@ -39,7 +39,10 @@ public static class CustomerShortCode
     {
         if (customerId == Guid.Empty)
         {
-            throw new DomainValidationException("A short code needs a real customer id.");
+            throw new DomainValidationException("A short code needs a real customer id.")
+            {
+                Code = "customers.id.invalid",
+            };
         }
 
         // Big-endian, so byte 15 is the last byte of the canonical text form and

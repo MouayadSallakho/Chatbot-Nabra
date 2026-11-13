@@ -60,6 +60,7 @@ public sealed class KnowledgeFileRefusalCodeTests
 
         Assert.Equal(KnowledgeFileRefusals.TooLarge, refused.Code);
         Assert.Equal(64, refused.Limit);
+        Assert.Equal(KnowledgeFileLimitUnits.Bytes, refused.LimitUnit);
     }
 
     [Fact]
@@ -71,6 +72,7 @@ public sealed class KnowledgeFileRefusalCodeTests
 
         Assert.Equal(KnowledgeFileRefusals.TooManyPages, refused.Code);
         Assert.Equal(3, refused.Limit);
+        Assert.Equal(KnowledgeFileLimitUnits.Pages, refused.LimitUnit);
     }
 
     [Fact]
@@ -82,6 +84,7 @@ public sealed class KnowledgeFileRefusalCodeTests
 
         Assert.Equal(KnowledgeFileRefusals.TooManyCharacters, refused.Code);
         Assert.Equal(100, refused.Limit);
+        Assert.Equal(KnowledgeFileLimitUnits.Characters, refused.LimitUnit);
     }
 
     [Fact]
@@ -99,6 +102,9 @@ public sealed class KnowledgeFileRefusalCodeTests
         Assert.Equal((KnowledgeFileRefusals.TooManyColumns, 3L), (columns.Code, columns.Limit!.Value));
         Assert.Equal((KnowledgeFileRefusals.TooManyRows, 3L), (rows.Code, rows.Limit!.Value));
         Assert.Equal((KnowledgeFileRefusals.CellTooLong, 50L), (cells.Code, cells.Limit!.Value));
+        Assert.Equal(KnowledgeFileLimitUnits.Columns, columns.LimitUnit);
+        Assert.Equal(KnowledgeFileLimitUnits.Rows, rows.LimitUnit);
+        Assert.Equal(KnowledgeFileLimitUnits.Characters, cells.LimitUnit);
     }
 
     [Fact]
@@ -109,6 +115,36 @@ public sealed class KnowledgeFileRefusalCodeTests
         KnowledgeFileRejectedException refused = Refuse(bounded, "bomb.docx", KnowledgeFileFixtures.DocxExpandingTo(4));
 
         Assert.Equal(KnowledgeFileRefusals.ArchiveTooLarge, refused.Code);
+
+        // Phase 38.7b (BA-12): the same code counts bytes here...
+        Assert.Equal(2 * 1024 * 1024, refused.Limit);
+        Assert.Equal(KnowledgeFileLimitUnits.Bytes, refused.LimitUnit);
+    }
+
+    [Fact]
+    public void A_docx_with_too_many_parts_names_the_archive_bound_in_entries()
+    {
+        KnowledgeFilePolicy bounded = new() { MaxArchiveEntries = 8 };
+
+        KnowledgeFileRejectedException refused = Refuse(bounded, "parts.docx", KnowledgeFileFixtures.DocxWithEntries(12));
+
+        // ...and entries here: the unit is what tells the two apart.
+        Assert.Equal(KnowledgeFileRefusals.ArchiveTooLarge, refused.Code);
+        Assert.Equal(8, refused.Limit);
+        Assert.Equal(KnowledgeFileLimitUnits.Entries, refused.LimitUnit);
+    }
+
+    [Fact]
+    public void A_limit_never_travels_without_its_unit()
+    {
+        Assert.Throws<ArgumentException>(() => new KnowledgeFileRejectedException(
+            KnowledgeFileRejection.TooMuchContent, KnowledgeFileRefusals.ArchiveTooLarge, "x", limit: 3));
+
+        Assert.Throws<ArgumentException>(() => new KnowledgeFileRejectedException(
+            KnowledgeFileRejection.TooMuchContent, KnowledgeFileRefusals.ArchiveTooLarge, "x", limitUnit: KnowledgeFileLimitUnits.Entries));
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => new KnowledgeFileRejectedException(
+            KnowledgeFileRejection.TooMuchContent, KnowledgeFileRefusals.ArchiveTooLarge, "x", limit: 3, limitUnit: "parts"));
     }
 
     [Fact]

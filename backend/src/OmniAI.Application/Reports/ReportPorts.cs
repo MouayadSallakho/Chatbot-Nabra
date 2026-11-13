@@ -429,25 +429,35 @@ public sealed class ReportNotDownloadableException : Exception
         })
     {
         Status = status;
+        Code = CodeFor(status);
     }
 
     public ReportNotDownloadableException(string message)
         : base(message)
     {
+        Code = CodeFor(Status);
     }
 
     public ReportNotDownloadableException(string message, Exception innerException)
         : base(message, innerException)
     {
+        Code = CodeFor(Status);
     }
 
-    private ReportNotDownloadableException(ReportExecutionStatus status, string message)
+    private ReportNotDownloadableException(ReportExecutionStatus status, string code, string message)
         : base(message)
     {
         Status = status;
+        Code = code;
     }
 
     public ReportExecutionStatus Status { get; }
+
+    /// <summary>
+    /// The stable code of the refusal (Phase 38.7b, BA-4): <c>reports.file.not_ready</c>,
+    /// <c>reports.file.failed</c>, <c>reports.file.expired</c> or <c>reports.file.missing</c>.
+    /// </summary>
+    public string Code { get; }
 
     /// <summary>
     /// The record says the file exists, and the store does not have it.
@@ -459,7 +469,15 @@ public sealed class ReportNotDownloadableException : Exception
     public static ReportNotDownloadableException Missing() =>
         new(
             ReportExecutionStatus.Expired,
+            "reports.file.missing",
             "This report's file is no longer in report storage. Generate the report again.");
+
+    private static string CodeFor(ReportExecutionStatus status) => status switch
+    {
+        ReportExecutionStatus.Failed => "reports.file.failed",
+        ReportExecutionStatus.Expired => "reports.file.expired",
+        _ => "reports.file.not_ready",
+    };
 }
 
 /// <summary>A schedule was changed since the caller read it.</summary>

@@ -1,3 +1,4 @@
+using OmniAI.Api.ErrorHandling;
 using OmniAI.Api.Http;
 using OmniAI.Api.Security;
 using OmniAI.Application.Concurrency;
@@ -36,6 +37,18 @@ internal static class CustomerEndpoints
 {
     private const string GetCustomerRouteName = "GetCustomer";
 
+    // Phase 38.7b (BA-4): the codes only this edge can name. The rest are named at
+    // their throw sites; all of them are in problem-codes.md.
+
+    /// <summary><c>page</c> or <c>pageSize</c> out of range (400).</summary>
+    internal const string PageInvalid = "customers.page.invalid";
+
+    /// <summary>A merge that names no customer to keep (400).</summary>
+    internal const string MergeTargetRequired = "customers.merge.target_required";
+
+    /// <summary>The customer was merged into another, which is the one to use (409).</summary>
+    internal const string Merged = "customers.merged";
+
     public static IEndpointRouteBuilder MapCustomerEndpoints(this IEndpointRouteBuilder endpoints)
     {
         ArgumentNullException.ThrowIfNull(endpoints);
@@ -62,13 +75,15 @@ internal static class CustomerEndpoints
         // customer. The label is the only editable field there is, and a generic
         // JSON patch would be a hole somebody widens later without noticing.
         customers.MapPut("/{customerId:guid}/display-name", RenameAsync)
-            .WithName("RenameCustomer");
+            .WithName("RenameCustomer")
+            .Produces<CustomerResponse>(StatusCodes.Status200OK);
 
         // POST to a named action, because combining two people's histories is a
         // decision rather than a property edit, and naming it keeps the audit
         // readable.
         customers.MapPost("/{customerId:guid}/merge", MergeAsync)
-            .WithName("MergeCustomers");
+            .WithName("MergeCustomers")
+            .Produces<CustomerMergeResponse>(StatusCodes.Status200OK);
 
         return endpoints;
     }
@@ -98,7 +113,8 @@ internal static class CustomerEndpoints
             return Results.Problem(
                 statusCode: StatusCodes.Status400BadRequest,
                 title: "That page cannot be served",
-                detail: failure.Message);
+                detail: failure.Message,
+                extensions: new Dictionary<string, object?> { [ProblemCodes.Member] = PageInvalid });
         }
     }
 
@@ -159,7 +175,7 @@ internal static class CustomerEndpoints
         }
         catch (CustomerAlreadyMergedException failure)
         {
-            return Merged(failure);
+            return MergedAway(failure);
         }
     }
 
@@ -180,7 +196,8 @@ internal static class CustomerEndpoints
             return Results.Problem(
                 statusCode: StatusCodes.Status400BadRequest,
                 title: "A customer to keep is required",
-                detail: "Combining two customers needs the record that will survive.");
+                detail: "Combining two customers needs the record that will survive.",
+                extensions: new Dictionary<string, object?> { [ProblemCodes.Member] = MergeTargetRequired });
         }
 
         // The route customer is the one being merged away, and the version
@@ -209,14 +226,15 @@ internal static class CustomerEndpoints
         }
         catch (CustomerAlreadyMergedException failure)
         {
-            return Merged(failure);
+            return MergedAway(failure);
         }
         catch (CustomerMergeNotAllowedException failure)
         {
             return Results.Problem(
                 statusCode: StatusCodes.Status400BadRequest,
                 title: "These customers cannot be combined",
-                detail: failure.Message);
+                detail: failure.Message,
+                extensions: new Dictionary<string, object?> { [ProblemCodes.Member] = failure.Code });
         }
     }
 
@@ -246,13 +264,14 @@ internal static class CustomerEndpoints
     /// caller's next move is always to act on the surviving record, and making
     /// them go and find it is how a stale tab becomes a dead end.
     /// </remarks>
-    private static IResult Merged(CustomerAlreadyMergedException failure) =>
+    private static IResult MergedAway(CustomerAlreadyMergedException failure) =>
         Results.Problem(
             statusCode: StatusCodes.Status409Conflict,
             title: "This customer has been combined with another",
             detail: "It was combined into another customer, which is the record to use.",
             extensions: new Dictionary<string, object?>(StringComparer.Ordinal)
             {
+                [ProblemCodes.Member] = Merged,
                 ["customerId"] = failure.CustomerId.Value,
                 ["canonicalCustomerId"] = failure.CanonicalId.Value,
             });

@@ -73,6 +73,9 @@ public static class ReportScheduleCalendar
             // started six days earlier.
             ReportFrequency.Weekly => today.AddDays(-(((int)today.DayOfWeek + 6) % 7)),
             ReportFrequency.Monthly => new DateOnly(today.Year, today.Month, 1),
-            _ => throw new DomainValidationException("That report frequency is not recognised."),
+            _ => throw new DomainValidationException("That report frequency is not recognised.")
+            {
+                Code = "reports.frequency.invalid",
+            },
         };
 }

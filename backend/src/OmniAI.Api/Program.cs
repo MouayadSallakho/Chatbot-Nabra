@@ -16,13 +16,15 @@ using OmniAI.Api.WebChat;
 using OmniAI.Api.WhatsApp;
 using OmniAI.Api.Security;
 using OmniAI.Api.Health;
+using OmniAI.Api.Http;
 using OmniAI.Api.Team;
 using OmniAI.Api.Tenants;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
-// OpenAPI describes the HTTP surface that the Angular admin application consumes.
-builder.Services.AddOpenApi();
+// OpenAPI describes the HTTP surface that the Angular admin application consumes,
+// with what the generator cannot infer (Phase 38.7b): see OpenApiContract.
+builder.Services.AddNabraOpenApi();
 
 // Problem Details is the single, uniform error contract for the whole API. Every
 // correctable refusal carries a stable code (Phase 37.5a): the throw site names it

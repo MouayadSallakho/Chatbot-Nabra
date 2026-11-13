@@ -239,16 +239,20 @@ internal static class ConversationEndpoints
         // there is no public entry to any of them, and a visitor's conversation
         // credential opens none of them.
         workspace.MapPost("/{conversationId:guid}/take-over", TakeOverAsync)
-            .WithName("TakeOverTenantConversation");
+            .WithName("TakeOverTenantConversation")
+            .Produces<ConversationDetailResponse>(StatusCodes.Status200OK);
 
         workspace.MapPost("/{conversationId:guid}/return-to-ai", ReturnToAiAsync)
-            .WithName("ReturnTenantConversationToAi");
+            .WithName("ReturnTenantConversationToAi")
+            .Produces<ConversationDetailResponse>(StatusCodes.Status200OK);
 
         workspace.MapPut("/{conversationId:guid}/assignment", AssignAsync)
-            .WithName("AssignTenantConversation");
+            .WithName("AssignTenantConversation")
+            .Produces<ConversationDetailResponse>(StatusCodes.Status200OK);
 
         workspace.MapPost("/{conversationId:guid}/messages", ReplyAsync)
-            .WithName("ReplyToTenantConversation");
+            .WithName("ReplyToTenantConversation")
+            .Produces<TranscriptMessageResponse>(StatusCodes.Status200OK);
 
         workspace.MapGet("/assignees", ListAssigneesAsync)
             .WithName("ListTenantConversationAssignees");

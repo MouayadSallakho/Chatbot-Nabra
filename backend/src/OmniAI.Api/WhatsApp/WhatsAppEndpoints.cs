@@ -49,29 +49,34 @@ internal static class WhatsAppEndpoints
             .WithName("ListWhatsAppConnections");
 
         workspace.MapPost("/", CreateAsync)
-            .WithName("CreateWhatsAppConnection");
+            .WithName("CreateWhatsAppConnection")
+            .Produces<WhatsAppConnectionResponse>(StatusCodes.Status201Created);
 
         workspace.MapGet("/{connectionId:guid}", GetAsync)
             .WithName(GetConnectionRouteName);
 
         workspace.MapPut("/{connectionId:guid}", UpdateAsync)
-            .WithName("UpdateWhatsAppConnection");
+            .WithName("UpdateWhatsAppConnection")
+            .Produces<WhatsAppConnectionResponse>(StatusCodes.Status200OK);
 
         // PUT to a sub-resource rather than a field on the connection. The token
         // is write-only, so it has no representation the connection could carry,
         // and a route of its own is what makes "who can send a credential here"
         // answerable by reading one line.
         workspace.MapPut("/{connectionId:guid}/credential", ReplaceCredentialAsync)
-            .WithName("ReplaceWhatsAppCredential");
+            .WithName("ReplaceWhatsAppCredential")
+            .Produces<WhatsAppConnectionResponse>(StatusCodes.Status200OK);
 
         // POST to a named action rather than PATCH on a status field. Putting a
         // number into service and taking it out are decisions, not property
         // edits, and naming them keeps the audit readable.
         workspace.MapPost("/{connectionId:guid}/activate", ActivateAsync)
-            .WithName("ActivateWhatsAppConnection");
+            .WithName("ActivateWhatsAppConnection")
+            .Produces<WhatsAppConnectionResponse>(StatusCodes.Status200OK);
 
         workspace.MapPost("/{connectionId:guid}/disable", DisableAsync)
-            .WithName("DisableWhatsAppConnection");
+            .WithName("DisableWhatsAppConnection")
+            .Produces<WhatsAppConnectionResponse>(StatusCodes.Status200OK);
 
         // The WhatsApp side of one conversation, for the shared inbox. Its own
         // group because it is guarded by conversations.view rather than by a

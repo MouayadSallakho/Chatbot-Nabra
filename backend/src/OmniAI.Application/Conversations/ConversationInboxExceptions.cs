@@ -43,21 +43,30 @@ public sealed class ConversationNotHandledByHumanException()
 /// deliberately with different sentences: the first is a mistake worth naming
 /// plainly because it should be impossible from the UI, and the second is a
 /// routine consequence of how roles are set up that an administrator can fix.
+/// <para>
+/// Each carries its own stable <see cref="Code"/> (Phase 38.7b, BA-4), so a client
+/// words the two differently without reading the sentence.
+/// </para>
 /// </remarks>
 public sealed class ConversationAssigneeIneligibleException : Exception
 {
-    private ConversationAssigneeIneligibleException(string message)
-        : base(message)
-    {
-    }
+    private ConversationAssigneeIneligibleException(string code, string message)
+        : base(message) =>
+        Code = code;
+
+    /// <summary>The stable code, such as <c>conversations.assignee.not_member</c>.</summary>
+    public string Code { get; }
 
     /// <summary>The named person does not belong to this workspace.</summary>
     public static ConversationAssigneeIneligibleException NotAMember() =>
-        new("That person is not a member of this workspace.");
+        new(
+            "conversations.assignee.not_member",
+            "That person is not a member of this workspace.");
 
     /// <summary>The named member holds no permission to reply.</summary>
     public static ConversationAssigneeIneligibleException CannotReply() =>
         new(
+            "conversations.assignee.cannot_reply",
             "That member cannot reply to conversations, so assigning this one to "
             + "them would leave the customer waiting. Give them the reply "
             + "permission first.");

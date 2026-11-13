@@ -59,6 +59,58 @@ public sealed class KnowledgeFileRefusalApiTests(KnowledgeFileApiFixture fixture
         JsonElement problem = await ProblemAsync(response);
         Assert.Equal("knowledge.file.too_large", problem.GetProperty("code").GetString());
         Assert.Equal(KnowledgeFileApiFixture.MaxFileBytes, problem.GetProperty("limit").GetInt64());
+        Assert.Equal("bytes", problem.GetProperty("limitUnit").GetString());
+    }
+
+    [Fact]
+    public async Task An_archive_with_too_many_parts_names_its_limit_in_entries()
+    {
+        (HttpClient owner, Guid tenantId, _) = await fixture.CreateOwnerAsync();
+
+        HttpResponseMessage response = await UploadAsync(
+            owner,
+            tenantId,
+            "parts.docx",
+            Archive(KnowledgeFileApiFixture.MaxArchiveEntries + 4, bytesPerPart: 4));
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+
+        JsonElement problem = await ProblemAsync(response);
+        Assert.Equal("knowledge.file.archive_too_large", problem.GetProperty("code").GetString());
+        Assert.Equal(KnowledgeFileApiFixture.MaxArchiveEntries, problem.GetProperty("limit").GetInt64());
+        Assert.Equal("entries", problem.GetProperty("limitUnit").GetString());
+    }
+
+    [Fact]
+    public async Task An_archive_that_expands_too_far_names_its_limit_in_bytes()
+    {
+        (HttpClient owner, Guid tenantId, _) = await fixture.CreateOwnerAsync();
+
+        // One part of 768 KB of spaces: a few kilobytes on the wire.
+        HttpResponseMessage response = await UploadAsync(
+            owner,
+            tenantId,
+            "large.docx",
+            Archive(1, bytesPerPart: 768 * 1024));
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+
+        JsonElement problem = await ProblemAsync(response);
+        Assert.Equal("knowledge.file.archive_too_large", problem.GetProperty("code").GetString());
+        Assert.Equal(KnowledgeFileApiFixture.MaxArchiveExpandedBytes, problem.GetProperty("limit").GetInt64());
+        Assert.Equal("bytes", problem.GetProperty("limitUnit").GetString());
+    }
+
+    [Fact]
+    public async Task A_refusal_without_a_bound_carries_neither_limit_nor_unit()
+    {
+        (HttpClient owner, Guid tenantId, _) = await fixture.CreateOwnerAsync();
+
+        JsonElement problem = await ProblemAsync(
+            await UploadAsync(owner, tenantId, "setup.exe", Encoding.UTF8.GetBytes("MZ")));
+
+        Assert.False(problem.TryGetProperty("limit", out _));
+        Assert.False(problem.TryGetProperty("limitUnit", out _));
     }
 
     public static TheoryData<string, byte[], HttpStatusCode, string> ParserRefusals => new()
@@ -88,6 +140,29 @@ public sealed class KnowledgeFileRefusalApiTests(KnowledgeFileApiFixture fixture
         JsonElement problem = await ProblemAsync(response);
         Assert.Equal(code, problem.GetProperty("code").GetString());
         Assert.False(string.IsNullOrWhiteSpace(problem.GetProperty("detail").GetString()));
+    }
+
+    /// <summary>A zip with this many parts, each this many spaces long.</summary>
+    private static byte[] Archive(int parts, int bytesPerPart)
+    {
+        using MemoryStream buffer = new();
+
+        using (System.IO.Compression.ZipArchive archive = new(
+            buffer,
+            System.IO.Compression.ZipArchiveMode.Create,
+            leaveOpen: true))
+        {
+            byte[] content = new byte[bytesPerPart];
+            Array.Fill(content, (byte)' ');
+
+            for (int index = 0; index < parts; index++)
+            {
+                using Stream stream = archive.CreateEntry($"word/part{index}.xml").Open();
+                stream.Write(content);
+            }
+        }
+
+        return buffer.ToArray();
     }
 
     private static Uri Files(Guid tenantId) =>

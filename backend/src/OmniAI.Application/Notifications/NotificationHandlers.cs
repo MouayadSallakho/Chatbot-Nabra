@@ -76,13 +76,19 @@ public sealed class NotificationHandlers(
 
         if (number < 1)
         {
-            throw new DomainValidationException("Page must be 1 or greater.");
+            throw new DomainValidationException("Page must be 1 or greater.")
+            {
+                Code = "notifications.page.invalid",
+            };
         }
 
         if (size < 1 || size > NotificationPage.MaxPageSize)
         {
             throw new DomainValidationException(
-                string.Create(CultureInfo.InvariantCulture, $"Page size must be between 1 and {NotificationPage.MaxPageSize}."));
+                string.Create(CultureInfo.InvariantCulture, $"Page size must be between 1 and {NotificationPage.MaxPageSize}."))
+            {
+                Code = "notifications.page.invalid",
+            };
         }
 
         if (await MemberAsync(tenantId, cancellationToken).ConfigureAwait(false) is not (TenantId workspace, UserId me))
@@ -221,7 +227,10 @@ public sealed class NotificationHandlers(
             || command.ChannelHealth is not bool channelHealth)
         {
             throw new DomainValidationException(
-                "Say whether each category is emailed: reports, usage, billing, knowledge and channelHealth.");
+                "Say whether each category is emailed: reports, usage, billing, knowledge and channelHealth.")
+            {
+                Code = "notifications.preferences.incomplete",
+            };
         }
 
         if (await MemberAsync(command.TenantId, cancellationToken).ConfigureAwait(false) is not (TenantId workspace, UserId me))

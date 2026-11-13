@@ -114,7 +114,10 @@ public sealed class ReportSchedule
     {
         if (tenantId.IsEmpty)
         {
-            throw new DomainValidationException("A schedule belongs to a workspace.");
+            throw new DomainValidationException("A schedule belongs to a workspace.")
+            {
+                Code = "reports.tenant.required",
+            };
         }
 
         Validate(type, format, frequency);
@@ -245,17 +248,26 @@ public sealed class ReportSchedule
     {
         if (!Enum.IsDefined(type))
         {
-            throw new DomainValidationException("That report type is not recognised.");
+            throw new DomainValidationException("That report type is not recognised.")
+            {
+                Code = "reports.type.invalid",
+            };
         }
 
         if (!Enum.IsDefined(format))
         {
-            throw new DomainValidationException("That report format is not recognised.");
+            throw new DomainValidationException("That report format is not recognised.")
+            {
+                Code = "reports.format.invalid",
+            };
         }
 
         if (!Enum.IsDefined(frequency))
         {
-            throw new DomainValidationException("A schedule runs weekly or monthly.");
+            throw new DomainValidationException("A schedule runs weekly or monthly.")
+            {
+                Code = "reports.frequency.invalid",
+            };
         }
     }
 
@@ -263,7 +275,10 @@ public sealed class ReportSchedule
     {
         if (!Enum.IsDefined(language))
         {
-            throw new DomainValidationException("A schedule's reports are written in English or Arabic.");
+            throw new DomainValidationException("A schedule's reports are written in English or Arabic.")
+            {
+                Code = "language.unsupported",
+            };
         }
     }
 
@@ -273,18 +288,27 @@ public sealed class ReportSchedule
 
         if (trimmed.Length == 0)
         {
-            throw new DomainValidationException("A schedule needs a name.");
+            throw new DomainValidationException("A schedule needs a name.")
+            {
+                Code = "reports.schedule.name.required",
+            };
         }
 
         if (trimmed.Length > MaxNameLength)
         {
             throw new DomainValidationException(
-                $"A schedule name may be at most {MaxNameLength} characters.");
+                $"A schedule name may be at most {MaxNameLength} characters.")
+            {
+                Code = "reports.schedule.name.too_long",
+            };
         }
 
         if (trimmed.Any(char.IsControl))
         {
-            throw new DomainValidationException("A schedule name may not contain control characters.");
+            throw new DomainValidationException("A schedule name may not contain control characters.")
+            {
+                Code = "reports.schedule.name.control_characters",
+            };
         }
 
         return trimmed;

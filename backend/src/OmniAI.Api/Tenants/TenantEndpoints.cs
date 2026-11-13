@@ -54,11 +54,12 @@ internal static class TenantEndpoints
             .AddEndpointFilter<AntiforgeryEndpointFilter>();
 
         tenants.MapPost("/", CreateTenantAsync)
-            .WithName("CreateTenant");
+            .WithName("CreateTenant")
+            .Produces<TenantResponse>(StatusCodes.Status201Created);
 
         tenants.MapGet("/{tenantId:guid}", GetTenantByIdAsync)
             .WithName(GetTenantByIdRouteName)
-            .WithSummary("The workspace, with the ETag a rename must send in If-Match.")
+            .WithSummary("The workspace, with the ETag a rename must send in If-Match. For a caller holding workspace.manage, scheduleCount says how many report schedules a time-zone change would move; it is absent for everybody else.")
             .Produces<TenantResponse>()
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status404NotFound);
@@ -119,7 +120,10 @@ internal static class TenantEndpoints
     /// </summary>
     /// <remarks>
     /// The <c>:guid</c> route constraint means a non-GUID segment never reaches
-    /// this method; it simply does not match the route.
+    /// this method; it simply does not match the route. From Phase 38.7b (BA-9) the
+    /// body carries <c>scheduleCount</c> for a caller holding
+    /// <c>workspace.manage</c>, and nothing for anybody else; the <c>ETag</c> still
+    /// names the workspace row only.
     /// </remarks>
     private static async Task<IResult> GetTenantByIdAsync(
         HttpContext http,

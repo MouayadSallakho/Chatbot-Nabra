@@ -82,7 +82,8 @@ internal static class CsvTextReader
                     KnowledgeFileRefusals.TooManyRows,
                     $"That file has more than {policy.MaxCsvRows:N0} rows. Split it into smaller "
                     + "files, or summarise it before uploading.",
-                    limit: policy.MaxCsvRows);
+                    limit: policy.MaxCsvRows,
+                    limitUnit: KnowledgeFileLimitUnits.Rows);
             }
 
             string record = RenderRecord(parser, headers, policy);
@@ -108,7 +109,8 @@ internal static class CsvTextReader
                     KnowledgeFileRefusals.TooManyCharacters,
                     $"That file renders to more than {policy.MaxExtractedCharacters:N0} "
                     + "characters. Split it into smaller files.",
-                    limit: policy.MaxExtractedCharacters);
+                    limit: policy.MaxExtractedCharacters,
+                    limitUnit: KnowledgeFileLimitUnits.Characters);
             }
         }
 
@@ -160,7 +162,8 @@ internal static class CsvTextReader
                 KnowledgeFileRefusals.TooManyColumns,
                 $"That file has {headers.Length} columns and the limit is "
                 + $"{policy.MaxCsvColumns}.",
-                limit: policy.MaxCsvColumns)
+                limit: policy.MaxCsvColumns,
+                limitUnit: KnowledgeFileLimitUnits.Columns)
             : headers;
     }
 
@@ -196,7 +199,8 @@ internal static class CsvTextReader
                     KnowledgeFileRefusals.CellTooLong,
                     $"A cell in that file holds more than {policy.MaxCsvCellCharacters:N0} "
                     + "characters. It is too large to read as a table.",
-                    limit: policy.MaxCsvCellCharacters);
+                    limit: policy.MaxCsvCellCharacters,
+                    limitUnit: KnowledgeFileLimitUnits.Characters);
             }
 
             if (record.Length > 0)

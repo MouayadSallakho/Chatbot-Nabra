@@ -15,7 +15,10 @@ public readonly record struct NotificationId
     {
         if (value == Guid.Empty)
         {
-            throw new DomainValidationException("Notification id must not be an empty GUID.");
+            throw new DomainValidationException("Notification id must not be an empty GUID.")
+            {
+                Code = "notifications.id.invalid",
+            };
         }
 
         return new NotificationId(value);
@@ -37,7 +40,10 @@ public readonly record struct NotificationOccurrenceId
     {
         if (value == Guid.Empty)
         {
-            throw new DomainValidationException("Notification occurrence id must not be an empty GUID.");
+            throw new DomainValidationException("Notification occurrence id must not be an empty GUID.")
+            {
+                Code = "notifications.occurrence.invalid",
+            };
         }
 
         return new NotificationOccurrenceId(value);
@@ -59,7 +65,10 @@ public readonly record struct NotificationEmailId
     {
         if (value == Guid.Empty)
         {
-            throw new DomainValidationException("Notification email id must not be an empty GUID.");
+            throw new DomainValidationException("Notification email id must not be an empty GUID.")
+            {
+                Code = "notifications.email_id.invalid",
+            };
         }
 
         return new NotificationEmailId(value);

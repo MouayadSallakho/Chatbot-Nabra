@@ -404,6 +404,13 @@ password-protected PDF (PdfPig's `PdfDocumentEncryptedException`) is told apart 
 a damaged one by its code alone; its sentence stays the same. The full list is in
 `problem-codes.md`.
 
+**Phase 38.7b (BA-12): the unit beside the number.** Every refusal that carries
+`limit` also carries `limitUnit` (`bytes`, `pages`, `characters`, `rows`, `columns`
+or `entries`), and none carries one without the other: the refusal's constructor
+refuses a limit without its unit. `.archive_too_large` needs it, because its
+`limit` is `entries` for a DOCX with too many parts (`MaxArchiveEntries`) and
+`bytes` for one that expands too far (`MaxArchiveExpandedBytes`).
+
 ### Title
 
 An explicit title wins. Without one the filename is used, minus its extension —

@@ -113,17 +113,26 @@ public sealed class Notification
     {
         if (tenantId.IsEmpty)
         {
-            throw new DomainValidationException("A notification belongs to a workspace.");
+            throw new DomainValidationException("A notification belongs to a workspace.")
+            {
+                Code = "notifications.tenant.required",
+            };
         }
 
         if (!Enum.IsDefined(kind))
         {
-            throw new DomainValidationException("That notification kind is not recognised.");
+            throw new DomainValidationException("That notification kind is not recognised.")
+            {
+                Code = "notifications.kind.unknown",
+            };
         }
 
         if (retention <= TimeSpan.Zero)
         {
-            throw new DomainValidationException("A notification must be kept for a positive length of time.");
+            throw new DomainValidationException("A notification must be kept for a positive length of time.")
+            {
+                Code = "notifications.retention.invalid",
+            };
         }
 
         return new Notification(
@@ -163,12 +172,18 @@ public sealed class Notification
     {
         if (string.IsNullOrWhiteSpace(value))
         {
-            throw new DomainValidationException($"A notification {what} must not be empty.");
+            throw new DomainValidationException($"A notification {what} must not be empty.")
+            {
+                Code = "notifications.text.invalid",
+            };
         }
 
         if (value.Length > max)
         {
-            throw new DomainValidationException($"A notification {what} must be at most {max} characters.");
+            throw new DomainValidationException($"A notification {what} must be at most {max} characters.")
+            {
+                Code = "notifications.text.invalid",
+            };
         }
 
         return value;

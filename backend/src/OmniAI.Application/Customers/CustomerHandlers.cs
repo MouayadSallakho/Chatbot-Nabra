@@ -293,8 +293,7 @@ public sealed class CustomerHandlers(
 
         if (sourceId == targetId)
         {
-            throw new CustomerMergeNotAllowedException(
-                "A customer cannot be merged into itself.");
+            throw CustomerMergeNotAllowedException.Self();
         }
 
         // Both must exist in this workspace before anything is locked. A merge

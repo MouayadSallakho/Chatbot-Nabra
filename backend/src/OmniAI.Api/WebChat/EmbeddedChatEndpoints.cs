@@ -70,7 +70,8 @@ internal static class EmbeddedChatEndpoints
             .Produces(StatusCodes.Status404NotFound);
 
         embed.MapPost("/{publicKey}/conversations", StartConversationAsync)
-            .WithName("StartEmbeddedWebChatConversation");
+            .WithName("StartEmbeddedWebChatConversation")
+            .Produces<StartedEmbeddedConversationResponse>(StatusCodes.Status200OK);
 
         // Exchanges the embedded credential for a realtime ticket.
         //
@@ -82,13 +83,15 @@ internal static class EmbeddedChatEndpoints
         // The allowlist is re-checked inside, on this request, so a website
         // removed while a widget is open cannot mint a ticket a second later.
         embed.MapPost("/conversations/{conversationId:guid}/realtime-ticket", IssueTicketAsync)
-            .WithName("IssueEmbeddedRealtimeTicket");
+            .WithName("IssueEmbeddedRealtimeTicket")
+            .Produces<RealtimeTicketResponse>(StatusCodes.Status200OK);
 
         embed.MapGet("/conversations/{conversationId:guid}/messages", ListMessagesAsync)
             .WithName("ListEmbeddedWebChatMessages");
 
         embed.MapPost("/conversations/{conversationId:guid}/messages", SendMessageAsync)
-            .WithName("SendEmbeddedWebChatMessage");
+            .WithName("SendEmbeddedWebChatMessage")
+            .Produces<ChatTurnResponse>(StatusCodes.Status200OK);
 
         return endpoints;
     }

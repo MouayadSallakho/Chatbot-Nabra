@@ -92,7 +92,8 @@ internal static class RoleEndpoints
             .ProducesProblem(StatusCodes.Status404NotFound);
 
         workspace.MapPost("/roles", CreateAsync)
-            .WithName("CreateTenantRole");
+            .WithName("CreateTenantRole")
+            .Produces<RoleResponse>(StatusCodes.Status201Created);
 
         workspace.MapGet("/roles/{roleId:guid}", GetByIdAsync)
             .WithName(GetRoleByIdRouteName)
@@ -110,10 +111,12 @@ internal static class RoleEndpoints
         // Merging them would mean a caller fixing a duplicate name had to resend
         // a permission set they were not changing.
         workspace.MapPut("/roles/{roleId:guid}/name", RenameAsync)
-            .WithName("RenameTenantRole");
+            .WithName("RenameTenantRole")
+            .Produces<RoleResponse>(StatusCodes.Status200OK);
 
         workspace.MapPut("/roles/{roleId:guid}/permissions", ReplacePermissionsAsync)
-            .WithName("ReplaceTenantRolePermissions");
+            .WithName("ReplaceTenantRolePermissions")
+            .Produces<RoleResponse>(StatusCodes.Status200OK);
 
         return endpoints;
     }

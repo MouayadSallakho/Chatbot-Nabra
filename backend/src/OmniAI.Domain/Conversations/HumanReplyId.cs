@@ -29,7 +29,10 @@ public readonly record struct HumanReplyId
     {
         if (value == Guid.Empty)
         {
-            throw new DomainValidationException("Human reply id must not be an empty GUID.");
+            throw new DomainValidationException("Human reply id must not be an empty GUID.")
+            {
+                Code = "conversations.reply.invalid",
+            };
         }
 
         return new HumanReplyId(value);

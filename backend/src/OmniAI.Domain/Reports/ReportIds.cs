@@ -15,7 +15,10 @@ public readonly record struct ReportExecutionId
     {
         if (value == Guid.Empty)
         {
-            throw new DomainValidationException("Report execution id must not be an empty GUID.");
+            throw new DomainValidationException("Report execution id must not be an empty GUID.")
+            {
+                Code = "reports.id.invalid",
+            };
         }
 
         return new ReportExecutionId(value);
@@ -37,7 +40,10 @@ public readonly record struct ReportArtifactId
     {
         if (value == Guid.Empty)
         {
-            throw new DomainValidationException("Report artifact id must not be an empty GUID.");
+            throw new DomainValidationException("Report artifact id must not be an empty GUID.")
+            {
+                Code = "reports.artifact.invalid",
+            };
         }
 
         return new ReportArtifactId(value);
@@ -59,7 +65,10 @@ public readonly record struct ReportScheduleId
     {
         if (value == Guid.Empty)
         {
-            throw new DomainValidationException("Report schedule id must not be an empty GUID.");
+            throw new DomainValidationException("Report schedule id must not be an empty GUID.")
+            {
+                Code = "reports.schedule.id.invalid",
+            };
         }
 
         return new ReportScheduleId(value);

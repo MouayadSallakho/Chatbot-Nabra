@@ -80,8 +80,42 @@ public sealed class PostgresTestDatabase : IAsyncLifetime
 
         NpgsqlConnection.ClearAllPools();
 
-        await ExecuteOnMaintenanceDatabaseAsync(
-            $"DROP DATABASE IF EXISTS \"{_databaseName}\" WITH (FORCE)");
+        await DropDatabaseAsync(_maintenanceConnectionString, _databaseName);
+    }
+
+    /// <summary>
+    /// Drops a throwaway database, retrying a transient failure a bounded number
+    /// of times.
+    /// </summary>
+    /// <remarks>
+    /// Under a full run's load the drop has failed once with a transient
+    /// <see cref="NpgsqlException"/>, which failed the class's cleanup although
+    /// every test passed. Only a transient error is retried, and the last
+    /// attempt's error is thrown unchanged, so a real problem still fails the run.
+    /// </remarks>
+    public static async Task DropDatabaseAsync(string maintenanceConnectionString, string databaseName)
+    {
+        const int MaxAttempts = 3;
+        TimeSpan delay = TimeSpan.FromMilliseconds(250);
+
+        for (int attempt = 1; ; attempt++)
+        {
+            try
+            {
+                await using NpgsqlConnection connection = new(maintenanceConnectionString);
+                await connection.OpenAsync();
+
+                await using NpgsqlCommand command = new(
+                    $"DROP DATABASE IF EXISTS \"{databaseName}\" WITH (FORCE)",
+                    connection);
+                await command.ExecuteNonQueryAsync();
+                return;
+            }
+            catch (NpgsqlException exception) when (exception.IsTransient && attempt < MaxAttempts)
+            {
+                await Task.Delay(delay);
+            }
+        }
     }
 
     /// <summary>

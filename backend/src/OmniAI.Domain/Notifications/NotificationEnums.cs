@@ -113,7 +113,10 @@ public static class NotificationKinds
 
         NotificationKind.WhatsAppDeliveryUnknown => NotificationCategory.ChannelHealth,
 
-        _ => throw new DomainValidationException("That notification kind is not recognised."),
+        _ => throw new DomainValidationException("That notification kind is not recognised.")
+        {
+            Code = "notifications.kind.unknown",
+        },
     };
 
     /// <remarks>
@@ -139,6 +142,9 @@ public static class NotificationKinds
             or NotificationKind.UsageExhausted
             or NotificationKind.BillingSuspended => NotificationSeverity.Critical,
 
-        _ => throw new DomainValidationException("That notification kind is not recognised."),
+        _ => throw new DomainValidationException("That notification kind is not recognised.")
+        {
+            Code = "notifications.kind.unknown",
+        },
     };
 }

@@ -40,10 +40,16 @@ internal static class NotificationEndpoints
             .WithSummary("The caller's own notifications, newest first. Report kinds carry parameters.reportType (a report catalogue code); other kinds null.")
             .Produces<NotificationPageResponse>();
         notifications.MapGet("/unread-count", UnreadCountAsync).WithName("GetUnreadNotificationCount");
-        notifications.MapPost("/{notificationId:guid}/read", MarkReadAsync).WithName("MarkNotificationRead");
-        notifications.MapPost("/read-all", MarkAllReadAsync).WithName("MarkAllNotificationsRead");
+        notifications.MapPost("/{notificationId:guid}/read", MarkReadAsync)
+            .WithName("MarkNotificationRead")
+            .Produces(StatusCodes.Status204NoContent);
+        notifications.MapPost("/read-all", MarkAllReadAsync)
+            .WithName("MarkAllNotificationsRead")
+            .Produces<MarkAllReadResponse>(StatusCodes.Status200OK);
         notifications.MapGet("/preferences", PreferencesAsync).WithName("GetNotificationPreferences");
-        notifications.MapPut("/preferences", SavePreferencesAsync).WithName("SaveNotificationPreferences");
+        notifications.MapPut("/preferences", SavePreferencesAsync)
+            .WithName("SaveNotificationPreferences")
+            .Produces<NotificationPreferencesResponse>(StatusCodes.Status200OK);
 
         return endpoints;
     }

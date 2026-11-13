@@ -61,7 +61,10 @@ public sealed class NotificationPreferences
     {
         if (tenantId.IsEmpty)
         {
-            throw new DomainValidationException("Preferences belong to a workspace.");
+            throw new DomainValidationException("Preferences belong to a workspace.")
+            {
+                Code = "notifications.tenant.required",
+            };
         }
 
         return new NotificationPreferences(tenantId, userId, false, false, false, false, false, now.ToUniversalTime());

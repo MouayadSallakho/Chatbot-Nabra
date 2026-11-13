@@ -61,7 +61,10 @@ public sealed record ReportPeriod
     {
         if (toExclusive <= from)
         {
-            throw new DomainValidationException("A report period must end after it starts.");
+            throw new DomainValidationException("A report period must end after it starts.")
+            {
+                Code = "reports.period.reversed",
+            };
         }
 
         if (toExclusive.DayNumber - from.DayNumber > MaxDays)
@@ -69,7 +72,10 @@ public sealed record ReportPeriod
             throw new DomainValidationException(
                 string.Create(
                     CultureInfo.InvariantCulture,
-                    $"A report period may cover at most {MaxDays} days."));
+                    $"A report period may cover at most {MaxDays} days."))
+            {
+                Code = "reports.period.too_long",
+            };
         }
 
         if (from < Earliest)
@@ -77,7 +83,10 @@ public sealed record ReportPeriod
             throw new DomainValidationException(
                 string.Create(
                     CultureInfo.InvariantCulture,
-                    $"A report period may not start before {Earliest:yyyy-MM-dd}."));
+                    $"A report period may not start before {Earliest:yyyy-MM-dd}."))
+            {
+                Code = "reports.period.too_early",
+            };
         }
 
         return new ReportPeriod(from, toExclusive, timeZone ?? WorkspaceTimeZone.Utc);

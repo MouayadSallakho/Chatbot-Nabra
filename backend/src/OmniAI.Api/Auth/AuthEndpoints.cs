@@ -110,7 +110,8 @@ internal static class AuthEndpoints
 
         auth.MapPost("/logout", LogoutAsync)
             .RequireAuthorization()
-            .WithName("Logout");
+            .WithName("Logout")
+            .Produces(StatusCodes.Status204NoContent);
 
         // Phase 37.5b (row 29): the eighth anonymous route. A question with no
         // side effect: no cookie is written, nothing is cached, and every caller

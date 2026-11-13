@@ -35,7 +35,10 @@ public readonly record struct ConversationId
     {
         if (value == Guid.Empty)
         {
-            throw new DomainValidationException("Conversation id must not be an empty GUID.");
+            throw new DomainValidationException("Conversation id must not be an empty GUID.")
+            {
+                Code = "conversations.id.invalid",
+            };
         }
 
         return new ConversationId(value);

@@ -1,8 +1,11 @@
+using OmniAI.Application.Authorization;
 using OmniAI.Application.Security;
 using OmniAI.Application.Tenants;
 using OmniAI.Application.Tenants.GetTenantById;
 using OmniAI.Application.Tests.Security;
+using OmniAI.Application.Tests.WebChat;
 using OmniAI.Domain;
+using OmniAI.Domain.Authorization;
 using OmniAI.Domain.Tenants;
 using OmniAI.Domain.Users;
 
@@ -50,7 +53,8 @@ public sealed class GetTenantByIdHandlerTests
         // unwind, and nothing that would be logged as a server fault.
         GetTenantByIdHandler handler = new(
             new InMemoryTenantRepository(),
-            TestAuthority.Outsider(Member));
+            TestAuthority.Outsider(Member),
+            TimeProvider.System);
 
         TenantView? found = (await handler.HandleAsync(new GetTenantByIdQuery(Guid.CreateVersion7())))?.Value;
 
@@ -71,7 +75,8 @@ public sealed class GetTenantByIdHandlerTests
 
         GetTenantByIdHandler handler = new(
             new InMemoryTenantRepository().Seed(somebodyElses),
-            TestAuthority.Outsider(Member));
+            TestAuthority.Outsider(Member),
+            TimeProvider.System);
 
         TenantView? found =
             (await handler.HandleAsync(new GetTenantByIdQuery(somebodyElses.Id.Value)))?.Value;
@@ -90,7 +95,8 @@ public sealed class GetTenantByIdHandlerTests
 
         GetTenantByIdHandler handler = new(
             new InMemoryTenantRepository().Seed(stored),
-            TestAuthority.Anonymous());
+            TestAuthority.Anonymous(),
+            TimeProvider.System);
 
         await Assert.ThrowsAsync<NotAuthenticatedException>(
             () => handler.HandleAsync(new GetTenantByIdQuery(stored.Id.Value)));
@@ -113,7 +119,8 @@ public sealed class GetTenantByIdHandlerTests
         // exist, so it must not be answered with "not found".
         GetTenantByIdHandler handler = new(
             new InMemoryTenantRepository(),
-            TestAuthority.Outsider(Member));
+            TestAuthority.Outsider(Member),
+            TimeProvider.System);
 
         await Assert.ThrowsAsync<DomainValidationException>(
             () => handler.HandleAsync(new GetTenantByIdQuery(Guid.Empty)));
@@ -124,7 +131,8 @@ public sealed class GetTenantByIdHandlerTests
     {
         GetTenantByIdHandler handler = new(
             new InMemoryTenantRepository(),
-            TestAuthority.Outsider(Member));
+            TestAuthority.Outsider(Member),
+            TimeProvider.System);
 
         await Assert.ThrowsAsync<ArgumentNullException>(() => handler.HandleAsync(null!));
     }
@@ -133,15 +141,106 @@ public sealed class GetTenantByIdHandlerTests
     public void The_handler_requires_its_dependencies()
     {
         Assert.Throws<ArgumentNullException>(
-            () => new GetTenantByIdHandler(null!, TestAuthority.Outsider(Member)));
+            () => new GetTenantByIdHandler(null!, TestAuthority.Outsider(Member), TimeProvider.System));
 
         Assert.Throws<ArgumentNullException>(
-            () => new GetTenantByIdHandler(new InMemoryTenantRepository(), null!));
+            () => new GetTenantByIdHandler(new InMemoryTenantRepository(), null!, TimeProvider.System));
+
+        Assert.Throws<ArgumentNullException>(
+            () => new GetTenantByIdHandler(new InMemoryTenantRepository(), TestAuthority.Outsider(Member), null!));
+    }
+
+    // ---- Phase 38.7b, BA-9: the schedules a zone change would move ----------
+
+    [Fact]
+    public async Task A_manager_without_reports_view_is_told_how_many_schedules_a_zone_change_moves()
+    {
+        Tenant stored = Tenant.Create(TenantName.Create("Acme"), TenantSlug.Create("acme"));
+        FakeTimeProvider clock = new(new DateTimeOffset(2026, 11, 13, 9, 0, 0, TimeSpan.Zero));
+        InMemoryTenantRepository tenants = new InMemoryTenantRepository()
+            .Seed(stored)
+            .WithSchedulesToRezone(stored.Id, 3);
+
+        GetTenantByIdHandler handler = new(
+            tenants,
+            TestAuthority.With(Member, stored.Id.Value, PlatformPermissions.WorkspaceView, PlatformPermissions.WorkspaceManage),
+            clock);
+
+        TenantView? found = (await handler.HandleAsync(new GetTenantByIdQuery(stored.Id.Value)))?.Value;
+
+        Assert.Equal(3, found?.ScheduleCount);
+
+        // Counted as of now, which is the instant a change would be made at.
+        Assert.Equal(clock.GetUtcNow(), tenants.ScheduleCountAskedAt);
+    }
+
+    [Fact]
+    public async Task A_manager_of_a_workspace_without_schedules_is_told_zero()
+    {
+        Tenant stored = Tenant.Create(TenantName.Create("Acme"), TenantSlug.Create("acme"));
+
+        TenantView? found = (await HandlerFor(stored, memberOf: stored)
+            .HandleAsync(new GetTenantByIdQuery(stored.Id.Value)))?.Value;
+
+        Assert.Equal(0, found?.ScheduleCount);
+    }
+
+    [Fact]
+    public async Task A_member_without_workspace_manage_learns_nothing_about_schedules()
+    {
+        Tenant stored = Tenant.Create(TenantName.Create("Acme"), TenantSlug.Create("acme"));
+        InMemoryTenantRepository tenants = new InMemoryTenantRepository()
+            .Seed(stored)
+            .WithSchedulesToRezone(stored.Id, 3);
+
+        GetTenantByIdHandler handler = new(
+            tenants,
+            TestAuthority.With(Member, stored.Id.Value, PlatformPermissions.WorkspaceView, PlatformPermissions.ReportsView),
+            TimeProvider.System);
+
+        TenantView? found = (await handler.HandleAsync(new GetTenantByIdQuery(stored.Id.Value)))?.Value;
+
+        Assert.NotNull(found);
+        Assert.Null(found.ScheduleCount);
+
+        // Not even asked: the count is never computed for somebody who may not have it.
+        Assert.Null(tenants.ScheduleCountAskedAt);
+    }
+
+    [Fact]
+    public async Task A_member_without_workspace_view_is_still_refused_with_a_permission_error()
+    {
+        Tenant stored = Tenant.Create(TenantName.Create("Acme"), TenantSlug.Create("acme"));
+
+        GetTenantByIdHandler handler = new(
+            new InMemoryTenantRepository().Seed(stored),
+            TestAuthority.With(Member, stored.Id.Value, PlatformPermissions.WorkspaceManage),
+            TimeProvider.System);
+
+        await Assert.ThrowsAsync<PermissionDeniedException>(
+            () => handler.HandleAsync(new GetTenantByIdQuery(stored.Id.Value)));
+    }
+
+    [Fact]
+    public async Task The_count_is_the_workspace_s_own()
+    {
+        Tenant mine = Tenant.Create(TenantName.Create("Acme"), TenantSlug.Create("acme"));
+        Tenant theirs = Tenant.Create(TenantName.Create("Rival"), TenantSlug.Create("rival"));
+        InMemoryTenantRepository tenants = new InMemoryTenantRepository()
+            .Seed(mine)
+            .Seed(theirs)
+            .WithSchedulesToRezone(theirs.Id, 7);
+
+        GetTenantByIdHandler handler = new(tenants, TestAuthority.Owner(Member, mine.Id.Value), TimeProvider.System);
+
+        Assert.Equal(0, (await handler.HandleAsync(new GetTenantByIdQuery(mine.Id.Value)))?.Value.ScheduleCount);
+        Assert.Null(await handler.HandleAsync(new GetTenantByIdQuery(theirs.Id.Value)));
     }
 
     /// <summary>A handler over a store holding one tenant, for a member of it.</summary>
     private static GetTenantByIdHandler HandlerFor(Tenant stored, Tenant memberOf) =>
         new(
             new InMemoryTenantRepository().Seed(stored),
-            TestAuthority.Owner(Member, memberOf.Id.Value));
+            TestAuthority.Owner(Member, memberOf.Id.Value),
+            TimeProvider.System);
 }

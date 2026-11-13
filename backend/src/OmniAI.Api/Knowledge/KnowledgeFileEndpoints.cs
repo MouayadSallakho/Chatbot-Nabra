@@ -60,10 +60,12 @@ internal static class KnowledgeFileEndpoints
         // last place to make an exception.
         knowledge.MapPost("/files", UploadAsync)
             .WithName("UploadKnowledgeFile")
+            .Produces<KnowledgeDocumentResponse>(StatusCodes.Status201Created)
             .WithMetadata(new RequestSizeLimitAttribute(policy.MaxFileBytes));
 
         knowledge.MapPut("/{knowledgeDocumentId:guid}/source", ReplaceAsync)
             .WithName("ReplaceKnowledgeSource")
+            .Produces<KnowledgeDocumentResponse>(StatusCodes.Status200OK)
             .WithMetadata(new RequestSizeLimitAttribute(policy.MaxFileBytes));
 
         return endpoints;
@@ -232,19 +234,20 @@ internal static class KnowledgeFileEndpoints
             title: "That file is too large",
             detail: $"Uploads must be {policy.MaxFileMegabytes} MB or smaller. Split the file "
                 + "into smaller documents, or upload the part that matters.",
-            extensions: Coded(KnowledgeFileRefusals.TooLarge, policy.MaxFileBytes));
+            extensions: Coded(KnowledgeFileRefusals.TooLarge, policy.MaxFileBytes, KnowledgeFileLimitUnits.Bytes));
 
     /// <summary>
     /// The stable code of a refusal written here rather than by a parser, and the
     /// bound it broke, matching what a parser's refusal carries (Phase 37.5a).
     /// </summary>
-    private static Dictionary<string, object?> Coded(string code, long? limit = null)
+    private static Dictionary<string, object?> Coded(string code, long? limit = null, string? limitUnit = null)
     {
         Dictionary<string, object?> extensions = new(StringComparer.Ordinal) { ["code"] = code };
 
         if (limit is long bound)
         {
             extensions["limit"] = bound;
+            extensions["limitUnit"] = limitUnit;
         }
 
         return extensions;

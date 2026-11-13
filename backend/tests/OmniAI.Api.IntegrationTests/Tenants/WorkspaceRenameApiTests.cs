@@ -27,11 +27,14 @@ public sealed class WorkspaceRenameApiTests(WebChatApiFixture fixture)
         Assert.False(read.Headers.ETag!.IsWeak);
 
         // The four fields of 37.5a, unchanged, plus the workspace time zone that
-        // Phase 37.6 (row 34) added: an additive member, UTC by default.
+        // Phase 37.6 (row 34) added: an additive member, UTC by default. An owner
+        // holds workspace.manage, so Phase 38.7b (BA-9) adds scheduleCount too;
+        // WorkspaceScheduleCountApiTests pins who gets it.
         JsonElement body = await ReadAsync(read);
         Assert.Equal(
-            ["id", "name", "slug", "status", "timeZone"],
+            ["id", "name", "scheduleCount", "slug", "status", "timeZone"],
             body.EnumerateObject().Select(property => property.Name).Order(StringComparer.Ordinal));
+        Assert.Equal(0, body.GetProperty("scheduleCount").GetInt32());
         Assert.Equal("UTC", body.GetProperty("timeZone").GetString());
     }
 

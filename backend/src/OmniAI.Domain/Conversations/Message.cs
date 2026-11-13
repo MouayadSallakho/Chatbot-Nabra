@@ -99,7 +99,10 @@ public sealed class Message
     {
         if (string.IsNullOrWhiteSpace(text))
         {
-            throw new DomainValidationException("Message text is required.");
+            throw new DomainValidationException("Message text is required.")
+            {
+                Code = "conversations.message.required",
+            };
         }
 
         string normalised = text.Trim();
@@ -108,7 +111,10 @@ public sealed class Message
         {
             throw new DomainValidationException(
                 $"Message text must be at most {MaxTextLength} characters; " +
-                $"the supplied text has {normalised.Length}. It is not truncated.");
+                $"the supplied text has {normalised.Length}. It is not truncated.")
+            {
+                Code = "conversations.message.too_long",
+            };
         }
 
         foreach (char character in normalised)
@@ -119,7 +125,10 @@ public sealed class Message
             if (char.IsControl(character) && character is not ('\n' or '\r' or '\t'))
             {
                 throw new DomainValidationException(
-                    "Message text must not contain control characters other than tab, carriage return and line feed.");
+                    "Message text must not contain control characters other than tab, carriage return and line feed.")
+                {
+                    Code = "conversations.message.control_characters",
+                };
             }
         }
 

@@ -34,10 +34,12 @@ internal static class MeEndpoints
             .AddEndpointFilter<AntiforgeryEndpointFilter>();
 
         me.MapGet("/tenants", ListWorkspacesAsync)
-            .WithName("ListMyTenants");
+            .WithName("ListMyTenants")
+            .Produces<WorkspaceResponse[]>(StatusCodes.Status200OK);
 
         me.MapGet("/tenants/{tenantId:guid}/permissions", ListMyPermissionsAsync)
-            .WithName("ListMyTenantPermissions");
+            .WithName("ListMyTenantPermissions")
+            .Produces<string[]>(StatusCodes.Status200OK);
 
         // Phase 37.3.
         me.MapPut("/language", ChangeLanguageAsync)

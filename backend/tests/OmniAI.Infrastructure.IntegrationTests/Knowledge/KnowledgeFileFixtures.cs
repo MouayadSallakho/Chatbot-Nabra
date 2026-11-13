@@ -139,6 +139,27 @@ internal static class KnowledgeFileFixtures
         return buffer.ToArray();
     }
 
+    /// <summary>
+    /// A small archive with this many parts (Phase 38.7b): a real document part
+    /// plus empty ones, each tiny, so only the part count is past a bound.
+    /// </summary>
+    public static byte[] DocxWithEntries(int entries)
+    {
+        using MemoryStream buffer = new();
+
+        using (ZipArchive archive = new(buffer, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            for (int index = 0; index < entries; index++)
+            {
+                using Stream stream = archive.CreateEntry($"word/part{index}.xml").Open();
+
+                stream.Write("<x/>"u8);
+            }
+        }
+
+        return buffer.ToArray();
+    }
+
     /// <summary>A DOCX containing more paragraphs than a document may hold.</summary>
     public static byte[] DocxWithCharacters(int characters)
     {

@@ -29,7 +29,10 @@ public readonly record struct ConversationTurnId
     {
         if (value == Guid.Empty)
         {
-            throw new DomainValidationException("Conversation turn id must not be an empty GUID.");
+            throw new DomainValidationException("Conversation turn id must not be an empty GUID.")
+            {
+                Code = "conversations.turn.invalid",
+            };
         }
 
         return new ConversationTurnId(value);

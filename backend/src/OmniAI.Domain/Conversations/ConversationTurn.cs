@@ -89,17 +89,26 @@ public sealed class ConversationTurn
     {
         if (conversationId.IsEmpty)
         {
-            throw new DomainValidationException("A conversation turn must name a conversation.");
+            throw new DomainValidationException("A conversation turn must name a conversation.")
+            {
+                Code = "conversations.turn.invalid",
+            };
         }
 
         if (clientMessageId.IsEmpty)
         {
-            throw new DomainValidationException("A conversation turn must carry a client message id.");
+            throw new DomainValidationException("A conversation turn must carry a client message id.")
+            {
+                Code = "conversations.turn.invalid",
+            };
         }
 
         if (customerMessageId.IsEmpty)
         {
-            throw new DomainValidationException("A conversation turn must name a customer message.");
+            throw new DomainValidationException("A conversation turn must name a customer message.")
+            {
+                Code = "conversations.turn.invalid",
+            };
         }
 
         return new ConversationTurn(
@@ -138,7 +147,10 @@ public sealed class ConversationTurn
 
         if (replyMessageId.IsEmpty)
         {
-            throw new DomainValidationException("A completed turn must name its reply message.");
+            throw new DomainValidationException("A completed turn must name its reply message.")
+            {
+                Code = "conversations.turn.invalid",
+            };
         }
 
         ReplyMessageId = replyMessageId;
@@ -197,7 +209,10 @@ public sealed class ConversationTurn
         if (IsSettled)
         {
             throw new DomainStateException(
-                $"Cannot {operation} a turn that is already {Status.ToString().ToLowerInvariant()}.");
+                $"Cannot {operation} a turn that is already {Status.ToString().ToLowerInvariant()}.")
+            {
+                Code = "conversations.turn.settled",
+            };
         }
     }
 
@@ -213,7 +228,10 @@ public sealed class ConversationTurn
     {
         if (instant == default)
         {
-            throw new DomainValidationException("The instant must be a real point in time.");
+            throw new DomainValidationException("The instant must be a real point in time.")
+            {
+                Code = "conversations.instant.invalid",
+            };
         }
 
         return instant.ToUniversalTime();

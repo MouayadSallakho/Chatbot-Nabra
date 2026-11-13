@@ -52,7 +52,10 @@ public readonly record struct ClientMessageId
     {
         if (string.IsNullOrWhiteSpace(value))
         {
-            throw new DomainValidationException("A client message id is required.");
+            throw new DomainValidationException("A client message id is required.")
+            {
+                Code = "conversations.client_message_id.required",
+            };
         }
 
         string trimmed = value.Trim();
@@ -61,7 +64,10 @@ public readonly record struct ClientMessageId
         {
             throw new DomainValidationException(
                 $"A client message id must be at most {MaxLength} characters; " +
-                $"the supplied value has {trimmed.Length}.");
+                $"the supplied value has {trimmed.Length}.")
+            {
+                Code = "conversations.client_message_id.too_long",
+            };
         }
 
         foreach (char character in trimmed)
@@ -73,7 +79,10 @@ public readonly record struct ClientMessageId
             if (!char.IsAsciiLetterOrDigit(character) && character is not ('-' or '_'))
             {
                 throw new DomainValidationException(
-                    "A client message id must contain only letters, digits, hyphens and underscores.");
+                    "A client message id must contain only letters, digits, hyphens and underscores.")
+                {
+                    Code = "conversations.client_message_id.invalid",
+                };
             }
         }
 

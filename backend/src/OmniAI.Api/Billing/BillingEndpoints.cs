@@ -47,10 +47,12 @@ internal static class BillingEndpoints
 
         billing.MapPost("/checkout", CheckoutAsync)
             .WithName("StartWorkspaceBillingCheckout")
+            .Produces<StartCheckoutResponse>(StatusCodes.Status200OK)
             .AddEndpointFilter<AntiforgeryEndpointFilter>();
 
         billing.MapPost("/portal", PortalAsync)
             .WithName("OpenWorkspaceBillingPortal")
+            .Produces<BillingPortalResponse>(StatusCodes.Status200OK)
             .AddEndpointFilter<AntiforgeryEndpointFilter>();
 
         return endpoints;

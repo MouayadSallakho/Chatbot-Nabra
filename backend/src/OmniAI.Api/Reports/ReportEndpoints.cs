@@ -1,4 +1,5 @@
 using OmniAI.Api.Auth;
+using OmniAI.Api.ErrorHandling;
 using OmniAI.Api.Http;
 using OmniAI.Api.Security;
 using OmniAI.Application.Concurrency;
@@ -31,6 +32,18 @@ namespace OmniAI.Api.Reports;
 internal static class ReportEndpoints
 {
     private const string GetExecutionRouteName = "GetReportExecution";
+
+    // Phase 38.7b (BA-4): the codes only this edge can name. The rest are named at
+    // their throw sites; all of them are in problem-codes.md.
+
+    /// <summary>The <c>clientRequestId</c> was already used for a different report (409).</summary>
+    internal const string ClientRequestIdReused = "reports.client_request_id.reused";
+
+    /// <summary>The workspace already has as many schedules as it may (409).</summary>
+    internal const string ScheduleLimitReached = "reports.schedule.limit_reached";
+
+    /// <summary>Switching a schedule on or off without saying which (400).</summary>
+    internal const string ScheduleEnabledRequired = "reports.schedule.enabled_required";
 
     public static IEndpointRouteBuilder MapReportEndpoints(this IEndpointRouteBuilder endpoints)
     {
@@ -140,7 +153,8 @@ internal static class ReportEndpoints
             return Results.Problem(
                 statusCode: StatusCodes.Status409Conflict,
                 title: "That request id was already used",
-                detail: failure.Message);
+                detail: failure.Message,
+                extensions: Coded(ClientRequestIdReused));
         }
         catch (ReportStorageUnavailableException)
         {
@@ -208,14 +222,16 @@ internal static class ReportEndpoints
             return Results.Problem(
                 statusCode: StatusCodes.Status410Gone,
                 title: "This report is no longer available",
-                detail: failure.Message);
+                detail: failure.Message,
+                extensions: Coded(failure.Code));
         }
         catch (ReportNotDownloadableException failure)
         {
             return Results.Problem(
                 statusCode: StatusCodes.Status409Conflict,
                 title: "This report has no file to download",
-                detail: failure.Message);
+                detail: failure.Message,
+                extensions: Coded(failure.Code));
         }
     }
 
@@ -275,7 +291,8 @@ internal static class ReportEndpoints
             return Results.Problem(
                 statusCode: StatusCodes.Status409Conflict,
                 title: "Schedule limit reached",
-                detail: failure.Message);
+                detail: failure.Message,
+                extensions: Coded(ScheduleLimitReached));
         }
     }
 
@@ -329,7 +346,8 @@ internal static class ReportEndpoints
             return Results.Problem(
                 statusCode: StatusCodes.Status400BadRequest,
                 title: "Enabled is required",
-                detail: "Say whether the schedule should be on or off.");
+                detail: "Say whether the schedule should be on or off.",
+                extensions: Coded(ScheduleEnabledRequired));
         }
 
         try
@@ -391,6 +409,10 @@ internal static class ReportEndpoints
             statusCode: StatusCodes.Status404NotFound,
             title: "No such workspace",
             detail: "This workspace does not exist, or you are not a member of it.");
+
+    /// <summary>The <c>code</c> member of a refusal written here (Phase 38.7b, BA-4).</summary>
+    private static Dictionary<string, object?> Coded(string code) =>
+        new(StringComparer.Ordinal) { [ProblemCodes.Member] = code };
 
     private static IResult NoSuchReport() =>
         Results.Problem(

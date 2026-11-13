@@ -20,6 +20,8 @@ namespace OmniAI.Api.IntegrationTests.ErrorHandling;
 /// Phase 37.5a, row 28a: every 400, 409 and 422 the knowledge, agent and channel
 /// areas return carries a stable <c>code</c>, and every code is in the catalogue.
 /// Phase 37.5b, row 28b: the same for roles, invitations, team and billing.
+/// Phase 38.7b, BA-4: customers, conversations, notifications, reports and
+/// schedules.
 /// </summary>
 /// <remarks>
 /// Three layers, because each catches what the others cannot:
@@ -60,6 +62,28 @@ public sealed partial class ProblemCodeTests(WebChatApiFixture fixture)
         "backend/src/OmniAI.Application/Members",
         "backend/src/OmniAI.Application/Billing",
         "backend/src/OmniAI.Application/Plans",
+
+        // Phase 38.7b (BA-4): the last areas that answered the generic codes.
+        "backend/src/OmniAI.Domain/Customers",
+        "backend/src/OmniAI.Domain/Conversations",
+        "backend/src/OmniAI.Domain/Notifications",
+        "backend/src/OmniAI.Domain/Reports",
+        "backend/src/OmniAI.Application/Customers",
+        "backend/src/OmniAI.Application/Conversations",
+        "backend/src/OmniAI.Application/Notifications",
+        "backend/src/OmniAI.Application/Reports",
+    ];
+
+    /// <summary>
+    /// The endpoint files of the Phase 38.7b areas, whose own refusals (written
+    /// with <c>Results.Problem</c>) must name their rule too.
+    /// </summary>
+    private static readonly string[] EndpointFiles =
+    [
+        "backend/src/OmniAI.Api/Customers/CustomerEndpoints.cs",
+        "backend/src/OmniAI.Api/Conversations/ConversationEndpoints.cs",
+        "backend/src/OmniAI.Api/Notifications/NotificationEndpoints.cs",
+        "backend/src/OmniAI.Api/Reports/ReportEndpoints.cs",
     ];
 
     // ---- the fallback ----------------------------------------------------
@@ -141,6 +165,32 @@ public sealed partial class ProblemCodeTests(WebChatApiFixture fixture)
     }
 
     [Fact]
+    public void Every_endpoint_refusal_in_these_areas_names_its_rule()
+    {
+        List<string> uncoded = [];
+
+        foreach (string relative in EndpointFiles)
+        {
+            string text = File.ReadAllText(Path.Combine(Repository().FullName, relative));
+
+            foreach (Match site in EndpointProblem().Matches(text))
+            {
+                int end = Closing(text, site.Index + site.Length - 1);
+                string call = text[site.Index..(end + 1)];
+
+                // A correctable refusal (the statuses the guarantee covers) carries
+                // its code beside the detail.
+                if (CorrectableStatus().IsMatch(call) && !call.Contains("extensions:", StringComparison.Ordinal))
+                {
+                    uncoded.Add($"{Path.GetFileName(relative)}:{LineOf(text, site.Index)}");
+                }
+            }
+        }
+
+        Assert.True(uncoded.Count == 0, "Endpoint refusals without a code: " + string.Join(", ", uncoded));
+    }
+
+    [Fact]
     public void Every_file_refusal_names_its_rule()
     {
         List<string> uncoded = [];
@@ -198,6 +248,21 @@ public sealed partial class ProblemCodeTests(WebChatApiFixture fixture)
             Application.Billing.BillingCustomerMissingException.Code,
             .. Enum.GetValues<Application.Billing.BillingCheckoutRefusal>()
                 .Select(reason => new Application.Billing.BillingCheckoutRefusedException(reason, "x").Code),
+
+            // Phase 38.7b: codes the edge or a refusal type carries.
+            global::OmniAI.Api.Customers.CustomerEndpoints.PageInvalid,
+            global::OmniAI.Api.Customers.CustomerEndpoints.MergeTargetRequired,
+            global::OmniAI.Api.Customers.CustomerEndpoints.Merged,
+            Domain.Customers.CustomerMergeNotAllowedException.Self().Code,
+            Domain.Customers.CustomerMergeNotAllowedException.NotInWorkspace("x").Code,
+            Application.Conversations.ConversationAssigneeIneligibleException.NotAMember().Code,
+            Application.Conversations.ConversationAssigneeIneligibleException.CannotReply().Code,
+            global::OmniAI.Api.Reports.ReportEndpoints.ClientRequestIdReused,
+            global::OmniAI.Api.Reports.ReportEndpoints.ScheduleLimitReached,
+            global::OmniAI.Api.Reports.ReportEndpoints.ScheduleEnabledRequired,
+            Application.Reports.ReportNotDownloadableException.Missing().Code,
+            .. Enum.GetValues<Domain.Reports.ReportExecutionStatus>()
+                .Select(status => new Application.Reports.ReportNotDownloadableException(status).Code),
         ];
 
         string[] missing =
@@ -269,13 +334,11 @@ public sealed partial class ProblemCodeTests(WebChatApiFixture fixture)
     {
         (HttpClient owner, Guid tenantId, _) = await fixture.CreateOwnerAsync();
 
-        // A customer merge naming no customer to keep: an endpoint refusal of the
-        // customer area, which has no specific code yet (Phase 37.5b coded the
-        // workspace slug, the earlier example), so the guarantee gives it the
-        // generic one.
-        HttpResponseMessage refused = await owner.PostAsJsonAsync(
-            WebChatApiFixture.Relative($"/api/tenants/{tenantId}/customers/{Guid.CreateVersion7()}/merge"),
-            new { });
+        // An unknown analytics range: a refusal with no specific code (the
+        // customer merge, the earlier example, was coded in Phase 38.7b), so the
+        // guarantee gives it the generic one.
+        HttpResponseMessage refused = await owner.GetAsync(
+            WebChatApiFixture.Relative($"/api/tenants/{tenantId}/analytics/dashboard?range=1y"));
 
         Assert.Equal(HttpStatusCode.BadRequest, refused.StatusCode);
         Assert.Equal("validation.failed", await CodeAsync(refused));
@@ -313,6 +376,9 @@ public sealed partial class ProblemCodeTests(WebChatApiFixture fixture)
         typeof(Application.Invitations.InvitationNoLongerUsableException),
         typeof(Application.Invitations.InvitationNotForThisAccountException),
         typeof(Application.Invitations.InvitationStatusFilterInvalidException),
+
+        // Phase 38.7b.
+        typeof(Application.Conversations.ConversationNotHandledByHumanException),
     ];
 
     /// <summary>
@@ -393,6 +459,12 @@ public sealed partial class ProblemCodeTests(WebChatApiFixture fixture)
 
     [GeneratedRegex(@"new KnowledgeFileRejectedException\(|\bnew\(\s*KnowledgeFileRejection\.")]
     private static partial Regex FileRefusal();
+
+    [GeneratedRegex(@"\bResults\.Problem\(")]
+    private static partial Regex EndpointProblem();
+
+    [GeneratedRegex(@"Status(400BadRequest|409Conflict|422UnprocessableEntity)\b")]
+    private static partial Regex CorrectableStatus();
 
     [GeneratedRegex(@"KnowledgeFileRejection\.\w+,\s*code,")]
     private static partial Regex CodeParameter();

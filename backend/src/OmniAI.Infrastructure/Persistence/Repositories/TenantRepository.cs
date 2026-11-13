@@ -259,6 +259,27 @@ internal sealed class TenantRepository(OmniAiDbContext context) : ITenantReposit
         return CurrentVersion(tenant);
     }
 
+    /// <inheritdoc />
+    /// <remarks>
+    /// The predicate of <see cref="ChangeTimeZoneAsync"/>'s locking read, as a count:
+    /// the workspace in the predicate, then the next run. Served by
+    /// <c>ix_report_schedules_tenant_name</c> (its leading column is the workspace);
+    /// a workspace holds at most a handful of schedules.
+    /// </remarks>
+    public Task<int> CountSchedulesToRezoneAsync(
+        TenantId tenantId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken = default)
+    {
+        DateTimeOffset instant = now.ToUniversalTime();
+
+        return _context.ReportSchedules
+            .AsNoTracking()
+            .CountAsync(
+                schedule => schedule.TenantId == tenantId && schedule.NextRunAt > instant,
+                cancellationToken);
+    }
+
     private ConcurrencyToken CurrentVersion(Tenant tenant) =>
         RowVersionTokens.Encode(RowVersion(tenant).CurrentValue);
 

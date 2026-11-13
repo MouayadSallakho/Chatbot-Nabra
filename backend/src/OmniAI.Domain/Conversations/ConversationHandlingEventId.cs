@@ -28,7 +28,10 @@ public readonly record struct ConversationHandlingEventId
     {
         if (value == Guid.Empty)
         {
-            throw new DomainValidationException("Handling event id must not be an empty GUID.");
+            throw new DomainValidationException("Handling event id must not be an empty GUID.")
+            {
+                Code = "conversations.handling_event.invalid",
+            };
         }
 
         return new ConversationHandlingEventId(value);

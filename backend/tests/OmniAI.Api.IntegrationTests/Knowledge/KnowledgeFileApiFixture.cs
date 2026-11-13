@@ -23,6 +23,12 @@ public sealed class KnowledgeFileApiFixture : RoleApiFixture
     /// <summary>Small enough for a test to exceed cheaply.</summary>
     public const int MaxFileBytes = 32 * 1024;
 
+    /// <summary>Parts a DOCX may hold here (Phase 38.7b); the fixture's own DOCX has three.</summary>
+    public const int MaxArchiveEntries = 16;
+
+    /// <summary>Bytes a DOCX may expand to here (Phase 38.7b).</summary>
+    public const long MaxArchiveExpandedBytes = 512 * 1024;
+
     private readonly RecordingEmbeddingProvider _embeddings = new();
 
     /// <summary>
@@ -43,6 +49,8 @@ public sealed class KnowledgeFileApiFixture : RoleApiFixture
         services.Replace(ServiceDescriptor.Singleton(new KnowledgeFilePolicy
         {
             MaxFileBytes = MaxFileBytes,
+            MaxArchiveEntries = MaxArchiveEntries,
+            MaxArchiveExpandedBytes = MaxArchiveExpandedBytes,
         }));
 
         services.Replace(

@@ -120,12 +120,18 @@ public sealed class ConversationHandlingEvent
     {
         if (actor.IsEmpty)
         {
-            throw new DomainValidationException("A handling change must name the member who made it.");
+            throw new DomainValidationException("A handling change must name the member who made it.")
+            {
+                Code = "conversations.handling_event.invalid",
+            };
         }
 
         if (afterSequence < 0)
         {
-            throw new DomainValidationException("A transcript position cannot be negative.");
+            throw new DomainValidationException("A transcript position cannot be negative.")
+            {
+                Code = "conversations.handling_event.invalid",
+            };
         }
 
         return true;

@@ -102,7 +102,8 @@ internal static class DocxTextReader
                         KnowledgeFileRejection.TooMuchContent,
                         KnowledgeFileRefusals.ArchiveTooLarge,
                         "That document contains too many parts to read safely.",
-                        limit: policy.MaxArchiveEntries);
+                        limit: policy.MaxArchiveEntries,
+                        limitUnit: KnowledgeFileLimitUnits.Entries);
                 }
 
                 long declared = 0;
@@ -117,7 +118,8 @@ internal static class DocxTextReader
                             KnowledgeFileRejection.TooMuchContent,
                             KnowledgeFileRefusals.ArchiveTooLarge,
                             "That document expands to more content than this platform will read.",
-                            limit: policy.MaxArchiveExpandedBytes);
+                            limit: policy.MaxArchiveExpandedBytes,
+                            limitUnit: KnowledgeFileLimitUnits.Bytes);
                     }
 
                     // A single entry claiming an implausible ratio is the shape
@@ -179,7 +181,8 @@ internal static class DocxTextReader
                         KnowledgeFileRefusals.TooManyCharacters,
                         $"That document holds more than {policy.MaxExtractedCharacters:N0} "
                         + "characters of text. Split it into smaller documents.",
-                        limit: policy.MaxExtractedCharacters);
+                        limit: policy.MaxExtractedCharacters,
+                        limitUnit: KnowledgeFileLimitUnits.Characters);
                 }
             }
 

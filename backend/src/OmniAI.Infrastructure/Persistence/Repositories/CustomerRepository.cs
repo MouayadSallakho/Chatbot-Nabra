@@ -413,7 +413,7 @@ internal sealed class CustomerRepository(OmniAiDbContext context) : ICustomerRep
     {
         if (sourceId == targetId)
         {
-            throw new CustomerMergeNotAllowedException("A customer cannot be merged into itself.");
+            throw CustomerMergeNotAllowedException.Self();
         }
 
         await using IDbContextTransaction transaction = await _context.Database
@@ -537,7 +537,7 @@ internal sealed class CustomerRepository(OmniAiDbContext context) : ICustomerRep
                 customer => customer.Id == customerId && customer.TenantId == tenantId,
                 cancellationToken)
             .ConfigureAwait(false)
-        ?? throw new CustomerMergeNotAllowedException(
+        ?? throw CustomerMergeNotAllowedException.NotInWorkspace(
             "Both customers must exist in this workspace.");
 
     /// <summary>

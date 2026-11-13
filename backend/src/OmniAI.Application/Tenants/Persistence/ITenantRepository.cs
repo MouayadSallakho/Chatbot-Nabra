@@ -148,4 +148,18 @@ public interface ITenantRepository
         ConcurrencyToken expected,
         DateTimeOffset now,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// How many report schedules a time-zone change made at <paramref name="now"/>
+    /// would move (Phase 38.7b, BA-9).
+    /// </summary>
+    /// <remarks>
+    /// Exactly the rows <see cref="ChangeTimeZoneAsync"/> locks and re-times: this
+    /// workspace's schedules, enabled or not, whose next run is still to come. One
+    /// already due keeps its time and is not counted.
+    /// </remarks>
+    Task<int> CountSchedulesToRezoneAsync(
+        TenantId tenantId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken = default);
 }

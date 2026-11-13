@@ -32,7 +32,10 @@ public readonly record struct MessageId
     {
         if (value == Guid.Empty)
         {
-            throw new DomainValidationException("Message id must not be an empty GUID.");
+            throw new DomainValidationException("Message id must not be an empty GUID.")
+            {
+                Code = "conversations.message_id.invalid",
+            };
         }
 
         return new MessageId(value);

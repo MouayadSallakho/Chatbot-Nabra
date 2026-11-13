@@ -281,7 +281,15 @@ public sealed class AiAgentOpenAiPreviewApiTests(AiAgentOpenAiApiFixture api)
 
         using HttpResponseMessage response = await PreviewAsync(client, tenantId, agentId, "Hello?");
 
-        string body = await response.Content.ReadAsStringAsync();
+        using JsonDocument document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+
+        // The per-request trace id is random hex and can contain "401" by chance,
+        // so it is left out; every other member is checked as the API wrote it.
+        string body = string.Join(
+            '|',
+            document.RootElement.EnumerateObject()
+                .Where(field => !string.Equals(field.Name, "traceId", StringComparison.Ordinal))
+                .Select(field => $"{field.Name}={field.Value.GetRawText()}"));
 
         foreach (string forbidden in (string[])
             ["sk-leaked-probe", "invalid_api_key", "req_leak", "api.openai.com", "openai",

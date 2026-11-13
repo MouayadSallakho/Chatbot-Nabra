@@ -93,7 +93,8 @@ internal static class HostedChatEndpoints
 
         chat.MapPost("/{publicKey}/conversations", StartConversationAsync)
             .AddEndpointFilter<AntiforgeryEndpointFilter>()
-            .WithName("StartWebChatConversation");
+            .WithName("StartWebChatConversation")
+            .Produces<StartedConversationResponse>(StatusCodes.Status200OK);
 
         // Exchanges the conversation's own credential for a realtime ticket.
         //
@@ -102,14 +103,16 @@ internal static class HostedChatEndpoints
         // same reasoning that puts a token on sending a message puts one here.
         chat.MapPost("/conversations/{conversationId:guid}/realtime-ticket", IssueTicketAsync)
             .AddEndpointFilter<AntiforgeryEndpointFilter>()
-            .WithName("IssueHostedRealtimeTicket");
+            .WithName("IssueHostedRealtimeTicket")
+            .Produces<RealtimeTicketResponse>(StatusCodes.Status200OK);
 
         chat.MapGet("/conversations/{conversationId:guid}/messages", ListMessagesAsync)
             .WithName("ListWebChatMessages");
 
         chat.MapPost("/conversations/{conversationId:guid}/messages", SendMessageAsync)
             .AddEndpointFilter<AntiforgeryEndpointFilter>()
-            .WithName("SendWebChatMessage");
+            .WithName("SendWebChatMessage")
+            .Produces<ChatTurnResponse>(StatusCodes.Status200OK);
 
         return endpoints;
     }
