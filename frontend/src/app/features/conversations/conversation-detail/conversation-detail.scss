@@ -31,17 +31,6 @@
   grid-template-columns: minmax(0, 1fr) auto;
 }
 
-// On a phone filling the screen the explanation under the handoff button is
-// read by the button's description only; the header stays short.
-.conversation.is-fill:not(.is-panes) .handling-help {
-  position: absolute;
-  inline-size: 1px;
-  block-size: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
-}
-
 .conversation-header,
 .conversation-footer {
   padding: var(--space-4) var(--page-gutter);
@@ -92,7 +81,6 @@
 
 .conversation-title {
   font: var(--text-section-title);
-  font-stretch: var(--heading-stretch, 100%);
   overflow-wrap: anywhere;
 }
 
@@ -256,4 +244,28 @@
     inline-size: 55%;
     margin-block-end: var(--space-2);
   }
+}
+
+// -----------------------------------------------------------------------------
+// The one-line header on a phone (Phase 38 note 5, 39.3)
+// -----------------------------------------------------------------------------
+// Back, the customer, the handling chip and Details on one line; the facts
+// line, the handling bar with its action and help, and Refresh open with
+// Details, each on a line of its own. The flex layout itself comes from the
+// layout utilities bound in the template (`d-flex`, `flex-wrap`, `p-2`, ...); the back
+// link is an icon button there.
+.is-compact .conversation-header > :not(.conversation-back, .conversation-title-row) {
+  flex-basis: 100%;
+}
+
+.is-compact .conversation-title-row {
+  flex: 1 1 0;
+}
+
+// One line: the customer's label truncates, never the chip or the button.
+.is-compact .conversation-title {
+  overflow: hidden;
+  font: var(--text-title-3);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

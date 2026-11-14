@@ -9,7 +9,8 @@ import { PermissionApi } from '@app/core/authorization/permission-api';
 import { ConversationRealtime } from '@app/core/realtime/conversation-realtime';
 import { LOCAL_STORAGE } from '@app/core/storage/local-storage';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
-import { memoryStorage, permissionApiGranting } from '@app/testing/test-doubles';
+import { FakeMediaMatcher, memoryStorage, permissionApiGranting } from '@app/testing/test-doubles';
+import { MEDIA_QUERY_FACTORY, MediaQueries } from '@app/core/media/media';
 import { WhatsAppApi } from '@app/features/channels/whatsapp-api';
 import { ArabicFonts } from '@app/core/i18n/arabic-fonts';
 import { InboxSignals } from '@app/core/sounds/inbox-signals';
@@ -46,9 +47,13 @@ describe('ConversationDetail', () => {
     },
   };
 
+  /** A phone's width (Phase 39.3): the one-line header. Off unless a test says so. */
+  let phone = false;
+
   beforeEach(() => {
     notify = null;
     unsubscribed = false;
+    phone = false;
   });
 
   const detail = {
@@ -115,6 +120,14 @@ describe('ConversationDetail', () => {
         // against; what matters here is that the component subscribes and
         // unsubscribes, and the captured callback is how a test drives it.
         { provide: ConversationRealtime, useValue: realtime },
+        ...(phone
+          ? [
+              {
+                provide: MEDIA_QUERY_FACTORY,
+                useValue: new FakeMediaMatcher({ [MediaQueries.phone]: true }).factory,
+              },
+            ]
+          : []),
       ],
     });
 
@@ -1035,5 +1048,81 @@ describe('ConversationDetail', () => {
     await settle();
 
     expect(text()).toContain('do not have access to conversations');
+  });
+
+  describe('on a phone (Phase 38 note 5, 39.3)', () => {
+    async function open(...permissions: string[]): Promise<void> {
+      phone = true;
+      await mount(...permissions);
+
+      http.expectOne(detailUrl).flush(detail, tagged(detail));
+      await settle();
+      http.expectOne(messagesUrl).flush({ items: [], nextCursor: null, previousCursor: null });
+      await settle();
+    }
+
+    const details = (): HTMLButtonElement =>
+      host().querySelector<HTMLButtonElement>('[data-testid="toggle-details"]')!;
+
+    it('heads the conversation with one line: back, the customer, the chip, Details', async () => {
+      await open('conversations.view', 'conversations.handoff');
+
+      expect(host().querySelector('.conversation')?.classList).toContain('is-compact');
+      expect(host().querySelector('h1')?.textContent?.replace(/\s+/g, ' ').trim()).toBe(
+        'Visitor 7KQ2MX',
+      );
+      expect(host().querySelector('[data-testid="handling-chip-compact"]')?.textContent).toContain(
+        'AI',
+      );
+
+      // The back link is the arrow alone, and still says where it goes.
+      const back = host().querySelector<HTMLAnchorElement>('.conversation-back')!;
+
+      expect(back.textContent?.replace(/\s+/g, ' ').trim()).toBe('Back to Conversations');
+      expect(back.querySelector(':scope > span')?.classList).toContain('visually-hidden');
+
+      // The facts wait for Details.
+      expect(host().querySelector('.conversation-meta')).toBeNull();
+      expect(host().querySelector('[data-testid="handling"]')).toBeNull();
+      expect(host().querySelector('[data-testid="refresh-conversation"]')).toBeNull();
+      expect(details().getAttribute('aria-expanded')).toBe('false');
+    });
+
+    it('opens the facts, the handling bar with its action and help, and Refresh on demand', async () => {
+      await open('conversations.view', 'conversations.handoff');
+
+      details().click();
+      await settle();
+
+      expect(details().getAttribute('aria-expanded')).toBe('true');
+      expect(host().querySelector('.conversation-meta')?.textContent).toContain('Website chat');
+      expect(host().querySelector('[data-testid="handling"]')).not.toBeNull();
+      expect(
+        host().querySelector('[data-testid="take-over"]')?.getAttribute('aria-describedby'),
+      ).toBe('handling-help');
+      expect(host().querySelector('#handling-help')).not.toBeNull();
+      expect(host().querySelector('[data-testid="refresh-conversation"]')).not.toBeNull();
+      // The chip is said once: on the title's line, not again in the bar.
+      expect(host().querySelectorAll('app-voice-chip')).toHaveLength(1);
+
+      details().click();
+      await settle();
+
+      expect(host().querySelector('[data-testid="handling"]')).toBeNull();
+    });
+
+    it('keeps the full header on a wider screen', async () => {
+      await mount('conversations.view');
+
+      http.expectOne(detailUrl).flush(detail, tagged(detail));
+      await settle();
+      http.expectOne(messagesUrl).flush({ items: [], nextCursor: null, previousCursor: null });
+      await settle();
+
+      expect(host().querySelector('.conversation')?.classList).not.toContain('is-compact');
+      expect(host().querySelector('.conversation-meta')).not.toBeNull();
+      expect(host().querySelector('[data-testid="handling"]')).not.toBeNull();
+      expect(host().querySelector('[data-testid="handling-chip-compact"]')).toBeNull();
+    });
   });
 });

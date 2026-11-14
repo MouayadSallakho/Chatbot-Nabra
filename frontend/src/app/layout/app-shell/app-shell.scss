@@ -3,59 +3,81 @@
 }
 
 // -----------------------------------------------------------------------------
-// Shell frame
+// Shell frame (calm-glass.md §7)
 // -----------------------------------------------------------------------------
-// CSS Grid, not the Bootstrap grid: a fixed-width column beside a filling one.
-//
-// The column is the rail's width unless the sidebar is pinned. Peeking never
-// changes it -- the expanded rail is an overlay -- so hovering the navigation
-// cannot move, reflow or re-wrap anything on the page. Pinning changes it once,
-// deliberately, and is not animated: animating a grid track would re-lay-out the
-// whole page on every frame.
+// The ground with its two glows, the floating side bar in a fixed column and
+// the content beside it. Only the content scrolls: the side bar and the bars
+// hold still while the page moves. `--shell-nav-end` says where the navigation
+// ends, for the panel that opens beside it.
 .shell {
+  --shell-nav-end: calc(var(--shell-padding) + var(--sidebar-width) + var(--column-gap));
+
+  position: relative;
   display: grid;
-  grid-template-columns: var(--sidebar-width-collapsed) minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr);
   // Dynamic viewport height: on mobile browsers `100vh` is the height with the
   // address bar hidden, which leaves the layout taller than the window.
   block-size: 100vh;
   block-size: 100dvh;
+  // `clip`, not `hidden`: the frame itself can never be scrolled, not even
+  // by focus moving to something near its edge. Only the content scrolls.
+  overflow: clip;
+  background-color: var(--color-ground);
 }
 
-.shell.is-pinned {
-  grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+.shell.is-rail {
+  --shell-nav-end: calc(var(--shell-padding) + var(--sidebar-rail-width) + var(--column-gap));
 }
 
-// The grid cell the sidebar sits in. As a rail, the panel is positioned inside
-// it and overflows it when peeking; the cell's own edge is the rail's divider.
+// The two soft glows: 900px of emerald at the start-top, 760px of gold at the
+// end-bottom (board Inbox). Behind everything, and never in forced colours.
+.shell-glow {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+
+  @media (forced-colors: active) {
+    display: none;
+  }
+}
+
+.shell-glow-a {
+  inset-block-start: -380px;
+  inset-inline-start: -320px;
+  inline-size: 900px;
+  block-size: 900px;
+  background: radial-gradient(closest-side, var(--glow-a), transparent);
+}
+
+.shell-glow-b {
+  inset-block-end: -340px;
+  inset-inline-end: -260px;
+  inline-size: 760px;
+  block-size: 760px;
+  background: radial-gradient(closest-side, var(--glow-b), transparent);
+}
+
+// The side bar floats 14px from the window's edges, 12px from the content.
 .shell-sidebar {
   position: relative;
-  grid-column: 1;
-  min-inline-size: 0;
   z-index: var(--z-sidebar);
+  grid-column: 1;
+  padding: var(--shell-padding);
+  padding-inline-end: var(--column-gap);
 }
 
-.shell-content {
-  grid-column: 2;
-  display: flex;
-  flex-direction: column;
-  // Without this a wide child -- a table, a long unbroken string -- would stretch
-  // the grid column instead of scrolling inside it.
-  min-inline-size: 0;
-  min-block-size: 0;
-}
-
-// The only scrolling region for page content. Keeping the scroll here rather
-// than on the body is what holds the sidebar and top bar still while the page
-// moves. `scrollbar-gutter` reserves the scrollbar's width even on a short page,
-// so moving between a long page and a short one does not shift the layout.
+// The only scrolling region for page content. `scrollbar-gutter` reserves the
+// scrollbar's width even on a short page, so moving between a long page and a
+// short one does not shift the layout.
 .shell-main {
   // The containing block for anything absolutely positioned in a page -- the
   // visually hidden captions and labels above all. Without it they anchor to
   // <body> at their scrolled-down position and make the document itself
   // scroll, which drew a second scrollbar beside this one.
   position: relative;
-  flex: 1;
+  grid-row: 1;
+  grid-column: 2;
   min-block-size: 0;
   overflow-y: auto;
   scrollbar-gutter: stable;
@@ -67,50 +89,35 @@
 }
 
 // -----------------------------------------------------------------------------
-// Drawer layout
+// Phones and tablets: the two bars over the content
 // -----------------------------------------------------------------------------
-// Below the desktop breakpoint the sidebar leaves the grid entirely and becomes
-// an overlay. A different layout, not a narrower one: a permanent rail of tiny
-// icons on a phone is a worse drawer, not a better sidebar.
-.shell.is-drawer {
+// The content runs under both bars, so the glass has something to soften. Its
+// padding keeps the page's own start and end clear of them, and
+// `scroll-padding` keeps a focused control from scrolling underneath one
+// (WCAG 2.4.11).
+.shell.is-bars {
   grid-template-columns: minmax(0, 1fr);
 
-  .shell-content {
+  .shell-main {
     grid-column: 1;
-  }
-
-  .shell-sidebar {
-    position: fixed;
-    inset-block: 0;
-    inset-inline-start: 0;
-    z-index: var(--z-drawer);
-    // Wide enough to read, never so wide it covers the page completely -- seeing
-    // the edge of what is behind is what makes a drawer feel dismissible.
-    inline-size: min(18rem, 86vw);
-    transform: translateX(calc(var(--direction-flip) * -100%));
-    transition: transform var(--motion-slow) var(--ease-standard);
-  }
-
-  .shell-sidebar.is-open {
-    transform: translateX(0);
+    padding-block: var(--topbar-height)
+      calc(var(--bottombar-height) + var(--space-4) + env(safe-area-inset-bottom));
+    scroll-padding-block: var(--topbar-height)
+      calc(var(--bottombar-height) + var(--space-4) + env(safe-area-inset-bottom));
   }
 }
 
-.shell-scrim {
-  position: fixed;
-  inset: 0;
-  z-index: calc(var(--z-drawer) - 1);
-  background-color: var(--scrim);
-  opacity: 0;
-  // Not merely transparent: an invisible full-screen layer would still swallow
-  // every tap on the page behind it.
-  visibility: hidden;
-  transition:
-    opacity var(--motion-slow) var(--ease-standard),
-    visibility var(--motion-slow) var(--ease-standard);
+.shell-topbar,
+.shell-bottombar {
+  position: absolute;
+  z-index: var(--z-sidebar);
+  inset-inline: 0;
 }
 
-.shell-scrim.is-visible {
-  opacity: 1;
-  visibility: visible;
+.shell-topbar {
+  inset-block-start: 0;
+}
+
+.shell-bottombar {
+  inset-block-end: 0;
 }

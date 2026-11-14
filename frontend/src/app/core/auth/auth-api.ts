@@ -20,6 +20,13 @@ export interface AuthenticatedUser {
    * English: that is the server's own rule for an account that never chose.
    */
   readonly language?: string | null;
+
+  /**
+   * The name the member chose to be shown by (Phase 39.1, `CurrentUserResponse`);
+   * null when none was set, and then the address stands in. Staff-facing only:
+   * visitors never see it. The side bar's member block shows it (39.3).
+   */
+  readonly displayName?: string | null;
 }
 
 /** The answer to "is anybody signed in", which is never a 401. */

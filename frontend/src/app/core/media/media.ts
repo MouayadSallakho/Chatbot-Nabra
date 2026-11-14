@@ -12,7 +12,8 @@ export const MediaQueries = {
   prefersDark: '(prefers-color-scheme: dark)',
 
   /**
-   * Where the layout switches from drawer navigation to a permanent sidebar.
+   * Where the layout switches from the phone's top and bottom bars to the side
+   * bar (Phase 39.3; until then, from the drawer).
    *
    * 992px is Bootstrap's `lg` breakpoint, matched deliberately: the grid classes
    * used in templates change behaviour at exactly this width, and a shell that
@@ -21,11 +22,23 @@ export const MediaQueries = {
   desktop: '(min-width: 992px)',
 
   /**
+   * Where the side bar is shown in full (Phase 39.3, plan 39.0 §3.2.4): 216px
+   * with its names. Narrower desktops get the rail of icons.
+   */
+  sidebarFull: '(min-width: 1280px)',
+
+  /**
    * Wide enough for the inbox's three panes (Phase 36.6): the conversation list
    * stays beside the open conversation. The inbox's stylesheets switch layout
    * at exactly this width, written in px there too, so the two never disagree.
    */
   inbox: '(min-width: 1280px)',
+
+  /**
+   * A phone: the conversation's header shrinks to one line here (Phase 38
+   * note 5, 39.3), with its facts on demand.
+   */
+  phone: '(max-width: 767.98px)',
 
   /**
    * Tall enough for a conversation to fill the screen with its own scrolling

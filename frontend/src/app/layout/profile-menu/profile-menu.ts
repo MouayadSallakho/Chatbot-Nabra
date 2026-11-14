@@ -24,15 +24,18 @@ const THEME_ICONS: Readonly<Record<ThemePreference, IconName>> = {
 };
 
 /**
- * The account menu at the end of the top bar.
+ * The account menu: at the foot of the side bar on a desktop (the member's
+ * avatar, name and sounds state, board Inbox), at the end of the top bar on a
+ * phone (the avatar alone).
  *
  * Who is signed in, which workspace they are in, their appearance (the theme
  * and "Reduce transparency") and language, and the ways out -- and nothing
  * else. It is not a settings page: anything a workspace administers lives in
  * the sidebar, under Workspace.
  *
- * Every value shown is real. The initials come from the account's own address;
- * there is no invented display name, role or avatar image.
+ * Every value shown is real: the display name the member chose (39.1), or the
+ * address when there is none; initials drawn from whichever is shown; no
+ * invented role or avatar image.
  */
 @Component({
   selector: 'app-profile-menu',
@@ -43,7 +46,21 @@ const THEME_ICONS: Readonly<Record<ThemePreference, IconName>> = {
 })
 export class ProfileMenu {
   readonly email = input('');
+
+  /** The name the member chose to be shown by; empty when none was set. */
+  readonly displayName = input<string | null | undefined>(null);
+
   readonly workspaceName = input('');
+
+  /**
+   * How the trigger looks: the avatar alone (the phone's top bar, the collapsed
+   * rail), or the member block with the name and the sounds state (the side
+   * bar's foot).
+   */
+  readonly variant = input<'avatar' | 'member'>('avatar');
+
+  /** Which edge of the trigger the menu lines up with (see `Menu`). */
+  readonly placement = input<'start' | 'end'>('end');
   readonly canSwitchWorkspace = input(false);
 
   /**
@@ -85,8 +102,24 @@ export class ProfileMenu {
     icon: THEME_ICONS[value],
   }));
 
-  /** One or two letters from the address, never a guess at a real name. */
+  /** The name shown for the member: the chosen display name, else the address. */
+  protected readonly shownName = computed(() => this.displayName()?.trim() || this.email());
+
+  /**
+   * One or two letters from the shown name: the first letters of its first two
+   * words for a display name ("Sara Ahmed" → SA, an Arabic name gives Arabic
+   * letters), or from the address's local part. Never a guess at a real name.
+   */
   protected readonly initials = computed(() => {
+    const display = this.displayName()?.trim();
+
+    if (display) {
+      const words = display.split(/\s+/).filter(Boolean);
+      const letters = words.length > 1 ? [...words[0]][0] + [...words[1]][0] : [...words[0]][0];
+
+      return letters.toLocaleUpperCase();
+    }
+
     const local = this.email().split('@')[0] ?? '';
     const parts = local.split(/[._-]+/).filter(Boolean);
     const letters = parts.length > 1 ? parts[0][0] + parts[1][0] : local.slice(0, 1);
@@ -111,10 +144,23 @@ export class ProfileMenu {
    * The trigger's name starts with the initials it shows (WCAG 2.5.3, Phase
    * 36.11): somebody using speech input reads "AO" on the button and says it.
    */
-  protected readonly label = computed(() =>
-    this.email()
+  protected readonly label = computed(() => {
+    // The member block's own words (the name, the sounds state and a hidden
+    // "Account menu") are its name, so it needs no label of its own.
+    if (this.variant() === 'member') {
+      return '';
+    }
+
+    return this.email()
       ? $localize`:@@account.menuLabelFor:${this.initials()}:initials:: Account menu for ${this.email()}:email:`
-      : $localize`:@@account.menuLabel:Account menu`,
+      : $localize`:@@account.menuLabel:Account menu`;
+  });
+
+  /** The member block's second line: whether sounds are on, as words. */
+  protected readonly soundsLine = computed(() =>
+    this.soundsOn()
+      ? $localize`:@@account.soundsOn:Sounds on`
+      : $localize`:@@account.soundsOff:Sounds off`,
   );
 
   /** Sounds are about the inbox, so only somebody who can read it is offered them. */

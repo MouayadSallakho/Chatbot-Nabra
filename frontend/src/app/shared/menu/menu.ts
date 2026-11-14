@@ -16,6 +16,10 @@ const ITEM_SELECTOR =
 
 let nextId = 0;
 
+/** The space a menu keeps from the window's edge, and the least it shrinks to. */
+const MENU_MARGIN_PX = 12;
+const MENU_MIN_PX = 160;
+
 /**
  * A menu button: a trigger and the menu it opens.
  *
@@ -46,6 +50,7 @@ let nextId = 0;
       [attr.aria-expanded]="open()"
       [attr.aria-controls]="open() ? menuId : null"
       [attr.aria-label]="label() || null"
+      [attr.data-testid]="triggerTestId()"
       (click)="toggle()"
       (keydown.arrowDown)="openFromKeyboard($event, 'first')"
       (keydown.arrowUp)="openFromKeyboard($event, 'last')"
@@ -111,6 +116,9 @@ export class Menu {
    * it to `text-align` on the host element, which every item then inherited.
    */
   readonly placement = input<'start' | 'end'>('end');
+
+  /** A `data-testid` for the trigger button, when a test or journey needs one. */
+  readonly triggerTestId = input<string | null>(null);
 
   protected readonly open = signal(false);
   protected readonly side = signal<'start' | 'end'>('end');
@@ -236,13 +244,22 @@ export class Menu {
     }
 
     const triggerRect = this.trigger().nativeElement.getBoundingClientRect();
+    const above =
+      rect.bottom > view.clientHeight && triggerRect.top > view.clientHeight - triggerRect.bottom;
 
-    if (
-      rect.bottom > view.clientHeight &&
-      triggerRect.top > view.clientHeight - triggerRect.bottom
-    ) {
+    if (above) {
       this.above.set(true);
+      // Now, not at the next render: focus moves into the menu straight after
+      // this, and an item still below the window would scroll the page to it.
+      panel.classList.add('menu-above');
     }
+
+    // No taller than the room on the side it opens towards (the account menu
+    // at the foot of the side bar, on a short window): it scrolls inside
+    // instead of running off the screen (Phase 39.3).
+    const room = above ? triggerRect.top : view.clientHeight - triggerRect.bottom;
+
+    panel.style.maxBlockSize = `${Math.max(room - MENU_MARGIN_PX, MENU_MIN_PX)}px`;
   }
 
   private items(): HTMLElement[] {

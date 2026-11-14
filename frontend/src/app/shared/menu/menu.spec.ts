@@ -5,7 +5,7 @@ import { Menu } from './menu';
 @Component({
   imports: [Menu],
   template: `
-    <app-menu label="Row actions">
+    <app-menu label="Row actions" triggerTestId="row-actions">
       <span menuTrigger>More</span>
       <button type="button" role="menuitem" (click)="chosen.set('edit')">Edit</button>
       <button type="button" role="menuitem" (click)="chosen.set('copy')">Copy</button>
@@ -131,5 +131,9 @@ describe('Menu', () => {
     await settle();
 
     expect(menu()).toBeNull();
+  });
+
+  it('carries a test id on its trigger when it is given one (39.3)', () => {
+    expect(trigger().getAttribute('data-testid')).toBe('row-actions');
   });
 });

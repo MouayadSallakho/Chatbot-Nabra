@@ -6,6 +6,8 @@
   [attr.aria-expanded]="open()"
   aria-controls="notification-panel"
   [attr.aria-label]="name()"
+  [appTooltip]="name()"
+  [placement]="placement() === 'side' ? 'end' : 'below'"
   data-testid="notification-bell"
   (click)="toggle()"
 >
@@ -28,10 +30,12 @@
 
 @if (open()) {
   <section
+    #panel
     id="notification-panel"
-    class="panel"
+    class="panel glass"
     aria-labelledby="notification-panel-heading"
     data-testid="notification-panel"
+    (keydown)="onPanelKeydown($event)"
   >
     <header class="panel-header">
       <div class="panel-heading">

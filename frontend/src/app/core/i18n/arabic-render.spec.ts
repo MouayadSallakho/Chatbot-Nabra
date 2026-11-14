@@ -116,6 +116,10 @@ describe('Arabic renders', () => {
     const { NAV_ITEMS, NAV_GROUP_LABELS } = await import('@app/layout/navigation');
 
     expect(NAV_ITEMS[0].label).toBe('نظرة عامة');
+    expect(NAV_ITEMS.find((item) => item.path === 'conversations')?.label).toBe('صندوق المحادثات');
+    expect(NAV_GROUP_LABELS.Conversations).toBe('المحادثات');
+    expect(NAV_GROUP_LABELS.AI).toBe('الذكاء الاصطناعي');
+    expect(NAV_GROUP_LABELS.Insights).toBe('الرؤى');
     expect(NAV_GROUP_LABELS.Workspace).toBe('مساحة العمل');
   });
 

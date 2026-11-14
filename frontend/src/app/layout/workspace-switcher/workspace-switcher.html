@@ -1,0 +1,79 @@
+@if (!name()) {
+  <!-- Holds the switcher's place while the workspace loads. -->
+  <span class="switcher-static" aria-hidden="true">
+    <span class="skeleton switcher-tile"></span>
+    @if (variant() !== 'rail') {
+      <span class="skeleton switcher-name-skeleton"></span>
+    }
+  </span>
+} @else if (canSwitch()) {
+  <app-menu
+    [label]="variant() === 'rail' ? railLabel() : ''"
+    [triggerClass]="'switcher-trigger is-' + variant()"
+    placement="start"
+    triggerTestId="workspace-switch"
+  >
+    <span menuTrigger class="switcher-face">
+      <span class="switcher-tile" aria-hidden="true">{{ initial() }}</span>
+      @if (variant() !== 'rail') {
+        <span class="switcher-name"
+          ><span class="visually-hidden" i18n="@@shell.workspacePrefix">Workspace: </span
+          ><bdi dir="auto">{{ name() }}</bdi
+          ><span class="visually-hidden"
+            >. <ng-container i18n="@@shell.switchWorkspace">Switch workspace</ng-container></span
+          ></span
+        >
+        <app-icon class="switcher-chevron" name="chevron-down" [strokeWidth]="1.75" />
+      }
+    </span>
+
+    <p
+      class="menu-label"
+      role="presentation"
+      id="workspace-switcher-label"
+      i18n="@@workspaceSwitcher.heading"
+    >
+      Your workspaces
+    </p>
+    <div role="group" aria-labelledby="workspace-switcher-label">
+      @for (option of options(); track option.workspace.id) {
+        <button
+          type="button"
+          class="menu-item switcher-option"
+          role="menuitemradio"
+          [attr.aria-checked]="option.current"
+          [attr.data-testid]="'workspace-option-' + option.workspace.id"
+          (click)="choose(option)"
+        >
+          <span class="switcher-tile is-small" aria-hidden="true">{{ option.initial }}</span>
+          <span class="switcher-option-name"
+            ><bdi dir="auto">{{ option.workspace.name }}</bdi></span
+          >
+          @if (option.current) {
+            <app-icon class="menu-check" name="check" [strokeWidth]="2" />
+          }
+        </button>
+      }
+    </div>
+    <hr class="menu-separator" role="separator" />
+    <button
+      type="button"
+      class="menu-item"
+      role="menuitem"
+      data-testid="workspace-chooser"
+      (click)="chooserRequested.emit()"
+    >
+      <app-icon name="switch" [strokeWidth]="1.75" />
+      <span i18n="@@workspaceSwitcher.chooser">Choose or create a workspace</span>
+    </button>
+  </app-menu>
+} @else {
+  <!-- One workspace: its name, as context, and nothing to operate. -->
+  <p class="switcher-static" data-testid="workspace-name">
+    <span class="switcher-tile" aria-hidden="true">{{ initial() }}</span>
+    <span class="switcher-name" [class.visually-hidden]="variant() === 'rail'"
+      ><span class="visually-hidden" i18n="@@shell.workspacePrefix">Workspace: </span
+      ><bdi dir="auto">{{ name() }}</bdi></span
+    >
+  </p>
+}

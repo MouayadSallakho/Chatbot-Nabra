@@ -1,5 +1,29 @@
-<app-menu [label]="label()" triggerClass="avatar-trigger" placement="end">
-  <span menuTrigger class="avatar" aria-hidden="true">{{ initials() }}</span>
+<app-menu
+  [label]="label()"
+  [triggerClass]="variant() === 'member' ? 'member-trigger' : 'avatar-trigger'"
+  [placement]="placement()"
+>
+  @if (variant() === 'member') {
+    <!--
+      The member at the foot of the side bar (board Inbox): the avatar, the name
+      and, for somebody who hears the inbox, whether sounds are on. The words are
+      the button's name; "Account menu" completes it for a screen reader.
+    -->
+    <span menuTrigger class="member">
+      <span class="avatar avatar-member" aria-hidden="true">{{ initials() }}</span>
+      <span class="member-lines">
+        <span class="member-name"
+          ><bdi dir="auto">{{ shownName() }}</bdi></span
+        >
+        @if (canHearSounds()) {
+          <span class="member-status">{{ soundsLine() }}</span>
+        }
+        <span class="visually-hidden" i18n="@@account.menuLabel">Account menu</span>
+      </span>
+    </span>
+  } @else {
+    <span menuTrigger class="avatar" aria-hidden="true">{{ initials() }}</span>
+  }
 
   <div class="identity" role="presentation">
     <span class="avatar avatar-lg" aria-hidden="true">{{ initials() }}</span>
@@ -9,6 +33,11 @@
       language, a workspace name is whatever its owner typed.
     -->
     <span class="identity-lines">
+      @if (displayName()?.trim()) {
+        <span class="identity-name"
+          ><bdi dir="auto">{{ shownName() }}</bdi></span
+        >
+      }
       <span class="identity-email" [title]="email()"
         ><bdi dir="ltr">{{ email() }}</bdi></span
       >

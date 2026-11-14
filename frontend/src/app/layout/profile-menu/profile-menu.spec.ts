@@ -23,7 +23,11 @@ describe('ProfileMenu', () => {
   const root = (): HTMLElement => fixture.nativeElement as HTMLElement;
   const trigger = (): HTMLButtonElement => root().querySelector('[aria-haspopup="menu"]')!;
 
-  async function render(email = 'ada.owner@omniai.example', canSwitch = false) {
+  async function render(
+    email = 'ada.owner@omniai.example',
+    canSwitch = false,
+    member: { variant?: 'avatar' | 'member'; displayName?: string | null } = {},
+  ) {
     TestBed.configureTestingModule({
       providers: [
         provideRouter([]),
@@ -39,6 +43,8 @@ describe('ProfileMenu', () => {
     fixture.componentRef.setInput('email', email);
     fixture.componentRef.setInput('workspaceName', 'Acme Trading');
     fixture.componentRef.setInput('canSwitchWorkspace', canSwitch);
+    fixture.componentRef.setInput('variant', member.variant ?? 'avatar');
+    fixture.componentRef.setInput('displayName', member.displayName ?? null);
     document.body.appendChild(fixture.nativeElement);
     fixture.detectChanges();
     await fixture.whenStable();
@@ -363,6 +369,56 @@ describe('ProfileMenu', () => {
 
       expect(TestBed.inject(LOCAL_STORAGE)?.getItem(LANGUAGE_STORAGE_KEY)).toBe('en');
       expect(reloads).toBe(0);
+    });
+  });
+
+  describe('as the member block at the foot of the side bar (39.3)', () => {
+    /** A member who reads the inbox, so the block says whether sounds are on. */
+    async function asMember(displayName: string | null = null): Promise<void> {
+      TestBed.configureTestingModule({
+        providers: [
+          { provide: PermissionApi, useValue: permissionApiGranting('conversations.view') },
+        ],
+      });
+      await render('ada.owner@omniai.example', false, { variant: 'member', displayName });
+      await TestBed.inject(PermissionService).load('t1');
+      fixture.detectChanges();
+    }
+
+    it('shows the address and the sounds state as the trigger’s own words', async () => {
+      await asMember();
+
+      expect(trigger().hasAttribute('aria-label')).toBe(false);
+      expect(trigger().textContent).toContain('ada.owner@omniai.example');
+      expect(trigger().textContent).toContain('Account menu');
+      expect(root().querySelector('.member-status')?.textContent?.trim()).toBe('Sounds on');
+    });
+
+    it('says when sounds are off, in words', async () => {
+      await asMember();
+
+      TestBed.inject(SoundSettings).setEnabled(false);
+      fixture.detectChanges();
+
+      expect(root().querySelector('.member-status')?.textContent?.trim()).toBe('Sounds off');
+    });
+
+    it('shows the chosen display name, with initials from it, in any script', async () => {
+      await asMember('Sara Ahmed');
+
+      expect(trigger().textContent).toContain('Sara Ahmed');
+      expect(root().querySelector('.avatar')?.textContent?.trim()).toBe('SA');
+      expect(root().querySelector('.member-name bdi')?.getAttribute('dir')).toBe('auto');
+
+      await open();
+      expect(root().querySelector('.identity')?.textContent).toContain('Sara Ahmed');
+      expect(root().querySelector('.identity')?.textContent).toContain('ada.owner@omniai.example');
+    });
+
+    it('takes Arabic initials from an Arabic name', async () => {
+      await asMember('ليلى حداد');
+
+      expect(root().querySelector('.avatar')?.textContent?.trim()).toBe('لح');
     });
   });
 });

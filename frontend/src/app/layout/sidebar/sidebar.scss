@@ -1,274 +1,256 @@
+// The floating glass side bar (calm-glass.md §7, boards Inbox and Overview):
+// 216px, radius 24, 18/14px padding; on the rail, a column of 40px icons.
+
 :host {
   display: block;
   block-size: 100%;
 }
 
-// -----------------------------------------------------------------------------
-// Panel
-// -----------------------------------------------------------------------------
-// Always the full expanded width. As a rail it is clipped to the rail's width,
-// and peeking animates only the clip -- no width, no layout, nothing behind it
-// reflows. The clip also clips hit-testing, so the hidden part cannot be
-// clicked by accident.
 .sidebar {
-  --rail-clip: calc(var(--sidebar-width) - var(--sidebar-width-collapsed));
-
+  position: relative;
   display: flex;
   flex-direction: column;
+  gap: var(--space-4);
   inline-size: var(--sidebar-width);
   block-size: 100%;
-  background-color: var(--surface-default);
-  border-inline-end: 1px solid var(--border-default);
+  padding: var(--sidebar-padding-block) var(--sidebar-padding-inline);
+  color: var(--color-text);
 }
 
-.sidebar.is-rail {
+// The glass, behind the bar's content (see the template). Radius 24.
+.sidebar-glass {
   position: absolute;
-  inset-block: 0;
-  inset-inline-start: 0;
-  z-index: var(--z-sidebar);
-  clip-path: inset(0 var(--rail-clip) 0 0);
-  // The rail peeks open under the pointer many times an hour, so both ways stay
-  // within 150ms (Phase 36.11). Closing is still a little slower than opening,
-  // on purpose: it reads as the panel settling back rather than being snatched.
-  transition:
-    clip-path var(--duration-sm) var(--ease-standard),
-    box-shadow var(--duration-sm) var(--ease-standard);
+  inset: 0;
+  border-radius: var(--radius-panel);
+  pointer-events: none;
 }
 
-.sidebar.is-rail.is-expanded {
-  // Negative on the open edge so the overlay's shadow is not clipped away.
-  clip-path: inset(0 -3rem 0 0);
-  box-shadow: var(--shadow-overlay);
-  transition-duration: var(--duration-xs);
-}
-
-:host-context([dir='rtl']) .sidebar.is-rail {
-  clip-path: inset(0 0 0 var(--rail-clip));
-}
-
-:host-context([dir='rtl']) .sidebar.is-rail.is-expanded {
-  clip-path: inset(0 0 0 -3rem);
-}
-
-// Labels fade rather than jump. They never leave the DOM, so every link keeps
-// its accessible name in every state.
-.fades {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  transition: opacity var(--duration-sm) var(--ease-standard);
-}
-
-.sidebar:not(.is-expanded) .fades {
-  opacity: 0;
+.sidebar > :not(.sidebar-glass) {
+  position: relative;
 }
 
 // -----------------------------------------------------------------------------
-// Brand
+// Head: the mark and the name, the palette and the bell
 // -----------------------------------------------------------------------------
+.sidebar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-block-size: var(--control-height-sm);
+  padding-inline-start: 0.375rem;
+}
+
 .sidebar-brand {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
-  flex: none;
-  min-block-size: var(--topbar-height);
-  padding-inline: 1.125rem;
-  border-block-end: 1px solid var(--border-subtle);
+  gap: 0.625rem;
+  min-inline-size: 0;
 }
 
 .brand-mark {
-  inline-size: 1.75rem;
-  block-size: 1.75rem;
   flex: none;
+  inline-size: 1.875rem;
+  block-size: 1.625rem;
 }
 
-// The lockup: the mark and the wordmark -- "Nabra" in Geist, tracked like
-// every title; "نبرة" in IBM Plex Sans Arabic, untracked. Weight 600, so an
-// Arabic page needs no 700 file for it (39.2b draws the outlined lockup). The
-// line is tall enough for the dots of ب and ة, which a clipped `.fades` box
-// would otherwise cut.
+// "Nabra" in Geist 600, 18px, tracked in a little; «نبرة» untracked.
 .brand-name {
-  font: 600 1.0625rem / 1.4 var(--font-sans);
-  font-stretch: var(--heading-stretch);
+  font: 600 1.125rem / 1.4 var(--font-sans);
   letter-spacing: var(--letter-spacing-tight);
-  color: var(--text-primary);
+  white-space: nowrap;
 }
 
-.sidebar-dismiss {
-  // The close button is the drawer's first stop, and a thumb's.
-  min-inline-size: 2.75rem;
-  min-block-size: 2.75rem;
-  margin-inline-start: auto;
+.sidebar-tools {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-hairline);
 }
 
 // -----------------------------------------------------------------------------
-// Navigation
+// Areas
 // -----------------------------------------------------------------------------
+// The list scrolls on its own when the window is short; the head and the
+// member stay where they are. The rows are never blurred: the one glass layer
+// is the bar's own.
 .sidebar-nav {
   flex: 1;
-  min-block-size: 0; // the list scrolls on its own; the footer stays put
+  min-block-size: 0;
+  margin-inline: calc(-1 * var(--space-1));
+  padding-inline: var(--space-1);
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: var(--space-1) var(--space-3) var(--space-3);
-  // A thin, quiet scrollbar: present when the list is long, never a slab.
   scrollbar-width: thin;
-  scrollbar-color: var(--border-strong) transparent;
+  scrollbar-color: var(--color-line-strong) transparent;
 }
 
 .nav-group + .nav-group {
-  margin-block-start: var(--space-1);
+  margin-block-start: var(--space-3);
 }
 
-// The section heading keeps its height in every state, so expanding the rail
-// moves nothing vertically. Collapsed, a short rule stands in for the words.
+// The section label: the caption style, in the quiet tone, sentence case. No
+// tracking and no capitals, which Arabic does not have (MASTER.md).
 .nav-group-label {
-  position: relative;
-  display: flex;
-  align-items: center;
-  block-size: 1.5rem;
-  margin-block-start: var(--space-1);
-  padding-inline: 0.625rem;
-  // Sentence case, as everywhere in Two Voices: uppercase labels shout, and
-  // Arabic has no case to set at all.
-  color: var(--text-muted);
+  margin: 0;
+  padding: 0 0.625rem var(--space-1);
+  color: var(--color-text-quiet);
   font: var(--text-caption);
-
-  &::before {
-    content: '';
-    position: absolute;
-    inset-inline-start: 0.625rem;
-    inline-size: 1.25rem;
-    border-block-start: 1px solid var(--border-default);
-    opacity: 0;
-    transition: opacity var(--duration-sm) var(--ease-standard);
-  }
-}
-
-.sidebar:not(.is-expanded) .nav-group + .nav-group .nav-group-label::before {
-  opacity: 1;
 }
 
 .nav-group ul {
   display: flex;
   flex-direction: column;
   gap: var(--gap-hairline);
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
-// A nav item: the icon sits on the rail's centre line in every state, so the
-// icons never move when the panel expands or collapses.
 .nav-item {
-  position: relative;
   display: flex;
   align-items: center;
-  gap: var(--space-3);
-  inline-size: 100%;
-  min-block-size: 2.25rem;
+  gap: 0.625rem;
+  min-block-size: var(--nav-item-height);
   padding-inline: 0.625rem;
-  border: 0;
-  border-radius: var(--radius-control);
-  background: none;
-  color: var(--text-secondary);
-  font: var(--text-nav);
-  text-align: start;
+  border-radius: var(--radius-nav-item);
+  color: var(--color-text-secondary);
+  font: 500 0.875rem / 1.25rem var(--font-sans);
   text-decoration: none;
-  cursor: pointer;
   transition:
-    background-color var(--motion-fast) var(--ease-standard),
-    color var(--motion-fast) var(--ease-standard);
+    background-color var(--duration-press) var(--ease-calm),
+    color var(--duration-press) var(--ease-calm);
+
+  .icon {
+    flex: none;
+    inline-size: var(--icon-size);
+    block-size: var(--icon-size);
+  }
 
   &:hover {
-    background-color: var(--surface-hover);
-    color: var(--text-primary);
+    background-color: var(--nav-hover-bg);
+    color: var(--color-text);
     text-decoration: none;
   }
 
-  // Inside the panel, so neither the clip nor the scroller can cut it off.
   &:focus-visible {
     outline-offset: -2px;
   }
-
-  .icon {
-    inline-size: var(--icon-size-nav);
-    block-size: var(--icon-size-nav);
-    flex: none;
-  }
 }
 
-// Collapsed, an item is exactly its icon's square, so its hover and active
-// fills sit inside the rail instead of running off under the clip. The width
-// snaps back only after the collapse has finished, so it never shows.
-.sidebar.is-rail .nav-item {
-  // motion-audit-ignore: layout-property, the width is a 0s snap after the collapse, never animated
-  transition:
-    background-color var(--motion-fast) var(--ease-standard),
-    color var(--motion-fast) var(--ease-standard),
-    inline-size 0s linear var(--duration-sm);
-}
-
-.sidebar.is-rail:not(.is-expanded) .nav-item {
-  inline-size: 2.5rem;
-}
-
-.sidebar.is-rail.is-expanded .nav-item {
-  transition-delay: 0s;
-}
-
-// Touch targets in the drawer, where a finger rather than a pointer chooses.
-@media (pointer: coarse) {
-  .nav-item {
-    min-block-size: 2.75rem;
-  }
-}
-
-// The current page. Three signals, not one: a neutral selected fill, ink text
-// at a heavier weight, and a 2px ink marker on the start edge -- the marker is
-// what still reads in greyscale and on the collapsed rail, and it mirrors with
-// the reading direction. `aria-current="page"` announces it.
-.nav-item.is-active {
-  background-color: var(--surface-selected);
-  color: var(--text-primary);
-  font-weight: 600;
-  // The 2px ink marker on the start edge is `.edge-marker` (_primitives.scss),
-  // added with the class by routerLinkActive.
-}
-
-// -----------------------------------------------------------------------------
-// Footer
-// -----------------------------------------------------------------------------
-.sidebar-footer {
+.nav-glyph {
+  position: relative;
+  display: inline-grid;
   flex: none;
-  padding: var(--space-2) var(--space-3);
-  border-block-start: 1px solid var(--border-subtle);
 }
 
-.pin-toggle {
-  color: var(--text-muted);
+// A long name («صندوق المحادثات» beside its count) wraps onto a second line
+// rather than losing its end; the item grows past 40px only then.
+.nav-label {
+  flex: 1;
+  min-inline-size: 0;
+  padding-block: var(--space-1);
+  overflow-wrap: anywhere;
+}
+
+// The current area: filled (light: the action colour with white words; dark: a
+// 16% sage tint with light words), 600 weight, and `aria-current="page"`. The
+// fill is not the only cue: the weight changes and forced colours draw it in
+// the system's highlight.
+.nav-item.is-active {
+  background-color: var(--nav-active-bg);
+  box-shadow: inset 0 0 0 1px var(--nav-active-edge);
+  color: var(--nav-active-fg);
+  font-weight: 600;
+}
+
+// The inbox's needs-a-person count: a gold pill with ink digits, at the end.
+.nav-count {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  min-inline-size: 1.375rem;
+  block-size: 1.375rem;
+  margin-inline-start: auto;
+  padding-inline: 0.375rem;
+  border-radius: var(--radius-pill);
+  background: var(--nav-count-bg);
+  color: var(--nav-count-fg);
+  font: 700 0.6875rem / 1 var(--font-sans);
+  font-variant-numeric: tabular-nums;
+
+  // On the rail: on the icon's end-top corner.
+  &.is-corner {
+    position: absolute;
+    inset-block-start: -0.5rem;
+    inset-inline-end: -0.75rem;
+    min-inline-size: 1.125rem;
+    block-size: 1.125rem;
+    padding-inline: 0.25rem;
+    font-size: 0.625rem;
+  }
+}
+
+// Forced colours: the current area and the count in the system's highlight.
+@media (forced-colors: active) {
+  .nav-item.is-active,
+  .nav-count {
+    forced-color-adjust: none;
+    background: Highlight;
+    color: HighlightText;
+  }
 }
 
 // -----------------------------------------------------------------------------
-// Drawer
+// Foot: the member
 // -----------------------------------------------------------------------------
-// Floating above the page rather than beside it: a shadow, no trailing border.
-// The shadow is only cast while open; off screen it would bleed onto the page.
-.sidebar.is-drawer {
-  inline-size: 100%;
-  border-inline-end: none;
-  // The edge that faces the page is rounded like every other overlay; the edge
-  // against the screen stays square. Logical corners, so it mirrors in Arabic.
-  border-start-end-radius: var(--radius-overlay);
-  border-end-end-radius: var(--radius-overlay);
-  overflow: hidden;
+.sidebar-foot {
+  display: flex;
+  flex: none;
+}
 
-  .sidebar-brand {
-    min-block-size: var(--topbar-height);
-    padding-inline-end: var(--space-2);
+// -----------------------------------------------------------------------------
+// The rail (992-1279px): icons, names on hover and focus
+// -----------------------------------------------------------------------------
+.sidebar.is-collapsed {
+  align-items: center;
+  inline-size: var(--sidebar-rail-width);
+  padding-inline: var(--space-4);
+
+  .sidebar-head {
+    flex-direction: column;
+    gap: var(--space-2);
+    padding-inline-start: 0;
+  }
+
+  .sidebar-tools {
+    flex-direction: column;
   }
 
   .sidebar-nav {
-    padding-block-start: var(--space-2);
+    align-self: stretch;
+    margin-inline: calc(-1 * var(--space-4));
+    padding-inline: var(--space-4);
+  }
+
+  .nav-group + .nav-group {
+    margin-block-start: 0;
+  }
+
+  .nav-item {
+    justify-content: center;
+    inline-size: var(--nav-item-height);
+    padding-inline: 0;
+  }
+
+  .sidebar-foot {
+    justify-content: center;
   }
 }
 
-.sidebar.is-drawer.is-open {
-  box-shadow: var(--shadow-overlay);
+// The rail's thin divider between sections (in place of their labels).
+.nav-divider {
+  display: block;
+  inline-size: 1.5rem;
+  margin: var(--space-2) auto;
+  border-block-start: 1px solid var(--color-control-border);
 }

@@ -140,6 +140,12 @@
   --brand-team: var(--gold-500);
   --brand-lens: var(--emerald-300);
   --avatar-bg: var(--emerald-775);
+  --nav-active-bg: rgb(142 182 155 / 16%);
+  --nav-active-fg: var(--mist-50);
+  // The 16% tint is 1.35:1 against the glass: a 3:1 edge marks the current
+  // area as well (the weight and aria-current already do).
+  --nav-active-edge: var(--color-control-border);
+  --nav-hover-bg: rgb(142 182 155 / 10%);
   --channel-web: var(--emerald-300);
   --event-failed-line: rgb(240 160 143 / 35%);
 
@@ -341,6 +347,19 @@
   --avatar-bg: var(--cream-200);
   --avatar-fg: var(--color-text-secondary);
 
+  // The shell's navigation (boards Inbox and Overview, 39.3). The current area
+  // is filled in the action colour (dark: a 16% sage tint with light text);
+  // hover is a faint tint over the glass. The inbox's count is a gold pill with
+  // ink digits, and the member's avatar is the team's gold, in both themes.
+  --nav-active-bg: var(--color-primary);
+  --nav-active-fg: var(--color-on-primary);
+  --nav-active-edge: transparent;
+  --nav-hover-bg: rgb(35 83 71 / 8%);
+  --nav-count-bg: var(--gold-500);
+  --nav-count-fg: var(--ink-900);
+  --member-avatar-bg: var(--gold-500);
+  --member-avatar-fg: var(--ink-900);
+
   // A neutral chip (a word with no voice or status), and the failed event
   // line's rule (decorative: the words carry it, in coral text).
   --chip-neutral-bg: var(--color-panel-soft);
@@ -487,9 +506,16 @@
   // ---------------------------------------------------------------------------
   // Layout
   // ---------------------------------------------------------------------------
-  --sidebar-width: 15rem; // 240px: expanded, pinned or peeking (39.3: 216px glass)
-  --sidebar-width-collapsed: 4rem; // 64px: the icon rail
-  --topbar-height: 3.5rem; // 56px
+  // The shell (calm-glass.md §7, boards Inbox and Overview, 39.3): a floating
+  // glass side bar of 216px from 1280px, a 72px rail of icons from 992px, and
+  // below that a glass top bar and bottom bar over the content.
+  --sidebar-width: 13.5rem; // 216px
+  --sidebar-rail-width: 4.5rem; // 72px: a 40px item inside 16px of padding
+  --sidebar-padding-block: 1.125rem; // 18px
+  --sidebar-padding-inline: 0.875rem; // 14px
+  --nav-item-height: 2.5rem; // 40px
+  --topbar-height: 3.5rem; // 56px: the phone's top bar
+  --bottombar-height: 4rem; // 64px: the phone's bottom bar, above the safe area
   --page-max-width: 100rem; // 1600px
   --page-gutter: var(--space-6);
   --focus-ring-width: 2px;
@@ -504,7 +530,6 @@
   --z-sticky: 10;
   --z-sidebar: 20;
   --z-dropdown: 30;
-  --z-drawer: 40;
   --z-toast: 60;
   --z-skip-link: 70;
 
@@ -531,6 +556,8 @@
   --text-small: 400 0.8125rem / 1.6923 var(--font-sans); // 13/22
   --text-label: 500 0.8125rem / 1.6923 var(--font-sans); // 13/22
   --text-caption: 500 0.8125rem / 1.5385 var(--font-sans); // 13/20 (never under 13)
+  // The phone's bottom bar holds a two-line name («صندوق المحادثات») in Arabic.
+  --bottombar-height: 4.875rem; // 78px
   --text-table: 400 0.8125rem / 1.6923 var(--font-sans); // 13/22
   --text-numeric: 600 0.875rem / 1.5714 var(--font-sans); // 14/22
   --text-button: 600 0.875rem / 1.5 var(--font-sans);

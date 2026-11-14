@@ -1,19 +1,29 @@
 @use '../../../styles/glass' as *;
 
 // Toasts are glass (calm-glass.md §6): a floating layer, one of the three
-// blurred layers the budget allows. 39.3 moves them to the bottom start on a
-// desktop and the top on a phone. Bottom end corner, above everything: a toast may be reporting the result of
-// the dialog that is still closing.
+// blurred layers the budget allows. Placed per width (39.3):
+//   - a desktop: the bottom start corner of the content, beside the side bar
+//     (the shell says where the navigation ends: `--shell-nav-end`);
+//   - a phone or a tablet: the top, under the top bar, where the bottom bar and
+//     a thumb would otherwise cover them.
+// Above everything: a toast may be reporting the result of the dialog that is
+// still closing.
 .toast-host {
   position: fixed;
-  inset-block-end: var(--space-5);
-  inset-inline-end: var(--space-5);
+  inset-block-end: var(--shell-padding);
+  inset-inline-start: var(--shell-nav-end, var(--space-5));
   z-index: var(--z-toast);
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
   // The empty host must never swallow clicks on the page beneath it.
   pointer-events: none;
+}
+
+:host-context(.shell.is-bars) .toast-host {
+  inset-block: calc(var(--topbar-height) + var(--space-2)) auto;
+  inset-inline: var(--space-3);
+  align-items: center;
 }
 
 .toast-region {
@@ -63,6 +73,8 @@
   color: var(--color-text-secondary);
 }
 
+// Rising from below on a desktop; on a phone they come from the top bar, so
+// they drop in. The travel is 0 under reduced motion: only the fade is left.
 @keyframes toast-in {
   from {
     opacity: 0;
@@ -70,9 +82,13 @@
   }
 }
 
-@media (max-width: 575.98px) {
-  .toast-host {
-    inset-inline: var(--space-4);
-    inset-block-end: var(--space-4);
+@keyframes toast-in-top {
+  from {
+    opacity: 0;
+    transform: translateY(calc(-1 * var(--motion-rise)));
   }
+}
+
+:host-context(.shell.is-bars) .toast {
+  animation-name: toast-in-top;
 }

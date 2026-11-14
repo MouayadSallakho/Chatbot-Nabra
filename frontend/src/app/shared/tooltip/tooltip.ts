@@ -3,6 +3,7 @@ import {
   Directive,
   ElementRef,
   Renderer2,
+  RendererStyleFlags2,
   effect,
   inject,
   input,
@@ -10,6 +11,9 @@ import {
 } from '@angular/core';
 
 let nextId = 0;
+
+/** The space between a window-placed tooltip and its trigger (`--space-2`). */
+const TOOLTIP_GAP_PX = 8;
 
 /**
  * A small glass tooltip on hover and on focus (calm-glass.md §6;
@@ -29,7 +33,8 @@ let nextId = 0;
  * It names or explains; it never holds the only copy of something a person
  * needs, so a touch screen (no hover) loses nothing. The trigger is made a
  * positioning box. `placement` is logical: `end` sits beside the trigger on
- * its end side (the collapsed side bar), `above` over it.
+ * its end side (the collapsed side bar), `above` over it, `below` under it
+ * (the phone's top bar).
  */
 @Directive({
   selector: '[appTooltip]',
@@ -50,11 +55,25 @@ export class Tooltip {
   /** The words. */
   readonly appTooltip = input.required<string>();
 
-  /** Where it sits: beside the trigger on its end side, or above it. */
-  readonly placement = input<'end' | 'above'>('end');
+  /** Where it sits: beside the trigger on its end side, above it, or below it. */
+  readonly placement = input<'end' | 'above' | 'below'>('end');
 
   /** Whether the words add to the trigger's name (then `aria-describedby`). */
   readonly describes = input(false);
+
+  /**
+   * Placed against the window rather than inside the trigger (39.3): for a
+   * trigger in a scrolling list whose tooltip must sit outside the list (the
+   * collapsed side bar), where an absolutely placed tooltip would be clipped by
+   * the list. Measured from the trigger each time it opens; `end` placement.
+   */
+  readonly fixed = input(false);
+
+  /**
+   * With `fixed`: an ancestor (a selector) whose end edge the tooltip clears,
+   * rather than the trigger's (the rail's edge, not its 40px item's).
+   */
+  readonly edge = input<string | null>(null);
 
   protected readonly id = `tooltip-${++nextId}`;
 
@@ -89,7 +108,41 @@ export class Tooltip {
   }
 
   protected show(): void {
-    this.open.set(true);
+    // No words, no tooltip: a trigger that names itself visibly in one layout
+    // (the full side bar) and not in another (the rail) passes '' for the first.
+    const shown = this.appTooltip().trim() !== '';
+
+    if (shown && this.fixed()) {
+      this.placeAgainstWindow();
+    }
+
+    this.open.set(shown);
+  }
+
+  /** Beside the trigger on its end side, centred on it, in window coordinates. */
+  private placeAgainstWindow(): void {
+    const trigger = this.host.nativeElement;
+    const box = trigger.getBoundingClientRect();
+    const selector = this.edge();
+    const edgeBox = ((selector && trigger.closest(selector)) || trigger).getBoundingClientRect();
+    const view = trigger.ownerDocument.documentElement;
+    const rtl = getComputedStyle(trigger).direction === 'rtl';
+    const gap = TOOLTIP_GAP_PX;
+    const el = this.element;
+
+    this.renderer.setAttribute(el, 'data-fixed', '');
+    this.renderer.setStyle(
+      el,
+      'inset-block-start',
+      `${box.top + box.height / 2}px`,
+      RendererStyleFlags2.DashCase,
+    );
+    this.renderer.setStyle(
+      el,
+      'inset-inline-start',
+      `${rtl ? view.clientWidth - edgeBox.left + gap : edgeBox.right + gap}px`,
+      RendererStyleFlags2.DashCase,
+    );
   }
 
   protected hide(): void {

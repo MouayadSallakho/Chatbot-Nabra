@@ -1,54 +1,79 @@
 <!--
-  The whole sidebar is the navigation landmark (Phase 36.11): the product's
-  name and the pin toggle belong to it, and a reader moving by landmark used to
-  skip the name entirely. `aria-label` distinguishes it from any other
-  navigation landmark.
+  The whole side bar is the navigation landmark: the product's name, the
+  workspace and the member belong to it. `aria-label` tells it apart from any
+  other navigation landmark on the page.
 -->
 <nav
   class="sidebar"
+  [class.is-collapsed]="collapsed()"
   aria-label="Primary"
   i18n-aria-label="@@nav.primaryLabel"
-  [class.is-rail]="rail()"
-  [class.is-expanded]="expanded()"
-  [class.is-drawer]="drawer()"
-  [class.is-open]="drawer() && open()"
-  (pointerenter)="onPointerEnter($event)"
-  (pointerleave)="onPointerLeave($event)"
-  (focusin)="onFocusIn()"
-  (focusout)="onFocusOut($event)"
-  (keydown.escape)="onEscape($event)"
 >
-  <div class="sidebar-brand">
-    <!--
-      The product mark: the AI and a person on the team, two speech shapes
-      overlapping into an "O". Decorative, so it is hidden from assistive
-      technology -- the wordmark beside it already carries the name.
-    -->
-    <app-brand-mark class="brand-mark" />
-    <span class="brand-name fades" i18n="@@brand.name">Nabra</span>
+  <!--
+    The glass itself (calm-glass.md §3), a layer behind the content rather than
+    the bar's own background: a menu or panel that opens from the bar is then
+    not inside a blurred element, so it blurs the page behind it, not nothing.
+  -->
+  <span class="sidebar-glass glass" aria-hidden="true"></span>
 
-    @if (drawer()) {
+  <div class="sidebar-head">
+    <span class="sidebar-brand">
+      <!-- Decorative: the name beside it carries it, and on the rail the landmark does. -->
+      <app-brand-mark class="brand-mark" />
+      @if (!collapsed()) {
+        <span class="brand-name" i18n="@@brand.name">Nabra</span>
+      }
+    </span>
+
+    <span class="sidebar-tools">
+      <!--
+        The command palette. Icon-only: its words are its name, and the tooltip
+        shows them with the shortcut on hover and on focus.
+      -->
       <button
-        #dismissButton
         type="button"
-        class="btn btn-ghost btn-icon btn-sm sidebar-dismiss"
-        (click)="dismissed.emit()"
+        class="btn btn-quiet btn-icon"
+        aria-haspopup="dialog"
+        [attr.aria-expanded]="paletteOpen()"
+        [attr.aria-keyshortcuts]="shortcutAria"
+        [attr.aria-label]="paletteName"
+        [appTooltip]="paletteName + ' ' + shortcut"
+        data-testid="palette-trigger"
+        (click)="paletteRequested.emit()"
       >
-        <app-icon name="close" [strokeWidth]="1.75" />
-        <span class="visually-hidden" i18n="@@nav.closeNavigation">Close navigation</span>
+        <app-icon name="search" [strokeWidth]="1.75" />
       </button>
-    }
+      <app-notification-bell placement="side" />
+    </span>
   </div>
+
+  <app-workspace-switcher
+    class="sidebar-workspace"
+    [name]="workspaceName()"
+    [currentId]="workspaceId()"
+    [workspaces]="workspaces()"
+    [variant]="collapsed() ? 'rail' : 'panel'"
+    (chosen)="workspaceChosen.emit($event)"
+    (chooserRequested)="chooserRequested.emit()"
+  />
 
   <!--
     Each section's list is labelled by its heading, so a screen reader announces
-    "Work, list, 3 items" rather than one undifferentiated run of links.
+    "Conversations, list, 3 items". On the rail the heading is visually hidden
+    and a thin divider stands in for it.
   -->
   <div class="sidebar-nav">
-    @for (group of groups(); track group.name) {
+    @for (group of groups(); track group.name; let first = $first) {
       <div class="nav-group">
-        <p class="nav-group-label" [id]="'nav-group-' + group.name">
-          <span class="fades">{{ group.label }}</span>
+        @if (collapsed() && !first) {
+          <span class="nav-divider" aria-hidden="true"></span>
+        }
+        <p
+          class="nav-group-label"
+          [class.visually-hidden]="collapsed()"
+          [id]="'nav-group-' + group.name"
+        >
+          {{ group.label }}
         </p>
         <ul [attr.aria-labelledby]="'nav-group-' + group.name">
           @for (item of group.items; track item.path) {
@@ -56,18 +81,47 @@
               <a
                 class="nav-item"
                 [routerLink]="item.path"
-                routerLinkActive="is-active edge-marker"
+                routerLinkActive="is-active"
                 ariaCurrentWhenActive="page"
-                (click)="navigated.emit()"
+                [attr.data-testid]="'nav-' + item.path"
+                [appTooltip]="collapsed() ? item.label : ''"
+                [fixed]="true"
+                edge=".sidebar"
               >
-                <app-icon [name]="item.icon" [strokeWidth]="1.6" />
                 <!--
-                  Always in the DOM and in the accessibility tree: collapsed to the
-                  rail it is clipped and transparent, never removed, so the link
-                  keeps its name. The rail expands on hover and on focus, which is
-                  what a sighted reader gets in place of a tooltip.
+                  The icon, and on the rail the inbox's count on its corner. The
+                  wrapper is the count's reference, so the link itself stays
+                  unpositioned and its tooltip is never clipped (sidebar.scss).
                 -->
-                <span class="nav-label fades">{{ item.label }}</span>
+                <span class="nav-glyph">
+                  <app-icon [name]="item.icon" [strokeWidth]="1.75" />
+                  @if (collapsed() && item.path === inboxPath && inboxCount(); as count) {
+                    <span class="nav-count is-corner" dir="ltr" aria-hidden="true">{{
+                      count
+                    }}</span>
+                  }
+                </span>
+                <!--
+                  Always in the DOM and the accessibility tree: on the rail it is
+                  visually hidden, never removed, so the link keeps its name.
+                -->
+                <span class="nav-label" [class.visually-hidden]="collapsed()">{{
+                  item.label
+                }}</span>
+                @if (item.path === inboxPath && inboxCount(); as count) {
+                  <span class="visually-hidden"
+                    >, {{ needsPersonWord }}: {{ inboxCountWords() }}</span
+                  >
+                  @if (!collapsed()) {
+                    <span
+                      class="nav-count"
+                      dir="ltr"
+                      aria-hidden="true"
+                      data-testid="nav-inbox-count"
+                      >{{ count }}</span
+                    >
+                  }
+                }
               </a>
             </li>
           }
@@ -76,17 +130,17 @@
     }
   </div>
 
-  <!-- Pinning is a desktop choice. In drawer mode the sidebar is already an overlay. -->
-  @if (!drawer()) {
-    <div class="sidebar-footer">
-      <button type="button" class="nav-item pin-toggle" (click)="pinToggled.emit()">
-        <app-icon [name]="pinned() ? 'chevron-start' : 'pin'" [strokeWidth]="1.6" />
-        @if (pinned()) {
-          <span class="nav-label fades" i18n="@@nav.unpinSidebar">Unpin sidebar</span>
-        } @else {
-          <span class="nav-label fades" i18n="@@nav.pinSidebar">Pin sidebar</span>
-        }
-      </button>
-    </div>
-  }
+  <div class="sidebar-foot">
+    <app-profile-menu
+      [email]="email()"
+      [displayName]="displayName()"
+      [emailLanguage]="emailLanguage()"
+      [workspaceName]="workspaceName()"
+      [canSwitchWorkspace]="workspaces().length > 1"
+      [variant]="collapsed() ? 'avatar' : 'member'"
+      placement="start"
+      (workspaceSwitched)="chooserRequested.emit()"
+      (signedOut)="signedOut.emit()"
+    />
+  </div>
 </nav>

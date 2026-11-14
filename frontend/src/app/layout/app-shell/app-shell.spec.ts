@@ -1,5 +1,6 @@
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
+import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter, withComponentInputBinding } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
@@ -17,7 +18,7 @@ import { NAV_ITEMS } from '@app/layout/navigation';
 import { FakeMediaMatcher, memoryStorage, permissionApiGranting } from '@app/testing/test-doubles';
 import { PermissionApi } from '@app/core/authorization/permission-api';
 import { routes } from '@app/app.routes';
-import { PINNED_STORAGE_KEY } from '@app/layout/app-shell/app-shell';
+import { NavCounts } from '@app/layout/nav-counts';
 
 /** A workspace that already exists, so the guard lets the shell render. */
 const TENANT = {
@@ -48,10 +49,13 @@ describe('AppShell', () => {
   let media: FakeMediaMatcher;
   let harness: RouterTestingHarness;
 
-  /** Boots the application at a URL, at either desktop or drawer width. */
-  async function render(url: string, options: { desktop?: boolean } = {}) {
+  /** Boots the application at a URL: a wide desktop unless told otherwise. */
+  async function render(url: string, options: { desktop?: boolean; wide?: boolean } = {}) {
+    const desktop = options.desktop ?? true;
+
     media = new FakeMediaMatcher({
-      [DESKTOP]: options.desktop ?? true,
+      [DESKTOP]: desktop,
+      [MediaQueries.sidebarFull]: desktop && (options.wide ?? true),
       [MediaQueries.prefersDark]: false,
     });
 
@@ -62,6 +66,12 @@ describe('AppShell', () => {
         // would fail on verify() for a reason unrelated to what it asserts.
         { provide: PermissionApi, useValue: permissionApiGranting('*') },
         provideRouter(routes, withComponentInputBinding()),
+        // The inbox's count is the shared reader's (its own suite); here it is
+        // simply not known yet.
+        {
+          provide: NavCounts,
+          useValue: { needsPerson: signal(null), show: () => () => undefined },
+        },
         provideHttpClient(),
         provideHttpClientTesting(),
         { provide: MEDIA_QUERY_FACTORY, useValue: media.factory },
@@ -111,10 +121,6 @@ describe('AppShell', () => {
   const query = <T extends HTMLElement>(selector: string): T | null =>
     host().querySelector<T>(selector);
 
-  const menuButton = (): HTMLButtonElement | null => query<HTMLButtonElement>('.topbar-menu');
-
-  const sidebarHost = (): HTMLElement | null => query('#primary-navigation');
-
   /** Settles the router, the template and any queued render callbacks. */
   async function settle(): Promise<void> {
     harness.detectChanges();
@@ -123,34 +129,36 @@ describe('AppShell', () => {
   }
 
   describe('landmarks and structure', () => {
-    it('exposes the navigation, main and banner landmarks', async () => {
+    it('exposes the navigation and main landmarks on a desktop, with no banner', async () => {
       await render('/overview');
 
       expect(query('nav[aria-label="Primary"]')).not.toBeNull();
       expect(query('main#main-content')).not.toBeNull();
-      expect(query('[role="banner"]')).not.toBeNull();
+      // The desktop's top bar is gone (39.3): its contents live in the side bar.
+      expect(query('[role="banner"]')).toBeNull();
     });
 
     it('leaves no shell text outside a landmark', async () => {
-      // A reader moving by landmark reaches the product name with the
-      // navigation, and the workspace with the banner (Phase 36.11).
+      // A reader moving by landmark reaches the product name, the workspace and
+      // the member with the navigation.
       await render('/overview');
 
       expect(query('.brand-name')?.closest('nav')).not.toBeNull();
-      expect(
-        query('[data-testid="workspace-name"], [data-testid="workspace-switch"]')?.closest(
-          '[role="banner"]',
-        ),
-      ).not.toBeNull();
+      expect(query('[data-testid="workspace-name"]')?.closest('nav')).not.toBeNull();
+      expect(query('app-profile-menu')?.closest('nav')).not.toBeNull();
     });
 
     it('puts a skip link ahead of the navigation, pointing at the main region', async () => {
       await render('/overview');
 
       const skipLink = query<HTMLAnchorElement>('a.skip-link');
+      const nav = query('nav[aria-label="Primary"]')!;
 
       expect(skipLink?.getAttribute('href')).toBe('#main-content');
       expect(query('main')?.id).toBe('main-content');
+      expect(
+        skipLink!.compareDocumentPosition(nav) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
     });
 
     it('actually moves focus to the content when the skip link is used', async () => {
@@ -169,11 +177,20 @@ describe('AppShell', () => {
     it('renders every navigation entry exactly once', async () => {
       await render('/overview');
 
-      const labels = [...host().querySelectorAll('.sidebar-nav .nav-item')].map((link) =>
-        link.textContent?.trim(),
+      const labels = [...host().querySelectorAll('.sidebar-nav .nav-label')].map((label) =>
+        label.textContent?.trim(),
       );
 
-      expect(labels).toEqual(NAV_ITEMS.map((item) => item.label));
+      expect([...labels].sort()).toEqual(NAV_ITEMS.map((item) => item.label).sort());
+    });
+
+    it('draws the ground’s two glows, hidden from assistive technology', async () => {
+      await render('/overview');
+
+      const glows = [...host().querySelectorAll('.shell-glow')];
+
+      expect(glows).toHaveLength(2);
+      expect(glows.every((glow) => glow.getAttribute('aria-hidden') === 'true')).toBe(true);
     });
   });
 
@@ -192,7 +209,7 @@ describe('AppShell', () => {
 
     it('offers no unbuilt area in the primary navigation', async () => {
       // Integrations was the last placeholder and left the navigation in Phase
-      // 33.5: a dead destination is not something the sidebar should advertise.
+      // 33.5: a dead destination is not something the side bar should advertise.
       // Its address is now simply unknown, answered like any other.
       expect(NAV_ITEMS.every((item) => item.implemented)).toBe(true);
 
@@ -203,8 +220,6 @@ describe('AppShell', () => {
     });
 
     it('renders the real feature for an area that is built', async () => {
-      // AI Agents stopped being a placeholder in Phase 11. The navigation model
-      // says so, and this is what proves the route followed it.
       await render('/ai-agents');
 
       expect(query('h1')?.textContent).toContain('AI Agents');
@@ -219,12 +234,11 @@ describe('AppShell', () => {
       expect(query('nav[aria-label="Primary"]')).not.toBeNull();
     });
 
-    // Its own time limit: it loads every feature area's lazy chunk in turn (twelve
-    // from Phase 38.4), so its time grows with the navigation. About a second
-    // alone; over the 5-second default once in a loaded parallel run.
+    // Its own time limit: it loads every feature area's lazy chunk in turn, so
+    // its time grows with the navigation.
     it('gives every navigation entry a route that resolves', { timeout: 20_000 }, async () => {
       // The guarantee that there are no dead links. Routes are generated from
-      // the same array the sidebar renders, and this proves the generation.
+      // the same array the side bar renders, and this proves the generation.
       await render('/overview');
 
       for (const item of NAV_ITEMS) {
@@ -242,35 +256,36 @@ describe('AppShell', () => {
       const current = [...host().querySelectorAll('.sidebar-nav .nav-item[aria-current="page"]')];
 
       expect(current).toHaveLength(1);
-      expect(current[0].textContent?.trim()).toBe('Conversations');
+      expect(current[0].querySelector('.nav-label')?.textContent?.trim()).toBe('Inbox');
     });
 
-    it('names the workspace in the top bar, as global context', async () => {
+    it('names the workspace in the side bar, as global context', async () => {
       await render('/knowledge');
 
-      // The page names itself in its own <h1>; the bar carries what every page
-      // shares -- which workspace it is about.
-      expect(query('.workspace-name')?.textContent?.trim()).toBe('Workspace: Acme Trading');
+      // The page names itself in its own <h1>; the side bar carries what every
+      // page shares -- which workspace it is about.
+      expect(query('[data-testid="workspace-name"] .switcher-name')?.textContent?.trim()).toBe(
+        'Workspace: Acme Trading',
+      );
       expect(query('h1')?.textContent).toContain('Knowledge');
     });
 
     it('marks the workspace with its own first letter, hidden from assistive technology', async () => {
       await render('/knowledge');
 
-      const mark = query('.workspace-mark');
+      const mark = query('[data-testid="workspace-name"] .switcher-tile');
 
       expect(mark?.textContent?.trim()).toBe('A');
       expect(mark?.getAttribute('aria-hidden')).toBe('true');
     });
 
-    it('offers no workspace switch from the top bar when there is nowhere to switch to', async () => {
+    it('offers no workspace switch when there is nowhere to switch to', async () => {
       await render('/knowledge');
 
       expect(query('[data-testid="workspace-switch"]')).toBeNull();
-      expect(query('p.workspace')).not.toBeNull();
     });
 
-    it('groups the navigation under labelled sections', async () => {
+    it('groups the navigation under four labelled sections', async () => {
       await render('/overview');
 
       const lists = [...host().querySelectorAll<HTMLUListElement>('.sidebar-nav ul')];
@@ -278,160 +293,93 @@ describe('AppShell', () => {
         document.getElementById(list.getAttribute('aria-labelledby') ?? '')?.textContent?.trim(),
       );
 
-      expect(names).toEqual(['Work', 'AI', 'Channels', 'Insights', 'Workspace']);
+      expect(names).toEqual(['Conversations', 'AI', 'Insights', 'Workspace']);
     });
   });
 
-  describe('on a desktop viewport', () => {
-    it('offers no drawer trigger, because navigation is always visible', async () => {
-      await render('/overview', { desktop: true });
+  describe('on a wide desktop (from 1280px)', () => {
+    it('shows the full side bar with its names, and no bars', async () => {
+      await render('/overview');
 
-      expect(menuButton()).toBeNull();
+      expect(query('.shell')?.classList).toContain('is-wide');
+      expect(query('.sidebar')?.classList).not.toContain('is-collapsed');
+      expect(query('.brand-name')?.textContent?.trim()).toBe('Nabra');
+      expect(query('app-topbar')).toBeNull();
+      expect(query('app-bottom-bar')).toBeNull();
     });
 
-    it('leaves the navigation reachable', async () => {
-      await render('/overview', { desktop: true });
+    it('holds one bell and one account menu, in the side bar', async () => {
+      await render('/overview');
 
-      expect(sidebarHost()?.hasAttribute('inert')).toBe(false);
-    });
-
-    it('starts as an unpinned rail, and pinning makes the layout room for it', async () => {
-      await render('/overview', { desktop: true });
-
-      const toggle = () => query<HTMLButtonElement>('.pin-toggle');
-
-      expect(query('.shell')?.classList.contains('is-pinned')).toBe(false);
-      expect(toggle()?.textContent?.trim()).toBe('Pin sidebar');
-
-      toggle()?.click();
-      await settle();
-
-      expect(query('.shell')?.classList.contains('is-pinned')).toBe(true);
-      expect(toggle()?.textContent?.trim()).toBe('Unpin sidebar');
-    });
-
-    it('remembers the pin preference in this browser', async () => {
-      await render('/overview', { desktop: true });
-
-      query<HTMLButtonElement>('.pin-toggle')?.click();
-      await settle();
-
-      expect(TestBed.inject(LOCAL_STORAGE)?.getItem(PINNED_STORAGE_KEY)).toBe('true');
-    });
-
-    it('keeps navigation labels available to assistive technology as a rail', async () => {
-      await render('/overview', { desktop: true });
-
-      // Clipped and transparent, still in the accessibility tree: the rail must
-      // not become a column of unnamed glyphs.
-      const labels = [...host().querySelectorAll('.sidebar-nav .nav-label')].map((label) =>
-        label.textContent?.trim(),
-      );
-
-      expect(labels).toEqual(NAV_ITEMS.map((item) => item.label));
+      expect(host().querySelectorAll('[data-testid="notification-bell"]')).toHaveLength(1);
+      expect(host().querySelectorAll('app-profile-menu')).toHaveLength(1);
+      expect(query('[data-testid="notification-bell"]')?.closest('app-sidebar')).not.toBeNull();
     });
   });
 
-  describe('on a narrow viewport', () => {
-    it('offers a drawer trigger that reports it is closed', async () => {
+  describe('on a narrow desktop (992-1279px)', () => {
+    it('collapses the side bar to a rail of named icons', async () => {
+      await render('/overview', { wide: false });
+
+      expect(query('.shell')?.classList).toContain('is-rail');
+      expect(query('.sidebar')?.classList).toContain('is-collapsed');
+
+      // Visually hidden, still in the accessibility tree: the rail is never a
+      // column of unnamed glyphs.
+      const labels = [...host().querySelectorAll('.sidebar-nav .nav-label')];
+
+      expect(labels.every((label) => label.classList.contains('visually-hidden'))).toBe(true);
+      expect(labels.map((label) => label.textContent?.trim()).sort()).toEqual(
+        NAV_ITEMS.map((item) => item.label).sort(),
+      );
+    });
+  });
+
+  describe('on a phone or a tablet (below 992px)', () => {
+    it('has a top bar (the banner) and a bottom bar (the navigation), and no side bar', async () => {
       await render('/overview', { desktop: false });
 
-      expect(menuButton()?.getAttribute('aria-expanded')).toBe('false');
-      expect(menuButton()?.getAttribute('aria-controls')).toBe('primary-navigation');
+      expect(query('.shell')?.classList).toContain('is-bars');
+      expect(query('app-sidebar')).toBeNull();
+      expect(query('[role="banner"]')).not.toBeNull();
+      expect(query('[data-testid="bottom-bar"]')?.getAttribute('aria-label')).toBe('Primary');
+      expect(query('[role="banner"]')?.compareDocumentPosition(query('main')!)).toBe(
+        Node.DOCUMENT_POSITION_FOLLOWING,
+      );
     });
 
-    it('keeps the closed drawer out of the tab order', async () => {
-      await render('/overview', { desktop: false });
+    it('names the current area and the workspace in the top bar', async () => {
+      await render('/knowledge', { desktop: false });
 
-      // The drawer stays rendered so it can animate, so `inert` is what keeps it
-      // from being tabbed into while off screen.
-      expect(sidebarHost()?.hasAttribute('inert')).toBe(true);
+      expect(query('[data-testid="area-title"]')?.textContent?.trim()).toBe('Knowledge');
+      expect(query('[role="banner"] [data-testid="workspace-name"]')?.textContent).toContain(
+        'Acme Trading',
+      );
     });
 
-    it('opens the drawer, reports it, and moves focus into it', async () => {
-      await render('/overview', { desktop: false });
+    it('says only the workspace on a page outside the areas', async () => {
+      await render('/notifications', { desktop: false });
 
-      menuButton()?.click();
-      await settle();
-
-      expect(menuButton()?.getAttribute('aria-expanded')).toBe('true');
-      expect(sidebarHost()?.hasAttribute('inert')).toBe(false);
-      expect(document.activeElement?.closest('#primary-navigation')).not.toBeNull();
+      expect(query('[data-testid="area-title"]')).toBeNull();
+      expect(query('[role="banner"] [data-testid="workspace-name"]')).not.toBeNull();
     });
 
-    it('makes the page behind the open drawer inert', async () => {
+    it('offers four areas and "More" in the bottom bar, in the plan’s order', async () => {
       await render('/overview', { desktop: false });
 
-      menuButton()?.click();
-      await settle();
-
-      // What turns the drawer into a real modal surface: focus cannot tab out
-      // behind it, and a screen reader cannot wander into hidden content.
-      expect(query('.shell-content')?.hasAttribute('inert')).toBe(true);
-    });
-
-    it('closes on Escape and returns focus to the trigger', async () => {
-      await render('/overview', { desktop: false });
-
-      menuButton()?.click();
-      await settle();
-
-      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-      await settle();
-
-      expect(menuButton()?.getAttribute('aria-expanded')).toBe('false');
-      expect(document.activeElement).toBe(menuButton());
-    });
-
-    it('closes when the close button is used', async () => {
-      await render('/overview', { desktop: false });
-
-      menuButton()?.click();
-      await settle();
-
-      query<HTMLButtonElement>('.sidebar-dismiss')?.click();
-      await settle();
-
-      expect(menuButton()?.getAttribute('aria-expanded')).toBe('false');
-    });
-
-    it('closes after navigating, so the drawer does not cover the new page', async () => {
-      await render('/overview', { desktop: false });
-
-      menuButton()?.click();
-      await settle();
-
-      const link = [...host().querySelectorAll<HTMLAnchorElement>('.sidebar-nav .nav-item')].find(
-        (anchor) => anchor.textContent?.includes('Analytics'),
+      const items = [...host().querySelectorAll('[data-testid="bottom-bar"] .bar-item')].map(
+        (item) => item.querySelector('.bar-label')?.textContent?.trim(),
       );
 
-      link?.click();
-      await settle();
-
-      expect(menuButton()?.getAttribute('aria-expanded')).toBe('false');
+      expect(items).toEqual(['Inbox', 'Overview', 'Customers', 'Knowledge', 'More']);
     });
 
-    it('puts focus on the new page, not back on the trigger, after navigating', async () => {
+    it('holds one bell and one account menu, in the top bar', async () => {
       await render('/overview', { desktop: false });
 
-      menuButton()?.click();
-      await settle();
-
-      [...host().querySelectorAll<HTMLAnchorElement>('.sidebar-nav .nav-item')]
-        .find((anchor) => anchor.textContent?.includes('Knowledge'))
-        ?.click();
-      await settle();
-      await settle();
-
-      // The reader chose a page: they arrive at its heading (RouteFocus).
-      expect(document.activeElement?.tagName).toBe('H1');
-      expect(document.activeElement?.textContent).toContain('Knowledge');
-    });
-
-    it('offers no pin control, which would mean nothing for an overlay', async () => {
-      await render('/overview', { desktop: false });
-
-      expect(query('.pin-toggle')).toBeNull();
+      expect(host().querySelectorAll('[data-testid="notification-bell"]')).toHaveLength(1);
+      expect(host().querySelectorAll('app-profile-menu')).toHaveLength(1);
+      expect(query('app-profile-menu')?.closest('[role="banner"]')).not.toBeNull();
     });
   });
 
@@ -512,7 +460,7 @@ describe('AppShell', () => {
     it('offers a labelled trigger that announces its shortcut', async () => {
       await render('/overview');
 
-      expect(trigger()?.textContent).toContain('Search or jump to…');
+      expect(trigger()?.getAttribute('aria-label')).toBe('Search or jump to…');
       expect(trigger()?.getAttribute('aria-haspopup')).toBe('dialog');
       expect(trigger()?.getAttribute('aria-keyshortcuts')).toBe('Control+K');
       expect(trigger()?.getAttribute('aria-expanded')).toBe('false');
@@ -566,19 +514,22 @@ describe('AppShell', () => {
     });
   });
 
-  describe('when the viewport grows past the breakpoint', () => {
-    it('turns the drawer back into a permanent column', async () => {
-      await render('/overview', { desktop: false });
+  describe('when the window changes width', () => {
+    it('trades the bars for the side bar, and the rail for the full side bar', async () => {
+      await render('/overview', { desktop: false, wide: false });
 
-      menuButton()?.click();
-      await settle();
+      expect(query('app-topbar')).not.toBeNull();
 
       media.set(DESKTOP, true);
       await settle();
 
-      expect(menuButton()).toBeNull();
-      expect(sidebarHost()?.hasAttribute('inert')).toBe(false);
-      expect(query('.shell-content')?.hasAttribute('inert')).toBe(false);
+      expect(query('app-topbar')).toBeNull();
+      expect(query('.sidebar')?.classList).toContain('is-collapsed');
+
+      media.set(MediaQueries.sidebarFull, true);
+      await settle();
+
+      expect(query('.sidebar')?.classList).not.toContain('is-collapsed');
     });
   });
 });

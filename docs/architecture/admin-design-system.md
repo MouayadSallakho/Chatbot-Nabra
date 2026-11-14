@@ -52,31 +52,36 @@ backgrounds.
 
 ```
 App (root)                    router outlet only, deliberately empty
-└── AppShell                  layout route: owns pinned + drawer state
-    ├── Sidebar               navigation model, rail peek state (its own)
-    ├── Topbar                drawer trigger, workspace identity + switch, palette trigger
-    │   ├── NotificationBell
-    │   └── ProfileMenu       identity, theme, language, preferences, switch, sign out
-    ├── <router-outlet>       lazily loaded feature pages
+└── AppShell                  layout route: wide | rail | bars, by the window's width (39.3)
+    ├── Sidebar               from 992px: floating glass side bar (216px; a 72px rail below 1280px)
+    │   ├── WorkspaceSwitcher a glass menu of the account's workspaces
+    │   ├── NotificationBell  a glass popover beside the bar
+    │   └── ProfileMenu       the member block: identity, theme, transparency, language, sounds, sign out
+    ├── Topbar                below 992px: the glass top bar (area, workspace, palette, bell, account)
+    ├── <router-outlet>       lazily loaded feature pages, on the ground with two glows
+    ├── BottomBar             below 992px: four areas + "More" (a modal glass sheet)
     ├── CommandPalette        @defer: loaded on first Ctrl+K (or when idle), a modal dialog
     └── ToastHost             outside the grid: a fixed layer
 ```
 
-Every page is a child of the shell, so navigation, the top bar and the account
+Every page is a child of the shell, so navigation, the bars and the account
 menu persist across navigations instead of being rebuilt each time.
 
 The root component holds nothing. That is a deliberate guard -- the root is the
 easiest place in an Angular application to accumulate global state and
 "temporary" markup.
 
-The shell owns three pieces of state: whether the sidebar is **pinned**
-(which decides the grid), whether the **drawer** is open (which the top bar's
-trigger reports) and whether the **command palette** is open (Phase 36.4; the
-top bar's trigger reports it too). Whether the rail is **peeking** changes no layout, so it is
-the sidebar's own. The shell owns no feature logic and loads no data.
+The shell owns two pieces of state: its **layout** (wide, rail or bars, from
+two media queries; Phase 39.3 replaced the pin, the peeking rail and the drawer)
+and whether the **command palette** is open. The "More" sheet's open state is the
+bottom bar's own. The inbox's needs-a-person count comes from `NavCounts`, which
+only tells the existing `InboxSignals` reader (38.2b) that the count is on screen:
+no read of its own. The shell owns no feature logic and loads no data.
 
-The toast host sits outside the grid. As a grid child it had claimed an implicit
-second row, which left the sidebar and main region 52px short of the viewport.
+The toast host sits inside the frame but out of the grid (a fixed layer), so it
+reads `--shell-nav-end`: bottom start beside the side bar on a desktop, under the
+top bar on a phone. The frame is `overflow: clip`, so focus can never scroll it;
+only the content scrolls.
 
 **Standalone components, signals, `OnPush` everywhere.** The application is
 zoneless, so signal-driven state is how change detection works here. No
@@ -210,7 +215,7 @@ controls draw a `--choice-size` 20px box or a `--switch-inline` ×
 
 ### Layers
 
-`--z-sticky` 10 · `--z-sidebar` 20 · `--z-dropdown` 30 · `--z-drawer` 40 ·
+`--z-sticky` 10 · `--z-sidebar` 20 (the side bar and the phone's bars) · `--z-dropdown` 30 ·
 `--z-toast` 60 · `--z-skip-link` 70. The only z-index values in the product.
 Dialogs need none: they open in the browser's top layer.
 

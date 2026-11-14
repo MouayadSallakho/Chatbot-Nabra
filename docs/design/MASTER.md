@@ -220,6 +220,10 @@ a changed file is `v2`.
   choice control's label is a 44 px target on every pointer. Segments are 36 px on a 44 px
   track with a fine pointer, 44 px on touch. Targets never under 24 px.
 - Page frame: content capped at 1600 px; gutter 24 px, 16 px under 576 px.
+- Shell (39.3): a 216 px floating glass side bar from 1280 px (`--sidebar-width`), a 72 px rail
+  from 992 px (`--sidebar-rail-width`), and below that a 56 px top bar and a 64 px bottom bar
+  over the content (`--topbar-height`, `--bottombar-height`). Areas are 40 px
+  (`--nav-item-height`). See section 14.1.
 - Patterns: page header + sections (not card soup); `.data-list` for record lists whose rows
   are links; `.table` for real tabular data; one pager pattern with the page in the URL.
 
@@ -420,6 +424,12 @@ chip (owner decision Q4).
 | 2026-11-14 | Controls are 44 px with a 40 px dense size (`.btn-sm`, menu items); coarse pointers get 44 px everywhere.                                                                                                                                                                                                                                                                                                                                                                                                                                                      | calm-glass.md §6; Phase 38 note 3.                                                                                                                                                                                                  | Phase 39.2b                                                                                      |
 | 2026-11-14 | The lockup's names are outlined paths from the self-hosted OFL fonts (HarfBuzz-shaped Arabic); the loading state uses it now, the side bar and entry pages in their steps.                                                                                                                                                                                                                                                                                                                                                                                     | An English page never downloads Arabic 700 for its logo; exact shapes in forced colours.                                                                                                                                            | Phase 39.2b                                                                                      |
 | 2026-11-14 | An Arabic name's avatar shows one letter.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | Two Arabic initials join into a fragment of a word.                                                                                                                                                                                 | Phase 39.2b                                                                                      |
+| 2026-11-14 | The shell is a floating glass side bar from 1280 px, a rail of icons with tooltips from 992 px, and a glass top bar with a bottom bar of four areas and "More" below; the pin, the peeking rail, the drawer and the desktop top bar are gone | calm-glass.md §7 and the plan (39.0 §3.2.4); one navigation per width instead of three modes | Phase 39.3 |
+| 2026-11-14 | Four section labels (Conversations · AI · Insights · Workspace) replace five; "Conversations" in the navigation is now "Inbox" (صندوق المحادثات); AI holds Knowledge, AI agents and Channels; Workspace is Team, Roles, Workspace settings, Plan & usage, Billing | The owner's assistant's design note (current glass dashboards); the glossary's Inbox; a group named Conversations beside an item named Conversations read twice | Phase 39.3 |
+| 2026-11-14 | The workspace switcher is a glass menu of the account's workspaces; choosing one leaves the page for the chooser first (unsaved-changes guards ask), then selects it and opens its overview | Switching in place would keep the old workspace's page state; the chooser's own path keeps every guarantee | Phase 39.3 |
+| 2026-11-14 | The notification panel is a popover that takes focus and keeps Tab inside it; menus keep the menu pattern (Tab leaves and closes) | calm-glass.md §6 ("focus trapped") for popovers and sheets; the APG menu pattern for menus | Phase 39.3 |
+| 2026-11-14 | Dark current area gets a 1 px control-border edge (not on the board) | Its 16% tint is 1.35:1 against the glass; the edge is 3.5:1 or more | Phase 39.3 |
+| 2026-11-14 | The switcher's border is the control border, not the board's line | Owner decision Q3: every control boundary meets 3:1 | Phase 39.3 |
 
 ## 13. Contrast table (Calm Glass, Phase 39.2a)
 
@@ -582,6 +592,26 @@ Measured from the resolved tokens (`p39-2b/chrome/contrast-new.json`); glass is 
 | Button                  | secondary words on hover                | 4.5:1 | 13.27 | 11.17 |
 | Input                   | focus border on the panel               | 3:1   | 8.75  | 6.71  |
 
+### 13.2 The shell's pairs (Phase 39.3)
+
+Measured by `p39-3/scratch/contrast_shell.py` (`p39-3/chrome/contrast.json`). Glass is composited at its alpha over the ground, over the emerald glow at its peak and over the gold glow at its peak, and measured as its solid twin; the table gives the worst of the four. 72 of 72 pass.
+
+| Part | Pair | Needs | Light (worst) | Dark (worst) |
+| --- | --- | --- | --- | --- |
+| Shell | area name (secondary text) on the glass | 4.5:1 | 8.61 | 9.59 |
+| Shell | section label, sounds line (quiet text) on the glass | 4.5:1 | 4.94 | 5.67 |
+| Shell | top bar title, sheet title on the glass | 4.5:1 | 13.73 | 12.40 |
+| Shell | area on hover, over the hover tint | 4.5:1 | 12.20 | 10.35 |
+| Shell | current area: its words on its fill | 4.5:1 | 8.75 | 9.20 |
+| Shell | current area: fill (light) or edge (dark) vs the glass | 3:1 | 7.55 | 3.39 |
+| Shell | inbox count: ink on gold | 4.5:1 | 7.08 | 7.08 |
+| Shell | member avatar: ink on gold | 4.5:1 | 7.08 | 7.08 |
+| Shell | member name on the soft panel | 4.5:1 | 14.36 | 11.96 |
+| Shell | sounds line on the soft panel | 4.5:1 | 5.17 | 5.47 |
+| Shell | switcher border (control border) on the panel | 3:1 | 3.78 | 3.62 |
+| Shell | workspace letter on its tile | 4.5:1 | 8.75 | 7.61 |
+| Shell | rail divider on the glass (decorative) | — | 3.26 | 3.39 |
+
 ## 14. Components (Calm Glass, Phase 39.2b)
 
 Each is shown in the Design Lab in both languages and themes, with "Reduce transparency". A
@@ -610,3 +640,20 @@ the event line, `.bubble-human` = the team's bubble). Tests: a Vitest spec besid
 | Skeletons: `.skeleton` + `-text`, `-title`, `-bar`, `-bubble`, `-avatar`                                                             | a soft sheen that stops under reduced motion; each screen step draws its own geometry                                                                                                                                                                                                                                                                                             | `--skeleton-base/-sheen`                                                                                         |
 | Empty state: `app-empty-state`                                                                                                       | one serif line (Plex Arabic 600 in Arabic), one sentence, one action, a quiet glyph (coral for the error tone)                                                                                                                                                                                                                                                                    | `--text-empty`                                                                                                   |
 | Brand: `app-brand-mark`, `app-brand-lockup`                                                                                          | section 6 and section 0                                                                                                                                                                                                                                                                                                                                                           | `--brand-ai/-team/-lens`                                                                                         |
+
+### 14.1 The shell (Phase 39.3)
+
+| Width | Layout | Glass at rest |
+| --- | --- | --- |
+| from 1280 px | the floating side bar, 216 px, 14 px from the window, 12 px from the content: the mark and the name with the palette and the bell; the workspace switcher; the areas under four section labels; the member (avatar, name, sounds state), which opens the account menu | the side bar |
+| 992–1279 px | the same bar as a 72 px rail: icons with their names in glass tooltips on hover and focus, a thin divider instead of each section label, the member's avatar | the rail |
+| below 992 px | a glass top bar (the area, the workspace, the palette, the bell, the account) and a floating bottom bar of four areas and "More"; the content scrolls under both | top bar, bottom bar |
+
+- **Sections:** Conversations (Overview, Inbox, Customers) · AI (Knowledge, AI agents, Channels) · Insights (Analytics, Reports) · Workspace (Team, Roles & permissions, Workspace settings, Plan & usage, Billing). The caption style in the quiet tone, sentence case, no tracking, no capitals. A section with no area the member may open is not shown.
+- **Bottom bar:** the first four of Inbox, Overview, Customers, Knowledge, Analytics, Reports that the member may open; the rest in "More", a modal glass sheet grouped like the side bar. "More" is marked current when the page is one of its areas.
+- **Long names wrap, never truncate:** in the side bar «صندوق المحادثات» beside its count takes a second line; in the bottom bar the Arabic labels are the 13 px caption and the bar is 78 px tall in Arabic (`--bottombar-height` under `:lang(ar)`), so the same name wraps there too. Counts are an LTR island (`dir="ltr"`), so «99+» never reads «+99».
+- **Counts:** the inbox's needs-a-person count, a gold pill (999+ in the side bar, 99+ on a phone's icon); a screen reader hears the exact number with the words "Needs a person".
+- **Current area:** filled (light: emerald with white words; dark: a 16% sage tint with a control-border edge), weight 600, `aria-current="page"`; `Highlight` in forced colours.
+- **Popovers:** the workspace switcher and the account menu are `app-menu`s (arrow keys, Escape and focus return; Tab leaves a menu, as the menu pattern says); the notification panel and the "More" sheet move focus in, keep Tab inside (`layout/trap-tab.ts`), close on Escape and return focus. A glass layer is a sibling behind the bar's content, so a popover opening from the bar blurs the page rather than nothing.
+- **Toasts:** bottom start beside the side bar on a desktop, under the top bar on a phone.
+- **The conversation on a phone:** one line (back, the customer, the handling chip, Details); the facts line, the handling bar with its action and help, and Refresh open with Details.

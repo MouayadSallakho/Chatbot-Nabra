@@ -340,4 +340,56 @@ describe('NotificationBell', () => {
 
     expect(TestBed.inject(NotificationCenter).unread()).toBe(5);
   });
+
+  it('moves focus into the panel when opened, and keeps Tab inside it (39.3)', async () => {
+    await mount();
+    await answerCount(1);
+    await openPanel([unread], 1);
+
+    expect(document.activeElement?.id).toBe('notification-panel-heading');
+
+    const stops = [
+      ...panel()!.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      ),
+    ];
+    const first = stops[0];
+    const last = stops[stops.length - 1];
+    const tab = (shiftKey: boolean) => {
+      const event = new KeyboardEvent('keydown', {
+        key: 'Tab',
+        shiftKey,
+        bubbles: true,
+        cancelable: true,
+      });
+
+      document.activeElement!.dispatchEvent(event);
+
+      return event;
+    };
+
+    // From the last control, Tab goes back to the first.
+    last.focus();
+    expect(tab(false).defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(first);
+
+    // From the heading (not a tab stop), Shift+Tab goes to the last.
+    panel()!.querySelector<HTMLElement>('#notification-panel-heading')!.focus();
+    expect(tab(true).defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(last);
+
+    // In between, Tab is the browser's own.
+    first.focus();
+    expect(tab(false).defaultPrevented).toBe(false);
+  });
+
+  it('opens beside the side bar when it sits in one', async () => {
+    await mount();
+    await answerCount(0);
+
+    fixture.componentRef.setInput('placement', 'side');
+    await settle();
+
+    expect(host().classList).toContain('is-side');
+  });
 });

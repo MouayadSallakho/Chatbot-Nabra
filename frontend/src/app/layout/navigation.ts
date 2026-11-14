@@ -41,13 +41,14 @@ export interface NavItem {
 }
 
 /**
- * The sidebar's sections, in the order they appear.
+ * The side bar's sections, in the order they appear (Phase 39.3).
  *
- * Shallow on purpose: five short headings, frequent operational work first and
- * workspace administration last, so the destinations somebody uses every day are
- * never below the ones they open once a quarter.
+ * Four short headings, the daily work first and the workspace's administration
+ * last: Conversations (the overview, the inbox, the customers), the AI and what
+ * it draws on and speaks through, what happened, and the workspace itself. On
+ * the collapsed rail a thin divider stands in for each heading.
  */
-export const NAV_GROUPS = ['Work', 'AI', 'Channels', 'Insights', 'Workspace'] as const;
+export const NAV_GROUPS = ['Conversations', 'AI', 'Insights', 'Workspace'] as const;
 
 export type NavGroup = (typeof NAV_GROUPS)[number];
 
@@ -55,13 +56,12 @@ export type NavGroup = (typeof NAV_GROUPS)[number];
  * What each section heading says.
  *
  * Kept apart from NAV_GROUPS on purpose: the group names are identifiers (types,
- * element ids, the order of the sidebar) and must not change with the language,
+ * element ids, the order of the side bar) and must not change with the language,
  * while these are words, and must.
  */
 export const NAV_GROUP_LABELS: Readonly<Record<NavGroup, string>> = {
-  Work: $localize`:@@nav.group.work:Work`,
+  Conversations: $localize`:@@nav.group.conversations:Conversations`,
   AI: $localize`:@@nav.group.ai:AI`,
-  Channels: $localize`:@@nav.group.channels:Channels`,
   Insights: $localize`:@@nav.group.insights:Insights`,
   Workspace: $localize`:@@nav.group.workspace:Workspace`,
 };
@@ -74,11 +74,12 @@ export const NAV_GROUP_LABELS: Readonly<Record<NavGroup, string>> = {
  * from this array, which is what makes a dead navigation link structurally
  * impossible rather than merely unlikely.
  *
- * Ordered by group, in NAV_GROUPS order, and within a group by how often it is
- * used: the daily work (Overview, Conversations, Customers), the AI and what it
- * draws on, how it reaches people, what happened, and finally the workspace's
- * own administration. Entries of one group are contiguous, which is what lets
- * the sidebar render them under one heading without re-sorting.
+ * Ordered by group, in NAV_GROUPS order, and within a group as the side bar
+ * shows it (Phase 39.3): the overview, the inbox and the customers; the
+ * knowledge the AI answers from, the agents and the channels they speak
+ * through; analytics and reports; then the team, its roles and the workspace's
+ * own settings, plan and billing. Entries of one group are contiguous, which is
+ * what lets the side bar render them under one heading without re-sorting.
  */
 export const NAV_ITEMS: readonly NavItem[] = [
   {
@@ -86,15 +87,15 @@ export const NAV_ITEMS: readonly NavItem[] = [
     path: 'overview',
     icon: 'overview',
     implemented: true,
-    group: 'Work',
+    group: 'Conversations',
   },
   {
     // Real from Phase 15: these are the conversations customers have actually
     // had, not a placeholder. Read-only -- replying, assigning and handing off do
     // not exist yet, and the screen says so rather than showing controls that
     // would fail.
-    label: $localize`:@@nav.conversations:Conversations`,
-    group: 'Work',
+    label: $localize`:@@nav.inbox:Inbox`,
+    group: 'Conversations',
     path: 'conversations',
     icon: 'conversations',
     implemented: true,
@@ -109,11 +110,22 @@ export const NAV_ITEMS: readonly NavItem[] = [
     // somebody said in confidence. customers.view is deliberately not
     // conversations.view.
     label: $localize`:@@nav.customers:Customers`,
-    group: 'Work',
+    group: 'Conversations',
     path: 'customers',
     icon: 'customers',
     implemented: true,
     permissions: ['customers.view'],
+  },
+  {
+    // Real from Phase 17: written documents an agent can actually answer from,
+    // not a placeholder. File upload, crawling and connectors are still absent,
+    // and the screens say so rather than showing controls that would fail.
+    label: $localize`:@@nav.knowledge:Knowledge`,
+    group: 'AI',
+    path: 'knowledge',
+    icon: 'knowledge',
+    implemented: true,
+    permissions: ['knowledge.view'],
   },
   {
     label: $localize`:@@nav.aiAgents:AI Agents`,
@@ -133,17 +145,6 @@ export const NAV_ITEMS: readonly NavItem[] = [
     ],
   },
   {
-    // Real from Phase 17: written documents an agent can actually answer from,
-    // not a placeholder. File upload, crawling and connectors are still absent,
-    // and the screens say so rather than showing controls that would fail.
-    label: $localize`:@@nav.knowledge:Knowledge`,
-    group: 'AI',
-    path: 'knowledge',
-    icon: 'knowledge',
-    implemented: true,
-    permissions: ['knowledge.view'],
-  },
-  {
     // Website chat and WhatsApp are real; Instagram and Messenger are still
     // honestly labelled as not built rather than shown as empty screens, which
     // is why the area is entered through a list rather than straight into one
@@ -152,7 +153,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
     // Either channel permission opens it: somebody who administers WhatsApp and
     // not website chat still needs a way in.
     label: $localize`:@@nav.channels:Channels`,
-    group: 'Channels',
+    group: 'AI',
     path: 'channels',
     icon: 'channels',
     implemented: true,
@@ -186,17 +187,6 @@ export const NAV_ITEMS: readonly NavItem[] = [
     permissions: ['reports.view'],
   },
   {
-    // The workspace's own details (Phase 38.4): its name, which visitors see, and
-    // from 38.5 its time zone. Read by every member with workspace.view (the
-    // owner's decision, 38.0 §4.3 #7e); only workspace.manage changes it.
-    label: $localize`:@@nav.workspaceSettings:Workspace settings`,
-    group: 'Workspace',
-    path: 'workspace-settings',
-    icon: 'settings',
-    implemented: true,
-    permissions: ['workspace.view'],
-  },
-  {
     // Beside Roles rather than inside it: a role is a definition of what may be
     // done, and a team is the people who may do it. They are administered by
     // different permissions and, in a real workspace, often by different people.
@@ -223,6 +213,17 @@ export const NAV_ITEMS: readonly NavItem[] = [
     permissions: ['roles.view'],
   },
   {
+    // The workspace's own details (Phase 38.4): its name, which visitors see, and
+    // from 38.5 its time zone. Read by every member with workspace.view (the
+    // owner's decision, 38.0 §4.3 #7e); only workspace.manage changes it.
+    label: $localize`:@@nav.workspaceSettings:Workspace settings`,
+    group: 'Workspace',
+    path: 'workspace-settings',
+    icon: 'settings',
+    implemented: true,
+    permissions: ['workspace.view'],
+  },
+  {
     // Beside Analytics, behind the same permission. It answers a different
     // question -- what this workspace may hold, rather than what it did -- and
     // there is nothing to configure here, so one read permission is enough.
@@ -247,6 +248,19 @@ export const NAV_ITEMS: readonly NavItem[] = [
   },
 ];
 
+/** The inbox's path: its entry carries the needs-a-person count (Phase 39.3). */
+export const INBOX_PATH = 'conversations';
+
+/**
+ * The navigation entry a URL belongs to, by its first path segment; null for a
+ * page outside the areas (notifications, the design lab, not found).
+ */
+export function navItemForUrl(url: string): NavItem | null {
+  const first = url.split(/[?#]/)[0].split('/').filter(Boolean)[0] ?? '';
+
+  return NAV_ITEMS.find((item) => item.path === first) ?? null;
+}
+
 /** Where the application lands, and where "not found" sends people back to. */
 export const HOME_PATH = 'overview';
 
@@ -261,4 +275,37 @@ export function visibleNavItems(
   hasAny: (...codes: readonly PermissionCode[]) => boolean,
 ): readonly NavItem[] {
   return NAV_ITEMS.filter((item) => item.permissions === undefined || hasAny(...item.permissions));
+}
+
+/**
+ * Which areas a phone's bottom bar offers, in order of preference (plan 39.0
+ * §3.2.4): the inbox, the overview, the customers and the knowledge, with
+ * analytics and reports standing in for any the member may not open.
+ */
+export const PHONE_BAR_PRIORITY: readonly string[] = [
+  'conversations',
+  'overview',
+  'customers',
+  'knowledge',
+  'analytics',
+  'reports',
+];
+
+/** How many areas the bottom bar holds beside "More". */
+export const PHONE_BAR_SIZE = 4;
+
+/**
+ * Splits the areas a member may see between a phone's bottom bar and its
+ * "More" sheet: up to four from PHONE_BAR_PRIORITY in that order, and every
+ * other one, in side-bar order, behind "More".
+ */
+export function phoneBarSplit(visible: readonly NavItem[]): {
+  readonly bar: readonly NavItem[];
+  readonly more: readonly NavItem[];
+} {
+  const bar = PHONE_BAR_PRIORITY.map((path) => visible.find((item) => item.path === path))
+    .filter((item): item is NavItem => item !== undefined)
+    .slice(0, PHONE_BAR_SIZE);
+
+  return { bar, more: visible.filter((item) => !bar.includes(item)) };
 }

@@ -1,125 +1,122 @@
 import {
   ChangeDetectionStrategy,
   Component,
-  DestroyRef,
-  ElementRef,
+  DOCUMENT,
   computed,
+  effect,
   inject,
   input,
   output,
-  signal,
   viewChild,
 } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
+import { Tenant } from '@app/core/api/tenant-api';
+import { PermissionService } from '@app/core/authorization/permission-service';
+import { LocaleFormat } from '@app/core/i18n/locale-format';
+import { BrandMark } from '@app/shared/brand-mark/brand-mark';
 import { Icon } from '@app/shared/icon/icon';
+import { Tooltip } from '@app/shared/tooltip/tooltip';
+import { NavCounts } from '@app/layout/nav-counts';
 import {
+  INBOX_PATH,
   NAV_GROUPS,
   NAV_GROUP_LABELS,
   NavGroup,
   NavItem,
   visibleNavItems,
 } from '@app/layout/navigation';
-import { PermissionService } from '@app/core/authorization/permission-service';
-import { BrandMark } from '@app/shared/brand-mark/brand-mark';
+import { NotificationBell } from '@app/layout/notification-bell/notification-bell';
+import { ProfileMenu } from '@app/layout/profile-menu/profile-menu';
+import { WorkspaceSwitcher } from '@app/layout/workspace-switcher/workspace-switcher';
+import { isApplePlatform, shortcutAria, shortcutLabel } from '@app/layout/command-palette/shortcut';
 
-/**
- * How long the pointer has to rest on the rail before it opens.
- *
- * Long enough that sweeping across the rail on the way to something else does
- * not flash the panel open; short enough that reaching for it feels immediate.
- */
-export const PEEK_OPEN_DELAY_MS = 150;
-
-/**
- * How long the panel waits after the pointer leaves before it closes.
- *
- * Deliberately longer than the open delay. A pointer that overshoots the edge by
- * a few pixels and comes straight back must find the panel still there; closing
- * on the first stray pixel is what makes hover navigation feel twitchy.
- */
-export const PEEK_CLOSE_DELAY_MS = 260;
-
-/** One sidebar section and the entries in it the reader may see. */
+/** One side-bar section and the entries in it the reader may see. */
 interface VisibleGroup {
   readonly name: NavGroup;
   readonly label: string;
   readonly items: readonly NavItem[];
 }
 
+/** Counts above this read as "999+": the pill stays one short word wide. */
+const COUNT_CAP = 999;
+
 /**
- * The product's primary navigation.
+ * The product's primary navigation on a desktop (Phase 39.3, calm-glass.md §7,
+ * boards Inbox and Overview): a floating glass side bar.
  *
- * Three presentations, one component:
+ * From the top: the mark and the name with the command palette's trigger and
+ * the notification bell; the workspace switcher; the areas the member may open,
+ * under four short section labels; and the member, whose block opens the account
+ * menu. The inbox carries its needs-a-person count.
  *
- * - **Pinned** (desktop): a permanent column, and the layout makes room for it.
- * - **Rail** (desktop, unpinned -- the default): a 64px column of icons that
- *   expands over the content while the reader is using it -- after a short
- *   hover, or at once when keyboard focus enters it. The expansion overlays the
- *   page instead of pushing it, so nothing on screen moves or reflows.
- * - **Drawer** (narrow screens): an overlay the shell opens and closes. No hover
- *   logic runs here: a touch screen has no hover.
+ * **Collapsed** (narrow desktops, from 992 to 1279px) it is a rail of icons. The
+ * names stay in the DOM as the links' names, and a glass tooltip shows them on
+ * hover and on focus; a thin divider stands where a section label would be.
  *
- * The peek state is the sidebar's own, because nothing else is affected by it.
- * Pinned and drawer state are the shell's, because the layout and the top bar
- * depend on them too.
+ * Phones and tablets do not use it: the shell gives them a top bar and a bottom
+ * bar instead.
+ *
+ * <strong>Hiding a link is not authorisation.</strong> The server decides; the
+ * side bar only avoids offering a destination that would answer 403.
  */
 @Component({
   selector: 'app-sidebar',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [BrandMark, RouterLink, RouterLinkActive, Icon],
+  imports: [
+    BrandMark,
+    RouterLink,
+    RouterLinkActive,
+    Icon,
+    Tooltip,
+    NotificationBell,
+    ProfileMenu,
+    WorkspaceSwitcher,
+  ],
   templateUrl: './sidebar.html',
   styleUrl: './sidebar.scss',
 })
 export class Sidebar {
-  /** Whether the reader has pinned the sidebar open. Desktop only. */
-  readonly pinned = input(false);
+  /** The rail of icons (992–1279px) rather than the full side bar. */
+  readonly collapsed = input(false);
 
-  /** Whether the layout is currently drawer-based. */
-  readonly drawer = input(false);
+  /** The workspace being administered, and the account's other workspaces. */
+  readonly workspaceName = input('');
+  readonly workspaceId = input<string | null>(null);
+  readonly workspaces = input<readonly Tenant[]>([]);
 
-  /** Whether the drawer is showing. Meaningless outside drawer mode. */
-  readonly open = input(false);
+  /** The signed-in member. */
+  readonly email = input('');
+  readonly displayName = input<string | null | undefined>(null);
+  readonly emailLanguage = input<string | null | undefined>(undefined);
 
-  /** The reader asked to pin or unpin the desktop sidebar. */
-  readonly pinToggled = output<void>();
+  /** Whether the command palette is showing, for `aria-expanded`. */
+  readonly paletteOpen = input(false);
 
-  /** The reader asked to close the drawer. */
-  readonly dismissed = output<void>();
-
-  /**
-   * A navigation link was activated.
-   *
-   * The shell uses this to close the drawer: on a phone the navigation covers
-   * the page it just navigated to, and leaving it open would hide the result of
-   * the reader's own action.
-   */
-  readonly navigated = output<void>();
+  readonly paletteRequested = output<void>();
+  readonly workspaceChosen = output<Tenant>();
+  readonly chooserRequested = output<void>();
+  readonly signedOut = output<void>();
 
   private readonly permissions = inject(PermissionService);
-  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly counts = inject(NavCounts);
+  private readonly format = inject(LocaleFormat);
+  private readonly apple = isApplePlatform(inject(DOCUMENT).defaultView?.navigator);
 
-  /** The temporary expansion of the rail. */
-  private readonly peeking = signal(false);
+  protected readonly shortcut = shortcutLabel(this.apple);
+  protected readonly shortcutAria = shortcutAria(this.apple);
 
-  private openTimer: ReturnType<typeof setTimeout> | undefined;
-  private closeTimer: ReturnType<typeof setTimeout> | undefined;
+  protected readonly inboxPath = INBOX_PATH;
 
-  /** The collapsed desktop rail, whether or not it is currently peeking. */
-  protected readonly rail = computed(() => !this.drawer() && !this.pinned());
+  protected readonly paletteName = $localize`:@@shell.paletteTrigger:Search or jump to…`;
 
-  /** Labels are showing: pinned, peeking, or in the drawer. */
-  protected readonly expanded = computed(() => !this.rail() || this.peeking());
+  /** The same words as the inbox's own view link (38.2b). */
+  protected readonly needsPersonWord = $localize`:@@inbox.view.needsPerson:Needs a person`;
+
+  private readonly bell = viewChild.required(NotificationBell);
 
   /**
    * The navigation entries this person has a reason to see, in their sections.
-   *
-   * <strong>Not authorisation, and it must not be mistaken for it.</strong> A
-   * hidden link is still reachable by typing the URL, and the server refuses
-   * regardless. What this buys is a sidebar that does not advertise destinations
-   * that would answer 403 on arrival.
-   *
-   * Entries with no permissions listed are shown to everyone. A section left
-   * with no entries is dropped rather than shown as a lone heading.
+   * A section left with no entries is dropped, label and all.
    */
   protected readonly groups = computed<readonly VisibleGroup[]>(() => {
     const visible = visibleNavItems((...codes) => this.permissions.hasAny(...codes));
@@ -131,99 +128,40 @@ export class Sidebar {
     })).filter((group) => group.items.length > 0);
   });
 
-  private readonly dismissButton = viewChild<ElementRef<HTMLButtonElement>>('dismissButton');
+  private readonly showsInbox = computed(() =>
+    this.groups().some((group) => group.items.some((item) => item.path === INBOX_PATH)),
+  );
+
+  /** The inbox's needs-a-person count as shown, or null while unknown or zero. */
+  protected readonly inboxCount = computed(() => {
+    const count = this.counts.needsPerson();
+
+    if (count === null || count <= 0) {
+      return null;
+    }
+
+    return count > COUNT_CAP ? `${this.format.number(COUNT_CAP)}+` : this.format.number(count);
+  });
+
+  /** The exact count, for the words a screen reader hears beside the pill. */
+  protected readonly inboxCountWords = computed(() => {
+    const count = this.counts.needsPerson();
+
+    return count === null || count <= 0 ? null : this.format.number(count);
+  });
 
   constructor() {
-    inject(DestroyRef).onDestroy(() => this.clearTimers());
+    // The count is on screen while the inbox entry is: the shared reader is told
+    // so, and told again when it no longer is (a member losing the permission).
+    effect((onCleanup) => {
+      if (this.showsInbox()) {
+        onCleanup(this.counts.show());
+      }
+    });
   }
 
-  /**
-   * Moves focus into the drawer.
-   *
-   * Called by the shell after the drawer opens. Opening a panel without moving
-   * focus into it leaves a keyboard reader still on the trigger, tabbing through
-   * content they cannot see.
-   */
-  focusFirstControl(): void {
-    this.dismissButton()?.nativeElement.focus();
-  }
-
-  protected onPointerEnter(event: PointerEvent): void {
-    // Touch "enters" on every tap. Only a pointer that can hover gets hover
-    // behaviour; a tap on a rail icon simply follows the link.
-    if (!this.rail() || event.pointerType === 'touch') {
-      return;
-    }
-
-    clearTimeout(this.closeTimer);
-
-    if (!this.peeking()) {
-      clearTimeout(this.openTimer);
-      this.openTimer = setTimeout(() => this.peeking.set(true), PEEK_OPEN_DELAY_MS);
-    }
-  }
-
-  protected onPointerLeave(event: PointerEvent): void {
-    if (!this.rail() || event.pointerType === 'touch') {
-      return;
-    }
-
-    clearTimeout(this.openTimer);
-
-    // The panel stays while a keyboard reader is working inside it: leaving
-    // with the mouse must not yank away the item they have focused.
-    if (this.hasKeyboardFocus()) {
-      return;
-    }
-
-    clearTimeout(this.closeTimer);
-    this.closeTimer = setTimeout(() => this.peeking.set(false), PEEK_CLOSE_DELAY_MS);
-  }
-
-  /**
-   * Keyboard focus opens the rail at once. Hover is never required: a reader
-   * tabbing into the navigation sees every label the moment they arrive.
-   */
-  protected onFocusIn(): void {
-    if (this.rail() && this.hasKeyboardFocus()) {
-      this.clearTimers();
-      this.peeking.set(true);
-    }
-  }
-
-  protected onFocusOut(event: FocusEvent): void {
-    const next = event.relatedTarget as Node | null;
-
-    if (this.rail() && !(next && this.host.nativeElement.contains(next))) {
-      this.clearTimers();
-      this.peeking.set(false);
-    }
-  }
-
-  /**
-   * Escape dismisses the temporary expansion. Focus moves to the page content,
-   * because a focused item left inside a collapsed rail would be half hidden.
-   */
-  protected onEscape(event: Event): void {
-    if (!this.rail() || !this.peeking()) {
-      return;
-    }
-
-    event.preventDefault();
-    this.clearTimers();
-    this.peeking.set(false);
-
-    if (this.host.nativeElement.contains(document.activeElement)) {
-      document.getElementById('main-content')?.focus();
-    }
-  }
-
-  private hasKeyboardFocus(): boolean {
-    return this.host.nativeElement.querySelector(':focus-visible') !== null;
-  }
-
-  private clearTimers(): void {
-    clearTimeout(this.openTimer);
-    clearTimeout(this.closeTimer);
+  /** Opens the notification panel and moves focus into it (the palette's action). */
+  openNotifications(): void {
+    this.bell().openPanel();
   }
 }

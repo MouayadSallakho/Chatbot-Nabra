@@ -1,6 +1,6 @@
 <!--
   First in the tab order, on every page. Without it a keyboard reader tabs
-  through the whole sidebar before reaching the content, on every navigation.
+  through the whole side bar before reaching the content, on every navigation.
 -->
 <a
   class="skip-link"
@@ -10,70 +10,79 @@
   >Skip to main content</a
 >
 
-<div class="shell" [class.is-drawer]="drawer()" [class.is-pinned]="pinned()">
-  <app-sidebar
-    id="primary-navigation"
-    class="shell-sidebar"
-    [class.is-open]="navOpen()"
-    [pinned]="pinned()"
-    [drawer]="drawer()"
-    [open]="navOpen()"
-    [attr.inert]="navHidden() ? '' : null"
-    (pinToggled)="togglePinned()"
-    (dismissed)="closeNav()"
-    (navigated)="onNavigated()"
-  />
+<div
+  class="shell"
+  [class.is-wide]="layout() === 'wide'"
+  [class.is-rail]="layout() === 'rail'"
+  [class.is-bars]="layout() === 'bars'"
+>
+  <!--
+    The ground's two soft glows (calm-glass.md §2): emerald at the start-top,
+    gold at the end-bottom. Decoration only.
+  -->
+  <span class="shell-glow shell-glow-a" aria-hidden="true"></span>
+  <span class="shell-glow shell-glow-b" aria-hidden="true"></span>
 
-  @if (drawer()) {
-    <!--
-      The scrim. Purely presentational: it is hidden from assistive technology
-      and is not the accessible way to dismiss the drawer -- Escape and the close
-      button are. It exists so a pointer user can tap away, and so the content
-      behind reads as unavailable.
-    -->
-    <div
-      class="shell-scrim"
-      [class.is-visible]="navOpen()"
-      aria-hidden="true"
-      (click)="closeNav()"
-    ></div>
+  @if (layout() === 'bars') {
+    <app-topbar
+      class="shell-topbar"
+      [areaTitle]="areaTitle()"
+      [workspaceName]="workspaceName()"
+      [workspaceId]="workspaceId()"
+      [workspaces]="workspaces()"
+      [email]="userEmail()"
+      [displayName]="userDisplayName()"
+      [emailLanguage]="userEmailLanguage()"
+      [paletteOpen]="paletteOpen()"
+      (paletteRequested)="openPalette()"
+      (workspaceChosen)="switchTo($event)"
+      (chooserRequested)="openChooser()"
+      (signedOut)="signOut()"
+    />
+  } @else {
+    <app-sidebar
+      id="primary-navigation"
+      class="shell-sidebar"
+      [collapsed]="layout() === 'rail'"
+      [workspaceName]="workspaceName()"
+      [workspaceId]="workspaceId()"
+      [workspaces]="workspaces()"
+      [email]="userEmail()"
+      [displayName]="userDisplayName()"
+      [emailLanguage]="userEmailLanguage()"
+      [paletteOpen]="paletteOpen()"
+      (paletteRequested)="openPalette()"
+      (workspaceChosen)="switchTo($event)"
+      (chooserRequested)="openChooser()"
+      (signedOut)="signOut()"
+    />
   }
 
   <!--
-    Made inert while the drawer is open, which is what turns the drawer into a
-    real modal surface: focus cannot tab out behind it, and a screen reader
-    cannot wander into content the reader cannot see.
+    The content, on the ground. `tabindex="-1"` makes the skip link's target
+    focusable, so following it actually moves focus rather than only scrolling.
   -->
-  <div class="shell-content" [attr.inert]="navOpen() ? '' : null">
-    <app-topbar
-      [drawer]="drawer()"
-      [navOpen]="navOpen()"
-      [workspaceName]="workspaceName()"
-      [userEmail]="userEmail()"
-      [userEmailLanguage]="userEmailLanguage()"
-      [canSwitchWorkspace]="canSwitchWorkspace()"
-      [paletteOpen]="paletteOpen()"
-      (paletteRequested)="openPalette()"
-      (menuToggled)="toggleNav()"
-      (workspaceSwitched)="switchWorkspace()"
-      (signedOut)="signOut()"
-    />
+  <main #mainRegion id="main-content" class="shell-main" tabindex="-1">
+    <router-outlet />
+  </main>
 
-    <!--
-      `tabindex="-1"` makes the skip link's target focusable, so following it
-      actually moves focus rather than only scrolling.
-    -->
-    <main #mainRegion id="main-content" class="shell-main" tabindex="-1">
-      <router-outlet />
-    </main>
-  </div>
+  @if (layout() === 'bars') {
+    <app-bottom-bar class="shell-bottombar" />
+  }
+
+  <!--
+    Rendered once, by the shell, because its live region has to exist in the DOM
+    before anything is announced into it. A fixed layer; inside the frame so it
+    knows where the navigation ends (bottom start on a desktop, under the top
+    bar on a phone).
+  -->
+  <app-toast-host />
 </div>
 
 <!--
   The command palette. Its code is fetched the first time it is asked for, or
   ahead of time once the browser is idle, so it never weighs on startup and is
-  usually already there by the first Ctrl+K. Outside the inert content: it is a
-  modal dialog of its own.
+  usually already there by the first Ctrl+K. A modal dialog of its own.
 -->
 @defer (when paletteRequested(); prefetch on idle) {
   <app-command-palette
@@ -82,10 +91,3 @@
     (notificationsRequested)="openNotifications()"
   />
 }
-
-<!--
-  Rendered once, by the shell, because its live region has to exist in the DOM
-  before anything is announced into it. Outside the grid: it is a fixed layer,
-  and as a grid child it would have claimed a row of its own.
--->
-<app-toast-host />

@@ -131,6 +131,15 @@ export class ConversationDetail {
    */
   protected readonly fill = computed(() => this.panes() || this.tall());
 
+  private readonly phone = mediaQuerySignal(MediaQueries.phone);
+
+  /**
+   * The one-line header on a phone (Phase 38 note 5, 39.3): back, the customer,
+   * the handling chip and the facts button. The facts line, the handling bar
+   * with its action and help, and the refresh open with "Details".
+   */
+  protected readonly compact = computed(() => this.phone() && !this.panes());
+
   protected readonly loading = signal(true);
   protected readonly failure = signal<ApiError | null>(null);
   protected readonly conversation = signal<Conversation | null>(null);

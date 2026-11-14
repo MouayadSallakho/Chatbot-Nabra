@@ -161,7 +161,7 @@ describe('CommandPalette', () => {
     const shown = labels();
 
     expect(shown).toContain('Overview');
-    expect(shown).toContain('Conversations');
+    expect(shown).toContain('Inbox');
     expect(shown).toContain('Knowledge');
     expect(shown).toContain('Notifications');
     expect(shown).not.toContain('Analytics');

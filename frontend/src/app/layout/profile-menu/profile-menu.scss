@@ -25,6 +25,72 @@
   }
 }
 
+// The member block at the foot of the side bar (board Inbox): a soft panel
+// with the avatar, the name and the sounds state; the whole block is the
+// trigger, at least 44px tall.
+:host ::ng-deep .member-trigger {
+  display: flex;
+  inline-size: 100%;
+  min-inline-size: 0;
+  min-block-size: var(--target-min);
+  padding: 0.625rem;
+  border: 0;
+  border-radius: var(--radius-tile);
+  background: var(--color-panel-soft);
+  color: var(--color-text);
+  text-align: start;
+  cursor: pointer;
+  transition: background-color var(--duration-press) var(--ease-calm);
+
+  &:hover,
+  &[aria-expanded='true'] {
+    background: var(--color-hover);
+  }
+}
+
+:host:has(.member) {
+  display: flex;
+  inline-size: 100%;
+  min-inline-size: 0;
+
+  ::ng-deep app-menu {
+    flex: 1;
+    min-inline-size: 0;
+  }
+}
+
+.member {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 0.625rem;
+  min-inline-size: 0;
+}
+
+.member-lines {
+  display: flex;
+  flex-direction: column;
+  min-inline-size: 0;
+}
+
+.member-name {
+  display: flex;
+  min-inline-size: 0;
+  font: 600 0.8125rem / 1.25rem var(--font-sans);
+
+  bdi {
+    min-inline-size: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.member-status {
+  color: var(--color-text-quiet);
+  font: var(--text-caption);
+}
+
 .avatar {
   display: inline-grid;
   place-items: center;
@@ -35,8 +101,18 @@
   background-color: var(--surface-selected);
   color: var(--text-primary);
   font: 600 0.75rem / 1 var(--font-sans);
-  letter-spacing: 0.02em; // rtl-lint-ignore: initials come from the address, always Latin
-  transition: border-color var(--motion-fast) var(--ease-standard);
+  transition: border-color var(--duration-press) var(--ease-calm);
+}
+
+// The member's avatar: the team's gold with ink initials (board Inbox), 34px.
+// Initials may now come from an Arabic display name, so no tracking.
+.avatar-member {
+  flex: none;
+  inline-size: var(--avatar-size-sm);
+  block-size: var(--avatar-size-sm);
+  border: 0;
+  background: var(--member-avatar-bg);
+  color: var(--member-avatar-fg);
 }
 
 // Who is signed in, and where: the initials beside the address and the
@@ -65,6 +141,7 @@
 
 // Each value truncates inside its own isolate, so it loses its own end in
 // either interface (an address is cut "ada.owner@omn…", never "…ai.example").
+.identity-name,
 .identity-email,
 .identity-workspace {
   display: flex;
@@ -76,6 +153,11 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+}
+
+.identity-name {
+  font: var(--text-body-strong);
+  color: var(--color-text);
 }
 
 .identity-email {

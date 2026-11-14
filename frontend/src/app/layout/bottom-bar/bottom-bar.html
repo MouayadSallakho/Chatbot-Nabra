@@ -1,0 +1,105 @@
+<!--
+  The phone's navigation landmark. Four areas and "More"; the current one is
+  marked with `aria-current="page"`, a heavier word and a filled pill behind
+  its icon.
+-->
+<nav
+  class="bottom-bar"
+  aria-label="Primary"
+  i18n-aria-label="@@nav.primaryLabel"
+  data-testid="bottom-bar"
+>
+  <span class="bottom-bar-glass glass" aria-hidden="true"></span>
+
+  <ul class="bottom-bar-list">
+    @for (item of bar(); track item.path) {
+      <li>
+        <a
+          class="bar-item"
+          [routerLink]="item.path"
+          routerLinkActive="is-active"
+          ariaCurrentWhenActive="page"
+          [attr.data-testid]="'nav-' + item.path"
+        >
+          <span class="bar-glyph">
+            <app-icon [name]="item.icon" [strokeWidth]="1.75" />
+            @if (item.path === inboxPath && inboxCount(); as count) {
+              <span class="bar-count" dir="ltr" aria-hidden="true">{{ count }}</span>
+            }
+          </span>
+          <span class="bar-label">{{ item.label }}</span>
+          @if (item.path === inboxPath && inboxCount(); as count) {
+            <span class="visually-hidden">, {{ needsPersonWord }}: {{ inboxCountWords() }}</span>
+          }
+        </a>
+      </li>
+    }
+    @if (moreGroups().length > 0) {
+      <li>
+        <button
+          #moreButton
+          type="button"
+          class="bar-item"
+          [class.is-active]="moreActive()"
+          aria-haspopup="dialog"
+          [attr.aria-expanded]="open()"
+          aria-controls="more-sheet"
+          data-testid="nav-more"
+          (click)="showMore()"
+        >
+          <span class="bar-glyph"><app-icon name="more" [strokeWidth]="1.75" /></span>
+          <span class="bar-label" i18n="@@nav.more">More</span>
+        </button>
+      </li>
+    }
+  </ul>
+</nav>
+
+<!--
+  "More": every other area, under the side bar's section labels. A native modal
+  dialog, so the page behind is inert and focus stays inside until it closes.
+-->
+<dialog
+  #sheet
+  id="more-sheet"
+  class="more-sheet glass"
+  aria-labelledby="more-sheet-title"
+  data-testid="more-sheet"
+  (cancel)="onCancel($event)"
+  (keydown)="onSheetKeydown($event)"
+  (click)="onDialogClick($event)"
+>
+  <div class="more-sheet-body">
+    <div class="more-sheet-head">
+      <h2 id="more-sheet-title" class="more-sheet-title" i18n="@@nav.moreTitle">More areas</h2>
+      <button type="button" class="btn btn-quiet btn-icon" (click)="close()">
+        <app-icon name="close" [strokeWidth]="1.75" />
+        <span class="visually-hidden" i18n="@@palette.close">Close</span>
+      </button>
+    </div>
+
+    @for (group of moreGroups(); track group.name; let firstGroup = $first) {
+      <div class="more-group">
+        <p class="more-group-label" [id]="'more-group-' + group.name">{{ group.label }}</p>
+        <ul [attr.aria-labelledby]="'more-group-' + group.name">
+          @for (item of group.items; track item.path; let firstItem = $first) {
+            <li>
+              <!-- The sheet opens on its first area (autofocus in a modal dialog). -->
+              <a
+                class="more-item"
+                [attr.autofocus]="firstGroup && firstItem ? '' : null"
+                [routerLink]="item.path"
+                routerLinkActive="is-active"
+                ariaCurrentWhenActive="page"
+                [attr.data-testid]="'more-' + item.path"
+              >
+                <app-icon [name]="item.icon" [strokeWidth]="1.75" />
+                <span>{{ item.label }}</span>
+              </a>
+            </li>
+          }
+        </ul>
+      </div>
+    }
+  </div>
+</dialog>

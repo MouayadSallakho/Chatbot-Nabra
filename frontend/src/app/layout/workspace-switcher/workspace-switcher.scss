@@ -1,0 +1,160 @@
+// The workspace switcher (board Inbox): a 44px panel button in the side bar,
+// the letter alone on the rail, a quiet line in the phone's top bar.
+
+:host {
+  display: flex;
+  min-inline-size: 0;
+}
+
+:host ::ng-deep app-menu {
+  inline-size: 100%;
+}
+
+.switcher-static {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  inline-size: 100%;
+  min-inline-size: 0;
+  min-block-size: var(--target-min);
+  margin: 0;
+  color: var(--color-text);
+  font: 500 0.8125rem / 1.25rem var(--font-sans);
+}
+
+:host(.is-panel) .switcher-static {
+  padding-inline: 0.75rem;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-input);
+  background: var(--color-panel);
+}
+
+:host(.is-rail) .switcher-static {
+  justify-content: center;
+}
+
+:host(.is-bar) .switcher-static {
+  min-block-size: 0;
+  color: var(--color-text-secondary);
+  font: var(--text-caption);
+}
+
+// The trigger is styled here; the menu (glass) is the shared `.menu`.
+:host ::ng-deep .switcher-trigger {
+  display: flex;
+  align-items: center;
+  inline-size: 100%;
+  min-inline-size: 0;
+  border: 1px solid var(--color-control-border);
+  border-radius: var(--radius-input);
+  background: var(--color-panel);
+  color: var(--color-text);
+  cursor: pointer;
+  transition:
+    background-color var(--duration-press) var(--ease-calm),
+    border-color var(--duration-press) var(--ease-calm);
+
+  &:hover,
+  &[aria-expanded='true'] {
+    background: var(--color-panel-soft);
+  }
+
+  &.is-panel {
+    min-block-size: var(--target-min);
+    padding-inline: 0.75rem 0.625rem;
+  }
+
+  // The rail: a square of the letter, centred on the rail.
+  &.is-rail {
+    justify-content: center;
+    inline-size: var(--target-min);
+    block-size: var(--target-min);
+    padding: 0;
+  }
+
+  // The phone's top bar: a quiet line under the area's title, still 24px tall.
+  &.is-bar {
+    min-block-size: 1.5rem;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--color-text-secondary);
+
+    &:hover,
+    &[aria-expanded='true'] {
+      background: none;
+      color: var(--color-text);
+    }
+  }
+}
+
+.switcher-face {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  inline-size: 100%;
+  min-inline-size: 0;
+  font: 500 0.8125rem / 1.25rem var(--font-sans);
+}
+
+:host(.is-bar) .switcher-face {
+  gap: var(--space-1);
+  font: var(--text-caption);
+}
+
+// The workspace's letter on a primary tile: its first letter, never a logo.
+.switcher-tile {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  inline-size: 1.5rem;
+  block-size: 1.5rem;
+  border-radius: var(--radius-badge);
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  font: 600 0.75rem / 1 var(--font-sans);
+
+  &.is-small {
+    inline-size: 1.25rem;
+    block-size: 1.25rem;
+    font-size: 0.6875rem;
+  }
+}
+
+:host(.is-bar) .switcher-tile {
+  display: none;
+}
+
+// The name truncates inside its own isolate, so it loses its own end in
+// either interface ("Northwind Opera…", never "…Operations").
+.switcher-name,
+.switcher-option-name {
+  display: flex;
+  flex: 1;
+  min-inline-size: 0;
+  text-align: start;
+
+  bdi {
+    min-inline-size: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.switcher-chevron {
+  flex: none;
+  inline-size: var(--icon-size-sm);
+  block-size: var(--icon-size-sm);
+  color: var(--color-text-secondary);
+}
+
+.switcher-name-skeleton {
+  inline-size: 7rem;
+  block-size: 0.75rem;
+}
+
+.menu-check {
+  margin-inline-start: auto;
+  color: var(--color-text);
+}

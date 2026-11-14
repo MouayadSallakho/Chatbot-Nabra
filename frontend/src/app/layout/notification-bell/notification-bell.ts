@@ -7,6 +7,7 @@ import {
   afterNextRender,
   computed,
   inject,
+  input,
   signal,
   viewChild,
 } from '@angular/core';
@@ -17,14 +18,20 @@ import { AppNotification } from '@app/core/notifications/notification-api';
 import { NotificationCenter } from '@app/core/notifications/notification-center';
 import { NotificationItem } from '@app/core/notifications/notification-item';
 import { Icon } from '@app/shared/icon/icon';
+import { Tooltip } from '@app/shared/tooltip/tooltip';
+import { trapTab } from '@app/layout/trap-tab';
 
 /**
  * The notification bell and its panel.
  *
- * <strong>A disclosure, not a dialog.</strong> The button says whether the panel
- * is open with <code>aria-expanded</code>; the panel follows it in the DOM, so
- * Tab moves straight into it and focus is never trapped. Escape closes it and
- * returns focus to the bell; so does a click outside or a navigation.
+ * <strong>A glass popover (Phase 39.3).</strong> The button says whether the
+ * panel is open with <code>aria-expanded</code>. Opening it moves focus to the
+ * panel's heading, and Tab and Shift+Tab stay inside the panel while it is
+ * open; Escape closes it and returns focus to the bell. A click outside or a
+ * navigation closes it too.
+ *
+ * In the side bar it opens beside the bar, at the top of the content; in the
+ * phone's top bar it hangs under the bar, within the screen's gutters.
  *
  * <strong>Never opens itself.</strong> A realtime signal updates the badge and
  * the accessible name — politely — and does nothing else. Focus stays where the
@@ -36,21 +43,26 @@ import { Icon } from '@app/shared/icon/icon';
 @Component({
   selector: 'app-notification-bell',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Icon, NotificationItem, RouterLink],
+  imports: [Icon, NotificationItem, RouterLink, Tooltip],
   templateUrl: './notification-bell.html',
   styleUrl: './notification-bell.scss',
   host: {
+    '[class.is-side]': "placement() === 'side'",
     '(document:keydown.escape)': 'closeFromKeyboard()',
     '(document:click)': 'closeIfOutside($event)',
   },
 })
 export class NotificationBell {
+  /** Where the bell sits: the side bar's head, or the phone's top bar. */
+  readonly placement = input<'side' | 'bar'>('bar');
+
   protected readonly center = inject(NotificationCenter);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly injector = inject(Injector);
 
   private readonly button = viewChild.required<ElementRef<HTMLButtonElement>>('bell');
   private readonly heading = viewChild<ElementRef<HTMLElement>>('heading');
+  private readonly panel = viewChild<ElementRef<HTMLElement>>('panel');
 
   /** Skeleton rows while the first list loads: as many as the panel shows. */
   protected readonly placeholders = [0, 1, 2];
@@ -91,9 +103,9 @@ export class NotificationBell {
     setTimeout(() => {
       if (!this.open()) {
         this.toggle();
+      } else {
+        this.focusHeading();
       }
-
-      afterNextRender(() => this.heading()?.nativeElement.focus(), { injector: this.injector });
     });
   }
 
@@ -108,7 +120,20 @@ export class NotificationBell {
 
     if (opening) {
       void this.center.loadRecent();
+      this.focusHeading();
     }
+  }
+
+  /**
+   * Keeps Tab inside the open panel: from its last control Tab goes back to
+   * its first, and Shift+Tab the other way. Escape (on the document) closes it.
+   */
+  protected onPanelKeydown(event: KeyboardEvent): void {
+    trapTab(event, this.panel()?.nativeElement);
+  }
+
+  private focusHeading(): void {
+    afterNextRender(() => this.heading()?.nativeElement.focus(), { injector: this.injector });
   }
 
   protected closeFromKeyboard(): void {
