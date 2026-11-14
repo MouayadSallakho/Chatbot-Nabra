@@ -1,0 +1,95 @@
+// The segmented control (shared/segmented/segmented.ts). Unencapsulated: the
+// options are the consumer's own elements; every selector is scoped to the
+// control's classes.
+
+.segmented {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  min-inline-size: 0;
+  margin: 0;
+  padding: var(--space-1);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background-color: var(--color-panel-soft);
+
+  @media (forced-colors: active) {
+    border: 1px solid CanvasText;
+  }
+}
+
+.segmented-option {
+  position: relative;
+  display: inline-flex;
+  flex: 1 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-block-size: calc(var(--control-height) - 2 * var(--space-1));
+  padding-inline: var(--space-4);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background-color: transparent;
+  color: var(--color-text-secondary);
+  font: var(--text-label);
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color var(--duration-press) var(--ease-calm),
+    color var(--duration-press) var(--ease-calm),
+    box-shadow var(--duration-press) var(--ease-calm);
+
+  @media (pointer: coarse) {
+    min-block-size: var(--target-min);
+  }
+
+  // The radio stays in the page (for the keyboard, the form and the checked
+  // state) but is drawn by the whole segment.
+  > input {
+    position: absolute;
+    inset: 0;
+    margin: 0;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  &:hover {
+    color: var(--color-text);
+    text-decoration: none;
+  }
+
+  // Selected: raised on the panel, a control-border edge, weight 600.
+  &:has(> input:checked),
+  &[aria-pressed='true'],
+  &[aria-current='true'],
+  &[aria-current='page'] {
+    background-color: var(--color-panel-raised);
+    color: var(--color-text);
+    font-weight: 600;
+    box-shadow: 0 0 0 1px var(--color-control-border);
+  }
+
+  &:has(> input:focus-visible),
+  &:focus-visible {
+    outline: var(--focus-ring-width) solid var(--color-focus-ring);
+    outline-offset: 1px;
+  }
+
+  &:has(> input:disabled) {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+
+  // Forced colours drop the edge (a box-shadow) and the fill: a system
+  // outline, inside the segment so nothing moves, says which one is chosen.
+  @media (forced-colors: active) {
+    &:has(> input:checked),
+    &[aria-pressed='true'],
+    &[aria-current='true'],
+    &[aria-current='page'] {
+      outline: 2px solid Highlight;
+      outline-offset: -2px;
+    }
+  }
+}

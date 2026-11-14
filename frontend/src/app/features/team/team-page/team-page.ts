@@ -44,6 +44,7 @@ import {
   invitationSummary,
   roleList,
 } from '../team-words';
+import { Segmented } from '@app/shared/segmented/segmented';
 
 /** Members per page; the server allows up to 100. */
 const MEMBER_PAGE_SIZE = 20;
@@ -84,6 +85,7 @@ const INVITATION_PAGE_PARAM = 'invitationsPage';
     LocalDatePipe,
     LocalNumberPipe,
     Pagination,
+    Segmented,
   ],
   templateUrl: './team-page.html',
   styleUrl: './team-page.scss',

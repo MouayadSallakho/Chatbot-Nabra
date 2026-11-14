@@ -7,8 +7,10 @@ import {
 } from '@app/core/i18n/language';
 import { LanguageService } from '@app/core/i18n/language-service';
 import { RouteFocus } from '@app/core/navigation/route-focus';
-import { BRAND_MARK_PATHS, BrandMark } from '@app/shared/brand-mark/brand-mark';
+import { BrandMark } from '@app/shared/brand-mark/brand-mark';
+import { BRAND_MARK } from '@app/shared/brand-mark/brand-geometry';
 import { VOICE_WORDS } from '@app/shared/voice/voice';
+import { Segmented } from '@app/shared/segmented/segmented';
 
 /**
  * Whether the mark's signature moment is still to be played on this page load.
@@ -60,7 +62,7 @@ export class EntrySignature {
 @Component({
   selector: 'app-entry-frame',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [BrandMark],
+  imports: [BrandMark, Segmented],
   templateUrl: './entry-frame.html',
   styleUrl: './entry-frame.scss',
 })
@@ -85,7 +87,7 @@ export class EntryFrame {
 
   protected readonly settle = inject(EntrySignature).claim();
 
-  protected readonly markPaths = BRAND_MARK_PATHS;
+  protected readonly mark = BRAND_MARK;
 
   protected readonly voiceWords = VOICE_WORDS;
 

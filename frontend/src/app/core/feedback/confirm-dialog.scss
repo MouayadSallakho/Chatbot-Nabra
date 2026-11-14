@@ -1,30 +1,31 @@
-// A focused decision: a title that names the action and its object, a sentence
+@use '../../../styles/glass' as *;
+
+// Glass with a scrim (calm-glass.md §6), radius 24, in the browser's top
+// layer. A focused decision: a title that names the action and its object, a sentence
 // on the consequence, and the two ways out -- the safe one first, so it is also
 // where focus lands when the dialog opens.
 .confirm {
   inline-size: min(28rem, calc(100vw - 2 * var(--space-4)));
   margin: auto;
   padding: var(--space-6);
-  background-color: var(--surface-raised);
-  color: var(--text-primary);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-overlay);
-  box-shadow: var(--shadow-overlay);
+  border-radius: var(--radius-dialog);
+  color: var(--color-text);
 
   // A long address or name in the title wraps instead of widening the dialog
   // past its frame.
   overflow-wrap: anywhere;
+  @include glass;
 
   &::backdrop {
     background-color: var(--scrim);
   }
 
   &[open] {
-    animation: confirm-in var(--duration-lg) var(--ease-enter);
+    animation: confirm-in var(--duration-dialog) var(--ease-calm);
   }
 
   &[open]::backdrop {
-    animation: confirm-scrim-in var(--duration-md) var(--ease-standard);
+    animation: confirm-scrim-in var(--duration-menu) var(--ease-calm);
   }
 }
 
@@ -56,7 +57,7 @@
 @keyframes confirm-in {
   from {
     opacity: 0;
-    transform: translateY(6px) scale(0.985);
+    transform: translateY(var(--motion-rise)) scale(0.985);
   }
 }
 

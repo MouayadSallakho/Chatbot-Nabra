@@ -71,23 +71,20 @@
           <fieldset class="categories" aria-labelledby="email-heading">
             @for (category of categories; track category.key) {
               <div class="category">
-                <input
-                  type="checkbox"
-                  role="switch"
-                  class="switch category-switch"
-                  [id]="'email-' + category.key"
-                  [formControlName]="category.key"
-                  [attr.aria-describedby]="'email-' + category.key + '-description'"
-                  [attr.data-testid]="'email-' + category.key"
-                />
-                <div class="category-text">
-                  <label class="category-label" [for]="'email-' + category.key">{{
-                    category.label
-                  }}</label>
-                  <p class="category-description" [id]="'email-' + category.key + '-description'">
-                    {{ category.description }}
-                  </p>
-                </div>
+                <label app-switch class="category-switch" [for]="'email-' + category.key">
+                  <input
+                    type="checkbox"
+                    role="switch"
+                    [id]="'email-' + category.key"
+                    [formControlName]="category.key"
+                    [attr.aria-describedby]="'email-' + category.key + '-description'"
+                    [attr.data-testid]="'email-' + category.key"
+                  />
+                  <span class="category-label">{{ category.label }}</span>
+                </label>
+                <p class="category-description" [id]="'email-' + category.key + '-description'">
+                  {{ category.description }}
+                </p>
               </div>
             }
           </fieldset>
@@ -217,24 +214,22 @@
           </div>
 
           <div class="category browser-alerts">
-            <input
-              type="checkbox"
-              role="switch"
-              class="switch category-switch"
-              id="desktop-alerts"
-              aria-describedby="desktop-alerts-description"
-              data-testid="desktop-alerts"
-              [checked]="desktopOn()"
-              [disabled]="!desktopSupported"
-              (click)="toggleDesktop($event)"
-            />
-            <div class="category-text">
-              <label
-                class="category-label"
-                for="desktop-alerts"
-                i18n="@@notificationPreferences.desktopAlerts"
-                >Desktop alerts</label
+            <label app-switch class="category-switch" for="desktop-alerts">
+              <input
+                type="checkbox"
+                role="switch"
+                id="desktop-alerts"
+                aria-describedby="desktop-alerts-description"
+                data-testid="desktop-alerts"
+                [checked]="desktopOn()"
+                [disabled]="!desktopSupported"
+                (click)="toggleDesktop($event)"
+              />
+              <span class="category-label" i18n="@@notificationPreferences.desktopAlerts"
+                >Desktop alerts</span
               >
+            </label>
+            <div class="category-text">
               <p
                 class="category-description"
                 id="desktop-alerts-description"

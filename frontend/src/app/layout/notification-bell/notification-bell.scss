@@ -1,3 +1,5 @@
+@use '../../../styles/glass' as *;
+
 // Every value is a semantic token, so light and dark need no separate rules.
 
 :host {
@@ -26,6 +28,14 @@
   font: 600 0.6875rem / 1 var(--font-sans);
   font-variant-numeric: tabular-nums;
   box-shadow: 0 0 0 2px var(--surface-default);
+
+  // Its own system pair in forced colours, so the number never sits on a
+  // colour the browser did not choose (39.2a, risk 4).
+  @media (forced-colors: active) {
+    forced-color-adjust: none;
+    background: Highlight;
+    color: HighlightText;
+  }
 }
 
 .panel {
@@ -37,13 +47,13 @@
   flex-direction: column;
   inline-size: min(26rem, calc(100vw - 2 * var(--space-4)));
   max-block-size: min(36rem, calc(100dvh - var(--topbar-height) - var(--space-6)));
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-card);
-  background: var(--surface-raised);
-  box-shadow: var(--shadow-overlay);
+  border-radius: var(--radius-tile);
   overflow: hidden;
   transform-origin: top;
-  animation: menu-in var(--duration-sm) var(--ease-enter);
+  animation: menu-in var(--duration-menu) var(--ease-calm);
+  // A popover: glass (calm-glass.md §6). Its list scrolls inside the one
+  // blurred layer; the rows themselves are never blurred.
+  @include glass;
 }
 
 .panel-header {
@@ -53,7 +63,7 @@
   gap: var(--space-3);
   padding-block: var(--space-3);
   padding-inline: var(--space-4) var(--space-3);
-  border-block-end: 1px solid var(--border-subtle);
+  border-block-end: 1px solid var(--color-line);
 }
 
 .panel-heading {
@@ -94,7 +104,7 @@
   list-style: none;
 
   > li + li {
-    border-block-start: 1px solid var(--border-subtle);
+    border-block-start: 1px solid var(--color-line);
   }
 }
 
@@ -171,7 +181,7 @@
   justify-content: space-between;
   gap: var(--space-1) var(--space-3);
   padding: var(--space-2) var(--space-4);
-  border-block-start: 1px solid var(--border-subtle);
+  border-block-start: 1px solid var(--color-line);
   font: var(--text-small);
 
   // Links stay links (ink, underlined), with a target taller than their text.

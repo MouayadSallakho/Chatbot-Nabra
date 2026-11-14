@@ -97,13 +97,8 @@
             <fieldset class="catalogue" data-testid="catalogue">
               <legend class="visually-hidden" i18n="@@reports.field.report">Report</legend>
               @for (entry of reports(); track entry.type) {
-                <label class="catalogue-item" [attr.data-testid]="'report-' + entry.type">
-                  <input
-                    type="radio"
-                    class="form-check-input"
-                    formControlName="type"
-                    [value]="entry.type"
-                  />
+                <label app-radio class="catalogue-item" [attr.data-testid]="'report-' + entry.type">
+                  <input type="radio" formControlName="type" [value]="entry.type" />
                   <span class="catalogue-text">
                     <span class="catalogue-title">{{ entry.title }}</span>
                     <span class="catalogue-description">{{ entry.description }}</span>
@@ -174,7 +169,7 @@
 
               <fieldset class="field">
                 <legend class="field-label" i18n="@@reports.field.format">Format</legend>
-                <div class="segmented">
+                <div app-segmented>
                   @for (format of formats(); track format) {
                     <label class="segmented-option">
                       <input type="radio" formControlName="format" [value]="format" />
@@ -187,7 +182,7 @@
               <!-- The file's language (Phase 38.5, E8): the reader's own by default. -->
               <fieldset class="field">
                 <legend class="field-label" i18n="@@reports.field.language">File language</legend>
-                <div class="segmented" data-testid="report-language">
+                <div app-segmented data-testid="report-language">
                   @for (language of languages; track language) {
                     <label class="segmented-option">
                       <input

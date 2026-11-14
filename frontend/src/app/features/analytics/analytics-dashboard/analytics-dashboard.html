@@ -50,7 +50,7 @@
         everything below it except "Right now", which says so.
       -->
       <div class="range-bar">
-        <fieldset class="segmented range-picker">
+        <fieldset app-segmented class="range-picker">
           <legend class="visually-hidden" i18n="@@analytics.period">Period</legend>
           @for (option of ranges; track option.value) {
             <label class="segmented-option">

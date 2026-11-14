@@ -17,38 +17,36 @@ This document records what was decided and what was deliberately left for later.
 
 ## D1. UI philosophy
 
-> **Phase 39 (Calm Glass).** The tokens (D5), type (D6) and themes (D7, D8) below
-> already describe Calm Glass (39.2a); the components and this philosophy section
-> are rewritten with them in 39.2b. Until then, read "Lagoon" as emerald (the AI),
-> "Ember" as gold (the team) and "ink" as emerald for the action colour
-> (`docs/design/MASTER.md`, section 3).
+**"Calm Glass" (Phase 39).** One tone, two voices: every Nabra conversation is a
+duet between the AI and the team, with the customer as the third voice. The AI
+speaks in **emerald**, the team in **gold**, the customer in plain **cream**, on
+every screen, in the widget, in emails and in report files. Colour is
+information, not decoration. The full brief, the contrast table and the
+component catalogue are `docs/design/MASTER.md` (sections 3, 13 and 14).
 
-**"Two Voices."** Every OmniAI conversation is a duet between the AI and the
-team, and the interface gives each voice one colour: **Lagoon** for the AI,
-**Ember** for a person on the team. Colour is information, not decoration;
-everything else is calm ink on porcelain, comfortable for an eight-hour shift
-and premium without effects. The full brief is `docs/design/MASTER.md`.
+**The voices mean one thing each.** Emerald and gold say who is answering -- in
+a chip, a split bar, a 4px track, an event line in a transcript, the "Take over"
+colour change -- and are never decoration. Status words that are not voices
+(quotas, billing, indexing) reuse the hues only with their own glyph and word
+(owner decision Q4). Nothing is shown in voice colours that the API cannot tell.
 
-**The voices mean one thing each.** Lagoon and Ember say who is answering --
-in a chip, a split bar, a 4px track, a handoff divider in a transcript, the
-"Take over" sweep -- and are never used for decoration or for status. Status
-keeps its own colours (green, yellow amber, crimson, blue), each with its own
-icon and word; a voice always carries its glyph and word. Nothing is shown in
-voice colours that the API cannot tell.
+**Emerald is the action colour.** Primary buttons, links (always underlined) and
+the focus ring are emerald; one primary action per area.
 
-**Ink is the action colour.** Primary buttons are ink on light and porcelain on
-dark, links are ink and always underlined, the focus ring is ink, and selection
-is neutral. There is no brand blue or indigo anywhere.
+**Glass only where things float.** Menus, popovers, tooltips, dialogs, toasts and
+the command palette (and the side bar from 39.3) are glass; conversations,
+tables, forms and charts sit on solid panels with a 1px line and no shadow. At
+most three blurred layers on screen; each becomes its solid twin under "Reduce
+transparency", the OS preference and forced colours.
 
-**Hierarchy comes from surface, space and type, not decoration.** A porcelain
-page behind white panels and hairline borders; a shadow only on overlays.
-Instrument Sans, narrowed for headings, gives the type its character; tabular
-figures keep numbers calm.
+**Hierarchy comes from surface, space and type.** A cream ground (emerald-950 in
+dark) behind solid panels; Geist and IBM Plex Sans Arabic, with Instrument Serif
+for one display line; tabular figures keep numbers calm. Motion explains a
+change and then stops.
 
-**Nothing decorative that has to be maintained.** No gradients, glow, glass,
-illustrations, sparkle icons or animated backgrounds. These are the first things
-to look dated, the first to slow a page down, and none of them help somebody
-answer a customer.
+**Nothing decorative that has to be maintained.** No gradients beyond the two
+background glows and the orb, no illustrations, sparkle icons or animated
+backgrounds.
 
 ## D2. Angular shell architecture
 
@@ -195,17 +193,20 @@ and the shell's `--shell-padding` 14px, `--column-gap` 12px, `--panel-padding`
 
 By role: `--radius-pill` 999 · `--radius-input` 12 · `--radius-nav-item` 12 ·
 `--radius-tile` 16 · `--radius-panel` 24 · `--radius-dialog` 24 ·
-`--radius-bubble` 18 with a `--radius-bubble-tail` 6px corner on the speaker's
-side (logical corners) · `--radius-badge` 6 (checkboxes and small marks until
-39.2b).
+`--radius-toast` 18 · `--radius-bubble` 18 with a `--radius-bubble-tail` 6px
+corner on the speaker's side (logical corners) · `--choice-radius` 6 (the
+checkbox box) · `--radius-badge` 6 (keys and small marks).
 
 ### Control sizing
 
-`--control-height-sm` 32 · `--control-height` 36 · `--control-height-lg` 40,
-rising to 40-44px under `pointer: coarse`, until 39.2b restyles buttons and
-inputs to 44px (`--control-height-dense` 40 in dense desktop headers).
-`--target-min` 44px, `--chip-height` 24px. Icon sizes: `--icon-size-sm` 16 ·
-`--icon-size` 18 · `--icon-size-nav` 20.
+`--control-height` 44 (buttons and inputs) · `--control-height-sm` 40 (the dense
+size: `.btn-sm`, menu items, desktop headers) · `--control-height-lg` 44; every
+one is 44px under `pointer: coarse`. `--target-min` 44px: each choice control's
+label is a 44px target. `--chip-height` 24px (`--chip-height-sm` 22). The choice
+controls draw a `--choice-size` 20px box or a `--switch-inline` ×
+`--switch-block` 40×24 track with an 18px thumb. Avatars `--avatar-size` 40 /
+`-sm` 34 / `-lg` 64; the orb `--orb-size` 26 / `-lg` 64. Icon sizes:
+`--icon-size-sm` 16 · `--icon-size` 18 · `--icon-size-nav` 20.
 
 ### Layers
 
@@ -222,7 +223,10 @@ shadow from the `--glass-*` tokens, the solid twin where `backdrop-filter` is no
 supported, and system colours with no shadow in forced colours. Under
 `data-transparency="reduced"` (the account menu's "Reduce transparency") and
 `prefers-reduced-transparency`, the tokens themselves resolve to the solid twin.
-Budget: three blurred layers at most, never on a scrolling row.
+Budget: three blurred layers at most, never on a scrolling row; the Design Lab
+counts them (`countBlurredLayers` in `shared/glass/glass-budget.ts`). Glass is
+used by `.menu`, `.popover`, `.tooltip`, the confirm dialog, the command
+palette, the notifications panel and toasts (39.2b).
 
 ### Motion
 
@@ -491,65 +495,68 @@ hosted chat and widget, the Design Lab) keep their own `<h1>`.
 
 ## D16. Primitives
 
-Buttons, cards, badges, form controls, tables, lists and the empty / loading /
-error states are **CSS conventions**, not Angular components. Components are
-reserved for primitives that carry structure or behaviour: `Icon`, `BrandMark`,
-`PageHeader`, `EmptyState`, `Pagination`, `Menu`, `ConfirmDialog`, and the voice
-components below. Phase 36.2 restyled every one to "Two Voices" without changing
-a class name or DOM contract. Every state -- hover, pressed, focus, disabled,
-busy -- is drawn, with the motion tokens.
+Buttons, inputs, tables, lists, menus, bubbles and the loading / empty / error
+states are **CSS conventions**; components are reserved for what carries
+structure or behaviour. Phase 39.2b restyled every convention to Calm Glass in
+place, without changing a class name or DOM contract, and added the components
+the screen steps build from. The catalogue, with tokens, is MASTER.md section 14.
 
-- **Buttons** -- primary (ink) / secondary / ghost / danger / danger-ghost / link,
-  in sm / default / lg, plus icon-only. Press is a 1px settle in 100ms; colour
-  changes take 150ms. Loading overlays a spinner on a transparent label, so a
-  busy button keeps its width.
-- **Cards** -- white on porcelain with a hairline, 14px radius, no shadow;
-  `.card-header` (a sentence in it wraps under the title), `.card-body`, and
-  `.card-actions` as a card's last child is its footer.
-- **Badges** -- status badges draw their own glyph (tick, triangle, exclamation,
-  "i") beside the word on a 6px-radius chip: neutral, success, warning, danger,
-  info. `.badge-plain` (no glyph) for metadata such as a channel; `.count-badge`
-  (ink) for numbers. `.badge-accent` is gone: what it meant ("Human") is now the
-  voice chip.
-- **Voice chips** (`app-voice-chip`) -- "AI" in Lagoon or "Person" in Ember, glyph
-  and word, md or sm; a chip that changes voice sweeps across in 320ms on the
-  emphasized curve (the "Take over" moment). Not a status badge.
-- **Forms** -- `.field` > label + control + hint + error; `.field-row`; 10px
-  controls with `--border-control` boundaries; invalid by `aria-invalid`. The
-  Bootstrap aliases (`.form-control`, `.form-select`, `.form-label`, `.form-hint`,
-  `.form-error`) are the same rules. `.switch` (`role="switch"`, ink when on, the
-  thumb mirrors in RTL), `.segmented` (radios), native checkboxes and radios in
-  ink.
-- **Tables** -- `.table-wrap` frame with contained scroll, caption-style headers,
-  `.num` end-aligned tabular figures, `.actions` column.
-- **Data list** -- `.data-list` / `.data-list-head` / `.data-row`: the pattern for
-  lists whose rows are links. A table's look on a wide screen, stacked rows on a
-  phone; a feature supplies only `--data-list-columns`.
-- **Toolbar, pager** -- `.toolbar` / `.toolbar-end`; `.pager` drawn by the
-  `Pagination` component.
-- **Menus** -- `.menu`, `.menu-item`, `.menu-separator`, `.menu-label`; an
-  overlay, so it casts the shadow.
-- **Notices** -- `.alert-*` (danger, warning, info, success; the glyph comes from
-  the template) and `.stale-notice`, the one treatment for "this changed
-  somewhere else" (warning, because nothing failed).
-- **Dialog and toast** -- the dialog enters in 320ms on the enter curve with its
-  scrim fading in; toasts carry a glyph and a sentence, no coloured edge stripe.
-- **Transcript** -- `.bubble` (customer on the start side; AI and person on the
-  end side in their voice tints, the tail on the speaker's corner) and
-  `.handoff-divider`, drawn only where the replying voice really changes.
-- **Empty / error / skeleton** -- skeletons match the final geometry; the sweep
-  stops under reduced motion.
+- **Buttons** -- `.btn-primary` (emerald) / `-secondary` (a panel with a line) /
+  `-quiet` (text only; `.btn-ghost` is the same rule) / `-danger` /
+  `-danger-ghost` / `.btn-link`, pills of 44px (`.btn-sm` 40px), weight 600,
+  plus round icon-only buttons with an accessible name. Press is a 1px settle in
+  120ms. Busy overlays a spinner and keeps the button's size and its visually
+  hidden label.
+- **Choice controls** (`shared/choice`, `shared/segmented`) -- `label[app-check]`,
+  `label[app-radio]`, `label[app-switch]` and `[app-segmented]`: attribute
+  components on the consumer's own label or container, around its native
+  `<input>`, so ids, `formControlName`, testids and e2e locators are unchanged
+  and keyboard and screen-reader behaviour is native. A 20px box or a 40×24
+  track in a 44px target that includes the label; segmented options are radios
+  (forms), links with `aria-current` (an address; never `role="tab"`) or buttons
+  with `aria-pressed`. The global checkbox rule and `.switch` are gone (Phase 38
+  notes 3 and 4).
+- **Inputs** -- `.field` > label + control + hint + error; `.input`, `.select`,
+  `.textarea` (and the `.form-*` aliases) are 44px, radius 12, with the 3:1
+  control border; focus is a 2px emerald border and a 3px halo (an outline in
+  forced colours); invalid by `aria-invalid`.
+- **Chips** -- `app-chip` with a tone (need, team, waiting, ai, failed, neutral;
+  success, warning, danger, info with their glyphs): a 24px pill, a dot and a
+  word. The `.badge-*` classes are the same rules until each screen moves to
+  `app-chip`; `.count-badge` stays for numbers. `app-voice-chip` is a chip that
+  names the voice.
+- **Panels and tiles** -- `.panel-surface` (radius 24, a line, no shadow) and
+  `.tile-surface` (radius 16, the soft fill); `.card` keeps radius 16 until each
+  screen's step.
+- **Rows and avatars** -- `.list-row` (radius 16; avatar, name and time, one line
+  of preview, chips; selected tint; unread dot + heavier name + the word) and
+  `app-avatar` (initials or a code, the channel's badge with its glyph).
+- **Tables, data list, toolbar, pager** -- unchanged in structure; restyled
+  through the tokens.
+- **Menus, popovers, tooltips** -- `.menu` and `.popover` are glass (radius 16);
+  `[appTooltip]` (`shared/tooltip`) shows small glass on hover and keyboard
+  focus, is hoverable and dismissed by Escape.
+- **Notices** -- `.alert-*` and `.stale-notice`, unchanged in structure.
+- **Dialogs and toasts** -- glass; the dialog on the scrim in 280ms; toasts with a
+  glyph and a sentence (39.3 places them).
+- **Transcript** -- `.bubble` + `-ai` / `-team` (`-human`) / `-customer`, the
+  three voices, the tail on the speaker's corner, rising 8px; `app-orb` beside
+  the AI; `app-event-line` (`role="note"`; `.handoff-divider` is the same rule)
+  for failed turns, takeovers and returns.
+- **Empty / error / skeleton** -- `app-empty-state` draws one serif line (Plex
+  Arabic 600 in Arabic), one sentence and one action; skeletons sweep softly and
+  stop under reduced motion, and each screen step draws its own geometry.
 
 **Voice components** (`shared/voice/`): `VoiceChip`; `VoiceSplit` (AI vs people
 counts as one bar, a legend and one sentence for screen readers); `VoiceTrack`
-(the real sequence of reply authors in one conversation, derived from the
-messages given and nothing else; it renders nothing until somebody has replied).
+(the real sequence of reply authors, derived from the messages given and nothing
+else).
 
-**Design Lab.** `/design-lab` shows the tokens, type in Latin and Arabic, every
-primitive in every state, the voice components and a sample transcript, with
-light / dark and LTR / RTL toggles. It is registered only in development builds
-and compiled out of production (the route's condition is `ngDevMode`, which the
-production build defines as `false`).
+**Design Lab.** `/design-lab` shows the tokens, the glass (with a live count of
+blurred layers), the mark and the lockup, and every component in its states,
+with theme, direction and "Reduce transparency" toggles. It is registered only in
+development builds and compiled out of production (the route's condition is
+`ngDevMode`).
 
 ## D17. Icons
 

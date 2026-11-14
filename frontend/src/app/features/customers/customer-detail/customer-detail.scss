@@ -171,25 +171,21 @@
   overflow-y: auto;
 }
 
+// The family's radio (shared/choice) on a tile; the whole tile is the target.
 .candidate {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: start;
-  gap: var(--space-1) var(--space-3);
-  padding: var(--space-3);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-control);
-  cursor: pointer;
+  padding-inline: var(--space-3);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-tile);
 
   &:hover {
-    background-color: var(--surface-hover);
+    background-color: var(--color-hover);
   }
 
   // Chosen is neutral, like every selection: the selected surface and a
   // control-strength edge, never a voice or status colour.
   &.is-chosen {
-    border-color: var(--border-control);
-    background-color: var(--surface-selected);
+    border-color: var(--color-control-border);
+    background-color: var(--color-selected);
   }
 }
 
@@ -202,10 +198,6 @@
 .candidate-name {
   font: var(--text-body-strong);
   overflow-wrap: anywhere;
-}
-
-.candidate-count {
-  grid-column: 2;
 }
 
 // Warning colours, because this is the one operation on the page that cannot be

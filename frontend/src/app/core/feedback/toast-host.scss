@@ -1,4 +1,8 @@
-// Bottom end corner, above everything: a toast may be reporting the result of
+@use '../../../styles/glass' as *;
+
+// Toasts are glass (calm-glass.md §6): a floating layer, one of the three
+// blurred layers the budget allows. 39.3 moves them to the bottom start on a
+// desktop and the top on a phone. Bottom end corner, above everything: a toast may be reporting the result of
 // the dialog that is still closing.
 .toast-host {
   position: fixed;
@@ -28,30 +32,24 @@
   gap: var(--space-3);
   max-inline-size: min(24rem, calc(100vw - 2 * var(--space-4)));
   padding-block: var(--space-3);
-  padding-inline: var(--space-4) var(--space-3);
-  background-color: var(--surface-raised);
-  color: var(--text-primary);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-card);
-  box-shadow: var(--shadow-overlay);
+  padding-inline: var(--space-4) var(--space-2);
+  border-radius: var(--radius-toast);
+  color: var(--color-text);
   font: var(--text-small);
   pointer-events: auto;
-  animation: toast-in var(--duration-sm) var(--ease-enter);
+  animation: toast-in var(--duration-menu) var(--ease-calm);
+  @include glass;
 }
 
 // Outcome by shape and word as well as colour: a tick or a triangle. No
 // coloured edge stripe: the glyph and the sentence carry the outcome.
 .toast-icon {
   flex: none;
-  color: var(--success-fg);
+  color: var(--status-success-fg);
 }
 
-.toast-error {
-  border-color: var(--danger-border);
-
-  .toast-icon {
-    color: var(--danger-fg);
-  }
+.toast-error .toast-icon {
+  color: var(--status-danger-fg);
 }
 
 .toast-text {
@@ -62,13 +60,13 @@
 
 .toast-dismiss {
   flex: none;
-  color: var(--text-muted);
+  color: var(--color-text-secondary);
 }
 
 @keyframes toast-in {
   from {
     opacity: 0;
-    transform: translateY(6px);
+    transform: translateY(var(--motion-rise));
   }
 }
 

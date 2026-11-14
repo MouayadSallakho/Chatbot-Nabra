@@ -115,18 +115,10 @@ app-permission-picker {
   grid-column: 1 / -1;
 }
 
+// A permission: the family's checkbox (shared/choice), its 44px target the
+// whole row.
 .perm-option {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: var(--space-3);
-  align-items: start;
-  padding-block: var(--space-2);
-  border-block-start: 1px solid var(--border-subtle);
-  cursor: pointer;
-
-  .form-check-input {
-    margin-block-start: 0.1875rem;
-  }
+  border-block-start: 1px solid var(--color-line);
 }
 
 .perm-option-text,
@@ -289,28 +281,21 @@ app-permission-picker {
   }
 }
 
+// A role: the family's checkbox (shared/choice) on a tile; the whole tile is
+// the target. Ticked is marked by the box and a stronger edge, never by colour
+// alone.
 .role-option {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: var(--space-3);
-  align-items: start;
-  padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-control);
-  cursor: pointer;
+  padding-inline: var(--space-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-tile);
 
   &:hover {
-    background-color: var(--surface-hover);
+    background-color: var(--color-hover);
   }
 
-  // Ticked is marked by the checkbox and a stronger edge, never by colour alone.
   &:has(input:checked) {
-    border-color: var(--border-control);
-    background-color: var(--surface-selected);
-  }
-
-  .form-check-input {
-    margin-block-start: 0.1875rem;
+    border-color: var(--color-control-border);
+    background-color: var(--color-selected);
   }
 }
 

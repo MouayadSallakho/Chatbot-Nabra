@@ -26,6 +26,7 @@ import { Customer, CustomerRow, CustomersApi } from '../customers-api';
 import { ConversationCustomer } from '@app/features/conversations/conversations-api';
 import { CustomerLabel, customerLabelPlain } from '@app/features/conversations/customer-label';
 import { asLabelled, conversationsPhrase } from '../customer-words';
+import { Radio } from '@app/shared/choice/choice';
 
 /** What tells one record apart from another in the merge step. */
 export interface Distinction {
@@ -64,6 +65,7 @@ export interface Distinction {
     ChannelBadge,
     VoiceChip,
     CustomerLabel,
+    Radio,
   ],
   templateUrl: './customer-detail.html',
   styleUrl: './customer-detail.scss',

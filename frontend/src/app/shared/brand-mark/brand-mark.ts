@@ -1,33 +1,25 @@
 import { ChangeDetectionStrategy, Component, input } from '@angular/core';
-
-/** The mark's geometry on a 23-unit grid (viewBox "2 4 23 23"). */
-export const BRAND_MARK_PATHS = {
-  /** The AI bubble, tail at the lower left, with the Ember bubble cut out. */
-  ai: 'M4.4 18.35 3.5 23l4.7-1.6.54-.21A9.5 9.5 0 0 1 17.02 7 8.5 8.5 0 0 0 4.4 18.35Z',
-  /** The person bubble, in front, tail at the lower right. */
-  human: 'M17 9a7.5 7.5 0 0 1 5.8 12.25l.8 4.25-4.1-1.4A7.5 7.5 0 1 1 17 9Z',
-} as const;
+import { BRAND_MARK } from './brand-geometry';
 
 /**
- * The Nabra mark: two rounded speech shapes, overlapping -- the AI (Lagoon) and
- * a person on the team (Ember): two voices in one tone, which is what the name
- * نبرة ("tone of voice") says. Since the brand step the shapes no longer stand
- * for the letter "O" of the code name; the geometry is unchanged.
+ * The Nabra mark (brand.md, direction A): two overlapping circles, the AI in
+ * emerald and the team in gold, and their overlap -- the lens -- in
+ * emerald-900: two voices in one tone, which is what نبرة ("tone of voice")
+ * says. On dark grounds the circles are emerald-100 and gold-500 and the lens
+ * emerald-300, through the `--brand-*` tokens.
  *
- * DRAWN, NOT MASKED. The Lagoon shape is pre-cut: its path is the AI bubble
- * minus the Ember bubble grown by a 2-unit gap, computed once (Phase 36.2). So
- * the two shapes stay apart on any background and in a single colour, with no
- * `<mask>` or `url(#id)` reference -- which `<base href="/">` breaks in some
- * browsers and which would need a unique id per instance.
+ * ONE COLOUR. `tone="mono"`, and forced colours: the two circle outlines and
+ * the filled lens, in `currentColor` (brand.md).
  *
- * NEVER MIRRORED. The mark is a logo, not a direction: it renders the same in
- * RTL, and nothing here reads `--direction-flip`.
+ * NEVER MIRRORED, ROTATED OR GRADIENT. The mark is a logo, not a direction: it
+ * renders the same in RTL, and nothing here reads `--direction-flip`.
  *
- * Decorative by default (the wordmark beside it carries the name). Pass
- * `label` where the mark stands alone, and it becomes a named image.
+ * Its box is 140 × 120: `--brand-mark-size` sets the width and the height
+ * follows. Decorative by default (the name beside it carries it); pass `label`
+ * where the mark stands alone, and it becomes a named image.
  *
- * The same geometry is in public/nabra-icon.v1.svg (and its .ico) and the
- * index.html loading state; keep the three in step.
+ * The same geometry is in brand-geometry.ts and in the boot state of
+ * index.html; keep them in step. The favicons and app icons follow in 39.8a.
  */
 @Component({
   selector: 'app-brand-mark',
@@ -36,14 +28,20 @@ export const BRAND_MARK_PATHS = {
   template: `
     <svg
       class="brand-mark-svg"
-      viewBox="2 4 23 23"
+      [attr.viewBox]="mark.viewBox"
       focusable="false"
       [attr.role]="label() ? 'img' : null"
       [attr.aria-label]="label() || null"
       [attr.aria-hidden]="label() ? null : 'true'"
     >
-      <path class="voice-ai" [attr.d]="aiPath" />
-      <path class="voice-human" [attr.d]="humanPath" />
+      <circle class="mark-ai" [attr.cx]="mark.ai.cx" [attr.cy]="mark.ai.cy" [attr.r]="mark.ai.r" />
+      <circle
+        class="mark-team"
+        [attr.cx]="mark.team.cx"
+        [attr.cy]="mark.team.cy"
+        [attr.r]="mark.team.r"
+      />
+      <path class="mark-lens" [attr.d]="mark.lens" />
     </svg>
   `,
   styles: `
@@ -51,42 +49,57 @@ export const BRAND_MARK_PATHS = {
       display: inline-flex;
       flex: none;
       inline-size: var(--brand-mark-size, 1.75rem);
-      block-size: var(--brand-mark-size, 1.75rem);
+      block-size: calc(var(--brand-mark-size, 1.75rem) * 6 / 7);
     }
 
     .brand-mark-svg {
       inline-size: 100%;
       block-size: 100%;
+      overflow: visible;
     }
 
-    .voice-ai {
-      fill: var(--voice-ai-fg);
+    .mark-ai {
+      fill: var(--brand-ai);
     }
 
-    .voice-human {
-      fill: var(--voice-human-fg);
+    .mark-team {
+      fill: var(--brand-team);
     }
 
-    :host(.is-mono) path {
+    .mark-lens {
+      fill: var(--brand-lens);
+    }
+
+    /* One colour: the circles as outlines, the lens filled. */
+    :host(.is-mono) circle {
+      fill: none;
+      stroke: currentcolor;
+      stroke-width: 6;
+    }
+
+    :host(.is-mono) .mark-lens {
       fill: currentcolor;
     }
 
-    /* As specific as the voice rules above, or they win and the colours stay. */
     @media (forced-colors: active) {
-      .voice-ai,
-      .voice-human {
+      circle {
+        fill: none;
+        stroke: CanvasText;
+        stroke-width: 6;
+      }
+
+      .mark-lens {
         fill: CanvasText;
       }
     }
   `,
 })
 export class BrandMark {
-  /** `voices` draws Lagoon and Ember; `mono` draws both in the current colour. */
-  readonly tone = input<'voices' | 'mono'>('voices');
+  /** `colour` draws the three tones; `mono` draws it in the current colour. */
+  readonly tone = input<'colour' | 'mono'>('colour');
 
-  /** An accessible name, for the rare place the mark stands without a wordmark. */
+  /** An accessible name, for the rare place the mark stands without its name. */
   readonly label = input('');
 
-  protected readonly aiPath = BRAND_MARK_PATHS.ai;
-  protected readonly humanPath = BRAND_MARK_PATHS.human;
+  protected readonly mark = BRAND_MARK;
 }

@@ -1,0 +1,180 @@
+// The choice-control family: checkbox, radio, switch (shared/choice/choice.ts).
+// Unencapsulated on purpose, because the drawn input is the consumer's own,
+// projected into the label; every selector is scoped to the family's classes,
+// so nothing here reaches an input outside it.
+
+.choice {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  min-block-size: var(--target-min);
+  // The box sits in the middle of the 44px target, and the first line of the
+  // label is centred on the box.
+  padding-block: calc((var(--target-min) - var(--choice-box, var(--choice-size))) / 2);
+  color: var(--color-text);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+
+  &:has(> input:disabled) {
+    cursor: not-allowed;
+  }
+
+  > input {
+    position: relative;
+    display: grid;
+    place-content: center;
+    flex: none;
+    inline-size: var(--choice-size);
+    block-size: var(--choice-size);
+    margin: 0;
+    border: 1.5px solid var(--color-control-border);
+    background-color: var(--color-panel);
+    cursor: inherit;
+    appearance: none;
+    transition:
+      background-color var(--duration-press) var(--ease-calm),
+      border-color var(--duration-press) var(--ease-calm);
+
+    &::before {
+      content: '';
+      transition: transform var(--duration-press) var(--ease-calm);
+    }
+
+    &:checked {
+      border-color: var(--color-primary);
+      background-color: var(--color-primary);
+    }
+
+    &:disabled {
+      opacity: 0.5;
+    }
+  }
+
+  &:hover > input:not(:disabled, :checked) {
+    border-color: var(--color-text-secondary);
+  }
+}
+
+.choice-label {
+  min-inline-size: 0;
+  margin-block-start: calc((var(--choice-box, var(--choice-size)) - 1lh) / 2);
+}
+
+// Checkbox: a 20px box with radius 6 and a drawn tick (a dash when mixed).
+.choice-check > input {
+  border-radius: var(--choice-radius);
+
+  &::before {
+    inline-size: 0.75rem;
+    block-size: 0.75rem;
+    background-color: var(--color-on-primary);
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.4 6.2 5 8.7l4.6-5.4' fill='none' stroke='%23000' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+      center / contain no-repeat;
+    transform: scale(0);
+  }
+
+  &:checked::before {
+    transform: scale(1);
+  }
+
+  &:indeterminate {
+    border-color: var(--color-primary);
+    background-color: var(--color-primary);
+
+    &::before {
+      block-size: 2px;
+      inline-size: 0.625rem;
+      border-radius: 1px;
+      mask: none;
+      transform: scale(1);
+    }
+  }
+}
+
+// Radio: a 20px circle with a dot.
+.choice-radio > input {
+  border-radius: var(--radius-pill);
+
+  &::before {
+    inline-size: 0.5rem;
+    block-size: 0.5rem;
+    border-radius: var(--radius-pill);
+    background-color: var(--color-on-primary);
+    transform: scale(0);
+  }
+
+  &:checked::before {
+    transform: scale(1);
+  }
+}
+
+// Switch: a 40×24 track with an 18px thumb that travels to the end side
+// (mirrored under RTL). Off is the soft fill with the control border, so the
+// track still meets 3:1; on is emerald.
+.choice-switch {
+  --choice-box: var(--switch-block);
+
+  > input {
+    inline-size: var(--switch-inline);
+    block-size: var(--switch-block);
+    border-radius: var(--radius-pill);
+    background-color: var(--color-panel-soft);
+
+    &::before {
+      position: absolute;
+      inset-block-start: calc((var(--switch-block) - 3px - var(--switch-thumb)) / 2);
+      inset-inline-start: 1.5px;
+      inline-size: var(--switch-thumb);
+      block-size: var(--switch-thumb);
+      border-radius: var(--radius-pill);
+      background-color: var(--color-text-secondary);
+      transition:
+        transform var(--duration-press) var(--ease-calm),
+        background-color var(--duration-press) var(--ease-calm);
+    }
+
+    &:checked::before {
+      background-color: var(--color-on-primary);
+      transform: translateX(
+        calc(var(--direction-flip) * (var(--switch-inline) - 3px - var(--switch-thumb) - 3px))
+      );
+    }
+  }
+}
+
+// Windows high contrast: the family draws itself with system colours, so a
+// checked box never depends on a colour the browser replaced.
+@media (forced-colors: active) {
+  .choice > input {
+    forced-color-adjust: none;
+    border-color: ButtonText;
+    background-color: Canvas;
+
+    &::before {
+      background-color: ButtonText;
+    }
+
+    &:checked {
+      border-color: Highlight;
+      background-color: Highlight;
+
+      &::before {
+        background-color: HighlightText;
+      }
+    }
+
+    &:disabled {
+      border-color: GrayText;
+      opacity: 1;
+    }
+  }
+
+  .choice-check > input:indeterminate {
+    border-color: Highlight;
+    background-color: Highlight;
+
+    &::before {
+      background-color: HighlightText;
+    }
+  }
+}

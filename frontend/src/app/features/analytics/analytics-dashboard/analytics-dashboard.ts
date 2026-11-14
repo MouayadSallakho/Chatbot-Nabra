@@ -41,6 +41,7 @@ import { StackedBar } from '@app/shared/charts/stacked-bar';
 import { Icon } from '@app/shared/icon/icon';
 import { ScrollRegion } from '@app/shared/scroll-region/scroll-region';
 import { VoiceSplit } from '@app/shared/voice/voice-split';
+import { Segmented } from '@app/shared/segmented/segmented';
 
 /**
  * The workspace analytics dashboard.
@@ -91,6 +92,7 @@ import { VoiceSplit } from '@app/shared/voice/voice-split';
     AreaChart,
     BarChart,
     StackedBar,
+    Segmented,
   ],
   templateUrl: './analytics-dashboard.html',
   styleUrl: './analytics-dashboard.scss',

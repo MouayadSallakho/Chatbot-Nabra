@@ -55,29 +55,19 @@
     background-color var(--duration-sm) var(--ease-standard);
 
   &:hover {
-    border-color: var(--border-strong);
+    border-color: var(--color-control-border);
   }
 
-  // Selection is neutral, with an ink edge (MASTER rule 4): never a colour.
+  // Selected: the radio's dot and an emerald edge, never the colour alone.
   &:has(input:checked) {
-    border-color: var(--action);
-    box-shadow: inset 0 0 0 1px var(--action);
-    background-color: var(--surface-selected);
-  }
-
-  &:has(input:focus-visible) {
-    outline: var(--focus-ring-width) solid var(--focus-ring);
-    outline-offset: 2px;
+    border-color: var(--color-primary);
+    box-shadow: inset 0 0 0 1px var(--color-primary);
+    background-color: var(--color-selected);
   }
 
   &.is-skeleton {
     flex-direction: column;
     min-block-size: 7rem;
-  }
-
-  input {
-    flex: none;
-    margin-block-start: 2px; // token-lint-ignore: optical alignment with the title's first line
   }
 }
 

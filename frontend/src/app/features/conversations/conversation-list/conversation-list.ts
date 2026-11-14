@@ -32,6 +32,7 @@ import { ConversationSummary, ConversationView, ConversationsApi } from '../conv
 import { CustomerLabel } from '../customer-label';
 import { InboxState } from '../inbox-state';
 import { needsPersonWord, sameDay, senderWord } from '../conversation-words';
+import { Segmented } from '@app/shared/segmented/segmented';
 
 /** Rows per page. One screen of a busy inbox, not the whole history. */
 const PAGE_SIZE = 20;
@@ -85,6 +86,7 @@ interface ConversationRow {
     VoiceChip,
     ChannelBadge,
     CustomerLabel,
+    Segmented,
   ],
   templateUrl: './conversation-list.html',
   styleUrl: './conversation-list.scss',

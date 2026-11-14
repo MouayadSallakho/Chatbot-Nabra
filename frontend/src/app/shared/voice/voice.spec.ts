@@ -62,11 +62,13 @@ describe('VoiceChip', () => {
     return { fixture, chip };
   }
 
-  it('says the voice in a word beside its glyph, never by colour alone', () => {
+  it('says the voice in a word beside its dot, never by colour alone', () => {
     const { chip } = setup();
 
     expect(chip().textContent?.trim()).toBe('AI');
-    expect(chip().querySelector('svg')).not.toBeNull();
+    // The dot is the chip's own ::before; the word is the only text.
+    expect(chip().classList).toContain('chip');
+    expect(chip().classList).toContain('chip-ai');
     expect(chip().classList).toContain('voice-chip-ai');
     expect(chip().dataset['voice']).toBe('ai');
   });
@@ -81,7 +83,9 @@ describe('VoiceChip', () => {
     expect(chip()).toBe(before);
     expect(chip().textContent?.trim()).toBe('Person');
     expect(chip().classList).toContain('voice-chip-human');
+    expect(chip().classList).toContain('chip-team');
     expect(chip().classList).not.toContain('voice-chip-ai');
+    expect(chip().classList).not.toContain('chip-ai');
   });
 
   it('can carry a more specific word, such as a colleague', () => {

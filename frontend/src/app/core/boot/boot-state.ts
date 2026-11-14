@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
-import { BrandMark } from '@app/shared/brand-mark/brand-mark';
+import { BrandLockup } from '@app/shared/brand-mark/brand-lockup';
 
 /**
  * The loading state, continued inside the application.
@@ -19,12 +19,9 @@ import { BrandMark } from '@app/shared/brand-mark/brand-mark';
 @Component({
   selector: 'app-boot-state',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [BrandMark],
+  imports: [BrandLockup],
   template: `
-    <div class="boot-lockup">
-      <app-brand-mark class="boot-mark" />
-      <span class="boot-wordmark" i18n="@@brand.name">Nabra</span>
-    </div>
+    <app-brand-lockup class="boot-lockup" aria-hidden="true" />
     <p class="boot-status" role="status" aria-live="polite" i18n="@@boot.loading">Loading…</p>
   `,
   styles: `
@@ -35,32 +32,17 @@ import { BrandMark } from '@app/shared/brand-mark/brand-mark';
       place-content: center;
       justify-items: center;
       gap: 0.75rem;
-      background-color: var(--surface-page);
+      background-color: var(--color-ground);
       font-family: var(--font-sans);
     }
 
     .boot-lockup {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-    }
-
-    .boot-mark {
-      --brand-mark-size: 36px;
-    }
-
-    .boot-wordmark {
-      color: var(--text-primary);
-      font-size: 1.375rem;
-      font-weight: 600;
-      font-stretch: var(--heading-stretch);
-      letter-spacing: var(--letter-spacing-tight);
-      line-height: 1.4;
+      --lockup-size: 1.375rem;
     }
 
     .boot-status {
       margin: 0;
-      color: var(--text-muted);
+      color: var(--color-text-quiet);
       font-size: 0.875rem;
     }
   `,

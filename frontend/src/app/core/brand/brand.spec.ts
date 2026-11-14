@@ -6,6 +6,7 @@ import { Title } from '@angular/platform-browser';
 import { Router, TitleStrategy, provideRouter } from '@angular/router';
 import { AppTitleStrategy } from '@app/core/title/app-title-strategy';
 import { PRODUCT_NAME } from './brand';
+import { BRAND_MARK, BRAND_NAMES } from '@app/shared/brand-mark/brand-geometry';
 
 @Component({ template: '' })
 class Blank {}
@@ -64,8 +65,13 @@ describe('the product name', () => {
 
     expect(html).toContain('<title>Nabra</title>');
     expect(body).not.toMatch(/omniai/i);
-    expect(body).toMatch(/lang="en"[^>]*>\s*Nabra\s*</);
-    expect(body).toMatch(/lang="ar"[^>]*>\s*نبرة\s*</);
+    // The lockup (39.2b): the two-circle mark and both names as outlined
+    // paths, the same geometry as BrandLockup, so it needs no font.
+    expect(body).toContain(BRAND_MARK.lens);
+    expect(body).toContain(BRAND_NAMES.latin.path);
+    expect(body).toContain(BRAND_NAMES.arabic.path);
+    // On Arabic pages the Arabic name leads.
+    expect(html).toMatch(/html\[lang='ar'\] \.boot-name-latin \{\s*order: 1;/);
   });
 
   it('points the browser at versioned icon files that exist', () => {

@@ -95,8 +95,7 @@
   }
 }
 
-// The shared segmented control, with links (`a.segmented-option` in the
-// primitives): each view is an address.
+// The segmented control (shared/segmented), with links: each view is an address.
 .inbox-views {
   margin-block-end: var(--space-3);
 }

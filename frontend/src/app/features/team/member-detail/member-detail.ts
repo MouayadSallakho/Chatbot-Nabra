@@ -32,6 +32,7 @@ import {
 } from '@app/features/roles/permission-words';
 import { AssignableRole, Member, TeamApi } from '../team-api';
 import { roleList, rolesSelected } from '../team-words';
+import { Check } from '@app/shared/choice/choice';
 
 /** One area of a member's access, for the at-a-glance list. */
 interface AccessArea {
@@ -64,7 +65,7 @@ interface AccessArea {
 @Component({
   selector: 'app-member-detail',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, PageHeader, EmptyState, Icon, ConfirmDialog, LocalDatePipe],
+  imports: [RouterLink, PageHeader, EmptyState, Icon, ConfirmDialog, LocalDatePipe, Check],
   templateUrl: './member-detail.html',
   styleUrl: './member-detail.scss',
 })

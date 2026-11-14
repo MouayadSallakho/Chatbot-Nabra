@@ -40,6 +40,8 @@ import { HasUnsavedChanges, protectUnsavedChanges } from '@app/core/navigation/u
 import { ReportsNav } from '../reports-nav/reports-nav';
 import { LocaleFormat } from '@app/core/i18n/locale-format';
 import { ScrollRegion } from '@app/shared/scroll-region/scroll-region';
+import { Radio } from '@app/shared/choice/choice';
+import { Segmented } from '@app/shared/segmented/segmented';
 
 /**
  * Weekly and monthly reports, generated automatically.
@@ -65,7 +67,16 @@ import { ScrollRegion } from '@app/shared/scroll-region/scroll-region';
 @Component({
   selector: 'app-report-schedules',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, PageHeader, EmptyState, ReportsNav, ScrollRegion, Icon],
+  imports: [
+    ReactiveFormsModule,
+    PageHeader,
+    EmptyState,
+    ReportsNav,
+    ScrollRegion,
+    Icon,
+    Radio,
+    Segmented,
+  ],
   templateUrl: './report-schedules.html',
   styleUrl: './report-schedules.scss',
 })

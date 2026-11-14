@@ -10,97 +10,43 @@
 .categories {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: var(--space-2);
   margin: 0;
   padding: 0;
   border: 0;
 }
 
+// A category: the switch with its name (the family's 44px target, the name
+// part of it), and the sentence under the name, outside the label so it is the
+// switch's description rather than part of its name.
 .category {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: start;
-  gap: var(--space-3);
-}
-
-// A switch drawn from the native checkbox, so keyboard use, the checked state and
-// the accessible role all stay the browser's. Larger than the `.switch` primitive
-// it builds on: that class is also what keeps the global checkbox rule (16px) off.
-.category-switch {
-  appearance: none;
-  position: relative;
-  flex: none;
-  inline-size: 40px;
-  // 24px: the smallest target allowed (WCAG 2.2, 2.5.8).
-  block-size: 24px;
-  // Optical alignment of the switch with the label's first line.
-  margin: var(--gap-hairline) 0 0;
-  border: 1px solid var(--border-control);
-  border-radius: var(--radius-pill);
-  background: var(--surface-inset);
-  cursor: pointer;
-  transition: background-color var(--motion-fast) var(--ease-standard);
-
-  &::after {
-    content: '';
-    position: absolute;
-    inset-block-start: 3px;
-    inset-inline-start: 2px;
-    inline-size: 16px;
-    block-size: 16px;
-    border-radius: var(--radius-pill);
-    background: var(--text-secondary);
-    transition: transform var(--motion-fast) var(--ease-standard);
-  }
-
-  &:checked {
-    border-color: var(--action);
-    background: var(--action);
-
-    &::after {
-      background: var(--on-action);
-      transform: translateX(calc(18px * var(--direction-flip, 1)));
-    }
-  }
-
-  &:focus-visible {
-    outline: var(--focus-ring-width) solid var(--focus-ring);
-    outline-offset: var(--focus-ring-offset);
-  }
-
-  // A finger gets a 44px target without the switch having to look any bigger.
-  @media (pointer: coarse) {
-    &::before {
-      content: '';
-      position: absolute;
-      inset: -10px 0;
-    }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    transition: none;
-
-    &::after {
-      transition: none;
-    }
-  }
+  display: flex;
+  flex-direction: column;
 }
 
 .category-label {
   font: var(--text-body-strong);
-  color: var(--text-primary);
-  cursor: pointer;
+  color: var(--color-text);
+}
+
+.category-text,
+.category-description {
+  margin-inline-start: calc(var(--switch-inline) + var(--space-3));
 }
 
 .category-description {
-  margin: var(--space-1) 0 0;
+  margin-block: 0;
   font: var(--text-small);
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
+}
+
+.category-text .category-description {
+  margin-inline-start: 0;
 }
 
 .category + .category {
-  padding-block-start: var(--space-4);
-  border-block-start: 1px solid var(--border-subtle);
+  padding-block-start: var(--space-2);
+  border-block-start: 1px solid var(--color-line);
 }
 
 .browser-section {
@@ -119,8 +65,8 @@
 }
 
 .browser-alerts {
-  padding-block-start: var(--space-4);
-  border-block-start: 1px solid var(--border-subtle);
+  padding-block-start: var(--space-2);
+  border-block-start: 1px solid var(--color-line);
 }
 
 .volume {
@@ -134,7 +80,7 @@
   inline-size: 100%;
   // A comfortable target, on touch as well; the browser draws the track inside it.
   min-block-size: 44px;
-  accent-color: var(--action);
+  accent-color: var(--color-primary);
 }
 
 .volume-value {

@@ -16,6 +16,15 @@ import { ToastHost } from '@app/core/feedback/toast-host';
 import { ToastService } from '@app/core/feedback/toast-service';
 import type { MessageSender } from '@app/features/conversations/conversations-api';
 import { BrandMark } from '@app/shared/brand-mark/brand-mark';
+import { BrandLockup } from '@app/shared/brand-mark/brand-lockup';
+import { Avatar } from '@app/shared/avatar/avatar';
+import { Check, Radio, Switch } from '@app/shared/choice/choice';
+import { Chip } from '@app/shared/chip/chip';
+import { EventLine } from '@app/shared/event-line/event-line';
+import { countBlurredLayers } from '@app/shared/glass/glass-budget';
+import { Orb } from '@app/shared/orb/orb';
+import { Segmented } from '@app/shared/segmented/segmented';
+import { Tooltip } from '@app/shared/tooltip/tooltip';
 import { EmptyState } from '@app/shared/empty-state/empty-state';
 import { Icon } from '@app/shared/icon/icon';
 import { ICON_PATHS, IconName } from '@app/shared/icon/icon-paths';
@@ -380,7 +389,9 @@ const SAMPLE_ROWS: readonly SampleRow[] = SAMPLE_TRANSCRIPT.map((message, index)
 });
 
 /**
- * The Design Lab: the whole "Two Voices" system on one page, for review.
+ * The Design Lab: the whole "Calm Glass" system on one page, for review: the
+ * tokens, the glass, the brand, and every component screens are built from
+ * (Phase 39.2b), in both languages and themes, with "Reduce transparency".
  *
  * DEVELOPMENT ONLY. The route is registered only in development builds (see
  * app.routes.ts), and the production build does not contain this chunk at all.
@@ -396,6 +407,16 @@ const SAMPLE_ROWS: readonly SampleRow[] = SAMPLE_TRANSCRIPT.map((message, index)
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     BrandMark,
+    BrandLockup,
+    Avatar,
+    Check,
+    Radio,
+    Switch,
+    Segmented,
+    Chip,
+    EventLine,
+    Orb,
+    Tooltip,
     ConfirmDialog,
     EmptyState,
     Icon,
@@ -615,6 +636,12 @@ export class DesignLab {
 
   protected readonly switchOn = signal(true);
 
+  /** Whether the sample popover is open. */
+  protected readonly popoverOpen = signal(false);
+
+  /** Blurred layers on screen when last counted; null until asked. */
+  protected readonly blurredLayers = signal<number | null>(null);
+
   /** The live, resolved value of every token on the page, by name. */
   protected readonly values = signal<Readonly<Record<string, string>>>({});
 
@@ -639,6 +666,10 @@ export class DesignLab {
         );
       },
     });
+  }
+
+  protected countLayers(): void {
+    this.blurredLayers.set(countBlurredLayers(this.document));
   }
 
   protected selectTheme(preference: ThemePreference): void {

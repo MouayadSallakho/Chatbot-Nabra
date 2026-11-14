@@ -1,5 +1,5 @@
 // The Design Lab's own layout. Development only; everything visual it shows
-// comes from the global primitives and tokens, never from rules here.
+// comes from the global primitives, the shared components and the tokens.
 .lab {
   min-block-size: 100vh;
 }
@@ -10,37 +10,40 @@
   padding-block: var(--space-7) var(--space-10);
 }
 
-.lab-header {
+.lab-header,
+.lab-title,
+.lab-toggles,
+.lab-row,
+.lab-nav {
   display: flex;
   flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.lab-header {
   align-items: flex-start;
   justify-content: space-between;
-  gap: var(--space-4);
 }
 
 .lab-title {
-  display: flex;
-  gap: var(--space-3);
+  flex-wrap: nowrap;
   max-inline-size: 44rem;
 
   app-brand-mark {
-    --brand-mark-size: 2.25rem;
+    --brand-mark-size: 2.5rem;
     margin-block-start: var(--space-1);
   }
 }
 
-.lab-toggles {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
+.lab-toggles,
+.lab-row {
+  align-items: center;
 }
 
 .lab-nav {
-  display: flex;
-  flex-wrap: wrap;
   gap: var(--space-2) var(--space-4);
   padding-block-end: var(--space-4);
-  border-block-end: 1px solid var(--border-default);
+  border-block-end: 1px solid var(--color-line);
   font: var(--text-small);
 }
 
@@ -49,125 +52,96 @@
   gap: var(--space-4);
   scroll-margin-block-start: var(--space-4);
 
-  // The grid gap is the rhythm here; the page-flow margins of the global
-  // layer (a title's following sibling, a section note) would double it.
   > * {
     margin-block: 0;
   }
 
-  // An inline control is its own width, not the grid column's.
-  > .segmented {
+  > .segmented,
+  > .lab-sample-flag {
     justify-self: start;
   }
-}
-
-.lab-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-3);
 }
 
 .lab-stack {
   display: grid;
   align-content: start;
-  gap: var(--space-3);
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  border: 0;
 }
 
-.lab-columns {
+.lab-columns,
+.swatches,
+.form-grid,
+.icon-sheet {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
-  gap: var(--space-5);
-  align-items: start;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 16rem), 1fr));
+  gap: var(--space-4);
+}
+
+.swatches,
+.icon-sheet {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 9rem), 1fr));
 }
 
 code {
   font: 400 0.75rem / 1.4 var(--font-mono);
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
 }
 
-.swatches {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 12rem), 1fr));
-  gap: var(--space-3);
-}
-
-// A label tight on its value: the colour swatches and the radius samples.
-.swatch,
-.radius-row li {
+.swatch {
   display: grid;
   gap: var(--gap-hairline);
 }
 
-.swatch-chip {
+.swatch-chip,
+.radius-box {
   block-size: 2.75rem;
-  margin-block-end: var(--space-1);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-control);
-}
-
-.swatch-value {
-  color: var(--text-muted);
-}
-
-.type-table {
-  display: grid;
-  gap: var(--space-4);
-}
-
-.type-row {
-  display: grid;
-  grid-template-columns: 7rem minmax(0, 1fr) minmax(0, 1fr);
-  gap: var(--space-4);
-  align-items: baseline;
-  padding-block-end: var(--space-4);
-  border-block-end: 1px solid var(--border-subtle);
-
-  @media (max-width: 767.98px) {
-    grid-template-columns: minmax(0, 1fr);
-    gap: var(--space-2);
-  }
-}
-
-.type-role {
-  color: var(--text-muted);
-}
-
-.radius-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-5);
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-input);
 }
 
 .radius-box {
   inline-size: 4.5rem;
-  block-size: 3rem;
-  margin-block-end: var(--space-1);
-  border: 1px solid var(--border-strong);
-  background-color: var(--surface-default);
+  background-color: var(--color-panel);
 }
 
-.space-list {
-  display: grid;
-  gap: var(--space-2);
+.swatch-value {
+  color: var(--color-text-quiet);
+}
 
-  li {
-    display: grid;
-    grid-template-columns: 9rem auto 1fr;
-    gap: var(--space-3);
-    align-items: center;
+.type-table,
+.space-list,
+.lab-transcript {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.type-row {
+  display: grid;
+  grid-template-columns: 7rem repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+  align-items: baseline;
+  padding-block-end: var(--space-3);
+  border-block-end: 1px solid var(--color-line);
+
+  @media (max-width: 767.98px) {
+    grid-template-columns: minmax(0, 1fr);
   }
+}
+
+.space-list li {
+  display: grid;
+  grid-template-columns: 9rem auto 1fr;
+  gap: var(--space-3);
+  align-items: center;
 }
 
 .space-bar {
   block-size: 0.75rem;
-  border-radius: 2px;
+  border-radius: var(--radius-badge);
   background-color: var(--chart-neutral);
-}
-
-.depth-sample {
-  max-inline-size: 18rem;
-  padding: var(--space-4);
 }
 
 // The glass sample floats over the two glows, as the shell will (39.3).
@@ -177,31 +151,27 @@ code {
   background:
     radial-gradient(at 20% 20%, var(--glow-a), transparent 60%),
     radial-gradient(at 80% 80%, var(--glow-b), transparent 60%);
-
-  > * {
-    border-radius: var(--radius-dialog);
-  }
 }
 
-.icon-sheet {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(7.5rem, 1fr));
-  gap: var(--space-2);
-
-  li {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    color: var(--text-primary);
-  }
+.lab-glass,
+.lab-popover {
+  max-inline-size: 20rem;
+  padding: var(--space-4);
+  border-radius: var(--radius-dialog);
 }
 
-.mark-on-ink {
+.mark-on-primary {
   display: inline-flex;
   padding: var(--space-2);
-  border-radius: var(--radius-control);
-  background-color: var(--action);
-  color: var(--on-action);
+  border-radius: var(--radius-input);
+  background-color: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+.lockup-row {
+  --lockup-size: 1.5rem;
+
+  gap: var(--space-9);
 }
 
 .state-grid {
@@ -215,64 +185,54 @@ code {
   }
 }
 
-.state-label {
-  color: var(--text-muted);
-}
-
-.form-grid {
+.lab-choice-text {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
-  gap: var(--space-4);
 }
 
-.lab-check {
-  display: inline-flex;
-  align-items: center;
+.lab-rows {
+  display: grid;
+  gap: var(--space-1);
+  max-inline-size: 24rem;
+  padding: var(--space-2);
+}
+
+.lab-transcript {
+  max-inline-size: 44rem;
+  padding: var(--space-5);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-panel);
+  background-color: var(--color-panel);
+}
+
+.lab-message {
+  display: flex;
+  align-items: flex-end;
   gap: var(--space-2);
-  min-block-size: 1.5rem;
-  font: var(--text-body);
+
+  &.is-end {
+    justify-content: flex-end;
+  }
 }
 
-.lab-data-list {
-  --data-list-columns: minmax(0, 3fr) minmax(0, 1.25fr) 6rem;
+.lab-popover-anchor {
+  position: relative;
+
+  .lab-popover {
+    position: absolute;
+    inset-block-start: calc(100% + var(--space-2));
+    inset-inline-start: 0;
+    z-index: var(--z-dropdown);
+    inline-size: 16rem;
+  }
 }
 
 .lab-skeleton {
   display: grid;
-  gap: var(--space-3);
-  padding: var(--space-5);
+  gap: var(--space-2);
 }
 
-.lab-sample-flag {
-  justify-self: start;
-}
-
-.lab-transcript {
+.icon-sheet li {
   display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  max-inline-size: 44rem;
-  padding: var(--space-5);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-card);
-  background-color: var(--surface-muted);
-}
-
-// The two lockups: the wordmark beside the mark, as the sidebar and sign-in
-// set it; the title utilities give each script its own width and tracking.
-// Far apart, so the two names never read as one phrase.
-.lockup-row {
-  gap: var(--space-10);
-  margin-block-start: var(--space-4);
-}
-
-.lockup {
-  display: inline-flex;
   align-items: center;
-  gap: var(--space-3);
-}
-
-.lockup-name {
-  font: var(--text-title-2);
-  letter-spacing: var(--letter-spacing-tight);
+  gap: var(--space-2);
 }

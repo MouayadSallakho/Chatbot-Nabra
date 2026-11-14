@@ -42,19 +42,13 @@
   letter-spacing: var(--letter-spacing-tight);
 }
 
-// Touch: the two languages are 44px targets, like every control there.
-@media (pointer: coarse) {
-  .entry-language .segmented-option {
-    min-block-size: 2.75rem;
-  }
-}
-
 // On a page that is not Arabic, its one Arabic word ("العربية") is drawn with
 // the system's Arabic font through the metric-matched local fallback, so an
 // English entry page downloads no Arabic font file (45 kB for one word, Phase
 // 36.12). Arabic pages keep IBM Plex Sans Arabic.
 :host-context(html:not([lang='ar'])) .entry-language .segmented-option:lang(ar) {
-  font-family: 'IBM Plex Sans Arabic Fallback', system-ui, sans-serif;
+  font-family:
+    'IBM Plex Sans Arabic Fallback', system-ui, sans-serif; // token-lint-ignore: a local fallback, so an English page fetches no Arabic file
 }
 
 .entry-main {
@@ -114,45 +108,66 @@
   }
 }
 
-// The signature. The Lagoon shape is in place from the first frame; the Ember
-// shape settles into the room it keeps for it. Translate only: both shapes are
-// fully drawn at every moment. The mark is a logo, so it never mirrors.
+// The signature (brand.md): the AI's circle is in place from the first frame;
+// the team's circle travels in to meet it, and only then does the lens, the
+// one tone where they overlap, appear. Translate and opacity only. The mark is
+// a logo, so it never mirrors, and neither does its travel.
 .entry-story-mark {
-  inline-size: 3rem;
+  inline-size: 3.5rem;
   block-size: 3rem;
   margin-block-end: var(--space-3);
   overflow: visible;
 }
 
 .mark-ai {
-  fill: var(--voice-ai-fg);
+  fill: var(--brand-ai);
 }
 
-.mark-human {
-  fill: var(--voice-human-fg);
-  transform-box: fill-box;
+.mark-team {
+  fill: var(--brand-team);
 }
 
-.is-settling .mark-human {
-  animation: entry-settle calc(var(--duration-xl) + var(--duration-sm)) var(--ease-emphasized)
-    var(--duration-sm) both;
+.mark-lens {
+  fill: var(--brand-lens);
+}
+
+.is-settling .mark-team {
+  animation: entry-settle calc(var(--duration-dialog) + var(--duration-press)) var(--ease-calm)
+    var(--duration-press) both;
+}
+
+.is-settling .mark-lens {
+  animation: entry-lens var(--duration-menu) var(--ease-calm)
+    calc(var(--duration-dialog) + 2 * var(--duration-press)) both;
 }
 
 // motion-audit-ignore: rtl-direction (the mark is a logo and is never mirrored, so neither is its travel)
 @keyframes entry-settle {
   from {
-    transform: translate(26%, 18%);
+    transform: translateX(28px);
+  }
+}
+
+@keyframes entry-lens {
+  from {
+    opacity: 0;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .is-settling .mark-human {
+  .is-settling :is(.mark-team, .mark-lens) {
     animation: none;
   }
 }
 
 @media (forced-colors: active) {
-  .entry-story-mark path {
+  .entry-story-mark circle {
+    fill: none;
+    stroke: CanvasText;
+    stroke-width: 6;
+  }
+
+  .entry-story-mark .mark-lens {
     fill: CanvasText;
   }
 }

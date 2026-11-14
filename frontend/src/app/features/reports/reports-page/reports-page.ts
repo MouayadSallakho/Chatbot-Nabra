@@ -54,6 +54,8 @@ import { Icon } from '@app/shared/icon/icon';
 import { ReportsNav } from '../reports-nav/reports-nav';
 import { LocaleFormat } from '@app/core/i18n/locale-format';
 import { ScrollRegion } from '@app/shared/scroll-region/scroll-region';
+import { Radio } from '@app/shared/choice/choice';
+import { Segmented } from '@app/shared/segmented/segmented';
 
 /**
  * Generate a report, and download the ones already generated.
@@ -90,6 +92,8 @@ import { ScrollRegion } from '@app/shared/scroll-region/scroll-region';
     ScrollRegion,
     Pagination,
     Icon,
+    Radio,
+    Segmented,
   ],
   templateUrl: './reports-page.html',
   styleUrl: './reports-page.scss',

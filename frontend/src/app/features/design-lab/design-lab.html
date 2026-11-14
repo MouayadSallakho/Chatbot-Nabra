@@ -5,16 +5,16 @@
         <app-brand-mark />
         <div>
           <h1 class="text-page-title" i18n="@@lab.title">Design Lab</h1>
-          <p class="text-small text-secondary" i18n="@@lab.intro.calmGlass">
-            "Calm Glass": the tokens, type, glass and motion on one page; the components below take
-            the new colours through the tokens and are redrawn in the next step. Development builds
-            only. Every name, number and message here is sample content, written for this page.
+          <p class="text-small text-secondary" i18n="@@lab.intro.components">
+            "Calm Glass": the tokens and every component screens are built from, on one page.
+            Development builds only. Every name, number and message here is sample content, written
+            for this page.
           </p>
         </div>
       </div>
 
       <div class="lab-toggles">
-        <fieldset class="segmented" data-testid="lab-theme">
+        <fieldset app-segmented data-testid="lab-theme">
           <legend class="visually-hidden" i18n="@@lab.theme">Theme</legend>
           @for (option of themes; track option) {
             <label class="segmented-option">
@@ -29,7 +29,7 @@
           }
         </fieldset>
 
-        <fieldset class="segmented" data-testid="lab-direction">
+        <fieldset app-segmented data-testid="lab-direction">
           <legend class="visually-hidden" i18n="@@lab.direction">Reading direction</legend>
           <label class="segmented-option">
             <input
@@ -50,6 +50,17 @@
             <span i18n="@@lab.direction.rtl">Right to left</span>
           </label>
         </fieldset>
+
+        <label app-switch class="lab-transparency">
+          <input
+            type="checkbox"
+            role="switch"
+            data-testid="lab-reduce-transparency"
+            [checked]="transparency.reduced()"
+            (change)="transparency.setReduced(!transparency.reduced())"
+          />
+          <span i18n="@@account.reduceTransparency">Reduce transparency</span>
+        </label>
       </div>
     </header>
 
@@ -57,14 +68,17 @@
       <a href="#lab-colour" i18n="@@lab.colour">Colour</a>
       <a href="#lab-type" i18n="@@lab.type">Type</a>
       <a href="#lab-shape" i18n="@@lab.shape.short">Shape and motion</a>
-      <a href="#lab-icons" i18n="@@lab.icons">Icons</a>
+      <a href="#lab-glass" i18n="@@lab.shape.glass">Glass</a>
       <a href="#lab-mark" i18n="@@lab.mark.short">Mark</a>
       <a href="#lab-buttons" i18n="@@lab.buttons">Buttons</a>
+      <a href="#lab-choices" i18n="@@lab.choices.short">Choices</a>
       <a href="#lab-forms" i18n="@@lab.forms.short">Forms</a>
-      <a href="#lab-content" i18n="@@lab.content">Content</a>
-      <a href="#lab-feedback" i18n="@@lab.feedback.short">Feedback</a>
-      <a href="#lab-voices" i18n="@@lab.voices.short">Voices</a>
+      <a href="#lab-chips" i18n="@@lab.colour.chips">Chips</a>
+      <a href="#lab-rows" i18n="@@lab.rows.short">Rows</a>
       <a href="#lab-transcript" i18n="@@lab.transcript.short">Transcript</a>
+      <a href="#lab-overlays" i18n="@@lab.overlays.short">Overlays</a>
+      <a href="#lab-states" i18n="@@lab.states.short">States</a>
+      <a href="#lab-icons" i18n="@@lab.icons">Icons</a>
       <a href="#lab-charts" i18n="@@lab.charts.short">Charts</a>
       <a href="#lab-admin" i18n="@@lab.admin.short">Plan and billing</a>
     </nav>
@@ -83,26 +97,12 @@
           @for (token of group.tokens; track token) {
             <li class="swatch">
               <span class="swatch-chip" [style.background]="'var(' + token + ')'"></span>
-              <code dir="ltr" class="swatch-name">{{ token }}</code>
+              <code dir="ltr">{{ token }}</code>
               <code dir="ltr" class="swatch-value">{{ values()[token] }}</code>
             </li>
           }
         </ul>
       }
-
-      <h3 class="text-card-title" i18n="@@lab.colour.sideBySide">Voice and status, side by side</h3>
-      <p class="section-note" i18n="@@lab.colour.sideBySide.note.calmGlass">
-        Status words reuse the three hues, each with its own glyph and word, so none depends on its
-        hue. In the inbox and the transcript only the voice chips appear.
-      </p>
-      <div class="lab-row">
-        <app-voice-chip voice="ai" />
-        <app-voice-chip voice="human" />
-        <span class="badge badge-warning" i18n="@@lab.badge.needsAttention">Needs attention</span>
-        <span class="badge badge-danger" i18n="@@lab.badge.failed">Failed</span>
-        <span class="badge badge-success" i18n="@@lab.badge.connected">Connected</span>
-        <span class="badge badge-info" i18n="@@lab.badge.indexing">Indexing</span>
-      </div>
     </section>
 
     <!-- Type ------------------------------------------------------------- -->
@@ -116,7 +116,7 @@
       <div class="type-table">
         @for (row of typeRoles; track row.role) {
           <div class="type-row">
-            <span class="type-role text-caption">{{ row.role }}</span>
+            <span class="text-caption">{{ row.role }}</span>
             <p [class]="row.className" lang="en" dir="ltr">{{ row.latin }}</p>
             <p [class]="row.className" lang="ar" dir="rtl">{{ row.arabic }}</p>
           </div>
@@ -124,16 +124,16 @@
       </div>
     </section>
 
-    <!-- Shape, spacing, elevation, motion -------------------------------- -->
+    <!-- Shape, spacing, motion ------------------------------------------- -->
     <section class="lab-section" id="lab-shape" aria-labelledby="lab-shape-title">
       <h2 id="lab-shape-title" class="text-section-title" i18n="@@lab.shape">
         Shape, space, depth and motion
       </h2>
 
       <h3 class="text-card-title" i18n="@@lab.shape.radius">Radius by role</h3>
-      <ul class="radius-row">
+      <ul class="lab-row">
         @for (token of radiusTokens; track token) {
-          <li>
+          <li class="swatch">
             <span class="radius-box" [style.border-radius]="'var(' + token + ')'"></span>
             <code dir="ltr">{{ token }}</code>
             <code dir="ltr" class="swatch-value">{{ values()[token] }}</code>
@@ -152,31 +152,13 @@
         }
       </ul>
 
-      <h3 class="text-card-title" i18n="@@lab.shape.elevation">Elevation</h3>
-      <div class="lab-row">
-        <div class="card depth-sample">
-          <p class="text-small" i18n="@@lab.shape.panel">A panel: solid, a 1px line, no shadow.</p>
+      <h3 class="text-card-title" i18n="@@lab.shape.surfaces">Panels and tiles</h3>
+      <div class="panel-surface lab-row">
+        <p class="text-small" i18n="@@lab.shape.panel">A panel: solid, a 1px line, no shadow.</p>
+        <div class="tile-surface">
+          <p class="text-small" i18n="@@lab.shape.tile">A tile inside it: the soft fill.</p>
         </div>
       </div>
-
-      <h3 class="text-card-title" i18n="@@lab.shape.glass">Glass</h3>
-      <div class="glass-stage">
-        <div class="glass depth-sample" data-testid="glass-sample">
-          <p class="text-small" i18n="@@lab.shape.glassSample">
-            Glass: only where things float, and the only surface that casts a shadow. With "Reduce
-            transparency" it becomes its solid twin.
-          </p>
-        </div>
-      </div>
-      <button
-        type="button"
-        class="btn btn-secondary btn-sm"
-        data-testid="lab-reduce-transparency"
-        [attr.aria-pressed]="transparency.reduced()"
-        (click)="transparency.setReduced(!transparency.reduced())"
-      >
-        <span i18n="@@account.reduceTransparency">Reduce transparency</span>
-      </button>
 
       <h3 class="text-card-title" i18n="@@lab.shape.motion">Motion</h3>
       <ul class="space-list">
@@ -189,62 +171,69 @@
       </ul>
     </section>
 
-    <!-- Icons ------------------------------------------------------------ -->
-    <section class="lab-section" id="lab-icons" aria-labelledby="lab-icons-title">
-      <h2 id="lab-icons-title" class="text-section-title" i18n="@@lab.icons">Icons</h2>
-      <p class="section-note" i18n="@@lab.icons.note">
-        One authored 24px outline set, 1.6 stroke with round joins. Channel glyphs are generic and
-        always shown with the channel's name; no brand logo is recoloured. Arrows and chevrons turn
-        round in a right-to-left page.
+    <!-- Glass ------------------------------------------------------------ -->
+    <section class="lab-section" id="lab-glass" aria-labelledby="lab-glass-title">
+      <h2 id="lab-glass-title" class="text-section-title" i18n="@@lab.shape.glass">Glass</h2>
+      <p class="section-note" i18n="@@lab.glass.note">
+        Glass only where things float: menus, popovers, tooltips, dialogs, toasts and, from the next
+        step, the side bar. At most three blurred layers on screen, and never on a list that
+        scrolls. With "Reduce transparency" each one becomes its solid twin.
       </p>
-      <ul class="icon-sheet">
-        @for (name of iconNames; track name) {
-          <li>
-            <app-icon [name]="name" />
-            <code dir="ltr">{{ name }}</code>
-          </li>
+      <div class="glass-stage">
+        <div class="glass lab-glass" data-testid="glass-sample">
+          <p class="text-small" i18n="@@lab.shape.glassSample">
+            Glass: only where things float, and the only surface that casts a shadow. With "Reduce
+            transparency" it becomes its solid twin.
+          </p>
+        </div>
+      </div>
+      <div class="lab-row">
+        <button type="button" class="btn btn-secondary btn-sm" (click)="countLayers()">
+          <span i18n="@@lab.glass.count">Count the blurred layers</span>
+        </button>
+        @if (blurredLayers() !== null) {
+          <p class="text-small" role="status" data-testid="lab-glass-count">
+            <span i18n="@@lab.glass.result"
+              >Blurred layers on screen now: {{ blurredLayers() }} (the budget is 3).</span
+            >
+          </p>
         }
-      </ul>
+      </div>
     </section>
 
     <!-- Mark ------------------------------------------------------------- -->
     <section class="lab-section" id="lab-mark" aria-labelledby="lab-mark-title">
       <h2 id="lab-mark-title" class="text-section-title" i18n="@@lab.mark">The mark</h2>
-      <p class="section-note" i18n="@@lab.mark.note">
-        Two speech shapes, two voices in one tone: the AI and the team. Never mirrored.
+      <p class="section-note" i18n="@@lab.mark.note.circles">
+        Two circles, the AI and the team, and the one tone where they meet. Never mirrored, rotated
+        or given a gradient. One colour: the outlines and the filled overlap.
       </p>
-      <div class="lab-row mark-row">
+      <div class="lab-row">
         <app-brand-mark style="--brand-mark-size: 16px" />
-        <app-brand-mark style="--brand-mark-size: 28px" />
-        <app-brand-mark style="--brand-mark-size: 48px" />
-        <app-brand-mark tone="mono" style="--brand-mark-size: 48px" />
-        <span class="mark-on-ink"
-          ><app-brand-mark tone="mono" style="--brand-mark-size: 28px"
+        <app-brand-mark style="--brand-mark-size: 32px" />
+        <app-brand-mark style="--brand-mark-size: 64px" />
+        <app-brand-mark tone="mono" style="--brand-mark-size: 64px" />
+        <span class="mark-on-primary"
+          ><app-brand-mark tone="mono" style="--brand-mark-size: 32px"
         /></span>
       </div>
       <!--
-        The lockup in both of its forms, whatever the page's language: each name
-        is written in its own language and direction, never translated here.
+        The lockup with each name leading, whatever the page's language. The
+        names are outlined paths: no font is downloaded for them.
       -->
       <div class="lab-row lockup-row" data-testid="lab-lockups">
-        <span class="lockup" lang="en" dir="ltr"
-          ><app-brand-mark style="--brand-mark-size: 28px" /><span class="lockup-name"
-            >Nabra</span
-          ></span
-        >
-        <span class="lockup" lang="ar" dir="rtl"
-          ><app-brand-mark style="--brand-mark-size: 28px" /><span class="lockup-name"
-            >نبرة</span
-          ></span
-        >
+        <app-brand-lockup lead="en" />
+        <app-brand-lockup lead="ar" />
+        <app-brand-lockup tone="mono" />
       </div>
     </section>
 
     <!-- Buttons ---------------------------------------------------------- -->
     <section class="lab-section" id="lab-buttons" aria-labelledby="lab-buttons-title">
       <h2 id="lab-buttons-title" class="text-section-title" i18n="@@lab.buttons">Buttons</h2>
-      <p class="section-note" i18n="@@lab.buttons.note">
-        Hover, press and focus are live: point at them, or press Tab.
+      <p class="section-note" i18n="@@lab.buttons.note.calmGlass">
+        Pills, 44px tall (40px in dense headers), weight 600. One primary per area. Hover, press and
+        focus are live: point at them, or press Tab.
       </p>
 
       <div
@@ -254,19 +243,16 @@
         i18n-aria-label="@@lab.buttons.group"
       >
         @for (
-          variant of ['primary', 'secondary', 'ghost', 'danger', 'danger-ghost'];
+          variant of ['primary', 'secondary', 'quiet', 'danger', 'danger-ghost'];
           track variant
         ) {
-          <code class="state-label text-caption" dir="ltr">{{ variant }}</code>
+          <code dir="ltr">{{ variant }}</code>
           <div class="lab-row">
-            <button type="button" [class]="'btn btn-sm btn-' + variant" i18n="@@lab.buttons.small">
-              Small
-            </button>
             <button type="button" [class]="'btn btn-' + variant" i18n="@@lab.buttons.default">
               Default
             </button>
-            <button type="button" [class]="'btn btn-lg btn-' + variant" i18n="@@lab.buttons.large">
-              Large
+            <button type="button" [class]="'btn btn-sm btn-' + variant" i18n="@@lab.buttons.dense">
+              Dense
             </button>
             <button type="button" [class]="'btn btn-' + variant">
               <app-icon name="plus" />
@@ -282,22 +268,23 @@
             </button>
             <button type="button" [class]="'btn btn-loading btn-' + variant" aria-busy="true">
               <span class="spinner" aria-hidden="true"></span>
-              <span i18n="@@lab.buttons.saving">Saving</span>
+              <span class="visually-hidden" i18n="@@lab.buttons.saving">Saving</span>
+              <span aria-hidden="true" i18n="@@lab.buttons.saving">Saving</span>
             </button>
           </div>
         }
-        <code class="state-label text-caption" dir="ltr">link</code>
+        <code dir="ltr">link</code>
         <div class="lab-row">
           <button type="button" class="btn-link" i18n="@@lab.buttons.linkButton">
             Link button
           </button>
           <a href="#lab-buttons" i18n="@@lab.buttons.linkInProse">A link in prose</a>
         </div>
-        <code class="state-label text-caption" dir="ltr">icon</code>
+        <code dir="ltr">icon</code>
         <div class="lab-row">
           <button
             type="button"
-            class="btn btn-ghost btn-icon btn-sm"
+            class="btn btn-quiet btn-icon btn-sm"
             aria-label="Sample: more"
             i18n-aria-label="@@lab.buttons.more"
           >
@@ -323,9 +310,122 @@
       </div>
     </section>
 
-    <!-- Forms ------------------------------------------------------------ -->
+    <!-- Choice controls -------------------------------------------------- -->
+    <section class="lab-section" id="lab-choices" aria-labelledby="lab-choices-title">
+      <h2 id="lab-choices-title" class="text-section-title" i18n="@@lab.choices">
+        Choice controls
+      </h2>
+      <p class="section-note" i18n="@@lab.choices.note">
+        One family: a visible 20px box or a 40×24 track inside a 44px target, and the label is part
+        of the target. Each wraps the native control, so keyboard and screen readers behave as they
+        always do.
+      </p>
+
+      <div class="lab-columns">
+        <fieldset class="lab-stack" data-testid="lab-checks">
+          <legend class="text-card-title" i18n="@@lab.choices.checkboxes">Checkboxes</legend>
+          <label app-check
+            ><input type="checkbox" checked />
+            <span i18n="@@lab.forms.checked">Checked</span></label
+          >
+          <label app-check
+            ><input type="checkbox" /> <span i18n="@@lab.forms.unchecked">Unchecked</span></label
+          >
+          <label app-check
+            ><input type="checkbox" [indeterminate]="true" />
+            <span i18n="@@lab.choices.mixed">Some of them</span></label
+          >
+          <label app-check
+            ><input type="checkbox" disabled />
+            <span i18n="@@lab.forms.disabled">Disabled</span></label
+          >
+          <label app-check class="lab-choice-long"
+            ><input type="checkbox" checked />
+            <span class="lab-choice-text">
+              <span class="text-body-strong" i18n="@@lab.choices.longLabel"
+                >Read conversations</span
+              >
+              <span class="text-small text-secondary" i18n="@@lab.choices.longHint"
+                >Open the inbox and read every message, without replying.</span
+              >
+            </span></label
+          >
+        </fieldset>
+
+        <fieldset class="lab-stack" data-testid="lab-radios">
+          <legend class="text-card-title" i18n="@@lab.choices.radios">Radios</legend>
+          <label app-radio
+            ><input type="radio" name="lab-frequency" checked />
+            <span i18n="@@schedules.frequency.weekly">Weekly</span></label
+          >
+          <label app-radio
+            ><input type="radio" name="lab-frequency" />
+            <span i18n="@@schedules.frequency.monthly">Monthly</span></label
+          >
+          <label app-radio
+            ><input type="radio" name="lab-frequency" disabled />
+            <span i18n="@@lab.forms.disabled">Disabled</span></label
+          >
+        </fieldset>
+
+        <fieldset class="lab-stack" data-testid="lab-switches">
+          <legend class="text-card-title" i18n="@@lab.choices.switches">Switches</legend>
+          <label app-switch
+            ><input
+              type="checkbox"
+              role="switch"
+              [checked]="switchOn()"
+              (change)="switchOn.set(!switchOn())"
+            />
+            <span i18n="@@lab.forms.emailDaily">Email me daily</span></label
+          >
+          <label app-switch
+            ><input type="checkbox" role="switch" />
+            <span i18n="@@lab.choices.off">Off</span></label
+          >
+          <label app-switch
+            ><input type="checkbox" role="switch" disabled />
+            <span i18n="@@lab.forms.disabledSwitch">Disabled switch</span></label
+          >
+        </fieldset>
+      </div>
+
+      <h3 class="text-card-title" i18n="@@lab.choices.segmented">Segmented controls</h3>
+      <p class="section-note" i18n="@@lab.choices.segmented.note">
+        Radios for a choice in a form, links when the choice is an address (never tabs for an
+        address), buttons for a choice that acts at once.
+      </p>
+      <fieldset app-segmented>
+        <legend class="visually-hidden" i18n="@@lab.forms.period">Sample period</legend>
+        <label class="segmented-option"
+          ><input type="radio" name="lab-period" />
+          <span i18n="@@lab.forms.days7">7 days</span></label
+        >
+        <label class="segmented-option"
+          ><input type="radio" name="lab-period" checked />
+          <span i18n="@@lab.forms.days30">30 days</span></label
+        >
+        <label class="segmented-option"
+          ><input type="radio" name="lab-period" disabled />
+          <span i18n="@@lab.forms.days90">90 days</span></label
+        >
+      </fieldset>
+      <nav app-segmented aria-label="Sample views" i18n-aria-label="@@lab.choices.views">
+        <a class="segmented-option" href="#lab-choices" aria-current="true" i18n="@@inbox.view.all"
+          >All</a
+        >
+        <a class="segmented-option" href="#lab-choices" i18n="@@lab.choices.needsPerson"
+          >Needs a person</a
+        >
+        <a class="segmented-option" href="#lab-choices" i18n="@@lab.choices.mine">Mine</a>
+      </nav>
+    </section>
+
+    <!-- Inputs ----------------------------------------------------------- -->
     <section class="lab-section" id="lab-forms" aria-labelledby="lab-forms-title">
-      <h2 id="lab-forms-title" class="text-section-title" i18n="@@lab.forms">Form controls</h2>
+      <h2 id="lab-forms-title" class="text-section-title" i18n="@@lab.forms.inputs">
+        Inputs, selects and text areas
+      </h2>
 
       <div class="form-grid">
         <div class="field">
@@ -389,235 +489,243 @@
 Answer briefly. Hand over to a person for refunds.</textarea>
         </div>
       </div>
+    </section>
 
+    <!-- Chips ------------------------------------------------------------ -->
+    <section class="lab-section" id="lab-chips" aria-labelledby="lab-chips-title">
+      <h2 id="lab-chips-title" class="text-section-title" i18n="@@lab.colour.chips">Chips</h2>
+      <p class="section-note" i18n="@@lab.colour.sideBySide.note.calmGlass">
+        Status words reuse the three hues, each with its own glyph and word, so none depends on its
+        hue. In the inbox and the transcript only the voice chips appear.
+      </p>
+      <div class="lab-row" data-testid="lab-voice-chips">
+        <app-chip tone="need" i18n="@@lab.chips.need">Needs a person</app-chip>
+        <app-chip tone="ai" i18n="@@lab.chips.ai">AI is answering</app-chip>
+        <app-chip tone="failed" i18n="@@lab.chips.failed">The AI could not reply</app-chip>
+        <app-chip tone="team" i18n="@@lab.chips.team">Handled by Sara</app-chip>
+        <app-chip tone="waiting" i18n="@@lab.chips.waiting">Waiting for the team</app-chip>
+        <app-chip tone="neutral" i18n="@@lab.badge.draft">Draft</app-chip>
+        <app-chip tone="ai" size="sm" i18n="@@lab.badge.small">Small</app-chip>
+      </div>
+      <div class="lab-row" data-testid="lab-status-chips">
+        <app-chip tone="success" i18n="@@lab.badge.connected">Connected</app-chip>
+        <app-chip tone="warning" i18n="@@lab.badge.needsAttention">Needs attention</app-chip>
+        <app-chip tone="danger" i18n="@@lab.badge.failed">Failed</app-chip>
+        <app-chip tone="info" i18n="@@lab.badge.indexing">Indexing</app-chip>
+        <span class="badge badge-plain" i18n="@@lab.forms.channel.website">Website chat</span>
+        <span class="count-badge">12</span>
+      </div>
+      <h3 class="text-card-title" i18n="@@lab.voices.takeOver">The "Take over" moment</h3>
       <div class="lab-row">
-        <label class="lab-check">
-          <input
-            type="checkbox"
-            class="switch"
-            role="switch"
-            [checked]="switchOn()"
-            (change)="switchOn.set(!switchOn())"
-          />
-          <span i18n="@@lab.forms.emailDaily">Email me daily</span>
-        </label>
-        <label class="lab-check">
-          <input type="checkbox" class="switch" role="switch" disabled />
-          <span i18n="@@lab.forms.disabledSwitch">Disabled switch</span>
-        </label>
-        <label class="lab-check"
-          ><input type="checkbox" checked /> <span i18n="@@lab.forms.checked">Checked</span></label
-        >
-        <label class="lab-check"
-          ><input type="checkbox" /> <span i18n="@@lab.forms.unchecked">Unchecked</span></label
-        >
-        <label class="lab-check"
-          ><input type="radio" name="lab-radio" checked />
-          <span i18n="@@lab.forms.radio">Radio</span></label
-        >
-        <label class="lab-check"
-          ><input type="radio" name="lab-radio" disabled />
-          <span i18n="@@lab.forms.disabled">Disabled</span></label
-        >
+        <app-voice-chip [voice]="demoVoice()" data-testid="lab-takeover-chip" />
+        <button type="button" class="btn btn-secondary btn-sm" (click)="toggleVoice()">
+          @if (demoVoice() === 'ai') {
+            <span i18n="@@inbox.takeOver">Take over</span>
+          } @else {
+            <span i18n="@@inbox.returnToAi">Return to AI</span>
+          }
+        </button>
       </div>
-
-      <fieldset class="segmented">
-        <legend class="visually-hidden" i18n="@@lab.forms.period">Sample period</legend>
-        <label class="segmented-option"
-          ><input type="radio" name="lab-period" />
-          <span i18n="@@lab.forms.days7">7 days</span></label
-        >
-        <label class="segmented-option"
-          ><input type="radio" name="lab-period" checked />
-          <span i18n="@@lab.forms.days30">30 days</span></label
-        >
-        <label class="segmented-option"
-          ><input type="radio" name="lab-period" disabled />
-          <span i18n="@@lab.forms.days90">90 days</span></label
-        >
-      </fieldset>
     </section>
 
-    <!-- Content: cards, badges, tables, lists, toolbar, pager, menu ------- -->
-    <section class="lab-section" id="lab-content" aria-labelledby="lab-content-title">
-      <h2 id="lab-content-title" class="text-section-title" i18n="@@lab.content">Content</h2>
-
-      <div class="lab-columns">
-        <article class="card">
-          <header class="card-header">
-            <h3 class="card-title" i18n="@@lab.content.card">Sample card</h3>
-            <p i18n="@@lab.content.card.subtitle">A grouping device, not a default wrapper.</p>
-          </header>
-          <div class="card-body">
-            <p class="text-body" i18n="@@lab.content.card.body">
-              Cards are white on the porcelain page, edged by a hairline.
-            </p>
-          </div>
-          <div class="card-actions">
-            <button type="button" class="btn btn-primary" i18n="@@common.saveChanges">
-              Save changes
-            </button>
-            <button type="button" class="btn btn-secondary" i18n="@@dialog.cancel">Cancel</button>
-          </div>
-        </article>
-
-        <div class="lab-stack">
-          <h3 class="text-card-title" i18n="@@lab.content.badges">Badges</h3>
-          <div class="lab-row">
-            <span class="badge badge-neutral" i18n="@@lab.badge.draft">Draft</span>
-            <span class="badge badge-success" i18n="@@lab.badge.active">Active</span>
-            <span class="badge badge-warning" i18n="@@lab.badge.paused">Paused</span>
-            <span class="badge badge-danger" i18n="@@lab.badge.failed">Failed</span>
-            <span class="badge badge-info" i18n="@@lab.badge.indexing">Indexing</span>
-            <span class="badge badge-plain" i18n="@@lab.forms.channel.website">Website chat</span>
-            <span class="badge badge-success badge-sm" i18n="@@lab.badge.small">Small</span>
-            <span class="count-badge">12</span>
-          </div>
-
-          <h3 class="text-card-title" i18n="@@lab.content.menu">Menu</h3>
-          <app-menu
-            label="Sample menu"
-            i18n-label="@@lab.content.menu.label"
-            triggerClass="btn btn-secondary"
-            placement="start"
-          >
-            <span menuTrigger i18n="@@lab.content.menu.open">Open menu</span>
-            <button type="button" class="menu-item" role="menuitem">
-              <app-icon name="refresh" />
-              <span i18n="@@lab.content.menu.refresh">Refresh</span>
-            </button>
-            <button type="button" class="menu-item" role="menuitem">
-              <app-icon name="download" />
-              <span i18n="@@lab.content.menu.download">Download</span>
-            </button>
-            <hr class="menu-separator" role="separator" />
-            <button type="button" class="menu-item menu-item-danger" role="menuitem">
-              <app-icon name="close" />
-              <span i18n="@@lab.content.menu.remove">Remove</span>
-            </button>
-          </app-menu>
-        </div>
+    <!-- Rows and avatars ------------------------------------------------- -->
+    <section class="lab-section" id="lab-rows" aria-labelledby="lab-rows-title">
+      <h2 id="lab-rows-title" class="text-section-title" i18n="@@lab.rows">Rows and avatars</h2>
+      <p class="section-note" i18n="@@lab.rows.note">
+        Radius 16, a 40px avatar with its channel's badge and glyph, the name and the time, one line
+        of preview, then chips. Selected is a faint emerald tint; unread is a dot, a heavier name
+        and the word "Unread" for screen readers.
+      </p>
+      <div class="lab-row">
+        <app-avatar name="Layla Haddad" channel="WhatsApp" size="lg" />
+        <app-avatar name="Layla Haddad" channel="WhatsApp" />
+        <app-avatar text="7K" channel="WebChat" />
+        <app-avatar name="سارة أحمد" size="sm" />
+        <app-avatar text="12" channel="Messenger" />
       </div>
-
-      <h3 class="text-card-title" i18n="@@lab.content.table">Table (sample rows)</h3>
-      <div class="table-wrap">
-        <table class="table">
-          <thead>
-            <tr>
-              <th scope="col" i18n="@@lab.content.table.day">Day</th>
-              <th scope="col" class="num" i18n="@@lab.content.table.started">Started</th>
-              <th scope="col" class="num" i18n="@@lab.content.table.aiReplies">AI replies</th>
-              <th scope="col" class="num" i18n="@@lab.content.table.humanReplies">
-                Replies by people
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td>{{ sampleDays[0] | localDate: 'dayMonth' : 'UTC' }}</td>
-              <td class="num">42</td>
-              <td class="num">118</td>
-              <td class="num">9</td>
-            </tr>
-            <tr>
-              <td>{{ sampleDays[1] | localDate: 'dayMonth' : 'UTC' }}</td>
-              <td class="num">37</td>
-              <td class="num">96</td>
-              <td class="num">14</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <h3 class="text-card-title" i18n="@@lab.content.dataList">Data list (sample rows)</h3>
-      <div class="data-list lab-data-list">
-        <div class="data-list-head" aria-hidden="true">
-          <span i18n="@@lab.content.dataList.conversation">Conversation</span>
-          <span i18n="@@lab.content.dataList.handledBy">Handled by</span>
-          <span class="data-cell-end" i18n="@@lab.content.dataList.lastActivity"
-            >Last activity</span
-          >
-        </div>
-        <div class="data-row">
-          <span class="data-row-title" dir="auto">Where is my order #4821?</span>
-          <span class="data-row-meta"><app-voice-chip voice="ai" size="sm" /></span>
-          <span class="data-row-meta data-cell-end num">10:42</span>
-        </div>
-        <div class="data-row is-human">
-          <span class="data-row-title" dir="auto">أريد تغيير عنوان التوصيل</span>
-          <span class="data-row-meta"><app-voice-chip voice="human" size="sm" /></span>
-          <span class="data-row-meta data-cell-end num">10:47</span>
-        </div>
-      </div>
-
-      <div class="toolbar">
-        <span class="text-small text-secondary" i18n="@@lab.content.toolbar"
-          >Toolbar and pager (sample: 120 items)</span
-        >
-      </div>
-      <app-pagination
-        [page]="samplePage()"
-        [pageSize]="20"
-        [total]="120"
-        items="conversations"
-        (pageChange)="samplePage.set($event)"
-      />
-    </section>
-
-    <!-- Feedback --------------------------------------------------------- -->
-    <section class="lab-section" id="lab-feedback" aria-labelledby="lab-feedback-title">
-      <h2 id="lab-feedback-title" class="text-section-title" i18n="@@lab.feedback">
-        Notices, dialog, toast and states
-      </h2>
-
-      <div class="lab-stack">
-        <p class="alert alert-info">
-          <app-icon name="info" /><span i18n="@@lab.feedback.info"
-            >Sample: indexing runs in the background.</span
-          >
-        </p>
-        <p class="alert alert-success">
-          <app-icon name="check" /><span i18n="@@lab.feedback.success"
-            >Sample: the channel is connected.</span
-          >
-        </p>
-        <p class="alert alert-warning">
-          <app-icon name="alert" /><span i18n="@@lab.feedback.warning"
-            >Sample: the plan's message limit is close.</span
-          >
-        </p>
-        <p class="alert alert-danger">
-          <app-icon name="critical" /><span i18n="@@lab.feedback.danger"
-            >Sample: the document could not be read.</span
-          >
-        </p>
-
-        <div class="stale-notice">
-          <app-icon name="alert" />
-          <div class="conflict-body">
-            <p class="conflict-title" i18n="@@lab.feedback.stale.title">
-              Sample: someone else changed this agent
-            </p>
-            <p i18n="@@lab.feedback.stale.body">
-              Your edits are still here. Review the newer version, or keep yours.
-            </p>
-            <div class="conflict-actions">
-              <button
-                type="button"
-                class="btn btn-secondary btn-sm"
-                i18n="@@lab.feedback.stale.show"
+      <ul class="lab-rows panel-surface" aria-label="Sample rows" i18n-aria-label="@@lab.rows.list">
+        <li>
+          <a class="list-row is-selected" href="#lab-rows" aria-current="true">
+            <app-avatar name="Layla Haddad" channel="WhatsApp" />
+            <span class="list-row-body">
+              <span class="list-row-head"
+                ><span class="list-row-name" dir="auto">Layla Haddad</span
+                ><span class="list-row-time">2 m</span></span
               >
-                Show the newer version
-              </button>
-              <button type="button" class="btn btn-ghost btn-sm" i18n="@@lab.feedback.stale.keep">
-                Keep my edits
-              </button>
-            </div>
-          </div>
-        </div>
+              <span class="list-row-preview" dir="auto">Perfect, thank you!</span>
+              <span class="list-row-chips"
+                ><app-chip tone="team" size="sm" i18n="@@lab.chips.team"
+                  >Handled by Sara</app-chip
+                ></span
+              >
+            </span>
+          </a>
+        </li>
+        <li>
+          <a class="list-row is-unread" href="#lab-rows">
+            <app-avatar text="7K" channel="WebChat" />
+            <span class="list-row-body">
+              <span class="list-row-head"
+                ><span class="list-row-name" dir="auto">Visitor 7KQ2MX</span
+                ><span class="list-row-time">5 m</span></span
+              >
+              <span class="list-row-preview" dir="auto">هل توصلون إلى جدة يوم الجمعة؟</span>
+              <span class="list-row-chips"
+                ><app-chip tone="ai" size="sm" i18n="@@lab.chips.ai">AI is answering</app-chip
+                ><span class="unread-dot" aria-hidden="true"></span
+                ><span class="visually-hidden" i18n="@@lab.rows.unread">Unread</span></span
+              >
+            </span>
+          </a>
+        </li>
+        <li>
+          <a class="list-row" href="#lab-rows">
+            <app-avatar text="KM" channel="WhatsApp" />
+            <span class="list-row-body">
+              <span class="list-row-head"
+                ><span class="list-row-name" dir="auto">Khalid M.</span
+                ><span class="list-row-time">9 m</span></span
+              >
+              <span class="list-row-preview" dir="auto">Is the grinder back in stock?</span>
+              <span class="list-row-chips"
+                ><app-chip tone="failed" size="sm" i18n="@@lab.chips.failed"
+                  >The AI could not reply</app-chip
+                ></span
+              >
+            </span>
+          </a>
+        </li>
+      </ul>
+    </section>
+
+    <!-- Transcript: bubbles, the orb, event lines ----------------------- -->
+    <section class="lab-section" id="lab-transcript" aria-labelledby="lab-transcript-title">
+      <h2 id="lab-transcript-title" class="text-section-title" i18n="@@lab.transcript.voices">
+        The three voices: bubbles, the orb and event lines
+      </h2>
+      <p class="badge badge-neutral lab-sample-flag" i18n="@@lab.transcript.flag">
+        Sample, not a real conversation
+      </p>
+      <div class="lab-row">
+        <app-orb />
+        <app-orb size="lg" />
+        <span class="lab-row">
+          <app-orb [thinking]="true" />
+          <span class="text-small text-secondary" i18n="@@lab.orb.answering"
+            >The AI is answering…</span
+          >
+        </span>
       </div>
 
+      <ol class="lab-transcript">
+        <li><app-event-line i18n="@@lab.event.today">Today</app-event-line></li>
+        @for (row of rows; track row.id) {
+          @if (row.handoffTo; as voice) {
+            <li>
+              @if (voice === 'human') {
+                <app-event-line tone="team" i18n="@@transcript.handoff.toPerson"
+                  >A person took over</app-event-line
+                >
+              } @else {
+                <app-event-line tone="ai" i18n="@@transcript.handoff.toAi"
+                  >Back with the AI</app-event-line
+                >
+              }
+            </li>
+          }
+          @if (row.id === 4) {
+            <li>
+              <app-event-line tone="failed" i18n="@@lab.event.failed"
+                >The AI could not reply · 10:41</app-event-line
+              >
+            </li>
+          }
+          <li class="lab-message" [class.is-end]="row.bubble !== 'bubble-customer'">
+            @if (row.bubble === 'bubble-ai') {
+              <app-orb />
+            }
+            <span class="bubble" [class]="row.bubble">
+              <span class="bubble-speaker" dir="auto">{{ row.speaker }}</span>
+              <span dir="auto">{{ row.text }}</span>
+            </span>
+          </li>
+        }
+      </ol>
+
+      <h3 class="text-card-title" i18n="@@lab.voices.split">Voice split (sample counts)</h3>
+      <div class="lab-columns">
+        <app-voice-split [ai]="7" [human]="3" subject="openConversations" />
+        <app-voice-track [messages]="transcript" />
+      </div>
+    </section>
+
+    <!-- Overlays: menu, popover, tooltip, dialog, toast ----------------- -->
+    <section class="lab-section" id="lab-overlays" aria-labelledby="lab-overlays-title">
+      <h2 id="lab-overlays-title" class="text-section-title" i18n="@@lab.overlays">
+        Menus, popovers, tooltips, dialogs and toasts
+      </h2>
+      <p class="section-note" i18n="@@lab.overlays.note">
+        All glass. Focus moves in and returns to the control that opened it; Escape closes; a
+        tooltip shows on hover and on keyboard focus.
+      </p>
       <div class="lab-row">
+        <app-menu
+          label="Sample menu"
+          i18n-label="@@lab.content.menu.label"
+          triggerClass="btn btn-secondary"
+          placement="start"
+        >
+          <span menuTrigger i18n="@@lab.content.menu.open">Open menu</span>
+          <button type="button" class="menu-item" role="menuitem">
+            <app-icon name="refresh" />
+            <span i18n="@@lab.content.menu.refresh">Refresh</span>
+          </button>
+          <button type="button" class="menu-item" role="menuitem">
+            <app-icon name="download" />
+            <span i18n="@@lab.content.menu.download">Download</span>
+          </button>
+          <hr class="menu-separator" role="separator" />
+          <button type="button" class="menu-item menu-item-danger" role="menuitem">
+            <app-icon name="close" />
+            <span i18n="@@lab.content.menu.remove">Remove</span>
+          </button>
+        </app-menu>
+
+        <span class="lab-popover-anchor">
+          <button
+            type="button"
+            class="btn btn-secondary"
+            aria-controls="lab-popover"
+            [attr.aria-expanded]="popoverOpen()"
+            (click)="popoverOpen.set(!popoverOpen())"
+            (keydown.escape)="popoverOpen.set(false)"
+            i18n="@@lab.popover.open"
+          >
+            Open a popover
+          </button>
+          @if (popoverOpen()) {
+            <div id="lab-popover" class="popover lab-popover" data-testid="lab-popover">
+              <p i18n="@@lab.popover.body">
+                Sample: a popover holds a little content, not a list of actions.
+              </p>
+            </div>
+          }
+        </span>
+
+        <button
+          type="button"
+          class="btn btn-secondary btn-icon"
+          aria-label="Sample: information"
+          i18n-aria-label="@@lab.tooltip.label"
+          appTooltip="Sample: a tooltip names or explains."
+          i18n-appTooltip="@@lab.tooltip.text"
+          placement="above"
+          [describes]="true"
+          data-testid="lab-tooltip-trigger"
+        >
+          <app-icon name="info" />
+        </button>
+
         <button
           type="button"
           class="btn btn-secondary"
@@ -671,19 +779,81 @@ Answer briefly. Hand over to a person for refunds.</textarea>
         confirmLabel="Delete document"
         i18n-confirmLabel="@@lab.dialog.delete.confirm"
       />
+    </section>
+
+    <!-- States: notices, skeletons, empty and error --------------------- -->
+    <section class="lab-section" id="lab-states" aria-labelledby="lab-states-title">
+      <h2 id="lab-states-title" class="text-section-title" i18n="@@lab.states">
+        Notices, skeletons, empty and error states
+      </h2>
+
+      <div class="lab-stack">
+        <p class="alert alert-info">
+          <app-icon name="info" /><span i18n="@@lab.feedback.info"
+            >Sample: indexing runs in the background.</span
+          >
+        </p>
+        <p class="alert alert-success">
+          <app-icon name="check" /><span i18n="@@lab.feedback.success"
+            >Sample: the channel is connected.</span
+          >
+        </p>
+        <p class="alert alert-warning">
+          <app-icon name="alert" /><span i18n="@@lab.feedback.warning"
+            >Sample: the plan's message limit is close.</span
+          >
+        </p>
+        <p class="alert alert-danger">
+          <app-icon name="critical" /><span i18n="@@lab.feedback.danger"
+            >Sample: the document could not be read.</span
+          >
+        </p>
+
+        <div class="stale-notice">
+          <app-icon name="alert" />
+          <div class="conflict-body">
+            <p class="conflict-title" i18n="@@lab.feedback.stale.title">
+              Sample: someone else changed this agent
+            </p>
+            <p i18n="@@lab.feedback.stale.body">
+              Your edits are still here. Review the newer version, or keep yours.
+            </p>
+            <div class="conflict-actions">
+              <button
+                type="button"
+                class="btn btn-secondary btn-sm"
+                i18n="@@lab.feedback.stale.show"
+              >
+                Show the newer version
+              </button>
+              <button type="button" class="btn btn-quiet btn-sm" i18n="@@lab.feedback.stale.keep">
+                Keep my edits
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
 
       <div class="lab-columns">
-        <div class="card lab-skeleton" aria-hidden="true">
-          <span class="skeleton skeleton-title"></span>
+        <div class="panel-surface lab-skeleton" aria-hidden="true">
+          <span class="lab-row">
+            <span class="skeleton skeleton-avatar"></span>
+            <span class="skeleton skeleton-title"></span>
+          </span>
           <span class="skeleton skeleton-text"></span>
           <span class="skeleton skeleton-text"></span>
+          <span class="skeleton skeleton-bubble"></span>
         </div>
         <app-empty-state
           heading="Sample: no conversations yet"
           i18n-heading="@@lab.empty.heading"
           description="They appear here as soon as a customer writes on a connected channel."
           i18n-description="@@lab.empty.description"
-        />
+        >
+          <button stateActions type="button" class="btn btn-primary" i18n="@@lab.empty.action">
+            Connect a channel
+          </button>
+        </app-empty-state>
         <app-empty-state
           tone="error"
           icon="alert"
@@ -693,75 +863,63 @@ Answer briefly. Hand over to a person for refunds.</textarea>
           i18n-description="@@lab.error.description"
         />
       </div>
+
+      <h3 class="text-card-title" i18n="@@lab.content.table">Table (sample rows)</h3>
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th scope="col" i18n="@@lab.content.table.day">Day</th>
+              <th scope="col" class="num" i18n="@@lab.content.table.started">Started</th>
+              <th scope="col" class="num" i18n="@@lab.content.table.aiReplies">AI replies</th>
+              <th scope="col" class="num" i18n="@@lab.content.table.humanReplies">
+                Replies by people
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>{{ sampleDays[0] | localDate: 'dayMonth' : 'UTC' }}</td>
+              <td class="num">42</td>
+              <td class="num">118</td>
+              <td class="num">9</td>
+            </tr>
+            <tr>
+              <td>{{ sampleDays[1] | localDate: 'dayMonth' : 'UTC' }}</td>
+              <td class="num">37</td>
+              <td class="num">96</td>
+              <td class="num">14</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <app-pagination
+        [page]="samplePage()"
+        [pageSize]="20"
+        [total]="120"
+        items="conversations"
+        (pageChange)="samplePage.set($event)"
+      />
     </section>
 
-    <!-- Voices ----------------------------------------------------------- -->
-    <section class="lab-section" id="lab-voices" aria-labelledby="lab-voices-title">
-      <h2 id="lab-voices-title" class="text-section-title" i18n="@@lab.voices">The two voices</h2>
-
-      <h3 class="text-card-title" i18n="@@lab.voices.chips">Voice chips</h3>
-      <div class="lab-row">
-        <app-voice-chip voice="ai" />
-        <app-voice-chip voice="human" />
-        <app-voice-chip voice="ai" size="sm" />
-        <app-voice-chip voice="human" size="sm" label="Sara" i18n-label="@@lab.voices.sara" />
-      </div>
-
-      <h3 class="text-card-title" i18n="@@lab.voices.takeOver">The "Take over" moment</h3>
-      <p class="section-note" i18n="@@lab.voices.takeOver.note">
-        The same chip changes voice: a 320ms sweep on the emphasized curve, instant under reduced
-        motion.
+    <!-- Icons ------------------------------------------------------------ -->
+    <section class="lab-section" id="lab-icons" aria-labelledby="lab-icons-title">
+      <h2 id="lab-icons-title" class="text-section-title" i18n="@@lab.icons">Icons</h2>
+      <p class="section-note" i18n="@@lab.icons.note">
+        One authored 24px outline set, 1.6 stroke with round joins. Channel glyphs are generic and
+        always shown with the channel's name; no brand logo is recoloured. Arrows and chevrons turn
+        round in a right-to-left page.
       </p>
-      <div class="lab-row">
-        <app-voice-chip [voice]="demoVoice()" data-testid="lab-takeover-chip" />
-        <button type="button" class="btn btn-secondary btn-sm" (click)="toggleVoice()">
-          @if (demoVoice() === 'ai') {
-            <span i18n="@@inbox.takeOver">Take over</span>
-          } @else {
-            <span i18n="@@inbox.returnToAi">Return to AI</span>
-          }
-        </button>
-      </div>
-
-      <h3 class="text-card-title" i18n="@@lab.voices.split">Voice split (sample counts)</h3>
-      <div class="lab-columns">
-        <app-voice-split [ai]="7" [human]="3" subject="openConversations" />
-        <app-voice-split [ai]="0" [human]="0" subject="openConversations" />
-      </div>
-
-      <h3 class="text-card-title" i18n="@@lab.voices.track">
-        Voice track (from the sample transcript below)
-      </h3>
-      <app-voice-track [messages]="transcript" />
-    </section>
-
-    <!-- Transcript ------------------------------------------------------- -->
-    <section class="lab-section" id="lab-transcript" aria-labelledby="lab-transcript-title">
-      <h2 id="lab-transcript-title" class="text-section-title" i18n="@@lab.transcript">
-        Sample transcript
-      </h2>
-      <p class="badge badge-neutral lab-sample-flag" i18n="@@lab.transcript.flag">
-        Sample, not a real conversation
-      </p>
-
-      <ol class="lab-transcript">
-        @for (row of rows; track row.id) {
-          @if (row.handoffTo; as voice) {
-            <li class="handoff-divider" [class]="'handoff-to-' + voice">
-              @if (voice === 'human') {
-                <span i18n="@@transcript.handoff.toPerson">A person took over</span>
-              } @else {
-                <span i18n="@@transcript.handoff.toAi">Back with the AI</span>
-              }
-            </li>
-          }
-          <li class="bubble" [class]="row.bubble">
-            <span class="bubble-speaker" dir="auto">{{ row.speaker }}</span>
-            <span dir="auto">{{ row.text }}</span>
+      <ul class="icon-sheet">
+        @for (name of iconNames; track name) {
+          <li>
+            <app-icon [name]="name" />
+            <code dir="ltr">{{ name }}</code>
           </li>
         }
-      </ol>
+      </ul>
     </section>
+
     <section class="lab-section" id="lab-charts" aria-labelledby="lab-charts-title">
       <h2 id="lab-charts-title" class="text-section-title" i18n="@@lab.charts">
         Charts (sample data)

@@ -109,7 +109,7 @@
 
             <fieldset class="field">
               <legend class="field-label" i18n="@@reports.field.format">Format</legend>
-              <div class="segmented">
+              <div app-segmented>
                 @for (format of formatsFor(form.controls.type.value); track format) {
                   <label class="segmented-option">
                     <input type="radio" formControlName="format" [value]="format" />
@@ -122,7 +122,7 @@
             <!-- The language every report from this schedule is written in (Phase 38.5, E8). -->
             <fieldset class="field">
               <legend class="field-label" i18n="@@reports.field.language">File language</legend>
-              <div class="segmented" data-testid="schedule-language">
+              <div app-segmented data-testid="schedule-language">
                 @for (language of languages; track language) {
                   <label class="segmented-option">
                     <input
@@ -140,13 +140,8 @@
             <fieldset class="field">
               <legend class="field-label" i18n="@@schedules.field.frequency">How often</legend>
               <div class="frequency-options">
-                <label class="frequency-option">
-                  <input
-                    type="radio"
-                    class="form-check-input"
-                    formControlName="frequency"
-                    value="Weekly"
-                  />
+                <label app-radio class="frequency-option">
+                  <input type="radio" formControlName="frequency" value="Weekly" />
                   <span class="frequency-text">
                     <span i18n="@@schedules.frequency.weekly">Weekly</span>
                     <span class="frequency-hint" i18n="@@schedules.frequency.weeklyHint"
@@ -154,13 +149,8 @@
                     >
                   </span>
                 </label>
-                <label class="frequency-option">
-                  <input
-                    type="radio"
-                    class="form-check-input"
-                    formControlName="frequency"
-                    value="Monthly"
-                  />
+                <label app-radio class="frequency-option">
+                  <input type="radio" formControlName="frequency" value="Monthly" />
                   <span class="frequency-text">
                     <span i18n="@@schedules.frequency.monthly">Monthly</span>
                     <span class="frequency-hint" i18n="@@schedules.frequency.monthlyHint"

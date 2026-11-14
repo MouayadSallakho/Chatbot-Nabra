@@ -290,7 +290,11 @@
                     @for (candidate of candidates(); track candidate.id) {
                       @let facts = distinguish(candidate);
                       <li>
-                        <label class="candidate" [class.is-chosen]="target()?.id === candidate.id">
+                        <label
+                          app-radio
+                          class="candidate"
+                          [class.is-chosen]="target()?.id === candidate.id"
+                        >
                           <input
                             type="radio"
                             name="mergeTarget"

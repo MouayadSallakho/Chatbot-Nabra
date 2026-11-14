@@ -136,6 +136,13 @@
   --skeleton-base: var(--emerald-800);
   --skeleton-sheen: var(--emerald-750);
 
+  --brand-ai: var(--emerald-100);
+  --brand-team: var(--gold-500);
+  --brand-lens: var(--emerald-300);
+  --avatar-bg: var(--emerald-775);
+  --channel-web: var(--emerald-300);
+  --event-failed-line: rgb(240 160 143 / 35%);
+
   color-scheme: dark;
 }
 
@@ -150,6 +157,7 @@
   --emerald-900: #0b2b26; // dark panel; ink on emerald-100
   --emerald-850: #12332d; // dark panel-soft, dark customer bubble
   --emerald-800: #163832; // dark raised
+  --emerald-775: #1c433b; // dark avatars (board Inbox)
   --emerald-750: #1c4a40; // dark AI bubble
   --emerald-700: #235347; // primary, the AI's voice
   --emerald-600: #2f6b58; // hover, charts
@@ -315,10 +323,38 @@
     var(--emerald-600) 55%,
     var(--emerald-900)
   );
+  // The channel badge on an avatar (board Inbox): WhatsApp green, the website
+  // emerald-600. Always with the channel's glyph, never the colour alone.
   --channel-whatsapp: var(--whatsapp-500);
-  --channel-web: var(--color-primary);
+  --channel-web: var(--emerald-600);
+  --channel-other: var(--color-text-quiet);
   --skeleton-base: var(--cream-200);
   --skeleton-sheen: var(--cream-150);
+
+  // The brand mark (brand.md): the AI's circle, the team's circle and their
+  // overlap, the lens. Dark grounds take emerald-100, gold-500, emerald-300.
+  --brand-ai: var(--emerald-700);
+  --brand-team: var(--gold-500);
+  --brand-lens: var(--emerald-900);
+
+  // Avatars: initials or a short code on cream (dark: a deep emerald).
+  --avatar-bg: var(--cream-200);
+  --avatar-fg: var(--color-text-secondary);
+
+  // A neutral chip (a word with no voice or status), and the failed event
+  // line's rule (decorative: the words carry it, in coral text).
+  --chip-neutral-bg: var(--color-panel-soft);
+  --chip-neutral-fg: var(--color-text-secondary);
+  --chip-neutral-dot: var(--color-text-quiet);
+  --event-failed-line: rgb(180 67 47 / 35%);
+
+  // Choice controls (Phase 38 notes 3 and 4): a visible 20px box or a 40×24
+  // track, inside a 44px target that includes the label.
+  --choice-size: 1.25rem;
+  --choice-radius: 6px;
+  --switch-inline: 2.5rem;
+  --switch-block: 1.5rem;
+  --switch-thumb: 1.125rem;
 
   color-scheme: light;
 
@@ -359,23 +395,32 @@
   --radius-dialog: 24px; // dialogs and sheets
   --radius-bubble: 18px;
   --radius-bubble-tail: 6px; // the speaker's corner, written with logical corners
-  --radius-badge: 6px; // checkboxes and small marks until 39.2b's choice controls
+  --radius-toast: 18px; // board Inbox
+  --radius-badge: 6px; // keys (kbd) and other small marks
 
   // ---------------------------------------------------------------------------
-  // Control sizing
+  // Control sizing (calm-glass.md §6)
   // ---------------------------------------------------------------------------
-  // The heights stay Two Voices' until 39.2b restyles buttons and inputs in
-  // place (pill, 44px; 40px in dense desktop headers). The touch override
-  // below already raises them to 44px on a coarse pointer.
-  --control-height-sm: 2rem; // 32px
-  --control-height: 2.25rem; // 36px
-  --control-height-lg: 2.5rem; // 40px
-  --control-height-dense: 2.5rem; // 40px: dense desktop headers (calm-glass.md §6)
+  // Buttons and inputs are 44px; 40px is the dense size (desktop headers,
+  // toolbars and rows). A coarse pointer raises every one to 44px.
+  --control-height-sm: 2.5rem; // 40px: dense
+  --control-height: 2.75rem; // 44px
+  --control-height-lg: 2.75rem; // 44px
+  --control-height-dense: 2.5rem; // 40px: dense desktop headers
   --target-min: 2.75rem; // 44px: every touch target, the label included
   --chip-height: 1.5rem; // 24px (the spec allows 22-28)
+  --chip-height-sm: 1.375rem; // 22px: inside dense rows
   --icon-size-sm: 1rem; // 16px
   --icon-size: 1.125rem; // 18px
   --icon-size-nav: 1.25rem; // 20px
+
+  // Avatars (40px in rows, 34px for the member, 64px on a customer panel) and
+  // the AI's orb (26px in threads, 64px in the widget's greeting).
+  --avatar-size: 2.5rem;
+  --avatar-size-sm: 2.125rem;
+  --avatar-size-lg: 4rem;
+  --orb-size: 1.625rem;
+  --orb-size-lg: 4rem;
 
   // ---------------------------------------------------------------------------
   // Typography (calm-glass.md §4)
@@ -416,6 +461,11 @@
   --text-numeric: 600 0.875rem / 1.4286 var(--font-sans); // 14/20, with tabular-nums
   // Large figures (overview and analytics numbers) until the bento (39.7a).
   --text-figure: 600 clamp(1.75rem, 1.35rem + 1.3vw, 2.5rem) / 1.1 var(--font-sans);
+  // Buttons: 600 (calm-glass.md §6); 13px in the dense size, as on the boards.
+  --text-button: 600 0.875rem / 1.25rem var(--font-sans);
+  --text-button-sm: 600 0.8125rem / 1.25rem var(--font-sans);
+  // The empty state's one line: Instrument Serif in Latin (calm-glass.md §6).
+  --text-empty: 400 1.75rem / 1.2 var(--font-display);
 
   // ---------------------------------------------------------------------------
   // Motion (calm-glass.md §5)
@@ -483,13 +533,16 @@
   --text-caption: 500 0.8125rem / 1.5385 var(--font-sans); // 13/20 (never under 13)
   --text-table: 400 0.8125rem / 1.6923 var(--font-sans); // 13/22
   --text-numeric: 600 0.875rem / 1.5714 var(--font-sans); // 14/22
+  --text-button: 600 0.875rem / 1.5 var(--font-sans);
+  --text-button-sm: 600 0.8125rem / 1.5 var(--font-sans);
+  --text-empty: 600 1.25rem / 1.5 var(--font-sans); // Plex Arabic 600, never the serif
 }
 
 // Touch: every control grows to a comfortable target and the page gutter
 // narrows, rather than shipping a separate mobile component set.
 @media (pointer: coarse) {
   :root {
-    --control-height-sm: 2.5rem;
+    --control-height-sm: 2.75rem;
     --control-height: 2.75rem;
     --control-height-lg: 2.75rem;
   }

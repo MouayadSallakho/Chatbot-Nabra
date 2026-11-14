@@ -26,6 +26,7 @@ import { SoundSettings } from '@app/core/sounds/sound-settings';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
 import { PageHeader } from '@app/shared/page-header/page-header';
 import { NotificationsNav } from '../notifications-nav';
+import { Switch } from '@app/shared/choice/choice';
 
 /** The fragment the account menu's "Sound and alert settings" link opens. */
 const BROWSER_SECTION = 'in-this-browser';
@@ -51,7 +52,7 @@ interface Category {
 @Component({
   selector: 'app-notification-preferences',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, PageHeader, NotificationsNav],
+  imports: [ReactiveFormsModule, PageHeader, NotificationsNav, Switch],
   templateUrl: './notification-preferences.html',
   styleUrl: './notification-preferences.scss',
 })
@@ -242,7 +243,8 @@ export class NotificationPreferencesPage implements HasUnsavedChanges {
       // browser has already dropped focus on the body. Back to the start of the
       // choices, so the reader is still in the form they were using.
       afterNextRender(
-        () => this.host.nativeElement.querySelector<HTMLElement>('.category-switch')?.focus(),
+        () =>
+          this.host.nativeElement.querySelector<HTMLElement>('.category-switch > input')?.focus(),
         { injector: this.injector },
       );
     } catch (error: unknown) {

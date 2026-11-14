@@ -30,21 +30,10 @@
   border: 0;
 }
 
+// The family's radios (shared/choice): each 44px target holds its label.
 .frequency-options {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
-}
-
-.frequency-option {
-  display: inline-flex;
-  align-items: flex-start;
-  gap: var(--space-2);
-  cursor: pointer;
-
-  input {
-    margin-block-start: 3px; // token-lint-ignore: optical alignment with the first line of text
-  }
 }
 
 .frequency-text {

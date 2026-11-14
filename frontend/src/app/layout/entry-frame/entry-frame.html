@@ -13,7 +13,8 @@
         reloads the page in that language.
       -->
       <div
-        class="segmented entry-language"
+        app-segmented
+        class="entry-language"
         role="group"
         aria-label="Language"
         i18n-aria-label="@@entry.language"
@@ -47,12 +48,18 @@
     <svg
       class="entry-story-mark"
       [class.is-settling]="settle"
-      viewBox="2 4 23 23"
+      [attr.viewBox]="mark.viewBox"
       aria-hidden="true"
       focusable="false"
     >
-      <path class="mark-ai" [attr.d]="markPaths.ai" />
-      <path class="mark-human" [attr.d]="markPaths.human" />
+      <circle class="mark-ai" [attr.cx]="mark.ai.cx" [attr.cy]="mark.ai.cy" [attr.r]="mark.ai.r" />
+      <circle
+        class="mark-team"
+        [attr.cx]="mark.team.cx"
+        [attr.cy]="mark.team.cy"
+        [attr.r]="mark.team.r"
+      />
+      <path class="mark-lens" [attr.d]="mark.lens" />
     </svg>
 
     <h2 id="entry-story-title" class="entry-tagline" i18n="@@entry.tagline">

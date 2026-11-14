@@ -152,6 +152,10 @@
       html[lang='ar'] [data-boot-lang='en'] {
         display: none;
       }
+
+      html[lang='ar'] .boot-name-latin {
+        order: 1;
+      }
     </style>
   </head>
   <body>
@@ -171,10 +175,9 @@
       global stylesheet is a blocking <link> in <head>, so the tokens exist by
       the time this paints, and the script above has already chosen the theme.
 
-      The lockup -- the mark and the wordmark, Nabra or نبرة -- is the same as
-      the sidebar's; the mark has the geometry of BrandMark and
-      public/nabra-icon.v1.svg. Nothing moves: this is a loading state, not a
-      splash screen.
+      The lockup -- the mark and both names, outlined -- is BrandLockup's
+      (Phase 39.2b). Nothing moves: this is a loading state, not a splash
+      screen.
 
       aria-live and role="status" so a screen reader is told something is
       happening rather than meeting silence.
@@ -195,58 +198,59 @@
           font-family: var(--font-sans, system-ui, sans-serif);
         "
       >
-        <div style="display: flex; align-items: center; gap: 0.75rem">
+        <!--
+          The lockup (brand.md): the two-circle mark, then "Nabra" (Geist 600)
+          and «نبرة» (IBM Plex Sans Arabic 700) as outlined paths, so it needs
+          no font; on Arabic pages the Arabic name comes first (the rule in
+          <head>). The geometry is BrandMark's and BrandLockup's
+          (src/app/shared/brand-mark/brand-geometry.ts): keep them in step.
+        -->
+        <div
+          class="boot-lockup"
+          aria-hidden="true"
+          style="
+            display: flex;
+            align-items: center;
+            gap: 0.5em;
+            font-size: 1.375rem;
+            line-height: 1;
+          "
+        >
           <svg
-            viewBox="2 4 23 23"
-            width="36"
-            height="36"
+            viewBox="0 0 140 120"
             aria-hidden="true"
             focusable="false"
-            style="display: block"
+            style="display: block; width: 1.4em; height: 1.2em; margin-inline-end: 0.1em"
           >
+            <circle cx="52" cy="60" r="40" style="fill: var(--brand-ai)" />
+            <circle cx="88" cy="60" r="40" style="fill: var(--brand-team)" />
             <path
-              style="fill: var(--voice-ai-fg, #235347)"
-              d="M4.4 18.35 3.5 23l4.7-1.6.54-.21A9.5 9.5 0 0 1 17.02 7 8.5 8.5 0 0 0 4.4 18.35Z"
-            />
-            <path
-              style="fill: var(--voice-human-fg, #7a5c1e)"
-              d="M17 9a7.5 7.5 0 0 1 5.8 12.25l.8 4.25-4.1-1.4A7.5 7.5 0 1 1 17 9Z"
+              d="M70 24.28 A40 40 0 0 1 70 95.72 A40 40 0 0 1 70 24.28 Z"
+              style="fill: var(--brand-lens)"
             />
           </svg>
-          <!--
-            The wordmark, in the page's language: "Nabra" in Geist, "نبرة" in
-            IBM Plex Sans Arabic (untracked, through :lang(ar)). Weight 600, so
-            an Arabic first paint needs no 700 file; 39.2b replaces both with
-            the outlined lockup.
-          -->
-          <span
-            class="boot-wordmark"
-            data-boot-lang="en"
-            lang="en"
-            style="
-              color: var(--text-primary, #1b2420);
-              font-size: 1.375rem;
-              font-weight: 600;
-              font-stretch: var(--heading-stretch, 86%);
-              letter-spacing: var(--letter-spacing-tight, 0);
-              line-height: 1.4;
-            "
-            >Nabra</span
+          <svg
+            class="boot-name-latin"
+            viewBox="0 -1085 2874 1500"
+            aria-hidden="true"
+            focusable="false"
+            style="display: block; width: 2.874em; height: 1.5em; fill: var(--color-text)"
           >
-          <span
-            class="boot-wordmark"
-            data-boot-lang="ar"
-            lang="ar"
-            style="
-              color: var(--text-primary, #1b2420);
-              font-size: 1.375rem;
-              font-weight: 600;
-              font-stretch: var(--heading-stretch, 86%);
-              letter-spacing: var(--letter-spacing-tight, 0);
-              line-height: 1.4;
-            "
-            >نبرة</span
+            <path
+              d="M80 0V-710H232L538 -176V-710H668V0H512L210 -519V0ZM963 12Q879 12 828 -26Q777 -65 777 -134Q777 -203 820 -242Q863 -281 951 -298L1128 -333Q1128 -390 1102 -418Q1076 -447 1025 -447Q979 -447 952 -425Q926 -404 916 -364L786 -370Q802 -455 864 -500Q926 -546 1025 -546Q1139 -546 1198 -489Q1256 -431 1256 -324V-130Q1256 -109 1264 -101Q1271 -93 1286 -93H1303V0Q1297 2 1283 3Q1270 4 1256 4Q1223 4 1197 -6Q1171 -17 1157 -43Q1143 -70 1143 -116L1154 -108Q1146 -73 1119 -45Q1093 -18 1053 -3Q1013 12 963 12ZM989 -81Q1032 -81 1063 -98Q1094 -115 1111 -145Q1128 -175 1128 -216V-246L990 -218Q947 -209 929 -191Q910 -174 910 -146Q910 -115 930 -98Q951 -81 989 -81ZM1667 12Q1611 12 1569 -12Q1528 -36 1505 -79L1502 0H1380V-710H1508V-458Q1530 -495 1571 -520Q1612 -546 1667 -546Q1736 -546 1786 -512Q1837 -477 1864 -415Q1892 -352 1892 -267Q1892 -182 1864 -119Q1837 -57 1786 -22Q1736 12 1667 12ZM1638 -92Q1693 -92 1726 -138Q1759 -185 1759 -267Q1759 -350 1727 -396Q1694 -442 1639 -442Q1598 -442 1568 -422Q1539 -401 1524 -362Q1508 -323 1508 -267Q1508 -213 1524 -174Q1539 -134 1568 -113Q1597 -92 1638 -92ZM1991 0V-534H2111L2116 -386L2105 -388Q2117 -465 2151 -500Q2184 -534 2242 -534H2291V-424H2241Q2200 -424 2173 -412Q2146 -400 2133 -375Q2119 -349 2119 -308V0ZM2519 12Q2435 12 2384 -26Q2333 -65 2333 -134Q2333 -203 2376 -242Q2419 -281 2507 -298L2684 -333Q2684 -390 2658 -418Q2632 -447 2581 -447Q2535 -447 2508 -425Q2482 -404 2472 -364L2342 -370Q2358 -455 2420 -500Q2482 -546 2581 -546Q2695 -546 2754 -489Q2812 -431 2812 -324V-130Q2812 -109 2820 -101Q2827 -93 2842 -93H2859V0Q2853 2 2839 3Q2826 4 2812 4Q2779 4 2753 -6Q2727 -17 2713 -43Q2699 -70 2699 -116L2710 -108Q2702 -73 2675 -45Q2649 -18 2609 -3Q2569 12 2519 12ZM2545 -81Q2588 -81 2619 -98Q2650 -115 2667 -145Q2684 -175 2684 -216V-246L2546 -218Q2503 -209 2485 -191Q2466 -174 2466 -146Q2466 -115 2486 -98Q2507 -81 2545 -81Z"
+            />
+          </svg>
+          <svg
+            class="boot-name-arabic"
+            viewBox="0 -1085 1378 1500"
+            aria-hidden="true"
+            focusable="false"
+            style="display: block; width: 1.378em; height: 1.5em; fill: var(--color-text)"
           >
+            <path
+              d="M231 12Q131 12 76 -41Q20 -94 20 -191Q20 -251 50 -314Q80 -377 141 -435L161 -454H307L328 -436Q388 -385 415 -332Q442 -279 442 -213Q442 -107 386 -48Q331 12 231 12ZM241 -138Q289 -138 316 -155Q342 -172 342 -201Q342 -210 338 -220Q335 -230 325 -242Q315 -254 298 -270Q281 -286 254 -307L219 -334H211L182 -306Q165 -289 153 -276Q141 -263 134 -252Q126 -240 123 -229Q120 -218 120 -206Q120 -176 146 -157Q173 -138 221 -138ZM303 -534Q277 -534 260 -550Q244 -566 244 -601Q244 -636 260 -652Q277 -668 303 -668H323Q349 -668 366 -652Q382 -636 382 -601Q382 -566 366 -550Q349 -534 323 -534ZM145 -534Q119 -534 102 -550Q86 -566 86 -601Q86 -636 102 -652Q119 -668 145 -668H165Q191 -668 208 -652Q224 -636 224 -601Q224 -566 208 -550Q191 -534 165 -534ZM402 90H442Q533 90 576 53Q618 16 617 -70Q617 -93 614 -118Q611 -144 606 -173L585 -306L694 -323L705 -250L870 -277V-363H980V-224Q980 -179 998 -164Q1016 -150 1060 -150H1090V-30L1060 0H1049Q973 0 931 -30Q889 -61 876 -130L725 -105Q726 -97 726 -89Q726 -81 726 -75Q726 -3 708 55Q690 113 654 154Q618 196 565 218Q512 240 443 240H402ZM914 215Q888 215 872 199Q855 183 855 148Q855 113 872 97Q888 81 914 81H934Q960 81 976 97Q993 113 993 148Q993 183 976 199Q960 215 934 215ZM1060 -120 1090 -150H1119Q1155 -150 1178 -153Q1202 -156 1216 -164Q1231 -171 1236 -182Q1242 -194 1242 -211Q1242 -226 1240 -250Q1237 -273 1230 -311L1213 -404L1322 -422L1337 -329Q1342 -302 1345 -269Q1348 -236 1348 -211Q1348 -102 1294 -51Q1241 0 1119 0H1060ZM1242 -502Q1216 -502 1200 -518Q1183 -534 1183 -569Q1183 -604 1200 -620Q1216 -636 1242 -636H1262Q1288 -636 1304 -620Q1321 -604 1321 -569Q1321 -534 1304 -518Q1288 -502 1262 -502Z"
+            />
+          </svg>
         </div>
         <p
           role="status"

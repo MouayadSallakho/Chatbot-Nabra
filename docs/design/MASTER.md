@@ -7,19 +7,21 @@
 
 - Status: **Phase 39 in progress.** "Calm Glass" (the owner's choice, Phase 39 pack
   `reference/calm-glass.md`) replaces the Phase 36 "Two Voices" visuals and keeps their idea.
-  The foundations are in place (39.2a): tokens, themes, reduced transparency, forced colours,
-  motion tokens, the glass mixin, the fonts and the contrast table (sections 3 to 7 and 13).
-  The components and the Design Lab follow in 39.2b; each screen's layout in 39.3 to 39.8.
-  Until 39.2b, sections 0 to 2, 6 (icons and the mark) and 8 to 11 still describe the Two
-  Voices components where they say so; the colour names there map as in section 3.
-- Last updated: 2026-11-14 (Phase 39.2a: foundations)
+  The foundations (39.2a: tokens, themes, reduced transparency, forced colours, motion, the glass
+  mixin, the fonts and the contrast table) and the components (39.2b: the choice-control family,
+  buttons, chips, inputs, segmented controls, rows and avatars, bubbles, event lines, the orb,
+  menus, popovers, tooltips, dialogs, toasts, skeletons, empty states, the new mark and the
+  outlined lockup) are in place and shown in the Design Lab. Each screen's layout follows in 39.3
+  to 39.8; until a screen's step, its markup keeps the Two Voices class names, restyled in place.
+- Last updated: 2026-11-14 (Phase 39.2b: components)
 - Specification: `calm-glass.md`, `brand.md` and the boards in the Phase 39 pack; the approved
   plan is `docs/phase-reports/PHASE_39_0_REDESIGN_PLAN_REPORT.md` (with the owner's decisions
   in its section 12).
 - Implementation: `frontend/src/styles/_tokens.scss` (values), `_fonts.scss`, `_glass.scss`,
-  `_base.scss`, `_primitives.scss`, `_charts.scss`, `_authoring.scss`, `_admin.scss`,
-  `src/app/shared/voice/`, `src/app/shared/charts/`, `src/app/shared/brand-mark/`. The
-  development-only Design Lab (`/design-lab`) shows all of it on one page.
+  `_base.scss`, `_primitives.scss`, `_charts.scss`, `_authoring.scss`, `_admin.scss`, and the
+  shared components in `src/app/shared/` (`choice/`, `segmented/`, `chip/`, `avatar/`, `orb/`,
+  `event-line/`, `tooltip/`, `glass/`, `brand-mark/`, `voice/`, `charts/`). Section 14 lists
+  every component. The development-only Design Lab (`/design-lab`) shows all of it on one page.
 
 ## 0. Name
 
@@ -31,10 +33,13 @@
   sentence it takes the grammar of a feminine noun ("نبرة لا تستجيب", "الانتقال إلى نبرة",
   "تسجيل الدخول إلى نبرة"). In English copy it is "Nabra", never "NABRA" or "nabra".
 - Tagline: "Two voices. One tone." / «صوتان… بنبرة واحدة».
-- Wordmark: "Nabra" in Instrument Sans, narrowed like every title (`--heading-stretch`, tight
-  tracking); "نبرة" in IBM Plex Sans Arabic at full width with no tracking (the same tokens under
-  `:lang(ar)`). Always beside the mark, in the page's language: sidebar, sign-in, registration,
-  invitation, workspace chooser, loading state. No other font files.
+- Lockup (`app-brand-lockup`, brand.md): the mark, then "Nabra" in Geist 600, then «نبرة» in
+  IBM Plex Sans Arabic 700, on one line; on Arabic pages the Arabic name comes first. The two
+  names are **outlined paths** (`shared/brand-mark/brand-geometry.ts`, from the self-hosted OFL
+  files), so the logo needs no font at runtime and is exact in forced colours; running text never
+  uses outlined glyphs. One named image (`role="img"`, the product's name in the page's
+  language). Used by the loading state (`index.html` and `BootState`) from 39.2b; the side bar
+  (39.3) and the entry pages (39.8a) adopt it in their steps.
 - Tab titles: "<page> · Nabra" and "<page> · نبرة" (`AppTitleStrategy`).
 - **"OmniAI" is never shown to users.** It is the internal code name only: the repository,
   namespaces, folders, CSS classes, `data-testid`s, i18n message IDs, `localStorage` and cookie
@@ -59,33 +64,36 @@
 
 ## 2. Design direction
 
-- Concept: every Nabra conversation is a duet between the AI and the team. The interface gives
-  each voice one colour and shows the handoff between them everywhere. Colour is information,
-  not decoration; everything else is calm ink on porcelain.
+- Concept: **one tone, two voices.** Every Nabra conversation is a duet between the AI and the
+  team; the customer is the third voice. The AI speaks in emerald, the team in gold, the
+  customer in plain cream, on every screen, in the widget, in emails and in report files. Glass
+  only where things float; everything a person reads or edits sits on solid panels with strong
+  contrast. Calm: generous space, few borders, soft shadows only on glass, one accent per area,
+  motion that explains a change and then stops.
 - Principles:
-  1. The two voice colours mean only "the AI" (Lagoon) and "a person on the team" (Ember).
-     Never decorative, never status.
-  2. Ink is the action colour: primary buttons are ink on light and porcelain on dark. Links are
-     ink and always underlined.
-  3. Calm surfaces, crisp hairlines, depth only for overlays.
-  4. Type with character: Instrument Sans narrowed for headings, IBM Plex Sans Arabic for
-     Arabic, tabular figures for numbers.
-  5. The handoff is the hero moment: chip, track, split bar and the "Take over" transition.
+  1. The voice colours mean only "the AI" (emerald), "the team" (gold) and "the customer"
+     (cream). Never decoration. Status words reuse the hues only with their own glyph (Q4).
+  2. Emerald is the action colour: primary buttons, links (always underlined) and focus.
+  3. Solid panels on a cream ground (emerald-950 in dark), a 1px line, no shadow; glass on the
+     floating layers only, three at most on screen.
+  4. Type: Geist for Latin, IBM Plex Sans Arabic for Arabic, Instrument Serif for one display
+     line (the overview greeting, empty states, entry pages), tabular figures for numbers.
+  5. The handoff is the hero moment: chips, the event line, the split bar and the "Take over"
+     colour change.
   6. Real data only. If the API cannot tell it, the design does not show it.
-- Alternatives considered (Phase 36 direction study): the generic indigo admin it replaces
-  (rejected: the AI-default look, and colour said nothing), and the other directions in the
-  reference pack.
+- Alternatives considered: the Phase 36 "Two Voices" porcelain-and-ink look it replaces, and
+  the other directions of the Phase 39 canvas (see the plan, section 3).
 
 ### Signature elements
 
-| #   | Element                              | Where                                    | Rule                                                                                                                                                        |
-| --- | ------------------------------------ | ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | Voice chip (`app-voice-chip`)        | conversation rows, headers, legends      | "AI" in Lagoon or "Person" in Ember, always glyph + word                                                                                                    |
-| 2   | Voice split bar (`app-voice-split`)  | Overview "Right now", Analytics          | AI vs people from API counts only; legend + one screen-reader sentence                                                                                      |
-| 3   | Voice track (`app-voice-track`)      | conversation detail header               | 4 px; the real sequence of reply authors; renders nothing it cannot derive                                                                                  |
-| 4   | Handoff divider (`.handoff-divider`) | transcripts                              | only where the replying voice changes, from real message authors or real handoff events                                                                     |
-| 5   | The "Take over" moment               | conversation header chip                 | the chip sweeps Lagoon → Ember in 320 ms (emphasized); "Return to AI" reverses; instant under reduced motion                                                |
-| 6   | The mark (`app-brand-mark`)          | sidebar, sign-in, favicon, loading state | two speech shapes, two voices in one tone (no longer the letter "O" of the code name; geometry unchanged); works at 16 px and in one colour; never mirrored |
+| #   | Element                                    | Where                                             | Rule                                                                                                           |
+| --- | ------------------------------------------ | ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| 1   | Voice chips (`app-voice-chip`, `app-chip`) | rows, headers, legends                            | a dot and a word, emerald for the AI and gold for the team; never colour alone                                 |
+| 2   | Voice split bar (`app-voice-split`)        | Overview, Analytics                               | AI vs people from API counts only; legend + one screen-reader sentence                                         |
+| 3   | Voice track (`app-voice-track`)            | conversation detail header                        | 4 px; the real sequence of reply authors; renders nothing it cannot derive                                     |
+| 4   | Event line (`app-event-line`)              | transcripts                                       | a centred line with words where something happened (failed turn in coral, takeover in gold, return in emerald) |
+| 5   | The orb (`app-orb`)                        | beside the AI's bubbles, the widget's greeting    | the AI's presence; breathes only while the AI answers, still under reduced motion; the state is said in words  |
+| 6   | The mark (`app-brand-mark`)                | side bar, sign-in, loading state, favicon (39.8a) | two circles, the AI and the team, with the lens where they meet; never mirrored, rotated or given a gradient   |
 
 One signature per page: a page leads with at most one of 2, 3 or 5; chips are vocabulary, not
 a signature.
@@ -206,10 +214,11 @@ a changed file is `v2`.
   became 56). Nothing in between. Beside the scale, `--gap-hairline` (2 px) for things that read
   as one. The shell's rhythm: `--shell-padding` 14 px around the shell, `--column-gap` 12 px
   between columns, `--panel-padding` 24 px inside panels (39.3 onward).
-- Density: controls 32 / 36 / 40 px (`--control-height-sm`, default, `-lg`), raised to 40-44 px
-  under `pointer: coarse`, until 39.2b restyles buttons and inputs to Calm Glass's 44 px
-  (`--control-height-dense` 40 px in dense desktop headers). `--target-min` 44 px for every touch
-  target, the label included. Targets never under 24 px.
+- Density: buttons and inputs are 44 px (`--control-height`); the dense size is 40 px
+  (`--control-height-sm`, `.btn-sm`: desktop headers, toolbars, rows); every one is 44 px under
+  `pointer: coarse`. `--target-min` 44 px for every touch target, the label included: each
+  choice control's label is a 44 px target on every pointer. Segments are 36 px on a 44 px
+  track with a fine pointer, 44 px on touch. Targets never under 24 px.
 - Page frame: content capped at 1600 px; gutter 24 px, 16 px under 576 px.
 - Patterns: page header + sections (not card soup); `.data-list` for record lists whose rows
   are links; `.table` for real tabular data; one pager pattern with the page in the URL.
@@ -220,15 +229,24 @@ a changed file is `v2`.
   widget's input), `--radius-input` 12 (inputs, small cards; the old `--radius-control`),
   `--radius-nav-item` 12, `--radius-tile` 16 (rows and tiles; the old `--radius-card`),
   `--radius-panel` 24, `--radius-dialog` 24 (the old `--radius-overlay`), `--radius-bubble` 18
-  with a 6 px "tail" corner on the speaker's side (logical corners, so it mirrors in RTL).
-  `--radius-badge` 6 stays for checkboxes and small marks until 39.2b's choice controls.
+  with a 6 px "tail" corner on the speaker's side (logical corners, so it mirrors in RTL),
+  `--radius-toast` 18; `--choice-radius` 6 for the checkbox box; `--radius-badge` 6 for keys
+  and other small marks.
 - Nested radius: inner = outer − padding.
+- The mark (brand.md, direction A): two circles of radius 40 at (52, 60) and (88, 60) in a
+  140 × 120 box, the AI in `--brand-ai` (emerald-700; dark emerald-100), the team in
+  `--brand-team` (gold-500), and the lens where they overlap in `--brand-lens` (emerald-900;
+  dark emerald-300). One colour (`tone="mono"`, and forced colours): the two outlines and the
+  filled lens in `currentColor`. Never rotated, mirrored or given a gradient; clear space half a
+  radius; smallest 16 px. `--brand-mark-size` sets its width. Favicons and app icons follow in
+  39.8a (`nabra-icon.v1.*` still draws the Phase 36 shapes until then).
 - Icons: one authored 24 px outline set (`app-icon`), stroke 1.6 with round caps and joins.
   Voice glyphs `ai` (a calm bot face, never a sparkle) and `person`. Channel glyphs are generic
   (`website`, `whatsapp` as a phone in a bubble, `instagram` as a camera, `messenger` as two
   bubbles) and always shown with the channel's name; no recoloured brand logos. Only directional
   icons mirror in RTL; the mark never does.
-- Imagery: none in the admin. No illustrations in empty states.
+- Imagery: none in the admin. No illustrations in empty states: one serif line, one sentence,
+  one action, with a quiet glyph above.
 
 ## 7. Motion
 
@@ -261,7 +279,8 @@ a changed file is `v2`.
 ## 9. Accessibility and RTL commitments
 
 - WCAG 2.2 AA: text 4.5:1 (large 3:1), UI parts 3:1, proven per pair in both themes; targets at
-  least 24 px (44 px on touch); visible focus (2 px ink ring, 2 px offset) never hidden; no
+  least 24 px (44 px on touch); visible focus (a 2 px emerald outline with a 2 px offset; inputs
+  a 2 px emerald border with a 3 px halo, and an outline in forced colours) never hidden; no
   colour-only meaning; reduced motion honoured; forced colours supported (outline focus, the
   mark and voice bars fall back to system colours).
 - `lang` and `dir` on `html` per locale, set before first paint; logical CSS only; transforms
@@ -281,12 +300,18 @@ a changed file is `v2`.
    palette's highlighted option keep their 2 px edge (`.edge-marker`).
 5. Shadows only on glass; glass only on the floating layers of section 3.1, with its solid twin
    under reduced transparency and forced colours.
-6. Every status carries its own icon and word; every voice its glyph and word.
-7. Voice displays (chip, split, track, divider) are drawn only from real API data.
+6. Every status carries its own glyph and word; every voice its dot (or glyph) and word.
+7. Voice displays (chip, split, track, event line) are drawn only from real API data.
 8. No CDN, font service or third-party request from the application.
 9. Components use semantic tokens only; shared rules go to the global layers, not budgets.
 10. Sample content exists only in the development-only Design Lab, labelled as sample. One
     page exception: the labelled example conversation on the entry pages (`pages/entry.md`).
+11. Checkboxes, radios, switches and segmented controls are the choice-control family (section
+    14), on the consumer's own `<label>` and native `<input>`. There is no global
+    `input[type=checkbox]` rule and no `.switch` escape class (Phase 38 notes 3 and 4); a bare
+    checkbox outside the family keeps the browser's look and is a review finding.
+12. `backdrop-filter` is declared only by `@mixin glass` / `.glass` (`_glass.scss`); the Design
+    Lab counts the blurred layers on screen (`countBlurredLayers`, budget 3).
 
 ## 11. Avoid in this project (as of 2026-10)
 
@@ -390,6 +415,11 @@ chip (owner decision Q4).
 | 2026-11-14 | `--voice-ai-meta` for the time inside an AI bubble (stone-600 light, `#C9D8CF` dark)                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | Quiet text on the dark AI bubble is 3.99:1                                                                                                                                                                                          | 39.2a (measured)                                                                                 |
 | 2026-11-14 | Large figures keep a sans token (`--text-figure`) while `--text-display` becomes the serif; the KPI numbers and the entry tagline use it until their steps                                                                                                                                                                                                                                                                                                                                                                                                     | A figure in Instrument Serif would be wrong; layouts change in 39.7a and 39.8a                                                                                                                                                      | 39.2a                                                                                            |
 | 2026-11-14 | Control heights stay 32 / 36 / 40 px (44 on touch) until 39.2b restyles buttons and inputs in place                                                                                                                                                                                                                                                                                                                                                                                                                                                            | Height is layout; 39.2a changes colour and type only                                                                                                                                                                                | 39.2a                                                                                            |
+| 2026-11-14 | The choice controls are attribute components on the consumer's own `<label>` (`label[app-check]`, `[app-radio]`, `[app-switch]`, `[app-segmented]`) with unencapsulated styles scoped to the family's classes; the global checkbox rule and `.switch` are deleted and every use moved.                                                                                                                                                                                                                                                                         | Native behaviour, ids, testids and e2e locators stay; no ControlValueAccessor (plan decision 2); Phase 38 notes 3 and 4.                                                                                                            | Phase 39.2b                                                                                      |
+| 2026-11-14 | Buttons, inputs, badges, bubbles, the handoff divider, menus, toasts, dialogs and skeletons are restyled in place; `app-chip`, `.list-row`, `app-avatar`, `app-event-line`, `app-orb`, `[appTooltip]` and `.popover` are new for the screen steps.                                                                                                                                                                                                                                                                                                             | No template churn before each screen's own step (plan decision 3); every screen takes the new look at once.                                                                                                                         | Phase 39.2b                                                                                      |
+| 2026-11-14 | Controls are 44 px with a 40 px dense size (`.btn-sm`, menu items); coarse pointers get 44 px everywhere.                                                                                                                                                                                                                                                                                                                                                                                                                                                      | calm-glass.md §6; Phase 38 note 3.                                                                                                                                                                                                  | Phase 39.2b                                                                                      |
+| 2026-11-14 | The lockup's names are outlined paths from the self-hosted OFL fonts (HarfBuzz-shaped Arabic); the loading state uses it now, the side bar and entry pages in their steps.                                                                                                                                                                                                                                                                                                                                                                                     | An English page never downloads Arabic 700 for its logo; exact shapes in forced colours.                                                                                                                                            | Phase 39.2b                                                                                      |
+| 2026-11-14 | An Arabic name's avatar shows one letter.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | Two Arabic initials join into a fragment of a word.                                                                                                                                                                                 | Phase 39.2b                                                                                      |
 
 ## 13. Contrast table (Calm Glass, Phase 39.2a)
 
@@ -514,3 +544,69 @@ Result: **436 of 436 required pairs pass, 0 fail**; 28 decorative pairs are repo
 | `--voice-team-dot`         | `--color-panel`                            | 2.24  | 6.72  | 2.24         | 6.72        | 3 (decorative)   |
 | `--chart-team-fill`        | `--color-panel`                            | 2.24  | 6.72  | 2.24         | 6.72        | 3 (decorative)   |
 | `--skeleton-base`          | `--color-panel`                            | 1.19  | 1.18  | 1.19         | 1.18        | 3 (decorative)   |
+
+### 13.1 The components' own pairs (Phase 39.2b)
+
+Measured from the resolved tokens (`p39-2b/chrome/contrast-new.json`); glass is composited over the ground. Text needs 4.5:1; glyphs, marks and control boundaries 3:1. 60 of 60 pass.
+
+| Component               | Pair                                    | Needs | Light | Dark  |
+| ----------------------- | --------------------------------------- | ----- | ----- | ----- |
+| Avatar                  | initials on the avatar                  | 4.5:1 | 8.32  | 7.42  |
+| Avatar                  | WhatsApp badge glyph on its badge       | 3:1   | 3.22  | 4.71  |
+| Avatar                  | website badge glyph on its badge        | 3:1   | 6.24  | 6.71  |
+| Avatar                  | other channel badge glyph on its badge  | 3:1   | 5.73  | 6.05  |
+| Bubble                  | AI speaker on the AI bubble             | 4.5:1 | 12.70 | 8.38  |
+| Bubble                  | team speaker on the team bubble         | 4.5:1 | 6.20  | 8.14  |
+| Bubble                  | customer speaker on the customer bubble | 4.5:1 | 8.84  | 9.24  |
+| Event line              | failed words on the panel               | 4.5:1 | 7.08  | 7.30  |
+| Event line              | takeover words on the panel             | 4.5:1 | 6.22  | 9.38  |
+| Event line              | return-to-AI words on the panel         | 4.5:1 | 8.75  | 6.71  |
+| Event line              | quiet words on the panel                | 4.5:1 | 5.73  | 6.05  |
+| Checkbox, radio         | checked fill against the panel          | 3:1   | 8.75  | 6.71  |
+| Checkbox, radio         | tick or dot on the checked fill         | 3:1   | 8.75  | 7.61  |
+| Checkbox, radio, switch | control border on the panel             | 3:1   | 3.78  | 3.62  |
+| Checkbox, radio, switch | control border on the ground            | 3:1   | 3.35  | 4.10  |
+| Switch                  | off thumb on the off track              | 3:1   | 9.00  | 9.24  |
+| Switch                  | on thumb on the on track                | 3:1   | 8.75  | 7.61  |
+| Segmented               | option words on the track               | 4.5:1 | 9.00  | 9.24  |
+| Segmented               | chosen words on the raised segment      | 4.5:1 | 15.91 | 11.17 |
+| Segmented               | chosen edge on the track                | 3:1   | 3.41  | 3.27  |
+| Chip                    | neutral chip words                      | 4.5:1 | 9.00  | 9.24  |
+| Row                     | unread dot on the panel                 | 3:1   | 8.75  | 6.71  |
+| Row                     | name on the selected tint               | 4.5:1 | 14.35 | 10.55 |
+| Row                     | time (quiet) on the selected tint       | 4.5:1 | 5.17  | 4.82  |
+| Toast                   | success glyph on glass                  | 3:1   | 8.38  | 7.09  |
+| Toast                   | error glyph on glass                    | 3:1   | 6.78  | 7.71  |
+| Tooltip, menu, popover  | text on glass                           | 4.5:1 | 15.24 | 13.98 |
+| Tooltip, menu           | secondary text on glass                 | 4.5:1 | 9.56  | 10.81 |
+| Button                  | secondary words on hover                | 4.5:1 | 13.27 | 11.17 |
+| Input                   | focus border on the panel               | 3:1   | 8.75  | 6.71  |
+
+## 14. Components (Calm Glass, Phase 39.2b)
+
+Each is shown in the Design Lab in both languages and themes, with "Reduce transparency". A
+screen step moves its markup onto these; until then the Two Voices class names are restyled in
+place to the same look (`.btn-ghost` = `.btn-quiet`, `.badge-*` = chips, `.handoff-divider` =
+the event line, `.bubble-human` = the team's bubble). Tests: a Vitest spec beside each.
+
+| Component                                                                                                                            | What it is                                                                                                                                                                                                                                                                                                                                                                        | Tokens                                                                                                           |
+| ------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Choice controls: `label[app-check]`, `label[app-radio]`, `label[app-switch]` (`shared/choice`)                                       | attribute components on the consumer's `<label>` around its native `<input>` (ids, `formControlName`, testids and locators unchanged); a 20 px box (checkbox radius 6, radio round) or a 40×24 track with an 18 px thumb that mirrors in RTL; 44 px target with the label; checked is emerald with a drawn tick or dot; indeterminate is a dash; system colours in forced colours | `--choice-size`, `--choice-radius`, `--switch-inline/-block/-thumb`, `--color-control-border`, `--color-primary` |
+| Segmented control: `[app-segmented]` (`shared/segmented`)                                                                            | the consumer's container; options are `label.segmented-option` around a hidden radio (forms), `a.segmented-option[aria-current]` (an address: never `role="tab"`), or `button.segmented-option[aria-pressed]` (acts at once); soft pill track, the chosen one raised on the panel with a control-border edge and weight 600                                                       | `--color-panel-soft`, `--color-panel-raised`, `--color-control-border`                                           |
+| Buttons: `.btn` + `.btn-primary`, `-secondary`, `-quiet` (`-ghost`), `-danger`, `-danger-ghost`, `-link`, `-icon`, `-sm`, `-loading` | pills, 44 px (40 dense), 600; primary emerald, secondary a panel with a line, quiet text only; icon-only round with an accessible name; busy keeps its size and its visually hidden label                                                                                                                                                                                         | `--control-height(-sm)`, `--text-button(-sm)`, `--radius-pill`                                                   |
+| Inputs: `.input`, `.select`, `.textarea` (`.form-*`)                                                                                 | 44 px, radius 12, the control border; focus a 2 px emerald border and a 3 px halo; `aria-invalid` coral                                                                                                                                                                                                                                                                           | `--radius-input`, `--color-focus-ring`, `--color-focus-halo`                                                     |
+| Chips: `app-chip` (`shared/chip`), `.chip-*`                                                                                         | a 24 px pill (22 dense), a 7 px dot and a word; tones need, team, waiting (gold), ai (emerald), failed (coral), neutral; status tones success, warning, danger, info with their own glyph                                                                                                                                                                                         | `--chip-need/ai/failed/neutral-*`, `--status-*`, `--chip-height(-sm)`                                            |
+| Voice chip: `app-voice-chip`                                                                                                         | a chip naming the voice ("AI", "Person" or a colleague); its colours cross over when the voice changes                                                                                                                                                                                                                                                                            | `--chip-ai-*`, `--chip-need-*`                                                                                   |
+| Rows: `.list-row` + `-body`, `-head`, `-name`, `-time`, `-preview`, `-chips`, `.unread-dot`                                          | radius 16, avatar, name and time, one line of preview, chips; selected a faint emerald tint; unread a dot, a heavier name and the word in the accessible name; solid, never blurred                                                                                                                                                                                               | `--radius-tile`, `--color-selected`, `--color-hover`                                                             |
+| Avatar: `app-avatar` (`shared/avatar`)                                                                                               | initials (one letter for an Arabic name) or a code, 40 / 34 / 64 px; the channel's badge with its glyph (WhatsApp green, the website emerald-600); decorative                                                                                                                                                                                                                     | `--avatar-*`, `--channel-*`                                                                                      |
+| Bubbles: `.bubble` + `-ai`, `-team` (`-human`), `-customer`                                                                          | the three voices; 18 px corners, 6 px on the speaker's side; the team's gold edge drawn inside; rise 8 px and fade                                                                                                                                                                                                                                                                | `--voice-*`, `--radius-bubble(-tail)`, `--motion-rise`                                                           |
+| Event line: `app-event-line`, `.event-line`                                                                                          | `role="note"`, a centred line with words; tones quiet, failed (coral), team, ai                                                                                                                                                                                                                                                                                                   | `--event-failed-line`, `--voice-*-edge`                                                                          |
+| Orb: `app-orb` (`shared/orb`)                                                                                                        | the AI's presence, 26 / 64 px; breathes while the AI answers; `aria-hidden`                                                                                                                                                                                                                                                                                                       | `--orb-gradient`, `--orb-size(-lg)`, `--orb-breath`                                                              |
+| Menus, popovers: `app-menu` + `.menu`, `.popover`                                                                                    | glass, radius 16; roving focus, Escape and focus return are the Menu directive's                                                                                                                                                                                                                                                                                                  | `--glass-*`, `--radius-tile`                                                                                     |
+| Tooltip: `[appTooltip]` (`shared/tooltip`)                                                                                           | small glass, on hover and keyboard focus, hoverable, Escape dismisses; hidden from the accessibility tree, `aria-describedby` only when it adds to the name                                                                                                                                                                                                                       | `--glass-*`, `--radius-input`                                                                                    |
+| Dialogs: `app-confirm-dialog` (native `<dialog>`), the command palette                                                               | glass on the scrim, radius 24, in the top layer; focus trapped, Escape closes, focus returns                                                                                                                                                                                                                                                                                      | `--glass-*`, `--scrim`, `--radius-dialog`                                                                        |
+| Toasts: `app-toast-host`                                                                                                             | glass, radius 18, a glyph and a sentence, polite (`role="status"`) or at once (`role="alert"`), held on hover and focus; 39.3 places them                                                                                                                                                                                                                                         | `--glass-*`, `--radius-toast`                                                                                    |
+| Surfaces: `.panel-surface`, `.tile-surface`, `.glass`                                                                                | a panel (radius 24, a line, no shadow), a tile inside it (radius 16, the soft fill), glass (the only shadow)                                                                                                                                                                                                                                                                      | `--color-panel(-soft)`, `--radius-panel/-tile`                                                                   |
+| Skeletons: `.skeleton` + `-text`, `-title`, `-bar`, `-bubble`, `-avatar`                                                             | a soft sheen that stops under reduced motion; each screen step draws its own geometry                                                                                                                                                                                                                                                                                             | `--skeleton-base/-sheen`                                                                                         |
+| Empty state: `app-empty-state`                                                                                                       | one serif line (Plex Arabic 600 in Arabic), one sentence, one action, a quiet glyph (coral for the error tone)                                                                                                                                                                                                                                                                    | `--text-empty`                                                                                                   |
+| Brand: `app-brand-mark`, `app-brand-lockup`                                                                                          | section 6 and section 0                                                                                                                                                                                                                                                                                                                                                           | `--brand-ai/-team/-lens`                                                                                         |

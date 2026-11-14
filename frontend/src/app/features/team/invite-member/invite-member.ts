@@ -23,6 +23,7 @@ import { PageHeader } from '@app/shared/page-header/page-header';
 import { permissionCount } from '@app/features/roles/permission-words';
 import { AssignableRole, TeamApi } from '../team-api';
 import { roleList, rolesSelected } from '../team-words';
+import { Check } from '@app/shared/choice/choice';
 
 /**
  * Inviting somebody to the workspace.
@@ -44,7 +45,7 @@ import { roleList, rolesSelected } from '../team-words';
 @Component({
   selector: 'app-invite-member',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, RouterLink, PageHeader, EmptyState, Icon],
+  imports: [ReactiveFormsModule, RouterLink, PageHeader, EmptyState, Icon, Check],
   templateUrl: './invite-member.html',
   styleUrl: './invite-member.scss',
 })

@@ -17,6 +17,8 @@
 // motion tokens, so a feature never has to invent one.
 // -----------------------------------------------------------------------------
 
+@use 'glass' as *;
+
 // -----------------------------------------------------------------------------
 // Page layout
 // -----------------------------------------------------------------------------
@@ -66,11 +68,13 @@ app-page-header + * > .page-section:first-child {
 }
 
 // -----------------------------------------------------------------------------
-// Buttons
+// Buttons (calm-glass.md §6)
 // -----------------------------------------------------------------------------
-// Ink is the action colour: the primary button is ink on porcelain (porcelain
-// on night shift). Press is a 1px settle, not a bounce; colour changes take the
-// short durations so a click reads as a response rather than an animation.
+// Pills, 44px tall (40px in the dense size), weight 600. Primary is the emerald
+// fill, one per area; secondary is a panel with a line; quiet is text only.
+// Press is a 1px settle, not a bounce, on the 120ms press duration. A class
+// family rather than a component (plan 39.0, decision 3): a native <button>
+// needs no wrapper to be correct.
 .btn {
   position: relative;
   display: inline-flex;
@@ -78,27 +82,27 @@ app-page-header + * > .page-section:first-child {
   justify-content: center;
   gap: var(--space-2);
   min-block-size: var(--control-height);
-  padding-inline: var(--space-4);
+  padding-inline: var(--space-5);
   padding-block: 0;
   border: 1px solid transparent;
-  border-radius: var(--radius-control);
-  font: var(--text-body-strong);
+  border-radius: var(--radius-pill);
+  font: var(--text-button);
   text-decoration: none;
   white-space: nowrap;
   cursor: pointer;
   user-select: none;
   transition:
-    background-color var(--duration-sm) var(--ease-standard),
-    border-color var(--duration-sm) var(--ease-standard),
-    color var(--duration-sm) var(--ease-standard),
-    transform var(--duration-xs) var(--ease-standard);
+    background-color var(--duration-press) var(--ease-calm),
+    border-color var(--duration-press) var(--ease-calm),
+    color var(--duration-press) var(--ease-calm),
+    transform var(--duration-press) var(--ease-calm);
 
   &:hover {
     text-decoration: none;
   }
 
   &:active:not(:disabled, [aria-disabled='true'], .btn-loading) {
-    transform: translateY(1px);
+    transform: translateY(calc(1px * var(--motion-travel)));
   }
 
   // Disabled is a real state, not a dimmed one: the cursor changes, the colours
@@ -117,70 +121,73 @@ app-page-header + * > .page-section:first-child {
   }
 }
 
-// The single high-emphasis action on a view. There should rarely be two.
+// The single high-emphasis action in an area.
 .btn-primary {
-  background-color: var(--action);
-  color: var(--on-action);
+  background-color: var(--color-primary);
+  color: var(--color-on-primary);
 
   &:hover:not(:disabled) {
-    background-color: var(--action-hover);
-    color: var(--on-action);
+    background-color: var(--color-primary-hover);
+    color: var(--color-on-primary);
   }
 
   &:active:not(:disabled) {
-    background-color: var(--action-pressed);
+    background-color: var(--color-primary-pressed);
   }
 }
 
-// The default. Most buttons are this one.
+// The default. Most buttons are this one: a panel with a line.
 .btn-secondary {
-  background-color: var(--surface-default);
-  border-color: var(--border-strong);
-  color: var(--text-primary);
+  background-color: var(--color-panel);
+  border-color: var(--color-line-strong);
+  color: var(--color-text);
 
   &:hover:not(:disabled) {
-    background-color: var(--surface-hover);
-    border-color: var(--border-control);
-    color: var(--text-primary);
+    background-color: var(--color-hover);
+    border-color: var(--color-control-border);
+    color: var(--color-text);
   }
 
   &:active:not(:disabled) {
-    background-color: var(--surface-selected);
+    background-color: var(--color-selected);
   }
 }
 
-// Low emphasis, for actions that sit inside dense surfaces such as toolbars.
+// Quiet: text only, for actions inside dense surfaces such as toolbars.
+// `.btn-ghost` is the Two Voices name of the same button (39.8b removes it).
+.btn-quiet,
 .btn-ghost {
   background-color: transparent;
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
 
   &:hover:not(:disabled) {
-    background-color: var(--surface-hover);
-    color: var(--text-primary);
+    background-color: var(--color-hover);
+    color: var(--color-text);
   }
 
   &:active:not(:disabled) {
-    background-color: var(--surface-selected);
+    background-color: var(--color-selected);
   }
 }
 
 // Destructive actions are visually distinct, because "delete" and "save" must
 // never be one misread away from each other.
 .btn-danger {
-  background-color: var(--danger-solid);
-  color: var(--danger-contrast);
+  background-color: var(--status-danger-solid);
+  color: var(--status-on-danger-solid);
 
   &:hover:not(:disabled) {
-    background-color: var(--danger-solid-hover);
-    color: var(--danger-contrast);
+    background-color: var(--status-danger-solid-hover);
+    color: var(--status-on-danger-solid);
   }
 }
 
+// The dense size: desktop headers, toolbars and rows (44px on touch).
 .btn-sm {
   min-block-size: var(--control-height-sm);
-  padding-inline: var(--space-3);
+  padding-inline: var(--space-4);
   gap: var(--space-1);
-  font: var(--text-label);
+  font: var(--text-button-sm);
 
   .icon {
     inline-size: var(--icon-size-sm);
@@ -190,41 +197,42 @@ app-page-header + * > .page-section:first-child {
 
 .btn-lg {
   min-block-size: var(--control-height-lg);
-  padding-inline: var(--space-5);
+  padding-inline: var(--space-6);
 }
 
 // A low-emphasis destructive action: the rare "Remove" that sits in a list and
 // must not shout, but must still never be mistaken for a neutral one.
 .btn-danger-ghost {
   background-color: transparent;
-  color: var(--danger-fg);
+  color: var(--status-danger-fg);
 
   &:hover:not(:disabled) {
-    background-color: var(--danger-bg);
-    color: var(--danger-fg);
+    background-color: var(--status-danger-bg);
+    color: var(--status-danger-fg);
   }
 
   &:active:not(:disabled) {
-    border-color: var(--danger-border);
+    border-color: var(--status-danger-border);
   }
 }
 
-// Reads as a link, behaves as a button: for inline actions inside prose. Ink
-// and underlined, exactly like a real link.
+// Reads as a link, behaves as a button: for inline actions inside prose.
+// Emerald and underlined, exactly like a real link.
 .btn-link {
   min-block-size: auto;
   padding: 0;
   border: 0;
+  border-radius: 0;
   background: none;
-  color: var(--link);
+  color: var(--color-link);
   font: inherit;
-  font-weight: 550;
+  font-weight: 500;
   text-decoration: underline;
   text-decoration-thickness: 1px;
   text-underline-offset: 0.2em;
 
   &:hover:not(:disabled) {
-    color: var(--link-hover);
+    color: var(--color-link-hover);
     text-decoration: underline;
     text-decoration-thickness: 2px;
   }
@@ -234,8 +242,9 @@ app-page-header + * > .page-section:first-child {
   }
 }
 
-// A square button whose only content is an icon. The accessible name has to come
-// from aria-label or visually hidden text; there is no label to fall back on.
+// A round button whose only content is an icon. The accessible name has to
+// come from aria-label or visually hidden text; there is no label to fall back
+// on (the design lab's check counts unnamed buttons).
 .btn-icon {
   inline-size: var(--control-height);
   padding-inline: 0;
@@ -253,7 +262,9 @@ app-page-header + * > .page-section:first-child {
   cursor: progress;
   color: transparent;
 
-  > :not(.spinner) {
+  // A visually hidden label stays in the accessibility tree, so the button
+  // keeps its name while it is busy.
+  > :not(.spinner, .visually-hidden) {
     visibility: hidden;
   }
 
@@ -269,21 +280,29 @@ app-page-header + * > .page-section:first-child {
   color: transparent;
 
   > .spinner {
-    color: var(--on-action);
+    color: var(--color-on-primary);
   }
 }
 
 .btn-danger.btn-loading > .spinner {
-  color: var(--danger-contrast);
+  color: var(--status-on-danger-solid);
 }
 
 .btn-secondary.btn-loading > .spinner,
+.btn-quiet.btn-loading > .spinner,
 .btn-ghost.btn-loading > .spinner {
-  color: var(--text-primary);
+  color: var(--color-text);
 }
 
 .btn-danger-ghost.btn-loading > .spinner {
-  color: var(--danger-fg);
+  color: var(--status-danger-fg);
+}
+
+// Forced colours: a button keeps a real border, so it still reads as one.
+@media (forced-colors: active) {
+  .btn:not(.btn-link) {
+    border-color: ButtonText;
+  }
 }
 
 .spinner {
@@ -303,6 +322,25 @@ app-page-header + * > .page-section:first-child {
   to {
     transform: rotate(1turn);
   }
+}
+
+// Panels and tiles (`.panel-surface`, `.tile-surface`; the bare names are taken
+// by component classes).
+// Solid panels with a 1px line and no shadow (calm-glass.md §5): only glass
+// casts a shadow. A panel is a page's column (radius 24); a tile sits inside
+// one (radius 16, the soft fill); a card is the Two Voices grouping box, kept
+// at radius 16 until each screen step moves to panels and tiles.
+.panel-surface {
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-panel);
+  background-color: var(--color-panel);
+  padding: var(--panel-padding);
+}
+
+.tile-surface {
+  border-radius: var(--radius-tile);
+  background-color: var(--color-panel-soft);
+  padding: var(--space-3);
 }
 
 // -----------------------------------------------------------------------------
@@ -389,38 +427,94 @@ app-page-header + * > .page-section:first-child {
 }
 
 // -----------------------------------------------------------------------------
-// Badges
+// Chips (calm-glass.md §6) and the status badges they replace
 // -----------------------------------------------------------------------------
-// Status is never colour alone: each status badge draws its own glyph (a tick,
-// a triangle, a stop, an "i") before its word, so it survives greyscale and
-// every colour-vision difference. The glyphs are masks filled with the text
+// A 24px pill (22px in dense rows): a 7px dot, then a word. The dot is the
+// voice's mark; the word carries the meaning, so a chip survives greyscale and
+// every colour-vision difference. `app-chip` draws these classes; the Two
+// Voices `.badge-*` names are the same rules, restyled in place, until each
+// screen step moves its markup (39.8b removes them).
+//
+//   need, team, waiting  gold     needs a person, handled by, waiting
+//   ai                   emerald  the AI is answering
+//   failed               coral    the AI could not reply
+//   neutral              cream    a word with no voice and no status
+//
+// Status words that are not voices (quotas, billing, indexing) reuse the three
+// hues with their own glyph in place of the dot (owner decision Q4): a tick,
+// a triangle, an octagon, an "i". The glyphs are masks filled with the text
 // colour, so they follow the theme with no extra markup.
+.chip,
 .badge {
-  --badge-glyph: none;
+  --chip-glyph: none;
+  --badge-glyph: var(--chip-glyph);
 
   display: inline-flex;
   align-items: center;
-  gap: 0.3125rem;
-  min-block-size: 1.375rem;
-  padding-inline: 0.4375rem var(--space-2);
+  gap: 0.375rem;
+  min-block-size: var(--chip-height);
+  padding-inline: 0.5625rem 0.625rem;
   border: 1px solid transparent;
-  border-radius: var(--radius-badge);
+  border-radius: var(--radius-pill);
+  background-color: var(--chip-bg, var(--chip-neutral-bg));
+  color: var(--chip-fg, var(--chip-neutral-fg));
   font: var(--text-caption);
+  font-weight: 600;
   white-space: nowrap;
   vertical-align: middle;
 
-  // A neutral badge (and any badge without a glyph) keeps the small dot.
   &::before {
     content: '';
     flex: none;
-    inline-size: 0.375rem;
-    block-size: 0.375rem;
+    inline-size: 0.4375rem;
+    block-size: 0.4375rem;
     border-radius: var(--radius-pill);
-    background-color: currentcolor;
+    background-color: var(--chip-dot, currentcolor);
+  }
+
+  // Windows high contrast: the fill is gone, so the pill keeps an outline and
+  // the dot takes the text colour.
+  @media (forced-colors: active) {
+    border-color: CanvasText;
+
+    &::before {
+      background-color: CanvasText;
+    }
   }
 }
 
+.chip-need,
+.chip-team,
+.chip-waiting {
+  --chip-bg: var(--chip-need-bg);
+  --chip-fg: var(--chip-need-fg);
+  --chip-dot: var(--chip-need-dot);
+}
+
+.chip-ai {
+  --chip-bg: var(--chip-ai-bg);
+  --chip-fg: var(--chip-ai-fg);
+  --chip-dot: var(--chip-ai-dot);
+}
+
+.chip-failed {
+  --chip-bg: var(--chip-failed-bg);
+  --chip-fg: var(--chip-failed-fg);
+  --chip-dot: var(--chip-failed-dot);
+}
+
+.chip-neutral,
+.badge-neutral {
+  --chip-bg: var(--chip-neutral-bg);
+  --chip-fg: var(--chip-neutral-fg);
+  --chip-dot: var(--chip-neutral-dot);
+}
+
 // The glyph variants replace the dot with a 12px masked icon.
+.chip-success,
+.chip-warning,
+.chip-danger,
+.chip-info,
 .badge-success,
 .badge-warning,
 .badge-danger,
@@ -429,30 +523,23 @@ app-page-header + * > .page-section:first-child {
     inline-size: 0.75rem;
     block-size: 0.75rem;
     border-radius: 0;
-    mask: var(--badge-glyph) center / contain no-repeat;
+    background-color: currentcolor;
+    mask: var(--chip-glyph) center / contain no-repeat;
   }
 }
 
-.badge-neutral {
-  background-color: var(--surface-muted);
-  border-color: var(--border-default);
-  color: var(--text-secondary);
-}
-
+.chip-success,
 .badge-success {
-  --badge-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 6.3 5 8.7l4.5-5.2' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-
-  background-color: var(--success-bg);
-  border-color: var(--success-border);
-  color: var(--success-fg);
+  --chip-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 6.3 5 8.7l4.5-5.2' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  --chip-bg: var(--status-success-bg);
+  --chip-fg: var(--status-success-fg);
 }
 
+.chip-warning,
 .badge-warning {
-  --badge-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M6 1.2 11.2 10.4H.8z' fill='%23fff'/%3E%3Cpath d='M6 4.6v2.6' stroke='%23000' stroke-width='1.4' stroke-linecap='round'/%3E%3Ccircle cx='6' cy='8.8' r='.75' fill='%23000'/%3E%3C/svg%3E");
-
-  background-color: var(--warning-bg);
-  border-color: var(--warning-border);
-  color: var(--warning-fg);
+  --chip-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M6 1.2 11.2 10.4H.8z' fill='%23fff'/%3E%3Cpath d='M6 4.6v2.6' stroke='%23000' stroke-width='1.4' stroke-linecap='round'/%3E%3Ccircle cx='6' cy='8.8' r='.75' fill='%23000'/%3E%3C/svg%3E");
+  --chip-bg: var(--status-warning-bg);
+  --chip-fg: var(--status-warning-fg);
 
   // Luminance masks: the white shape shows, the black "!" is punched through.
   &::before {
@@ -460,24 +547,22 @@ app-page-header + * > .page-section:first-child {
   }
 }
 
+.chip-danger,
 .badge-danger {
-  --badge-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M4 .9h4L11.1 4v4L8 11.1H4L.9 8V4z' fill='%23fff'/%3E%3Cpath d='M6 3.4v3.2' stroke='%23000' stroke-width='1.4' stroke-linecap='round'/%3E%3Ccircle cx='6' cy='8.5' r='.75' fill='%23000'/%3E%3C/svg%3E");
-
-  background-color: var(--danger-bg);
-  border-color: var(--danger-border);
-  color: var(--danger-fg);
+  --chip-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M4 .9h4L11.1 4v4L8 11.1H4L.9 8V4z' fill='%23fff'/%3E%3Cpath d='M6 3.4v3.2' stroke='%23000' stroke-width='1.4' stroke-linecap='round'/%3E%3Ccircle cx='6' cy='8.5' r='.75' fill='%23000'/%3E%3C/svg%3E");
+  --chip-bg: var(--status-danger-bg);
+  --chip-fg: var(--status-danger-fg);
 
   &::before {
     mask-mode: luminance;
   }
 }
 
+.chip-info,
 .badge-info {
-  --badge-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Ccircle cx='6' cy='6' r='5.2' fill='%23fff'/%3E%3Cpath d='M6 5.4v3.2' stroke='%23000' stroke-width='1.4' stroke-linecap='round'/%3E%3Ccircle cx='6' cy='3.6' r='.75' fill='%23000'/%3E%3C/svg%3E");
-
-  background-color: var(--info-bg);
-  border-color: var(--info-border);
-  color: var(--info-fg);
+  --chip-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Ccircle cx='6' cy='6' r='5.2' fill='%23fff'/%3E%3Cpath d='M6 5.4v3.2' stroke='%23000' stroke-width='1.4' stroke-linecap='round'/%3E%3Ccircle cx='6' cy='3.6' r='.75' fill='%23000'/%3E%3C/svg%3E");
+  --chip-bg: var(--status-info-bg);
+  --chip-fg: var(--status-info-fg);
 
   &::before {
     mask-mode: luminance;
@@ -487,21 +572,23 @@ app-page-header + * > .page-section:first-child {
 // Metadata rather than state: a channel, a file type. No glyph and no dot,
 // because either would say "this is a status".
 .badge-plain {
-  background-color: transparent;
-  border-color: var(--border-default);
-  color: var(--text-secondary);
+  --chip-bg: transparent;
+  --chip-fg: var(--color-text-secondary);
+
+  border-color: var(--color-line-strong);
 
   &::before {
     display: none;
   }
 }
 
+.chip-sm,
 .badge-sm {
-  min-block-size: 1.125rem;
-  padding-inline: 0.3125rem 0.375rem;
+  min-block-size: var(--chip-height-sm);
+  padding-inline: 0.4375rem 0.5rem;
 }
 
-// A count on an icon or a tab: a number, not a state. Ink, like every action.
+// A count on an icon or a tab: a number, not a state.
 .count-badge {
   display: inline-grid;
   place-items: center;
@@ -509,10 +596,18 @@ app-page-header + * > .page-section:first-child {
   block-size: 1.125rem;
   padding-inline: 0.3125rem;
   border-radius: var(--radius-pill);
-  background-color: var(--action);
-  color: var(--on-action);
+  background-color: var(--color-primary);
+  color: var(--color-on-primary);
   font: 600 0.6875rem / 1 var(--font-sans);
   font-variant-numeric: tabular-nums;
+
+  // Its own system pair in forced colours, so the number never sits on a
+  // colour the browser did not choose (39.2a, risk 4).
+  @media (forced-colors: active) {
+    forced-color-adjust: none;
+    background-color: Highlight;
+    color: HighlightText;
+  }
 }
 
 // -----------------------------------------------------------------------------
@@ -617,6 +712,9 @@ app-page-header + * > .page-section:first-child {
   gap: var(--space-3);
 }
 
+// Inputs, selects and text areas (calm-glass.md §6): 44px, radius 12, the
+// control border (3:1 on every ground; owner decision Q3), and a focus of a
+// 2px emerald border plus a 3px emerald halo. Labels sit above, always shown.
 .input,
 .textarea,
 .select,
@@ -624,46 +722,58 @@ app-page-header + * > .page-section:first-child {
 .form-select {
   inline-size: 100%;
   min-block-size: var(--control-height);
-  padding-inline: var(--space-3);
+  padding-inline: 0.875rem;
   padding-block: var(--space-2);
   font: var(--text-body);
-  background-color: var(--surface-default);
-  color: var(--text-primary);
-  border: 1px solid var(--border-control);
-  border-radius: var(--radius-control);
+  background-color: var(--color-panel);
+  color: var(--color-text);
+  border: 1px solid var(--color-control-border);
+  border-radius: var(--radius-input);
   transition:
-    border-color var(--duration-sm) var(--ease-standard),
-    background-color var(--duration-sm) var(--ease-standard);
+    border-color var(--duration-press) var(--ease-calm),
+    box-shadow var(--duration-press) var(--ease-calm),
+    background-color var(--duration-press) var(--ease-calm);
 
   &::placeholder {
-    color: var(--text-muted);
+    color: var(--color-text-quiet);
   }
 
   &:hover:not(:disabled, :focus) {
-    border-color: var(--text-muted);
+    border-color: var(--color-text-secondary);
   }
 
-  // The ring is the global ink outline; the border darkens with it so the
-  // field reads as active even where the outline gap shows the surface.
-  &:focus-visible {
-    border-color: var(--text-primary);
+  // The border thickens to 2px with an inner line (so nothing moves) and the
+  // halo rings it. Shadows vanish in forced colours, so the outline returns
+  // there.
+  &:focus-visible,
+  &:focus {
+    outline: none;
+    border-color: var(--color-focus-ring);
+    box-shadow:
+      inset 0 0 0 1px var(--color-focus-ring),
+      0 0 0 3px var(--color-focus-halo);
+
+    @media (forced-colors: active) {
+      outline: 2px solid Highlight;
+      outline-offset: 1px;
+    }
   }
 
   &:disabled {
-    background-color: var(--surface-muted);
-    border-color: var(--border-strong);
-    color: var(--text-muted);
+    background-color: var(--color-panel-soft);
+    border-color: var(--color-line-strong);
+    color: var(--color-text-quiet);
     cursor: not-allowed;
   }
 
   &[readonly] {
-    background-color: var(--surface-muted);
+    background-color: var(--color-panel-soft);
   }
 
   // The invalid state is driven by aria-invalid, which is the same attribute
   // assistive technology reads. One source of truth for "this field is wrong".
   &[aria-invalid='true'] {
-    border-color: var(--danger-fg);
+    border-color: var(--status-danger-fg);
   }
 }
 
@@ -671,7 +781,7 @@ app-page-header + * > .page-section:first-child {
 textarea.form-control {
   min-block-size: 5rem;
   resize: vertical;
-  font: var(--text-reading);
+  font: var(--text-body);
 }
 
 // Native select, with the platform arrow replaced by one drawn in the text
@@ -682,8 +792,8 @@ select.input {
   appearance: none;
   padding-inline-end: var(--space-8);
   background-image:
-    linear-gradient(45deg, transparent 50%, var(--text-secondary) 50%),
-    linear-gradient(135deg, var(--text-secondary) 50%, transparent 50%);
+    linear-gradient(45deg, transparent 50%, var(--color-text-secondary) 50%),
+    linear-gradient(135deg, var(--color-text-secondary) 50%, transparent 50%);
   background-position:
     right 1.125rem center,
     right 0.8125rem center;
@@ -698,188 +808,10 @@ select.input {
     left 1.125rem center;
 }
 
-// Checkboxes and radios keep their native behaviour and take the ink.
-input[type='checkbox']:not(.switch),
-input[type='radio'],
-.form-check-input {
-  inline-size: 1rem;
-  block-size: 1rem;
-  margin: 0;
-  flex: none;
-  accent-color: var(--action);
-  cursor: pointer;
-
-  &:disabled {
-    cursor: not-allowed;
-  }
-}
-
-// The whole label is the target of a checkbox or radio inside it, so a 16px
-// box still offers a comfortable hit area.
-label:has(> input[type='checkbox'], > input[type='radio']) {
-  cursor: pointer;
-}
-
-// A switch is an immediate on/off setting: a checkbox with role="switch", so it
-// is announced as on or off and toggled by Space. On is ink; the thumb travels
-// with the standard easing and mirrors under RTL.
-.switch {
-  position: relative;
-  inline-size: 2.25rem;
-  block-size: 1.25rem;
-  margin: 0;
-  flex: none;
-  appearance: none;
-  border: 1px solid var(--border-control);
-  border-radius: var(--radius-pill);
-  background-color: var(--surface-inset);
-  cursor: pointer;
-  transition:
-    background-color var(--duration-sm) var(--ease-standard),
-    border-color var(--duration-sm) var(--ease-standard);
-
-  &::after {
-    content: '';
-    position: absolute;
-    inset-block-start: 1px;
-    inset-inline-start: 1px;
-    inline-size: 1rem;
-    block-size: 1rem;
-    border-radius: var(--radius-pill);
-    background-color: var(--text-secondary);
-    transition:
-      transform var(--duration-sm) var(--ease-standard),
-      background-color var(--duration-sm) var(--ease-standard);
-  }
-
-  &:hover:not(:disabled) {
-    border-color: var(--text-muted);
-  }
-
-  &:checked {
-    border-color: var(--action);
-    background-color: var(--action);
-
-    &::after {
-      background-color: var(--on-action);
-      transform: translateX(calc(var(--direction-flip) * 1rem));
-    }
-  }
-
-  &:disabled {
-    cursor: not-allowed;
-    opacity: 0.5;
-  }
-}
-
-// A small exclusive choice drawn as one control: periods, formats, themes.
-// Radios underneath, so arrow keys and the checked state stay the browser's.
-.segmented {
-  display: inline-flex;
-  flex-wrap: wrap;
-  gap: var(--gap-hairline);
-  margin: 0;
-  padding: 3px; // token-lint-ignore: inset so a segment's radius nests inside the control's
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-control);
-  background-color: var(--surface-inset);
-}
-
-.segmented-option {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-block-size: calc(var(--control-height-sm) - 8px);
-  padding-inline: var(--space-3);
-  border-radius: calc(var(--radius-control) - 3px);
-  color: var(--text-secondary);
-  font: var(--text-label);
-  cursor: pointer;
-  transition:
-    background-color var(--duration-sm) var(--ease-standard),
-    color var(--duration-sm) var(--ease-standard),
-    box-shadow var(--duration-sm) var(--ease-standard);
-
-  input {
-    position: absolute;
-    opacity: 0;
-    pointer-events: none;
-  }
-
-  &:hover {
-    color: var(--text-primary);
-  }
-
-  &:has(input:checked) {
-    background-color: var(--surface-default);
-    color: var(--text-primary);
-    box-shadow: 0 0 0 1px var(--border-strong);
-  }
-
-  &:has(input:focus-visible) {
-    outline: var(--focus-ring-width) solid var(--focus-ring);
-    outline-offset: 1px;
-  }
-
-  &:has(input:disabled) {
-    cursor: not-allowed;
-    opacity: 0.5;
-  }
-}
-
-// The same control with buttons instead of radios, for a choice that acts at
-// once (the language before sign-in). The pressed option is drawn like a checked
-// one, with a control-strength edge so its state reads at 3:1 on the well.
-button.segmented-option {
-  border: 0;
-  background-color: transparent;
-
-  &[aria-pressed='true'] {
-    background-color: var(--surface-default);
-    color: var(--text-primary);
-    box-shadow: 0 0 0 1px var(--border-control);
-  }
-
-  &:focus-visible {
-    outline: var(--focus-ring-width) solid var(--focus-ring);
-    outline-offset: 1px;
-  }
-
-  // Forced colours drop the edge (a box-shadow) and the fill: a system outline,
-  // inside the option so nothing moves, says which one is pressed instead.
-  @media (forced-colors: active) {
-    &[aria-pressed='true'] {
-      outline: 2px solid Highlight;
-      outline-offset: -2px;
-    }
-  }
-}
-
-// The same control with links, where each choice is an address (the inbox's
-// views, the team's invitation lists): the current one carries
-// `aria-current="true"` and is drawn like a pressed option.
-a.segmented-option {
-  text-decoration: none;
-
-  &[aria-current='true'] {
-    background-color: var(--surface-default);
-    color: var(--text-primary);
-    box-shadow: 0 0 0 1px var(--border-control);
-  }
-
-  &:focus-visible {
-    outline: var(--focus-ring-width) solid var(--focus-ring);
-    outline-offset: 1px;
-  }
-
-  @media (forced-colors: active) {
-    &[aria-current='true'] {
-      outline: 2px solid CanvasText;
-      outline-offset: -2px;
-    }
-  }
-}
+// Checkboxes, radios, switches and segmented controls are the choice-control
+// family (shared/choice, shared/segmented): there is no global
+// input[type=checkbox] rule and no `.switch` escape class (Phase 38 notes 3
+// and 4). A bare checkbox outside the family keeps the browser's own drawing.
 
 // -----------------------------------------------------------------------------
 // Tables
@@ -1118,11 +1050,14 @@ a.data-row:hover .data-row-chevron {
 }
 
 // -----------------------------------------------------------------------------
-// Menus
+// Menus, popovers and tooltips (calm-glass.md §3, §6)
 // -----------------------------------------------------------------------------
-// Overflow menus, the profile menu: an overlay, so one of the few surfaces that
-// casts a shadow. Behaviour (roving focus, Escape, outside click, focus return)
-// is the Menu directive's.
+// Things that float are glass: menus, popovers and tooltips take the material
+// from styles/_glass.scss (its solid twin under "Reduce transparency", the OS
+// setting, forced colours and browsers without backdrop-filter). Each one is a
+// blurred layer of the three the budget allows; none of them scrolls.
+// Behaviour (roving focus, Escape, outside click, focus return) is the Menu
+// directive's and the Tooltip directive's.
 .menu {
   position: absolute;
   z-index: var(--z-dropdown);
@@ -1131,14 +1066,12 @@ a.data-row:hover .data-row-chevron {
   gap: 1px;
   min-inline-size: 12rem;
   max-inline-size: min(20rem, calc(100vw - 2 * var(--space-4)));
-  padding: var(--space-1);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-card);
-  background-color: var(--surface-raised);
-  box-shadow: var(--shadow-overlay);
+  padding: 0.375rem;
+  border-radius: var(--radius-tile);
   text-align: start;
   transform-origin: top;
-  animation: menu-in var(--duration-sm) var(--ease-enter);
+  animation: menu-in var(--duration-menu) var(--ease-calm);
+  @include glass;
 }
 
 .menu-item {
@@ -1149,30 +1082,30 @@ a.data-row:hover .data-row-chevron {
   min-block-size: var(--control-height-sm);
   padding: var(--space-1) var(--space-3);
   border: 0;
-  border-radius: calc(var(--radius-card) - var(--space-1));
+  border-radius: calc(var(--radius-tile) - 0.375rem);
   background: none;
-  color: var(--text-primary);
+  color: var(--color-text);
   font: var(--text-body);
   text-align: start;
   text-decoration: none;
   cursor: pointer;
-  transition: background-color var(--duration-xs) var(--ease-standard);
+  transition: background-color var(--duration-press) var(--ease-calm);
 
   .icon {
     inline-size: var(--icon-size-sm);
     block-size: var(--icon-size-sm);
-    color: var(--text-secondary);
+    color: var(--color-text-secondary);
   }
 
   &:hover,
   &:focus-visible {
-    background-color: var(--surface-hover);
-    color: var(--text-primary);
+    background-color: var(--color-hover);
+    color: var(--color-text);
     text-decoration: none;
   }
 
   &:active {
-    background-color: var(--surface-selected);
+    background-color: var(--color-selected);
   }
 
   &:focus-visible {
@@ -1185,7 +1118,7 @@ a.data-row:hover .data-row-chevron {
 }
 
 .menu-item-danger {
-  color: var(--danger-fg);
+  color: var(--status-danger-fg);
 
   .icon {
     color: currentcolor;
@@ -1193,29 +1126,69 @@ a.data-row:hover .data-row-chevron {
 
   &:hover,
   &:focus-visible {
-    background-color: var(--danger-bg);
-    color: var(--danger-fg);
+    background-color: var(--status-danger-bg);
+    color: var(--status-danger-fg);
   }
 }
 
 .menu-separator {
-  margin: var(--space-1) calc(-1 * var(--space-1));
+  margin: var(--space-1) -0.375rem;
   border: 0;
-  border-block-start: 1px solid var(--border-default);
+  border-block-start: 1px solid var(--color-line);
 }
 
 .menu-label {
   padding: var(--space-2) var(--space-3) var(--space-1);
-  color: var(--text-muted);
+  color: var(--color-text-quiet);
   font: var(--text-caption);
+}
+
+// A popover: a small glass panel that holds content rather than a list of
+// actions (the notifications panel from 39.3, the design lab's sample).
+.popover {
+  padding: var(--space-4);
+  border-radius: var(--radius-tile);
+  color: var(--color-text);
+  font: var(--text-small);
+  animation: menu-in var(--duration-menu) var(--ease-calm);
+  @include glass;
+}
+
+// A tooltip (shared/tooltip): small glass, on hover and focus. It names or
+// explains; it never holds the only copy of something a person needs.
+.tooltip {
+  position: absolute;
+  z-index: var(--z-toast);
+  inline-size: max-content;
+  max-inline-size: 16rem;
+  padding: 0.375rem 0.625rem;
+  border-radius: var(--radius-input);
+  color: var(--color-text);
+  font: var(--text-caption);
+  white-space: normal;
+  animation: tooltip-in var(--duration-menu) var(--ease-calm);
+  @include glass;
+
+  // Beside the trigger on its end side (logical, so it mirrors under RTL).
+  &[data-placement='end'] {
+    inset-block-start: 50%;
+    inset-inline-start: calc(100% + var(--space-2));
+    translate: 0 -50%;
+  }
+
+  // Above the trigger, centred (centring is the same in both directions).
+  &[data-placement='above'] {
+    inset-block-end: calc(100% + var(--space-2));
+    left: 50%; // rtl-lint-ignore: centring, direction-neutral
+    translate: -50% 0;
+  }
 }
 
 // The current or highlighted item in a list of choices -- the sidebar's current
 // page, the command palette's highlighted option (MASTER.md rule 4): a short,
-// rounded 2px ink bar on the start edge. A bar rather than an inset shadow, which
-// followed the item's rounded corner and read as a bracket; placed with a
-// logical inset, so it sits on the start edge in either direction with no
-// transform. The item itself must be positioned.
+// rounded 2px emerald bar on the start edge, placed with a logical inset, so
+// it sits on the start edge in either direction with no transform. The item
+// itself must be positioned.
 .edge-marker::before {
   content: '';
   position: absolute;
@@ -1223,7 +1196,7 @@ a.data-row:hover .data-row-chevron {
   inset-inline-start: 0;
   inline-size: 2px;
   border-radius: 2px;
-  background: var(--action);
+  background: var(--color-primary);
 }
 
 // A key, as printed on a keyboard: the command palette's trigger and legend.
@@ -1235,49 +1208,160 @@ a.data-row:hover .data-row-chevron {
   min-inline-size: 1.375rem;
   block-size: 1.375rem;
   padding-inline: 0.375rem;
-  border: 1px solid var(--border-default);
+  border: 1px solid var(--color-line-strong);
   border-block-end-width: 2px;
   border-radius: var(--radius-badge);
-  background: var(--surface-muted);
-  color: var(--text-secondary);
+  background: var(--color-panel-soft);
+  color: var(--color-text-secondary);
   font: 500 0.6875rem / 1 var(--font-sans);
   font-variant-numeric: tabular-nums;
   letter-spacing: 0;
   white-space: nowrap;
 }
 
+// Menus open 4px towards the reader and settle; under reduced motion the
+// travel token is 0 and only the fade is left.
 @keyframes menu-in {
   from {
     opacity: 0;
-    transform: translateY(-4px) scale(0.98);
+    transform: translateY(calc(-4px * var(--motion-travel))) scale(0.98);
+  }
+}
+
+@keyframes tooltip-in {
+  from {
+    opacity: 0;
   }
 }
 
 // -----------------------------------------------------------------------------
-// Transcript bubbles and the handoff divider
+// Rows (calm-glass.md §6)
 // -----------------------------------------------------------------------------
-// Shared by the conversation detail, the hosted chat and the Design Lab. Who
-// spoke is said three ways: the bubble's voice tint, a speaker line with a word
-// ("AI", a person's name, "Customer"), and the side it sits on. The speaker's
-// corner is the small "tail"; it is written with logical corners, so it
-// mirrors under RTL with no extra rule. The customer is on the start side,
-// the business (AI or person) on the end side.
+// A row of a list whose items are people or conversations: radius 16, a 40px
+// avatar with its channel badge, the name and the time, a one-line preview,
+// then chips. Selected is a faint emerald tint; unread is an emerald dot plus
+// a heavier name, and the word "Unread" in the row's accessible name, never
+// colour alone. Rows are solid: no blur on anything that scrolls. The inbox
+// and the customer directory move onto this in their own steps (39.4a, 39.6a).
+.list-row {
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius-tile);
+  color: var(--color-text);
+  text-decoration: none;
+  transition: background-color var(--duration-press) var(--ease-calm);
+
+  &:hover {
+    background-color: var(--color-hover);
+    color: var(--color-text);
+    text-decoration: none;
+  }
+
+  &:focus-visible {
+    outline-offset: -2px;
+  }
+
+  &[aria-current='page'],
+  &[aria-current='true'],
+  &.is-selected {
+    background-color: var(--color-selected);
+  }
+}
+
+.list-row-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-inline-size: 0;
+}
+
+.list-row-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.list-row-name {
+  overflow: hidden;
+  font: var(--text-body-strong);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  .is-unread & {
+    font-weight: 600;
+  }
+}
+
+.list-row-time {
+  flex: none;
+  margin-inline-start: auto;
+  color: var(--color-text-quiet);
+  font: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+.list-row-preview {
+  overflow: hidden;
+  color: var(--color-text-secondary);
+  font: var(--text-small);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.list-row-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+// The unread dot. Decorative: the row's accessible name carries "Unread".
+.unread-dot {
+  flex: none;
+  inline-size: 0.5625rem;
+  block-size: 0.5625rem;
+  margin-inline-start: auto;
+  border-radius: var(--radius-pill);
+  background-color: var(--color-primary);
+
+  @media (forced-colors: active) {
+    background-color: CanvasText;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Message bubbles and event lines (calm-glass.md §6)
+// -----------------------------------------------------------------------------
+// Shared by the conversation, the hosted chat, the agent preview and the
+// design lab. Three voices: the AI in emerald (with the small orb beside it,
+// app-orb), the team in gold with a gold edge and the person's name under it,
+// the customer in plain cream. Who spoke is also said in words (the speaker
+// line), never by colour or side alone. 18px corners with a 6px corner on the
+// speaker's side, written with logical corners so it mirrors under RTL. New
+// messages rise 8px and fade in; under reduced motion only the fade is left.
 .bubble {
   max-inline-size: min(36rem, 85%);
-  padding: var(--space-2) var(--space-3) var(--space-3);
-  border: 1px solid var(--border-default);
+  padding: 0.6875rem 0.9375rem;
+  border: 0;
   border-radius: var(--radius-bubble);
-  background-color: var(--surface-default);
-  color: var(--text-primary);
-  font: var(--text-reading);
+  background-color: var(--voice-customer-bubble);
+  color: var(--voice-customer-text);
+  font: var(--text-body);
   overflow-wrap: anywhere;
-  animation: bubble-settle var(--duration-sm) var(--ease-enter);
+  animation: bubble-rise var(--duration-menu) var(--ease-calm);
+
+  // Forced colours flatten the three fills: each bubble keeps an outline.
+  @media (forced-colors: active) {
+    border: 1px solid CanvasText;
+  }
 }
 
 .bubble-speaker {
   display: block;
   margin-block-end: var(--gap-hairline);
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
   font: var(--text-caption);
 }
 
@@ -1288,36 +1372,44 @@ a.data-row:hover .data-row-chevron {
 
 .bubble-ai {
   align-self: flex-end;
-  border-color: var(--voice-ai-border);
   border-end-end-radius: var(--radius-bubble-tail);
-  background-color: var(--voice-ai-tint);
+  background-color: var(--voice-ai-bubble);
+  color: var(--voice-ai-text);
   // The time inside the bubble: quiet text is below 4.5:1 on the dark AI bubble.
   --text-muted: var(--voice-ai-meta);
+  --color-text-quiet: var(--voice-ai-meta);
 
+  // The speaker inside the bubble: emerald-300 is 4.42:1 on the dark AI
+  // bubble, so the chip's text pair (measured, MASTER.md §13) names it.
   .bubble-speaker {
-    color: var(--voice-ai-strong);
+    color: var(--chip-ai-fg);
   }
 }
 
-.bubble-human {
+// The team: gold, with a 1px gold edge drawn inside so the size never changes.
+.bubble-human,
+.bubble-team {
   align-self: flex-end;
-  border-color: var(--voice-human-border);
   border-end-end-radius: var(--radius-bubble-tail);
-  background-color: var(--voice-human-tint);
+  background-color: var(--voice-team-bubble);
+  color: var(--voice-team-text);
+  box-shadow: inset 0 0 0 1px var(--voice-team-edge);
 
   .bubble-speaker {
-    color: var(--voice-human-strong);
+    color: var(--chip-need-fg);
   }
 }
 
-// Where the replying voice changes. Drawn only from real message authors or
-// real handoff events, never inferred. The rule takes the incoming voice's
-// colour; the words carry the meaning.
+// An event between messages (a failed turn, a takeover, a return to the AI):
+// a centred line with words, `role="note"` on the element. The failed event
+// is coral; the others are quiet. The rule is decorative, the words carry it.
+// `.handoff-divider` is the Two Voices name of the same line.
+.event-line,
 .handoff-divider {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
-  color: var(--text-secondary);
+  gap: 0.625rem;
+  color: var(--color-text-quiet);
   font: var(--text-caption);
   text-align: center;
 
@@ -1326,38 +1418,45 @@ a.data-row:hover .data-row-chevron {
     content: '';
     flex: 1;
     block-size: 0;
-    border-block-start: 2px solid var(--handoff-color, var(--border-strong));
-    max-inline-size: 4rem;
-  }
-
-  &::before {
-    margin-inline-start: auto;
-  }
-
-  &::after {
-    margin-inline-end: auto;
+    border-block-start: 1px solid var(--event-line-rule, var(--color-line));
   }
 }
 
+.event-line-failed {
+  --event-line-rule: var(--event-failed-line);
+
+  color: var(--chip-failed-fg);
+  font-weight: 600;
+}
+
+.event-line-team,
 .handoff-to-human {
-  --handoff-color: var(--voice-human-fg);
+  --event-line-rule: var(--voice-team-edge);
+
+  color: var(--voice-team-label);
 }
 
+.event-line-ai,
 .handoff-to-ai {
-  --handoff-color: var(--voice-ai-fg);
+  --event-line-rule: var(--voice-ai-edge);
+
+  color: var(--voice-ai-label);
 }
 
-@keyframes bubble-settle {
+@keyframes bubble-rise {
   from {
     opacity: 0;
-    transform: translateY(4px);
+    transform: translateY(var(--motion-rise));
   }
 }
 
 // -----------------------------------------------------------------------------
 // Empty, loading and error states
 // -----------------------------------------------------------------------------
-// Part of the design system from the start. No decorative illustration.
+// The empty state (calm-glass.md §6): one line in Instrument Serif (Plex Arabic
+// 600 in Arabic), one sentence, one action. A quiet glyph above it says which
+// kind of absence this is; the error tone draws it in coral, so a failure is
+// never told by colour alone (the words say it too). No illustration.
 .state {
   display: flex;
   flex-direction: column;
@@ -1371,28 +1470,29 @@ a.data-row:hover .data-row-chevron {
 .state-icon {
   display: grid;
   place-items: center;
-  inline-size: 2.75rem;
-  block-size: 2.75rem;
-  border-radius: var(--radius-control);
-  background-color: var(--surface-muted);
-  color: var(--text-secondary);
-  border: 1px solid var(--border-default);
+  inline-size: 3rem;
+  block-size: 3rem;
+  border-radius: var(--radius-pill);
+  background-color: var(--color-panel-soft);
+  color: var(--color-text-quiet);
 
   .icon {
-    inline-size: 1.25rem;
-    block-size: 1.25rem;
+    inline-size: 1.375rem;
+    block-size: 1.375rem;
   }
 }
 
 .state-title {
-  font: var(--text-card-title);
-  color: var(--text-primary);
+  max-inline-size: 28ch;
+  font: var(--text-empty);
+  color: var(--color-text);
+  text-wrap: balance;
 }
 
 .state-description {
   max-inline-size: 42ch;
   font: var(--text-small);
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
   text-wrap: pretty;
 }
 
@@ -1406,9 +1506,8 @@ a.data-row:hover .data-row-chevron {
 
 // Page-level error. Louder than an empty state, still not an illustration.
 .state-error .state-icon {
-  background-color: var(--danger-bg);
-  border-color: var(--danger-border);
-  color: var(--danger-fg);
+  background-color: var(--status-danger-bg);
+  color: var(--status-danger-fg);
 }
 
 // Inline notice, for a message that belongs beside the thing it is about.
@@ -1497,9 +1596,10 @@ a.data-row:hover .data-row-chevron {
   margin-block-start: var(--space-1);
 }
 
-// Skeletons. A shape that matches what is coming, so the layout does not jump
-// when it arrives. The sheen is a slow sweep rather than a pulse, and it stops
-// entirely under reduced motion: a still placeholder says "loading" as well.
+// Skeletons (calm-glass.md §6). A shape that matches what is coming, so the
+// layout does not jump when it arrives (each screen step redraws its own
+// geometry, Phase 38 note 11). A soft, slow sheen across the panel colour;
+// under reduced motion it stops: a still placeholder says "loading" as well.
 //
 // Anything using these must also expose a text alternative (aria-busy plus a
 // visually hidden "Loading" label); a silent shimmer tells a screen reader
@@ -1514,10 +1614,15 @@ a.data-row:hover .data-row-chevron {
   );
   background-size: 200% 100%;
   border-radius: var(--radius-badge);
-  animation: skeleton-sweep 1.6s var(--ease-standard) infinite; // motion-audit-ignore: infinite-animation, removed with the loading state; none under reduced motion (below)
+  animation: skeleton-sweep 1.8s var(--ease-calm) infinite; // motion-audit-ignore: infinite-animation, removed with the loading state; none under reduced motion (below)
 
   @media (prefers-reduced-motion: reduce) {
     animation: none;
+  }
+
+  // Forced colours: the fill is gone, so a placeholder keeps an outline.
+  @media (forced-colors: active) {
+    border: 1px solid GrayText;
   }
 }
 
@@ -1548,6 +1653,13 @@ a.data-row:hover .data-row-chevron {
 
 .skeleton-bubble-end {
   justify-self: end;
+}
+
+// Round placeholders for an avatar or the orb, at their own sizes.
+.skeleton-avatar {
+  inline-size: var(--avatar-size);
+  block-size: var(--avatar-size);
+  flex: none;
 }
 
 @keyframes skeleton-sweep {

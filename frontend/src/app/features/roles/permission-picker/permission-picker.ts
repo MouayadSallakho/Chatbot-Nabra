@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, output } from '@angular/core';
 import { LocaleFormat } from '@app/core/i18n/locale-format';
 import { PermissionDefinition } from '@app/core/authorization/permission-codes';
+import { Check } from '@app/shared/choice/choice';
 import { Icon } from '@app/shared/icon/icon';
 import { PermissionGroup, groupId } from '../permission-groups';
 import {
@@ -47,7 +48,7 @@ interface PickerArea {
 @Component({
   selector: 'app-permission-picker',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Icon],
+  imports: [Icon, Check],
   template: `
     @for (area of areas(); track area.key) {
       @if (mode() === 'edit') {
@@ -58,10 +59,9 @@ interface PickerArea {
           </p>
 
           @for (option of area.options; track option.code) {
-            <label class="perm-option" [attr.data-testid]="'permission-' + option.code">
+            <label app-check class="perm-option" [attr.data-testid]="'permission-' + option.code">
               <input
                 type="checkbox"
-                class="form-check-input"
                 [checked]="isTicked(option.code)"
                 [attr.aria-labelledby]="option.id + '-label'"
                 [attr.aria-describedby]="

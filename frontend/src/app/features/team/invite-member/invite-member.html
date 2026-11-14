@@ -232,10 +232,13 @@
                 </legend>
 
                 @for (role of assignable(); track role.id) {
-                  <label class="role-option" [attr.data-testid]="'role-option-' + role.id">
+                  <label
+                    app-check
+                    class="role-option"
+                    [attr.data-testid]="'role-option-' + role.id"
+                  >
                     <input
                       type="checkbox"
-                      class="form-check-input"
                       [checked]="isTicked(role.id)"
                       (change)="onToggle(role.id, $event)"
                     />
