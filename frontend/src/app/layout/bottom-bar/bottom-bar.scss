@@ -81,8 +81,9 @@
   }
 }
 
-// A name too long for a fifth of the width («صندوق المحادثات») wraps onto a
-// second line rather than losing its end; the Arabic bar is taller for it.
+// One line per name: the inbox uses its short form here (`shortLabel`, 39.4a), so
+// both languages keep the 64px bar. A name still too long for a fifth of the
+// width wraps rather than losing its end.
 .bar-label {
   max-inline-size: 100%;
   text-align: center;

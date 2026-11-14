@@ -10,6 +10,14 @@
   &:not(.is-open) .inbox-detail-pane {
     display: none;
   }
+
+  // The list as a page: its panel in the ordinary page frame.
+  .inbox-list-pane {
+    inline-size: 100%;
+    max-inline-size: var(--page-max-width);
+    margin-inline: auto;
+    padding: var(--space-6) var(--page-gutter) var(--space-9);
+  }
 }
 
 // An open conversation filling a tall narrow screen: the pane is the height of
@@ -19,25 +27,35 @@
   block-size: 100%;
 }
 
-// Side by side from 1280px. The inbox fills the content area and each pane
-// scrolls on its own (the shell stops scrolling a page that fills it: see
-// `.page-fills-content` in _primitives.scss), so the list never scrolls away from
-// the conversation beside it.
+// Side by side from 1280px (board Inbox, calm-glass.md §7): solid panels on the
+// ground, 12px apart and 14px from the window's edges (the side bar keeps its
+// own 12px on the start side). The list column is about 350px; the open
+// conversation takes the rest, with the customer panel inside it. Each panel
+// scrolls on its own (`.page-fills-content` in _primitives.scss), so the list
+// never scrolls away from the conversation beside it.
 .inbox.is-panes {
   display: grid;
-  grid-template-columns: clamp(20rem, 24vw, 25rem) minmax(0, 1fr);
+  grid-template-columns: var(--inbox-list-width) minmax(0, 1fr);
+  gap: var(--column-gap);
   block-size: 100%;
   min-block-size: 0;
+  padding: var(--shell-padding);
+  padding-inline-start: 0;
 
-  .inbox-list-pane {
-    min-block-size: 0;
-    overflow-y: auto;
-    border-inline-end: 1px solid var(--border-default);
-    background-color: var(--surface-default);
-  }
-
+  .inbox-list-pane,
   .inbox-detail-pane {
     min-inline-size: 0;
     min-block-size: 0;
+  }
+
+  app-conversation-list {
+    block-size: 100%;
+  }
+
+  .inbox-detail-pane {
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-panel);
+    background-color: var(--color-panel);
+    overflow: clip;
   }
 }

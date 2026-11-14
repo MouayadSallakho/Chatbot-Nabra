@@ -97,11 +97,17 @@ describe('ConversationList', () => {
     );
 
   let changed: ((id: string | null) => void) | null = null;
+  let allRead: (() => void) | null = null;
 
   const realtimeStub = () => ({
     live: signal(true),
     listen: (_tenant: string, callback: (id: string | null) => void) => {
       changed = callback;
+
+      return () => undefined;
+    },
+    listenRead: (_tenant: string, callback: () => void) => {
+      allRead = callback;
 
       return () => undefined;
     },
@@ -120,7 +126,7 @@ describe('ConversationList', () => {
       await settle();
     }
 
-    it('offers both views as links, and says which one this is', async () => {
+    it('offers the three views as links, and says which one this is', async () => {
       await mount('conversations.view');
       http.expectOne(url).flush(emptyPage);
       await settle();
@@ -128,6 +134,50 @@ describe('ConversationList', () => {
       expect(link('view-all').getAttribute('aria-current')).toBe('true');
       expect(link('view-needs-person').hasAttribute('aria-current')).toBe(false);
       expect(link('view-needs-person').getAttribute('href')).toContain('view=needs-person');
+      expect(link('view-mine').hasAttribute('aria-current')).toBe(false);
+      expect(link('view-mine').getAttribute('href')).toContain('view=mine');
+      expect(link('view-mine').textContent?.trim()).toBe('Mine');
+    });
+
+    it("reads the reader's own conversations for Mine, and is calm when there are none (39.1)", async () => {
+      await mount('conversations.view');
+      http.expectOne(url).flush(emptyPage);
+      await settle();
+
+      await goToView('mine');
+      http.expectOne(`${url}&filter=mine`).flush({
+        items: [conversation('c1', 'Mine', '2026-09-07T12:00:00Z')],
+        page: 1,
+        pageSize: 20,
+        total: 1,
+      });
+      await settle();
+
+      expect(link('view-mine').getAttribute('aria-current')).toBe('true');
+      expect(rows()).toHaveLength(1);
+
+      await goToView('needs-person');
+      http.expectOne(viewUrl).flush(emptyPage);
+      await goToView('mine');
+      http.expectOne(`${url}&filter=mine`).flush(emptyPage);
+      await settle();
+
+      expect(host().querySelector('[data-testid="mine-empty"]')?.textContent).toContain(
+        'Nothing is yours right now',
+      );
+    });
+
+    it('reads the full list for a view this build does not know', async () => {
+      await mount('conversations.view');
+      http.expectOne(url).flush(emptyPage);
+      await settle();
+
+      await goToView('everything');
+      await settle();
+
+      // No second read: an unknown view is the full list, already on screen.
+      http.expectNone(`${url}&filter=everything`);
+      expect(link('view-all').getAttribute('aria-current')).toBe('true');
     });
 
     it('shows the shared count beside its name, and costs no read of its own', async () => {
@@ -203,16 +253,15 @@ describe('ConversationList', () => {
       });
       await settle();
 
-      const reasons = rows().map((row) => {
-        const badge = row.querySelector('[data-testid="row-reason"]');
+      const reasons = rows().map((row) => row.querySelector('[data-testid="row-reason"]'));
+      const tones = reasons.map((chip) => chip?.getAttribute('data-tone'));
 
-        // A warning badge: its glyph beside the words, never colour alone.
-        expect(badge?.classList.contains('badge-warning')).toBe(true);
+      // A chip: its dot beside the words, never colour alone. Coral only when the
+      // AI could not reply; gold for every other wait.
+      expect(tones).toEqual(['need', 'failed', 'need', 'need', 'need']);
+      expect(reasons.every((chip) => chip?.classList.contains('chip-sm'))).toBe(true);
 
-        return badge?.textContent?.trim();
-      });
-
-      expect(reasons).toEqual([
+      expect(reasons.map((chip) => chip?.textContent?.trim())).toEqual([
         'Waiting for the team',
         'The AI could not reply',
         'Returned to the AI unanswered',
@@ -290,6 +339,37 @@ describe('ConversationList', () => {
       await settle();
     });
 
+    it('re-reads when this member marked every conversation read in another tab (39.1)', async () => {
+      TestBed.configureTestingModule({
+        providers: [{ provide: ConversationRealtime, useValue: realtimeStub() }],
+      });
+      await mount('conversations.view');
+      http.expectOne(url).flush({
+        items: [{ ...conversation('c1', 'Hi', '2026-09-07T12:00:00Z'), unread: true }],
+        page: 1,
+        pageSize: 20,
+        total: 1,
+      });
+      await settle();
+
+      expect(host().querySelector('[data-testid="row-unread"]')).not.toBeNull();
+
+      allRead!();
+      await settle();
+      http.expectOne(url).flush({
+        items: [{ ...conversation('c1', 'Hi', '2026-09-07T12:00:00Z'), unread: false }],
+        page: 1,
+        pageSize: 20,
+        total: 1,
+      });
+      await settle();
+
+      // In place: the row stays, its dot goes, nothing flips back to skeletons.
+      expect(rows()).toHaveLength(1);
+      expect(host().querySelector('[data-testid="row-unread"]')).toBeNull();
+      expect(host().querySelector('.is-skeleton')).toBeNull();
+    });
+
     it('asks to be shown the count only for somebody who can read conversations, and lets go', async () => {
       await mount('conversations.view');
       http.expectOne(url).flush(emptyPage);
@@ -326,6 +406,12 @@ describe('ConversationList', () => {
 
       expect(unread.querySelector('[data-testid="row-unread"]')?.textContent).toBe('Unread');
       expect(unread.querySelector('.row-customer')?.classList.contains('is-unread')).toBe(true);
+      // The dot closes the chips' line (board Inbox); the row itself gets no fill.
+      expect(
+        unread.querySelector('.row-chips')?.lastElementChild?.getAttribute('data-testid'),
+      ).toBe('row-unread');
+      expect(unread.classList.contains('is-unread')).toBe(true);
+      expect(unread.classList.contains('is-selected')).toBe(false);
       expect(read.querySelector('[data-testid="row-unread"]')).toBeNull();
       expect(read.querySelector('.row-customer')?.classList.contains('is-unread')).toBe(false);
     });
@@ -359,10 +445,50 @@ describe('ConversationList', () => {
     );
 
     expect(names).toEqual(['Lina Haddad', 'Visitor 7KQ2MX']);
-    // First in the row, before the message and the chips.
+    // The avatar first (its letters: the name's initials, or the code's first two),
+    // then the customer before the message and the chips.
+    expect(rows()[0].firstElementChild?.tagName).toBe('APP-AVATAR');
+    expect(rows()[0].querySelector('app-avatar')?.getAttribute('aria-hidden')).toBe('true');
+    expect(rows().map((row) => row.querySelector('.avatar-letters')?.textContent)).toEqual([
+      'LH',
+      '7K',
+    ]);
     expect(
-      rows()[0].firstElementChild?.querySelector('[data-testid="row-customer"]'),
+      rows()[0]
+        .querySelector('.row-main')
+        ?.firstElementChild?.querySelector('[data-testid="row-customer"]'),
     ).not.toBeNull();
+  });
+
+  it('draws the skeleton in the shape of a real row (note 11)', async () => {
+    await mount('conversations.view');
+
+    const shape = (row: Element | null) =>
+      [...(row?.querySelectorAll('*') ?? [])]
+        .map((el) =>
+          ['app-avatar', 'row-skeleton-avatar', 'row-main', 'row-top', 'row-preview', 'row-chips']
+            .filter((name) => el.tagName.toLowerCase() === name || el.classList.contains(name))
+            .map((name) => (name === 'row-skeleton-avatar' ? 'app-avatar' : name)),
+        )
+        .flat();
+    const skeleton = shape(host().querySelector('.conversation-row.is-skeleton'));
+
+    expect(host().querySelectorAll('.conversation-row.is-skeleton')).toHaveLength(6);
+
+    http.expectOne(url).flush({
+      items: [conversation('c1', 'Hello', '2026-09-07T12:00:00Z')],
+      page: 1,
+      pageSize: 20,
+      total: 1,
+    });
+    await settle();
+
+    expect(shape(rows()[0])).toEqual(skeleton);
+    expect(skeleton).toEqual(['app-avatar', 'row-main', 'row-top', 'row-preview', 'row-chips']);
+    // The text lines are the real lines' own elements, so they take the real line heights.
+    const line = host().querySelector('.row-customer');
+
+    expect(line).not.toBeNull();
   });
 
   it('starts the Arabic font when a first read holds Arabic', async () => {
@@ -413,8 +539,10 @@ describe('ConversationList', () => {
     });
     await settle();
 
-    expect(text()).toContain('Website chat');
-    expect(text()).not.toContain('WebChat');
+    // In words for a screen reader: the avatar's badge is a glyph and is hidden.
+    expect(rows()[0].querySelector('.visually-hidden')?.textContent).toContain('Website chat');
+    expect(rows()[0].querySelector('.avatar-badge')?.getAttribute('data-channel')).toBe('WebChat');
+    expect(text()).not.toContain('WebChat,');
   });
 
   it('renders a script-like preview as text', async () => {
@@ -525,7 +653,18 @@ describe('ConversationList', () => {
     expect(current[0].textContent).toContain('Certainly.');
     // The open conversation's heading is the page's; the list's is a section's.
     expect(host().querySelector('h1')).toBeNull();
-    expect(host().querySelector('h2')?.textContent).toContain('Conversations');
+    expect(host().querySelector('h2')?.textContent).toBe('Inbox');
+    // A shape as well as a tint: the 2px edge.
+    expect(current[0].classList.contains('edge-marker')).toBe(true);
+  });
+
+  it("says the navigation's word as the page's heading when nothing is open", async () => {
+    await mount('conversations.view');
+    http.expectOne(url).flush({ items: [], page: 1, pageSize: 20, total: 0 });
+    await settle();
+
+    expect(host().querySelector('h1')?.textContent).toBe('Inbox');
+    expect(host().querySelector('section')?.getAttribute('aria-labelledby')).toBe('inbox-heading');
   });
 
   it('says the team owes a reply only where the data says so', async () => {
@@ -585,8 +724,98 @@ describe('ConversationList', () => {
 
     expect(handled[0]?.textContent?.replace(/\s+/g, ' ').trim()).toBe('Handled by sam@acme.test');
     expect(handled[0]?.querySelector('bdi')?.getAttribute('dir')).toBe('ltr');
+    expect(handled[0]?.getAttribute('data-tone')).toBe('team');
     expect(handled[1]).toBeNull();
     expect(handled[2]).toBeNull();
+  });
+
+  it('says who has a conversation once: the taker, else the assignee, by display name (note 13)', async () => {
+    await mount('conversations.view');
+
+    const sam = { userId: 'u-sam', email: 'sam@acme.test', displayName: 'Sam Lee' };
+    const rana = { userId: 'u-rana', email: 'rana@acme.test', displayName: 'رنا' };
+    const noName = { userId: 'u-x', email: 'x@acme.test', displayName: '  ' };
+
+    http.expectOne(url).flush({
+      items: [
+        // Taken over and assigned to somebody else: the taker only.
+        {
+          ...conversation('c1', 'Hi', '2026-09-07T12:00:00Z'),
+          handling: 'Human',
+          takenOverBy: sam,
+          assignedTo: rana,
+        },
+        // Assigned, the AI answering: the assignee, and the AI chip.
+        {
+          ...conversation('c2', 'Hi', '2026-09-07T11:00:00Z'),
+          handling: 'Ai',
+          assignedTo: rana,
+        },
+        // A blank display name is no name: the email, left to right.
+        {
+          ...conversation('c3', 'Hi', '2026-09-07T10:00:00Z'),
+          handling: 'Human',
+          takenOverBy: noName,
+        },
+      ],
+      page: 1,
+      pageSize: 20,
+      total: 3,
+    });
+    await settle();
+
+    const chips = (row: HTMLElement) =>
+      [...row.querySelectorAll('.row-chips > :not(.row-unread)')].map((chip) =>
+        chip.textContent?.replace(/\s+/g, ' ').trim(),
+      );
+    const [taken, assigned, blank] = rows();
+
+    expect(chips(taken)).toEqual(['Handled by Sam Lee']);
+    expect(taken.querySelector('[data-testid="row-handled-by"] bdi')?.getAttribute('dir')).toBe(
+      'auto',
+    );
+    expect(chips(assigned)).toEqual(['Assigned to رنا', 'AI is answering']);
+    expect(assigned.querySelector('[data-testid="row-assigned"] bdi')?.getAttribute('dir')).toBe(
+      'auto',
+    );
+    expect(chips(blank)).toEqual(['Handled by x@acme.test']);
+    expect(blank.querySelector('bdi')?.getAttribute('dir')).toBe('ltr');
+  });
+
+  it('never says the AI is answering beside a reason it is not (BA-7)', async () => {
+    await mount('conversations.view');
+
+    http.expectOne(url).flush({
+      items: [
+        {
+          ...conversation('c1', 'Hi', '2026-09-07T12:00:00Z'),
+          handling: 'Ai',
+          needsPerson: true,
+          needsPersonReason: 'AiTurnFailed',
+        },
+        {
+          ...conversation('c2', 'Hi', '2026-09-07T11:00:00Z'),
+          handling: 'Ai',
+          needsPerson: false,
+          needsPersonReason: null,
+        },
+      ],
+      page: 1,
+      pageSize: 20,
+      total: 2,
+    });
+    await settle();
+
+    const [failed, fine] = rows();
+
+    expect(failed.querySelector('[data-testid="row-reason"]')?.textContent?.trim()).toBe(
+      'The AI could not reply',
+    );
+    expect(failed.querySelector('[data-testid="row-voice"]')).toBeNull();
+    expect(fine.querySelector('[data-testid="row-reason"]')).toBeNull();
+    expect(fine.querySelector('[data-testid="row-voice"]')?.textContent?.trim()).toBe(
+      'AI is answering',
+    );
   });
 
   it('names who is answering each conversation in a word, with its glyph', async () => {
@@ -609,7 +838,7 @@ describe('ConversationList', () => {
 
     expect(voices).toEqual(['human', 'ai']);
     expect(rows()[0].textContent).toContain('Person');
-    expect(rows()[1].textContent).toContain('AI');
+    expect(rows()[1].textContent).toContain('AI is answering');
   });
 
   it('moves between rows with the arrow keys, Home and End', async () => {

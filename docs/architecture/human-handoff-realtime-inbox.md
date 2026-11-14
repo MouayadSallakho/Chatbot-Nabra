@@ -595,6 +595,15 @@ its list through the authorised HTTP read. Announcing never fails the write: the
 transport logs and swallows its own failures, and the handler swallows anything that
 escapes.
 
+**The admin client (Phase 39.4a).** The page's one connection (`WorkspaceRealtime`)
+passes the event to `onConversationsRead` listeners, and `ConversationRealtime.listenRead`
+keeps only the current workspace's (compared without letter case). The inbox list then
+re-reads its current page in place: the dots go, the rows stay, nothing flips back to
+skeletons. The event is not replayed after a reconnect, because the list already
+re-reads on the conversation listeners' `null`. "Mark all as read" asks
+`GET …/conversations/unread-count` first and names the count in its confirmation; with
+none unread it opens no dialog.
+
 ### 16.4 `filter=mine` (BA39-5, owner decision Q1)
 
 `GET …/conversations?filter=mine` keeps the conversations **assigned to the reader

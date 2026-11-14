@@ -39,7 +39,8 @@ export const conversationRoutes: Routes = [
     children: [
       {
         path: '',
-        title: $localize`:@@title.conversations:Conversations`,
+        // The navigation's word for this area (39.3), so the tab and the heading say it too.
+        title: $localize`:@@title.inbox:Inbox`,
         loadComponent: () =>
           import('./inbox-placeholder/inbox-placeholder').then((m) => m.InboxPlaceholder),
       },

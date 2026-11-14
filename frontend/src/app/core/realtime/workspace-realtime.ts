@@ -107,6 +107,7 @@ export class WorkspaceRealtime {
   private readonly conversationListeners = new Set<ConversationChanged>();
   private readonly notificationListeners = new Set<() => void>();
   private readonly knowledgeListeners = new Set<KnowledgeChanged>();
+  private readonly readListeners = new Set<(tenantId: string | null) => void>();
 
   private started = false;
   private session: Session | null = null;
@@ -165,6 +166,18 @@ export class WorkspaceRealtime {
     this.notificationListeners.add(listener);
 
     return () => this.notificationListeners.delete(listener);
+  }
+
+  /**
+   * Calls back when this member marked every conversation read (Phase 39.1,
+   * `conversationsRead`, sent to the member's own group with the workspace id).
+   * Not told after a reconnect: a screen that shows unread re-reads on the
+   * conversation listeners' `null` already. Returns the unsubscribe.
+   */
+  onConversationsRead(listener: (tenantId: string | null) => void): () => void {
+    this.readListeners.add(listener);
+
+    return () => this.readListeners.delete(listener);
   }
 
   /**
@@ -280,6 +293,12 @@ export class WorkspaceRealtime {
 
     connection.on('knowledgeChanged', (documentId: string) => {
       this.tell(this.knowledgeListeners, documentId);
+    });
+
+    // Another tab of this member's (or this one) marked every conversation read.
+    // Only the member's own group hears it, so nobody else's unread changes.
+    connection.on('conversationsRead', (tenantId: string) => {
+      this.tell(this.readListeners, tenantId);
     });
 
     connection.onreconnecting(() => {

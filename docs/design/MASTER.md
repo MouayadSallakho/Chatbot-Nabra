@@ -429,6 +429,9 @@ chip (owner decision Q4).
 | 2026-11-14 | The workspace switcher is a glass menu of the account's workspaces; choosing one leaves the page for the chooser first (unsaved-changes guards ask), then selects it and opens its overview | Switching in place would keep the old workspace's page state; the chooser's own path keeps every guarantee | Phase 39.3 |
 | 2026-11-14 | The notification panel is a popover that takes focus and keeps Tab inside it; menus keep the menu pattern (Tab leaves and closes) | calm-glass.md §6 ("focus trapped") for popovers and sheets; the APG menu pattern for menus | Phase 39.3 |
 | 2026-11-14 | Dark current area gets a 1 px control-border edge (not on the board) | Its 16% tint is 1.35:1 against the glass; the edge is 3.5:1 or more | Phase 39.3 |
+| 2026-11-14 | The inbox list is a solid panel beside the conversation panel from 1280 px; rows carry at most two chips (why it waits, who has it once, or "AI is answering"); unread is a dot and a heavier name; "Mark all as read" names the count first | Phase 38 notes 6 and 13, owner decisions Q2 and Q4; the board Inbox | Phase 39.4a |
+| 2026-11-14 | The phone's bottom bar uses a one-line short name for the inbox («المحادثات»); the bar is 64 px in both languages again | «صندوق المحادثات» wrapped and made the Arabic bar 78 px (owner's assistant's note; GLOSSARY short form) | Phase 39.4a |
+| 2026-11-14 | The visitor toast ("Visitor … wrote. The AI is answering.") does not ship | The row moving to the top, its unread dot and the opt-in sounds already say it; a toast per message would stack on a busy inbox, and "The AI is answering" can be untrue a second later | Phase 39.4a |
 | 2026-11-14 | The switcher's border is the control border, not the board's line | Owner decision Q3: every control boundary meets 3:1 | Phase 39.3 |
 
 ## 13. Contrast table (Calm Glass, Phase 39.2a)
@@ -612,6 +615,23 @@ Measured by `p39-3/scratch/contrast_shell.py` (`p39-3/chrome/contrast.json`). Gl
 | Shell | workspace letter on its tile | 4.5:1 | 8.75 | 7.61 |
 | Shell | rail divider on the glass (decorative) | — | 3.26 | 3.39 |
 
+### 13.3 The inbox list's pairs (Phase 39.4a)
+
+Measured in Chrome from computed colours (`p39-4a/scratch/inbox.mjs contrast`, `p39-4a/chrome/results-after.json`), on a row at rest, under the pointer (the hover tint) and selected (the selected tint); the table gives the worst of the three. 80 measurements; every required pair passes.
+
+| Part | Pair | Needs | Light (worst) | Dark (worst) |
+| --- | --- | --- | --- | --- |
+| Inbox | customer's name on the row | 4.5:1 | 13.27 | 10.59 |
+| Inbox | preview on the row | 4.5:1 | 8.32 | 8.19 |
+| Inbox | time and "who wrote it" (quiet) on the row | 4.5:1 | 4.78 | 4.84 |
+| Inbox | unread dot on the row | 3:1 | 7.30 | 5.37 |
+| Inbox | selected edge on the selected tint | 3:1 | 7.89 | 5.37 |
+| Inbox | chip words: AI / need and team / failed | 4.5:1 | 12.70 / 6.20 / 6.03 | 7.59 / 6.74 / 5.67 |
+| Inbox | chip dot: gold on the gold chip (decorative; the word says it) | — | 1.91 | 4.84 |
+| Inbox | live words, live dot on the panel | 4.5:1, 3:1 | 5.73, 8.75 | 6.05, 6.71 |
+| Inbox | quiet actions on the panel | 4.5:1 | 9.98 | 10.24 |
+| Inbox | the view's count on the track | 4.5:1 | 9.00 | 9.24 |
+
 ## 14. Components (Calm Glass, Phase 39.2b)
 
 Each is shown in the Design Lab in both languages and themes, with "Reduce transparency". A
@@ -651,9 +671,19 @@ the event line, `.bubble-human` = the team's bubble). Tests: a Vitest spec besid
 
 - **Sections:** Conversations (Overview, Inbox, Customers) · AI (Knowledge, AI agents, Channels) · Insights (Analytics, Reports) · Workspace (Team, Roles & permissions, Workspace settings, Plan & usage, Billing). The caption style in the quiet tone, sentence case, no tracking, no capitals. A section with no area the member may open is not shown.
 - **Bottom bar:** the first four of Inbox, Overview, Customers, Knowledge, Analytics, Reports that the member may open; the rest in "More", a modal glass sheet grouped like the side bar. "More" is marked current when the page is one of its areas.
-- **Long names wrap, never truncate:** in the side bar «صندوق المحادثات» beside its count takes a second line; in the bottom bar the Arabic labels are the 13 px caption and the bar is 78 px tall in Arabic (`--bottombar-height` under `:lang(ar)`), so the same name wraps there too. Counts are an LTR island (`dir="ltr"`), so «99+» never reads «+99».
+- **Long names wrap, never truncate:** in the side bar «صندوق المحادثات» beside its count takes a second line. The bottom bar uses the inbox's one-line short form instead («المحادثات», `NavItem.shortLabel`, Phase 39.4a; English stays "Inbox"), so the bar is 64 px in both languages; the side bar, the "More" sheet, the page heading and the tab title keep the full name. Counts are an LTR island (`dir="ltr"`), so «99+» never reads «+99».
 - **Counts:** the inbox's needs-a-person count, a gold pill (999+ in the side bar, 99+ on a phone's icon); a screen reader hears the exact number with the words "Needs a person".
 - **Current area:** filled (light: emerald with white words; dark: a 16% sage tint with a control-border edge), weight 600, `aria-current="page"`; `Highlight` in forced colours.
 - **Popovers:** the workspace switcher and the account menu are `app-menu`s (arrow keys, Escape and focus return; Tab leaves a menu, as the menu pattern says); the notification panel and the "More" sheet move focus in, keep Tab inside (`layout/trap-tab.ts`), close on Escape and return focus. A glass layer is a sibling behind the bar's content, so a popover opening from the bar blurs the page rather than nothing.
 - **Toasts:** bottom start beside the side bar on a desktop, under the top bar on a phone.
 - **The conversation on a phone:** one line (back, the customer, the handling chip, Details); the facts line, the handling bar with its action and help, and Refresh open with Details.
+
+### 14.2 The inbox list (Phase 39.4a)
+
+- **Frame:** from 1280 px, solid panels on the ground: the list (`--inbox-list-width`, 352 px) and the open conversation (the rest, with its customer panel inside until 39.4b splits it), 12 px apart and 14 px from the window. Below 1280 px the list is a page and the conversation another (today's two-page pattern). No blur on the list or its rows.
+- **Head:** "Inbox" (the navigation's word, title-2; the page's `h1` only when nothing is open), the live state (dot and words), the three views as a segmented control of links (All · Needs a person with its count · Mine, in `?view=`), then two quiet actions: "Mark all as read" and Refresh. No search field: the API has none (BA39-3).
+- **Row:** 16 px radius, 12 px padding, the 40 px avatar with the channel's badge (the channel in words for a screen reader), the customer by its label (name, or word and code), the time, one line of preview with who wrote it, then one line of chips: why it waits (coral "The AI could not reply", otherwise gold), who has it said once (the taker, else the assignee; `displayName ?? email`; Arabic «استلام المحادثة: …», never a gendered verb), or "AI is answering" while the AI has it and nothing waits. A "who has it" chip that does not fit beside the others takes a second chip line (never more), and is cut at the name's own end when it must be (an address reads "p36.owner@omn…" in Arabic too).
+- **Unread:** the name at 600 instead of 500 and a 9 px primary dot closing the chips' line, with the word "Unread" for a screen reader; never a fill.
+- **Selected:** the faint primary tint, the 2 px primary edge and `aria-current="page"`.
+- **Mark all as read:** asks the count first; none unread gives a toast and no dialog; otherwise a glass confirmation that names the count and says only the reader's own unread changes. The member's other tabs follow live (`conversationsRead`).
+- **Skeleton:** six rows of the same shape (avatar, then the three lines at their real line heights, `1lh`, with the bar in the middle half).

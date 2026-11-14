@@ -441,6 +441,12 @@
   --orb-size: 1.625rem;
   --orb-size-lg: 4rem;
 
+  // The inbox (Phase 39.4a, board Inbox): the list's column, the unread dot at
+  // the end of a row's chips, and the live indicator's dot.
+  --inbox-list-width: 22rem; // 352px
+  --unread-dot-size: 0.5625rem; // 9px
+  --live-dot-size: 0.4375rem; // 7px
+
   // ---------------------------------------------------------------------------
   // Typography (calm-glass.md §4)
   // ---------------------------------------------------------------------------
@@ -556,8 +562,6 @@
   --text-small: 400 0.8125rem / 1.6923 var(--font-sans); // 13/22
   --text-label: 500 0.8125rem / 1.6923 var(--font-sans); // 13/22
   --text-caption: 500 0.8125rem / 1.5385 var(--font-sans); // 13/20 (never under 13)
-  // The phone's bottom bar holds a two-line name («صندوق المحادثات») in Arabic.
-  --bottombar-height: 4.875rem; // 78px
   --text-table: 400 0.8125rem / 1.6923 var(--font-sans); // 13/22
   --text-numeric: 600 0.875rem / 1.5714 var(--font-sans); // 14/22
   --text-button: 600 0.875rem / 1.5 var(--font-sans);

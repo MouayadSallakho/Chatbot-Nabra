@@ -22,6 +22,13 @@ export type ConversationHandling = 'Ai' | 'Human';
 export interface WorkspaceMember {
   readonly userId: string;
   readonly email: string;
+  /**
+   * The name the member chose for themselves (Phase 39.1), or null when they
+   * have none. The API sends it on every member read since 39.1; it is
+   * optional here so a screen not yet redrawn, and its fixtures, need not name
+   * it. Shown by `memberName()`: the name, or the email where there is none.
+   */
+  readonly displayName?: string | null;
 }
 
 /**
@@ -80,8 +87,12 @@ export interface ConversationSummary extends HandlingFacts {
   readonly unread: boolean;
 }
 
-/** Which conversations a list shows. */
-export type ConversationView = 'all' | 'needs-person';
+/**
+ * Which conversations a list shows: every one, those waiting for a person, or
+ * the reader's own (assigned to them, or taken over by them: `filter=mine`,
+ * Phase 39.1).
+ */
+export type ConversationView = 'all' | 'needs-person' | 'mine';
 
 /** A page of conversations. */
 export interface ConversationPage {
@@ -183,11 +194,33 @@ export class ConversationsApi {
     pageSize = 20,
     view: ConversationView = 'all',
   ): Observable<ConversationPage> {
-    const filter = view === 'needs-person' ? '&filter=needs-person' : '';
+    const filter = view === 'all' ? '' : `&filter=${view}`;
 
     return this.http.get<ConversationPage>(
       `/api/tenants/${tenantId}/conversations?page=${page}&pageSize=${pageSize}${filter}`,
     );
+  }
+
+  /**
+   * How many conversations this member has not read (Phase 39.1), by the list's
+   * own unread rule: asked first, so "Mark all as read" can say how many.
+   */
+  unreadCount(tenantId: string): Observable<number> {
+    return this.http
+      .get<{ count: number }>(`/api/tenants/${tenantId}/conversations/unread-count`)
+      .pipe(map((response) => response.count));
+  }
+
+  /**
+   * Marks every conversation in the workspace read for this member only, and
+   * answers how many were unread. Idempotent and only ever moves a marker
+   * forward, so no `If-Match` and no idempotency key; the server tells this
+   * member's other tabs with `conversationsRead`.
+   */
+  markAllRead(tenantId: string): Observable<number> {
+    return this.http
+      .post<{ marked: number }>(`/api/tenants/${tenantId}/conversations/read-all`, null)
+      .pipe(map((response) => response.marked));
   }
 
   /** Says this member has read up to a sequence. It only moves forward, so no `If-Match`. */

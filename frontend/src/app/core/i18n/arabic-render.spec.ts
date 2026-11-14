@@ -337,6 +337,148 @@ describe('Arabic renders', () => {
     });
   });
 
+  describe('the inbox list (Phase 39.4a)', () => {
+    it('renders the list in Arabic: its heading, the three views, the chips and the dot', async () => {
+      const { provideHttpClient } = await import('@angular/common/http');
+      const { HttpTestingController, provideHttpClientTesting } =
+        await import('@angular/common/http/testing');
+      const { provideRouter } = await import('@angular/router');
+      const { TenantApi } = await import('@app/core/api/tenant-api');
+      const { PermissionApi } = await import('@app/core/authorization/permission-api');
+      const { InboxSignals } = await import('@app/core/sounds/inbox-signals');
+      const { LOCAL_STORAGE } = await import('@app/core/storage/local-storage');
+      const { WorkspaceContextService } =
+        await import('@app/core/workspace/workspace-context-service');
+      const { memoryStorage, permissionApiGranting } = await import('@app/testing/test-doubles');
+      const { ConversationsApi } = await import('@app/features/conversations/conversations-api');
+      const { ConversationList } =
+        await import('@app/features/conversations/conversation-list/conversation-list');
+      const { signal } = await import('@angular/core');
+      const tenantId = '11111111-1111-7111-8111-111111111111';
+
+      TestBed.configureTestingModule({
+        providers: [
+          provideRouter([]),
+          provideHttpClient(),
+          provideHttpClientTesting(),
+          ConversationsApi,
+          { provide: LOCAL_STORAGE, useValue: memoryStorage() },
+          { provide: TenantApi, useValue: { get: () => undefined, create: () => undefined } },
+          { provide: PermissionApi, useValue: permissionApiGranting('conversations.view') },
+          { provide: InboxSignals, useValue: { count: signal(3), showCount: () => () => 0 } },
+        ],
+      });
+      await TestBed.inject(WorkspaceContextService).adopt({
+        id: tenantId,
+        name: 'النور',
+        slug: 'alnoor',
+        status: 'Active',
+      });
+
+      const fixture = TestBed.createComponent(ConversationList);
+
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      const conversation = {
+        id: 'c1',
+        channel: 'WhatsApp',
+        status: 'Open',
+        startedAt: '2026-11-14T10:00:00Z',
+        lastActivityAt: '2026-11-14T10:05:00Z',
+        agentName: null,
+        messageCount: 2,
+        lastMessagePreview: 'متى تفتحون؟',
+        lastMessageSender: 'Customer',
+        customer: {
+          id: 'p1',
+          displayName: null,
+          labelCode: 'AnonymousVisitor',
+          reference: null,
+          shortCode: '7KQ2MX',
+        },
+        unread: true,
+        assignedTo: null,
+        needsPerson: true,
+        needsPersonReason: 'PersonHandling',
+      };
+
+      TestBed.inject(HttpTestingController)
+        .expectOne(`/api/tenants/${tenantId}/conversations?page=1&pageSize=20`)
+        .flush({
+          items: [
+            {
+              ...conversation,
+              handling: 'Human',
+              takenOverBy: { userId: 'u1', email: 'sara@acme.test', displayName: 'سارة' },
+            },
+            {
+              ...conversation,
+              id: 'c2',
+              handling: 'Ai',
+              unread: false,
+              needsPerson: false,
+              needsPersonReason: null,
+              takenOverBy: null,
+            },
+          ],
+          page: 1,
+          pageSize: 20,
+          total: 2,
+        });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      const root = fixture.nativeElement as HTMLElement;
+      const rows = [...root.querySelectorAll('a.conversation-row')];
+
+      expect(text(root.querySelector('h1'))).toBe('صندوق المحادثات');
+      expect(text(root.querySelector('[data-testid="view-all"]'))).toBe('الكل');
+      expect(text(root.querySelector('[data-testid="view-needs-person"]'))).toBe(
+        'بحاجة إلى الفريق 3',
+      );
+      expect(text(root.querySelector('[data-testid="view-mine"]'))).toBe('محادثاتي');
+      expect(text(root.querySelector('[data-testid="mark-all-read"]'))).toBe('تحديد الكل كمقروء');
+      // «استلام المحادثة: …», never a gendered verb (Q8); the name in its own direction.
+      const handled = rows[0].querySelector('[data-testid="row-handled-by"]');
+
+      expect(text(handled)).toBe('استلام المحادثة: سارة');
+      expect(handled?.querySelector('bdi')?.getAttribute('dir')).toBe('auto');
+      expect(text(rows[0].querySelector('[data-testid="row-reason"]'))).toBe('بانتظار رد الفريق');
+      expect(text(rows[0].querySelector('[data-testid="row-unread"]'))).toBe('غير مقروءة');
+      expect(text(rows[1].querySelector('[data-testid="row-voice"]'))).toBe(
+        'يردّ الذكاء الاصطناعي',
+      );
+      expect(rows[0].querySelector('.visually-hidden')?.textContent).toContain('واتساب');
+      // The preview takes its own direction; the code stays left to right.
+      expect(rows[0].querySelector('.row-text')?.getAttribute('dir')).toBe('auto');
+      expect(rows[0].querySelector('app-customer-label bdi')?.getAttribute('dir')).toBe('ltr');
+    });
+
+    it('counts unread and marked conversations with every Arabic plural form', async () => {
+      const { unreadSentence, markedSentence } =
+        await import('@app/features/conversations/mark-all-read/mark-all-read');
+
+      expect(unreadSentence('ar', 1)).toBe('في مساحة العمل هذه محادثة واحدة غير مقروءة.');
+      expect(unreadSentence('ar', 2)).toBe('في مساحة العمل هذه محادثتان غيرُ مقروءتين.');
+      expect(unreadSentence('ar', 5)).toBe('في مساحة العمل هذه 5 محادثات غير مقروءة.');
+      expect(unreadSentence('ar', 961)).toBe('في مساحة العمل هذه 961 محادثة غير مقروءة.');
+      expect(markedSentence('ar', 0)).toBe('كانت كل المحادثات مقروءة بالفعل.');
+      expect(markedSentence('ar', 2)).toBe('حُدِّدت محادثتان كمقروءتين.');
+      expect(markedSentence('ar', 11)).toBe('حُدِّدت 11 محادثة كمقروءة.');
+    });
+
+    it("gives the phone's bottom bar a one-line name for the inbox, and keeps the full one elsewhere", async () => {
+      const { NAV_ITEMS } = await import('@app/layout/navigation');
+      const inbox = NAV_ITEMS.find((item) => item.path === 'conversations');
+
+      expect(inbox?.label).toBe('صندوق المحادثات');
+      expect(inbox?.shortLabel).toBe('المحادثات');
+      expect(CATALOGUE.translations['title.inbox']).toBe('صندوق المحادثات');
+    });
+  });
+
   describe('workspace, team, roles and billing (Phase 38.4)', () => {
     it('names the areas by key and counts role holders in Arabic', async () => {
       const { accessChangeSentence, areaName, memberCount, permissionLabel } =

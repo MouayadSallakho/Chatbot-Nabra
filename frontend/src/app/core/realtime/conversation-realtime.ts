@@ -25,4 +25,21 @@ export class ConversationRealtime {
       }
     });
   }
+
+  /**
+   * Calls back when this member marked every conversation in this workspace
+   * read, from any of their tabs (`conversationsRead`, Phase 39.1). Returns the
+   * unsubscribe.
+   */
+  listenRead(tenantId: string, onRead: () => void): () => void {
+    return this.owner.onConversationsRead((workspace) => {
+      // The event names its workspace: another workspace's is not this list's news.
+      if (
+        this.owner.tenantId() === tenantId &&
+        workspace?.toLowerCase() === tenantId.toLowerCase()
+      ) {
+        onRead();
+      }
+    });
+  }
 }

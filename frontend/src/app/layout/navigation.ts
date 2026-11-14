@@ -6,6 +6,13 @@ export interface NavItem {
   /** What the reader sees, and what a screen reader announces. */
   readonly label: string;
 
+  /**
+   * A one-line form for the phone's bottom bar, where the full name would wrap
+   * (39.4a: «المحادثات» for «صندوق المحادثات», which made the Arabic bar 78px
+   * instead of 64). The side bar, the More sheet and the page keep `label`.
+   */
+  readonly shortLabel?: string;
+
   /** Router path, without a leading slash. */
   readonly path: string;
 
@@ -95,6 +102,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
     // not exist yet, and the screen says so rather than showing controls that
     // would fail.
     label: $localize`:@@nav.inbox:Inbox`,
+    shortLabel: $localize`:@@nav.inboxShort:Inbox`,
     group: 'Conversations',
     path: 'conversations',
     icon: 'conversations',

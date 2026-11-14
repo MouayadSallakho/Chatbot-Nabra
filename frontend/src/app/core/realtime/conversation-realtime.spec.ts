@@ -27,6 +27,20 @@ describe('ConversationRealtime', () => {
         listener(id);
       }
     }
+
+    readListeners = new Set<(tenantId: string | null) => void>();
+
+    onConversationsRead(listener: (tenantId: string | null) => void): () => void {
+      this.readListeners.add(listener);
+
+      return () => this.readListeners.delete(listener);
+    }
+
+    fireRead(tenantId: string | null): void {
+      for (const listener of this.readListeners) {
+        listener(tenantId);
+      }
+    }
   }
 
   beforeEach(() => {
@@ -66,5 +80,33 @@ describe('ConversationRealtime', () => {
     stop();
 
     expect(owner.listeners.size).toBe(0);
+  });
+
+  describe('conversationsRead (Phase 39.1)', () => {
+    it("passes on the member's mark-all-read for this workspace, whatever its letter case", () => {
+      owner.current = 'aa11';
+      const heard = vi.fn();
+
+      TestBed.inject(ConversationRealtime).listenRead('aa11', heard);
+      owner.fireRead('AA11');
+
+      expect(heard).toHaveBeenCalledTimes(1);
+    });
+
+    it('ignores another workspace, a switch in progress and an empty payload', () => {
+      const heard = vi.fn();
+      const stop = TestBed.inject(ConversationRealtime).listenRead('t1', heard);
+
+      owner.fireRead('t2');
+      owner.fireRead(null);
+      owner.current = 't2';
+      owner.fireRead('t1');
+
+      expect(heard).not.toHaveBeenCalled();
+
+      stop();
+
+      expect(owner.readListeners.size).toBe(0);
+    });
   });
 });

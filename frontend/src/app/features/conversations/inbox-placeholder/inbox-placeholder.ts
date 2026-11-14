@@ -4,6 +4,9 @@ import { Icon } from '@app/shared/icon/icon';
 /**
  * The conversation pane when nothing is open.
  *
+ * The second panel's content while nothing is open (Calm Glass, 39.4a): on the
+ * panel colour, with the empty state's one serif line and one sentence.
+ *
  * Seen only where the list sits beside it (1280px and wider); on a narrower
  * screen `/conversations` is the list alone. Says what belongs here and how to
  * fill it, and nothing else: no counts, no illustration.
@@ -28,7 +31,7 @@ import { Icon } from '@app/shared/icon/icon';
       display: grid;
       block-size: 100%;
       place-items: center;
-      background-color: var(--surface-page);
+      background-color: var(--color-panel);
     }
 
     .inbox-placeholder {

@@ -196,6 +196,31 @@ describe('WorkspaceRealtime', () => {
     expect(notifications).toHaveBeenCalledTimes(1);
   });
 
+  it('tells the inbox when the member marked every conversation read, and nobody else (39.1)', async () => {
+    const { realtime, workspace } = setUp(VIEW);
+    const conversations: (string | null)[] = [];
+    const read: (string | null)[] = [];
+    const notifications = vi.fn();
+
+    realtime.onConversation((id) => conversations.push(id));
+    realtime.onNotifications(notifications);
+    const stop = realtime.onConversationsRead((id) => read.push(id));
+    realtime.start();
+    await workspace.adopt(tenant);
+    await settle();
+
+    built[0].handlers.get('conversationsRead')!(tenant.id);
+
+    expect(read).toEqual([tenant.id]);
+    expect(conversations).toEqual([]);
+    expect(notifications).not.toHaveBeenCalled();
+
+    stop();
+    built[0].handlers.get('conversationsRead')!(tenant.id);
+
+    expect(read).toEqual([tenant.id]);
+  });
+
   it('survives a listener that unsubscribes while it is being told', async () => {
     const { realtime, workspace } = setUp(VIEW);
     const later = vi.fn();
