@@ -1,4 +1,4 @@
-<div class="page">
+<div class="page page-calm">
   @if (loading()) {
     <!-- The heading stays while it loads: one h1, and somewhere for focus to land. -->
     <app-page-header
@@ -76,9 +76,9 @@
       [heading]="doc.title"
       [description]="typeWord(doc.source?.fileType ?? null) + ' · ' + savedSize()"
     >
-      <span pageStatus [class]="'badge ' + stateTone(displayState() ?? doc.readiness)">{{
+      <app-chip pageStatus [tone]="stateTone(displayState() ?? doc.readiness)">{{
         stateWord(displayState() ?? doc.readiness)
-      }}</span>
+      }}</app-chip>
     </app-page-header>
 
     @if (conflict(); as source) {
@@ -281,10 +281,10 @@
           </div>
           <div class="card-body indexing-body">
             <p class="indexing-state">
-              <span
-                [class]="'badge ' + stateTone(displayState() ?? doc.readiness)"
+              <app-chip
+                [tone]="stateTone(displayState() ?? doc.readiness)"
                 data-testid="readiness"
-                >{{ stateWord(displayState() ?? doc.readiness) }}</span
+                >{{ stateWord(displayState() ?? doc.readiness) }}</app-chip
               >
             </p>
             <p class="text-small text-secondary" data-testid="state-sentence">

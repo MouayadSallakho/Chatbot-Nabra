@@ -89,6 +89,23 @@ describe('AgentCreate', () => {
 
   afterEach(() => http.verify());
 
+  it('says what happens next with a space after each bold step, and the lifecycle as chips', async () => {
+    await mount();
+
+    const steps = [...host().querySelectorAll('.help-list li')].map((item) =>
+      item.textContent?.replace(/\s+/g, ' ').trim(),
+    );
+
+    expect(steps[0]).toBe('Create. The agent is saved as a draft. Nothing is sent to customers.');
+    expect(steps.every((step) => /\.\s\S/.test(step ?? ''))).toBe(true);
+
+    const chips = [...host().querySelectorAll('.lifecycle-path app-chip')];
+
+    expect(chips.map((chip) => chip.textContent?.trim())).toEqual(['Draft', 'Active']);
+    expect(chips[0].classList).toContain('chip-draft');
+    expect(chips[1].classList).toContain('chip-success');
+  });
+
   it('sends nothing until both fields are supplied', async () => {
     await mount();
 

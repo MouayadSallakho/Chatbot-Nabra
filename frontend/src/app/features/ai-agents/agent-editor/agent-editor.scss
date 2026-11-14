@@ -13,7 +13,7 @@
 
   & + & {
     padding-block-start: var(--space-5);
-    border-block-start: 1px solid var(--border-subtle);
+    border-block-start: 1px solid var(--color-line);
   }
 
   h3,
@@ -35,18 +35,31 @@
   list-style: none;
 }
 
-// A link to the channel's own page; the badge names it, the underline says it
-// can be followed.
+// A link to the channel's own page, as a soft tile (44px, radius 16) with a
+// chevron: the badge names the channel, the chevron says it can be followed.
 .behaviour-channel {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-1);
-  min-block-size: 1.5rem;
-  color: var(--text-primary);
-  text-decoration: underline;
-  text-underline-offset: 3px;
+  gap: var(--space-2);
+  min-block-size: var(--control-height);
+  padding-inline: var(--space-3) var(--space-2);
+  border-radius: var(--radius-tile);
+  background-color: var(--color-panel-soft);
+  color: var(--color-text);
+  text-decoration: none;
+  transition: background-color var(--duration-press) var(--ease-calm);
 
   &:hover {
-    text-decoration-thickness: 2px;
+    background-color: var(--color-hover);
+    color: var(--color-text);
+    text-decoration: none;
   }
+
+  @media (forced-colors: active) {
+    border: 1px solid LinkText;
+  }
+}
+
+.behaviour-channel-go {
+  color: var(--color-text-quiet);
 }

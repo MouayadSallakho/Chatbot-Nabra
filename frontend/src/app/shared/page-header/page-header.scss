@@ -39,6 +39,13 @@
     text-decoration: underline;
     text-underline-offset: 3px;
   }
+
+  // Touch: a 44px target (rule 14, Phase 39.5a) that takes no more room than
+  // the 28px one, so the title does not move.
+  @media (pointer: coarse) {
+    min-block-size: 2.75rem;
+    margin-block: -0.5rem;
+  }
 }
 
 .page-header-row {

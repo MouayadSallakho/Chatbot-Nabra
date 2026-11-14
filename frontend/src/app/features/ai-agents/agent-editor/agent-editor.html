@@ -1,4 +1,4 @@
-<div class="page">
+<div class="page page-calm">
   @if (!canView()) {
     <!--
       The permission-denied state, before any request: what is true and what to
@@ -106,9 +106,9 @@
       [heading]="current.name"
       [description]="statusSentence(current.status)"
     >
-      <span pageStatus [class]="'badge ' + statusTone(current.status)" data-testid="agent-status">{{
+      <app-chip pageStatus [tone]="statusTone(current.status)" data-testid="agent-status">{{
         statusWord(current.status)
-      }}</span>
+      }}</app-chip>
     </app-page-header>
 
     @if (conflict(); as source) {
@@ -381,7 +381,7 @@
                     class="lifecycle-step"
                     [attr.aria-current]="step === current.status ? 'step' : null"
                   >
-                    <span [class]="'badge ' + statusTone(step)">{{ statusWord(step) }}</span>
+                    <app-chip [tone]="statusTone(step)">{{ statusWord(step) }}</app-chip>
                   </li>
                 }
               </ol>
@@ -455,6 +455,11 @@
                           @if (channelNote(use.status); as note) {
                             <span class="text-small text-muted">({{ note }})</span>
                           }
+                          <app-icon
+                            class="behaviour-channel-go"
+                            name="chevron-end"
+                            [strokeWidth]="1.75"
+                          />
                         </a>
                       </li>
                     }

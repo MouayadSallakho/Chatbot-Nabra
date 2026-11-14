@@ -127,12 +127,66 @@ describe('KnowledgeList', () => {
     expect(host().textContent).toContain('Returns policy');
     expect(host().textContent).toContain('Delivery times');
 
-    // Exactly the API's states, each with its own badge.
-    const badges = [...host().querySelectorAll('.knowledge-state .badge')];
+    // Exactly the API's states, each a chip with its own word and glyph.
+    const chips = [...host().querySelectorAll('.knowledge-state app-chip')];
 
-    expect(badges.map((badge) => badge.textContent?.trim())).toEqual(['Indexed', 'Needs index']);
-    expect(badges[0].classList).toContain('badge-success');
-    expect(badges[1].classList).toContain('badge-warning');
+    expect(chips.map((chip) => chip.textContent?.trim())).toEqual(['Indexed', 'Needs index']);
+    expect(chips[0].classList).toContain('chip-success');
+    expect(chips[1].classList).toContain('chip-warning');
+    expect(chips.every((chip) => chip.classList.contains('chip-sm'))).toBe(true);
+  });
+
+  it("gives each row its document's glyph: written text, a table, a file", async () => {
+    await mount();
+
+    flush([
+      ready,
+      { ...unindexed, sourceFileType: 'Csv', sourceByteLength: 900 },
+      {
+        ...unindexed,
+        id: '44444444-4444-4444-4444-444444444444',
+        sourceFileType: 'Pdf',
+        sourceByteLength: 9000,
+      },
+    ]);
+    await settle();
+
+    const glyphs = [...host().querySelectorAll('.data-row .record-glyph')];
+
+    expect(glyphs).toHaveLength(3);
+    expect(glyphs.every((glyph) => glyph.getAttribute('aria-hidden') === 'true')).toBe(true);
+    // Decorative: the Type column says the same in words.
+    expect(host().textContent).toContain('CSV');
+    expect(host().querySelector('.record-title .knowledge-title')).not.toBeNull();
+  });
+
+  it('draws its skeleton in the loaded list: the head, then rows with a glyph, a title and a chip', async () => {
+    await mount();
+
+    const skeleton = host().querySelector('[data-testid="knowledge-skeleton"]');
+
+    expect(skeleton?.classList).toContain('knowledge-list');
+    expect(skeleton?.getAttribute('aria-busy')).toBe('true');
+    expect(skeleton?.querySelector('.data-list-head')).not.toBeNull();
+
+    const rows = [...(skeleton?.querySelectorAll('.data-row-skeleton') ?? [])];
+
+    expect(rows).toHaveLength(3);
+    // The loaded row's five cells, in its order: title (with its glyph), type,
+    // size, state, change.
+    expect([...rows[0].children].map((cell) => cell.className)).toEqual([
+      'record-title',
+      'skeleton skeleton-text',
+      'skeleton skeleton-text data-cell-end',
+      'skeleton skeleton-chip',
+      'skeleton skeleton-text',
+    ]);
+    expect(rows[0].querySelector('.record-glyph.skeleton')).not.toBeNull();
+
+    flush([ready]);
+    await settle();
+
+    expect(host().querySelector('[data-testid="knowledge-skeleton"]')).toBeNull();
   });
 
   it("says the file's size, and that a typed document has no file", async () => {
@@ -172,7 +226,7 @@ describe('KnowledgeList', () => {
 
       expect(state()).toBe('Indexing now');
       expect(host().querySelector('[data-testid="document-state"]')?.classList).toContain(
-        'badge-info',
+        'chip-info',
       );
     });
 
@@ -396,6 +450,62 @@ describe('KnowledgeList', () => {
       // Exactly one more for b and c.
       flush([ready]);
       await settle();
+    });
+
+    // Phase 38 note 17 (Phase 39.5a): indexing may end while the first read is in
+    // flight, and that read may already have been answered with the old state.
+    describe('an event during the first read (note 17)', () => {
+      it('is not lost: the list reads once more after the first read', async () => {
+        await mount(['knowledge.view']);
+
+        // The first read is out; indexing starts and ends meanwhile.
+        live.told!(unindexed.id);
+        live.told!(unindexed.id);
+        await settle();
+
+        // Nothing extra while the first read is in flight...
+        flush([{ ...unindexed, lastIndexAttempt: started }]);
+        await settle();
+
+        // ...and exactly one more read after it, however many events arrived.
+        flush([
+          { ...ready, id: unindexed.id, lastIndexAttempt: { ...started, status: 'Succeeded' } },
+        ]);
+        await settle();
+
+        expect(state()).toBe('Indexed');
+        expect(host().querySelector('.skeleton')).toBeNull();
+      });
+
+      it('reads only once when nothing arrived during the first read', async () => {
+        await mount(['knowledge.view']);
+        flush([ready]);
+        await settle();
+
+        // verify() in afterEach: no second request.
+        expect(state()).toBe('Indexed');
+      });
+
+      it('counts events during a page change too, and forgets those of a failed read', async () => {
+        await mount(['knowledge.view']);
+
+        live.told!(ready.id);
+        await settle();
+        http
+          .expectOne((request) => request.url === knowledgeUrl)
+          .flush({}, { status: 500, statusText: 'Server Error' });
+        await settle();
+
+        // A failed first read: Try again reads anyway, so no quiet read follows.
+        expect(host().textContent).toContain('Could not load knowledge');
+
+        (host().querySelector('.btn') as HTMLButtonElement).click();
+        await settle();
+        flush([ready]);
+        await settle();
+
+        expect(host().textContent).toContain('Returns policy');
+      });
     });
 
     it('keeps the rows when a live read fails', async () => {

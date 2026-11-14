@@ -12,6 +12,7 @@ import { ApiError, toApiError } from '@app/core/api/api-error';
 import { PermissionService } from '@app/core/authorization/permission-service';
 import { KnowledgeRealtime } from '@app/core/realtime/knowledge-realtime';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
+import { Chip } from '@app/shared/chip/chip';
 import { EmptyState } from '@app/shared/empty-state/empty-state';
 import { Icon } from '@app/shared/icon/icon';
 import { PageHeader } from '@app/shared/page-header/page-header';
@@ -24,6 +25,7 @@ import {
   TYPED_TEXT,
   indexAttemptNote,
   knowledgeDisplayState,
+  knowledgeGlyph,
   knowledgeStateTone,
   knowledgeStateWord,
   knowledgeTypeWord,
@@ -49,11 +51,19 @@ import { DEFAULT_PAGE_SIZE, KnowledgeApi, KnowledgeDocumentPage } from '../knowl
  * knowledge event over the page's one connection (BA-11), so "Indexing now" ends
  * by itself. The event carries an id and nothing else; the list re-reads its page
  * quietly, keeping the rows on screen, and once more after a reconnect.
+ *
+ * <strong>An event that arrives during a full read is not lost</strong> (Phase
+ * 38 note 17, Phase 39.5a). The first read (and a page change, or Try again)
+ * may have been answered before indexing ended; the events heard meanwhile are
+ * counted, and if any arrived the page is read once more, quietly, after it.
+ *
+ * Calm Glass (Phase 39.5a): one solid panel of rows, each with its document's
+ * glyph, and the state as a chip with a word and a glyph.
  */
 @Component({
   selector: 'app-knowledge-list',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, PageHeader, EmptyState, Icon, Pagination, LocalDatePipe],
+  imports: [RouterLink, PageHeader, EmptyState, Icon, Pagination, LocalDatePipe, Chip],
   templateUrl: './knowledge-list.html',
   styleUrl: './knowledge-list.scss',
 })
@@ -69,10 +79,14 @@ export class KnowledgeList {
   private liveReading = false;
   private liveAgain = false;
 
+  /** Events heard while a full read was in flight (note 17): re-read once after it. */
+  private missedDuringRead = 0;
+
   protected readonly stateWord = knowledgeStateWord;
   protected readonly stateTone = knowledgeStateTone;
   protected readonly typeWord = knowledgeTypeWord;
   protected readonly displayState = knowledgeDisplayState;
+  protected readonly glyph = knowledgeGlyph;
   protected readonly attemptNote = indexAttemptNote;
 
   /** Whether this list is the reader's to see at all. */
@@ -151,7 +165,15 @@ export class KnowledgeList {
       return;
     }
 
-    if (!tenantId || this.loading()) {
+    if (!tenantId) {
+      return;
+    }
+
+    if (this.loading()) {
+      // A full read is in flight and may already have been answered: count
+      // the event, and read again once it is done (note 17).
+      this.missedDuringRead += 1;
+
       return;
     }
 
@@ -195,16 +217,29 @@ export class KnowledgeList {
 
     this.loading.set(true);
     this.failure.set(null);
+    this.missedDuringRead = 0;
+
+    let read = false;
 
     try {
       this.page.set(
         await firstValueFrom(this.api.list(tenantId, this.currentPage(), this.pageSize)),
       );
+      read = true;
     } catch (error) {
       this.failure.set(toApiError(error));
       this.page.set(null);
     } finally {
       this.loading.set(false);
+    }
+
+    // Once, however many arrived; after a failure Try again reads anyway.
+    const missed = this.missedDuringRead;
+
+    this.missedDuringRead = 0;
+
+    if (read && missed > 0) {
+      await this.liveRead();
     }
   }
 

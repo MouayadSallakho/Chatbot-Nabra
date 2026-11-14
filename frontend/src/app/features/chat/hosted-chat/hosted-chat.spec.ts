@@ -1108,7 +1108,8 @@ describe('HostedChat', () => {
 
     const ids = (): string[] =>
       [...host().querySelectorAll('[data-testid="chat-message"]')].map(
-        (row) => `${row.getAttribute('data-sender')}:${row.textContent?.trim()}`,
+        (row) =>
+          `${row.getAttribute('data-sender')}:${row.textContent?.replace(/\s+/g, ' ').trim()}`,
       );
 
     const announce = (): void => {
@@ -1132,8 +1133,8 @@ describe('HostedChat', () => {
       await settle();
 
       expect(ids()).toEqual([
-        'Customer:You:When do you close?',
-        'AiAgent:ConciergeWe close at six.',
+        'Customer:You: When do you close?',
+        'AiAgent:Concierge We close at six.',
       ]);
 
       announce();
@@ -1142,8 +1143,8 @@ describe('HostedChat', () => {
       await settle();
 
       expect(ids()).toEqual([
-        'Customer:You:When do you close?',
-        'AiAgent:ConciergeWe close at six.',
+        'Customer:You: When do you close?',
+        'AiAgent:Concierge We close at six.',
       ]);
     });
 
@@ -1157,14 +1158,14 @@ describe('HostedChat', () => {
       reRead([asked.customerMessage]);
       await settle();
 
-      expect(ids()).toEqual(['Customer:You:When do you close?']);
+      expect(ids()).toEqual(['Customer:You: When do you close?']);
 
       answer();
       await settle();
 
       expect(ids()).toEqual([
-        'Customer:You:When do you close?',
-        'AiAgent:ConciergeWe close at six.',
+        'Customer:You: When do you close?',
+        'AiAgent:Concierge We close at six.',
       ]);
       expect(composer().value).toBe('');
     });
@@ -1182,8 +1183,8 @@ describe('HostedChat', () => {
       await settle();
 
       expect(ids()).toEqual([
-        'Customer:You:When do you close?',
-        'AiAgent:ConciergeWe close at six.',
+        'Customer:You: When do you close?',
+        'AiAgent:Concierge We close at six.',
       ]);
     });
 

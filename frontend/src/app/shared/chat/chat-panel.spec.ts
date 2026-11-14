@@ -84,6 +84,22 @@ describe('ChatPanel', () => {
     expect(person.querySelector('.chat-sender')?.textContent).toContain('Support');
     expect(person.querySelector('app-icon')).not.toBeNull();
 
+    // The three voices (Phase 39.5a): the visitor's own words in a bubble with
+    // no mark; the AI beside the orb; a person beside the gold person mark.
+    expect(mine.querySelector('.chat-bubble')?.classList).not.toContain('bubble-ai');
+    expect(mine.querySelector('app-orb, .chat-mark')).toBeNull();
+    expect(ai.querySelector('.chat-bubble')?.classList).toContain('bubble-ai');
+    expect(ai.querySelector('app-orb')?.getAttribute('aria-hidden')).toBe('true');
+    expect(ai.querySelector('app-orb')?.classList).not.toContain('is-thinking');
+    expect(person.querySelector('.chat-bubble')?.classList).toContain('bubble-team');
+    expect(person.querySelector('.chat-mark-team')?.getAttribute('aria-hidden')).toBe('true');
+    // The mark comes first in reading order, so it sits on the start side and
+    // mirrors with the page.
+    expect(ai.firstElementChild?.tagName.toLowerCase()).toBe('app-orb');
+    expect(person.firstElementChild?.classList).toContain('chat-mark-team');
+    // Never a member's name for a visitor (owner decision Q5).
+    expect(person.textContent?.replace(/\s+/g, ' ').trim()).toBe('Support It ships today.');
+
     // Every message keeps its own direction.
     for (const row of rows()) {
       expect(row.querySelector('.chat-text')?.getAttribute('dir')).toBe('auto');
@@ -116,6 +132,12 @@ describe('ChatPanel', () => {
     expect(host().querySelector('[data-testid="chat-typing"]')?.textContent).toContain(
       'Concierge is typing',
     );
+    // The orb breathes beside the dots while the AI answers; the words say it.
+    expect(
+      host()
+        .querySelector('[data-testid="chat-typing"] app-orb')
+        ?.classList.contains('is-thinking'),
+    ).toBe(true);
     expect(host().querySelector('[data-testid="chat-handover"]')).toBeNull();
 
     fixture.componentRef.setInput('handling', 'Human');

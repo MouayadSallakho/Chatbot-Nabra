@@ -1,3 +1,4 @@
+import type { ChipTone } from '@app/shared/chip/chip';
 import type { AiAgentStatus } from './ai-agent-api';
 
 /**
@@ -20,18 +21,18 @@ export function agentStatusWord(status: string): string {
 }
 
 /**
- * The badge classes for a status. Each status has its own marker as well as
- * its word, so none is told apart by colour: a tick for Active, a hollow ring
- * for a Draft (not yet in service), a filled dot for Disabled.
+ * The chip for a status (Phase 39.5a). Each status has its own marker as well
+ * as its word, so none is told apart by colour: a tick for Active, a hollow
+ * ring for a Draft (not yet in service), a filled dot for Disabled.
  */
-export function agentStatusTone(status: string): string {
+export function agentStatusTone(status: string): ChipTone {
   switch (status) {
     case 'Active':
-      return 'badge-success';
+      return 'success';
     case 'Draft':
-      return 'badge-neutral badge-draft';
+      return 'draft';
     default:
-      return 'badge-neutral';
+      return 'neutral';
   }
 }
 

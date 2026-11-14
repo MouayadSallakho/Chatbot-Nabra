@@ -1,4 +1,4 @@
-<div class="page">
+<div class="page page-calm">
   <app-page-header
     heading="AI Agents"
     i18n-heading="@@agents.heading"
@@ -35,12 +35,26 @@
         A skeleton shaped like the rows that are coming, so the layout does not
         jump when they arrive.
       -->
-      <div class="data-list agent-list" aria-busy="true">
+      <div
+        class="data-list agent-list"
+        [class.agent-list-channels]="canSeeChannels()"
+        aria-busy="true"
+        data-testid="agents-skeleton"
+      >
         <p class="visually-hidden" role="status" i18n="@@agents.loading">Loading AI agents…</p>
+        <div class="data-list-head" aria-hidden="true">
+          <span class="skeleton skeleton-text"></span>
+        </div>
         @for (row of skeletonRows; track row) {
           <div class="data-row data-row-skeleton" aria-hidden="true">
-            <span class="skeleton skeleton-title"></span>
-            <span class="skeleton skeleton-text"></span>
+            <span class="record-title">
+              <span class="record-glyph skeleton"></span>
+              <span class="skeleton skeleton-title"></span>
+            </span>
+            <span class="skeleton skeleton-chip"></span>
+            @if (canSeeChannels()) {
+              <span class="skeleton skeleton-text"></span>
+            }
             <span class="skeleton skeleton-text"></span>
           </div>
         }
@@ -122,12 +136,17 @@
                 [routerLink]="['/ai-agents', agent.id]"
                 [attr.data-testid]="'agent-' + agent.id"
               >
-                <span class="data-row-title" dir="auto">{{ agent.name }}</span>
+                <span class="record-title">
+                  <span class="record-glyph" aria-hidden="true">
+                    <app-orb [class.is-resting]="agent.status !== 'Active'" />
+                  </span>
+                  <span class="data-row-title" dir="auto">{{ agent.name }}</span>
+                </span>
 
                 <span class="agent-status">
-                  <span class="badge" [class]="statusTone(agent.status)">{{
+                  <app-chip size="sm" [tone]="statusTone(agent.status)">{{
                     statusWord(agent.status)
-                  }}</span>
+                  }}</app-chip>
                 </span>
 
                 <!-- No channel this reader may see: no column at all. -->

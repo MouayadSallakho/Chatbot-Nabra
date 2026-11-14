@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 import type { ChatMessage } from '@app/features/chat/hosted-chat-api';
 import { Icon } from '@app/shared/icon/icon';
+import { Orb } from '@app/shared/orb/orb';
 
 /** One row of the transcript: a message, and whether the replying voice changed before it. */
 interface TranscriptRow {
@@ -14,12 +15,14 @@ interface TranscriptRow {
  * Shared by the website widget, the hosted chat page and the widget preview in
  * the website chat settings, so the three cannot drift apart.
  *
- * <strong>Who spoke is said three ways, never by colour alone.</strong> The
- * visitor's own messages sit on the end side in a neutral bubble; the AI's
- * replies carry the workspace's accent as a tint and the agent's name; a
- * person's replies carry the person glyph and the word "Support". Never an
- * employee's name: the server sends none, and there is no field here that
- * could hold one.
+ * <strong>Who spoke is said three ways, never by colour alone</strong>: the
+ * three voices of Calm Glass (Phase 39.5a), as the inbox thread has them since
+ * 39.4b, seen from the visitor's side. The visitor's own messages sit on the
+ * end side in cream; the AI's replies on the start side beside the orb, in
+ * emerald (in the widget, the workspace's checked accent as a tint) with the
+ * agent's name; a person's replies on the start side in gold beside the person
+ * glyph, with the word "Support". Never an employee's name: the server sends
+ * none, and there is no field here that could hold one (owner decision Q5).
  *
  * <strong>Every message is text.</strong> Interpolation escapes, nothing here
  * uses `innerHTML`, and every message is `dir="auto"`, so an Arabic question in
@@ -33,7 +36,7 @@ interface TranscriptRow {
 @Component({
   selector: 'app-chat-transcript',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Icon],
+  imports: [Icon, Orb],
   templateUrl: './chat-transcript.html',
   styleUrl: './chat-transcript.scss',
 })

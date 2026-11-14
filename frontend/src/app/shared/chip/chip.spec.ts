@@ -30,6 +30,18 @@ describe('Chip', () => {
     expect(chip().dataset['tone']).toBe('need');
   });
 
+  it('marks something not yet in service with the draft tone (Phase 39.5a)', () => {
+    const { fixture, chip } = setup();
+
+    fixture.componentInstance.tone.set('draft');
+    fixture.componentInstance.word.set('Draft');
+    fixture.detectChanges();
+
+    expect(chip().classList).toContain('chip-draft');
+    expect(chip().dataset['tone']).toBe('draft');
+    expect(chip().textContent?.trim()).toBe('Draft');
+  });
+
   it('keeps the classes its consumer gave it', () => {
     const { fixture, chip } = setup();
 

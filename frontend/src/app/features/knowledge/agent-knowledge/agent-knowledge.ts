@@ -20,6 +20,7 @@ import { ToastService } from '@app/core/feedback/toast-service';
 import { LocaleFormat } from '@app/core/i18n/locale-format';
 import { LocalNumberPipe } from '@app/core/i18n/locale-pipes';
 import { Icon } from '@app/shared/icon/icon';
+import { Chip } from '@app/shared/chip/chip';
 import { knowledgeStateTone, knowledgeStateWord } from '../knowledge-words';
 import { KNOWLEDGE_LIMITS } from '../knowledge-limits';
 import { AgentKnowledgeOption, KnowledgeApi, KnowledgeSearchHit } from '../knowledge-api';
@@ -52,7 +53,7 @@ import { AgentKnowledgeOption, KnowledgeApi, KnowledgeSearchHit } from '../knowl
 @Component({
   selector: 'app-agent-knowledge',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, RouterLink, Icon, LocalNumberPipe],
+  imports: [ReactiveFormsModule, RouterLink, Icon, LocalNumberPipe, Chip],
   templateUrl: './agent-knowledge.html',
   styleUrl: './agent-knowledge.scss',
 })

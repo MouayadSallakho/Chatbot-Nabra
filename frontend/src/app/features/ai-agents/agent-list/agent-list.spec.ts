@@ -108,6 +108,31 @@ describe('AgentList', () => {
     expect(host().querySelector('[aria-busy="true"]')).toBeNull();
   });
 
+  it('draws its skeleton in the loaded list: a glyph tile, the name, a chip, and the other cells', async () => {
+    await mount();
+
+    const skeleton = host().querySelector('[data-testid="agents-skeleton"]');
+
+    expect(skeleton?.classList).toContain('agent-list');
+    // The channels column is there for a reader who may see channels, as it
+    // will be once the rows arrive.
+    expect(skeleton?.classList).toContain('agent-list-channels');
+
+    const cells = [...(skeleton?.querySelector('.data-row-skeleton')?.children ?? [])].map(
+      (cell) => cell.className,
+    );
+
+    expect(cells).toEqual([
+      'record-title',
+      'skeleton skeleton-chip',
+      'skeleton skeleton-text',
+      'skeleton skeleton-text',
+    ]);
+
+    expectList().flush({ items: [], page: 1, pageSize: 20, totalCount: 0 });
+    await settle();
+  });
+
   it('explains what an agent is when there are none, and offers the first step', async () => {
     // Not "No data". Somebody who has never seen this product needs to know what
     // the thing is before they can want one.
@@ -144,7 +169,7 @@ describe('AgentList', () => {
     expect(host().textContent).toContain('Disabled');
   });
 
-  it('shows each status as a badge carrying its own word, not colour alone', async () => {
+  it('shows each status as a chip carrying its own word, not colour alone', async () => {
     await mount();
 
     expectList().flush({
@@ -155,10 +180,12 @@ describe('AgentList', () => {
     });
     await settle();
 
-    const badge = host().querySelector('.badge');
+    const chip = host().querySelector('.agent-status app-chip');
 
-    expect(badge?.textContent?.trim()).toBe('Active');
-    expect(badge?.classList.contains('badge-success')).toBe(true);
+    expect(chip?.textContent?.trim()).toBe('Active');
+    expect(chip?.classList.contains('chip-success')).toBe(true);
+    // In service: the orb beside the name is not resting.
+    expect(host().querySelector('.record-glyph app-orb')?.classList).not.toContain('is-resting');
   });
 
   it('marks a draft with its own marker, so it differs from Disabled beyond the word', async () => {
@@ -172,11 +199,18 @@ describe('AgentList', () => {
     });
     await settle();
 
-    const badges = [...host().querySelectorAll('.agent-status .badge')];
+    const chips = [...host().querySelectorAll('.agent-status app-chip')];
 
-    expect(badges[0].textContent?.trim()).toBe('Draft');
-    expect(badges[0].classList).toContain('badge-draft');
-    expect(badges[1].classList).not.toContain('badge-draft');
+    expect(chips[0].textContent?.trim()).toBe('Draft');
+    expect(chips[0].classList).toContain('chip-draft');
+    expect(chips[1].classList).not.toContain('chip-draft');
+    expect(chips[1].classList).toContain('chip-neutral');
+
+    // Neither is in service, so both orbs rest; the chip says why in a word.
+    const orbs = [...host().querySelectorAll('.record-glyph app-orb')];
+
+    expect(orbs.map((orb) => orb.classList.contains('is-resting'))).toEqual([true, true]);
+    expect(orbs.every((orb) => orb.getAttribute('aria-hidden') === 'true')).toBe(true);
   });
 
   describe('channels', () => {

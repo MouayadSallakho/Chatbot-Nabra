@@ -22,6 +22,7 @@ import { ToastService } from '@app/core/feedback/toast-service';
 import { PermissionService } from '@app/core/authorization/permission-service';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
 import { EmptyState } from '@app/shared/empty-state/empty-state';
+import { Chip } from '@app/shared/chip/chip';
 import { Icon } from '@app/shared/icon/icon';
 import { PageHeader } from '@app/shared/page-header/page-header';
 import { AgentKnowledgeSection } from '@app/features/knowledge/agent-knowledge/agent-knowledge';
@@ -86,6 +87,7 @@ type ConflictSource = 'name' | 'instructions' | 'lifecycle';
     AgentKnowledgeSection,
     LocalNumberPipe,
     ChannelBadge,
+    Chip,
   ],
   templateUrl: './agent-editor.html',
   styleUrl: './agent-editor.scss',

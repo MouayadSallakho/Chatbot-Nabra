@@ -15,9 +15,9 @@ describe('agent words', () => {
   });
 
   it('gives Draft and Disabled different markers, not only different words', () => {
-    expect(agentStatusTone('Active')).toBe('badge-success');
-    expect(agentStatusTone('Draft')).toContain('badge-draft');
-    expect(agentStatusTone('Disabled')).not.toContain('badge-draft');
+    expect(agentStatusTone('Active')).toBe('success');
+    expect(agentStatusTone('Draft')).toBe('draft');
+    expect(agentStatusTone('Disabled')).toBe('neutral');
   });
 
   it('says what each status means for customers', () => {

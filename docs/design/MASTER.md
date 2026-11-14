@@ -436,6 +436,11 @@ chip (owner decision Q4).
 | 2026-11-14 | Messages: the customer on the start side in cream; the AI on the end side in emerald with the 26 px orb; the team on the end side in gold with a 26 px gold avatar and the name (`displayName ?? email`) under the bubble; event lines carry who and when | calm-glass.md §6 (the orb wins over the board, plan §4); the avatar keeps the AI's and the team's bubbles on one edge | Phase 39.4b |
 | 2026-11-14 | The customer panel shows every reader of the conversation its label, masked number, channel and the conversation's facts; "Customer since", the count and earlier conversations only with `customers.view` | The plan hid the panel without the permission; the facts it holds today belong to the conversation, so hiding them would remove behaviour (rule 4) | Phase 39.4b |
 | 2026-11-14 | No WhatsApp window ("open, 23 h left") in the header | The API does not offer it, and the 24-hour rule lives on the server; a client-side guess could disagree with what the server enforces (BA39-6) | Phase 39.4b |
+| 2026-11-14 | The inbox's side-bar label stays on one line («صندوق المحادثات» beside its count), without changing the name | Owner's assistant's note for 39.5a; measured: the label needs 103.5 px and now has 105.5 beside "150", 104 beside "999+" | Phase 39.5a |
+| 2026-11-14 | A screen moves to Calm Glass with `.page-calm` on its `.page`: cards become solid panels (radius 24, panel padding, no inner rules), data lists one panel of radius-16 rows separated by space, facts soft tiles; pages that have not moved keep the Two Voices card | The card and data list are shared with screens later steps redesign; a page-level modifier moves each screen in its own step, and 39.8b makes it the default | Phase 39.5a |
+| 2026-11-14 | Knowledge states and agent statuses are `app-chip`s: Indexed tick, Needs index and Indexing stopped triangle, Indexing failed octagon, Indexing now "i", Disabled dot; Active tick, Draft a hollow ring (new `draft` tone), Disabled dot | Owner decision Q4 (status words reuse the three hues with a glyph and a word) | Phase 39.5a |
+| 2026-11-14 | Knowledge rows carry their document's glyph (written text, a table for CSV, a file); agent rows the orb, resting (faded) when the agent is not in service | Decorative and `aria-hidden`; the Type column and the status chip say the same in words | Phase 39.5a |
+| 2026-11-14 | The visitor's transcript (widget, hosted page, agent preview) speaks in the three voices from the visitor's side: their own words on the end side in cream; the AI on the start side beside the orb (in the widget, the workspace's checked tint); a person on the start side in gold beside a gold person mark, named only "Support" | calm-glass.md §6; owner decision Q5; the preview is the chat customers see (Phase 36.11). The widget's header, greeting and composer stay for 39.5b | Phase 39.5a |
 | 2026-11-14 | The switcher's border is the control border, not the board's line | Owner decision Q3: every control boundary meets 3:1 | Phase 39.3 |
 
 ## 13. Contrast table (Calm Glass, Phase 39.2a)
@@ -636,6 +641,22 @@ Measured in Chrome from computed colours (`p39-4a/scratch/inbox.mjs contrast`, `
 | Inbox | quiet actions on the panel | 4.5:1 | 9.98 | 10.24 |
 | Inbox | the view's count on the track | 4.5:1 | 9.00 | 9.24 |
 
+### 13.4 Knowledge and AI agents (Phase 39.5a)
+
+Measured in Chrome from computed colours on the live pages, with translucent layers composited (`p39-5a/scratch/contrast.mjs`, `p39-5a/chrome/contrast.json`). The preview's bubbles were measured in the widget's look with the Northwind accent. Every pair passes.
+
+| Part | Pair | Needs | Light | Dark |
+| --- | --- | --- | --- | --- |
+| Lists | column head on the panel | 4.5:1 | 5.73 | 6.05 |
+| Lists | document glyph on its tile | 3:1 | 9.00 | 9.24 |
+| Lists | failure reason under a chip | 4.5:1 | 5.73 | 6.05 |
+| Chips | Indexed / Needs index / failed / Disabled / Draft | 4.5:1 | 7.34 / 6.20 / 6.03 / 9.00 / 9.00 | 4.95 / 6.74 / 5.67 / 9.24 / 9.24 |
+| Editor | fact term / value on its tile | 4.5:1 | 5.17 / 14.36 | 5.47 / 11.96 |
+| Upload | glyph on its disc; drop-zone edge on the panel | 3:1 | 8.75; 3.78 | 6.71; 3.62 |
+| Agent | channel link tile | 4.5:1 | 14.36 | 11.96 |
+| Preview | visitor's bubble text | 4.5:1 | 13.27 | 10.35 |
+| Preview | AI text and speaker name on the accent tint | 4.5:1 | 12.18 / 12.18 | 12.97 / 12.44 |
+
 ## 14. Components (Calm Glass, Phase 39.2b)
 
 Each is shown in the Design Lab in both languages and themes, with "Reduce transparency". A
@@ -675,7 +696,7 @@ the event line, `.bubble-human` = the team's bubble). Tests: a Vitest spec besid
 
 - **Sections:** Conversations (Overview, Inbox, Customers) · AI (Knowledge, AI agents, Channels) · Insights (Analytics, Reports) · Workspace (Team, Roles & permissions, Workspace settings, Plan & usage, Billing). The caption style in the quiet tone, sentence case, no tracking, no capitals. A section with no area the member may open is not shown.
 - **Bottom bar:** the first four of Inbox, Overview, Customers, Knowledge, Analytics, Reports that the member may open; the rest in "More", a modal glass sheet grouped like the side bar. "More" is marked current when the page is one of its areas.
-- **Long names wrap, never truncate:** in the side bar «صندوق المحادثات» beside its count takes a second line. The bottom bar uses the inbox's one-line short form instead («المحادثات», `NavItem.shortLabel`, Phase 39.4a; English stays "Inbox"), so the bar is 64 px in both languages; the side bar, the "More" sheet, the page heading and the tab title keep the full name. Counts are an LTR island (`dir="ltr"`), so «99+» never reads «+99».
+- **One line in the side bar:** «صندوق المحادثات» beside a "999+" count fits the 216 px bar on one line (Phase 39.5a: items end with 6 px, the count sits 6 px from the label with 4 px padding); an ellipsis is only a guard for a font that never arrives, and the link's accessible name is the whole label. The bottom bar uses the inbox's one-line short form instead («المحادثات», `NavItem.shortLabel`, Phase 39.4a; English stays "Inbox"), so the bar is 64 px in both languages; the side bar, the "More" sheet, the page heading and the tab title keep the full name. Counts are an LTR island (`dir="ltr"`), so «99+» never reads «+99».
 - **Counts:** the inbox's needs-a-person count, a gold pill (999+ in the side bar, 99+ on a phone's icon); a screen reader hears the exact number with the words "Needs a person".
 - **Current area:** filled (light: emerald with white words; dark: a 16% sage tint with a control-border edge), weight 600, `aria-current="page"`; `Highlight` in forced colours.
 - **Popovers:** the workspace switcher and the account menu are `app-menu`s (arrow keys, Escape and focus return; Tab leaves a menu, as the menu pattern says); the notification panel and the "More" sheet move focus in, keep Tab inside (`layout/trap-tab.ts`), close on Escape and return focus. A glass layer is a sibling behind the bar's content, so a popover opening from the bar blurs the page rather than nothing.
@@ -705,3 +726,14 @@ the event line, `.bubble-human` = the team's bubble). Tests: a Vitest spec besid
 - **Pinned to the end:** a reader at the end stays there when the pane changes height (the header grows on a takeover), so the next message is in view, not behind "1 new message".
 - **Customer panel:** the 64 px avatar with the channel badge, the label, the masked number, "Customer since …" (the customer read); two panel-soft tiles (Conversations, Channel); "Earlier conversations": the three newest others as panel-soft rows (channel · status, date) linking to them, "No earlier conversations." when there are none, and a link to the customer's page; then the conversation's facts (AI agent, Assigned to, Started, Last activity, Messages, Status). The customer read happens once per customer, only with `customers.view`; its loading, failure (with Try again) and empty states are quiet and never cover the thread.
 - **Skeleton:** the header (title, facts line, chip and action), three bubbles (the business's with its orb), the composer; beside it from 1280 px the panel's avatar, two lines and two tiles.
+
+### 14.4 Knowledge and AI agents (Phase 39.5a)
+
+- **Calm pages:** `.page-calm` on the page (styles/_authoring.scss). Panels: radius 24, the panel colour, a 1 px line, 20/24 px padding, no rule under the header and no fill behind the actions. Section numbers are a 28 px soft tile; guidance is a soft tile.
+- **Lists:** one panel with 8 px inside; the column head in the quiet caption on the panel; rows are radius-16 tiles (60 px), hover tint, pressed selected tint, 1 px apart. The title cell starts with a 36 px soft tile: the document's glyph or the agent's orb. A long name takes three lines at most beside the columns. On a phone the cells stack and the chevron sits at the row's end, level with its middle.
+- **States:** `app-chip` (small in rows): knowledge Indexed (tick), Needs index and Indexing stopped (triangle), Indexing failed (octagon) with the reason under it, Indexing now ("i"), Disabled (dot); agents Active (tick), Draft (hollow ring, `tone="draft"`), Disabled (dot). The lifecycle path outlines the current step's chip.
+- **Skeletons:** each list's skeleton is its loaded geometry: the head, then rows of a glyph tile, the title and a bar or chip per column.
+- **Knowledge list, live:** it re-reads quietly when indexing starts or ends, and once more after a full read during which an event arrived (Phase 38 note 17).
+- **Upload:** the drop zone is a soft tile with a dashed control border and the upload glyph on a 56 px panel disc; the chosen file is a soft tile.
+- **Agent editor:** the channels that use the agent are 44 px soft tiles with a chevron, each a link to the channel. The preview is the shared chat panel in its widget look, framed by a radius-24 line.
+- **The visitor's transcript (shared/chat):** their own words on the end side in cream (`--voice-customer-own-bubble`), the small corner at the end; the AI on the start side beside the 26 px orb, its bubble the AI voice or, in the widget, the workspace accent's checked tint, the agent's name inside; a person on the start side in gold with a 26 px gold person mark and the word "Support"; event lines between. Only the newest message rises into place. Typing: the breathing orb, three dots in the AI's bubble and "<agent> is typing…". A screen reader hears the speaker and the words apart ("Support It ships today.").

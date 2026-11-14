@@ -1,4 +1,4 @@
-<div class="page">
+<div class="page page-calm">
   <app-page-header
     heading="Knowledge"
     i18n-heading="@@knowledge.heading"
@@ -38,12 +38,24 @@
         />
       </div>
     } @else if (loading() && !page()) {
-      <div class="data-list knowledge-list" aria-busy="true">
+      <!--
+        The skeleton has the loaded list's geometry (note 11): the column head,
+        then rows of a glyph tile, the title, and a bar per column.
+      -->
+      <div class="data-list knowledge-list" aria-busy="true" data-testid="knowledge-skeleton">
         <p class="visually-hidden" role="status" i18n="@@knowledge.loading">Loading knowledge…</p>
+        <div class="data-list-head" aria-hidden="true">
+          <span class="skeleton skeleton-text"></span>
+        </div>
         @for (row of skeletonRows; track row) {
           <div class="data-row data-row-skeleton" aria-hidden="true">
-            <span class="skeleton skeleton-title"></span>
+            <span class="record-title">
+              <span class="record-glyph skeleton"></span>
+              <span class="skeleton skeleton-title"></span>
+            </span>
             <span class="skeleton skeleton-text"></span>
+            <span class="skeleton skeleton-text data-cell-end"></span>
+            <span class="skeleton skeleton-chip"></span>
             <span class="skeleton skeleton-text"></span>
           </div>
         }
@@ -119,7 +131,14 @@
                 [routerLink]="['/knowledge', document.id]"
                 [attr.data-testid]="'document-' + document.id"
               >
-                <span class="data-row-title knowledge-title" dir="auto">{{ document.title }}</span>
+                <span class="record-title">
+                  <span class="record-glyph" aria-hidden="true">
+                    <app-icon [name]="glyph(document.sourceFileType)" [strokeWidth]="1.6" />
+                  </span>
+                  <span class="data-row-title knowledge-title" dir="auto">{{
+                    document.title
+                  }}</span>
+                </span>
 
                 <span class="data-row-meta">
                   <span class="data-cell-label" i18n="@@knowledge.cell.type">Type:</span>&nbsp;<span
@@ -136,9 +155,9 @@
                 </span>
 
                 <span class="knowledge-state">
-                  <span [class]="'badge ' + stateTone(state)" data-testid="document-state">{{
+                  <app-chip size="sm" [tone]="stateTone(state)" data-testid="document-state">{{
                     stateWord(state)
-                  }}</span>
+                  }}</app-chip>
                   @if (attemptNote(state, document.lastIndexAttempt); as note) {
                     <span class="text-small text-muted" data-testid="document-attempt">{{
                       note

@@ -24,6 +24,7 @@ import { PermissionService } from '@app/core/authorization/permission-service';
 import { KnowledgeRealtime } from '@app/core/realtime/knowledge-realtime';
 import { Versioned } from '@app/core/api/versioned';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
+import { Chip } from '@app/shared/chip/chip';
 import { EmptyState } from '@app/shared/empty-state/empty-state';
 import { Icon } from '@app/shared/icon/icon';
 import { PageHeader } from '@app/shared/page-header/page-header';
@@ -111,6 +112,7 @@ type ConflictSource = 'content' | 'index' | 'availability' | 'source';
     ConfirmDialog,
     LocalDatePipe,
     LocalNumberPipe,
+    Chip,
   ],
   templateUrl: './knowledge-editor.html',
   styleUrl: './knowledge-editor.scss',

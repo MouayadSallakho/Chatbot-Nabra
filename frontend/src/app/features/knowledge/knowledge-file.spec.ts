@@ -11,6 +11,7 @@ import { registerProblemWords } from '@app/core/problems/problem-words';
 import { KNOWLEDGE_PROBLEM_WORDS } from './knowledge-problems';
 import {
   characterCount,
+  knowledgeGlyph,
   knowledgeStateTone,
   knowledgeStateWord,
   knowledgeTypeWord,
@@ -112,10 +113,22 @@ describe('knowledge words', () => {
     expect(knowledgeStateWord('Archived')).toBe('Archived');
   });
 
-  it('gives every state its own badge, so none is told apart by colour alone', () => {
-    const tones = ['Ready', 'NeedsIndex', 'Disabled', 'Failed'].map(knowledgeStateTone);
+  it('gives every state its own chip, so none is told apart by colour alone', () => {
+    const tones = ['Ready', 'NeedsIndex', 'Disabled', 'Failed', 'Indexing'].map(knowledgeStateTone);
 
-    expect(new Set(tones).size).toBe(4);
+    expect(tones).toEqual(['success', 'warning', 'neutral', 'danger', 'info']);
+    // Stopped shares the triangle with Needs index: both still need an index,
+    // and the words differ.
+    expect(knowledgeStateTone('Stopped')).toBe('warning');
+    expect(knowledgeStateTone('Archived')).toBe('neutral');
+  });
+
+  it("draws a document's kind as a glyph: written text, a table, a file", () => {
+    expect(knowledgeGlyph(null)).toBe('knowledge');
+    expect(knowledgeGlyph('Csv')).toBe('table');
+    expect(knowledgeGlyph('Pdf')).toBe('file');
+    expect(knowledgeGlyph('Docx')).toBe('file');
+    expect(knowledgeGlyph('Text')).toBe('file');
   });
 
   it('names where the text came from', () => {

@@ -2,9 +2,15 @@
 // (`.agent-chat`); this lays out the card around it.
 .preview-header {
   display: flex;
+  flex-wrap: nowrap;
   align-items: flex-start;
   justify-content: space-between;
   gap: var(--space-3);
+
+  > div {
+    flex: 1;
+    min-inline-size: 0;
+  }
 
   p {
     margin: var(--space-1) 0 0;

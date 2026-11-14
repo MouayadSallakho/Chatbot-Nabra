@@ -4,8 +4,10 @@ import { firstValueFrom } from 'rxjs';
 import { ApiError, toApiError } from '@app/core/api/api-error';
 import { PermissionService } from '@app/core/authorization/permission-service';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
+import { Chip } from '@app/shared/chip/chip';
 import { EmptyState } from '@app/shared/empty-state/empty-state';
 import { Icon } from '@app/shared/icon/icon';
+import { Orb } from '@app/shared/orb/orb';
 import { PageHeader } from '@app/shared/page-header/page-header';
 import { Pagination } from '@app/shared/pagination/pagination';
 import { initialPage, pageRecorder } from '@app/shared/pagination/page-query';
@@ -31,11 +33,25 @@ import { AiAgentApi, AiAgentPage, DEFAULT_PAGE_SIZE } from '../ai-agent-api';
  * <strong>Channels come with the page</strong> (Phase 38.3): each agent lists
  * the channels that use it, and only the kinds the reader may see. The column
  * is left out for somebody who may see neither.
+ *
+ * Calm Glass (Phase 39.5a): one solid panel of rows; each agent beside the orb
+ * (the AI's presence), still for an agent that is not in service, and its
+ * status as a chip with a word and a marker.
  */
 @Component({
   selector: 'app-agent-list',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, PageHeader, EmptyState, Icon, Pagination, LocalDatePipe, ChannelBadge],
+  imports: [
+    RouterLink,
+    PageHeader,
+    EmptyState,
+    Icon,
+    Pagination,
+    LocalDatePipe,
+    ChannelBadge,
+    Chip,
+    Orb,
+  ],
   templateUrl: './agent-list.html',
   styleUrl: './agent-list.scss',
 })

@@ -115,9 +115,9 @@
                         The real state, never a flattering one: an unindexed
                         document does not answer anything yet.
                       -->
-                      <span [class]="'badge badge-sm ' + stateTone(option.readiness)">{{
+                      <app-chip size="sm" [tone]="stateTone(option.readiness)">{{
                         stateWord(option.readiness)
-                      }}</span>
+                      }}</app-chip>
                       @if (canEdit()) {
                         <!-- erp-lint-ignore: destructive-confirm -- moves an unsaved choice back to Available; nothing is written until Save, and Add reverses it -->
                         <button
@@ -151,9 +151,9 @@
                   @for (option of availableOptions(); track option.knowledgeDocumentId) {
                     <li class="chooser-item">
                       <span class="chooser-title" dir="auto">{{ option.title }}</span>
-                      <span [class]="'badge badge-sm ' + stateTone(option.readiness)">{{
+                      <app-chip size="sm" [tone]="stateTone(option.readiness)">{{
                         stateWord(option.readiness)
-                      }}</span>
+                      }}</app-chip>
                       @if (canEdit()) {
                         <button
                           type="button"

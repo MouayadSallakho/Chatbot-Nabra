@@ -315,6 +315,14 @@ describe('AgentPreview', () => {
       expect(customer?.getAttribute('dir')).toBe('auto');
       expect(ai?.getAttribute('dir')).toBe('auto');
       expect(ai?.textContent).toContain('return within 30 days');
+
+      // The three voices (Phase 39.5a): the question in the visitor's cream on
+      // the end side, the reply in the AI's bubble beside the orb.
+      const aiRow = host().querySelector('[data-sender="AiAgent"]');
+
+      expect(aiRow?.querySelector('app-orb')).not.toBeNull();
+      expect(aiRow?.querySelector('.chat-bubble')?.classList).toContain('bubble-ai');
+      expect(host().querySelector('[data-sender="Customer"] app-orb')).toBeNull();
     });
 
     it('sends on Enter and starts a new line on Shift+Enter, as the widget does', async () => {

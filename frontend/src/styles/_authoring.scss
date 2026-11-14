@@ -7,13 +7,186 @@
 // Semantic tokens only; logical properties only.
 // -----------------------------------------------------------------------------
 
-// A Draft badge: the neutral badge with a hollow ring instead of a filled dot,
-// so Draft and Disabled differ by marker as well as by word.
+// A Draft chip: the neutral chip with a hollow ring instead of a filled dot,
+// so Draft and Disabled differ by marker as well as by word. `.badge-draft`
+// is its Two Voices name (the channels' lifecycle, until 39.5b).
+.chip-draft {
+  --chip-bg: var(--chip-neutral-bg);
+  --chip-fg: var(--chip-neutral-fg);
+}
+
+.chip-draft::before,
 .badge-draft::before {
   background-color: transparent;
   box-shadow: inset 0 0 0 1.5px currentcolor;
   inline-size: 0.5rem;
   block-size: 0.5rem;
+}
+
+// -----------------------------------------------------------------------------
+// Calm Glass screens (calm-glass.md §5–§6; Phase 39.5a: knowledge and AI agents)
+// -----------------------------------------------------------------------------
+// A page that has moved to Calm Glass carries `.page-calm`. Its cards become
+// solid panels (radius 24, the panel colour, a 1px line, no shadow) with the
+// panel's padding and no inner rules, and its data lists one panel of rows
+// (radius 16) separated by space rather than lines. Pages that have not moved
+// keep the Two Voices card until their own step adds the class; 39.8b makes it
+// the default and deletes the modifier.
+.page-calm {
+  .card {
+    border-color: var(--color-line);
+    border-radius: var(--radius-panel);
+    background-color: var(--color-panel);
+  }
+
+  .card-header {
+    padding: var(--space-5) var(--panel-padding) 0;
+    border-block-end: 0;
+  }
+
+  .card-body {
+    padding: var(--space-5) var(--panel-padding) var(--panel-padding);
+  }
+
+  .card-title,
+  .form-section-title {
+    font: var(--text-title-3);
+  }
+
+  .card > .card-actions {
+    padding: 0 var(--panel-padding) var(--panel-padding);
+    border-block-start: 0;
+    background-color: transparent;
+  }
+
+  // The section's number: a soft tile, not a ring.
+  .form-section-index {
+    inline-size: 1.75rem;
+    block-size: 1.75rem;
+    border: 0;
+    background-color: var(--color-panel-soft);
+    color: var(--color-text);
+    font-weight: 600;
+  }
+
+  .guidance {
+    border-inline-start: 0;
+    border-radius: var(--radius-tile);
+    background-color: var(--color-panel-soft);
+  }
+
+  // The list: one panel; the rows are tiles inside it.
+  .data-list {
+    padding: var(--space-2);
+    border-color: var(--color-line);
+    border-radius: var(--radius-panel);
+    background-color: var(--color-panel);
+
+    ul {
+      display: flex;
+      flex-direction: column;
+      gap: var(--gap-hairline);
+    }
+  }
+
+  .data-row {
+    min-block-size: 3.75rem;
+    padding: var(--space-3);
+    border-radius: var(--radius-tile);
+  }
+
+  a.data-row:hover {
+    background-color: var(--color-hover);
+  }
+
+  a.data-row:active {
+    background-color: var(--color-selected);
+  }
+
+  .data-list li + li .data-row,
+  .data-row + .data-row {
+    border-block-start: 0;
+  }
+
+  @media (min-width: 48rem) {
+    .data-list-head {
+      padding: var(--space-2) var(--space-3);
+      border-block-end: 0;
+      background-color: transparent;
+      color: var(--color-text-quiet);
+    }
+
+    // A very long name takes three lines at most beside the other columns;
+    // the link's accessible name and the record's own page keep all of it.
+    .record-title .data-row-title {
+      display: -webkit-box;
+      overflow: hidden;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 3;
+    }
+  }
+
+  // Stacked rows on a phone: the chevron sits at the row's end, level with its
+  // middle, instead of on a line of its own under the cells.
+  @media (max-width: 47.999rem) {
+    .data-row {
+      position: relative;
+      padding-inline-end: var(--space-8);
+    }
+
+    .data-row-chevron {
+      position: absolute;
+      inset-block: 0;
+      inset-inline-end: var(--space-3);
+      display: inline-flex;
+      align-items: center;
+    }
+  }
+
+  // Facts (dates, a file's format and size) as soft tiles.
+  .facts > div {
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-tile);
+    background-color: var(--color-panel-soft);
+  }
+}
+
+// A record's title with its glyph: a 36px soft tile holding the icon (a
+// document's kind) or the orb (an AI agent). Decorative; the row says it.
+.record-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-inline-size: 0;
+}
+
+.record-glyph {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  inline-size: 2.25rem;
+  block-size: 2.25rem;
+  border-radius: var(--radius-input);
+  background-color: var(--color-panel-soft);
+  color: var(--color-text-secondary);
+
+  .icon {
+    inline-size: var(--icon-size);
+    block-size: var(--icon-size);
+  }
+
+  @media (forced-colors: active) {
+    border: 1px solid CanvasText;
+  }
+}
+
+.data-row-skeleton .skeleton-title {
+  inline-size: min(16rem, 70%);
+}
+
+// An end-aligned bar (a size, a count) has no width of its own to shrink from.
+.data-row-skeleton .skeleton.data-cell-end {
+  inline-size: 4rem;
 }
 
 // -----------------------------------------------------------------------------
@@ -225,7 +398,8 @@ ol.help-list {
   color: var(--text-primary);
   font-weight: 550;
 
-  .badge {
+  .badge,
+  app-chip {
     outline: 1.5px solid var(--text-primary);
     outline-offset: 1px;
   }
@@ -238,8 +412,8 @@ ol.help-list {
 // chat customers use; the workspace accent arrives as `--chat-accent` from the
 // component, already checked. Here it gets only a frame and a height.
 .agent-chat-stage {
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-card);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-panel);
   overflow: hidden;
 }
 
@@ -258,9 +432,9 @@ ol.help-list {
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-7) var(--space-5);
-  border: 1.5px dashed var(--border-control);
-  border-radius: var(--radius-card);
-  background-color: var(--surface-muted);
+  border: 1.5px dashed var(--color-control-border);
+  border-radius: var(--radius-tile);
+  background-color: var(--color-panel-soft);
   text-align: center;
   transition:
     background-color var(--duration-sm) var(--ease-standard),
@@ -269,20 +443,27 @@ ol.help-list {
 
 .drop-zone.is-dragging {
   border-style: solid;
-  border-color: var(--text-primary);
-  background-color: var(--surface-selected);
+  border-color: var(--color-primary);
+  background-color: var(--color-selected);
 }
 
 .drop-zone[aria-disabled='true'] {
   opacity: 0.6;
 }
 
+// The glyph on a 56px panel disc, so the zone reads as a place to put a file.
 .drop-zone .drop-zone-glyph {
-  color: var(--text-muted);
+  display: inline-grid;
+  place-items: center;
+  inline-size: 3.5rem;
+  block-size: 3.5rem;
+  border-radius: var(--radius-pill);
+  background-color: var(--color-panel);
+  color: var(--color-primary);
 
   .icon {
-    inline-size: 2rem;
-    block-size: 2rem;
+    inline-size: 1.5rem;
+    block-size: 1.5rem;
   }
 }
 
@@ -302,9 +483,9 @@ ol.help-list {
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-control);
-  background-color: var(--surface-default);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-tile);
+  background-color: var(--color-panel-soft);
 }
 
 .file-card .file-card-glyph {
@@ -355,9 +536,9 @@ ol.help-list {
 }
 
 .chooser-list {
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-control);
-  background-color: var(--surface-default);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-tile);
+  background-color: var(--color-panel);
   overflow: hidden;
 }
 
@@ -368,8 +549,8 @@ ol.help-list {
   gap: var(--space-2);
   margin: 0;
   padding: var(--space-2) var(--space-3);
-  border-block-end: 1px solid var(--border-default);
-  background-color: var(--surface-muted);
+  border-block-end: 1px solid var(--color-line);
+  background-color: var(--color-panel-soft);
   font: var(--text-label);
 }
 
@@ -398,7 +579,8 @@ ol.help-list {
     border-block-start: 1px solid var(--border-subtle);
   }
 
-  > .badge {
+  > .badge,
+  > app-chip {
     justify-self: start;
     grid-column: 1;
   }

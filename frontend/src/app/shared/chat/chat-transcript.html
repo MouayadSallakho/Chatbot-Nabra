@@ -14,38 +14,56 @@
   }
 
   @for (row of rows(); track row.message.id) {
+    <!-- An event line (calm-glass.md §6): words between two rules. -->
     @if (row.handoff === 'toPerson') {
-      <li class="handoff-divider handoff-to-human" data-testid="chat-handoff-divider">
+      <li class="handoff-divider handoff-to-human" role="note" data-testid="chat-handoff-divider">
         <span i18n="@@visitor.handoff.joined">A person from the support team joined</span>
       </li>
     } @else if (row.handoff === 'toAi') {
-      <li class="handoff-divider handoff-to-ai" data-testid="chat-handoff-divider">
+      <li class="handoff-divider handoff-to-ai" role="note" data-testid="chat-handoff-divider">
         <span i18n="@@visitor.handoff.backToAi"
           ><bdi>{{ agentName() }}</bdi> is answering again</span
         >
       </li>
     }
 
+    <!--
+      The three voices (calm-glass.md §6), from the visitor's side: their own
+      words on the end side in cream; the AI on the start side in emerald (or
+      the workspace's checked tint) beside the orb; a person on the start side
+      in gold beside the person glyph, named only "Support". The spaces keep
+      the speaker and the words apart when a screen reader reads them as one.
+    -->
     @switch (row.message.sender) {
       @case ('Customer') {
         <li class="chat-msg chat-msg-mine" data-testid="chat-message" data-sender="Customer">
-          <span class="visually-hidden" i18n="@@visitor.sender.you">You:</span>
-          <span class="chat-text" dir="auto">{{ row.message.text }}</span>
+          <span class="bubble chat-bubble">
+            <span class="visually-hidden" i18n="@@visitor.sender.you">You:</span>
+            {{ ' ' }}
+            <span class="chat-text" dir="auto">{{ row.message.text }}</span>
+          </span>
         </li>
       }
       @case ('HumanAgent') {
         <li class="chat-msg chat-msg-person" data-testid="chat-message" data-sender="HumanAgent">
-          <span class="chat-sender">
-            <app-icon class="chat-sender-glyph" name="person" [strokeWidth]="1.8" />
-            <span i18n="@@visitor.sender.support">Support</span>
+          <span class="chat-mark chat-mark-team" aria-hidden="true">
+            <app-icon name="person" [strokeWidth]="1.8" />
           </span>
-          <span class="chat-text" dir="auto">{{ row.message.text }}</span>
+          <span class="bubble bubble-team chat-bubble">
+            <span class="chat-sender bubble-speaker" i18n="@@visitor.sender.support">Support</span>
+            {{ ' ' }}
+            <span class="chat-text" dir="auto">{{ row.message.text }}</span>
+          </span>
         </li>
       }
       @default {
         <li class="chat-msg chat-msg-ai" data-testid="chat-message" data-sender="AiAgent">
-          <span class="chat-sender" dir="auto">{{ agentName() }}</span>
-          <span class="chat-text" dir="auto">{{ row.message.text }}</span>
+          <app-orb class="chat-mark" />
+          <span class="bubble bubble-ai chat-bubble">
+            <span class="chat-sender bubble-speaker" dir="auto">{{ agentName() }}</span>
+            {{ ' ' }}
+            <span class="chat-text" dir="auto">{{ row.message.text }}</span>
+          </span>
         </li>
       }
     }
@@ -59,6 +77,7 @@
     waiting customer would be a promise the platform cannot keep.
   -->
   <p class="chat-typing" role="status" data-testid="chat-typing">
+    <app-orb class="chat-mark" [thinking]="true" />
     <span class="chat-dots" aria-hidden="true"><span></span><span></span><span></span></span>
     <span i18n="@@visitor.typing"
       ><bdi>{{ agentName() }}</bdi> is typing…</span

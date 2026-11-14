@@ -1,10 +1,11 @@
-// Column templates for the shared data list; everything else is the primitive's.
+// Column templates for the shared data list (the panel and the rows are the
+// Calm Glass list's, `.page-calm` in styles/_authoring.scss).
 .agent-list {
-  --data-list-columns: minmax(0, 2fr) 8rem minmax(0, 1fr) 1.5rem;
+  --data-list-columns: minmax(0, 2fr) 8.5rem minmax(0, 1fr) 1.5rem;
 }
 
 .agent-list-channels {
-  --data-list-columns: minmax(0, 2fr) 8rem minmax(0, 1.6fr) minmax(0, 1fr) 1.5rem;
+  --data-list-columns: minmax(0, 2fr) 8.5rem minmax(0, 1.6fr) minmax(0, 1fr) 1.5rem;
 }
 
 .agent-channels {
@@ -23,4 +24,11 @@
 
 .agent-channels .skeleton-text {
   inline-size: 6rem;
+}
+
+// An agent that is not in service: its orb rests, faded. Decorative only; the
+// status chip says it in a word.
+.is-resting {
+  opacity: 0.45;
+  filter: saturate(0.4);
 }

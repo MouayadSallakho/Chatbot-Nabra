@@ -1,4 +1,4 @@
-<div class="page">
+<div class="page page-calm">
   <app-page-header
     backLink="/ai-agents"
     backLabel="AI agents"
@@ -198,35 +198,37 @@
           <div class="card-body create-next">
             <ol class="lifecycle-path" [attr.aria-label]="lifecycleLabel">
               <li class="lifecycle-step" aria-current="step">
-                <span class="badge badge-neutral badge-draft" i18n="@@agents.status.draft"
-                  >Draft</span
-                >
+                <app-chip tone="draft" i18n="@@agents.status.draft">Draft</app-chip>
               </li>
               <li class="lifecycle-step">
-                <span class="badge badge-success" i18n="@@agents.status.active">Active</span>
+                <app-chip tone="success" i18n="@@agents.status.active">Active</app-chip>
               </li>
             </ol>
             <ol class="help-list">
               <li>
                 <strong i18n="@@agents.create.step1.title">Create.</strong>
+                {{ ' ' }}
                 <span i18n="@@agents.create.step1.body"
                   >The agent is saved as a draft. Nothing is sent to customers.</span
                 >
               </li>
               <li>
                 <strong i18n="@@agents.create.step2.title">Preview.</strong>
+                {{ ' ' }}
                 <span i18n="@@agents.create.step2.body"
                   >Ask it what a customer would ask, in a preview that looks like your chat.</span
                 >
               </li>
               <li>
                 <strong i18n="@@agents.create.step3.title">Give it knowledge.</strong>
+                {{ ' ' }}
                 <span i18n="@@agents.create.step3.body"
                   >Choose the documents it may answer from.</span
                 >
               </li>
               <li>
                 <strong i18n="@@agents.create.step4.title">Activate.</strong>
+                {{ ' ' }}
                 <span i18n="@@agents.create.step4.body"
                   >Put it in service, then connect it to a channel.</span
                 >

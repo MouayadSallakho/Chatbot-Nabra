@@ -247,6 +247,53 @@ describe('Arabic renders', () => {
     });
   });
 
+  describe('knowledge and AI agents in Calm Glass (Phase 39.5a)', () => {
+    it("speaks the preview's three voices in Arabic, from the visitor's side", async () => {
+      const { ChatTranscript } = await import('@app/shared/chat/chat-transcript');
+      const fixture = TestBed.createComponent(ChatTranscript);
+
+      fixture.componentRef.setInput('agentName', 'Concierge');
+      fixture.componentRef.setInput('messages', [
+        { id: '1', sender: 'Customer', text: 'أين طلبي؟', sentAt: '' },
+        { id: '2', sender: 'AiAgent', text: 'لحظة من فضلك.', sentAt: '' },
+        { id: '3', sender: 'HumanAgent', text: 'يُشحن اليوم.', sentAt: '' },
+      ]);
+      fixture.componentRef.setInput('typing', true);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      const root = fixture.nativeElement as HTMLElement;
+      const [mine, ai, person] = [...root.querySelectorAll('[data-testid="chat-message"]')];
+
+      expect(text(mine)).toBe('أنت: أين طلبي؟');
+      expect(ai.querySelector('app-orb')).not.toBeNull();
+      expect(text(ai.querySelector('.chat-sender'))).toBe('Concierge');
+      expect(text(person.querySelector('.chat-sender'))).toBe('فريق الدعم');
+      expect(person.querySelector('.chat-mark-team')).not.toBeNull();
+      expect(text(root.querySelectorAll('[data-testid="chat-handoff-divider"]')[0])).toBe(
+        'انضم أحد أعضاء فريق الدعم',
+      );
+      expect(text(root.querySelector('[data-testid="chat-typing"]'))).toBe('Concierge يكتب…');
+      // Each message keeps its own direction inside the right-to-left page.
+      expect(mine.querySelector('.chat-text')?.getAttribute('dir')).toBe('auto');
+    });
+
+    it('says the knowledge and agent chips in Arabic, each with its own tone', async () => {
+      const { knowledgeStateWord, knowledgeStateTone } =
+        await import('@app/features/knowledge/knowledge-words');
+      const { agentStatusWord, agentStatusTone } =
+        await import('@app/features/ai-agents/agent-words');
+
+      expect(['Ready', 'NeedsIndex', 'Failed'].map(knowledgeStateWord)).toEqual([
+        'مفهرس',
+        'يحتاج إلى فهرسة',
+        'فشلت الفهرسة',
+      ]);
+      expect(knowledgeStateTone('Failed')).toBe('danger');
+      expect(agentStatusTone('Draft')).toBe('draft');
+      expect(agentStatusWord('Draft')).toBe(CATALOGUE.translations['agents.status.draft']);
+    });
+  });
+
   describe('the inbox (Phase 38.2a)', () => {
     const customer = {
       id: 'p1',

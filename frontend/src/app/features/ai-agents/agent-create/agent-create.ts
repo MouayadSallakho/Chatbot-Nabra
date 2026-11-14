@@ -7,6 +7,7 @@ import { ToastService } from '@app/core/feedback/toast-service';
 import { PermissionService } from '@app/core/authorization/permission-service';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
 import { LocalNumberPipe } from '@app/core/i18n/locale-pipes';
+import { Chip } from '@app/shared/chip/chip';
 import { EmptyState } from '@app/shared/empty-state/empty-state';
 import { Icon } from '@app/shared/icon/icon';
 import { PageHeader } from '@app/shared/page-header/page-header';
@@ -37,7 +38,7 @@ import { AiAgentApi } from '../ai-agent-api';
 @Component({
   selector: 'app-agent-create',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, RouterLink, PageHeader, EmptyState, Icon, LocalNumberPipe],
+  imports: [ReactiveFormsModule, RouterLink, PageHeader, EmptyState, Icon, LocalNumberPipe, Chip],
   templateUrl: './agent-create.html',
   styleUrl: './agent-create.scss',
 })

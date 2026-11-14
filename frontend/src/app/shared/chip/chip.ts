@@ -9,6 +9,9 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core';
  * - `ai`: emerald (the AI is answering);
  * - `failed`: coral (the AI could not reply);
  * - `neutral`: a word with no voice and no status;
+ * - `draft`: the neutral chip with a hollow ring in place of the dot, for
+ *   something not yet in service (an AI agent's Draft, Phase 39.5a), so Draft
+ *   and Disabled differ by marker as well as by word;
  * - `success`, `warning`, `danger`, `info`: status words that are not voices
  *   (quotas, billing, indexing), each with its own glyph in place of the dot.
  */
@@ -19,6 +22,7 @@ export type ChipTone =
   | 'ai'
   | 'failed'
   | 'neutral'
+  | 'draft'
   | 'success'
   | 'warning'
   | 'danger'

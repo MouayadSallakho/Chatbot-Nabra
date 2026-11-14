@@ -1,12 +1,15 @@
-// Column template for the shared data list; everything else is the primitive's.
+// Column template for the shared data list (the panel and the rows are the
+// Calm Glass list's, `.page-calm` in styles/_authoring.scss).
 .knowledge-list {
   --data-list-columns: minmax(0, 2.4fr) minmax(6.5rem, 0.8fr) minmax(7.5rem, 0.8fr)
-    minmax(8.5rem, 1fr) minmax(0, 1fr) 1.5rem;
+    minmax(9rem, 1fr) minmax(0, 1fr) 1.5rem;
 }
 
+// The chip, and under it the reason or the date it was indexed.
 .knowledge-state {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 2px; // token-lint-ignore: badge and its date read as one fact
+  gap: var(--space-1);
+  min-inline-size: 0;
 }

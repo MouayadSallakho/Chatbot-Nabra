@@ -1,4 +1,6 @@
 import type { AppLanguage } from '@app/core/i18n/language';
+import type { ChipTone } from '@app/shared/chip/chip';
+import type { IconName } from '@app/shared/icon/icon-paths';
 import { pluralMessage } from '@app/core/i18n/plural';
 import type { KnowledgeFileType, KnowledgeIndexAttempt } from './knowledge-api';
 
@@ -101,21 +103,37 @@ export function knowledgeStateWord(state: string): string {
   return STATE_WORDS[state as KnowledgeDisplayState] ?? state;
 }
 
-/** The badge for a state: each has its own glyph as well as its word. */
-export function knowledgeStateTone(state: string): string {
+/**
+ * The chip for a state (Phase 39.5a): each has its own glyph as well as its
+ * word, so none is told apart by colour (owner decision Q4): a tick for
+ * Indexed, a triangle for Needs index and Indexing stopped, an octagon for
+ * Indexing failed, an "i" for Indexing now, a plain dot for Disabled.
+ */
+export function knowledgeStateTone(state: string): ChipTone {
   switch (state) {
     case 'Ready':
-      return 'badge-success';
+      return 'success';
     case 'NeedsIndex':
-      return 'badge-warning';
-    case 'Failed':
-      return 'badge-danger';
-    case 'Indexing':
-      return 'badge-info';
     case 'Stopped':
-      return 'badge-warning';
+      return 'warning';
+    case 'Failed':
+      return 'danger';
+    case 'Indexing':
+      return 'info';
     default:
-      return 'badge-neutral';
+      return 'neutral';
+  }
+}
+
+/** A document's glyph in a list: written text, a table (CSV), or a file. */
+export function knowledgeGlyph(fileType: KnowledgeFileType | string | null): IconName {
+  switch (fileType) {
+    case null:
+      return 'knowledge';
+    case 'Csv':
+      return 'table';
+    default:
+      return 'file';
   }
 }
 
