@@ -2493,6 +2493,16 @@
     "inbox.markAll.done.two": "حُدِّدت محادثتان كمقروءتين.",
     "inbox.markAll.done.few": "حُدِّدت {$count} محادثات كمقروءة.",
     "inbox.markAll.done.many": "حُدِّدت {$count} محادثة كمقروءة.",
-    "inbox.markAll.done.other": "حُدِّدت {$count} محادثة كمقروءة."
+    "inbox.markAll.done.other": "حُدِّدت {$count} محادثة كمقروءة.",
+    "conversation.assign": "إسناد",
+    "customerPanel.since": "عميل منذ {$date}",
+    "customerPanel.conversations": "المحادثات",
+    "customerPanel.channel": "القناة",
+    "customerPanel.earlier": " المحادثات السابقة ",
+    "customerPanel.loading": " جارٍ تحميل بيانات العميل… ",
+    "customerPanel.failed": "تعذّر تحميل محادثات العميل الأخرى.",
+    "customerPanel.noEarlier": "لا توجد محادثات سابقة.",
+    "customerPanel.allConversations": "عرض كل محادثات العميل",
+    "customerPanel.openCustomer": "فتح صفحة العميل"
   }
 }

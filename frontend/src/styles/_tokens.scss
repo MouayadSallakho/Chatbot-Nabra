@@ -447,6 +447,12 @@
   --unread-dot-size: 0.5625rem; // 9px
   --live-dot-size: 0.4375rem; // 7px
 
+  // The thread (Phase 39.4b, board Inbox): the customer panel's column, the
+  // composer's field (radius 20), and how wide a message may grow (72%).
+  --customer-panel-width: 16.5rem; // 264px
+  --radius-composer: 20px;
+  --message-max-width: 72%;
+
   // ---------------------------------------------------------------------------
   // Typography (calm-glass.md §4)
   // ---------------------------------------------------------------------------

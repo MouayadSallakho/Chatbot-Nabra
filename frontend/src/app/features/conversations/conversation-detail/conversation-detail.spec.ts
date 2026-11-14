@@ -14,6 +14,8 @@ import { MEDIA_QUERY_FACTORY, MediaQueries } from '@app/core/media/media';
 import { WhatsAppApi } from '@app/features/channels/whatsapp-api';
 import { ArabicFonts } from '@app/core/i18n/arabic-fonts';
 import { InboxSignals } from '@app/core/sounds/inbox-signals';
+import { AuthService } from '@app/core/auth/auth-service';
+import { CustomersApi } from '@app/features/customers/customers-api';
 import { ConversationsApi, TranscriptMessage } from '../conversations-api';
 import { ConversationComposer } from '../conversation-composer/conversation-composer';
 import { ConversationTranscript } from '../conversation-transcript/conversation-transcript';
@@ -106,6 +108,8 @@ describe('ConversationDetail', () => {
         provideHttpClient(),
         provideHttpClientTesting(),
         ConversationsApi,
+        // The customer panel's one read (39.4b), over the same testing backend.
+        CustomersApi,
 
         // The real client, over the same testing HTTP backend. These
         // conversations are on website chat, so it is never called -- and a test
@@ -352,7 +356,8 @@ describe('ConversationDetail', () => {
       reason: null,
     };
     const dividers = () =>
-      [...host().querySelectorAll('.handoff-divider')].map((node) =>
+      // The words of each line; its time follows them (39.4b).
+      [...host().querySelectorAll('.handoff-divider .event-words > span:first-child')].map((node) =>
         node.textContent?.replace(/\s+/g, ' ').trim(),
       );
 
@@ -1123,6 +1128,229 @@ describe('ConversationDetail', () => {
       expect(host().querySelector('.conversation-meta')).not.toBeNull();
       expect(host().querySelector('[data-testid="handling"]')).not.toBeNull();
       expect(host().querySelector('[data-testid="handling-chip-compact"]')).toBeNull();
+    });
+  });
+
+  describe('the thread and the customer panel (Calm Glass, 39.4b)', () => {
+    const assigneesUrl = `/api/tenants/${tenantId}/conversations/assignees`;
+    const customerUrl = `/api/tenants/${tenantId}/customers/p1`;
+    const sara = { userId: 'u-sara', email: 'sara@acme.test', displayName: 'Sara' };
+    const rana = { userId: 'u-rana', email: 'rana@acme.test', displayName: null };
+
+    const customer = {
+      id: 'p1',
+      displayName: null,
+      label: 'Visitor',
+      labelCode: 'AnonymousVisitor',
+      shortCode: '7KQ2MX',
+      identities: [],
+      channels: ['WebChat'],
+      conversationCount: 3,
+      lastActivityAt: '2026-09-07T10:05:00Z',
+      createdAt: '2026-09-03T08:00:00Z',
+      updatedAt: '2026-09-03T08:00:00Z',
+      mergedIntoCustomerId: null,
+      mergedAt: null,
+      canReadConversations: true,
+      conversations: [
+        {
+          id: conversationId,
+          channel: 'WebChat',
+          status: 'Open',
+          handling: 'Ai',
+          startedAt: '2026-09-07T10:00:00Z',
+          lastActivityAt: '2026-09-07T10:05:00Z',
+        },
+        {
+          id: 'c-older',
+          channel: 'WebChat',
+          status: 'Closed',
+          handling: 'Ai',
+          startedAt: '2026-09-04T09:00:00Z',
+          lastActivityAt: '2026-09-04T09:30:00Z',
+        },
+      ],
+    };
+
+    async function opened(body: object, ...permissions: string[]): Promise<void> {
+      await mount('conversations.view', ...permissions);
+
+      if (permissions.includes('conversations.assign')) {
+        http.expectOne(assigneesUrl).flush([sara, rana]);
+      }
+
+      http.expectOne(detailUrl).flush(body, tagged(body));
+      await settle();
+      http.expectOne(messagesUrl).flush({ items: [], nextCursor: null, previousCursor: null });
+      await settle();
+    }
+
+    it('says who handles it by display name beside the chip, in its own direction (note 14)', async () => {
+      await opened({ ...humanDetail, takenOverBy: sara });
+
+      const state = host().querySelector('.handling-state');
+      const who = host().querySelector('[data-testid="handled-by"]');
+
+      expect(state?.querySelector('app-voice-chip')?.textContent?.trim()).toBe(
+        'A person is answering',
+      );
+      expect(state?.contains(who)).toBe(true);
+      expect(who?.textContent?.replace(/\s+/g, ' ').trim()).toBe('Handled by Sara');
+      expect(who?.querySelector('bdi')?.getAttribute('dir')).toBe('auto');
+    });
+
+    it('says the AI is answering in the chip while it is', async () => {
+      await opened(detail);
+
+      expect(host().querySelector('.handling-state app-voice-chip')?.textContent?.trim()).toBe(
+        'The AI is answering',
+      );
+    });
+
+    it('offers Assign as a menu of who can reply, the current one checked, and routes with the version', async () => {
+      await opened(detail, 'conversations.assign');
+
+      const trigger = host().querySelector<HTMLButtonElement>('[data-testid="assignee"]')!;
+
+      expect(trigger.textContent?.trim()).toBe('Assign');
+      expect(trigger.getAttribute('aria-haspopup')).toBe('menu');
+
+      trigger.click();
+      await settle();
+
+      const items = [...host().querySelectorAll<HTMLElement>('[role="menuitemradio"]')];
+
+      expect(items.map((item) => item.textContent?.trim())).toEqual([
+        'Nobody',
+        'Sara',
+        'rana@acme.test',
+      ]);
+      expect(items.map((item) => item.getAttribute('aria-checked'))).toEqual([
+        'true',
+        'false',
+        'false',
+      ]);
+      expect(items[1].querySelector('bdi')?.getAttribute('dir')).toBe('auto');
+      expect(items[2].querySelector('bdi')?.getAttribute('dir')).toBe('ltr');
+
+      items[1].click();
+      await settle();
+
+      const put = http.expectOne(`${detailUrl}/assignment`);
+
+      expect(put.request.method).toBe('PUT');
+      expect(put.request.body).toEqual({ member: 'u-sara' });
+      expect(put.request.headers.get('If-Match')).toBe('"v1"');
+
+      const assigned = { ...detail, assignedTo: sara };
+
+      put.flush(assigned, tagged(assigned, '"v2"'));
+      await settle();
+
+      expect(document.activeElement).toBe(host().querySelector('[data-testid="assignee"]'));
+    });
+
+    it('offers no Assign without the permission', async () => {
+      await opened(detail);
+
+      expect(host().querySelector('[data-testid="assignee"]')).toBeNull();
+    });
+
+    it("names the reader on their own reply until the re-read names it (the reply's response does not)", async () => {
+      await mount('conversations.view', 'conversations.reply');
+
+      (
+        TestBed.inject(AuthService) as unknown as {
+          account: { set: (user: unknown) => void };
+        }
+      ).account.set({ id: 'u-me', email: 'me@acme.test', displayName: 'Mona' });
+
+      http.expectOne(detailUrl).flush(humanDetail, tagged(humanDetail));
+      await settle();
+      http
+        .expectOne(messagesUrl)
+        .flush({ items: [], nextCursor: null, previousCursor: null, events: [] });
+      await settle();
+
+      const composer = fixture.debugElement.query(By.directive(ConversationComposer))
+        .componentInstance as ConversationComposer;
+
+      composer.sent.emit(message('m9', 'HumanAgent', 'Mine', 20) as TranscriptMessage);
+      await settle();
+
+      expect(host().querySelector('[data-testid="message-author"]')?.textContent?.trim()).toBe(
+        'Mona',
+      );
+    });
+
+    it('reads the customer once for a reader with customers.view, and shows what it adds', async () => {
+      await opened(detail, 'customers.view');
+
+      host().querySelector<HTMLButtonElement>('[data-testid="toggle-details"]')!.click();
+      await settle();
+
+      http.expectOne(customerUrl).flush(customer, tagged(customer));
+      await settle();
+
+      expect(host().querySelector('[data-testid="customer-since"]')?.textContent).toContain(
+        'Customer since',
+      );
+      expect(host().querySelector('[data-testid="customer-conversations"]')?.textContent).toBe('3');
+      // The open conversation is not "earlier": only the other one is listed.
+      const earlier = [
+        ...host().querySelectorAll<HTMLAnchorElement>('[data-testid="earlier-conversation"]'),
+      ];
+
+      expect(earlier).toHaveLength(1);
+      expect(earlier[0].getAttribute('href')).toBe('/conversations/c-older');
+
+      // A live change to the conversation re-reads it, never the customer.
+      notify?.(conversationId);
+      await settle();
+      http.expectOne(detailUrl).flush(detail, tagged(detail));
+      await settle();
+      http.match(() => true).forEach((request) => request.flush({ items: [], nextCursor: null }));
+      await settle();
+      http.expectNone(customerUrl);
+    });
+
+    it('never asks for the customer without customers.view, and still shows the conversation facts', async () => {
+      await opened(detail);
+
+      host().querySelector<HTMLButtonElement>('[data-testid="toggle-details"]')!.click();
+      await settle();
+
+      http.expectNone(customerUrl);
+      expect(host().querySelector('[data-testid="customer-earlier"]')).toBeNull();
+      expect(host().querySelector('[data-testid="context-assignee"]')?.textContent).toContain(
+        'Nobody',
+      );
+      expect(host().querySelector('[data-testid="customer-channel"]')?.textContent).toBe(
+        'Website chat',
+      );
+    });
+
+    it("draws the thread's skeleton while it loads: header, bubbles with the orb, composer", async () => {
+      await mount('conversations.view');
+
+      const skeleton = host().querySelector('[data-testid="conversation-skeleton"]');
+
+      expect(skeleton).not.toBeNull();
+      expect(skeleton?.closest('[aria-busy="true"]')).not.toBeNull();
+      expect(skeleton?.querySelector('.skeleton-title')).not.toBeNull();
+      expect(skeleton?.querySelector('.skeleton-chip')).not.toBeNull();
+      expect(skeleton?.querySelectorAll('.skeleton-bubble')).toHaveLength(3);
+      expect(skeleton?.querySelector('.skeleton-end .skeleton-orb')).not.toBeNull();
+      expect(skeleton?.querySelector('.skeleton-composer')).not.toBeNull();
+      expect(host().querySelectorAll('h1')).toHaveLength(1);
+      expect(text()).toContain('Loading conversation…');
+
+      http.expectOne(detailUrl).flush(detail, tagged(detail));
+      await settle();
+      http.expectOne(messagesUrl).flush({ items: [], nextCursor: null, previousCursor: null });
+      await settle();
+
+      expect(host().querySelector('[data-testid="conversation-skeleton"]')).toBeNull();
     });
   });
 });

@@ -1,20 +1,43 @@
 <div class="composer" [class.is-sending]="sending()">
   <label class="visually-hidden" for="conversation-reply" i18n="@@composer.label">Your reply</label>
-  <textarea
-    id="conversation-reply"
-    class="input composer-input"
-    rows="3"
-    dir="auto"
-    [value]="text()"
-    [readOnly]="sending()"
-    [attr.aria-invalid]="tooLong() || null"
-    [attr.maxlength]="maxLength"
-    aria-describedby="composer-hint composer-count"
-    placeholder="Reply to the customer…"
-    i18n-placeholder="@@composer.placeholder"
-    (input)="onInput($event)"
-    (keydown)="onKeydown($event)"
-  ></textarea>
+  <!--
+    One field (board Inbox): the box and Send inside a panel-soft frame with a
+    20px radius. The frame carries the focus ring and the over-the-limit edge,
+    so the box itself has none.
+  -->
+  <div class="composer-field" [class.is-over]="tooLong()">
+    <textarea
+      id="conversation-reply"
+      class="composer-input"
+      rows="2"
+      dir="auto"
+      [value]="text()"
+      [readOnly]="sending()"
+      [attr.aria-invalid]="tooLong() || null"
+      [attr.maxlength]="maxLength"
+      aria-describedby="composer-hint composer-count"
+      placeholder="Reply to the customer…"
+      i18n-placeholder="@@composer.placeholder"
+      (input)="onInput($event)"
+      (keydown)="onKeydown($event)"
+    ></textarea>
+
+    <button
+      type="button"
+      class="btn btn-primary btn-sm composer-send"
+      [class.btn-loading]="sending()"
+      [attr.aria-busy]="sending() || null"
+      [disabled]="empty() || tooLong()"
+      [attr.aria-disabled]="sending() || null"
+      (click)="send()"
+      data-testid="send-reply"
+    >
+      <span class="btn-label" i18n="@@composer.send">Send reply</span>
+      @if (sending()) {
+        <span class="spinner" aria-hidden="true"></span>
+      }
+    </button>
+  </div>
 
   <div class="composer-footer">
     <p id="composer-hint" class="composer-hint">
@@ -33,22 +56,6 @@
         {{ countText() }}
       }
     </span>
-
-    <button
-      type="button"
-      class="btn btn-primary"
-      [class.btn-loading]="sending()"
-      [attr.aria-busy]="sending() || null"
-      [disabled]="empty() || tooLong()"
-      [attr.aria-disabled]="sending() || null"
-      (click)="send()"
-      data-testid="send-reply"
-    >
-      <span class="btn-label" i18n="@@composer.send">Send reply</span>
-      @if (sending()) {
-        <span class="spinner" aria-hidden="true"></span>
-      }
-    </button>
   </div>
 
   <p class="visually-hidden" role="status">

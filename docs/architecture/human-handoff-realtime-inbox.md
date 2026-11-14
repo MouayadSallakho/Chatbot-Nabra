@@ -611,3 +611,26 @@ or taken over by the reader**, "taken over by" being the very expression `takenO
 publishes (§15.1), so the tab and the chip cannot disagree. Any letter case;
 `total` counts the filtered set and paging is unchanged. `needs-person` is unchanged,
 and any other value is still `400 conversations.filter.invalid`.
+
+## 17. Phase 39.4b: the thread and the customer panel (admin client only)
+
+No contract changed. What the redrawn thread reads, and when:
+
+- **On opening a conversation:** the conversation and its newest page with events, as
+  before (§14.2), and the WhatsApp facts on WhatsApp. **New:** for a reader with
+  `customers.view`, once the customer panel is shown, one `GET …/customers/{customerId}`
+  for "Customer since", the conversation count and the customer's other conversations
+  (metadata only; `canReadConversations` decides whether they are listed). It is read
+  once per customer: a `conversationChanged` re-reads the conversation (§16), never the
+  customer, and opening another conversation of the same customer reads nothing more.
+  Without `customers.view` nothing is asked, so nothing is refused.
+- **Names:** team replies, takeover and return lines, "Handled by" and the Assign menu
+  show `displayName ?? email` (§16.1). The reply's own response still names no author
+  (`sentBy: null`), so the client puts the signed-in member on their own reply until the
+  re-read (§14.2's overlap) replaces it with the server's.
+- **Waiting line:** "The AI has not replied to the last message yet." needs the AI to be
+  handling, the customer to have written last, no `AiTurnFailed` after that message,
+  and (new) `needsPersonReason` not `ReturnedUnanswered`: the AI does not answer messages
+  sent while a person had the conversation, so no reply is owed.
+- **Assign:** the same conditional `PUT …/assignment` with `If-Match` (§9), now from a
+  menu in the thread's header; a 412 is reported, never retried.

@@ -37,7 +37,8 @@ describe('ConversationTranscript', () => {
   }
 
   const host = (): HTMLElement => fixture.nativeElement as HTMLElement;
-  const bubbles = () => [...host().querySelectorAll<HTMLElement>('li.bubble')];
+  /** One row per message (Calm Glass, 39.4b): the bubble, its meta line and the speaker's mark. */
+  const bubbles = () => [...host().querySelectorAll<HTMLElement>('li.message')];
   const testId = <T extends HTMLElement = HTMLElement>(id: string) =>
     host().querySelector<T>(`[data-testid="${id}"]`);
 
@@ -499,18 +500,149 @@ describe('ConversationTranscript', () => {
     expect(host().querySelector('[data-testid="awaiting-ai"]')).toBeNull();
   });
 
-  it('names the speaker of every bubble in words, and isolates an email address', async () => {
+  it('names the speaker of every bubble in words under it, and isolates an email address', async () => {
     await mount([message(1), message(2, 'AiAgent'), message(3, 'HumanAgent')]);
 
-    const speakers = bubbles().map(
-      (bubble) => bubble.querySelector('.bubble-name')?.textContent?.trim() ?? '',
+    const metas = bubbles().map((bubble) =>
+      bubble.querySelector('.message-meta')?.textContent?.replace(/\s+/g, ' ').trim(),
     );
 
-    expect(speakers).toEqual(['Customer', 'Concierge', 'sam@acme.test']);
+    // The customer's is said to a screen reader only (board Inbox: the time alone).
+    expect(metas[0]).toMatch(/^Customer, \d{1,2}:\d{2}\s?[AP]M$/);
+    expect(metas[1]).toMatch(/^AI, Concierge · \d{1,2}:\d{2}\s?[AP]M$/);
+    expect(metas[2]).toMatch(/^Team, sam@acme\.test · \d{1,2}:\d{2}\s?[AP]M$/);
     expect(bubbles()[2].querySelector('bdi[dir="ltr"]')?.textContent).toBe('sam@acme.test');
-    expect(bubbles().every((bubble) => bubble.querySelector('.message-text[dir="auto"]'))).toBe(
-      true,
-    );
+    expect(
+      bubbles().every((bubble) => bubble.querySelector('.bubble .message-text[dir="auto"]')),
+    ).toBe(true);
+  });
+
+  describe('a pane that changes height (39.4b)', () => {
+    let resized: (() => void) | null;
+
+    beforeEach(() => {
+      resized = null;
+      vi.stubGlobal(
+        'ResizeObserver',
+        class {
+          constructor(callback: () => void) {
+            resized = callback;
+          }
+
+          observe(): void {}
+
+          disconnect(): void {}
+        },
+      );
+    });
+
+    afterEach(() => vi.restoreAllMocks());
+
+    async function scrolling(scrollTop: number): Promise<HTMLElement> {
+      await mount([message(1), message(2), message(3)]);
+
+      const scroller = host();
+
+      vi.spyOn(window, 'getComputedStyle').mockReturnValue({
+        overflowY: 'auto',
+      } as CSSStyleDeclaration);
+      // A day row and three bubbles, 400 px each: 1,600 px, 500 in view.
+      measure(scroller, 400, scrollTop);
+      scroller.dispatchEvent(new Event('scroll'));
+
+      return scroller;
+    }
+
+    it('keeps a reader who was at the end at the end when the header grows', async () => {
+      const scroller = await scrolling(1100);
+
+      // The header grew: the pane is shorter, and the end moved out of view.
+      Object.defineProperty(scroller, 'clientHeight', { configurable: true, value: 380 });
+      resized?.();
+
+      expect(scroller.scrollTop).toBe(1600);
+    });
+
+    it('leaves a reader who scrolled up where they are', async () => {
+      const scroller = await scrolling(200);
+
+      Object.defineProperty(scroller, 'clientHeight', { configurable: true, value: 380 });
+      resized?.();
+
+      expect(scroller.scrollTop).toBe(200);
+    });
+  });
+
+  describe('the three voices (Calm Glass, 39.4b)', () => {
+    const named = (sequence: number): TranscriptMessage => ({
+      ...message(sequence, 'HumanAgent', 'Done.'),
+      sentBy: { userId: 'u2', email: 'sara@acme.test', displayName: 'سارة الحربي' },
+    });
+
+    it('puts the customer on the start side and the AI and the team on the end side', async () => {
+      await mount([message(1), message(2, 'AiAgent'), message(3, 'HumanAgent')]);
+
+      const [customer, ai, team] = bubbles();
+
+      expect(customer.classList.contains('message-customer')).toBe(true);
+      expect(customer.querySelector('.bubble-customer')).not.toBeNull();
+      expect(ai.classList.contains('message-ai')).toBe(true);
+      expect(ai.querySelector('.bubble-ai')).not.toBeNull();
+      expect(team.classList.contains('message-team')).toBe(true);
+      expect(team.querySelector('.bubble-team')).not.toBeNull();
+    });
+
+    it('marks the AI with the still orb and a colleague with a gold avatar; the customer with neither', async () => {
+      await mount([message(1), message(2, 'AiAgent'), message(3, 'HumanAgent')]);
+
+      const [customer, ai, team] = bubbles();
+
+      expect(customer.querySelector('.message-mark')).toBeNull();
+      expect(ai.querySelector('app-orb.message-mark')).not.toBeNull();
+      expect(ai.querySelector('app-orb')?.classList.contains('is-thinking')).toBe(false);
+      expect(ai.querySelector('app-orb')?.getAttribute('aria-hidden')).toBe('true');
+      expect(team.querySelector('app-avatar.message-mark.avatar-member.avatar-xs')).not.toBeNull();
+      expect(team.querySelector('app-avatar')?.textContent?.trim()).toBe('S');
+    });
+
+    it('names a colleague by display name, in its own direction', async () => {
+      await mount([message(1), named(2)]);
+
+      const author = testId('message-author');
+
+      expect(author?.textContent?.trim()).toBe('سارة الحربي');
+      expect(author?.getAttribute('dir')).toBe('auto');
+      expect(bubbles()[1].querySelector('app-avatar')?.textContent?.trim()).toBe('س');
+    });
+
+    it('never leaves a team reply without an author', async () => {
+      await mount([message(1), { ...message(2, 'HumanAgent'), sentBy: null }]);
+
+      expect(testId('message-author')?.textContent?.trim()).toBe('Team');
+    });
+
+    it('waits with the breathing orb on the AI side, in words', async () => {
+      await mount([message(1)], 'Ai');
+
+      const tail = testId('awaiting-ai');
+
+      expect(tail?.textContent).toContain('The AI has not replied to the last message yet.');
+      expect(tail?.querySelector('app-orb')?.classList.contains('is-thinking')).toBe(true);
+    });
+
+    it('owes no AI reply to a conversation returned to it unanswered', async () => {
+      await mount([message(1), message(2, 'AiAgent'), message(3)], 'Ai');
+      fixture.componentRef.setInput('needsPersonReason', 'ReturnedUnanswered');
+      await settle();
+
+      expect(testId('awaiting-ai')).toBeNull();
+    });
+
+    it('says the day as a quiet heading', async () => {
+      await mount([message(1)]);
+
+      expect(host().querySelector('.transcript-day h3')?.textContent?.trim()).toBeTruthy();
+    });
   });
 
   describe('dividers from the server', () => {
@@ -522,7 +654,10 @@ describe('ConversationTranscript', () => {
       const divider = testId('transcript-event-TakenOver');
       const email = divider?.querySelector('bdi');
 
-      expect(divider?.textContent?.replace(/\s+/g, ' ').trim()).toBe('sam@acme.test took over');
+      expect(divider?.textContent?.replace(/\s+/g, ' ').trim()).toMatch(
+        /^sam@acme\.test took over · \d{1,2}:\d{2}\s?[AP]M$/,
+      );
+      expect(divider?.querySelector('time')?.getAttribute('datetime')).toBe('2026-10-18T10:00:00Z');
       expect(divider?.classList.contains('handoff-to-human')).toBe(true);
       expect(email?.getAttribute('dir')).toBe('ltr');
       expect(email?.getAttribute('translate')).toBe('no');
@@ -535,10 +670,26 @@ describe('ConversationTranscript', () => {
 
       const divider = testId('transcript-event-ReturnedToAi');
 
-      expect(divider?.textContent?.replace(/\s+/g, ' ').trim()).toBe(
-        'sam@acme.test returned it to the AI',
+      expect(divider?.textContent?.replace(/\s+/g, ' ').trim()).toMatch(
+        /^sam@acme\.test returned it to the AI · \d{1,2}:\d{2}\s?[AP]M$/,
       );
       expect(divider?.classList.contains('handoff-to-ai')).toBe(true);
+    });
+
+    it('names who took over by display name when they have one', async () => {
+      await mount([message(1)]);
+      fixture.componentRef.setInput('events', [
+        event({
+          kind: 'TakenOver',
+          actor: { userId: 'u2', email: 'sara@acme.test', displayName: 'Sara' },
+        }),
+      ]);
+      await settle();
+
+      const name = testId('transcript-event-TakenOver')?.querySelector('bdi');
+
+      expect(name?.textContent?.trim()).toBe('Sara');
+      expect(name?.getAttribute('dir')).toBe('auto');
     });
 
     it('still says what happened when the actor is not known', async () => {

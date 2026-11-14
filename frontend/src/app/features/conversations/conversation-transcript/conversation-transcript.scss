@@ -7,7 +7,7 @@
 :host {
   display: block;
   padding: var(--space-4) var(--page-gutter) var(--space-6);
-  background-color: var(--surface-page);
+  background-color: var(--color-panel);
   overflow-anchor: none;
 }
 
@@ -29,50 +29,91 @@
 }
 
 // A reading column, centred in a wide pane: on a 1920px screen the customer
-// and the business stay within one glance of each other.
+// and the business stay within one glance of each other. 12px between messages
+// (board Inbox).
 .transcript {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--space-3);
   max-inline-size: 56rem;
   margin: 0 auto;
   padding: 0;
   list-style: none;
 }
 
-// Bubbles that were already there when the conversation opened do not move;
-// only a message that arrives while the reader is here settles in (220 ms,
-// MASTER.md section 7). The keyframes are the shared `bubble-settle`.
+// One message (a grid): the bubble, the speaker's mark beside it on the
+// business's side (the AI's orb, a colleague's avatar) level with the bubble's
+// last line, and the meta line under the bubble. The customer on the start
+// side; the AI and the team on the end side. The grid mirrors under RTL.
+.message {
+  display: grid;
+  grid-template-columns: minmax(0, auto) auto;
+  gap: var(--space-1) var(--space-2);
+  align-items: end;
+  max-inline-size: var(--message-max-width);
+
+  > .bubble {
+    grid-area: 1 / 1;
+  }
+
+  > .message-mark {
+    grid-area: 1 / 2;
+  }
+
+  > .message-meta {
+    grid-area: 2 / 1;
+  }
+}
+
+.message-customer {
+  align-self: flex-start;
+  grid-template-columns: minmax(0, auto);
+  justify-items: start;
+}
+
+.message-ai,
+.message-team {
+  align-self: flex-end;
+  justify-items: end;
+}
+
+// The bubble fills its column; the shared primitive draws its voice.
 .bubble {
+  max-inline-size: 100%;
   animation: none;
 }
 
-.bubble.is-fresh {
-  animation: bubble-settle var(--duration-sm) var(--ease-enter);
+// Bubbles that were already there when the conversation opened do not move;
+// only a message that arrives while the reader is here rises 8px and fades in
+// (calm-glass.md §5). Under reduced motion the travel token is 0: a fade.
+.message.is-fresh {
+  animation: bubble-rise var(--duration-menu) var(--ease-calm);
 }
 
-.bubble-speaker {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1) var(--space-2);
-  flex-wrap: wrap;
-}
-
-.bubble-glyph {
-  flex: none;
-  inline-size: 0.875rem;
-  block-size: 0.875rem;
-}
-
-.bubble-name {
-  min-inline-size: 0;
+.message-meta {
+  margin: 0;
+  padding-inline: var(--space-1);
+  color: var(--color-text-quiet);
+  font: var(--text-caption);
+  font-variant-numeric: tabular-nums;
   overflow-wrap: anywhere;
 }
 
-.bubble-time {
-  color: var(--text-muted);
-  font-variant-numeric: tabular-nums;
-  font-weight: 400;
+.message-ai .message-meta,
+.message-team .message-meta {
+  text-align: end;
+}
+
+.message-when {
+  white-space: nowrap;
+}
+
+.message-ai .message-speaker {
+  color: var(--voice-ai-label);
+}
+
+.message-team .message-speaker {
+  color: var(--voice-team-label);
 }
 
 // Whole message, wrapped. Interior spacing and line breaks carry meaning in a
@@ -92,34 +133,35 @@
   margin-block-start: var(--space-2);
 }
 
-// A calendar day, between hairlines. A real heading (h3, under the hidden
-// "Messages" h2), so a screen reader can move from day to day.
+// A calendar day: a quiet pill in the middle (board Inbox). A real heading (h3,
+// under the hidden "Messages" h2), so a screen reader can move from day to day.
 .transcript-day {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  margin-block: var(--space-3) var(--space-1);
-  color: var(--text-muted);
-
-  &::before,
-  &::after {
-    content: '';
-    flex: 1;
-    border-block-start: 1px solid var(--border-subtle);
-  }
+  align-self: center;
+  margin-block: var(--space-2) 0;
 
   h3 {
+    padding: var(--space-1) var(--space-3);
+    border-radius: var(--radius-pill);
+    background-color: var(--color-panel-soft);
+    color: var(--color-text-quiet);
     font: var(--text-caption);
   }
 }
 
 .handoff-divider {
-  margin-block: var(--space-2);
+  margin-block: var(--space-1);
+}
+
+.event-time {
+  font-variant-numeric: tabular-nums;
 }
 
 // The rule says the kind of event; the words say what happened.
 .transcript-failed {
-  --handoff-color: var(--danger-fg);
+  --event-line-rule: var(--event-failed-line);
+
+  color: var(--chip-failed-fg);
+  font-weight: 600;
 }
 
 // The platform talking about the conversation, not somebody in it: centred,
@@ -131,18 +173,22 @@
   text-align: center;
 }
 
-// Owed a reply while the AI is handling: a quiet note at the end, with its own
-// icon-free wording -- it is information, not an error.
+// Owed a reply while the AI has it: a calm line on the AI's side with the
+// breathing orb. Information, not an error: quiet words, no border.
 .transcript-tail {
-  align-self: center;
-  max-inline-size: 32rem;
-  margin-block-start: var(--space-3);
-  padding: var(--space-2) var(--space-3);
-  border: 1px dashed var(--border-strong);
-  border-radius: var(--radius-control);
-  color: var(--text-secondary);
+  display: flex;
+  align-self: flex-end;
+  align-items: center;
+  gap: var(--space-2);
+  max-inline-size: var(--message-max-width);
+  margin-block-start: var(--space-1);
+  color: var(--color-text-secondary);
   font: var(--text-small);
-  text-align: center;
+  text-align: end;
+
+  .message-mark {
+    margin: 0;
+  }
 }
 
 .transcript-earlier {

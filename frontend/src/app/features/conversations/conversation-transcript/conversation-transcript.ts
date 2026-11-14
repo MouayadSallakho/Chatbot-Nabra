@@ -17,14 +17,17 @@ import {
 } from '@angular/core';
 import { LocaleFormat } from '@app/core/i18n/locale-format';
 import { pluralMessage } from '@app/core/i18n/plural';
-import { Icon } from '@app/shared/icon/icon';
+import { Avatar } from '@app/shared/avatar/avatar';
+import { Orb } from '@app/shared/orb/orb';
 import type { WhatsAppConversationFacts } from '@app/features/channels/whatsapp-api';
 import type {
   ConversationHandling,
   TranscriptEvent,
   TranscriptMessage,
+  WorkspaceMember,
 } from '../conversations-api';
 import { deliveryWord, senderWord } from '../conversation-words';
+import { MemberName, memberName } from '../inbox-rows';
 import { TranscriptRow, transcriptRows } from '../transcript-rows';
 
 /** How far above the view the start of what is loaded may come before more is read, in px. */
@@ -39,12 +42,14 @@ const AT_END_SLACK = 48;
 let nextId = 0;
 
 /**
- * One conversation's messages, as a reader works through them.
+ * One conversation's messages, as a reader works through them (Calm Glass, 39.4b).
  *
- * <strong>Who spoke is said three ways.</strong> The bubble's voice tint
- * (neutral for the customer, Lagoon for the AI, Ember for a person), a speaker
- * line with a word and a glyph, and the side it sits on. Day separators come from
- * the messages, and dividers only from the server's events (`transcriptRows`).
+ * <strong>Three voices, each said three ways.</strong> The customer on the start
+ * side in cream; the AI on the end side in emerald with the small orb; the team on
+ * the end side in gold with the person's avatar. Under each bubble a line says who
+ * wrote it (the agent's name, the colleague's display name or email) and when. Day
+ * separators come from the messages, and event lines only from the server's events
+ * (`transcriptRows`), each with who and when.
  *
  * <strong>Nothing yanks the reader.</strong> New messages settle in at the end
  * (220 ms). A reader at the end stays at the end; one who has scrolled up keeps
@@ -64,7 +69,7 @@ let nextId = 0;
 @Component({
   selector: 'app-conversation-transcript',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Icon],
+  imports: [Avatar, Orb],
   // While the transcript scrolls by itself it is a named region a keyboard can
   // reach: focus it, then the arrow keys, Page Up/Down, Home and End scroll it,
   // whether or not it holds a link or a button (WCAG 2.1.1; Phase 36.12).
@@ -98,6 +103,13 @@ export class ConversationTranscript {
 
   /** Why the last read of earlier messages failed, in words; null when it did not. */
   readonly earlierFailure = input<string | null>(null);
+
+  /**
+   * Why the server says this conversation waits for a person (38.7a), or null. A
+   * conversation returned to the AI unanswered is not owed an AI reply: the AI
+   * does not answer what was sent while a person had it.
+   */
+  readonly needsPersonReason = input<string | null>(null);
 
   /** True when the conversation fills the screen and this transcript is its own scroll region. */
   readonly scrollRegion = input(false);
@@ -134,6 +146,7 @@ export class ConversationTranscript {
     return (
       this.handling() === 'Ai' &&
       last?.sender === 'Customer' &&
+      this.needsPersonReason() !== 'ReturnedUnanswered' &&
       !this.events().some(
         (event) => event.kind === 'AiTurnFailed' && event.afterSequence === last.sequence,
       )
@@ -152,6 +165,13 @@ export class ConversationTranscript {
   private newest = 0;
   private unseen = 0;
   private observer: IntersectionObserver | null = null;
+
+  /**
+   * Whether the reader is at the end, as of their last scroll. A pane that
+   * shrinks (the header grows when somebody takes the conversation over) must
+   * not leave them above the newest message: they stay pinned to the end.
+   */
+  private pinned = true;
 
   private newestObserver: IntersectionObserver | null = null;
   private newestInView = false;
@@ -181,7 +201,9 @@ export class ConversationTranscript {
     // Reaching the end clears the count; both possible scrollers are watched,
     // because which one scrolls depends on the width (see `scroller()`).
     const onScroll = () => {
-      if (this.unseen > 0 && this.atEnd()) {
+      this.pinned = this.atEnd();
+
+      if (this.unseen > 0 && this.pinned) {
         this.setUnseen(0);
       }
     };
@@ -196,7 +218,22 @@ export class ConversationTranscript {
 
     own.addEventListener('scroll', onScroll, { passive: true });
     main?.addEventListener('scroll', onScroll, { passive: true });
+
+    // The transcript's own pane changes height when the header above it or the
+    // composer below it does: a reader who was at the end stays there.
+    const resized =
+      typeof ResizeObserver === 'undefined'
+        ? null
+        : new ResizeObserver(() => {
+            if (this.pinned && this.scroller() === own) {
+              own.scrollTop = own.scrollHeight;
+            }
+          });
+
+    resized?.observe(own);
+
     inject(DestroyRef).onDestroy(() => {
+      resized?.disconnect();
       own.removeEventListener('scroll', onScroll);
       main?.removeEventListener('scroll', onScroll);
       this.observer?.disconnect();
@@ -213,6 +250,7 @@ export class ConversationTranscript {
     const scroller = this.scroller();
 
     scroller.scrollTop = scroller.scrollHeight;
+    this.pinned = true;
     this.setUnseen(0);
   }
 
@@ -223,17 +261,44 @@ export class ConversationTranscript {
     }
   }
 
+  /** The voice words, said to a screen reader before a name that does not say it. */
+  protected readonly aiWord = senderWord('AiAgent');
+  protected readonly teamWord = senderWord('HumanAgent');
+
   protected speaker(message: TranscriptMessage): string {
     switch (message.sender) {
       case 'AiAgent':
         return this.agentName() ?? senderWord('AiAgent');
       case 'HumanAgent':
-        // Inside the workspace, naming the colleague is the point. The customer
-        // is told something entirely different -- see the public clients.
-        return message.sentBy?.email ?? senderWord('HumanAgent');
+        return this.author(message).text;
       default:
         return senderWord(message.sender);
     }
+  }
+
+  /**
+   * Who wrote a team reply (Phase 39.1): their display name, or their email where
+   * they have none. Inside the workspace naming the colleague is the point; the
+   * customer is told something else entirely (see the public clients). A reply
+   * whose author the server did not name reads "Team", never an empty line.
+   */
+  protected author(message: TranscriptMessage): MemberName {
+    return message.sentBy
+      ? memberName(message.sentBy)
+      : { text: senderWord('HumanAgent'), isEmail: false };
+  }
+
+  protected name(member: WorkspaceMember): MemberName {
+    return memberName(member);
+  }
+
+  /** The first letter of an address, for the avatar beside a colleague with no display name. */
+  protected emailInitial(email: string): string {
+    return Array.from(email.trim())[0]?.toLocaleUpperCase() ?? '';
+  }
+
+  protected eventTime(event: TranscriptEvent): string {
+    return this.format.date(event.at, 'time');
   }
 
   protected time(message: TranscriptMessage): string {
@@ -361,7 +426,7 @@ export class ConversationTranscript {
   }
 
   private settleIn(arrived: readonly TranscriptMessage[]): void {
-    const follow = this.atEnd();
+    const follow = this.pinned || this.atEnd();
 
     this.fresh.set(new Set(arrived.map((message) => message.id)));
     this.announce(arrived);

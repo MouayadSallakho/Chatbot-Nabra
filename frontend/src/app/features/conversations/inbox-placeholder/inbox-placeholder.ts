@@ -34,6 +34,12 @@ import { Icon } from '@app/shared/icon/icon';
       background-color: var(--color-panel);
     }
 
+    /* Beside the list, a solid panel of its own (the thread draws its own). */
+    :host-context(.inbox.is-panes) {
+      border: 1px solid var(--color-line);
+      border-radius: var(--radius-panel);
+    }
+
     .inbox-placeholder {
       display: grid;
       justify-items: center;

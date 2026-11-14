@@ -1469,6 +1469,36 @@ a.data-row:hover .data-row-chevron {
   }
 }
 
+// The thread's handling chip (Phase 39.4b; here for the component's 4 kB
+// budget). The sweep: the new voice's chip wipes in from the reading start over the
+// old voice's tint, on the calm curve. Under reduced motion the duration
+// tokens collapse, so the change is instant and still complete.
+.handling-chip {
+  display: inline-flex;
+  border-radius: var(--radius-pill);
+
+  &.from-ai {
+    background-color: var(--voice-ai-tint);
+  }
+
+  &.from-human {
+    background-color: var(--voice-human-tint);
+  }
+
+  &.is-sweeping app-voice-chip {
+    animation: handoff-sweep var(--duration-dialog) var(--ease-calm);
+  }
+}
+
+@keyframes handoff-sweep {
+  from {
+    clip-path: inset(
+      0 calc(50% + 50% * var(--direction-flip)) 0 calc(50% - 50% * var(--direction-flip)) round
+        999px
+    );
+  }
+}
+
 // -----------------------------------------------------------------------------
 // Empty, loading and error states
 // -----------------------------------------------------------------------------
@@ -1679,6 +1709,98 @@ a.data-row:hover .data-row-chevron {
   inline-size: var(--avatar-size);
   block-size: var(--avatar-size);
   flex: none;
+}
+
+// The conversation's skeleton (Phase 39.4b): the header, three bubbles (the
+// business's with its orb), the composer; the customer panel's avatar, lines
+// and tiles beside it. Here rather than in the component, whose stylesheet
+// would pass the 4 kB budget; the shapes are generic.
+.skeleton-header {
+  gap: var(--space-2);
+}
+
+.skeleton-row,
+.skeleton-tiles {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-2);
+}
+
+.skeleton-chip {
+  inline-size: 8rem;
+  block-size: var(--chip-height);
+  border-radius: var(--radius-pill);
+}
+
+.skeleton-action {
+  inline-size: 7rem;
+  block-size: var(--control-height-sm);
+  margin-inline-start: auto;
+  border-radius: var(--radius-pill);
+}
+
+.skeleton-transcript {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+}
+
+.skeleton-end {
+  justify-content: flex-end;
+
+  .skeleton-bubble {
+    flex: 0 1 min(28rem, 60%);
+  }
+}
+
+.skeleton-bubble-short {
+  inline-size: min(16rem, 45%);
+}
+
+.skeleton-orb,
+.skeleton-avatar-lg {
+  flex: none;
+  inline-size: var(--orb-size);
+  block-size: var(--orb-size);
+  border-radius: var(--radius-pill);
+}
+
+.skeleton-composer {
+  block-size: 4.5rem;
+  border-radius: var(--radius-composer);
+}
+
+.skeleton-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-5);
+
+  .skeleton-avatar-lg {
+    inline-size: var(--avatar-size-lg);
+    block-size: var(--avatar-size-lg);
+  }
+
+  .skeleton-name {
+    inline-size: 60%;
+  }
+
+  .skeleton-since {
+    inline-size: 45%;
+  }
+
+  .skeleton-tiles {
+    align-self: stretch;
+  }
+
+  .skeleton-tile {
+    flex: 1;
+    block-size: 4.5rem;
+    border-radius: var(--radius-tile);
+  }
 }
 
 @keyframes skeleton-sweep {

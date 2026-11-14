@@ -2,6 +2,7 @@ import { Routes } from '@angular/router';
 import { MediaQueries } from '@app/core/media/media';
 import { provideProblemWords } from '@app/core/problems/problem-words';
 import { WhatsAppApi } from '@app/features/channels/whatsapp-api';
+import { CustomersApi } from '@app/features/customers/customers-api';
 import { CONVERSATION_PROBLEM_WORDS } from './conversation-problems';
 import { ConversationsApi } from './conversations-api';
 import { InboxState } from './inbox-state';
@@ -20,6 +21,10 @@ import { InboxState } from './inbox-state';
  * injector: they are used only by these screens, so scoping them keeps them in
  * the lazily loaded chunk, as every other feature area does.
  *
+ * `CustomersApi` is here for one read too (39.4b): the customer panel beside an
+ * open conversation shows "Customer since", the customer's conversation count
+ * and their other conversations, for a reader with `customers.view`.
+ *
  * `WhatsAppApi` is here for one read: a WhatsApp conversation shows who it is
  * with and whether each reply reached them, and that is channel-specific
  * information the shared conversation API deliberately does not carry.
@@ -29,6 +34,7 @@ export const conversationRoutes: Routes = [
     path: '',
     providers: [
       ConversationsApi,
+      CustomersApi,
       WhatsAppApi,
       InboxState,
       provideProblemWords(CONVERSATION_PROBLEM_WORDS),

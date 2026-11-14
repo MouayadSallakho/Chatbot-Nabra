@@ -60,7 +60,11 @@
           </li>
         }
         @case ('event') {
-          <!-- From the server (include=events). A word always says what happened. -->
+          <!--
+            From the server (include=events): a centred line with words, who and
+            when (calm-glass.md §6). A failed turn is coral; a takeover the team's
+            gold; a return to the AI emerald. The words always say what happened.
+          -->
           <li
             class="handoff-divider"
             [class.handoff-to-human]="row.event.kind === 'TakenOver'"
@@ -68,30 +72,43 @@
             [class.transcript-failed]="row.event.kind === 'AiTurnFailed'"
             [attr.data-testid]="'transcript-event-' + row.event.kind"
           >
-            @switch (row.event.kind) {
-              @case ('AiTurnFailed') {
-                <span i18n="@@transcript.event.aiFailed">The AI could not reply</span>
-              }
-              @case ('TakenOver') {
-                @if (row.event.actor; as actor) {
-                  <span i18n="@@transcript.event.takenOver"
-                    ><bdi dir="ltr" translate="no">{{ actor.email }}</bdi> took over</span
-                  >
-                } @else {
-                  <span i18n="@@transcript.handoff.toPerson">A person took over</span>
+            <span class="event-words">
+              @switch (row.event.kind) {
+                @case ('AiTurnFailed') {
+                  <span i18n="@@transcript.event.aiFailed">The AI could not reply</span>
+                }
+                @case ('TakenOver') {
+                  @if (row.event.actor; as actor) {
+                    @let who = name(actor);
+                    <span i18n="@@transcript.event.takenOver"
+                      ><bdi [attr.dir]="who.isEmail ? 'ltr' : 'auto'" translate="no">{{
+                        who.text
+                      }}</bdi>
+                      took over</span
+                    >
+                  } @else {
+                    <span i18n="@@transcript.handoff.toPerson">A person took over</span>
+                  }
+                }
+                @case ('ReturnedToAi') {
+                  @if (row.event.actor; as actor) {
+                    @let who = name(actor);
+                    <span i18n="@@transcript.event.returned"
+                      ><bdi [attr.dir]="who.isEmail ? 'ltr' : 'auto'" translate="no">{{
+                        who.text
+                      }}</bdi>
+                      returned it to the AI</span
+                    >
+                  } @else {
+                    <span i18n="@@transcript.handoff.toAi">Back with the AI</span>
+                  }
                 }
               }
-              @case ('ReturnedToAi') {
-                @if (row.event.actor; as actor) {
-                  <span i18n="@@transcript.event.returned"
-                    ><bdi dir="ltr" translate="no">{{ actor.email }}</bdi> returned it to the
-                    AI</span
-                  >
-                } @else {
-                  <span i18n="@@transcript.handoff.toAi">Back with the AI</span>
-                }
-              }
-            }
+              <span aria-hidden="true"> · </span
+              ><time class="event-time" [attr.datetime]="row.event.at">{{
+                eventTime(row.event)
+              }}</time>
+            </span>
           </li>
         }
         @case ('message') {
@@ -101,58 +118,103 @@
               <span class="message-text" dir="auto">{{ row.message.text }}</span>
             </li>
           } @else {
+            <!--
+              The three voices (calm-glass.md §6): the customer on the start side
+              in cream; the AI on the end side in emerald with the small orb; the
+              team on the end side in gold with the person's name under the bubble.
+              Who spoke is also said in words, never by colour or side alone.
+            -->
             <li
-              class="bubble"
-              [class.bubble-customer]="row.voice === null"
-              [class.bubble-ai]="row.voice === 'ai'"
-              [class.bubble-human]="row.voice === 'human'"
+              class="message"
+              [class.message-customer]="row.voice === null"
+              [class.message-ai]="row.voice === 'ai'"
+              [class.message-team]="row.voice === 'human'"
               [class.is-fresh]="fresh().has(row.message.id)"
               [attr.data-newest]="row.key === newestId() ? '' : null"
             >
-              <span class="bubble-speaker">
-                @if (row.voice === 'ai') {
-                  <app-icon class="bubble-glyph" name="ai" [strokeWidth]="1.8" />
-                } @else if (row.voice === 'human') {
-                  <app-icon class="bubble-glyph" name="person" [strokeWidth]="1.8" />
-                }
-                @if (row.voice === 'human' && row.message.sentBy) {
-                  <bdi dir="ltr" class="bubble-name">{{ speaker(row.message) }}</bdi>
-                } @else {
-                  <span class="bubble-name" dir="auto">{{ speaker(row.message) }}</span>
-                }
-                <time
-                  class="bubble-time"
-                  [attr.datetime]="row.message.sentAt"
-                  [attr.title]="fullTime(row.message)"
-                  >{{ time(row.message) }}</time
-                >
-              </span>
-              <span class="message-text" dir="auto">{{ row.message.text }}</span>
+              <div
+                class="bubble"
+                [class.bubble-customer]="row.voice === null"
+                [class.bubble-ai]="row.voice === 'ai'"
+                [class.bubble-team]="row.voice === 'human'"
+              >
+                <span class="message-text" dir="auto">{{ row.message.text }}</span>
 
-              @if (delivery(row.message); as status) {
-                <!--
-                  A word, not a colour: whether a reply reached the customer is
-                  exactly the kind of thing somebody who cannot rely on hue must
-                  still be able to read.
-                -->
-                <span class="bubble-delivery">
-                  <span
-                    class="badge badge-sm"
-                    [class.badge-success]="status === 'Delivered' || status === 'Read'"
-                    [class.badge-danger]="status === 'Failed'"
-                    [class.badge-warning]="status === 'Unknown'"
-                    [class.badge-neutral]="
-                      status !== 'Delivered' &&
-                      status !== 'Read' &&
-                      status !== 'Failed' &&
-                      status !== 'Unknown'
-                    "
-                    >{{ deliveryWord(status) }}</span
-                  >
-                  @if (deliveryHint(status); as hint) {
-                    <span class="text-small text-muted">{{ hint }}</span>
+                @if (delivery(row.message); as status) {
+                  <!--
+                      A word, not a colour: whether a reply reached the customer is
+                      exactly the kind of thing somebody who cannot rely on hue must
+                      still be able to read.
+                    -->
+                  <span class="bubble-delivery">
+                    <span
+                      class="badge badge-sm"
+                      [class.badge-success]="status === 'Delivered' || status === 'Read'"
+                      [class.badge-danger]="status === 'Failed'"
+                      [class.badge-warning]="status === 'Unknown'"
+                      [class.badge-neutral]="
+                        status !== 'Delivered' &&
+                        status !== 'Read' &&
+                        status !== 'Failed' &&
+                        status !== 'Unknown'
+                      "
+                      >{{ deliveryWord(status) }}</span
+                    >
+                    @if (deliveryHint(status); as hint) {
+                      <span class="text-small text-muted">{{ hint }}</span>
+                    }
+                  </span>
+                }
+              </div>
+
+              <!-- Under the bubble: who wrote it, then when. -->
+              <p class="message-meta">
+                @switch (row.voice) {
+                  @case ('ai') {
+                    @if (agentName()) {
+                      <span class="visually-hidden">{{ aiWord }}, </span>
+                    }
+                    <span class="message-speaker" dir="auto">{{ speaker(row.message) }}</span>
                   }
-                </span>
+                  @case ('human') {
+                    <span class="visually-hidden">{{ teamWord }}, </span>
+                    @let writer = author(row.message);
+                    <bdi
+                      class="message-speaker"
+                      [attr.dir]="writer.isEmail ? 'ltr' : 'auto'"
+                      data-testid="message-author"
+                      >{{ writer.text }}</bdi
+                    >
+                  }
+                  @default {
+                    <span class="visually-hidden">{{ speaker(row.message) }}, </span>
+                  }
+                }
+                <!-- The separator stays with the time, so a long name wraps whole. -->
+                <span class="message-when">
+                  @if (row.voice !== null) {
+                    <span aria-hidden="true"> · </span>
+                  }
+                  <time
+                    class="message-time"
+                    [attr.datetime]="row.message.sentAt"
+                    [attr.title]="fullTime(row.message)"
+                    >{{ time(row.message) }}</time
+                  ></span
+                >
+              </p>
+
+              @if (row.voice === 'ai') {
+                <app-orb class="message-mark" />
+              } @else if (row.voice === 'human') {
+                @let writer = author(row.message);
+                <app-avatar
+                  class="message-mark"
+                  size="xs"
+                  tone="member"
+                  [name]="writer.isEmail ? '' : writer.text"
+                  [text]="writer.isEmail ? emailInitial(writer.text) : ''"
+                />
               }
             </li>
           }
@@ -161,8 +223,16 @@
     }
 
     @if (awaitingAi()) {
+      <!--
+        A reply is owed and the AI has it: a calm line on the AI's side with the
+        breathing orb (calm-glass.md §5). The words say it; the orb only breathes,
+        and stays still under reduced motion.
+      -->
       <li class="transcript-tail" data-testid="awaiting-ai">
-        <span i18n="@@transcript.awaitingAi">The AI has not replied to the last message yet.</span>
+        <span class="transcript-tail-words" i18n="@@transcript.awaitingAi"
+          >The AI has not replied to the last message yet.</span
+        >
+        <app-orb class="message-mark" [thinking]="true" />
       </li>
     }
   </ol>

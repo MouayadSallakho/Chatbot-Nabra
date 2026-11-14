@@ -16,6 +16,7 @@ import {
 import { Router, RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { ApiError, toApiError } from '@app/core/api/api-error';
+import { AuthService } from '@app/core/auth/auth-service';
 import { Versioned } from '@app/core/api/versioned';
 import { PermissionService } from '@app/core/authorization/permission-service';
 import { ConversationRealtime } from '@app/core/realtime/conversation-realtime';
@@ -29,6 +30,7 @@ import { NavigationHistory } from '@app/core/navigation/navigation-history';
 import { WhatsAppApi, WhatsAppConversationFacts } from '@app/features/channels/whatsapp-api';
 import { EmptyState } from '@app/shared/empty-state/empty-state';
 import { Icon } from '@app/shared/icon/icon';
+import { Menu } from '@app/shared/menu/menu';
 import { VoiceChip } from '@app/shared/voice/voice-chip';
 import { VoiceTrack } from '@app/shared/voice/voice-track';
 import { Voice } from '@app/shared/voice/voice';
@@ -47,6 +49,7 @@ import { ConversationComposer } from '../conversation-composer/conversation-comp
 import { ConversationContext } from '../conversation-context/conversation-context';
 import { CustomerLabel } from '../customer-label';
 import { handlingSentence, messagesPhrase, statusWord } from '../conversation-words';
+import { MemberName, memberName } from '../inbox-rows';
 import { mergeEvents, mergeMessages, refreshCursor } from '../transcript-rows';
 
 /** Messages in the first window, and in each earlier page after it. */
@@ -58,8 +61,15 @@ export const MESSAGE_PAGE = 200;
 /** How many forward pages one catch-up follows: ten thousand messages. */
 export const MAX_CATCH_UP_PAGES = 50;
 
+/** A colleague the conversation can be assigned to, named as the inbox names people. */
+export interface AssignOption {
+  readonly userId: string;
+  readonly name: MemberName;
+}
+
 /**
- * One conversation, worked from the inbox.
+ * One conversation, worked from the inbox (Calm Glass, 39.4b: the thread and,
+ * from 1280px, the customer panel beside it).
  *
  * <strong>The handoff is the heart of it.</strong> The header says who is
  * answering in a voice chip (glyph and word) and offers the one action that
@@ -91,6 +101,7 @@ export const MAX_CATCH_UP_PAGES = 50;
     RouterLink,
     EmptyState,
     Icon,
+    Menu,
     VoiceChip,
     VoiceTrack,
     ConversationTranscript,
@@ -115,6 +126,7 @@ export class ConversationDetail {
   private readonly router = inject(Router);
   private readonly history = inject(NavigationHistory);
   private readonly inbox = inject(InboxState, { optional: true });
+  private readonly auth = inject(AuthService);
 
   /** From the route, through `withComponentInputBinding`. */
   readonly conversationId = input.required<string>();
@@ -186,6 +198,36 @@ export class ConversationDetail {
 
   /** Said once, politely, when who is answering changes while the reader is here. */
   protected readonly handoffAnnouncement = signal('');
+
+  /**
+   * Who handles the conversation (Phase 38 note 14), beside the handling chip:
+   * the member who took it over, by display name or email, while a person has it.
+   */
+  protected readonly handler = computed<MemberName | null>(() => {
+    const current = this.conversation();
+
+    return current?.handling === 'Human' && current.takenOverBy
+      ? memberName(current.takenOverBy)
+      : null;
+  });
+
+  /**
+   * The assign menu's people, with the current assignee in it even when the
+   * server no longer offers them (they lost the reply permission): a menu that
+   * cannot show its own value would claim the conversation is routed to nobody.
+   */
+  protected readonly assignOptions = computed<readonly AssignOption[]>(() => {
+    const current = this.conversation()?.assignedTo ?? null;
+    const offered = this.assignees();
+    const members =
+      current && !offered.some((member) => member.userId === current.userId)
+        ? [current, ...offered]
+        : offered;
+
+    return members.map((member) => ({ userId: member.userId, name: memberName(member) }));
+  });
+
+  protected readonly assignedToLabel = $localize`:@@conversation.assignedTo:Assigned to`;
 
   protected readonly fallbackTitle = $localize`:@@conversation.heading:Conversation`;
 
@@ -532,13 +574,29 @@ export class ConversationDetail {
       firstValueFrom(this.api.assign(tenantId, this.conversationId(), member, version)),
     );
 
-    // The select was disabled while the change ran, which dropped focus.
-    this.focusAfterRender('#conversation-assignee');
+    // The menu gave focus back to its trigger; keep it there once the header
+    // has re-rendered with the new assignee.
+    this.focusAfterRender('[data-testid="assignee"]');
   }
 
-  /** A reply the composer stored: on screen at once, without waiting for the re-read. */
+  /**
+   * A reply the composer stored: on screen at once, without waiting for the re-read.
+   *
+   * The reply's response names no author (`sentBy: null`, 39.1 decision 8), and
+   * only a transcript read does. Until that re-read replaces it, the reply is
+   * the signed-in member's own, so it carries their name: never an empty author.
+   */
   protected onSent(message: TranscriptMessage): void {
-    this.messages.update((current) => mergeMessages(current, [message]));
+    const user = this.auth.user();
+    const own: TranscriptMessage =
+      message.sentBy === null && message.sender === 'HumanAgent' && user
+        ? {
+            ...message,
+            sentBy: { userId: user.id, email: user.email, displayName: user.displayName ?? null },
+          }
+        : message;
+
+    this.messages.update((current) => mergeMessages(current, [own]));
     // The server has already marked it read for whoever sent it.
     this.lastRead = Math.max(this.lastRead ?? -1, message.sequence);
   }

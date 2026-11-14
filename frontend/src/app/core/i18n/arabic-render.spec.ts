@@ -298,13 +298,88 @@ describe('Arabic renders', () => {
       await fixture.whenStable();
 
       const root = fixture.nativeElement as HTMLElement;
+      // The words of each line; its time follows them (39.4b).
       const event = (kind: string) =>
-        text(root.querySelector(`[data-testid="transcript-event-${kind}"]`));
+        text(
+          root.querySelector(
+            `[data-testid="transcript-event-${kind}"] .event-words > span:first-child`,
+          ),
+        );
 
       expect(event('AiTurnFailed')).toBe('تعذّر على الذكاء الاصطناعي الرد');
       expect(event('TakenOver')).toBe('استلام المحادثة: sam@acme.test');
       expect(event('ReturnedToAi')).toBe('إعادة المحادثة إلى الذكاء الاصطناعي: sam@acme.test');
       expect(text(root.querySelector('[data-testid="transcript-start"]'))).toBe('بداية المحادثة');
+    });
+
+    it('writes the thread in Arabic: a colleague by display name, the waiting line, no gendered verb (39.4b)', async () => {
+      const { ConversationTranscript } =
+        await import('@app/features/conversations/conversation-transcript/conversation-transcript');
+      const fixture = TestBed.createComponent(ConversationTranscript);
+      const at = '2026-10-18T10:00:00Z';
+      const sara = { userId: 'u2', email: 'sara@acme.test', displayName: 'سارة' };
+
+      fixture.componentRef.setInput('conversationId', 'c1');
+      fixture.componentRef.setInput('handling', 'Ai');
+      fixture.componentRef.setInput('messages', [
+        { id: 'm1', sender: 'Customer', text: 'مرحبا', sentAt: at, sequence: 1, sentBy: null },
+        { id: 'm2', sender: 'HumanAgent', text: 'أهلًا', sentAt: at, sequence: 2, sentBy: sara },
+        { id: 'm3', sender: 'Customer', text: 'شكرًا', sentAt: at, sequence: 3, sentBy: null },
+      ]);
+      fixture.componentRef.setInput('events', [
+        { id: 'e1', kind: 'TakenOver', at, afterSequence: 1, actor: sara, reason: null },
+      ]);
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      const root = fixture.nativeElement as HTMLElement;
+      const author = root.querySelector('[data-testid="message-author"]');
+
+      expect(text(author)).toBe('سارة');
+      expect(author?.getAttribute('dir')).toBe('auto');
+      expect(
+        text(
+          root.querySelector(
+            '[data-testid="transcript-event-TakenOver"] .event-words > span:first-child',
+          ),
+        ),
+      ).toBe('استلام المحادثة: سارة');
+      expect(text(root.querySelector('[data-testid="awaiting-ai"]'))).toBe(
+        'لم يردّ الذكاء الاصطناعي على الرسالة الأخيرة بعد.',
+      );
+      expect(root.textContent).not.toContain('تتولا');
+    });
+
+    it('writes the customer panel in Arabic, with the date in Western digits (39.4b)', async () => {
+      const { ConversationContext } =
+        await import('@app/features/conversations/conversation-context/conversation-context');
+      const fixture = TestBed.createComponent(ConversationContext);
+
+      fixture.componentRef.setInput('conversation', {
+        id: 'c1',
+        channel: 'WebChat',
+        status: 'Open',
+        handling: 'Ai',
+        startedAt: '2026-09-07T10:00:00Z',
+        lastActivityAt: '2026-09-07T10:05:00Z',
+        agentName: 'المساعد',
+        messageCount: 2,
+        assignedTo: null,
+        customer: { ...customer },
+        lastReadSequence: null,
+        unread: false,
+        takenOverBy: null,
+        needsPerson: false,
+        needsPersonReason: null,
+      });
+      fixture.detectChanges();
+
+      const root = fixture.nativeElement as HTMLElement;
+
+      expect(text(root.querySelector('[data-testid="customer-channel"]'))).toBe('دردشة الموقع');
+      expect(text(root.querySelector('[data-testid="context-assignee"]'))).toBe('لا أحد');
+      expect(root.textContent).toContain('القناة');
+      expect(root.textContent).not.toMatch(/[\u0660-\u0669]/);
     });
 
     it('writes the needs-a-person words in Arabic', async () => {

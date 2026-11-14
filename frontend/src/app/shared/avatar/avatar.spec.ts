@@ -26,13 +26,20 @@ describe('initialsOf', () => {
 
 @Component({
   imports: [Avatar],
-  template: `<app-avatar [name]="name()" [text]="text()" [channel]="channel()" [size]="size()" />`,
+  template: `<app-avatar
+    [name]="name()"
+    [text]="text()"
+    [channel]="channel()"
+    [size]="size()"
+    [tone]="tone()"
+  />`,
 })
 class Host {
   readonly name = signal('Layla Haddad');
   readonly text = signal('');
   readonly channel = signal('WhatsApp');
-  readonly size = signal<'sm' | 'md' | 'lg'>('md');
+  readonly tone = signal<'customer' | 'member'>('customer');
+  readonly size = signal<'xs' | 'sm' | 'md' | 'lg'>('md');
 }
 
 describe('Avatar', () => {
@@ -85,5 +92,25 @@ describe('Avatar', () => {
     fixture.detectChanges();
 
     expect(host().querySelector('.avatar-letters')?.textContent?.trim()).toBe('س');
+  });
+
+  it("draws a colleague beside a team reply at the orb's size, in the team's gold (39.4b)", () => {
+    const { fixture, host } = setup();
+
+    fixture.componentInstance.size.set('xs');
+    fixture.componentInstance.tone.set('member');
+    fixture.componentInstance.channel.set('');
+    fixture.detectChanges();
+
+    expect(host().classList).toContain('avatar-xs');
+    expect(host().classList).toContain('avatar-member');
+    expect(host().querySelector('.avatar-badge')).toBeNull();
+  });
+
+  it('is a customer on cream unless told otherwise', () => {
+    const { host } = setup();
+
+    expect(host().classList).not.toContain('avatar-member');
+    expect(host().classList).not.toContain('avatar-xs');
   });
 });

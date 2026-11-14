@@ -62,6 +62,8 @@ export function initialsOf(name: string): string {
     'aria-hidden': 'true',
     '[class.avatar-sm]': "size() === 'sm'",
     '[class.avatar-lg]': "size() === 'lg'",
+    '[class.avatar-xs]': "size() === 'xs'",
+    '[class.avatar-member]': "tone() === 'member'",
   },
   template: `
     <span class="avatar-letters" dir="auto">{{ letters() }}</span>
@@ -96,6 +98,18 @@ export function initialsOf(name: string): string {
       inline-size: var(--avatar-size-lg);
       block-size: var(--avatar-size-lg);
       font-size: 1.25rem;
+    }
+
+    /* Beside a team reply in a thread: the orb's size, in the team's gold. */
+    :host(.avatar-xs) {
+      inline-size: var(--orb-size);
+      block-size: var(--orb-size);
+      font-size: 0.625rem;
+    }
+
+    :host(.avatar-member) {
+      background-color: var(--member-avatar-bg);
+      color: var(--member-avatar-fg);
     }
 
     .avatar-badge {
@@ -143,7 +157,11 @@ export class Avatar {
   /** The channel badge; none when empty or unknown. */
   readonly channel = input('');
 
-  readonly size = input<'sm' | 'md' | 'lg'>('md');
+  /** `xs` (26px, the orb's size) beside a team reply; `sm` 34px; `md` 40px; `lg` 64px. */
+  readonly size = input<'xs' | 'sm' | 'md' | 'lg'>('md');
+
+  /** `member`: a colleague, in the team's gold; `customer` (default) on cream. */
+  readonly tone = input<'customer' | 'member'>('customer');
 
   protected readonly letters = computed(() => this.text() || initialsOf(this.name()));
 

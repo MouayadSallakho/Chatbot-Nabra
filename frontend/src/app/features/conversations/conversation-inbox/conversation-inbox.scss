@@ -30,9 +30,10 @@
 // Side by side from 1280px (board Inbox, calm-glass.md §7): solid panels on the
 // ground, 12px apart and 14px from the window's edges (the side bar keeps its
 // own 12px on the start side). The list column is about 350px; the open
-// conversation takes the rest, with the customer panel inside it. Each panel
-// scrolls on its own (`.page-fills-content` in _primitives.scss), so the list
-// never scrolls away from the conversation beside it.
+// conversation takes the rest, and draws its own panels in it: the thread and
+// the customer panel (39.4b), or the placeholder. Each panel scrolls on its
+// own (`.page-fills-content` in _primitives.scss), so the list never scrolls
+// away from the conversation beside it.
 .inbox.is-panes {
   display: grid;
   grid-template-columns: var(--inbox-list-width) minmax(0, 1fr);
@@ -50,12 +51,5 @@
 
   app-conversation-list {
     block-size: 100%;
-  }
-
-  .inbox-detail-pane {
-    border: 1px solid var(--color-line);
-    border-radius: var(--radius-panel);
-    background-color: var(--color-panel);
-    overflow: clip;
   }
 }

@@ -1,5 +1,65 @@
-@if (!canView() || loading() || failure() || !conversation()) {
-  <!-- Every state before the conversation itself: one frame, the same heading. -->
+@if (canView() && loading()) {
+  <!--
+    The real layout's shapes (Phase 38 note 11): the thread's header with its
+    title, facts line and handling row; three bubbles (the business's with its
+    orb); the composer; and beside it from 1280px the customer panel's avatar,
+    lines and tiles.
+  -->
+  <div
+    class="conversation is-loading"
+    [class.is-panes]="panes()"
+    [class.is-fill]="fill()"
+    aria-busy="true"
+  >
+    <section class="conversation-main conversation-skeleton" data-testid="conversation-skeleton">
+      <h1 class="visually-hidden">{{ fallbackTitle }}</h1>
+      <p class="visually-hidden" role="status" i18n="@@conversation.loading">
+        Loading conversation…
+      </p>
+      <div class="conversation-header skeleton-header">
+        @if (!panes()) {
+          <a class="conversation-back" href="/conversations" (click)="goBack($event)">
+            <app-icon name="arrow-start" [strokeWidth]="1.75" />
+            <span
+              ><span class="visually-hidden" i18n="@@pageHeader.backTo">Back to </span
+              ><span i18n="@@back.conversations">Conversations</span></span
+            >
+          </a>
+        }
+        <span class="skeleton skeleton-title" aria-hidden="true"></span>
+        <span class="skeleton skeleton-text skeleton-meta" aria-hidden="true"></span>
+        <span class="skeleton-row" aria-hidden="true">
+          <span class="skeleton skeleton-chip"></span>
+          <span class="skeleton skeleton-action"></span>
+        </span>
+      </div>
+      <div class="skeleton-transcript" aria-hidden="true">
+        <span class="skeleton skeleton-bubble"></span>
+        <span class="skeleton-row skeleton-end">
+          <span class="skeleton skeleton-bubble"></span>
+          <span class="skeleton skeleton-orb"></span>
+        </span>
+        <span class="skeleton skeleton-bubble skeleton-bubble-short"></span>
+      </div>
+      <div class="conversation-footer skeleton-footer" aria-hidden="true">
+        <span class="skeleton skeleton-composer"></span>
+      </div>
+    </section>
+
+    @if (panes() && detailsOpen()) {
+      <div class="conversation-details skeleton-panel" aria-hidden="true">
+        <span class="skeleton skeleton-avatar-lg"></span>
+        <span class="skeleton skeleton-text skeleton-name"></span>
+        <span class="skeleton skeleton-text skeleton-since"></span>
+        <span class="skeleton-tiles">
+          <span class="skeleton skeleton-tile"></span>
+          <span class="skeleton skeleton-tile"></span>
+        </span>
+      </div>
+    }
+  </div>
+} @else if (!canView() || failure() || !conversation()) {
+  <!-- Every other state before the conversation itself: one frame, the same heading. -->
   <div class="conversation-state" [class.is-panes]="panes() && canView()">
     <!-- A way back whenever the list is not beside this pane. -->
     @if (!panes() || !canView()) {
@@ -22,20 +82,6 @@
           description="Reading what customers said to this workspace needs a permission your roles do not include. Ask somebody who administers this workspace if you need it."
           i18n-description="@@inbox.denied.body"
         />
-      </div>
-    } @else if (loading()) {
-      <!-- The real layout's shapes: title, meta, the handling bar, then bubbles. -->
-      <div class="conversation-skeleton" aria-busy="true">
-        <h1 class="visually-hidden">{{ fallbackTitle }}</h1>
-        <p class="visually-hidden" role="status" i18n="@@conversation.loading">
-          Loading conversation…
-        </p>
-        <span class="skeleton skeleton-title" aria-hidden="true"></span>
-        <span class="skeleton skeleton-text skeleton-meta" aria-hidden="true"></span>
-        <span class="skeleton skeleton-bar" aria-hidden="true"></span>
-        <span class="skeleton skeleton-bubble" aria-hidden="true"></span>
-        <span class="skeleton skeleton-bubble skeleton-bubble-end" aria-hidden="true"></span>
-        <span class="skeleton skeleton-bubble" aria-hidden="true"></span>
       </div>
     } @else if (failure(); as error) {
       <h1 class="text-page-title">{{ fallbackTitle }}</h1>
@@ -119,17 +165,18 @@
             @if (!compact() || detailsOpen()) {
               <button
                 type="button"
-                class="btn btn-ghost btn-sm"
+                class="btn btn-quiet btn-sm btn-icon"
                 (click)="refresh()"
                 data-testid="refresh-conversation"
               >
                 <app-icon name="refresh" [strokeWidth]="1.75" />
-                <span class="visually-hidden-narrow" i18n="@@inbox.refresh">Refresh</span>
+                <span class="visually-hidden" i18n="@@inbox.refresh">Refresh</span>
               </button>
             }
             <button
               type="button"
-              class="btn btn-secondary btn-sm"
+              class="btn btn-quiet btn-sm details-toggle"
+              [class.is-open]="detailsOpen()"
               [attr.aria-expanded]="detailsOpen()"
               aria-controls="conversation-details"
               (click)="toggleDetails()"
@@ -142,74 +189,131 @@
         </div>
 
         <!--
-          On a phone the bar, its action and its help are the facts that open
+          On a phone the bar, its actions and its help are the facts that open
           on demand (Phase 38 note 5); everywhere else they are always shown.
         -->
         @if (!compact() || detailsOpen()) {
           <!--
-            The handoff moment. Who is answering, as a voice chip (glyph and word)
-            and a sentence, beside the one action that changes it. When it changes,
-            the chip sweeps to the new voice: 320 ms, emphasized, instant under
-            reduced motion.
+            The handoff moment (board Inbox). Who is answering, as a voice chip
+            that says it in words, and who handles it beside the chip (Phase 38
+            note 14), then the actions that change it: Take over or Return to
+            AI, and Assign. When it changes, the chip sweeps to the new voice:
+            280 ms, instant under reduced motion.
           -->
           <div class="handling-bar" data-testid="handling">
-            @if (!compact()) {
-              <span
-                class="handling-chip"
-                [class.is-sweeping]="sweep() !== null"
-                [class.from-ai]="sweep() === 'human'"
-                [class.from-human]="sweep() === 'ai'"
-                (animationend)="endSweep()"
-              >
-                <app-voice-chip [voice]="voice()" />
-              </span>
-            }
-            <!-- On a phone the chip says it; the sentence stays for a screen reader. -->
-            <span class="handling-sentence visually-hidden-narrow">{{ handlingText() }}</span>
-            <!--
-              Who took it over (Phase 38.8, BA-2). Nothing when nobody is named: AI
-              mode, or a takeover from before Phase 37.4.
-            -->
-            @if (current.takenOverBy; as member) {
-              <span class="handling-who" data-testid="handled-by" i18n="@@conversation.handledBy"
-                >Handled by <bdi dir="ltr">{{ member.email }}</bdi></span
-              >
-            }
-
-            @if (canHandoff()) {
-              @if (isHuman()) {
-                <button
-                  type="button"
-                  class="btn btn-secondary handling-action"
-                  [class.btn-loading]="working()"
-                  [attr.aria-busy]="working() || null"
-                  [disabled]="working()"
-                  aria-describedby="handling-help"
-                  (click)="returnToAi()"
-                  data-testid="return-to-ai"
+            <div class="handling-state">
+              @if (!compact()) {
+                <span
+                  class="handling-chip"
+                  [class.is-sweeping]="sweep() !== null"
+                  [class.from-ai]="sweep() === 'human'"
+                  [class.from-human]="sweep() === 'ai'"
+                  (animationend)="endSweep()"
                 >
-                  <span class="btn-label" i18n="@@conversation.returnToAi">Return to AI</span>
-                  @if (working()) {
-                    <span class="spinner" aria-hidden="true"></span>
-                  }
-                </button>
-              } @else {
-                <button
-                  type="button"
-                  class="btn btn-primary handling-action"
-                  [class.btn-loading]="working()"
-                  [attr.aria-busy]="working() || null"
-                  [disabled]="working()"
-                  aria-describedby="handling-help"
-                  (click)="takeOver()"
-                  data-testid="take-over"
-                >
-                  <span class="btn-label" i18n="@@conversation.takeOver">Take over</span>
-                  @if (working()) {
-                    <span class="spinner" aria-hidden="true"></span>
-                  }
-                </button>
+                  <app-voice-chip [voice]="voice()" [label]="handlingText()" />
+                </span>
               }
+              <!--
+                Who took it over (Phase 38.8, BA-2), by display name (39.1) or
+                email. Nothing when nobody is named: AI mode, or a takeover from
+                before Phase 37.4.
+              -->
+              @if (handler(); as member) {
+                <span class="handling-who" data-testid="handled-by" i18n="@@conversation.handledBy"
+                  >Handled by
+                  <bdi [attr.dir]="member.isEmail ? 'ltr' : 'auto'">{{ member.text }}</bdi></span
+                >
+              }
+            </div>
+
+            @if (canHandoff() || canAssign()) {
+              <div class="handling-actions">
+                @if (canHandoff()) {
+                  @if (isHuman()) {
+                    <button
+                      type="button"
+                      class="btn btn-secondary btn-sm handling-action"
+                      [class.btn-loading]="working()"
+                      [attr.aria-busy]="working() || null"
+                      [disabled]="working()"
+                      aria-describedby="handling-help"
+                      (click)="returnToAi()"
+                      data-testid="return-to-ai"
+                    >
+                      <span class="btn-label" i18n="@@conversation.returnToAi">Return to AI</span>
+                      @if (working()) {
+                        <span class="spinner" aria-hidden="true"></span>
+                      }
+                    </button>
+                  } @else {
+                    <button
+                      type="button"
+                      class="btn btn-primary btn-sm handling-action"
+                      [class.btn-loading]="working()"
+                      [attr.aria-busy]="working() || null"
+                      [disabled]="working()"
+                      aria-describedby="handling-help"
+                      (click)="takeOver()"
+                      data-testid="take-over"
+                    >
+                      <span class="btn-label" i18n="@@conversation.takeOver">Take over</span>
+                      @if (working()) {
+                        <span class="spinner" aria-hidden="true"></span>
+                      }
+                    </button>
+                  }
+                }
+
+                @if (canAssign()) {
+                  <!--
+                    Routing, as a menu of the people who can reply (the current
+                    one checked), "Nobody" first. A conditional write like the
+                    handoff; a stale one is refused, never retried.
+                  -->
+                  <app-menu
+                    class="assign-menu"
+                    triggerClass="btn btn-secondary btn-sm assign-trigger"
+                    triggerTestId="assignee"
+                    placement="end"
+                  >
+                    <span menuTrigger class="assign-trigger-label">
+                      <app-icon name="person" [strokeWidth]="1.75" />
+                      <span i18n="@@conversation.assign">Assign</span>
+                    </span>
+                    <p class="menu-label" role="presentation">{{ assignedToLabel }}</p>
+                    <button
+                      type="button"
+                      class="menu-item"
+                      role="menuitemradio"
+                      [attr.aria-checked]="current.assignedTo === null"
+                      (click)="assign(null)"
+                      data-testid="assign-nobody"
+                    >
+                      <span i18n="@@conversation.nobody">Nobody</span>
+                      @if (current.assignedTo === null) {
+                        <app-icon class="menu-check" name="check" [strokeWidth]="2" />
+                      }
+                    </button>
+                    @for (option of assignOptions(); track option.userId) {
+                      <button
+                        type="button"
+                        class="menu-item"
+                        role="menuitemradio"
+                        [attr.aria-checked]="current.assignedTo?.userId === option.userId"
+                        (click)="assign(option.userId)"
+                        [attr.data-testid]="'assign-' + option.userId"
+                      >
+                        <bdi [attr.dir]="option.name.isEmail ? 'ltr' : 'auto'">{{
+                          option.name.text
+                        }}</bdi>
+                        @if (current.assignedTo?.userId === option.userId) {
+                          <app-icon class="menu-check" name="check" [strokeWidth]="2" />
+                        }
+                      </button>
+                    }
+                  </app-menu>
+                }
+              </div>
             }
           </div>
 
@@ -282,10 +386,7 @@
           <app-conversation-context
             [conversation]="current"
             [whatsApp]="whatsAppFacts()"
-            [assignees]="assignees()"
             [canAssign]="canAssign()"
-            [working]="working()"
-            (assign)="assign($event)"
           />
         </aside>
       }
@@ -300,6 +401,7 @@
         (earlierRequested)="loadEarlier()"
         (newestSeen)="markRead($event)"
         [handling]="current.handling"
+        [needsPersonReason]="current.needsPersonReason"
         [agentName]="current.agentName"
         [whatsApp]="whatsAppFacts()"
         [scrollRegion]="fill()"
@@ -340,10 +442,7 @@
         <app-conversation-context
           [conversation]="current"
           [whatsApp]="whatsAppFacts()"
-          [assignees]="assignees()"
           [canAssign]="canAssign()"
-          [working]="working()"
-          (assign)="assign($event)"
         />
       </aside>
     }

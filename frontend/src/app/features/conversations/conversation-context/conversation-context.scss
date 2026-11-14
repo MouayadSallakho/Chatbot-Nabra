@@ -1,67 +1,201 @@
-// A column of short sections from 1280px, a card under the header below it.
+// The customer panel (board Inbox): 20px inside its panel from 1280px, 18px
+// between its parts; on demand above the transcript below 1280px.
 :host {
-  display: grid;
-  align-content: start;
-  gap: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: 1.125rem;
   padding: var(--space-5);
 }
 
-.context-title {
-  font: var(--text-card-title);
-}
-
-.context-section {
-  display: grid;
-  justify-items: start;
+// The customer, centred: a 64px avatar, the label, then quiet lines.
+.customer-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   gap: var(--space-2);
-  padding-block-start: var(--space-4);
-  border-block-start: 1px solid var(--border-subtle);
+  text-align: center;
 }
 
-.context-heading {
-  color: var(--text-secondary);
-  font: var(--text-caption);
-
-  label {
-    font: inherit;
-  }
-}
-
-.context-value {
+.customer-name {
   margin: 0;
-  font: var(--text-body);
+  font: var(--text-title-3);
   overflow-wrap: anywhere;
 }
 
-.context-hint {
+.customer-line {
   margin: 0;
-  color: var(--text-muted);
-  font: var(--text-small);
+  color: var(--color-text-quiet);
+  font: var(--text-caption);
+  font-variant-numeric: tabular-nums;
 }
 
-.select {
-  inline-size: 100%;
-}
-
-.context-facts {
+// Two tiles on panel-soft, 10px apart (board Inbox).
+.customer-tiles {
   display: grid;
-  gap: var(--space-3);
-  inline-size: 100%;
+  grid-template-columns: repeat(auto-fit, minmax(6.5rem, 1fr));
+  gap: 0.625rem;
   margin: 0;
+}
 
-  div {
-    display: grid;
-    gap: var(--gap-hairline);
-  }
+.customer-tile {
+  display: grid;
+  align-content: start;
+  gap: var(--space-1);
+  min-inline-size: 0;
+  padding: var(--space-3);
+  border-radius: var(--radius-tile);
+  background-color: var(--color-panel-soft);
 
   dt {
-    color: var(--text-muted);
+    color: var(--color-text-quiet);
     font: var(--text-caption);
   }
 
   dd {
     margin: 0;
-    font: var(--text-body);
+    font: var(--text-label);
+    font-weight: 600;
+    overflow-wrap: anywhere;
+  }
+
+  // Forced colours drop the fill: the tile keeps an edge.
+  @media (forced-colors: active) {
+    border: 1px solid CanvasText;
+  }
+}
+
+.customer-tiles .customer-figure {
+  font: var(--text-title-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.context-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.context-heading {
+  color: var(--color-text-secondary);
+  font: var(--text-label);
+  font-weight: 600;
+}
+
+.context-hint {
+  margin: 0;
+  color: var(--color-text-quiet);
+  font: var(--text-small);
+}
+
+.context-retry {
+  align-self: flex-start;
+}
+
+.earlier-list {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+// An earlier conversation: a panel-soft row, the channel and status at the
+// start, the date at the end.
+.earlier-row {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-block-size: var(--control-height-sm);
+  align-items: center;
+  padding: 0.625rem var(--space-3);
+  border-radius: var(--radius-input);
+  background-color: var(--color-panel-soft);
+  color: var(--color-text);
+  font: var(--text-small);
+  text-decoration: none;
+  transition: background-color var(--duration-press) var(--ease-calm);
+
+  &:hover {
+    background-color: var(--color-hover);
+  }
+
+  @media (pointer: coarse) {
+    min-block-size: var(--target-min);
+  }
+
+  @media (forced-colors: active) {
+    border: 1px solid LinkText;
+  }
+}
+
+.earlier-what {
+  min-inline-size: 0;
+  overflow-wrap: anywhere;
+}
+
+.earlier-when {
+  flex: none;
+  color: var(--color-text-quiet);
+  font-variant-numeric: tabular-nums;
+}
+
+.earlier-skeleton {
+  block-size: var(--control-height-sm);
+  border-radius: var(--radius-input);
+}
+
+// A line of small text, and a figure in its tile, at their real heights.
+.line-skeleton {
+  block-size: 1lh;
+  inline-size: 70%;
+  font: var(--text-small);
+}
+
+.since-skeleton {
+  inline-size: 55%;
+  font: var(--text-caption);
+}
+
+.figure-skeleton {
+  display: block;
+  block-size: 1lh;
+  inline-size: 2rem;
+}
+
+.context-link {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  min-block-size: var(--control-height-sm);
+  color: var(--color-link);
+  font: var(--text-label);
+
+  @media (pointer: coarse) {
+    min-block-size: var(--target-min);
+  }
+}
+
+.context-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+
+  div {
+    display: grid;
+    gap: var(--gap-hairline);
+    min-inline-size: 0;
+  }
+
+  dt {
+    color: var(--color-text-quiet);
+    font: var(--text-caption);
+  }
+
+  dd {
+    margin: 0;
+    font: var(--text-small);
     font-variant-numeric: tabular-nums;
+    overflow-wrap: anywhere;
   }
 }

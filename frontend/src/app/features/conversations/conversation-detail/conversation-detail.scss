@@ -4,9 +4,9 @@
 }
 
 // Filling the screen (`is-fill`): the transcript scrolls between the header and
-// the composer. From 1280px (`is-panes`) the details panel sits beside it. On a
-// short screen neither applies: the conversation scrolls as a page, with the
-// composer stuck to the bottom of the content area.
+// the composer. From 1280px (`is-panes`) the thread and the customer panel are
+// two solid panels, 12px apart (board Inbox). On a short screen neither
+// applies: the conversation scrolls as a page, the composer stuck to the bottom.
 .conversation.is-fill {
   display: flex;
   flex-direction: column;
@@ -29,23 +29,32 @@
 .conversation.is-panes {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--column-gap);
+
+  > .conversation-main,
+  > .conversation-details {
+    min-block-size: 0;
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-panel);
+    background-color: var(--color-panel);
+    overflow: clip;
+  }
 }
 
 .conversation-header,
 .conversation-footer {
   padding: var(--space-4) var(--page-gutter);
-  background-color: var(--surface-default);
+  background-color: var(--color-panel);
 }
 
-.is-panes .conversation-header,
-.is-panes .conversation-footer {
+.is-panes .conversation-header {
   padding-inline: var(--space-5);
 }
 
 .conversation-header {
   display: grid;
   gap: var(--space-3);
-  border-block-end: 1px solid var(--border-default);
+  border-block-end: 1px solid var(--color-line);
 }
 
 .conversation-back {
@@ -54,9 +63,14 @@
   justify-self: start;
   gap: var(--space-1);
   min-block-size: 1.75rem;
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
   font: var(--text-label);
   text-decoration: none;
+
+  // A touch screen gets the full 44px target (calm-glass.md §6).
+  @media (pointer: coarse) {
+    min-block-size: var(--target-min);
+  }
 
   .icon {
     inline-size: var(--icon-size-sm);
@@ -66,145 +80,115 @@
 
 .conversation-title-row {
   display: flex;
-  flex-wrap: wrap;
   align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-2) var(--space-4);
+  gap: var(--space-2) var(--space-3);
 }
 
-// Takes the room the tools leave, so a long facts line wraps under the title
-// instead of pushing the tools onto a row of their own.
+// Takes the room the tools leave; a long facts line wraps under the title.
 .conversation-title-text {
-  flex: 1 1 12rem;
+  flex: 1 1 0;
   min-inline-size: 0;
 }
 
 .conversation-title {
-  font: var(--text-section-title);
+  font: var(--text-title-2);
   overflow-wrap: anywhere;
 }
 
 .conversation-meta {
-  margin: var(--space-1) 0 0;
-  color: var(--text-secondary);
-  font: var(--text-small);
+  margin: var(--gap-hairline) 0 0;
+  color: var(--color-text-quiet);
+  font: var(--text-caption);
+  font-weight: 400;
   font-variant-numeric: tabular-nums;
 }
 
 .conversation-tools {
   display: flex;
-  gap: var(--space-2);
+  flex: none;
+  gap: var(--space-1);
 }
 
-// The handoff moment: the voice chip, the sentence, the one action.
-.handling-bar {
+.details-toggle.is-open {
+  background-color: var(--color-panel-soft);
+}
+
+// The handoff moment: who answers and who handles it at the start, the
+// actions at the end; they wrap under each other in a narrow pane.
+.handling-bar,
+.handling-state,
+.handling-actions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2) var(--space-3);
-
-  .handling-action {
-    margin-inline-start: auto;
-  }
 }
 
-.handling-sentence {
-  font: var(--text-body-strong);
+.handling-bar {
+  justify-content: space-between;
 }
 
-// Who took it over: secondary, like the meta line, and free to wrap a long email.
+.handling-state {
+  min-inline-size: 0;
+}
+
+.handling-actions {
+  gap: var(--space-2);
+  margin-inline-start: auto;
+}
+
+// Who handles it: beside the chip, secondary, free to wrap a long email.
 .handling-who {
   min-inline-size: 0;
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
   font: var(--text-small);
   overflow-wrap: anywhere;
 }
 
+.assign-trigger-label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
 .handling-help {
   margin: calc(-1 * var(--space-1)) 0 0;
-  color: var(--text-muted);
+  color: var(--color-text-quiet);
   font: var(--text-small);
-}
-
-// The sweep: the new voice's chip wipes in from the reading start over the
-// old voice's tint, 320 ms on the emphasized curve. Under reduced motion the
-// duration tokens collapse, so the change is instant and still complete.
-.handling-chip {
-  display: inline-flex;
-  border-radius: var(--radius-pill);
-
-  &.from-ai {
-    background-color: var(--voice-ai-tint);
-  }
-
-  &.from-human {
-    background-color: var(--voice-human-tint);
-  }
-
-  &.is-sweeping app-voice-chip {
-    animation: handoff-sweep var(--duration-lg) var(--ease-emphasized);
-  }
-}
-
-@keyframes handoff-sweep {
-  from {
-    clip-path: inset(0 100% 0 0 round 999px);
-  }
-
-  to {
-    clip-path: inset(0 0 0 0 round 999px);
-  }
-}
-
-@keyframes handoff-sweep-rtl {
-  from {
-    clip-path: inset(0 0 0 100% round 999px);
-  }
-
-  to {
-    clip-path: inset(0 0 0 0 round 999px);
-  }
-}
-
-:host-context([dir='rtl']) .handling-chip.is-sweeping app-voice-chip {
-  animation-name: handoff-sweep-rtl;
 }
 
 .conversation-alert {
   margin: 0;
 }
 
+// The customer panel: 264px beside the thread from 1280px; on demand above
+// the transcript below it.
 .conversation-details {
-  inline-size: clamp(17rem, 20vw, 21rem);
-  min-block-size: 0;
+  inline-size: var(--customer-panel-width);
   overflow-y: auto;
-  border-inline-start: 1px solid var(--border-default);
-  background-color: var(--surface-default);
 
   &.is-inline {
     inline-size: auto;
-    border-inline-start: 0;
-    border-block-end: 1px solid var(--border-default);
+    border-block-end: 1px solid var(--color-line);
+    background-color: var(--color-panel);
   }
 }
 
-// Stuck to the bottom of the content area below 1280px; its own row above.
+// The composer's row (board Inbox: 14px 20px 18px), stuck to the bottom of
+// the content area below 1280px.
 .conversation-footer {
   position: sticky;
   inset-block-end: 0;
   z-index: var(--z-sticky);
   display: grid;
   gap: var(--space-3);
-  border-block-start: 1px solid var(--border-default);
+  padding-block: 0.875rem 1.125rem;
+  border-block-start: 1px solid var(--color-line);
 
   // Holding only the floating button, it takes no room of its own.
   &:not(:has(> :not(.new-messages))) {
     padding-block: 0;
     border-block-start: 0;
-  }
-
-  &:empty {
-    display: none;
   }
 }
 
@@ -220,11 +204,12 @@
 
 .composer-withheld {
   margin: 0;
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
   font: var(--text-small);
 }
 
-// Every state before the conversation: the same frame as the page.
+// Every state before the conversation: the same frame as the page; from
+// 1280px a panel of its own.
 .conversation-state {
   display: grid;
   align-content: start;
@@ -232,17 +217,11 @@
   padding: var(--space-6) var(--page-gutter);
 
   &.is-panes {
+    block-size: 100%;
     padding-inline: var(--space-5);
-  }
-}
-
-.conversation-skeleton {
-  display: grid;
-  gap: var(--space-3);
-
-  .skeleton-meta {
-    inline-size: 55%;
-    margin-block-end: var(--space-2);
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-panel);
+    background-color: var(--color-panel);
   }
 }
 
@@ -250,16 +229,16 @@
 // The one-line header on a phone (Phase 38 note 5, 39.3)
 // -----------------------------------------------------------------------------
 // Back, the customer, the handling chip and Details on one line; the facts
-// line, the handling bar with its action and help, and Refresh open with
+// line, the handling bar with its actions and help, and Refresh open with
 // Details, each on a line of its own. The flex layout itself comes from the
-// layout utilities bound in the template (`d-flex`, `flex-wrap`, `p-2`, ...); the back
-// link is an icon button there.
+// layout utilities bound in the template (`d-flex`, `flex-wrap`, `p-2`, ...).
 .is-compact .conversation-header > :not(.conversation-back, .conversation-title-row) {
   flex-basis: 100%;
 }
 
 .is-compact .conversation-title-row {
   flex: 1 1 0;
+  min-inline-size: 0;
 }
 
 // One line: the customer's label truncates, never the chip or the button.
