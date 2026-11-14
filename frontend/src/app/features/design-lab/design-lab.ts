@@ -7,6 +7,7 @@ import {
   signal,
 } from '@angular/core';
 import { ThemeService } from '@app/core/theme/theme-service';
+import { TransparencyService } from '@app/core/theme/transparency-service';
 import { THEME_LABELS, THEME_PREFERENCES, ThemePreference } from '@app/core/theme/theme';
 import { APP_LANGUAGE, directionOf } from '@app/core/i18n/language';
 import { LocalDatePipe } from '@app/core/i18n/locale-pipes';
@@ -106,76 +107,117 @@ interface SampleMessage {
 
 const COLOUR_GROUPS: readonly TokenGroup[] = [
   {
-    title: $localize`:@@lab.colour.surfaces:Surfaces`,
+    title: $localize`:@@lab.colour.grounds:Ground and panels`,
     tokens: [
-      '--surface-page',
-      '--surface-default',
-      '--surface-muted',
-      '--surface-raised',
-      '--surface-inset',
-      '--surface-hover',
-      '--surface-selected',
+      '--color-ground',
+      '--color-ground-visitor',
+      '--color-panel',
+      '--color-panel-soft',
+      '--color-panel-raised',
+      '--color-hover',
+      '--color-selected',
     ],
   },
   {
     title: $localize`:@@lab.colour.text:Text`,
-    tokens: ['--text-primary', '--text-secondary', '--text-muted'],
+    tokens: ['--color-text', '--color-text-secondary', '--color-text-quiet'],
   },
   {
-    title: $localize`:@@lab.colour.borders:Borders`,
-    tokens: ['--border-subtle', '--border-default', '--border-strong', '--border-control'],
+    title: $localize`:@@lab.colour.lines:Lines and control boundaries`,
+    tokens: ['--color-line', '--color-line-strong', '--color-control-border'],
   },
   {
-    title: $localize`:@@lab.colour.action:Action (ink)`,
+    title: $localize`:@@lab.colour.primary:Primary, links and focus (emerald)`,
     tokens: [
-      '--action',
-      '--action-hover',
-      '--action-pressed',
-      '--on-action',
-      '--link',
-      '--focus-ring',
-      '--selection',
+      '--color-primary',
+      '--color-primary-hover',
+      '--color-primary-pressed',
+      '--color-on-primary',
+      '--color-link',
+      '--color-focus-ring',
+      '--color-focus-halo',
+      '--color-selection',
     ],
   },
   {
-    title: $localize`:@@lab.colour.voiceAi:Voice: the AI (Lagoon)`,
-    tokens: ['--voice-ai-fg', '--voice-ai-strong', '--voice-ai-tint', '--voice-ai-border'],
+    title: $localize`:@@lab.colour.voice.ai:Voice: the AI (emerald)`,
+    tokens: [
+      '--voice-ai-bubble',
+      '--voice-ai-text',
+      '--voice-ai-label',
+      '--voice-ai-dot',
+      '--voice-ai-edge',
+    ],
   },
   {
-    title: $localize`:@@lab.colour.voiceHuman:Voice: a person (Ember)`,
+    title: $localize`:@@lab.colour.voice.team:Voice: the team (gold)`,
     tokens: [
-      '--voice-human-fg',
-      '--voice-human-strong',
-      '--voice-human-tint',
-      '--voice-human-border',
+      '--voice-team-bubble',
+      '--voice-team-text',
+      '--voice-team-label',
+      '--voice-team-dot',
+      '--voice-team-edge',
+    ],
+  },
+  {
+    title: $localize`:@@lab.colour.voice.customer:Voice: the customer (cream)`,
+    tokens: ['--voice-customer-bubble', '--voice-customer-text', '--voice-customer-own-bubble'],
+  },
+  {
+    title: $localize`:@@lab.colour.chips:Chips`,
+    tokens: [
+      '--chip-need-bg',
+      '--chip-need-fg',
+      '--chip-need-dot',
+      '--chip-ai-bg',
+      '--chip-ai-fg',
+      '--chip-ai-dot',
+      '--chip-failed-bg',
+      '--chip-failed-fg',
+      '--chip-failed-dot',
     ],
   },
   {
     title: $localize`:@@lab.colour.status:Status`,
     tokens: [
-      '--success-fg',
-      '--success-bg',
-      '--warning-fg',
-      '--warning-bg',
-      '--danger-fg',
-      '--danger-bg',
-      '--danger-solid',
-      '--info-fg',
-      '--info-bg',
+      '--status-success-fg',
+      '--status-success-bg',
+      '--status-warning-fg',
+      '--status-warning-bg',
+      '--status-danger-fg',
+      '--status-danger-bg',
+      '--status-danger-solid',
+      '--status-info-fg',
+      '--status-info-bg',
     ],
   },
   {
     title: $localize`:@@lab.colour.charts:Charts`,
     tokens: [
+      '--chart-current',
+      '--chart-previous',
       '--chart-ai',
-      '--chart-human',
+      '--chart-team',
+      '--chart-team-fill',
+      '--chart-channel-2',
       '--chart-customer',
       '--chart-neutral',
       '--chart-ramp-1',
-      '--chart-ramp-2',
       '--chart-ramp-3',
-      '--chart-ramp-4',
       '--chart-ramp-5',
+    ],
+  },
+  {
+    title: $localize`:@@lab.colour.glass:Glass and depth`,
+    tokens: [
+      '--glass-bg',
+      '--glass-solid-bg',
+      '--glass-border',
+      '--scrim',
+      '--glow-a',
+      '--glow-b',
+      '--channel-whatsapp',
+      '--channel-web',
     ],
   },
 ];
@@ -183,23 +225,20 @@ const COLOUR_GROUPS: readonly TokenGroup[] = [
 const SPACE_TOKENS = Array.from({ length: 10 }, (_, i) => `--space-${i + 1}`);
 
 const RADIUS_TOKENS = [
-  '--radius-badge',
-  '--radius-control',
-  '--radius-card',
-  '--radius-overlay',
+  '--radius-input',
+  '--radius-tile',
+  '--radius-panel',
   '--radius-bubble',
+  '--radius-pill',
 ] as const;
 
 const MOTION_TOKENS = [
-  '--duration-xs',
-  '--duration-sm',
-  '--duration-md',
-  '--duration-lg',
-  '--duration-xl',
-  '--ease-standard',
-  '--ease-enter',
-  '--ease-exit',
-  '--ease-emphasized',
+  '--duration-press',
+  '--duration-menu',
+  '--duration-dialog',
+  '--duration-fade',
+  '--ease-calm',
+  '--motion-travel',
 ] as const;
 
 /** Type roles, each with a Latin and an Arabic sample. */
@@ -207,6 +246,12 @@ const TYPE_ROLES = [
   {
     role: $localize`:@@lab.type.display:Display`,
     className: 'text-display',
+    latin: 'Good morning, Layla',
+    arabic: 'صباح الخير يا ليلى',
+  },
+  {
+    role: $localize`:@@lab.type.figure:Figure`,
+    className: 'text-figure',
     latin: '1,284',
     arabic: '1,284',
   },
@@ -378,6 +423,7 @@ export class DesignLab {
   private readonly document = inject(DOCUMENT);
   private readonly toasts = inject(ToastService);
   protected readonly theme = inject(ThemeService);
+  protected readonly transparency = inject(TransparencyService);
 
   protected readonly themes = THEME_PREFERENCES;
   protected readonly colourGroups = COLOUR_GROUPS;
@@ -579,6 +625,7 @@ export class DesignLab {
     afterRenderEffect({
       read: () => {
         this.theme.resolved();
+        this.transparency.reduced();
         this.direction();
         const style = getComputedStyle(this.document.documentElement);
         const names = [

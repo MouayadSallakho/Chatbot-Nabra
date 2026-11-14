@@ -2,7 +2,6 @@
 // comes from the global primitives and tokens, never from rules here.
 .lab {
   min-block-size: 100vh;
-  background-color: var(--surface-page);
 }
 
 .lab-main {
@@ -171,11 +170,17 @@ code {
   padding: var(--space-4);
 }
 
-.depth-overlay {
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-overlay);
-  background-color: var(--surface-raised);
-  box-shadow: var(--shadow-overlay);
+// The glass sample floats over the two glows, as the shell will (39.3).
+.glass-stage {
+  padding: var(--space-6);
+  border-radius: var(--radius-panel);
+  background:
+    radial-gradient(at 20% 20%, var(--glow-a), transparent 60%),
+    radial-gradient(at 80% 80%, var(--glow-b), transparent 60%);
+
+  > * {
+    border-radius: var(--radius-dialog);
+  }
 }
 
 .icon-sheet {
@@ -268,7 +273,6 @@ code {
 }
 
 .lockup-name {
-  font: var(--text-section-title);
-  font-stretch: var(--heading-stretch);
+  font: var(--text-title-2);
   letter-spacing: var(--letter-spacing-tight);
 }

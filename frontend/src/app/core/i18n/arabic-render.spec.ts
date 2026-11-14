@@ -636,6 +636,50 @@ describe('Arabic renders', () => {
     });
   });
 
+  describe("the account menu's appearance (Phase 39.2a)", () => {
+    it('offers «تقليل الشفافية» beside the theme, as a checkbox item that paints the setting', async () => {
+      const { LOCAL_STORAGE } = await import('@app/core/storage/local-storage');
+      const { MEDIA_QUERY_FACTORY, MediaQueries } = await import('@app/core/media/media');
+      const { FakeMediaMatcher, memoryStorage } = await import('@app/testing/test-doubles');
+      const { ProfileMenu } = await import('@app/layout/profile-menu/profile-menu');
+      TestBed.configureTestingModule({
+        providers: [
+          provideRouter([]),
+          { provide: LOCAL_STORAGE, useValue: memoryStorage() },
+          {
+            provide: MEDIA_QUERY_FACTORY,
+            useValue: new FakeMediaMatcher({ [MediaQueries.prefersDark]: false }).factory,
+          },
+        ],
+      });
+      const fixture = TestBed.createComponent(ProfileMenu);
+      fixture.componentRef.setInput('email', 'ada.owner@omniai.example');
+      document.body.appendChild(fixture.nativeElement);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      const root = fixture.nativeElement as HTMLElement;
+      root.querySelector<HTMLButtonElement>('[aria-haspopup="menu"]')!.click();
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      const item = root.querySelector<HTMLButtonElement>('[data-testid="reduce-transparency"]')!;
+      expect(text(item)).toBe('تقليل الشفافية');
+      expect(text(root.querySelector('#profile-theme-label'))).toBe('المظهر');
+      expect(item.getAttribute('role')).toBe('menuitemcheckbox');
+
+      expect(item.getAttribute('aria-checked')).toBe('false');
+      item.click();
+      fixture.detectChanges();
+      TestBed.tick();
+
+      expect(document.documentElement.getAttribute('data-transparency')).toBe('reduced');
+
+      document.documentElement.removeAttribute('data-transparency');
+      root.remove();
+    });
+  });
+
   describe('the 38.7 contracts (Phase 38.8)', () => {
     async function refuse(
       catalogue: Record<string, unknown>,

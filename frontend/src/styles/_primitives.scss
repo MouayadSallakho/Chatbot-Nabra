@@ -1291,6 +1291,8 @@ a.data-row:hover .data-row-chevron {
   border-color: var(--voice-ai-border);
   border-end-end-radius: var(--radius-bubble-tail);
   background-color: var(--voice-ai-tint);
+  // The time inside the bubble: quiet text is below 4.5:1 on the dark AI bubble.
+  --text-muted: var(--voice-ai-meta);
 
   .bubble-speaker {
     color: var(--voice-ai-strong);

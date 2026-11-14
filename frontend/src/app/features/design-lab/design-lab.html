@@ -5,9 +5,10 @@
         <app-brand-mark />
         <div>
           <h1 class="text-page-title" i18n="@@lab.title">Design Lab</h1>
-          <p class="text-small text-secondary" i18n="@@lab.intro">
-            "Two Voices", the whole system on one page. Development builds only. Every name, number
-            and message here is sample content, written for this page.
+          <p class="text-small text-secondary" i18n="@@lab.intro.calmGlass">
+            "Calm Glass": the tokens, type, glass and motion on one page; the components below take
+            the new colours through the tokens and are redrawn in the next step. Development builds
+            only. Every name, number and message here is sample content, written for this page.
           </p>
         </div>
       </div>
@@ -71,9 +72,9 @@
     <!-- Colour ----------------------------------------------------------- -->
     <section class="lab-section" id="lab-colour" aria-labelledby="lab-colour-title">
       <h2 id="lab-colour-title" class="text-section-title" i18n="@@lab.colour">Colour</h2>
-      <p class="section-note" i18n="@@lab.colour.note">
+      <p class="section-note" i18n="@@lab.colour.note.calmGlass">
         Values are read live from the page, so they are the ones this theme actually resolved.
-        Lagoon means the AI and Ember means a person; neither is ever decoration or status.
+        Emerald is the AI, gold is the team and cream is the customer; a voice is never decoration.
       </p>
 
       @for (group of colourGroups; track group.title) {
@@ -90,9 +91,9 @@
       }
 
       <h3 class="text-card-title" i18n="@@lab.colour.sideBySide">Voice and status, side by side</h3>
-      <p class="section-note" i18n="@@lab.colour.sideBySide.note">
-        Ember (a person) is orange, warning is a yellow amber, danger is crimson. Each carries its
-        own glyph and word, so none depends on its hue.
+      <p class="section-note" i18n="@@lab.colour.sideBySide.note.calmGlass">
+        Status words reuse the three hues, each with its own glyph and word, so none depends on its
+        hue. In the inbox and the transcript only the voice chips appear.
       </p>
       <div class="lab-row">
         <app-voice-chip voice="ai" />
@@ -107,9 +108,9 @@
     <!-- Type ------------------------------------------------------------- -->
     <section class="lab-section" id="lab-type" aria-labelledby="lab-type-title">
       <h2 id="lab-type-title" class="text-section-title" i18n="@@lab.type">Type</h2>
-      <p class="section-note" i18n="@@lab.type.note">
-        Instrument Sans (headings narrowed to 86%) and IBM Plex Sans Arabic, both self-hosted.
-        Figures are tabular and stay Western in both languages.
+      <p class="section-note" i18n="@@lab.type.note.calmGlass">
+        Geist and IBM Plex Sans Arabic for the interface, Instrument Serif for the display line, all
+        self-hosted. Figures are tabular and stay Western in both languages.
       </p>
 
       <div class="type-table">
@@ -154,14 +155,28 @@
       <h3 class="text-card-title" i18n="@@lab.shape.elevation">Elevation</h3>
       <div class="lab-row">
         <div class="card depth-sample">
-          <p class="text-small" i18n="@@lab.shape.card">A card: a hairline, no shadow.</p>
+          <p class="text-small" i18n="@@lab.shape.panel">A panel: solid, a 1px line, no shadow.</p>
         </div>
-        <div class="depth-sample depth-overlay">
-          <p class="text-small" i18n="@@lab.shape.overlay">
-            An overlay: the only thing that casts a shadow.
+      </div>
+
+      <h3 class="text-card-title" i18n="@@lab.shape.glass">Glass</h3>
+      <div class="glass-stage">
+        <div class="glass depth-sample" data-testid="glass-sample">
+          <p class="text-small" i18n="@@lab.shape.glassSample">
+            Glass: only where things float, and the only surface that casts a shadow. With "Reduce
+            transparency" it becomes its solid twin.
           </p>
         </div>
       </div>
+      <button
+        type="button"
+        class="btn btn-secondary btn-sm"
+        data-testid="lab-reduce-transparency"
+        [attr.aria-pressed]="transparency.reduced()"
+        (click)="transparency.setReduced(!transparency.reduced())"
+      >
+        <span i18n="@@account.reduceTransparency">Reduce transparency</span>
+      </button>
 
       <h3 class="text-card-title" i18n="@@lab.shape.motion">Motion</h3>
       <ul class="space-list">

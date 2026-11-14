@@ -1,23 +1,29 @@
 // =============================================================================
-// Fonts
+// Fonts (Calm Glass, Phase 39.2a)
 // =============================================================================
 //
-// Self-hosted, never fetched from a font service: the files live in
-// src/assets/fonts/ with their OFL texts, and because they are referenced from
-// here the build emits them as content-hashed media files, which the edge
-// caches for a year as immutable (deploy/edge: `.woff2` -> max-age=31536000).
+// Self-hosted, never fetched from a font service (CSP `font-src 'self'`). The
+// files live in public/fonts/ with their OFL texts beside them, all Fontsource
+// 5.3.0 builds (OFL-1.1):
 //
-//   Instrument Sans 5.3.0 (Fontsource build, OFL-1.1), variable wdth 75-100
-//   and wght 400-700, upright, Latin + Latin Extended: 57,332 + 18,856 bytes.
-//   IBM Plex Sans Arabic 5.3.0 (Fontsource build, OFL-1.1), 400/500/600,
-//   Arabic subset only: 42,848 + 45,296 + 45,688 bytes.
+//   Geist, variable wght 100-900, upright: Latin 29,400 B, Latin Extended
+//   16,512 B. Every Latin character in both languages, and the digits.
+//   IBM Plex Sans Arabic 400/500/600/700, Arabic subset only: 42,848 /
+//   45,296 / 45,688 / 44,280 B. 700 is for Arabic display only.
+//   Instrument Serif 400, upright: Latin 21,032 B, Latin Extended 11,604 B.
+//   The display accent (the overview greeting, empty-state lines, entry
+//   pages); never tables or forms.
+//
+// Why public/ and root-relative URLs: the build copies public/ as it is and
+// leaves a root-relative url() alone, so the file keeps its name. That is what
+// lets the pre-paint script in index.html preload the very same URL for the
+// page's language (one download, never two). The edge caches every .woff2 for
+// a year as immutable, so a changed file needs a new version in its name: the
+// next one is v2, as with nabra-icon.v1.
 //
 // Every face has a unicode-range, so a page only downloads the files whose
-// characters it actually renders: an English page fetches the 57 KB Latin file
-// and nothing else; the Arabic files arrive with the first Arabic character.
-//
-// No preload: Angular cannot write a hashed media name into index.html, and a
-// preload of an unhashed copy would download the same font twice.
+// characters it renders: an English page fetches geist-latin and nothing else
+// until Arabic text or the serif appears.
 // -----------------------------------------------------------------------------
 
 $latin-range:
@@ -32,37 +38,51 @@ $arabic-range:
   U+2010-2011, U+204F, U+2E41, U+FB50-FDFF, U+FE70-FE74, U+FE76-FEFC;
 
 @font-face {
-  font-family: 'Instrument Sans';
+  font-family: 'Geist';
   font-style: normal;
   font-display: swap;
-  font-weight: 400 700;
-  font-stretch: 75% 100%;
-  src: url('../assets/fonts/instrument-sans/instrument-sans-latin-wdth-normal.woff2')
-    format('woff2');
+  font-weight: 100 900;
+  src: url('/fonts/geist/geist-latin.v1.woff2') format('woff2');
   unicode-range: $latin-range;
 }
 
 @font-face {
-  font-family: 'Instrument Sans';
+  font-family: 'Geist';
   font-style: normal;
   font-display: swap;
-  font-weight: 400 700;
-  font-stretch: 75% 100%;
-  src: url('../assets/fonts/instrument-sans/instrument-sans-latin-ext-wdth-normal.woff2')
-    format('woff2');
+  font-weight: 100 900;
+  src: url('/fonts/geist/geist-latin-ext.v1.woff2') format('woff2');
   unicode-range: $latin-ext-range;
 }
 
-@each $weight in 400, 500, 600 {
+@each $weight in 400, 500, 600, 700 {
   @font-face {
     font-family: 'IBM Plex Sans Arabic';
     font-style: normal;
     font-display: swap;
     font-weight: $weight;
-    src: url('../assets/fonts/ibm-plex-sans-arabic/ibm-plex-sans-arabic-arabic-#{$weight}-normal.woff2')
+    src: url('/fonts/ibm-plex-sans-arabic/ibm-plex-sans-arabic-arabic-#{$weight}.v1.woff2')
       format('woff2');
     unicode-range: $arabic-range;
   }
+}
+
+@font-face {
+  font-family: 'Instrument Serif';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url('/fonts/instrument-serif/instrument-serif-latin.v1.woff2') format('woff2');
+  unicode-range: $latin-range;
+}
+
+@font-face {
+  font-family: 'Instrument Serif';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url('/fonts/instrument-serif/instrument-serif-latin-ext.v1.woff2') format('woff2');
+  unicode-range: $latin-ext-range;
 }
 
 // -----------------------------------------------------------------------------
@@ -70,19 +90,31 @@ $arabic-range:
 // -----------------------------------------------------------------------------
 // What renders during the swap period, adjusted so the real font lands on the
 // same line boxes and nearly the same line lengths: no layout shift when it
-// arrives. Measured in Chrome with canvas measureText against the shipped
-// files (Phase 36.2): Instrument Sans vs Arial on an English pangram + UI
-// words, IBM Plex Sans Arabic vs Segoe UI on an Arabic sentence.
+// arrives. Measured in Chrome (Phase 39.2a, evidence p39-2a/chrome/
+// font-metrics.json): canvas measureText of a UI sample in each web font
+// against its first local fallback; size-adjust is the width ratio, the
+// overrides are the web font's ascent and descent divided by it. Proven by the
+// same paragraphs wrapping to the same lines and heights in both.
 //
-// The Latin fallback carries the Latin ranges on purpose: Arial has Arabic
-// glyphs on Windows, and without the range Arabic text would fall into Arial
-// with Latin metrics instead of reaching the Arabic fallback below.
+// The Latin fallbacks carry the Latin ranges on purpose: Arial and Georgia
+// have Arabic glyphs on Windows, and without the range Arabic text would fall
+// into them with Latin metrics instead of reaching the Arabic fallback below.
 @font-face {
-  font-family: 'Instrument Sans Fallback';
+  font-family: 'Geist Fallback';
   src: local('Arial'), local('Arimo'), local('Liberation Sans'), local('Helvetica');
-  size-adjust: 101.61%;
-  ascent-override: 95.46%;
-  descent-override: 24.6%;
+  size-adjust: 101.72%;
+  ascent-override: 98.8%;
+  descent-override: 29%;
+  line-gap-override: 0%;
+  unicode-range: $latin-range, $latin-ext-range;
+}
+
+@font-face {
+  font-family: 'Instrument Serif Fallback';
+  src: local('Georgia'), local('Times New Roman'), local('Tinos');
+  size-adjust: 76.14%;
+  ascent-override: 130.03%;
+  descent-override: 40.72%;
   line-gap-override: 0%;
   unicode-range: $latin-range, $latin-ext-range;
 }
@@ -90,9 +122,9 @@ $arabic-range:
 @font-face {
   font-family: 'IBM Plex Sans Arabic Fallback';
   src: local('Segoe UI'), local('Tahoma'), local('Geeza Pro'), local('Noto Sans Arabic');
-  size-adjust: 90.8%;
-  ascent-override: 120.05%;
-  descent-override: 46.26%;
+  size-adjust: 89.52%;
+  ascent-override: 121.2%;
+  descent-override: 46.36%;
   line-gap-override: 0%;
   unicode-range: $arabic-range;
 }

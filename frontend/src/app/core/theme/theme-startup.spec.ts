@@ -1,7 +1,13 @@
 // @ts-expect-error No Node type declarations are installed in this workspace.
 import { readFileSync } from 'node:fs';
 import { LANGUAGE_STORAGE_KEY } from '@app/core/i18n/language';
-import { THEME_ATTRIBUTE, THEME_PREFERENCES, THEME_STORAGE_KEY } from './theme';
+import {
+  THEME_ATTRIBUTE,
+  THEME_PREFERENCES,
+  THEME_STORAGE_KEY,
+  TRANSPARENCY_ATTRIBUTE,
+  TRANSPARENCY_STORAGE_KEY,
+} from './theme';
 
 /**
  * Guards the one duplication in the theming and language design.
@@ -19,6 +25,7 @@ import { THEME_ATTRIBUTE, THEME_PREFERENCES, THEME_STORAGE_KEY } from './theme';
  * inline script fails here, by name.
  */
 const INDEX_HTML: string = readFileSync('src/index.html', 'utf8');
+const FONTS_SCSS: string = readFileSync('src/styles/_fonts.scss', 'utf8');
 
 const INLINE_SCRIPTS = [
   ...INDEX_HTML.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g),
@@ -33,9 +40,28 @@ interface FakeBrowser {
   readonly prefersDark?: boolean;
 }
 
+/** What the script appended to <head>: one entry per preload link. */
+interface FakeLink {
+  fetchPriority?: string;
+  rel?: string;
+  as?: string;
+  type?: string;
+  crossOrigin?: string;
+  href?: string;
+}
+
 /** Runs the inline script in a fake browser and returns what it wrote on <html>. */
 function startPage(browser: FakeBrowser = {}): Record<string, string> {
+  return boot(browser).attributes;
+}
+
+/** The same, with the preload links it added to <head>. */
+function boot(browser: FakeBrowser = {}): {
+  attributes: Record<string, string>;
+  preloads: FakeLink[];
+} {
   const attributes: Record<string, string> = {};
+  const preloads: FakeLink[] = [];
   const root = {
     setAttribute: (name: string, value: string) => {
       attributes[name] = value;
@@ -62,15 +88,24 @@ function startPage(browser: FakeBrowser = {}): Record<string, string> {
     INLINE_SCRIPTS[0],
   );
   run(
-    { documentElement: root },
+    {
+      documentElement: root,
+      createElement: (): FakeLink => ({}),
+      head: { appendChild: (link: FakeLink) => preloads.push(link) },
+    },
     storage,
     { matchMedia: () => ({ matches: browser.prefersDark ?? false }) },
     { pathname: browser.path ?? '/overview', search: browser.search ?? '' },
     { languages, language: languages[0] },
   );
 
-  return attributes;
+  return { attributes, preloads };
 }
+
+const GEIST = '/fonts/geist/geist-latin.v1.woff2';
+const ARABIC_400 = '/fonts/ibm-plex-sans-arabic/ibm-plex-sans-arabic-arabic-400.v1.woff2';
+const hrefs = (browser: FakeBrowser): string[] =>
+  boot(browser).preloads.map((link) => link.href ?? '');
 
 describe('startup contract with src/index.html', () => {
   it('has exactly one inline script: the edge allows inline code by hash, one hash per script', () => {
@@ -83,6 +118,9 @@ describe('startup contract with src/index.html', () => {
     expect(INLINE_SCRIPTS[0]).toContain(`'${THEME_STORAGE_KEY}'`);
     expect(INLINE_SCRIPTS[0]).toContain(`'${LANGUAGE_STORAGE_KEY}'`);
     expect(INLINE_SCRIPTS[0]).toContain(`'${THEME_ATTRIBUTE}'`);
+    expect(TRANSPARENCY_STORAGE_KEY).toBe('omniai.transparency');
+    expect(INLINE_SCRIPTS[0]).toContain(`'${TRANSPARENCY_STORAGE_KEY}'`);
+    expect(INLINE_SCRIPTS[0]).toContain(`'${TRANSPARENCY_ATTRIBUTE}'`);
     // index.html tests for 'dark' and 'system' by name, and treats a missing
     // value as 'system'.
     expect(THEME_PREFERENCES).toEqual(['system', 'light', 'dark']);
@@ -245,6 +283,124 @@ describe('startup contract with src/index.html', () => {
       expect(startPage({ path: '/overview', stored, prefersDark: false })[THEME_ATTRIBUTE]).toBe(
         'dark',
       );
+    });
+  });
+
+  describe('reduce transparency (Phase 39.2a)', () => {
+    it('stamps the solid twin before first paint when the person chose it', () => {
+      expect(
+        startPage({ stored: { [TRANSPARENCY_STORAGE_KEY]: 'reduced' } })[TRANSPARENCY_ATTRIBUTE],
+      ).toBe('reduced');
+    });
+
+    it('keeps glass otherwise, including for a value it does not know', () => {
+      expect(startPage()[TRANSPARENCY_ATTRIBUTE]).toBeUndefined();
+      expect(
+        startPage({ stored: { [TRANSPARENCY_STORAGE_KEY]: 'full' } })[TRANSPARENCY_ATTRIBUTE],
+      ).toBeUndefined();
+      expect(
+        startPage({ stored: { [TRANSPARENCY_STORAGE_KEY]: 'yes' } })[TRANSPARENCY_ATTRIBUTE],
+      ).toBeUndefined();
+    });
+
+    it('never applies a stored admin choice to the visitor pages (they follow the device)', () => {
+      const stored = { [TRANSPARENCY_STORAGE_KEY]: 'reduced' };
+
+      expect(startPage({ path: '/chat/abc', stored })[TRANSPARENCY_ATTRIBUTE]).toBeUndefined();
+      expect(startPage({ path: '/embed/abc', stored })[TRANSPARENCY_ATTRIBUTE]).toBeUndefined();
+    });
+
+    it('degrades to glass, and still sets the theme and language, when storage throws', () => {
+      const page = startPage({ storageThrows: true, languages: ['ar'] });
+
+      expect(page[TRANSPARENCY_ATTRIBUTE]).toBeUndefined();
+      expect(page['lang']).toBe('ar');
+      expect(page[THEME_ATTRIBUTE]).toBe('light');
+    });
+  });
+
+  describe('font preload for the first paint (Phase 39.2a, Phase 38 note 1)', () => {
+    it('preloads only Geist Latin on an English page', () => {
+      expect(hrefs({ path: '/overview' })).toEqual([GEIST]);
+    });
+
+    it('adds Arabic 400 on an Arabic page, admin or visitor', () => {
+      expect(hrefs({ path: '/overview', stored: { [LANGUAGE_STORAGE_KEY]: 'ar' } })).toEqual([
+        GEIST,
+        ARABIC_400,
+      ]);
+      expect(hrefs({ path: '/chat/abc', search: '?lang=ar' })).toEqual([GEIST, ARABIC_400]);
+    });
+
+    it('fetches both at high priority on an Arabic page', () => {
+      expect(
+        boot({ stored: { [LANGUAGE_STORAGE_KEY]: 'ar' } }).preloads.map((l) => l.fetchPriority),
+      ).toEqual(['high', 'high']);
+    });
+
+    it('adds Arabic 400 on the English inbox, where customers often write in Arabic', () => {
+      // Low there: on an English page it must not slow the bundle on a slow link.
+      expect(boot({ path: '/conversations' }).preloads.map((l) => l.fetchPriority)).toEqual([
+        'high',
+        'low',
+      ]);
+      expect(hrefs({ path: '/conversations' })).toEqual([GEIST, ARABIC_400]);
+      expect(hrefs({ path: '/conversations/0193' })).toEqual([GEIST, ARABIC_400]);
+      expect(hrefs({ path: '/conversations-archive' })).toEqual([GEIST]);
+    });
+
+    it('writes real font preloads: as=font, woff2, anonymous CORS (else the font is fetched twice)', () => {
+      for (const link of boot({ path: '/conversations' }).preloads) {
+        expect(link).toEqual(
+          expect.objectContaining({
+            rel: 'preload',
+            as: 'font',
+            type: 'font/woff2',
+            crossOrigin: 'anonymous',
+          }),
+        );
+      }
+    });
+
+    it('names exactly the URLs the stylesheet uses, so one download serves both', () => {
+      expect(FONTS_SCSS).toContain(`url('${GEIST}')`);
+      expect(FONTS_SCSS).toContain(
+        "url('/fonts/ibm-plex-sans-arabic/ibm-plex-sans-arabic-arabic-#{$weight}.v1.woff2')",
+      );
+      expect(ARABIC_400.replace('400', '#{$weight}')).toBe(
+        '/fonts/ibm-plex-sans-arabic/ibm-plex-sans-arabic-arabic-#{$weight}.v1.woff2',
+      );
+    });
+
+    it('still sets the theme, language and direction when the head refuses a link', () => {
+      const attributes: Record<string, string> = {};
+      const run = new Function(
+        'document',
+        'localStorage',
+        'window',
+        'location',
+        'navigator',
+        INLINE_SCRIPTS[0],
+      );
+      run(
+        {
+          documentElement: {
+            setAttribute: (name: string, value: string) => (attributes[name] = value),
+          },
+          createElement: () => {
+            throw new Error('no DOM');
+          },
+          head: null,
+        },
+        { getItem: () => null },
+        { matchMedia: () => ({ matches: false }) },
+        { pathname: '/overview', search: '' },
+        { languages: ['ar'], language: 'ar' },
+      );
+
+      expect(attributes['lang']).toBe('ar');
+      expect(attributes['dir']).toBe('rtl');
+      expect(attributes[THEME_ATTRIBUTE]).toBe('light');
     });
   });
 });

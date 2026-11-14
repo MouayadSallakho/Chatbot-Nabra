@@ -52,7 +52,7 @@ import { BrandMark } from '@app/shared/brand-mark/brand-mark';
     .boot-wordmark {
       color: var(--text-primary);
       font-size: 1.375rem;
-      font-weight: 650;
+      font-weight: 600;
       font-stretch: var(--heading-stretch);
       letter-spacing: var(--letter-spacing-tight);
       line-height: 1.4;

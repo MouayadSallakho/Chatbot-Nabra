@@ -2,13 +2,16 @@
 // Global stylesheet
 // =============================================================================
 //
-// Five layers, in cascade order:
+// The layers, in cascade order:
 //
 //   fonts       the self-hosted faces and their metric-matched fallbacks
-//   tokens      the values everything else resolves to
+//   tokens      the values everything else resolves to (Calm Glass, with the
+//               deprecated Two Voices aliases until 39.8b)
 //   base        element defaults, typography, focus, reduced motion
+//   glass       the floating material: the `glass` mixin and `.glass`
 //   primitives  the reusable visual vocabulary
 //   charts      the shared marks, axes and legends of src/app/shared/charts
+//   authoring, admin  shared form and admin page patterns
 //
 // Bootstrap's grid is loaded before this file, from angular.json, so anything
 // here can override it without needing specificity tricks or !important.
@@ -21,6 +24,7 @@
 @use 'styles/fonts';
 @use 'styles/tokens';
 @use 'styles/base';
+@use 'styles/glass';
 @use 'styles/primitives';
 @use 'styles/charts';
 @use 'styles/authoring';

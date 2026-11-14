@@ -17,6 +17,12 @@ This document records what was decided and what was deliberately left for later.
 
 ## D1. UI philosophy
 
+> **Phase 39 (Calm Glass).** The tokens (D5), type (D6) and themes (D7, D8) below
+> already describe Calm Glass (39.2a); the components and this philosophy section
+> are rewritten with them in 39.2b. Until then, read "Lagoon" as emerald (the AI),
+> "Ember" as gold (the team) and "ink" as emerald for the action colour
+> (`docs/design/MASTER.md`, section 3).
+
 **"Two Voices."** Every OmniAI conversation is a duet between the AI and the
 team, and the interface gives each voice one colour: **Lagoon** for the AI,
 **Ember** for a person on the team. Colour is information, not decoration;
@@ -138,163 +144,154 @@ queries would mean re-deriving what the grid already does.
 
 ## D5. Design tokens
 
-`src/styles/_tokens.scss` is the single source of visual truth. Two rules:
+`src/styles/_tokens.scss` is the single source of visual truth. Since Phase 39.2a
+it holds the **Calm Glass** tokens (`calm-glass.md`, Phase 39 pack); the values,
+the decisions and the contrast table are in `docs/design/MASTER.md` (sections 3
+to 7 and 13). Two rules:
 
-1. Components consume semantic tokens, never raw values.
-2. Tokens are named for their **role**, not their appearance. `--surface-raised`
-   survives a palette change; `--grey-100` becomes a lie the first time the
-   product is restyled.
+1. Components consume semantic or component tokens, never the raw scale and never
+   raw values (`token_lint.py` from the `design-system-tokens` skill checks it).
+2. Tokens are named for their **role**, not their appearance.
 
-Groups: surfaces, text, borders (decorative hairlines and `--border-control`),
-action (`--action`, `-hover`, `-pressed`, `--on-action`, `--link`,
-`--focus-ring`, `--selection`), the voices (`--voice-ai-*`, `--voice-human-*`:
-`fg`, `strong`, `tint`, `border`), status (success / warning / danger / info),
-charts (`--chart-ai`, `--chart-human`, `--chart-customer`, `--chart-neutral`,
-`--chart-grid`, `--chart-ramp-1…5`), shadows, skeleton, scrim, spacing, radius,
-type, motion, layout, layers.
+Three tiers:
 
-The Phase 33.5 `--accent-*` family is gone. Every use was remapped by meaning in
-Phase 36.2: the primary action, counts and tab markers to ink; links to
-`--link`; selection to the neutral `--surface-selected`; anything that meant
-"the AI" or "a person" to the matching voice; charts to the chart tokens. The
-embedded widget, the hosted chat and the agent preview take the workspace's own
-colour as `--chat-accent` / `--chat-on-accent` (checked by `accent-color.ts`),
-never the product's.
+- **Raw scale**: `--emerald-*`, `--cream-*`, `--sand-*`, `--stone-*`, `--ink-*`,
+  `--gold-*`, `--coral-*`, `--mist-*`, `--sage-*`, `--white`. Builds the roles;
+  read by nothing else.
+- **Semantic roles**: `--color-*` (ground, panel, panel-soft, panel-raised,
+  hover, selected, selection, line, line-strong, control-border, text,
+  text-secondary, text-quiet, primary, primary-hover, primary-pressed,
+  on-primary, link, link-hover, focus-ring, focus-halo), the three voices
+  (`--voice-ai-*`, `--voice-team-*`, `--voice-customer-*`), chips (`--chip-need-*`,
+  `--chip-ai-*`, `--chip-failed-*`), status (`--status-success|warning|danger|info-*`)
+  and charts (`--chart-*`). Light on `:root`, dark in the `dark-palette` mixin.
+- **Component tokens**: the glass material (`--glass-bg`, `-border`, `-shadow`,
+  `-highlight`, `-blur`, `-solid-bg`), `--scrim`, `--glow-a`/`-b`,
+  `--orb-gradient`, `--skeleton-*`, `--channel-whatsapp`/`-web`.
 
-Theming works by redefining the same custom properties under a different
-selector, so no component stylesheet is duplicated per theme.
+**The alias layer.** At the end of the file every Two Voices name (`--surface-*`,
+`--text-primary|secondary|muted`, `--border-*`, `--action*`, `--link*`,
+`--focus-ring`, `--selection`, `--voice-ai|human-*`, `--success|warning|danger|info-*`,
+`--chart-human`, `--shadow-overlay`, `--radius-control|card|overlay`,
+`--text-page-title|section-title|card-title|reading`, `--duration-xs…xl`,
+`--ease-*`, `--motion-*`) is a deprecated alias of its Calm Glass role. Every
+screen took the new palette and type at once; each Phase 39 screen step moves its
+components to the new names, and 39.8b deletes the block. The aliases are
+declared on `:root` (and the type aliases also on `:lang(ar)`), where every axis
+switch lives, so they follow the theme, transparency and contrast.
+
+The embedded widget, the hosted chat and the agent preview still take the
+workspace's own colour as `--chat-accent` / `--chat-on-accent` (checked by
+`accent-color.ts`), never the product's.
 
 ### Spacing -- a 4px foundation
 
-`--space-1` … `--space-10` = 4, 8, 12, 16, 20, 24, 32, 40, 48, 64 px.
-
-Ten steps, nothing in between. If a gap seems to want 13px the answer is 12 or
-16, not a new token. Beside the scale, not on it: `--gap-hairline` (2px), the
-gap between things that read as one -- a label tight on its value, the rows of a
-list, the segments of a bar (Phase 36.11). When 4px feels loose, the answer is
-still 4px.
+`--space-1` … `--space-10` = 4, 8, 12, 16, 20, 24, 32, 40, 56, 64 px (Calm Glass
+moved the ninth step from 48 to 56). Beside the scale: `--gap-hairline` (2px),
+and the shell's `--shell-padding` 14px, `--column-gap` 12px, `--panel-padding`
+24px.
 
 ### Radius
 
-By role: `--radius-badge` 6px · `--radius-control` 10px · `--radius-card` 14px ·
-`--radius-overlay` 20px (dialogs, drawers) · `--radius-bubble` 18px with a
-`--radius-bubble-tail` 6px corner on the speaker's side, written with logical
-corners so it mirrors in RTL · `--radius-pill` for counts and chips only. Every
-rule names the role; the older size names (`--radius-sm` … `-xl`) were retired
-in Phase 36.11, each use moved to the role it already resolved to.
+By role: `--radius-pill` 999 · `--radius-input` 12 · `--radius-nav-item` 12 ·
+`--radius-tile` 16 · `--radius-panel` 24 · `--radius-dialog` 24 ·
+`--radius-bubble` 18 with a `--radius-bubble-tail` 6px corner on the speaker's
+side (logical corners) · `--radius-badge` 6 (checkboxes and small marks until
+39.2b).
 
 ### Control sizing
 
-`--control-height-sm` 32 · `--control-height` 36 · `--control-height-lg` 40, shared
-by buttons, inputs and selects so they align without measuring. Under
-`pointer: coarse` they rise to 40-44px touch targets. Icon sizes:
-`--icon-size-sm` 16 · `--icon-size` 18 · `--icon-size-nav` 20. Each icon passes
-its stroke where it is used.
+`--control-height-sm` 32 · `--control-height` 36 · `--control-height-lg` 40,
+rising to 40-44px under `pointer: coarse`, until 39.2b restyles buttons and
+inputs to 44px (`--control-height-dense` 40 in dense desktop headers).
+`--target-min` 44px, `--chip-height` 24px. Icon sizes: `--icon-size-sm` 16 ·
+`--icon-size` 18 · `--icon-size-nav` 20.
 
 ### Layers
 
 `--z-sticky` 10 · `--z-sidebar` 20 · `--z-dropdown` 30 · `--z-drawer` 40 ·
 `--z-toast` 60 · `--z-skip-link` 70. The only z-index values in the product.
-Dialogs need none: they open in the browser's top layer (`<dialog>` with
-`showModal`).
+Dialogs need none: they open in the browser's top layer.
 
-### Shadow
+### Glass and shadow
 
-Hairlines everywhere; one shadow, for overlays only (menus, dialogs, toasts, the
-peeking sidebar): `--shadow-overlay`,
-`0 1px 2px rgb(22 24 27 / 5%), 0 12px 32px -8px rgb(22 24 27 / 18%)` in light.
-Cards cast none. In dark mode borders do the separating and the overlay shadow
-only grounds. (`--shadow-raised` and `--shadow-subtle`, unused, were removed in
-Phase 36.11, with `--icon-stroke`, `--letter-spacing-caps`, `--drawer-width` and
-`--z-modal`.)
+Solid panels have a 1px line and no shadow; only glass casts one. The `glass`
+mixin and `.glass` class in `src/styles/_glass.scss` are the only places that
+declare `backdrop-filter`: background, border, the inner highlight and the
+shadow from the `--glass-*` tokens, the solid twin where `backdrop-filter` is not
+supported, and system colours with no shadow in forced colours. Under
+`data-transparency="reduced"` (the account menu's "Reduce transparency") and
+`prefers-reduced-transparency`, the tokens themselves resolve to the solid twin.
+Budget: three blurred layers at most, never on a scrolling row.
 
 ### Motion
 
-Durations `--duration-xs` 100 · `-sm` 150 · `-md` 220 · `-lg` 320 · `-xl` 450 ms;
-easings `--ease-standard` `cubic-bezier(.2,0,0,1)`, `--ease-enter`
-`(.22,1,.36,1)`, `--ease-exit` `(.4,0,1,1)`, `--ease-emphasized`
-`(.05,.7,.1,1)`. The older `--motion-fast` / `-normal` / `-slow` names alias
-sm / md / lg. Under `prefers-reduced-motion` the duration tokens themselves
-collapse to ~0 (D19).
+`--duration-press` 120 · `--duration-menu` 200 · `--duration-dialog` 280 ms, one
+easing `--ease-calm` `cubic-bezier(0.2, 0, 0, 1)`, `--duration-fade` 200 ms for a
+fade kept under reduced motion, and `--motion-travel` (0 under reduced motion)
+multiplying every distance. Under `prefers-reduced-motion` the three durations
+collapse to ~0 at the source (D19).
 
 ## D6. Typography
 
-Two self-hosted families, both under the OFL, shipped as WOFF2 files with their
-licence texts in `src/assets/fonts/` and declared in `src/styles/_fonts.scss`:
+Three self-hosted families, all under the OFL, shipped as WOFF2 files with their
+licence texts in `public/fonts/` and declared in `src/styles/_fonts.scss`:
 
-- **Instrument Sans** (variable `wdth` 75-100, `wght` 400-700; Latin 57 KB,
-  Latin Extended 19 KB) for Latin text. Headings use the narrowed cut
-  (`--heading-stretch: 86%`), weight 600-650 and −0.015em tracking.
-- **IBM Plex Sans Arabic** (400, 500, 600; Arabic subset only, 43-46 KB each)
-  for Arabic.
+- **Geist** (variable `wght` 100-900; Latin 29,400 B, Latin Extended 16,512 B):
+  all Latin text and the digits, in both languages.
+- **IBM Plex Sans Arabic** (400, 500, 600, 700; Arabic subset only, 42-46 KB
+  each): Arabic. 700 only for Arabic display.
+- **Instrument Serif** (400; Latin 21,032 B, Latin Extended 11,604 B): the
+  display line only (the overview greeting, empty-state lines, entry pages),
+  never tables or forms.
 
-**No font service is contacted, ever.** Because the stylesheet references the
-files, the build emits them as content-hashed media files, which the edge caches
-for a year as immutable. Every face carries a `unicode-range`, so an English page
-downloads only the Latin file, and Latin characters inside Arabic text keep
-Instrument Sans. `font-display: swap` with metric-matched local fallbacks
-(`size-adjust`, `ascent-override`, `descent-override`, measured against the
-shipped files) means the swap moves nothing. There is no preload: Angular cannot
-write a hashed media name into `index.html`, and an unhashed copy would download
-the font twice.
+**No font service is contacted, ever.** The files keep versioned, unhashed names
+(`geist-latin.v1.woff2`) and the stylesheet names them root-relative, which the
+build leaves as written. That lets the pre-paint script in `index.html` preload
+the same URLs per language: Geist Latin always; Arabic 400 on Arabic pages, and
+at low priority on English pages under `/conversations`. Every face carries a
+`unicode-range`; `font-display: swap` with metric-matched local fallbacks
+(`Geist Fallback`, `IBM Plex Sans Arabic Fallback`, `Instrument Serif Fallback`,
+measured in 39.2a) means the swap moves nothing. The edge caches `.woff2` for a
+year as immutable, so a changed file is `v2`.
 
-Type steps are named for the job they do: `--text-display` (28-40px, overview
-numbers), `--text-page-title` (24-30px), `--text-section-title` (18px),
-`--text-card-title` (15px), `--text-body` (14px / 1.55, dense admin),
-`--text-reading` (15px / 1.6, transcripts), `--text-small` (13px),
-`--text-caption` (12px), `--text-numeric` (with `tabular-nums`), plus
-`--text-body-strong`, `--text-label`, `--text-nav`, `--text-table`. The title
-utilities set `font-stretch` after the `font` shorthand, which would reset it.
+Type steps (MASTER.md section 4): `--text-display` (Instrument Serif 44/48),
+`--text-figure` (large numbers), `--text-title-1` (30/36), `--text-title-2`
+(20/28), `--text-title-3` (16/24), `--text-body` (15/24), `--text-body-strong`,
+`--text-small` (13/20), `--text-label`, `--text-caption` (12/16),
+`--text-table`, `--text-nav`, `--text-numeric` (with `tabular-nums`). Titles
+track at −0.01em.
 
-Under `:lang(ar)` the width returns to 100%, tracking to 0, nothing is uppercase,
-body text is 15px / 1.7 and heading line-height at least 1.35.
+Under `:lang(ar)`: the same sizes with one more step of line height, never under
+13px, tracking 0, nothing uppercase, display in Plex Arabic 600.
 
-Headings are reset to inherit and given size by these classes, which keeps the
+Headings are reset to inherit and given size by the type classes, which keeps the
 heading **level** -- what a screen reader builds its outline from -- independent
 of the visual size.
 
 ## D7. Light mode
 
-"Porcelain." A warm page (`#f3f2ee`) behind white panels, so a surface reads as
-raised from the tint behind it and a hairline, never from a shadow. Text runs
-ink → secondary → muted (`#16181b`, `#4d525a`, `#5f646d`). Decorative hairlines
-are light; the boundary of an interactive control is `--border-control`, held to
-3:1. The primary action is ink with white text. The current navigation item gets
-the neutral selected fill, ink text at a heavier weight and a 2px ink edge on the
-start side, which mirrors in RTL.
+A cream ground (cream-100 `#F4F1EA`) behind white panels; text ink-900 →
+ink-700 → stone-600; decorative lines sand-300; control boundaries
+`--color-control-border` `#8A8370` (3:1). Emerald-700 is the primary action,
+with white text. Values: MASTER.md section 3.
 
 ## D8. Dark mode
 
-"Night shift." Designed separately, not inverted. Surfaces are warm near-blacks
-(`#0f1012` page, `#17191c` panels, `#1e2024` overlays), deliberately not pure
-black: `#000` causes halation against light text and makes overlays float
-nowhere. Text is `#f2f1ed` rather than pure white. Ink becomes porcelain: the
-primary action is the lightest thing on screen, with dark text. The voices are
-lifted for the dark canvas (Lagoon `#41c2b4`, Ember `#ff8d57`), and status,
-borders, chart colours, skeletons and the scrim are each specified for dark.
-Borders do the separating; the one overlay shadow only grounds.
+Designed separately, not inverted: an emerald-950 ground (`#051F20`) behind
+emerald-900 panels (`#0B2B26`), text `#E9F2EC` → `#C9D8CF` → `#9AA79F`, lines in
+emerald-300 at 16-28%, control boundaries `#668276`. The primary is emerald-300
+with emerald-950 text; the team's gold and the failed coral are lifted for the
+dark ground.
 
 ### Contrast
 
-Every foreground/background pair is checked with `contrast_check.py` (the
-`design-system-tokens` skill) against WCAG 2 ratios -- **79 pairs, in light,
-dark, and both again under `prefers-contrast: more`: 76 pass, 3 are
-informational (decorative hairlines and the Lagoon/Ember seam), 0 fail.** Text
-is at least 4.5:1, large text and the parts of controls at least 3:1. The full
-tables are in the Phase 36.2 report.
-
-Two starting values of the direction failed and were adjusted (values, never the
-rule):
-
-- light `--border-control` `#8b8e95` was 2.79:1 on `--surface-inset` → `#80838a`
-- light `--success-fg` `#2e7d32` was 4.49:1 on `--success-bg` → `#2b7a30`
-
-Lagoon and Ember are about 1.02-1.04:1 against each other, so wherever they
-touch (split bar, stacked chart, voice track) a hairline of the surface keeps
-them apart, and every voice is also a word.
-
-Under `prefers-contrast: more`, muted text becomes secondary and the decorative
-hairlines become real boundaries.
+Every pair the tokens can produce is measured from the live, resolved tokens in
+Chrome, in light, dark, and both under `prefers-contrast: more` (Phase 39.2a:
+436 required pairs, 0 fail, 28 decorative reported). The table is MASTER.md
+section 13; the script is in the 39.2a evidence. Text needs 4.5:1, control
+boundaries and marks a reader must see 3:1. Under `prefers-contrast: more`, quiet
+text becomes secondary and the lines become control boundaries.
 
 ## D9. Light / Dark / System
 

@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, output } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { ThemeService } from '@app/core/theme/theme-service';
+import { TransparencyService } from '@app/core/theme/transparency-service';
 import { LanguageService } from '@app/core/i18n/language-service';
 import {
   APP_LANGUAGES,
@@ -25,9 +26,10 @@ const THEME_ICONS: Readonly<Record<ThemePreference, IconName>> = {
 /**
  * The account menu at the end of the top bar.
  *
- * Who is signed in, which workspace they are in, their appearance and language,
- * and the ways out -- and nothing else. It is not a settings page: anything a
- * workspace administers lives in the sidebar, under Workspace.
+ * Who is signed in, which workspace they are in, their appearance (the theme
+ * and "Reduce transparency") and language, and the ways out -- and nothing
+ * else. It is not a settings page: anything a workspace administers lives in
+ * the sidebar, under Workspace.
  *
  * Every value shown is real. The initials come from the account's own address;
  * there is no invented display name, role or avatar image.
@@ -54,6 +56,7 @@ export class ProfileMenu {
   readonly signedOut = output<void>();
 
   private readonly theme = inject(ThemeService);
+  private readonly transparency = inject(TransparencyService);
 
   private readonly languageService = inject(LanguageService);
   private readonly permissions = inject(PermissionService);
@@ -61,6 +64,9 @@ export class ProfileMenu {
   private readonly soundSettings = inject(SoundSettings);
 
   protected readonly preference = this.theme.preference;
+
+  /** The in-app "Reduce transparency" choice (glass becomes solid). */
+  protected readonly transparencyReduced = this.transparency.reduced;
 
   /** The language this page runs in; a different choice reloads the page. */
   protected readonly language = this.languageService.current;
@@ -125,6 +131,10 @@ export class ProfileMenu {
       // This click is the gesture the browser wants before it allows audio.
       this.sounds.unlock();
     }
+  }
+
+  protected toggleTransparency(): void {
+    this.transparency.setReduced(!this.transparencyReduced());
   }
 
   protected selectTheme(preference: ThemePreference): void {

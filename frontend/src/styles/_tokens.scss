@@ -1,223 +1,329 @@
 // =============================================================================
-// Design tokens: "Two Voices"
+// Design tokens: "Calm Glass" (Phase 39)
 // =============================================================================
 //
 // The single source of visual truth. Every colour, space, radius, shadow, type
 // step and duration in this product resolves to something declared here. The
-// direction and every decision behind these values is in docs/design/MASTER.md;
-// read it before changing a value.
+// specification is calm-glass.md (Phase 39 pack); the decisions, the contrast
+// table and the departures are in docs/design/MASTER.md. Read it before
+// changing a value.
 //
-// Two rules keep it that way:
+// Three tiers, one direction:
 //
-//   1. Components consume semantic tokens, never raw values. A component that
-//      hard-codes a hex value is invisible to theming, and will be wrong in dark
-//      mode the moment somebody stops thinking about it.
-//   2. Tokens are named for their ROLE, not their appearance. `--surface-raised`
-//      survives a palette change; `--grey-100` becomes a lie the first time the
-//      product is restyled.
+//   1. The raw scale (emerald, cream, sand, stone, ink, gold, coral). It builds
+//      the roles below and nothing else: no component reads it.
+//   2. Semantic roles (`--color-*`, `--voice-*`, `--chip-*`, `--status-*`,
+//      `--chart-*`), declared for light on :root and for dark in the
+//      dark-palette mixin. Components read these.
+//   3. Component tokens: the glass material, the scrim, the glows, the orb,
+//      skeletons and channel badges.
 //
-// The concept in one line: every conversation is a duet between the AI and the
-// team. The two VOICE colours -- Lagoon for the AI, Ember for a person on the
-// team -- carry that one fact and nothing else: never decoration, never status.
-// Everything else is calm ink on porcelain, and ink is the action colour.
+// The concept in one line: one tone, two voices. The AI speaks in emerald, the
+// team in gold, the customer in plain cream; glass only where things float.
+// Colour never carries meaning alone: every chip has a word, every status a
+// glyph or a word.
 //
-// Theming works by redefining the same custom properties under a different
-// selector. Components are written once and are never duplicated per theme.
-// Every foreground/background pair below is proven by contrast_check.py in both
-// themes (the table is in the Phase 36.2 report): text 4.5:1, large text and
-// the boundaries of controls 3:1.
+// THE ALIAS LAYER (end of this file). Phase 39 moves screen by screen. Every
+// "Two Voices" role name (`--surface-page`, `--action`, `--voice-human-fg`, …)
+// is re-pointed at its Calm Glass role, so every screen takes the new palette
+// and type at once without a layout change, and each screen step moves its own
+// components to the new names. 39.8b deletes the alias block, and a grep gate
+// proves no old name is left. Do not use an alias name in new code.
+//
+// Axes, one switch each: theme `data-theme` (light | dark); transparency
+// `data-transparency="reduced"` or `prefers-reduced-transparency`; forced
+// colours; `prefers-contrast: more`; `prefers-reduced-motion`; script
+// `:lang(ar)`. Direction is not a token axis: logical properties and `dir`.
 // -----------------------------------------------------------------------------
 
 // -----------------------------------------------------------------------------
-// Dark palette ("night shift")
+// Dark palette (semantic roles, dark)
 // -----------------------------------------------------------------------------
-// Designed on its own, not inverted from light. A mixin rather than a plain
-// selector, because the dark values are needed in two places: when dark is
-// explicitly chosen, and when the OS asks for dark and no choice has been made
-// (the no-JavaScript path). Writing them once means the two can never drift.
+// Designed on its own, not inverted from light: emerald-950 ground, emerald-900
+// panels. A mixin because the dark values are needed in two places: when dark
+// is explicitly chosen, and when the OS asks for dark and no choice has been
+// made (the no-JavaScript path). Writing them once means they cannot drift.
 @mixin dark-palette {
-  // Surfaces: warm near-blacks, not #000. Pure black causes halation against
-  // light text, and depth here comes from borders rather than shadows.
-  --surface-page: #0f1012;
-  --surface-default: #17191c;
-  --surface-muted: #1c1e22;
-  --surface-raised: #1e2024; // overlays sit a step lighter than the page
-  --surface-inset: #0b0c0e;
-  --surface-hover: #202328;
-  --surface-selected: #23262b;
+  --color-ground: var(--emerald-950);
+  --color-ground-visitor: var(--emerald-950);
+  --color-panel: var(--emerald-900);
+  --color-panel-soft: var(--emerald-850);
+  --color-panel-raised: var(--emerald-800);
+  --color-hover: var(--emerald-800);
+  --color-selected: rgb(142 182 155 / 12%);
+  --color-selection: rgb(142 182 155 / 30%);
+  --color-line: rgb(142 182 155 / 16%);
+  --color-line-strong: rgb(142 182 155 / 28%);
+  --color-control-border: var(--sage-500);
 
-  --text-primary: #f2f1ed;
-  --text-secondary: #b6b9bf;
-  --text-muted: #8e929a;
+  --color-text: var(--mist-50);
+  --color-text-secondary: var(--mist-200);
+  --color-text-quiet: var(--mist-400);
 
-  --border-subtle: #24272c;
-  --border-default: #2c3036;
-  --border-strong: #3a3f46;
-  // The boundary of an interactive control: held to the 3:1 non-text rule,
-  // which the decorative hairlines above deliberately do not carry.
-  --border-control: #6b717a;
+  --color-primary: var(--emerald-300);
+  --color-primary-hover: var(--emerald-100);
+  --color-primary-pressed: var(--emerald-200);
+  --color-on-primary: var(--emerald-950);
+  --color-link: var(--emerald-300);
+  --color-link-hover: var(--emerald-100);
+  --color-focus-ring: var(--emerald-300);
+  --color-focus-halo: rgb(142 182 155 / 24%);
 
-  // Ink becomes porcelain: the primary action is the lightest thing on screen.
-  --action: #f2f1ed;
-  --action-hover: #ffffff;
-  --action-pressed: #d9d8d3;
-  --on-action: #0f1012;
-  --link: #f2f1ed;
-  --link-hover: #ffffff;
-  --focus-ring: #f2f1ed;
-  --selection: #3a3f46;
+  --voice-ai-bubble: var(--emerald-750);
+  --voice-ai-text: var(--mist-50);
+  --voice-ai-label: var(--emerald-300);
+  --voice-ai-dot: var(--emerald-300);
+  --voice-ai-edge: rgb(142 182 155 / 28%);
+  --voice-ai-meta: var(--mist-200);
+  --voice-team-bubble: var(--gold-950);
+  --voice-team-text: var(--gold-100);
+  --voice-team-edge: rgb(200 169 106 / 45%);
+  --voice-team-label: var(--gold-300);
+  --voice-team-dot: var(--gold-500);
+  --voice-customer-bubble: var(--emerald-850);
+  --voice-customer-text: var(--mist-50);
+  --voice-customer-own-bubble: var(--sage-900);
 
-  // The two voices, lifted for a dark canvas.
-  --voice-ai-fg: #41c2b4;
-  --voice-ai-strong: #7ad9ce;
-  --voice-ai-tint: #0f2a27;
-  --voice-ai-border: #1c4a44;
-  --voice-human-fg: #ff8d57;
-  --voice-human-strong: #ffb088;
-  --voice-human-tint: #33190c;
-  --voice-human-border: #5a2c16;
+  --chip-need-bg: rgb(200 169 106 / 18%);
+  --chip-need-fg: var(--gold-300);
+  --chip-need-dot: var(--gold-500);
+  --chip-ai-bg: rgb(142 182 155 / 16%);
+  --chip-ai-fg: var(--emerald-100);
+  --chip-ai-dot: var(--emerald-300);
+  --chip-failed-bg: rgb(240 160 143 / 14%);
+  --chip-failed-fg: var(--coral-300);
+  --chip-failed-dot: var(--coral-300);
 
-  --success-fg: #6bd68a;
-  --success-bg: #10251a;
-  --success-border: #1f4a2e;
+  --status-success-bg: rgb(142 182 155 / 16%);
+  --status-success-fg: var(--emerald-300);
+  --status-success-border: rgb(142 182 155 / 28%);
+  --status-warning-bg: rgb(200 169 106 / 18%);
+  --status-warning-fg: var(--gold-300);
+  --status-warning-border: rgb(200 169 106 / 45%);
+  --status-danger-bg: rgb(240 160 143 / 14%);
+  --status-danger-fg: var(--coral-300);
+  --status-danger-border: rgb(240 160 143 / 35%);
+  --status-danger-solid: var(--coral-300);
+  --status-danger-solid-hover: var(--coral-200);
+  --status-on-danger-solid: var(--emerald-950);
+  --status-info-bg: var(--emerald-850);
+  --status-info-fg: var(--mist-200);
+  --status-info-border: rgb(142 182 155 / 28%);
 
-  --warning-fg: #f2c94c;
-  --warning-bg: #2a220b;
-  --warning-border: #4d3e12;
+  --chart-current: var(--emerald-300);
+  --chart-previous: var(--gold-300);
+  --chart-ai: var(--emerald-300);
+  --chart-team: var(--gold-300);
+  --chart-team-fill: var(--gold-500);
+  --chart-channel-2: var(--emerald-100);
+  --chart-customer: var(--mist-400);
+  --chart-neutral: var(--mist-200);
+  --chart-grid: rgb(142 182 155 / 16%);
+  --chart-ramp-1: var(--emerald-800);
+  --chart-ramp-2: var(--emerald-750);
+  --chart-ramp-3: var(--emerald-600);
+  --chart-ramp-4: var(--emerald-300);
+  --chart-ramp-5: var(--emerald-100);
 
-  --danger-fg: #ff8a80;
-  --danger-bg: #2d1513;
-  --danger-border: #57261f;
-  --danger-solid: #f07a6e;
-  --danger-solid-hover: #f5928a;
-  --danger-contrast: #0f1012;
+  --glass-bg: rgb(11 43 38 / 62%);
+  --glass-border: rgb(142 182 155 / 22%);
+  --glass-shadow: 0 14px 44px rgb(0 0 0 / 38%);
+  --glass-highlight: inset 0 1px 0 rgb(218 241 222 / 10%);
+  --scrim: rgb(0 0 0 / 50%);
+  --glow-a: rgb(142 182 155 / 16%);
+  --glow-b: rgb(200 169 106 / 12%);
 
-  --info-fg: #7db7ff;
-  --info-bg: #0d1f33;
-  --info-border: #1c3a5c;
-
-  // Charts: AI and people are the voices; customers are a neutral slate.
-  --chart-ai: var(--voice-ai-fg);
-  --chart-human: var(--voice-human-fg);
-  --chart-customer: #a3aab5;
-  --chart-neutral: #b6b9bf;
-  --chart-grid: #2c3036;
-  --chart-ramp-1: #0f2a27;
-  --chart-ramp-2: #155149;
-  --chart-ramp-3: #1f7c71;
-  --chart-ramp-4: #41c2b4;
-  --chart-ramp-5: #7ad9ce;
-
-  // In the dark, borders do the separating; the overlay shadow only grounds.
-  --shadow-overlay: 0 1px 2px rgb(0 0 0 / 40%), 0 12px 32px -8px rgb(0 0 0 / 55%);
-
-  --skeleton-base: #202328;
-  --skeleton-sheen: #2a2d33;
-
-  --scrim: rgb(5 6 7 / 68%);
+  --skeleton-base: var(--emerald-800);
+  --skeleton-sheen: var(--emerald-750);
 
   color-scheme: dark;
 }
 
 // -----------------------------------------------------------------------------
-// Light palette ("porcelain"), and everything that does not change by theme
+// Raw scale, light roles, and everything that does not change by theme
 // -----------------------------------------------------------------------------
 :root {
   // ---------------------------------------------------------------------------
-  // Colour - light
+  // Raw scale (calm-glass.md §2). Builds roles only; never read by a component.
   // ---------------------------------------------------------------------------
-  // A warm porcelain page behind white panels: a surface reads as raised from
-  // the tint behind it and a hairline, never from a shadow.
-  --surface-page: #f3f2ee;
-  --surface-default: #ffffff;
-  --surface-muted: #f7f6f3;
-  --surface-raised: #ffffff;
-  --surface-inset: #eeede8;
-  --surface-hover: #f0efea;
-  // Selection is neutral, never a voice colour; the current navigation item
-  // adds a 2px ink edge so it still reads in greyscale.
-  --surface-selected: #e9e8e2;
+  --emerald-950: #051f20; // dark ground
+  --emerald-900: #0b2b26; // dark panel; ink on emerald-100
+  --emerald-850: #12332d; // dark panel-soft, dark customer bubble
+  --emerald-800: #163832; // dark raised
+  --emerald-750: #1c4a40; // dark AI bubble
+  --emerald-700: #235347; // primary, the AI's voice
+  --emerald-600: #2f6b58; // hover, charts
+  --emerald-300: #8eb69b; // the AI and primary on dark
+  --emerald-200: #b4d6be; // dark pressed (between 300 and 100)
+  --emerald-100: #daf1de; // AI bubble, AI chip
+  --emerald-50: #eef5ef; // the selected row (board)
+  --cream-50: #fbfaf6; // light ground for visitors
+  --cream-100: #f4f1ea; // app ground; customer bubble
+  --cream-150: #f6f3ec; // soft fills inside white panels
+  --cream-200: #efeae0; // the visitor's own bubble; avatars; hover
+  --sand-300: #e3dccc; // decorative lines
+  --sand-400: #cfc7b5; // stronger decorative edges (never a control boundary)
+  --stone-500: #8a8370; // control boundary, light (3:1; owner decision Q3)
+  --stone-600: #6b6658; // quiet text
+  --ink-700: #3a4540; // secondary text
+  --ink-900: #1b2420; // text
+  --mist-50: #e9f2ec; // dark text
+  --mist-200: #c9d8cf; // dark secondary text
+  --mist-400: #9aa79f; // dark quiet text
+  --sage-500: #668276; // control boundary, dark (3:1; owner decision Q3)
+  --sage-900: #2a3b35; // dark: the visitor's own bubble
+  --gold-950: #3a2f18; // dark team bubble
+  --gold-850: #6e521a; // team chip text on gold-100
+  --gold-800: #7a5c1e; // team text on light
+  --gold-500: #c8a96a; // team voice: fills and dots only, never text on cream
+  --gold-300: #e3c98f; // team text on dark
+  --gold-100: #f5ecd8; // team bubble, team chip
+  --coral-700: #9a3826; // failed chip text
+  --coral-600: #b4432f; // failed, errors
+  --coral-300: #f0a08f; // failed and errors on dark
+  --coral-200: #f5b8aa; // dark danger hover
+  --coral-50: #fbe9e5; // failed chip
+  --white: #fff;
+  --whatsapp-500: #25a36b; // the WhatsApp badge on an avatar
 
-  --text-primary: #16181b;
-  --text-secondary: #4d525a;
-  --text-muted: #5f646d;
+  // ---------------------------------------------------------------------------
+  // Semantic roles, light (calm-glass.md §2, plan 39.0 §3.2.1)
+  // ---------------------------------------------------------------------------
+  // A cream ground behind solid white panels: a panel reads from the ground
+  // behind it and a 1px line, never from a shadow. Only glass casts a shadow.
+  --color-ground: var(--cream-100);
+  --color-ground-visitor: var(--cream-50);
+  --color-panel: var(--white);
+  --color-panel-soft: var(--cream-150);
+  --color-panel-raised: var(--white);
+  --color-hover: var(--cream-200);
+  --color-selected: var(--emerald-50);
+  --color-selection: var(--sand-300);
+  // Lines are decorative (they fail 3:1 by design); the boundary of anything a
+  // person operates is `--color-control-border`, held to 3:1 on every ground.
+  --color-line: var(--sand-300);
+  --color-line-strong: var(--sand-400);
+  --color-control-border: var(--stone-500);
 
-  --border-subtle: #e7e5df;
-  --border-default: #dedbd4;
-  --border-strong: #cbc8bf;
-  --border-control: #80838a; // #8b8e95 adjusted: 2.79:1 on inset
+  --color-text: var(--ink-900);
+  --color-text-secondary: var(--ink-700);
+  --color-text-quiet: var(--stone-600);
 
-  // Ink: the action colour. Primary buttons are ink, links are ink and always
-  // underlined, the focus ring is ink. Nothing in the product is "brand blue".
-  --action: #16181b;
-  --action-hover: #2b2e33;
-  --action-pressed: #000000;
-  --on-action: #ffffff;
-  --link: #16181b;
-  --link-hover: #000000;
-  --focus-ring: #16181b;
-  --selection: #dedbd4;
+  // Emerald is the action colour: buttons, links (always underlined) and focus.
+  --color-primary: var(--emerald-700);
+  --color-primary-hover: var(--emerald-600);
+  --color-primary-pressed: var(--emerald-800);
+  --color-on-primary: var(--white);
+  --color-link: var(--emerald-700);
+  --color-link-hover: var(--emerald-900);
+  --color-focus-ring: var(--emerald-700);
+  --color-focus-halo: rgb(35 83 71 / 18%);
 
-  // The two voices. `fg` is the voice itself (glyphs, bars, the mark); `strong`
-  // is its text colour on a tint; `tint` and `border` draw a chip or a bubble.
-  // Lagoon = the AI. Ember = a person on the team. Nothing else, ever.
-  --voice-ai-fg: #0e7c72;
-  --voice-ai-strong: #0a5e57;
-  --voice-ai-tint: #e2f2ef;
-  --voice-ai-border: #bfe3dd;
-  --voice-human-fg: #c2410c;
-  --voice-human-strong: #9a330a;
-  --voice-human-tint: #fbe9df;
-  --voice-human-border: #f4cdb8;
+  // The three voices. `bubble` and `text` draw a message; `label` is the voice
+  // as text or a glyph on a panel (passes 4.5:1); `dot` is the voice as a mark
+  // beside a word; `edge` is decorative.
+  --voice-ai-bubble: var(--emerald-100);
+  --voice-ai-text: var(--emerald-900);
+  --voice-ai-label: var(--emerald-700);
+  --voice-ai-dot: var(--emerald-700);
+  --voice-ai-edge: rgb(35 83 71 / 22%);
+  // Meta text (the time) inside an AI bubble: quiet text drops to 3.99:1 on
+  // the dark AI bubble, so it takes the secondary tone there.
+  --voice-ai-meta: var(--stone-600);
+  --voice-team-bubble: var(--gold-100);
+  --voice-team-text: var(--ink-900);
+  --voice-team-edge: rgb(200 169 106 / 55%);
+  --voice-team-label: var(--gold-800);
+  --voice-team-dot: var(--gold-500);
+  --voice-customer-bubble: var(--cream-100);
+  --voice-customer-text: var(--ink-900);
+  --voice-customer-own-bubble: var(--cream-200);
 
-  // Status. Kept clear of the voices on purpose: Ember is orange, warning is a
-  // yellow amber, danger is crimson -- and every status also carries its own
-  // icon and word, every voice its glyph and word.
-  --success-fg: #2b7a30; // #2e7d32 adjusted: 4.49:1 on its bg
-  --success-bg: #e8f3e8;
-  --success-border: #c3e1c4;
+  // Chips: a dot and a word. Needs a person, handled by and waiting are gold;
+  // the AI answering is emerald; the AI could not reply is coral.
+  --chip-need-bg: var(--gold-100);
+  --chip-need-fg: var(--gold-850);
+  --chip-need-dot: var(--gold-500);
+  --chip-ai-bg: var(--emerald-100);
+  --chip-ai-fg: var(--emerald-900);
+  --chip-ai-dot: var(--emerald-700);
+  --chip-failed-bg: var(--coral-50);
+  --chip-failed-fg: var(--coral-700);
+  --chip-failed-dot: var(--coral-600);
 
-  --warning-fg: #8a5a00;
-  --warning-bg: #fdf3d7;
-  --warning-border: #f0d99a;
+  // Status words that are not voices (quotas, billing, indexing): the same
+  // three hues, each with its own glyph and word (owner decision Q4): success
+  // emerald + tick, warning gold + triangle, danger coral + octagon, info ink +
+  // "i". In the inbox and the transcript only the voice chips appear.
+  --status-success-bg: var(--emerald-100);
+  --status-success-fg: var(--emerald-700);
+  --status-success-border: rgb(35 83 71 / 22%);
+  --status-warning-bg: var(--gold-100);
+  --status-warning-fg: var(--gold-850);
+  --status-warning-border: rgb(200 169 106 / 55%);
+  --status-danger-bg: var(--coral-50);
+  --status-danger-fg: var(--coral-700);
+  --status-danger-border: rgb(180 67 47 / 30%);
+  --status-danger-solid: var(--coral-600);
+  --status-danger-solid-hover: var(--coral-700);
+  --status-on-danger-solid: var(--white);
+  --status-info-bg: var(--cream-150);
+  --status-info-fg: var(--ink-700);
+  --status-info-border: var(--sand-400);
 
-  --danger-fg: #b42318;
-  --danger-bg: #fdecea;
-  --danger-border: #f5c2bd;
-  --danger-solid: #c0392c;
-  --danger-solid-hover: #a83023;
-  --danger-contrast: #ffffff;
+  // Charts. Lines a reader must follow meet 3:1: gold-800 for the team and the
+  // previous period (gold-500 only as a fill, with ink labels).
+  --chart-current: var(--emerald-700);
+  --chart-previous: var(--gold-800);
+  --chart-ai: var(--emerald-700);
+  --chart-team: var(--gold-800);
+  --chart-team-fill: var(--gold-500);
+  // The second channel: sage, not emerald-300 (2.25:1 on white, below 3:1).
+  --chart-channel-2: var(--sage-500);
+  --chart-customer: var(--stone-600);
+  --chart-neutral: var(--ink-700);
+  --chart-grid: var(--sand-300);
+  --chart-ramp-1: var(--emerald-100);
+  --chart-ramp-2: var(--emerald-200);
+  --chart-ramp-3: var(--emerald-300);
+  --chart-ramp-4: var(--emerald-600);
+  --chart-ramp-5: var(--emerald-700);
 
-  --info-fg: #1f5fad;
-  --info-bg: #e7f0fb;
-  --info-border: #c3d8f3;
-
-  // Charts. Never a rainbow: AI and people are the voices, customers a neutral
-  // slate, single-series charts ink or neutral, sequential ramps Lagoon only.
-  --chart-ai: var(--voice-ai-fg);
-  --chart-human: var(--voice-human-fg);
-  --chart-customer: #5b6472;
-  --chart-neutral: #4d525a;
-  --chart-grid: #e7e5df;
-  --chart-ramp-1: #e2f2ef;
-  --chart-ramp-2: #a9d9d1;
-  --chart-ramp-3: #5fb3a8;
-  --chart-ramp-4: #0e7c72;
-  --chart-ramp-5: #0a5e57;
-
-  // Elevation: hairlines everywhere, shadows only on overlays (menus, dialogs,
-  // toasts, the peeking sidebar).
-  --shadow-overlay: 0 1px 2px rgb(22 24 27 / 5%), 0 12px 32px -8px rgb(22 24 27 / 18%);
-
-  --skeleton-base: #ebe9e3;
-  --skeleton-sheen: #f5f4f0;
-
-  --scrim: rgb(22 24 27 / 42%);
+  // ---------------------------------------------------------------------------
+  // Component tier
+  // ---------------------------------------------------------------------------
+  // Glass (calm-glass.md §3): only on floating layers, at most three blurred
+  // layers on screen, never on a scrolling row. Read through the `glass` mixin
+  // (styles/_glass.scss), the only place that declares backdrop-filter.
+  --glass-bg: rgb(255 255 255 / 62%);
+  --glass-border: rgb(255 255 255 / 78%);
+  --glass-shadow: 0 14px 44px rgb(11 43 38 / 10%);
+  --glass-highlight: inset 0 1px 0 rgb(255 255 255 / 90%);
+  --glass-blur: blur(24px) saturate(140%);
+  // The solid twin: what every glass becomes under reduced transparency, in
+  // forced colours and where backdrop-filter is not supported.
+  --glass-solid-bg: var(--color-panel);
+  --scrim: rgb(11 43 38 / 28%);
+  // The two background glows behind the shell (39.3): emerald at the start-top,
+  // gold at the end-bottom.
+  --glow-a: rgb(35 83 71 / 18%);
+  --glow-b: rgb(200 169 106 / 24%);
+  // The AI's presence (calm-glass.md §6), the same in both themes.
+  --orb-gradient: radial-gradient(
+    circle at 35% 30%,
+    var(--emerald-100),
+    var(--emerald-600) 55%,
+    var(--emerald-900)
+  );
+  --channel-whatsapp: var(--whatsapp-500);
+  --channel-web: var(--color-primary);
+  --skeleton-base: var(--cream-200);
+  --skeleton-sheen: var(--cream-150);
 
   color-scheme: light;
 
   // ---------------------------------------------------------------------------
-  // Spacing - a 4px foundation
+  // Spacing: a 4-point scale (calm-glass.md §5)
   // ---------------------------------------------------------------------------
   // One scale, ten steps, nothing in between. If a gap seems to want 13px the
   // answer is 12 or 16, not a new token.
@@ -229,102 +335,112 @@
   --space-6: 1.5rem; // 24px
   --space-7: 2rem; // 32px
   --space-8: 2.5rem; // 40px
-  --space-9: 3rem; // 48px
+  --space-9: 3.5rem; // 56px (Two Voices had 48)
   --space-10: 4rem; // 64px
 
   // The one gap below the scale, and not a step of it: a hairline between
-  // things that read as one (a label tight on its value, the rows of a list, the
-  // segments of a bar). When 4px feels loose, the answer is still 4px.
+  // things that read as one.
   --gap-hairline: 0.125rem; // 2px
 
+  // The shell's rhythm: 14px around the shell, 12px between columns, 24px
+  // inside panels (the spec allows 20-24).
+  --shell-padding: 0.875rem;
+  --column-gap: var(--space-3);
+  --panel-padding: var(--space-6);
+
   // ---------------------------------------------------------------------------
-  // Radius
+  // Radius (calm-glass.md §5)
   // ---------------------------------------------------------------------------
-  // One family, by role: every rule names the job, not a size.
-  --radius-badge: 6px; // badges, checkboxes, inner segments
-  --radius-control: 10px; // buttons, inputs, nav and menu items
-  --radius-card: 14px; // cards, panels, tables, menus
-  --radius-overlay: 20px; // dialogs and drawers
+  --radius-pill: 999px; // buttons, chips, segmented tracks, the widget's input
+  --radius-input: 12px; // inputs and small cards
+  --radius-nav-item: 12px;
+  --radius-tile: 16px; // rows and tiles
+  --radius-panel: 24px; // panels
+  --radius-dialog: 24px; // dialogs and sheets
   --radius-bubble: 18px;
   --radius-bubble-tail: 6px; // the speaker's corner, written with logical corners
-  --radius-pill: 999px; // counts and chips only
+  --radius-badge: 6px; // checkboxes and small marks until 39.2b's choice controls
 
   // ---------------------------------------------------------------------------
   // Control sizing
   // ---------------------------------------------------------------------------
-  // One height per density step, shared by buttons, inputs and selects so a
-  // button beside a field lines up without anybody measuring. The coarse-pointer
-  // override below raises the default to a touch target.
-  --control-height-sm: 2rem; // 32px: dense toolbars, table row actions
-  --control-height: 2.25rem; // 36px: the default
-  --control-height-lg: 2.5rem; // 40px: the primary action of a form
-  --icon-size-sm: 1rem; // 16px: inside compact controls
-  --icon-size: 1.125rem; // 18px: buttons, menus
-  --icon-size-nav: 1.25rem; // 20px: primary navigation
+  // The heights stay Two Voices' until 39.2b restyles buttons and inputs in
+  // place (pill, 44px; 40px in dense desktop headers). The touch override
+  // below already raises them to 44px on a coarse pointer.
+  --control-height-sm: 2rem; // 32px
+  --control-height: 2.25rem; // 36px
+  --control-height-lg: 2.5rem; // 40px
+  --control-height-dense: 2.5rem; // 40px: dense desktop headers (calm-glass.md §6)
+  --target-min: 2.75rem; // 44px: every touch target, the label included
+  --chip-height: 1.5rem; // 24px (the spec allows 22-28)
+  --icon-size-sm: 1rem; // 16px
+  --icon-size: 1.125rem; // 18px
+  --icon-size-nav: 1.25rem; // 20px
 
   // ---------------------------------------------------------------------------
-  // Typography
+  // Typography (calm-glass.md §4)
   // ---------------------------------------------------------------------------
-  // Instrument Sans (variable width and weight) for Latin, IBM Plex Sans Arabic
-  // for Arabic, both self-hosted (styles/_fonts.scss): no font service is ever
-  // contacted. Each family is followed by a metric-matched local fallback, so
-  // the swap when the real file arrives moves nothing.
-  //
-  // Order matters only for the fallbacks: every face carries a unicode-range,
-  // so Arabic characters skip both Latin faces and Latin characters inside
-  // Arabic text keep Instrument Sans.
+  // Geist for Latin, IBM Plex Sans Arabic for Arabic, Instrument Serif as the
+  // Latin display accent, all self-hosted (styles/_fonts.scss). Each family is
+  // followed by its metric-matched local fallback, so the swap moves nothing.
+  // Every face carries a unicode-range, so Arabic characters skip the Latin
+  // faces and the digits and Latin inside Arabic text keep Geist.
+  --font-ui-latin: 'Geist', 'Geist Fallback';
+  --font-ui-arabic: 'IBM Plex Sans Arabic', 'IBM Plex Sans Arabic Fallback';
   --font-sans:
-    'Instrument Sans', 'IBM Plex Sans Arabic', 'Instrument Sans Fallback',
-    'IBM Plex Sans Arabic Fallback', system-ui, sans-serif;
+    'Geist', 'IBM Plex Sans Arabic', 'Geist Fallback', 'IBM Plex Sans Arabic Fallback', system-ui,
+    sans-serif;
+  --font-display-latin: 'Instrument Serif', 'Instrument Serif Fallback';
+  --font-display:
+    'Instrument Serif', 'IBM Plex Sans Arabic', 'Instrument Serif Fallback',
+    'IBM Plex Sans Arabic Fallback', serif;
   --font-mono: ui-monospace, 'SF Mono', 'Cascadia Mono', 'Roboto Mono', menlo, consolas, monospace;
 
-  // Headings are the narrowed cut of the same variable font. `font` shorthands
-  // cannot carry a percentage width, so the title utilities apply this after.
-  --heading-stretch: 86%;
-  --letter-spacing-tight: -0.015em; // titles only, to close optical gaps at size
+  // Geist has no width axis; titles track in slightly, as on the boards.
+  --heading-stretch: 100%;
+  --letter-spacing-tight: -0.01em;
 
-  // Steps are named for the job they do, so a stylesheet says what it means.
-  --text-display: 600 clamp(1.75rem, 1.35rem + 1.3vw, 2.5rem) / 1.1 var(--font-sans); // 28-40px
-  --text-page-title: 620 clamp(1.5rem, 1.3rem + 0.65vw, 1.875rem) / 1.2 var(--font-sans); // 24-30px
-  --text-section-title: 600 1.125rem / 1.35 var(--font-sans); // 18px
-  --text-card-title: 600 0.9375rem / 1.4 var(--font-sans); // 15px
-  --text-body: 400 0.875rem / 1.55 var(--font-sans); // 14px, dense admin
-  --text-body-strong: 550 0.875rem / 1.55 var(--font-sans);
-  --text-reading: 400 0.9375rem / 1.6 var(--font-sans); // 15px, transcripts and long text
-  --text-small: 400 0.8125rem / 1.5 var(--font-sans); // 13px
-  --text-label: 550 0.8125rem / 1.4 var(--font-sans);
-  --text-nav: 500 0.875rem / 1.2 var(--font-sans);
-  --text-table: 400 0.8125rem / 1.45 var(--font-sans); // dense data
-  --text-caption: 500 0.75rem / 1.35 var(--font-sans); // 12px: meta, column headers
-  --text-numeric: 550 0.875rem / 1.3 var(--font-sans); // paired with tabular-nums
+  // The scale: size / line height, written unitless so a child with another
+  // size keeps its own leading. Numbers use tabular-nums where they line up.
+  --text-display: 400 2.75rem / 1.0909 var(--font-display); // 44/48 Instrument Serif
+  --text-title-1: 600 clamp(1.5rem, 1.3rem + 0.65vw, 1.875rem) / 1.2 var(--font-sans); // 30/36
+  --text-title-2: 600 1.25rem / 1.4 var(--font-sans); // 20/28
+  --text-title-3: 600 1rem / 1.5 var(--font-sans); // 16/24
+  --text-body: 400 0.9375rem / 1.6 var(--font-sans); // 15/24
+  --text-body-strong: 500 0.9375rem / 1.6 var(--font-sans);
+  --text-small: 400 0.8125rem / 1.5385 var(--font-sans); // 13/20
+  --text-label: 500 0.8125rem / 1.5385 var(--font-sans); // 13/20
+  --text-caption: 500 0.75rem / 1.3333 var(--font-sans); // 12/16
+  --text-nav: 500 0.875rem / 1.2 var(--font-sans); // 14
+  --text-table: 400 0.8125rem / 1.5385 var(--font-sans); // 13/20
+  --text-numeric: 600 0.875rem / 1.4286 var(--font-sans); // 14/20, with tabular-nums
+  // Large figures (overview and analytics numbers) until the bento (39.7a).
+  --text-figure: 600 clamp(1.75rem, 1.35rem + 1.3vw, 2.5rem) / 1.1 var(--font-sans);
 
   // ---------------------------------------------------------------------------
-  // Motion
+  // Motion (calm-glass.md §5)
   // ---------------------------------------------------------------------------
-  // Functional and quick: response, not animation. No count-ups, no stagger on
-  // every visit, no parallax.
-  --duration-xs: 100ms; // colour on press
-  --duration-sm: 150ms; // hover, small state changes, and anything frequent: menus, toasts, a new message settling
-  --duration-md: 220ms; // things that happen a few times a session: the widget opening, the dialog scrim
-  --duration-lg: 320ms; // drawers, dialogs, the "Take over" sweep
-  --duration-xl: 450ms; // the rare large surface change
-  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
-  --ease-enter: cubic-bezier(0.22, 1, 0.36, 1);
-  --ease-exit: cubic-bezier(0.4, 0, 1, 1);
-  --ease-emphasized: cubic-bezier(0.05, 0.7, 0.1, 1);
-
-  // The original three names, kept so every existing rule follows the scale.
-  --motion-fast: var(--duration-sm);
-  --motion-normal: var(--duration-md);
-  --motion-slow: var(--duration-lg);
+  // Motion explains a change and then stops. Three durations and one easing.
+  --duration-press: 120ms; // hover and press
+  --duration-menu: 200ms; // menus, popovers and toasts
+  --duration-dialog: 280ms; // dialogs and panels
+  // A fade is kept under reduced motion (only movement is dropped), so it has
+  // its own duration that the reduced-motion rule leaves alone.
+  --duration-fade: 200ms;
+  --ease-calm: cubic-bezier(0.2, 0, 0, 1);
+  // Travel is multiplied by this: 1 normally, 0 under reduced motion. A new
+  // message rises 8px; the orb breathes 1 -> 1.04 while the AI answers.
+  --motion-travel: 1;
+  --motion-rise: calc(8px * var(--motion-travel));
+  --orb-breath: 1.04;
 
   // ---------------------------------------------------------------------------
   // Layout
   // ---------------------------------------------------------------------------
-  --sidebar-width: 15rem; // 240px: expanded, pinned or peeking
+  --sidebar-width: 15rem; // 240px: expanded, pinned or peeking (39.3: 216px glass)
   --sidebar-width-collapsed: 4rem; // 64px: the icon rail
   --topbar-height: 3.5rem; // 56px
-  --page-max-width: 100rem; // 1600px: wide desktops get room, text stays readable
+  --page-max-width: 100rem; // 1600px
   --page-gutter: var(--space-6);
   --focus-ring-width: 2px;
   --focus-ring-offset: 2px;
@@ -343,7 +459,6 @@
   --z-skip-link: 70;
 
   // Direction multiplier for the transforms that have to mirror under RTL.
-  // Transforms do not respond to `dir`, so they take their sign from here.
   --direction-flip: 1;
 }
 
@@ -351,23 +466,23 @@
   --direction-flip: -1;
 }
 
-// Arabic. Plex Sans Arabic has no width axis and Arabic has no letter case, so
-// the narrowed headings, the negative tracking and any uppercase stop here;
-// Arabic body text is a step larger with more leading, because at the same
-// size it reads smaller than Latin.
+// Arabic: the same sizes with one more step of line height, letter-spacing 0,
+// never under 13px for running text, and Plex Arabic 600 for display (the
+// serif is Latin only).
 :lang(ar) {
   --heading-stretch: 100%;
   --letter-spacing-tight: 0;
-  --text-page-title: 600 clamp(1.5rem, 1.3rem + 0.65vw, 1.875rem) / 1.4 var(--font-sans);
-  --text-section-title: 600 1.125rem / 1.45 var(--font-sans);
-  --text-card-title: 600 0.9375rem / 1.5 var(--font-sans);
-  --text-body: 400 0.9375rem / 1.7 var(--font-sans);
-  --text-body-strong: 500 0.9375rem / 1.7 var(--font-sans);
-  --text-reading: 400 0.9375rem / 1.75 var(--font-sans);
-  --text-small: 400 0.875rem / 1.65 var(--font-sans);
-  --text-label: 500 0.875rem / 1.5 var(--font-sans);
-  --text-table: 400 0.875rem / 1.6 var(--font-sans);
-  --text-caption: 500 0.8125rem / 1.5 var(--font-sans);
+  --text-display: 600 2.75rem / 1.4 var(--font-sans); // 44/62
+  --text-title-1: 600 clamp(1.5rem, 1.3rem + 0.65vw, 1.875rem) / 1.4 var(--font-sans); // 30/42
+  --text-title-2: 600 1.25rem / 1.5 var(--font-sans); // 20/30
+  --text-title-3: 600 1rem / 1.625 var(--font-sans); // 16/26
+  --text-body: 400 0.9375rem / 1.7333 var(--font-sans); // 15/26
+  --text-body-strong: 500 0.9375rem / 1.7333 var(--font-sans);
+  --text-small: 400 0.8125rem / 1.6923 var(--font-sans); // 13/22
+  --text-label: 500 0.8125rem / 1.6923 var(--font-sans); // 13/22
+  --text-caption: 500 0.8125rem / 1.5385 var(--font-sans); // 13/20 (never under 13)
+  --text-table: 400 0.8125rem / 1.6923 var(--font-sans); // 13/22
+  --text-numeric: 600 0.875rem / 1.5714 var(--font-sans); // 14/22
 }
 
 // Touch: every control grows to a comfortable target and the page gutter
@@ -386,17 +501,18 @@
   }
 }
 
-// Reduced motion, at the source. Every transition and animation in the product
-// reads these tokens, so collapsing them here reaches component styles too --
-// which the base layer's universal selector cannot, because any component rule
-// out-ranks `*`. Near zero rather than zero, so transitionend still fires.
+// Reduced motion, at the source: movement is dropped and fades are kept. Every
+// transition and animation reads these tokens, so collapsing them here reaches
+// component styles too, which the base layer's universal selector cannot (any
+// component rule out-ranks `*`). Near zero rather than zero, so transitionend
+// and animationend still fire.
 @media (prefers-reduced-motion: reduce) {
   :root {
-    --duration-xs: 0.01ms;
-    --duration-sm: 0.01ms;
-    --duration-md: 0.01ms;
-    --duration-lg: 0.01ms;
-    --duration-xl: 0.01ms;
+    --duration-press: 0.01ms;
+    --duration-menu: 0.01ms;
+    --duration-dialog: 0.01ms;
+    --motion-travel: 0;
+    --orb-breath: 1;
   }
 }
 
@@ -405,8 +521,8 @@
   @include dark-palette;
 }
 
-// The no-JavaScript path. The pre-bootstrap script normally resolves the theme
-// and stamps data-theme before first paint, so this only takes effect when that
+// The no-JavaScript path. The pre-paint script normally resolves the theme and
+// stamps data-theme before first paint, so this only takes effect when that
 // script did not run at all. Scoped so it can never override an explicit choice.
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']):not([data-theme='dark']) {
@@ -414,15 +530,165 @@
   }
 }
 
-// More contrast asked for: muted text becomes secondary and the hairlines that
-// are decorative by default become real boundaries. Last, and scoped to the
-// theme selectors too, so it wins over the dark palette's literal values.
+// -----------------------------------------------------------------------------
+// Reduced transparency: every glass becomes its solid twin
+// -----------------------------------------------------------------------------
+// Panel colour, the same border, no blur (calm-glass.md §3). Two switches: the
+// person's own "Reduce transparency" setting (data-transparency, stamped before
+// first paint) and the operating system's preference. After the palettes, and
+// scoped to every theme selector, so it wins over their glass values.
+@mixin solid-glass {
+  --glass-bg: var(--glass-solid-bg);
+  --glass-blur: none;
+  --glass-highlight: inset 0 0 0 transparent;
+}
+
+:root[data-transparency='reduced'] {
+  @include solid-glass;
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  :root,
+  :root[data-theme='light'],
+  :root[data-theme='dark'],
+  :root:not([data-theme='light']):not([data-theme='dark']) {
+    @include solid-glass;
+  }
+}
+
+// More contrast asked for: quiet text becomes secondary and the decorative
+// lines become real boundaries.
 @media (prefers-contrast: more) {
   :root,
   :root[data-theme='light'],
-  :root[data-theme='dark'] {
-    --text-muted: var(--text-secondary);
-    --border-default: var(--border-control);
-    --border-subtle: var(--border-strong);
+  :root[data-theme='dark'],
+  :root:not([data-theme='light']):not([data-theme='dark']) {
+    --color-text-quiet: var(--color-text-secondary);
+    --color-line: var(--color-control-border);
+    --color-line-strong: var(--color-control-border);
   }
+}
+
+// Forced colours (Windows high contrast): the browser substitutes system
+// colours for ordinary colours; these are the values it cannot substitute.
+// No shadows, no blur, a Highlight focus ring drawn with outline.
+@media (forced-colors: active) {
+  :root,
+  :root[data-theme='light'],
+  :root[data-theme='dark'],
+  :root:not([data-theme='light']):not([data-theme='dark']) {
+    --glass-bg: Canvas;
+    --glass-solid-bg: Canvas;
+    --glass-border: CanvasText;
+    --glass-shadow: 0 0 0 transparent;
+    --glass-highlight: inset 0 0 0 transparent;
+    --glass-blur: none;
+    --color-focus-ring: Highlight;
+    --color-focus-halo: transparent;
+  }
+}
+
+// =============================================================================
+// DEPRECATED ALIAS LAYER (Two Voices names -> Calm Glass roles)
+// =============================================================================
+// Kept so every screen takes Calm Glass at once; each screen step moves its
+// components to the new names, and 39.8b deletes this block (a grep gate
+// proves no old name is left). Declared once on :root: every alias is a var()
+// that resolves on <html>, where the theme, transparency and contrast switches
+// also live, so it follows them. Never use these names in new code.
+:root {
+  // Surfaces
+  --surface-page: var(--color-ground);
+  --surface-default: var(--color-panel);
+  --surface-muted: var(--color-panel-soft);
+  --surface-raised: var(--color-panel-raised);
+  --surface-inset: var(--color-panel-soft);
+  --surface-hover: var(--color-hover);
+  --surface-selected: var(--color-selected);
+
+  // Text
+  --text-primary: var(--color-text);
+  --text-secondary: var(--color-text-secondary);
+  --text-muted: var(--color-text-quiet);
+
+  // Lines
+  --border-subtle: var(--color-line);
+  --border-default: var(--color-line);
+  --border-strong: var(--color-line-strong);
+  --border-control: var(--color-control-border);
+
+  // Action, links, focus
+  --action: var(--color-primary);
+  --action-hover: var(--color-primary-hover);
+  --action-pressed: var(--color-primary-pressed);
+  --on-action: var(--color-on-primary);
+  --link: var(--color-link);
+  --link-hover: var(--color-link-hover);
+  --focus-ring: var(--color-focus-ring);
+  --selection: var(--color-selection);
+
+  // Voices: Lagoon (AI) -> emerald, Ember (a person) -> gold. `fg` was the
+  // voice as a glyph or a bar, so it maps to the label colour that passes on a
+  // panel (gold-500 itself is 2.2:1 on white).
+  --voice-ai-fg: var(--voice-ai-label);
+  --voice-ai-strong: var(--chip-ai-fg);
+  --voice-ai-tint: var(--voice-ai-bubble);
+  --voice-ai-border: var(--voice-ai-edge);
+  --voice-human-fg: var(--voice-team-label);
+  --voice-human-strong: var(--chip-need-fg);
+  --voice-human-tint: var(--voice-team-bubble);
+  --voice-human-border: var(--voice-team-edge);
+
+  // Status
+  --success-fg: var(--status-success-fg);
+  --success-bg: var(--status-success-bg);
+  --success-border: var(--status-success-border);
+  --warning-fg: var(--status-warning-fg);
+  --warning-bg: var(--status-warning-bg);
+  --warning-border: var(--status-warning-border);
+  --danger-fg: var(--status-danger-fg);
+  --danger-bg: var(--status-danger-bg);
+  --danger-border: var(--status-danger-border);
+  --danger-solid: var(--status-danger-solid);
+  --danger-solid-hover: var(--status-danger-solid-hover);
+  --danger-contrast: var(--status-on-danger-solid);
+  --info-fg: var(--status-info-fg);
+  --info-bg: var(--status-info-bg);
+  --info-border: var(--status-info-border);
+
+  // Charts
+  --chart-human: var(--chart-team);
+
+  // Elevation: only glass casts a shadow, so the overlays' shadow is glass's.
+  --shadow-overlay: var(--glass-shadow);
+
+  // Shape
+  --radius-control: var(--radius-input);
+  --radius-card: var(--radius-tile);
+  --radius-overlay: var(--radius-dialog);
+
+  // Motion
+  --duration-xs: var(--duration-press);
+  --duration-sm: var(--duration-press);
+  --duration-md: var(--duration-menu);
+  --duration-lg: var(--duration-dialog);
+  --duration-xl: var(--duration-dialog);
+  --ease-standard: var(--ease-calm);
+  --ease-enter: var(--ease-calm);
+  --ease-exit: var(--ease-calm);
+  --ease-emphasized: var(--ease-calm);
+  --motion-fast: var(--duration-press);
+  --motion-normal: var(--duration-menu);
+  --motion-slow: var(--duration-dialog);
+}
+
+// Type aliases, re-declared wherever the type roles change (:lang(ar)), so an
+// Arabic fragment inside an English page gets the Arabic leading through the
+// old names too.
+:root,
+:lang(ar) {
+  --text-page-title: var(--text-title-1);
+  --text-section-title: var(--text-title-2);
+  --text-card-title: var(--text-title-3);
+  --text-reading: var(--text-body);
 }

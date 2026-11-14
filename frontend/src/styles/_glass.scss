@@ -1,0 +1,47 @@
+// =============================================================================
+// Glass (calm-glass.md §3)
+// =============================================================================
+//
+// The one material that floats: the side bar, the phone's top and bottom bars,
+// menus and popovers, dialogs and the command palette, toasts, and the
+// widget's header and composer. Conversations, tables, forms and charts stay
+// on solid panels.
+//
+// This mixin and the `.glass` class are the only places in the product that
+// declare backdrop-filter. Everything they draw comes from the `--glass-*`
+// tokens, which already resolve to the solid twin (panel colour, the same
+// border, no blur) under the "Reduce transparency" setting and
+// prefers-reduced-transparency (styles/_tokens.scss).
+//
+// The budget, enforced by review and the design lab:
+//   - at most three blurred layers on screen at once (on a phone: the top bar,
+//     the bottom bar and one sheet or menu);
+//   - never on a scrolling list's rows, and never on anything that scrolls
+//     under a fixed blur unless the layer is one of the five above;
+//   - `will-change` only while animating, never at rest.
+// -----------------------------------------------------------------------------
+
+@mixin glass {
+  background-color: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-highlight), var(--glass-shadow);
+  backdrop-filter: var(--glass-blur);
+
+  // A browser that cannot blur gets the solid twin rather than a see-through
+  // panel with nothing behind it to soften.
+  @supports not (backdrop-filter: blur(1px)) {
+    background-color: var(--glass-solid-bg);
+  }
+
+  // Windows high contrast: system colours, a real border, no shadow, no blur.
+  @media (forced-colors: active) {
+    border-color: CanvasText;
+    background-color: Canvas;
+    box-shadow: none;
+    backdrop-filter: none;
+  }
+}
+
+.glass {
+  @include glass;
+}

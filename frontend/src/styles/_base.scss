@@ -28,8 +28,8 @@ html {
 body {
   margin: 0;
   min-block-size: 100%;
-  background-color: var(--surface-page);
-  color: var(--text-primary);
+  background-color: var(--color-ground);
+  color: var(--color-text);
   font: var(--text-body);
   font-optical-sizing: auto;
 
@@ -41,8 +41,8 @@ body {
 // Neutral, never a voice colour: selecting text is not something the AI or a
 // person said.
 ::selection {
-  background-color: var(--selection);
-  color: var(--text-primary);
+  background-color: var(--color-selection);
+  color: var(--color-text);
 }
 
 // Headings are reset to inherit, then given weight by the type utilities below.
@@ -68,18 +68,18 @@ ol {
   list-style: none;
 }
 
-// Links are ink and always underlined: colour alone would not tell a link from
-// text now that the action colour is the text colour. The underline sits clear
-// of descenders and thickens on hover instead of appearing.
+// Links are emerald and always underlined: colour alone never tells a link
+// from text. The underline sits clear of descenders and thickens on hover
+// instead of appearing.
 a {
-  color: var(--link);
+  color: var(--color-link);
   text-decoration: underline;
   text-decoration-thickness: 1px;
   text-underline-offset: 0.2em;
-  transition: text-decoration-thickness var(--duration-xs) var(--ease-standard);
+  transition: text-decoration-thickness var(--duration-press) var(--ease-calm);
 
   &:hover {
-    color: var(--link-hover);
+    color: var(--color-link-hover);
     text-decoration-thickness: 2px;
   }
 }
@@ -103,9 +103,10 @@ select {
 // -----------------------------------------------------------------------------
 // Focus
 // -----------------------------------------------------------------------------
-// One focus treatment for the entire product, defined once: 2px of ink with a
-// 2px gap, which shows the surface behind and so separates the ring from an
-// ink button as clearly as from a white field.
+// One focus treatment for the entire product, defined once: 2px of the primary
+// colour with a 2px gap, which shows the surface behind and so separates the
+// ring from an emerald button as clearly as from a white field. (39.2b adds
+// the inputs' own 2px border + 3px halo, calm-glass.md §6.)
 //
 // `:focus-visible` rather than `:focus`, so a mouse user clicking a button does
 // not get a ring while a keyboard user always does. Drawn with `outline` on
@@ -113,7 +114,7 @@ select {
 // box-shadow ring would vanish there), cannot be clipped by `overflow: hidden`
 // and does not affect layout.
 :focus-visible {
-  outline: var(--focus-ring-width) solid var(--focus-ring);
+  outline: var(--focus-ring-width) solid var(--color-focus-ring);
   outline-offset: var(--focus-ring-offset);
 }
 
@@ -131,34 +132,40 @@ select {
 // screen readers use to build a document outline -- independent of its size,
 // which is a visual decision.
 //
-// Titles use the narrowed cut of Instrument Sans. The width is set after the
-// `font` shorthand, which would otherwise reset it.
+// Titles are Geist 600 with a slight inward tracking (zero in Arabic). The
+// display line is Instrument Serif (Plex Arabic 600 in Arabic): the overview
+// greeting, empty-state lines and entry pages only, never tables or forms.
 .text-display {
   font: var(--text-display);
-  font-stretch: var(--heading-stretch);
+  letter-spacing: var(--letter-spacing-tight);
+  color: var(--color-text);
+  text-wrap: balance;
+}
+
+// Large figures (tabular, so a changing number does not jiggle).
+.text-figure {
+  font: var(--text-figure);
   font-variant-numeric: tabular-nums;
   letter-spacing: var(--letter-spacing-tight);
-  color: var(--text-primary);
+  color: var(--color-text);
 }
 
 .text-page-title {
-  font: var(--text-page-title);
-  font-stretch: var(--heading-stretch);
+  font: var(--text-title-1);
   letter-spacing: var(--letter-spacing-tight);
-  color: var(--text-primary);
+  color: var(--color-text);
   text-wrap: balance;
 }
 
 .text-section-title {
-  font: var(--text-section-title);
-  font-stretch: var(--heading-stretch);
+  font: var(--text-title-2);
   letter-spacing: var(--letter-spacing-tight);
-  color: var(--text-primary);
+  color: var(--color-text);
 }
 
 .text-card-title {
-  font: var(--text-card-title);
-  color: var(--text-primary);
+  font: var(--text-title-3);
+  color: var(--color-text);
 }
 
 .text-body {
@@ -166,7 +173,7 @@ select {
 }
 
 .text-reading {
-  font: var(--text-reading);
+  font: var(--text-body);
 }
 
 .text-small {
@@ -174,11 +181,11 @@ select {
 }
 
 .text-secondary {
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
 }
 
 .text-muted {
-  color: var(--text-muted);
+  color: var(--color-text-quiet);
 }
 
 // -----------------------------------------------------------------------------
@@ -253,19 +260,19 @@ select {
   inset-inline-start: var(--space-2);
   z-index: var(--z-skip-link);
   padding: var(--space-2) var(--space-4);
-  background-color: var(--action);
-  color: var(--on-action);
-  border-radius: var(--radius-control);
+  background-color: var(--color-primary);
+  color: var(--color-on-primary);
+  border-radius: var(--radius-pill);
   font: var(--text-body-strong);
   text-decoration: none;
   transform: translateY(calc(-100% - var(--space-4)));
-  transition: transform var(--duration-sm) var(--ease-standard);
+  transition: transform var(--duration-press) var(--ease-calm);
 
   // The shadow is cast only while the link is on screen. Parked above the
   // viewport, a 40px blur still reached down into the page's top corner.
   &:focus-visible {
-    color: var(--on-action);
-    box-shadow: var(--shadow-overlay);
+    color: var(--color-on-primary);
+    box-shadow: var(--glass-shadow);
     transform: translateY(0);
   }
 }
@@ -298,11 +305,11 @@ select {
 }
 
 ::view-transition-old(route-content) {
-  animation: route-out var(--duration-sm) var(--ease-exit) both;
+  animation: route-out var(--duration-press) var(--ease-calm) both;
 }
 
 ::view-transition-new(route-content) {
-  animation: route-in var(--duration-sm) var(--ease-enter) both;
+  animation: route-in var(--duration-press) var(--ease-calm) both;
 }
 
 // Same page, new query string (a list's next page), or reduced motion: the
@@ -331,7 +338,9 @@ select {
 // A global switch rather than a per-component opt-in, so a component added later
 // cannot forget to honour it. Durations collapse to ~0 instead of being removed
 // outright: transitionend still fires, so anything that waits on it keeps
-// working.
+// working. A fade that should stay under reduced motion (calm-glass.md §5)
+// declares `var(--duration-fade)` on its own rule, which out-ranks `*`; travel
+// is already zero there through `--motion-travel`.
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

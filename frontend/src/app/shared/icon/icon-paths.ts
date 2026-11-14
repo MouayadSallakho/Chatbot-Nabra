@@ -164,6 +164,9 @@ export const ICON_PATHS = {
   /** Follow the operating system: a display. */
   monitor: ['M4 5h16v10H4z', 'M9 19h6', 'M12 15v4'],
 
+  /** Reduce transparency: two overlapping panes, the front one solid-edged. */
+  layers: ['M4 8h10v10H4z', 'M10 8V4h10v10h-6'],
+
   // --- States --------------------------------------------------------------
   /** Nothing here yet. */
   inbox: [

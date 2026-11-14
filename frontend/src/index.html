@@ -47,10 +47,26 @@
       the bundle exists -- and theme-startup.spec.ts runs this very script
       against fake browsers, so the two cannot drift apart silently.
 
-      Two guarded halves because localStorage throws outright, rather than
-      returning null, in some privacy modes. A failure must degrade to the
-      light, English default, never to a blank page, and a failure in one half
-      must not cost the other.
+      Transparency: the person's own "Reduce transparency" choice stamps
+      data-transparency="reduced", so no glass layer ever paints see-through
+      first. Admin pages only, like the theme: the visitor pages follow the
+      visitor's own device (prefers-reduced-transparency, in the token layer).
+
+      Fonts: a preload, at HTML parse, of exactly what the first paint of this
+      language needs (Phase 39.2a, Phase 38 note 1). Geist Latin always: the
+      Latin text and the digits of both languages. Arabic 400 on Arabic pages,
+      and on English pages under /conversations, where customers often write in
+      Arabic and the fallback otherwise showed for about 0.8 s; there at low
+      priority, so it does not slow the bundle on a slow link. Nothing else:
+      Latin Extended, 500, 600, 700 and the serif load when a glyph needs them.
+      The URLs are the very ones in src/styles/_fonts.scss (versioned, unhashed
+      files in public/fonts), so the stylesheet reuses the preloaded response
+      and nothing downloads twice.
+
+      Guarded parts because localStorage throws outright, rather than returning
+      null, in some privacy modes. A failure must degrade to the light, English
+      default with glass, never to a blank page, and a failure in one part must
+      not cost the others.
     -->
     <script>
       (function () {
@@ -99,6 +115,35 @@
         }
         root.setAttribute('lang', lang);
         root.setAttribute('dir', lang === 'ar' ? 'rtl' : 'ltr');
+        try {
+          if (!visitor && localStorage.getItem('omniai.transparency') === 'reduced') {
+            root.setAttribute('data-transparency', 'reduced');
+          }
+        } catch (_) {
+          // Glass, then: the solid twin is a preference, not a requirement.
+        }
+        try {
+          var arabic = '/fonts/ibm-plex-sans-arabic/ibm-plex-sans-arabic-arabic-400.v1.woff2';
+          var fonts = [['/fonts/geist/geist-latin.v1.woff2', 'high']];
+          if (lang === 'ar') {
+            fonts.push([arabic, 'high']);
+          } else if (/^\/conversations(\/|$)/.test(location.pathname)) {
+            // Low: on an English page it must not slow the bundle it shares the link with.
+            fonts.push([arabic, 'low']);
+          }
+          for (var f = 0; f < fonts.length; f++) {
+            var link = document.createElement('link');
+            link.rel = 'preload';
+            link.as = 'font';
+            link.type = 'font/woff2';
+            link.crossOrigin = 'anonymous';
+            link.fetchPriority = fonts[f][1];
+            link.href = fonts[f][0];
+            document.head.appendChild(link);
+          }
+        } catch (_) {
+          // The stylesheet still finds every face; only the head start is lost.
+        }
       })();
     </script>
     <!-- The boot status (in <body>) carries both languages; show the page's one. -->
@@ -160,27 +205,28 @@
             style="display: block"
           >
             <path
-              style="fill: var(--voice-ai-fg, #0e7c72)"
+              style="fill: var(--voice-ai-fg, #235347)"
               d="M4.4 18.35 3.5 23l4.7-1.6.54-.21A9.5 9.5 0 0 1 17.02 7 8.5 8.5 0 0 0 4.4 18.35Z"
             />
             <path
-              style="fill: var(--voice-human-fg, #c2410c)"
+              style="fill: var(--voice-human-fg, #7a5c1e)"
               d="M17 9a7.5 7.5 0 0 1 5.8 12.25l.8 4.25-4.1-1.4A7.5 7.5 0 1 1 17 9Z"
             />
           </svg>
           <!--
-            The wordmark, in the page's language. The width and tracking tokens
-            narrow "Nabra" in Instrument Sans and leave "نبرة" (IBM Plex Sans
-            Arabic) at full width and untracked, through :lang(ar).
+            The wordmark, in the page's language: "Nabra" in Geist, "نبرة" in
+            IBM Plex Sans Arabic (untracked, through :lang(ar)). Weight 600, so
+            an Arabic first paint needs no 700 file; 39.2b replaces both with
+            the outlined lockup.
           -->
           <span
             class="boot-wordmark"
             data-boot-lang="en"
             lang="en"
             style="
-              color: var(--text-primary, #16181b);
+              color: var(--text-primary, #1b2420);
               font-size: 1.375rem;
-              font-weight: 650;
+              font-weight: 600;
               font-stretch: var(--heading-stretch, 86%);
               letter-spacing: var(--letter-spacing-tight, 0);
               line-height: 1.4;
@@ -192,9 +238,9 @@
             data-boot-lang="ar"
             lang="ar"
             style="
-              color: var(--text-primary, #16181b);
+              color: var(--text-primary, #1b2420);
               font-size: 1.375rem;
-              font-weight: 650;
+              font-weight: 600;
               font-stretch: var(--heading-stretch, 86%);
               letter-spacing: var(--letter-spacing-tight, 0);
               line-height: 1.4;
@@ -205,7 +251,7 @@
         <p
           role="status"
           aria-live="polite"
-          style="margin: 0; color: var(--text-muted, #5f646d); font-size: 0.875rem"
+          style="margin: 0; color: var(--text-muted, #6b6658); font-size: 0.875rem"
         >
           <span data-boot-lang="en" lang="en">Loading…</span>
           <span data-boot-lang="ar" lang="ar">جارٍ التحميل…</span>

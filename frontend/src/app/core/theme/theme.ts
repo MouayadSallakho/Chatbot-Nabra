@@ -45,3 +45,22 @@ export const THEME_LABELS: Readonly<Record<ThemePreference, string>> = {
 export function isThemePreference(value: unknown): value is ThemePreference {
   return typeof value === 'string' && (THEME_PREFERENCES as readonly string[]).includes(value);
 }
+
+/**
+ * The person's own "Reduce transparency" choice: every glass layer becomes its
+ * solid twin (calm-glass.md §3). The operating system's
+ * `prefers-reduced-transparency` does the same on its own, in the token layer;
+ * this is the in-app switch beside it, for a browser or a person that does not
+ * set the system preference.
+ *
+ * DUPLICATED IN src/index.html like the theme key: the pre-paint script stamps
+ * the attribute before first paint, so a glass layer never flashes see-through.
+ * theme-startup.spec.ts runs that script and checks the two agree.
+ */
+export const TRANSPARENCY_STORAGE_KEY = 'omniai.transparency';
+
+/** The attribute the token layer reads; present only when transparency is reduced. */
+export const TRANSPARENCY_ATTRIBUTE = 'data-transparency';
+
+/** The one stored and stamped value. Anything else means full transparency. */
+export const REDUCED_TRANSPARENCY = 'reduced';

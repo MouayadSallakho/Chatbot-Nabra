@@ -82,12 +82,13 @@
   flex: none;
 }
 
-// The lockup: the mark and the wordmark -- "Nabra" in Instrument Sans,
-// narrowed like every title; "نبرة" in IBM Plex Sans Arabic, where the
-// width and tracking tokens are 100% and 0. The line is tall enough for the
-// dots of ب and ة, which a clipped `.fades` box would otherwise cut.
+// The lockup: the mark and the wordmark -- "Nabra" in Geist, tracked like
+// every title; "نبرة" in IBM Plex Sans Arabic, untracked. Weight 600, so an
+// Arabic page needs no 700 file for it (39.2b draws the outlined lockup). The
+// line is tall enough for the dots of ب and ة, which a clipped `.fades` box
+// would otherwise cut.
 .brand-name {
-  font: 650 1.0625rem / 1.4 var(--font-sans);
+  font: 600 1.0625rem / 1.4 var(--font-sans);
   font-stretch: var(--heading-stretch);
   letter-spacing: var(--letter-spacing-tight);
   color: var(--text-primary);

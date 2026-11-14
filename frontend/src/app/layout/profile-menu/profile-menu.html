@@ -41,6 +41,25 @@
         }
       </button>
     }
+    <!--
+      Beside the theme because it is the same kind of choice: how the surfaces
+      look, kept in this browser. Every glass layer becomes its solid twin. The
+      device's own "reduce transparency" setting does the same without it.
+    -->
+    <button
+      type="button"
+      class="menu-item"
+      role="menuitemcheckbox"
+      data-testid="reduce-transparency"
+      [attr.aria-checked]="transparencyReduced()"
+      (click)="toggleTransparency()"
+    >
+      <app-icon name="layers" [strokeWidth]="1.75" />
+      <span i18n="@@account.reduceTransparency">Reduce transparency</span>
+      @if (transparencyReduced()) {
+        <app-icon class="menu-check" name="check" [strokeWidth]="2" />
+      }
+    </button>
   </div>
 
   <hr class="menu-separator" role="separator" />

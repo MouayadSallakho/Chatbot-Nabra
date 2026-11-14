@@ -8,6 +8,8 @@ import { LOCAL_STORAGE } from '@app/core/storage/local-storage';
 import { PAGE_RELOAD } from '@app/core/i18n/language-service';
 import { LANGUAGE_STORAGE_KEY } from '@app/core/i18n/language';
 import { ThemeService } from '@app/core/theme/theme-service';
+import { TransparencyService } from '@app/core/theme/transparency-service';
+import { TRANSPARENCY_ATTRIBUTE, TRANSPARENCY_STORAGE_KEY } from '@app/core/theme/theme';
 import { PermissionApi } from '@app/core/authorization/permission-api';
 import { PermissionService } from '@app/core/authorization/permission-service';
 import { SoundSettings } from '@app/core/sounds/sound-settings';
@@ -85,6 +87,49 @@ describe('ProfileMenu', () => {
     fixture.detectChanges();
 
     expect(TestBed.inject(ThemeService).preference()).toBe('dark');
+  });
+
+  describe('Reduce transparency (Phase 39.2a)', () => {
+    const item = (): HTMLButtonElement =>
+      root().querySelector<HTMLButtonElement>('[data-testid="reduce-transparency"]')!;
+
+    afterEach(() => document.documentElement.removeAttribute(TRANSPARENCY_ATTRIBUTE));
+
+    it('sits in the appearance group as a checkbox item, off by default', async () => {
+      await render();
+      await open();
+
+      expect(item().closest('[aria-labelledby="profile-theme-label"]')).not.toBeNull();
+      expect(item().getAttribute('role')).toBe('menuitemcheckbox');
+      expect(item().textContent?.trim()).toBe('Reduce transparency');
+      expect(item().getAttribute('aria-checked')).toBe('false');
+      expect(document.documentElement.hasAttribute(TRANSPARENCY_ATTRIBUTE)).toBe(false);
+    });
+
+    it('turns every glass solid, keeps the choice in this browser, and turns back', async () => {
+      await render();
+      await open();
+
+      item().click();
+      fixture.detectChanges();
+      TestBed.tick();
+
+      expect(TestBed.inject(TransparencyService).reduced()).toBe(true);
+      expect(document.documentElement.getAttribute(TRANSPARENCY_ATTRIBUTE)).toBe('reduced');
+      expect(TestBed.inject(LOCAL_STORAGE)?.getItem(TRANSPARENCY_STORAGE_KEY)).toBe('reduced');
+
+      // Choosing closes the menu, like every item; reopened, it shows the choice.
+      await open();
+      expect(item().getAttribute('aria-checked')).toBe('true');
+
+      item().click();
+      fixture.detectChanges();
+      TestBed.tick();
+      await open();
+
+      expect(item().getAttribute('aria-checked')).toBe('false');
+      expect(document.documentElement.hasAttribute(TRANSPARENCY_ATTRIBUTE)).toBe(false);
+    });
   });
 
   it('signs out through a real menu item', async () => {
