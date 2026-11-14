@@ -104,6 +104,32 @@ public interface IConversationInboxStore
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Moves a member's read marker to the newest message of every conversation of
+    /// this workspace that is unread for them, in one statement (Phase 39.1).
+    /// </summary>
+    /// <remarks>
+    /// Never back: a conversation already read to its newest message is not
+    /// touched, and one without messages is never unread. So the count is exactly
+    /// the conversations that were unread for this member, and a second call
+    /// answers zero.
+    /// </remarks>
+    /// <returns>How many markers were written or moved forward.</returns>
+    Task<int> MarkAllReadAsync(
+        TenantId tenantId,
+        UserId member,
+        DateTimeOffset readAt,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// How many of this workspace's conversations are unread for a member, by the
+    /// list's own rule (Phase 39.1).
+    /// </summary>
+    Task<int> CountUnreadAsync(
+        TenantId tenantId,
+        UserId member,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Appends a reply from a person, at most once per client message id.
     /// </summary>
     /// <remarks>

@@ -51,6 +51,30 @@ internal sealed class AccountLanguages(OmniAiDbContext context) : IAccountLangua
 }
 
 /// <summary>
+/// Writes <c>users.display_name</c> (Phase 39.1) with one statement.
+/// </summary>
+/// <remarks>
+/// Not through <c>UserManager</c>, for the reason <see cref="AccountLanguages"/>
+/// gives: a display name is not a credential, so it touches no stamp.
+/// </remarks>
+internal sealed class AccountDisplayNames(OmniAiDbContext context) : IAccountDisplayNames
+{
+    private readonly OmniAiDbContext _context = context ?? throw new ArgumentNullException(nameof(context));
+
+    public async Task<bool> SetAsync(UserId userId, MemberDisplayName? displayName, CancellationToken cancellationToken = default)
+    {
+        string? value = displayName?.Value;
+
+        int rows = await _context.Users
+            .Where(user => user.Id == userId.Value)
+            .ExecuteUpdateAsync(set => set.SetProperty(user => user.DisplayName, value), cancellationToken)
+            .ConfigureAwait(false);
+
+        return rows == 1;
+    }
+}
+
+/// <summary>
 /// The audit table's writer. One <c>INSERT</c>; a failure is logged and swallowed.
 /// </summary>
 /// <remarks>

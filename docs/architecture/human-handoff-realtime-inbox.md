@@ -543,3 +543,62 @@ its turn by `ux_conversation_turns_customer_message`); no index was added to
 conversation now, so their reply is what is awaited, whatever happened to the AI's
 turn before they took it over. The two turn branches cannot both hold: a turn is
 failed or completed, never both.
+
+## 16. Phase 39.1: names, mark all read, and "Mine"
+
+Additive throughout; nothing existing changed meaning (contract table in
+`docs/phase-reports/PHASE_39_1_REDESIGN_BACKEND_REPORT.md`).
+
+### 16.1 The display name beside the email (note 7)
+
+`WorkspaceMemberResponse` is `{ userId, email, displayName }`. That one record is what
+`assignedTo`, `takenOverBy`, a transcript message's `sentBy`, an event's `actor` and
+`GET …/conversations/assignees` publish, so all of them carry the person's own name
+(`authentication-tenant-membership.md`), `null` when they have none. It is read in the
+same users query that reads the email (`NameMembersAsync`, the transcript's author
+and actor reads, the assignee list): no extra round trip. The reply route's own
+answer (`POST …/conversations/{id}/messages`) still answers `sentBy: null`, as it did
+before; the transcript read names the author. Public transports never carry it
+(owner decision Q5).
+
+### 16.2 Mark all read (note 6)
+
+| Route | Answer | Permission |
+| --- | --- | --- |
+| `POST …/conversations/read-all` | `200 { "marked": n }` | `conversations.view` |
+| `GET …/conversations/unread-count` | `200 { "count": n }` | `conversations.view` |
+
+- **Scope:** every conversation of the workspace, for the caller only (owner
+  decision Q2). There is no member field; the markers are the session's own.
+- **One statement.** `INSERT INTO conversation_reads … SELECT` each of the
+  workspace's conversations with its newest message (a `LATERAL` read of
+  `ix_messages_conversation_ingestion` backwards) `ON CONFLICT (conversation_id,
+  user_id) DO UPDATE … WHERE EXCLUDED.last_read_sequence >
+  conversation_reads.last_read_sequence`. A marker never moves back, a conversation
+  without messages is never unread and never written, and a conversation already
+  read to its newest message is not touched; so `marked` is exactly how many were
+  unread, and a second call answers `0`.
+- **`unread-count`** is the list's own `unread` rule in one statement: a newest
+  message, and no marker or a marker behind it. It is what `read-all` would mark.
+- No `If-Match`, as for the single marker. A non-member answers `404`, a member
+  without `conversations.view` `403`; another workspace's conversations are never in
+  the statement.
+
+### 16.3 `conversationsRead` (a new structural event)
+
+The single marker announces nothing (one tab, one conversation). Marking everything
+changes every row of the caller's other open inboxes, so when `marked > 0` the
+caller's **own member group** (`notifications:{tenant}:{member}`, joined by
+`SubscribeNotifications`) hears `conversationsRead` with **the workspace id as the
+whole payload**. Nobody else is told: a read marker is private. The client re-reads
+its list through the authorised HTTP read. Announcing never fails the write: the
+transport logs and swallows its own failures, and the handler swallows anything that
+escapes.
+
+### 16.4 `filter=mine` (BA39-5, owner decision Q1)
+
+`GET …/conversations?filter=mine` keeps the conversations **assigned to the reader
+or taken over by the reader**, "taken over by" being the very expression `takenOverBy`
+publishes (§15.1), so the tab and the chip cannot disagree. Any letter case;
+`total` counts the filtered set and paging is unchanged. `needs-person` is unchanged,
+and any other value is still `400 conversations.filter.invalid`.

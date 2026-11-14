@@ -10,6 +10,13 @@ namespace OmniAI.Application.Analytics;
 /// <param name="CustomerMessages">Messages a customer sent in the period.</param>
 /// <param name="AiMessages">Replies an AI agent produced in the period.</param>
 /// <param name="HumanMessages">Replies a person sent in the period.</param>
+/// <param name="ConversationsAnsweredByAi">
+/// Of the conversations started in the period, those the AI replied in and no
+/// person replied in or took over (Phase 39.1, BA39-1). As of the read: a person
+/// stepping in later takes a conversation out. A takeover is known from its
+/// handling event, recorded since Phase 37.4, and from the conversation being
+/// with a person now.
+/// </param>
 /// <remarks>
 /// System messages are counted separately and not folded into any of these:
 /// a handover note is not something a customer asked or an agent answered, and
@@ -20,7 +27,8 @@ public sealed record AnalyticsSummary(
     long CustomerMessages,
     long AiMessages,
     long HumanMessages,
-    long SystemMessages);
+    long SystemMessages,
+    long ConversationsAnsweredByAi = 0);
 
 /// <summary>
 /// What the workspace looks like right now.

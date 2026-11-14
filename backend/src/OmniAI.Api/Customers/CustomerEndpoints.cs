@@ -306,7 +306,8 @@ internal sealed record CustomerRowResponse(
     DateTimeOffset? LastActivityAt,
     DateTimeOffset CreatedAt,
     string LabelCode,
-    string ShortCode)
+    string ShortCode,
+    string? Reference)
 {
     public static CustomerRowResponse From(CustomerRow row)
     {
@@ -321,7 +322,8 @@ internal sealed record CustomerRowResponse(
             row.LastActivityAt,
             row.CreatedAt,
             row.LabelCode.ToString(),
-            row.ShortCode);
+            row.ShortCode,
+            row.Reference);
     }
 }
 
@@ -396,7 +398,8 @@ internal sealed record CustomerResponse(
     IReadOnlyList<CustomerConversationResponse> Conversations,
     bool CanReadConversations,
     string LabelCode,
-    string ShortCode)
+    string ShortCode,
+    string? Reference)
 {
     public static CustomerResponse From(CustomerView customer)
     {
@@ -417,7 +420,8 @@ internal sealed record CustomerResponse(
             [.. customer.Conversations.Select(CustomerConversationResponse.From)],
             customer.CanReadConversations,
             customer.LabelCode.ToString(),
-            customer.ShortCode);
+            customer.ShortCode,
+            customer.Reference);
     }
 }
 

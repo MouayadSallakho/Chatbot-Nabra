@@ -160,6 +160,35 @@ internal sealed class FakeConversationInboxStore : IConversationInboxStore
         }
     }
 
+    /// <summary>What the next mark-all answers, and what the count reads before it (Phase 39.1).</summary>
+    public int UnreadForAll { get; set; }
+
+    /// <summary>Every mark-all, with its workspace and member (Phase 39.1).</summary>
+    public List<(TenantId TenantId, UserId Member)> MarkedAll { get; } = [];
+
+    public Task<int> MarkAllReadAsync(
+        TenantId tenantId,
+        UserId member,
+        DateTimeOffset readAt,
+        CancellationToken cancellationToken = default)
+    {
+        lock (_sync)
+        {
+            MarkedAll.Add((tenantId, member));
+
+            int marked = UnreadForAll;
+            UnreadForAll = 0;
+
+            return Task.FromResult(marked);
+        }
+    }
+
+    public Task<int> CountUnreadAsync(
+        TenantId tenantId,
+        UserId member,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(UnreadForAll);
+
     public Task<bool> MarkReadAsync(
         TenantId tenantId,
         ConversationId conversationId,

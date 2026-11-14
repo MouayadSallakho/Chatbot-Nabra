@@ -150,6 +150,70 @@ internal sealed class ConversationInboxStore(OmniAiDbContext context) : IConvers
         return written > 0;
     }
 
+    public async Task<int> MarkAllReadAsync(
+        TenantId tenantId,
+        UserId member,
+        DateTimeOffset readAt,
+        CancellationToken cancellationToken = default)
+    {
+        // One statement (Phase 39.1):
+        //  - only this workspace's conversations, and only those with a message
+        //    (a conversation without one is never unread);
+        //  - each marker goes to the conversation's newest message, read through
+        //    ix_messages_conversation_ingestion backwards;
+        //  - an existing marker moves only forward, and a conversation already
+        //    read to its newest message is not touched at all (the DO UPDATE's
+        //    WHERE), so the row count is exactly the conversations that were unread.
+        // The membership key (user, tenant) is enforced by the foreign key.
+        return await _context.Database
+            .ExecuteSqlInterpolatedAsync(
+                $"""
+                INSERT INTO conversation_reads (conversation_id, user_id, tenant_id, last_read_sequence, read_at)
+                SELECT c.id, {member.Value}, c.tenant_id, newest.sequence, {readAt}
+                FROM conversations c
+                CROSS JOIN LATERAL (
+                    SELECT m.ingestion_sequence AS sequence
+                    FROM messages m
+                    WHERE m.conversation_id = c.id
+                    ORDER BY m.ingestion_sequence DESC
+                    LIMIT 1) newest
+                WHERE c.tenant_id = {tenantId.Value}
+                ON CONFLICT (conversation_id, user_id) DO UPDATE
+                SET last_read_sequence = EXCLUDED.last_read_sequence,
+                    read_at = EXCLUDED.read_at
+                WHERE EXCLUDED.last_read_sequence > conversation_reads.last_read_sequence
+                """,
+                cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    public async Task<int> CountUnreadAsync(
+        TenantId tenantId,
+        UserId member,
+        CancellationToken cancellationToken = default)
+    {
+        // The list's IsUnread rule in SQL: a newest message, and no marker or a
+        // marker behind it. One statement, the same index as above.
+        return await _context.Database
+            .SqlQuery<int>(
+                $"""
+                SELECT count(*)::int AS "Value"
+                FROM conversations c
+                CROSS JOIN LATERAL (
+                    SELECT m.ingestion_sequence AS sequence
+                    FROM messages m
+                    WHERE m.conversation_id = c.id
+                    ORDER BY m.ingestion_sequence DESC
+                    LIMIT 1) newest
+                LEFT JOIN conversation_reads r
+                    ON r.conversation_id = c.id AND r.user_id = {member.Value}
+                WHERE c.tenant_id = {tenantId.Value}
+                  AND (r.last_read_sequence IS NULL OR newest.sequence > r.last_read_sequence)
+                """)
+            .SingleAsync(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
     public async Task<HumanReplyOutcome> AppendReplyAsync(
         Conversation conversation,
         UserId sender,
@@ -255,7 +319,7 @@ internal sealed class ConversationInboxStore(OmniAiDbContext context) : IConvers
         var members = await _context.Users
             .AsNoTracking()
             .Where(user => userIds.Contains(user.Id))
-            .Select(user => new { user.Id, user.Email })
+            .Select(user => new { user.Id, user.Email, user.DisplayName })
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 
@@ -290,7 +354,7 @@ internal sealed class ConversationInboxStore(OmniAiDbContext context) : IConvers
 
             if (EffectivePermissions.Union(roles).Contains(PlatformPermissions.ConversationsReply))
             {
-                eligible.Add(new ConversationMessageAuthor(member.Id, member.Email!));
+                eligible.Add(new ConversationMessageAuthor(member.Id, member.Email!, member.DisplayName));
             }
         }
 

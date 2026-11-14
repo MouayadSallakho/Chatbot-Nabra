@@ -128,7 +128,10 @@ internal static class WebChatEndpoints
                     request.LauncherPosition,
                     request.Theme,
                     request.AllowedOrigins,
-                    expected),
+                    expected,
+                    request.Greetings is null
+                        ? null
+                        : new WebChatGreetingsInput(request.Greetings.En, request.Greetings.Ar)),
                 cancellationToken)
             .ConfigureAwait(false);
 

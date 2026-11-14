@@ -489,3 +489,33 @@ all: the existing explicit refusal, no outbound request, nothing spent.
 - The hosted chat page is untouched and unaffected by a widget's allowlist.
 - No historical migration was edited; Phase 18 added exactly one.
 - No physical `xmin` column exists anywhere; schema tests assert its absence.
+
+## 13. Phase 39.1: a greeting per language (note 9)
+
+Two nullable columns beside `widget_greeting` on `web_chat_endpoints`:
+`widget_greeting_en` and `widget_greeting_ar` (migration
+`AddWebChatGreetingPerLanguage`, no backfill), the same `WebChatGreeting` value object
+(300 characters, no control characters other than line feed). Today's greeting stays
+the **fallback** for a language without its own.
+
+**Admin.** `GET`/`PUT …/website-chat/{id}/widget`, permission and `If-Match` exactly as
+before. The widget gains `greetings: { en, ar }` (each `null` when not set, the
+object always present). The request gains an optional `greetings`:
+
+- **absent or `null`**: the stored per-language greetings are kept, so a client written
+  before Phase 39.1 never clears them;
+- **present**: both are set; `null`, empty or blank clears one.
+
+The refusals reuse `website-chat.greeting.too_long` and
+`website-chat.greeting.control_characters`, with `field` naming the member:
+`greeting`, `greetings.en` or `greetings.ar`.
+
+**Public.** `GET /api/public/embed/{publicKey}` (and the hosted
+`GET /api/public/webchat/{publicKey}`) accept an optional `lang`: `en` or `ar`, any
+letter case, surrounding spaces ignored. `greeting` is then that language's own when
+set, else the fallback. An absent, unknown or over-long `lang` is not refused: it is
+read as "no language" and gets the fallback, exactly the answer before Phase 39.1, so
+the language can never tell a valid key from an invalid one. **No member is added** to
+either public response, only the chosen text is published, and the rate limits, the
+origin check and `no-store` are unchanged. The loader and the hosted page pass the
+page's language from Phase 39.5b on.

@@ -1,3 +1,5 @@
+using OmniAI.Domain.Users;
+
 namespace OmniAI.Domain.WebChat;
 
 /// <summary>
@@ -26,16 +28,29 @@ public sealed record WebChatWidgetSettings
         WebChatGreeting? greeting,
         WebChatAccentColor accent,
         WebChatLauncherPosition position,
-        WebChatTheme theme)
+        WebChatTheme theme,
+        WebChatGreeting? greetingEn,
+        WebChatGreeting? greetingAr)
     {
         Greeting = greeting;
         Accent = accent;
         Position = position;
         Theme = theme;
+        GreetingEn = greetingEn;
+        GreetingAr = greetingAr;
     }
 
-    /// <summary>The line shown before anybody has said anything, or nothing.</summary>
+    /// <summary>
+    /// The line shown before anybody has said anything, or nothing. Since Phase 39.1
+    /// it is the fallback for a language without a greeting of its own.
+    /// </summary>
     public WebChatGreeting? Greeting { get; }
+
+    /// <summary>The greeting for English pages, or none (Phase 39.1, note 9).</summary>
+    public WebChatGreeting? GreetingEn { get; }
+
+    /// <summary>The greeting for Arabic pages, or none (Phase 39.1, note 9).</summary>
+    public WebChatGreeting? GreetingAr { get; }
 
     public WebChatAccentColor Accent { get; }
 
@@ -55,13 +70,19 @@ public sealed record WebChatWidgetSettings
         greeting: null,
         WebChatAccentColor.Default,
         WebChatLauncherPosition.Right,
-        WebChatTheme.System);
+        WebChatTheme.System,
+        greetingEn: null,
+        greetingAr: null);
 
+    /// <param name="greetingEn">The English page's own greeting (Phase 39.1), or none.</param>
+    /// <param name="greetingAr">The Arabic page's own greeting (Phase 39.1), or none.</param>
     public static WebChatWidgetSettings Create(
         WebChatGreeting? greeting,
         WebChatAccentColor accent,
         WebChatLauncherPosition position,
-        WebChatTheme theme)
+        WebChatTheme theme,
+        WebChatGreeting? greetingEn = null,
+        WebChatGreeting? greetingAr = null)
     {
         ArgumentNullException.ThrowIfNull(accent);
 
@@ -83,6 +104,21 @@ public sealed record WebChatWidgetSettings
             };
         }
 
-        return new WebChatWidgetSettings(greeting, accent, position, theme);
+        return new WebChatWidgetSettings(greeting, accent, position, theme, greetingEn, greetingAr);
     }
+
+    /// <summary>
+    /// The greeting a page in this language shows: its own when it has one, else
+    /// the fallback <see cref="Greeting"/> (Phase 39.1).
+    /// </summary>
+    /// <param name="language">
+    /// The page's language, or <see langword="null"/> when it named none this
+    /// platform knows; then the fallback, exactly as before Phase 39.1.
+    /// </param>
+    public WebChatGreeting? GreetingFor(UserLanguage? language) => language switch
+    {
+        UserLanguage.English => GreetingEn ?? Greeting,
+        UserLanguage.Arabic => GreetingAr ?? Greeting,
+        _ => Greeting,
+    };
 }

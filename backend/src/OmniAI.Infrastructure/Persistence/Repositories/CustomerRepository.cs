@@ -87,6 +87,9 @@ internal sealed class CustomerRepository(OmniAiDbContext context) : ICustomerRep
         IReadOnlyDictionary<CustomerId, IReadOnlyList<ChannelKind>> channels =
             await ChannelsAsync(tenantId, [.. ids], cancellationToken).ConfigureAwait(false);
 
+        IReadOnlyDictionary<CustomerId, string> references =
+            await ReferencesAsync(tenantId, [.. ids], cancellationToken).ConfigureAwait(false);
+
         List<CustomerDirectoryRow> rows = new(ids.Count);
 
         foreach (CustomerId id in ids)
@@ -106,10 +109,44 @@ internal sealed class CustomerRepository(OmniAiDbContext context) : ICustomerRep
                 active ? used!.Count : 0,
                 active ? used!.LastActivityAt : null,
                 customer.CreatedAt,
-                channels.TryGetValue(id, out IReadOnlyList<ChannelKind>? kinds) ? kinds : []));
+                channels.TryGetValue(id, out IReadOnlyList<ChannelKind>? kinds) ? kinds : [],
+                references.GetValueOrDefault(id)));
         }
 
         return (rows, total);
+    }
+
+    /// <summary>
+    /// Each customer's newest WhatsApp number on the page, masked (Phase 39.1).
+    /// </summary>
+    /// <remarks>
+    /// One statement for the page, through
+    /// <c>ix_whatsapp_customer_identities_customer</c>: never one per row. Masking
+    /// happens on the value object straight after the read, as on the detail's
+    /// identities and the conversation reads, so no variable here holds a raw
+    /// number. A customer with several numbers shows the one created last.
+    /// </remarks>
+    private async Task<IReadOnlyDictionary<CustomerId, string>> ReferencesAsync(
+        TenantId tenantId,
+        IReadOnlyList<CustomerId> customerIds,
+        CancellationToken cancellationToken)
+    {
+        var numbers = await _context.WhatsAppCustomerIdentities
+            .AsNoTracking()
+            .Where(identity => identity.TenantId == tenantId && customerIds.Contains(identity.CustomerId))
+            .OrderByDescending(identity => identity.CreatedAt)
+            .Select(identity => new { identity.CustomerId, Number = identity.WhatsAppCustomerId })
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        Dictionary<CustomerId, string> newest = [];
+
+        foreach (var entry in numbers)
+        {
+            newest.TryAdd(entry.CustomerId, entry.Number.Masked);
+        }
+
+        return newest;
     }
 
     /// <summary>

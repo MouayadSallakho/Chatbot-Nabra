@@ -1080,3 +1080,35 @@ authorise production deployment.**
 | Security-event auditing | Phase 37.3 audits password reset, throttling, session revocation and account emails (D33). Successful and failed sign-ins are still logged, not audited. A reset ends every session (D32); sign-out still ends only the browser's cookie |
 | Production rate limiting | Sign-in failures and password reset are limited per address and per network from Phase 37.3 (D30); registration is not limited yet |
 | Reverse-proxy deployment | The application accepts a trusted forwarded scheme (D9b) and refuses insecure requests (D9d). What is deferred is the deployment side: naming the production proxy's address, adopting the `__Host-` prefix, and verifying TLS termination end to end against the real host |
+
+## Phase 39.1: a display name for each person (note 7)
+
+One optional name per **account** (`users.display_name varchar(80) null`, migration
+`AddUserDisplayName`, no backfill), not per membership: a person's name is the same
+in every workspace they belong to, and they edit it once.
+
+**Edit: `PUT /api/me/display-name`**, body `{ "displayName": string | null }`, answer
+`204`. Signed in, antiforgery as on every write, no workspace and no permission
+involved, no `If-Match` (last write wins on one's own name, like `PUT /api/me/language`).
+There is no route that names another account, so nobody edits a colleague's name.
+
+The rules are the Domain value object `MemberDisplayName`:
+
+- trimmed, and every inner run of whitespace (spaces, tabs, line breaks) becomes one
+  space; `null`, empty or blank clears the name;
+- at most 80 characters, counted in UTF-16 code units as `WebChatGreeting` counts
+  them; longer is `400 account.display_name.too_long` with `limit: 80` and
+  `limitUnit: "characters"`, never truncated;
+- no control character and no format character except U+200C (ZWNJ) and U+200D
+  (ZWJ), which Arabic and emoji sequences need: `400
+  account.display_name.control_characters`. A direction mark such as U+200E or
+  U+202E is refused, because it would reorder whatever is printed after the name.
+
+**Reads.** `GET /api/auth/me` and `GET /api/auth/session` (`user`) answer
+`displayName` beside `email`, `null` when none is set. The email stays everywhere:
+older clients read it, and it is the label to show without a name. Where the
+workspace API names a person, see `human-handoff-realtime-inbox.md` §16 and
+`team-members-invitations.md` T22.
+
+**Staff-facing only** (owner decision Q5, 2026-11-13): a visitor's transcript keeps
+saying "Support" / «الدعم», and no public transport carries a name.

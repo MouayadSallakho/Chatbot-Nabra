@@ -34,6 +34,7 @@ internal sealed class InboxHubClient : IAsyncDisposable
     private readonly CancellationTokenSource _stop = new();
     private readonly Channel<Guid> _changed = Channel.CreateUnbounded<Guid>();
     private readonly Channel<Guid> _knowledge = Channel.CreateUnbounded<Guid>();
+    private readonly Channel<Guid> _read = Channel.CreateUnbounded<Guid>();
     private readonly Dictionary<string, TaskCompletionSource<string?>> _pending = [];
     private readonly Lock _sync = new();
     private readonly Task _reader;
@@ -160,6 +161,12 @@ internal sealed class InboxHubClient : IAsyncDisposable
     public Task<bool> WaitForKnowledgeAsync(Guid documentId, TimeSpan within) =>
         WaitForAsync(_knowledge, documentId, within);
 
+    /// <summary>
+    /// Waits for <c>conversationsRead</c> naming this workspace (Phase 39.1).
+    /// </summary>
+    public Task<bool> WaitForConversationsReadAsync(Guid tenantId, TimeSpan within) =>
+        WaitForAsync(_read, tenantId, within);
+
     private static async Task<bool> WaitForAsync(Channel<Guid> events, Guid id, TimeSpan within)
     {
         using CancellationTokenSource timeout = new(within);
@@ -266,6 +273,18 @@ internal sealed class InboxHubClient : IAsyncDisposable
 
             case 1 when root.GetProperty("target").GetString() == "knowledgeChanged":
                 _knowledge.Writer.TryWrite(root.GetProperty("arguments")[0].GetGuid());
+                break;
+
+            // Phase 39.1: the whole payload is the workspace id.
+            case 1 when root.GetProperty("target").GetString() == "conversationsRead":
+                JsonElement arguments = root.GetProperty("arguments");
+
+                if (arguments.GetArrayLength() != 1)
+                {
+                    throw new InvalidOperationException("conversationsRead carried more than the workspace id.");
+                }
+
+                _read.Writer.TryWrite(arguments[0].GetGuid());
                 break;
 
             // The completion of one of ours.

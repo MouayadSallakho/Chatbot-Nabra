@@ -95,7 +95,8 @@ public sealed class CustomerHandlers(
                 row.LastActivityAt,
                 row.CreatedAt,
                 CustomerLabels.CodeFor(row.DisplayName, row.Channels),
-                CustomerShortCode.For(row.Id)))],
+                CustomerShortCode.For(row.Id),
+                row.Reference))],
             page,
             pageSize,
             total);
@@ -198,7 +199,11 @@ public sealed class CustomerHandlers(
                 conversations,
                 canReadConversations,
                 CustomerLabels.CodeFor(customer.DisplayName, channels),
-                CustomerShortCode.For(customer.Id)),
+                CustomerShortCode.For(customer.Id),
+
+                // Phase 39.1: the identities are oldest first, so the newest
+                // number is the last; already masked.
+                identities.LastOrDefault(identity => identity.Channel == ChannelKind.WhatsApp)?.Reference),
             found.Version);
     }
 

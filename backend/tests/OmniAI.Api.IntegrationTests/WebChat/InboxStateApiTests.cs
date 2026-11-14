@@ -365,7 +365,7 @@ public sealed class InboxStateApiTests(WebChatApiFixture fixture)
         (HttpClient owner, Guid tenantId, _) = await WorkspaceAsync();
 
         HttpResponseMessage response = await owner.GetAsync(WebChatApiFixture.Relative(
-            $"/api/tenants/{tenantId}/conversations?filter=mine"));
+            $"/api/tenants/{tenantId}/conversations?filter=unassigned"));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Equal("conversations.filter.invalid", await CodeAsync(response));

@@ -457,3 +457,26 @@ place to report that an optional summary did not load.
   them at the conversation level.
 - **Retention and archival.** Ranges are bounded to 90 days, so the question of
   what happens to very old rows has not yet been forced.
+
+## 15. Answered by the AI (Phase 39.1, BA39-1)
+
+`summary.conversationsAnsweredByAi` (and, with `compare=previous`,
+`previous.summary.conversationsAnsweredByAi`): of the conversations started in the
+period (`conversationsStarted`), those **the AI replied in and no person replied in
+or took over**. Counted as of the read: a person stepping in later takes a
+conversation out.
+
+- A person replied: a message from `HumanAgent`.
+- A person took over: a `TakenOver` handling event (recorded since Phase 37.4), or the
+  conversation being with a person now.
+- One statement, beside the summary's two; each test is an index range
+  (`ix_messages_conversation_ingestion`, `ix_conversation_handling_events_conversation`).
+  No migration, no new event, no new index.
+
+**Exact for everything the API recorded.** Handling events exist from migration
+`AddConversationHandlingEvents` (Phase 37.4) on, and a deployment starts with every
+migration applied, so on a deployment the figure is exact. Only a database that
+already held conversations before that migration (the local development databases)
+can hold a conversation that was taken over **and handed back** before it with no
+reply from the person: nothing recorded that takeover, so it counts as answered by
+the AI there.

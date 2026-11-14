@@ -287,3 +287,19 @@ Instagram, Messenger.
 Customers consume no Phase 24 entitlement. There is no `MaxCustomers`, and no
 plan, price or quota changed: identity is not something a workspace should be
 charged for holding.
+
+## C13. The masked number on the directory (Phase 39.1, note 18)
+
+`GET …/customers` (each row) and `GET …/customers/{id}` carry `reference`: the
+customer's **most recently created** WhatsApp number, masked by
+`WhatsAppCustomerId.Masked` exactly as the conversation reads mask it (`••••1234`), or
+`null` for a customer with no WhatsApp identity (a web visitor). The full number is
+never sent. Merge candidates come from the list read, so they carry it too.
+
+- The list reads it in **one statement for the page** through
+  `ix_whatsapp_customer_identities_customer` (tenant, customer), never one per row,
+  masked on the value object straight after the read.
+- The detail takes it from the identities it already reads (oldest first, so the
+  last WhatsApp one): no extra statement.
+- Permission `customers.view`, unchanged; another workspace answers `404`. No
+  migration.

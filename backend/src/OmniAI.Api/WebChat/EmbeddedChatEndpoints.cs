@@ -65,7 +65,7 @@ internal static class EmbeddedChatEndpoints
 
         embed.MapGet("/{publicKey}", GetConfigAsync)
             .WithName("GetEmbeddedWebChat")
-            .WithSummary("An approved widget's configuration and the workspace's name. Every refusal is one indistinguishable 404.")
+            .WithSummary("An approved widget's configuration and the workspace's name. Every refusal is one indistinguishable 404. Optional lang=en|ar (any letter case, Phase 39.1): greeting is that language's own when the workspace set one, else the fallback; an absent or unknown lang gives the fallback, as before.")
             .Produces<EmbeddedChatConfigResponse>()
             .Produces(StatusCodes.Status404NotFound);
 
@@ -105,6 +105,7 @@ internal static class EmbeddedChatEndpoints
     /// </remarks>
     private static async Task<IResult> GetConfigAsync(
         string publicKey,
+        string? lang,
         HttpContext http,
         EmbeddedWebChatHandler handler,
         CancellationToken cancellationToken)
@@ -113,7 +114,7 @@ internal static class EmbeddedChatEndpoints
 
         EmbeddedWebChatView? view = await handler
             .GetAsync(
-                new GetEmbeddedWebChatQuery(publicKey, ReadOrigin(http)),
+                new GetEmbeddedWebChatQuery(publicKey, ReadOrigin(http), PageLanguage.Read(lang)),
                 cancellationToken)
             .ConfigureAwait(false);
 

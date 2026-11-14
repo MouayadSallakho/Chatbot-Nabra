@@ -145,6 +145,88 @@ public sealed class OpenApiDocumentContractTests(WebChatApiFixture fixture)
     }
 
     [Fact]
+    public async Task The_email_preferences_read_is_typed_exactly_and_the_save_keeps_its_nullable_members()
+    {
+        // Phase 39.1 (note 19): one schema served both sides, so the document
+        // typed the answer as nullable although it is always true or false.
+        JsonElement document = await DocumentAsync();
+        string[] members = ["reports", "usage", "billing", "knowledge", "channelHealth"];
+
+        JsonElement response = Schema(document, "EmailPreferencesResponse");
+        string[] required = [.. response.GetProperty("required").EnumerateArray().Select(item => item.GetString()!)];
+
+        foreach (string member in members)
+        {
+            Assert.Contains(member, required);
+            Assert.Equal(["boolean"], Types(response.GetProperty("properties").GetProperty(member)));
+        }
+
+        JsonElement request = Schema(document, "EmailPreferencesRequest");
+
+        foreach (string member in members)
+        {
+            Assert.Contains("null", Types(request.GetProperty("properties").GetProperty(member)));
+        }
+
+        Assert.EndsWith(
+            "/EmailPreferencesResponse",
+            Schema(document, "NotificationPreferencesResponse").GetProperty("properties").GetProperty("email").GetProperty("$ref").GetString(),
+            StringComparison.Ordinal);
+        Assert.False(document.GetProperty("components").GetProperty("schemas").TryGetProperty("EmailPreferencesContract", out _));
+    }
+
+    [Fact]
+    public async Task The_phase_39_1_routes_and_members_are_described()
+    {
+        JsonElement document = await DocumentAsync();
+
+        Assert.True(Operation(document, "/api/me/display-name", "put").GetProperty("responses").TryGetProperty("204", out _));
+        Assert.Equal("MarkAllConversationsReadResponse", SchemaOf(Operation(document, "/api/tenants/{tenantId}/conversations/read-all", "post").GetProperty("responses"), "200"));
+        Assert.Equal("ConversationUnreadCountResponse", SchemaOf(Operation(document, "/api/tenants/{tenantId}/conversations/unread-count", "get").GetProperty("responses"), "200"));
+
+        Assert.True(Schema(document, "ProblemDetails").GetProperty("properties").TryGetProperty("field", out _));
+
+        JsonElement schemas = document.GetProperty("components").GetProperty("schemas");
+        List<string> missing = [];
+
+        foreach ((string schema, string member) in new[]
+        {
+            ("CurrentUserResponse", "displayName"),
+            ("WorkspaceMemberResponse", "displayName"),
+            ("MemberSummaryResponse", "displayName"),
+            ("MemberResponse", "displayName"),
+            ("InvitationResponse", "invitedByDisplayName"),
+            ("WebChatWidgetResponse", "greetings"),
+            ("UpdateWebChatWidgetRequest", "greetings"),
+            ("CustomerRowResponse", "reference"),
+            ("CustomerResponse", "reference"),
+            ("AnalyticsSummaryResponse", "conversationsAnsweredByAi"),
+        })
+        {
+            if (!schemas.TryGetProperty(schema, out JsonElement described)
+                || !described.GetProperty("properties").TryGetProperty(member, out _))
+            {
+                missing.Add($"{schema}.{member}");
+            }
+        }
+
+        Assert.True(
+            missing.Count == 0,
+            "Not described: " + string.Join(", ", missing)
+                + ". Schemas: " + string.Join(", ", schemas.EnumerateObject().Select(entry => entry.Name)));
+
+        // The public reads take an optional lang.
+        foreach (string path in new[] { "/api/public/webchat/{publicKey}", "/api/public/embed/{publicKey}" })
+        {
+            JsonElement lang = Operation(document, path, "get").GetProperty("parameters").EnumerateArray()
+                .Single(parameter => parameter.GetProperty("name").GetString() == "lang");
+
+            Assert.Equal("query", lang.GetProperty("in").GetString());
+            Assert.False(lang.TryGetProperty("required", out JsonElement required) && required.GetBoolean());
+        }
+    }
+
+    [Fact]
     public async Task The_document_carries_the_public_name()
     {
         Assert.Equal("Nabra API", (await DocumentAsync()).GetProperty("info").GetProperty("title").GetString());
@@ -176,6 +258,14 @@ public sealed class OpenApiDocumentContractTests(WebChatApiFixture fixture)
             .GetProperty("$ref")
             .GetString()?
             .Split('/')[^1];
+
+    /// <summary>A member's JSON types, whether written as one name or a list (OpenAPI 3.1).</summary>
+    private static string[] Types(JsonElement member) =>
+        member.TryGetProperty("type", out JsonElement type)
+            ? type.ValueKind == JsonValueKind.Array
+                ? [.. type.EnumerateArray().Select(item => item.GetString()!).Order(StringComparer.Ordinal)]
+                : [type.GetString()!]
+            : [];
 
     private static void AssertOptional(JsonElement schema, string member)
     {

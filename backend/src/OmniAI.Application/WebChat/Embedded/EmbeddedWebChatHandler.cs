@@ -14,7 +14,14 @@ namespace OmniAI.Application.WebChat.Embedded;
 /// through <c>postMessage</c>'s <c>event.origin</c>. Never taken from a query
 /// parameter the embedding page could choose.
 /// </param>
-public sealed record GetEmbeddedWebChatQuery(string? PublicKey, string? ParentOrigin);
+/// <param name="Language">
+/// The page's language (Phase 39.1), or null when it named none this platform
+/// knows: then the fallback greeting, exactly as before.
+/// </param>
+public sealed record GetEmbeddedWebChatQuery(
+    string? PublicKey,
+    string? ParentOrigin,
+    Domain.Users.UserLanguage? Language = null);
 
 /// <param name="Client">The pseudonymous network identity Phase 16 derives.</param>
 public sealed record StartEmbeddedConversationCommand(
@@ -130,7 +137,7 @@ public sealed class EmbeddedWebChatHandler(
         return new EmbeddedWebChatView(
             approved.AgentName,
             approved.IsServing,
-            widget.Greeting?.Value,
+            widget.GreetingFor(query.Language)?.Value,
             widget.Accent.Value,
             widget.Position.ToString(),
             widget.Theme.ToString())

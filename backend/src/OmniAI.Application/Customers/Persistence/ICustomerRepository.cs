@@ -15,13 +15,19 @@ namespace OmniAI.Application.Customers.Persistence;
 /// conversations in memory would be one query per customer and would read every
 /// conversation in the workspace to answer a page of twenty.
 /// </remarks>
+/// <param name="Reference">
+/// The customer's most recently created WhatsApp number, masked to its last four
+/// digits (<c>••••1234</c>), or null for a customer without one (Phase 39.1). Set
+/// by the list read; masked on the value object, never carried unmasked.
+/// </param>
 public sealed record CustomerDirectoryRow(
     CustomerId Id,
     CustomerDisplayName? DisplayName,
     int ConversationCount,
     DateTimeOffset? LastActivityAt,
     DateTimeOffset CreatedAt,
-    IReadOnlyList<ChannelKind> Channels);
+    IReadOnlyList<ChannelKind> Channels,
+    string? Reference = null);
 
 /// <summary>What a merge moved.</summary>
 public sealed record CustomerMergeCounts(int Conversations, int Identities);

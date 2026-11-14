@@ -228,7 +228,7 @@ public sealed class InboxStateTests
     public async Task An_unknown_filter_is_refused_with_its_code()
     {
         ConversationQueryInvalidException refused = await Assert.ThrowsAsync<ConversationQueryInvalidException>(() =>
-            ReadHandler().ListAsync(new ListConversationsQuery(Workspace, 1, 20, "mine")));
+            ReadHandler().ListAsync(new ListConversationsQuery(Workspace, 1, 20, "unassigned")));
 
         Assert.Equal("conversations.filter.invalid", refused.Code);
     }

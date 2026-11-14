@@ -151,8 +151,21 @@ internal sealed partial class DomainProblemDetailsHandler(
 
             // Phase 37.5a: the throw site names the rule. A site without a code
             // yet falls through to the generic one ProblemCodes applies.
-            case DomainValidationException { Code: string validationCode }:
+            case DomainValidationException { Code: string validationCode } validation:
                 problem.Extensions["code"] = validationCode;
+
+                // Phase 39.1: which member, and the bound with its unit, where the
+                // throw site knows them. Absent otherwise, as before.
+                if (validation.Field is string field)
+                {
+                    problem.Extensions["field"] = field;
+                }
+
+                if (validation is { Limit: long bound, LimitUnit: string unit })
+                {
+                    problem.Extensions["limit"] = bound;
+                    problem.Extensions["limitUnit"] = unit;
+                }
 
                 return;
 

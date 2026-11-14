@@ -41,8 +41,12 @@ public sealed record ConversationMessageRecord(
 /// know who said something, and inside the workspace that is not a disclosure.
 /// It leaves through the admin API and no other: the public transports drop it
 /// before a view is built, and a test asserts they do.
+/// <para>
+/// Phase 39.1 adds the person's display name beside the email, read in the same
+/// query; null when they have not given one. The email stays.
+/// </para>
 /// </remarks>
-public sealed record ConversationMessageAuthor(Guid UserId, string Email);
+public sealed record ConversationMessageAuthor(Guid UserId, string Email, string? DisplayName = null);
 
 /// <summary>One page of a conversation's history.</summary>
 /// <param name="Items">Messages in ingestion order, oldest first.</param>
@@ -165,6 +169,12 @@ public enum ConversationListFilter
     /// branches holds (plan D-5, widened in 37.4 Revision 1).
     /// </summary>
     NeedsPerson = 1,
+
+    /// <summary>
+    /// Assigned to the reader, or taken over by the reader (Phase 39.1, BA39-5):
+    /// the inbox's "Mine" tab.
+    /// </summary>
+    Mine = 2,
 }
 
 /// <summary>What changed in a transcript besides its messages.</summary>

@@ -615,3 +615,10 @@ by the endpoint's own tenant). Nothing else about the workspace is read or publi
 no slug, status, plan, member, other endpoint or id. An unknown key still answers the
 same generic `404` as before (no `detail`, no `code`), and the public-chat rate limits
 are unchanged.
+
+## Phase 39.1: the greeting in the page's language
+
+`GET /api/public/webchat/{publicKey}?lang=en|ar` answers `greeting` in that language
+when the workspace set one, else the fallback greeting; no `lang`, or one this
+platform does not know, answers exactly as before. No other member changes and none
+is added. The admin side and the rules are in `embeddable-web-chat-widget.md` §13.

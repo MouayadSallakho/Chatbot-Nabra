@@ -371,3 +371,17 @@ invitation accepted, revoked or expired (`invitation_closed`).
 **Development.** The dev stack sends to Mailpit (`axllent/mailpit:v1.27`, no relay)
 on loopback inside the API's network namespace; its web UI is on
 `127.0.0.1:8026`. See `stack.md`.
+
+## 15. The preferences schema (Phase 39.1, note 19)
+
+`EmailPreferencesContract` served both the save and the read, so the document typed
+the read's five members as nullable although they are always `true` or `false`. It
+is split:
+
+- `EmailPreferencesRequest` (`bool?` each) for `PUT …/notifications/preferences`; a
+  `null` or missing member is still refused with `notifications.preferences.incomplete`;
+- `EmailPreferencesResponse` (`bool` each, all required) for
+  `NotificationPreferencesResponse.email`.
+
+The JSON on the wire is unchanged and no behaviour changed;
+`OpenApiDocumentContractTests` pins both schemas.

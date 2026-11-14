@@ -45,7 +45,8 @@ internal static class TenantMembers
             member.Email.Value,
             member.JoinedAt,
             Roles(member.Roles),
-            IsOwner(member.Roles));
+            IsOwner(member.Roles),
+            member.DisplayName);
     }
 
     /// <summary>A member, in full.</summary>
@@ -61,6 +62,7 @@ internal static class TenantMembers
             member.AccessUpdatedAt,
             Roles(member.Roles),
             IsOwner(member.Roles),
-            EffectivePermissions.Union(member.Roles));
+            EffectivePermissions.Union(member.Roles),
+            member.DisplayName);
     }
 }

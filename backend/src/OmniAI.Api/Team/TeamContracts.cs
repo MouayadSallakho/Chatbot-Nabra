@@ -19,12 +19,16 @@ public sealed record MemberRoleResponse(Guid Id, string Name, bool IsSystem)
 }
 
 /// <summary>A member, in a list.</summary>
+/// <param name="DisplayName">
+/// The name the person gave themselves, or null (Phase 39.1); the email stays.
+/// </param>
 public sealed record MemberSummaryResponse(
     Guid UserId,
     string Email,
     DateTimeOffset JoinedAt,
     IReadOnlyList<MemberRoleResponse> Roles,
-    bool IsOwner)
+    bool IsOwner,
+    string? DisplayName)
 {
     public static MemberSummaryResponse From(TenantMemberSummary member)
     {
@@ -35,7 +39,8 @@ public sealed record MemberSummaryResponse(
             member.Email,
             member.JoinedAt,
             [.. member.Roles.Select(MemberRoleResponse.From)],
-            member.IsOwner);
+            member.IsOwner,
+            member.DisplayName);
     }
 }
 
@@ -53,6 +58,7 @@ public sealed record MemberPageResponse(
 /// ceiling is judged on -- so a refusal is comprehensible rather than mysterious.
 /// Nothing about how the account authenticates appears here.
 /// </remarks>
+/// <param name="DisplayName">As on <see cref="MemberSummaryResponse"/> (Phase 39.1).</param>
 public sealed record MemberResponse(
     Guid UserId,
     Guid TenantId,
@@ -61,7 +67,8 @@ public sealed record MemberResponse(
     DateTimeOffset AccessUpdatedAt,
     IReadOnlyList<MemberRoleResponse> Roles,
     bool IsOwner,
-    IReadOnlyList<string> Permissions)
+    IReadOnlyList<string> Permissions,
+    string? DisplayName)
 {
     public static MemberResponse From(TenantMemberView member)
     {
@@ -75,7 +82,8 @@ public sealed record MemberResponse(
             member.AccessUpdatedAt,
             [.. member.Roles.Select(MemberRoleResponse.From)],
             member.IsOwner,
-            [.. member.Permissions.Select(code => code.Value)]);
+            [.. member.Permissions.Select(code => code.Value)],
+            member.DisplayName);
     }
 }
 
@@ -107,6 +115,10 @@ public sealed record CreateInvitationRequest(string? Email, IReadOnlyList<Guid>?
 /// There is no field here for the token or its digest, and there is deliberately
 /// no shape of this record that could carry one.
 /// </remarks>
+/// <param name="InvitedByDisplayName">
+/// The inviter's display name beside <c>invitedByEmail</c>, or null when they have
+/// none or the account is gone (Phase 39.1).
+/// </param>
 public sealed record InvitationResponse(
     Guid Id,
     string Email,
@@ -114,7 +126,8 @@ public sealed record InvitationResponse(
     IReadOnlyList<string> Roles,
     string? InvitedByEmail,
     DateTimeOffset CreatedAt,
-    DateTimeOffset ExpiresAt)
+    DateTimeOffset ExpiresAt,
+    string? InvitedByDisplayName)
 {
     public static InvitationResponse From(TenantInvitationView invitation)
     {
@@ -127,7 +140,8 @@ public sealed record InvitationResponse(
             invitation.Roles,
             invitation.InvitedByEmail,
             invitation.CreatedAt,
-            invitation.ExpiresAt);
+            invitation.ExpiresAt,
+            invitation.InvitedByDisplayName);
     }
 
     /// <summary>
@@ -169,7 +183,8 @@ public sealed record CreatedInvitationResponse(InvitationResponse Invitation, st
     public static CreatedInvitationResponse From(
         IssuedInvitation issued,
         DateTimeOffset now,
-        string? invitedByEmail)
+        string? invitedByEmail,
+        string? invitedByDisplayName = null)
     {
         ArgumentNullException.ThrowIfNull(issued);
 
@@ -186,7 +201,8 @@ public sealed record CreatedInvitationResponse(InvitationResponse Invitation, st
                 [.. issued.Roles.Select(role => role.Name.Value).Order(StringComparer.OrdinalIgnoreCase)],
                 invitedByEmail,
                 invitation.CreatedAt,
-                invitation.ExpiresAt),
+                invitation.ExpiresAt,
+                invitedByDisplayName),
             issued.Token);
     }
 }

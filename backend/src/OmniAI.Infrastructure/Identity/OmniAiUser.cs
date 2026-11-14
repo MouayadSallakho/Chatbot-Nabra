@@ -51,4 +51,14 @@ public sealed class OmniAiUser : IdentityUser<Guid>
     /// <see cref="IdentityAccountDirectory"/>.
     /// </remarks>
     public string? Language { get; set; }
+
+    /// <summary>
+    /// The name colleagues see beside the email, or null (Phase 39.1, note 7).
+    /// </summary>
+    /// <remarks>
+    /// Kept as the stored text, like <see cref="Language"/>; written only through
+    /// <see cref="Domain.Users.MemberDisplayName"/>, which trims, collapses and
+    /// bounds it. One per account, edited by its owner.
+    /// </remarks>
+    public string? DisplayName { get; set; }
 }

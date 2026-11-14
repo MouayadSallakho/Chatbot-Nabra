@@ -42,11 +42,20 @@ public sealed record StartedEmbeddedConversationResponse(
     string Credential);
 
 /// <summary>The appearance a workspace configured.</summary>
+/// <param name="Greeting">
+/// The fallback greeting: what a page shows when its language has no greeting of
+/// its own (Phase 39.1), and what every page showed before.
+/// </param>
+/// <param name="Greetings">
+/// Each page language's own greeting, null where none is set (Phase 39.1). Always
+/// present, so a form can bind both boxes.
+/// </param>
 public sealed record WebChatWidgetResponse(
     string? Greeting,
     string AccentColor,
     string LauncherPosition,
-    string Theme)
+    string Theme,
+    WebChatGreetingsResponse Greetings)
 {
     public static WebChatWidgetResponse From(WebChatWidgetView widget)
     {
@@ -56,9 +65,13 @@ public sealed record WebChatWidgetResponse(
             widget.Greeting,
             widget.AccentColor,
             widget.LauncherPosition,
-            widget.Theme);
+            widget.Theme,
+            new WebChatGreetingsResponse(widget.Greetings.En, widget.Greetings.Ar));
     }
 }
+
+/// <summary>The greetings of English and Arabic pages (Phase 39.1).</summary>
+public sealed record WebChatGreetingsResponse(string? En, string? Ar);
 
 /// <summary>
 /// Everything the Website Chat configuration screen reads.
@@ -114,9 +127,18 @@ public sealed record WebChatWidgetConfigurationResponse(
 /// that may already be out of date, and an origin somebody thought they had
 /// removed still being allowed is exactly the failure this list exists to prevent.
 /// </remarks>
+/// <param name="Greetings">
+/// Phase 39.1. Absent or null keeps the stored per-language greetings, so a client
+/// that does not know this member never clears them. Present sets both: null,
+/// empty or blank clears one.
+/// </param>
 public sealed record UpdateWebChatWidgetRequest(
     string? Greeting,
     string? AccentColor,
     string? LauncherPosition,
     string? Theme,
-    IReadOnlyList<string>? AllowedOrigins);
+    IReadOnlyList<string>? AllowedOrigins,
+    WebChatGreetingsRequest? Greetings = null);
+
+/// <summary>The greetings of English and Arabic pages, as a write sends them (Phase 39.1).</summary>
+public sealed record WebChatGreetingsRequest(string? En, string? Ar);

@@ -87,7 +87,7 @@ internal static class HostedChatEndpoints
 
         chat.MapGet("/{publicKey}", GetConfigAsync)
             .WithName("GetPublicWebChat")
-            .WithSummary("What a hosted chat page shows: the agent's name, availability, the workspace's name and the widget's appearance.")
+            .WithSummary("What a hosted chat page shows: the agent's name, availability, the workspace's name and the widget's appearance. Optional lang=en|ar (any letter case, Phase 39.1): greeting is that language's own when the workspace set one, else the fallback; an absent or unknown lang gives the fallback, as before.")
             .Produces<PublicWebChatResponse>()
             .Produces(StatusCodes.Status404NotFound);
 
@@ -124,11 +124,12 @@ internal static class HostedChatEndpoints
     /// </remarks>
     private static async Task<IResult> GetConfigAsync(
         string publicKey,
+        string? lang,
         StartWebChatConversationHandler handler,
         CancellationToken cancellationToken)
     {
         PublicWebChatView? view = await handler
-            .GetAsync(new GetPublicWebChatQuery(publicKey), cancellationToken)
+            .GetAsync(new GetPublicWebChatQuery(publicKey, PageLanguage.Read(lang)), cancellationToken)
             .ConfigureAwait(false);
 
         return view is null

@@ -40,6 +40,11 @@ public sealed record LoginRequest(string? Email, string? Password, string? Langu
 /// </summary>
 /// <param name="Id">The account's identity.</param>
 /// <param name="Email">The address it signs in with.</param>
+/// <param name="Language">The stored language, or null (Phase 37.3).</param>
+/// <param name="DisplayName">
+/// The name colleagues see, or null when the person has not given one (Phase 39.1).
+/// The email stays: older clients read it, and it is the fallback label.
+/// </param>
 /// <remarks>
 /// <strong>Two fields, chosen by subtraction.</strong> The stored account also
 /// has a password hash, a security stamp, a concurrency stamp, a lockout end, a
@@ -50,7 +55,7 @@ public sealed record LoginRequest(string? Email, string? Password, string? Langu
 /// written out by hand rather than serialised from the Identity entity precisely
 /// so that adding a column to that entity cannot quietly add a field here.
 /// </remarks>
-public sealed record CurrentUserResponse(Guid Id, string Email, string? Language);
+public sealed record CurrentUserResponse(Guid Id, string Email, string? Language, string? DisplayName);
 
 /// <summary>
 /// <c>GET /api/auth/session</c> (Phase 37.5b, row 29): whether this request carries
@@ -82,6 +87,10 @@ public sealed record ResetPasswordRequest(string? UserId, string? Token, string?
 
 /// <summary><c>PUT /api/me/language</c> (Phase 37.3).</summary>
 public sealed record ChangeLanguageRequest(string? Language);
+
+/// <summary><c>PUT /api/me/display-name</c> (Phase 39.1).</summary>
+/// <param name="DisplayName">The new name; null, empty or blank clears it.</param>
+public sealed record ChangeDisplayNameRequest(string? DisplayName);
 
 /// <summary>
 /// One workspace the caller belongs to, as <c>GET /api/me/tenants</c> publishes it.

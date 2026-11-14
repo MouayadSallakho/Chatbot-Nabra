@@ -16,8 +16,26 @@ namespace OmniAI.Api.Conversations;
 /// type, and none of them has a field this could be assigned to — which is what
 /// stops an employee's email reaching a customer by an oversight rather than by a
 /// rule somebody has to remember.
+/// <para>
+/// <strong>Phase 39.1: the display name beside the email.</strong> Null when the
+/// person has not given one; the email is still there, because older clients read
+/// it and it is the label to show without a name. This one record is what
+/// <c>assignedTo</c>, <c>takenOverBy</c>, a transcript message's <c>sentBy</c>, an
+/// event's <c>actor</c> and the assignee list all publish.
+/// </para>
 /// </remarks>
-public sealed record WorkspaceMemberResponse(Guid UserId, string Email);
+public sealed record WorkspaceMemberResponse(Guid UserId, string Email, string? DisplayName);
+
+/// <summary>What <c>POST …/conversations/read-all</c> did (Phase 39.1).</summary>
+/// <param name="Marked">
+/// How many conversations were unread for the caller and are now read; 0 when
+/// there were none, so a repeated call answers 0.
+/// </param>
+public sealed record MarkAllConversationsReadResponse(int Marked);
+
+/// <summary><c>GET …/conversations/unread-count</c> (Phase 39.1).</summary>
+/// <param name="Count">Conversations unread for the caller, by the list's own rule.</param>
+public sealed record ConversationUnreadCountResponse(int Count);
 
 /// <summary>Who a conversation is with (Phase 37.4).</summary>
 /// <param name="DisplayName">The name somebody in the workspace gave them, or null.</param>
@@ -209,7 +227,7 @@ internal static class ConversationEndpoints
 
         workspace.MapGet("/", ListAsync)
             .WithName("ListTenantConversations")
-            .WithSummary("Lists conversations, most recently active first, with the customer, the reader's unread state, who took it over and why it needs a person. Optional filter=needs-person (400 conversations.filter.invalid for any other value), which keeps exactly the rows whose needsPerson is true; total counts the filtered set.")
+            .WithSummary("Lists conversations, most recently active first, with the customer, the reader's unread state, who took it over and why it needs a person. Optional filter=needs-person, which keeps exactly the rows whose needsPerson is true, or filter=mine (Phase 39.1), which keeps the rows assigned to the reader or taken over by the reader; 400 conversations.filter.invalid for any other value; total counts the filtered set.")
             .Produces<ConversationPageResponse>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status403Forbidden);
@@ -232,6 +250,20 @@ internal static class ConversationEndpoints
             .WithSummary("Moves the caller's own read marker forward to a message sequence (clamped to the newest message; never moves back). conversations.view; no If-Match.")
             .Produces(StatusCodes.Status204NoContent)
             .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status403Forbidden);
+
+        // Phase 39.1 (note 6). Static segments: they cannot collide with the
+        // {conversationId:guid} routes.
+        workspace.MapPost("/read-all", MarkAllReadAsync)
+            .WithName("MarkAllTenantConversationsRead")
+            .WithSummary("Moves the caller's own read marker to the newest message of every conversation of the workspace that is unread for them, in one statement; marked counts them, and a second call answers 0. conversations.view; no If-Match. When marked > 0 the caller's own member group hears conversationsRead (payload: the workspace id).")
+            .Produces<MarkAllConversationsReadResponse>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status403Forbidden);
+
+        workspace.MapGet("/unread-count", CountUnreadAsync)
+            .WithName("CountTenantConversationsUnread")
+            .WithSummary("How many of the workspace's conversations are unread for the caller, by the list's own unread rule: what read-all would mark. conversations.view.")
+            .Produces<ConversationUnreadCountResponse>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status403Forbidden);
 
         // The operational routes. All four are unsafe writes on the same
@@ -407,6 +439,41 @@ internal static class ConversationEndpoints
         return stored ? Results.NoContent() : Results.NotFound();
     }
 
+    /// <summary><c>POST .../conversations/read-all</c> (Phase 39.1).</summary>
+    /// <remarks>
+    /// The caller's own markers only; another workspace's conversations are never
+    /// in the statement. A non-member is 404 and a member without
+    /// <c>conversations.view</c> 403, as on the single marker.
+    /// </remarks>
+    private static async Task<IResult> MarkAllReadAsync(
+        Guid tenantId,
+        MarkAllConversationsReadHandler handler,
+        CancellationToken cancellationToken)
+    {
+        int? marked = await handler
+            .MarkAllAsync(new MarkAllConversationsReadCommand(tenantId), cancellationToken)
+            .ConfigureAwait(false);
+
+        return marked is int count
+            ? Results.Ok(new MarkAllConversationsReadResponse(count))
+            : Results.NotFound();
+    }
+
+    /// <summary><c>GET .../conversations/unread-count</c> (Phase 39.1).</summary>
+    private static async Task<IResult> CountUnreadAsync(
+        Guid tenantId,
+        MarkAllConversationsReadHandler handler,
+        CancellationToken cancellationToken)
+    {
+        int? count = await handler
+            .CountUnreadAsync(new CountUnreadConversationsQuery(tenantId), cancellationToken)
+            .ConfigureAwait(false);
+
+        return count is int unread
+            ? Results.Ok(new ConversationUnreadCountResponse(unread))
+            : Results.NotFound();
+    }
+
     /// <summary><c>POST .../conversations/{id}/take-over</c>.</summary>
     private static Task<IResult> TakeOverAsync(
         Guid tenantId,
@@ -554,7 +621,8 @@ internal static class ConversationEndpoints
             ? Results.NotFound()
             : Results.Ok(members.Select(member => new WorkspaceMemberResponse(
                 member.UserId,
-                member.Email)));
+                member.Email,
+                member.DisplayName)));
     }
 
     /// <summary>
@@ -615,7 +683,7 @@ internal static class ConversationEndpoints
             detail.NeedsPersonReason?.ToString());
 
     private static WorkspaceMemberResponse? ToMember(ConversationMessageAuthor? author) =>
-        author is null ? null : new WorkspaceMemberResponse(author.UserId, author.Email);
+        author is null ? null : new WorkspaceMemberResponse(author.UserId, author.Email, author.DisplayName);
 
     private static ConversationCustomerResponse? ToCustomer(ConversationCustomer? customer) =>
         customer is null

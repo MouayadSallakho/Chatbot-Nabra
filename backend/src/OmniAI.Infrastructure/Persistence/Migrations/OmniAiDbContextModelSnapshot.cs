@@ -2384,6 +2384,16 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                                 .HasColumnType("character varying(300)")
                                 .HasColumnName("widget_greeting");
 
+                            b1.Property<string>("GreetingAr")
+                                .HasMaxLength(300)
+                                .HasColumnType("character varying(300)")
+                                .HasColumnName("widget_greeting_ar");
+
+                            b1.Property<string>("GreetingEn")
+                                .HasMaxLength(300)
+                                .HasColumnType("character varying(300)")
+                                .HasColumnName("widget_greeting_en");
+
                             b1.Property<string>("Position")
                                 .IsRequired()
                                 .HasMaxLength(16)
@@ -2787,6 +2797,11 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                         .IsConcurrencyToken()
                         .HasColumnType("text")
                         .HasColumnName("concurrency_stamp");
+
+                    b.Property<string>("DisplayName")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("display_name");
 
                     b.Property<string>("Email")
                         .HasMaxLength(256)

@@ -49,6 +49,14 @@ internal static class MeEndpoints
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status401Unauthorized);
 
+        // Phase 39.1 (note 7).
+        me.MapPut("/display-name", ChangeDisplayNameAsync)
+            .WithName("ChangeMyDisplayName")
+            .WithSummary("Stores the name colleagues see beside this account's email, or clears it with null or blank. Trimmed, inner whitespace collapsed, at most 80 characters (400 account.display_name.too_long with limit and limitUnit), no control or format characters except ZWJ and ZWNJ (400 account.display_name.control_characters). The caller's own account only; staff-facing, never shown to visitors.")
+            .Produces(StatusCodes.Status204NoContent)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status401Unauthorized);
+
         return endpoints;
     }
 
@@ -165,6 +173,42 @@ internal static class MeEndpoints
         UserId me = currentUser.Id ?? throw new NotAuthenticatedException();
 
         return await languages.SetAsync(me, language, cancellationToken).ConfigureAwait(false)
+            ? Results.NoContent()
+            : Results.Problem(
+                title: "Not authenticated",
+                detail: "This request does not identify a signed-in user.",
+                statusCode: StatusCodes.Status401Unauthorized);
+    }
+
+    /// <summary>
+    /// <c>PUT /api/me/display-name</c>. Changes, or clears, the caller's own name.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <strong>Only one's own.</strong> The account is the session's; there is no
+    /// user id in the route or the body, so there is no request that edits a
+    /// colleague's name. No workspace and no permission are involved, as with the
+    /// language.
+    /// </para>
+    /// <para>
+    /// No <c>If-Match</c>: last write wins on one's own name. The rules are the
+    /// value object's (<see cref="MemberDisplayName"/>), and a refusal reaches the
+    /// client with its code through the problem writer.
+    /// </para>
+    /// </remarks>
+    private static async Task<IResult> ChangeDisplayNameAsync(
+        Auth.ChangeDisplayNameRequest request,
+        ICurrentUser currentUser,
+        IAccountDisplayNames displayNames,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        MemberDisplayName? displayName = MemberDisplayName.CreateOrNone(request.DisplayName);
+
+        UserId me = currentUser.Id ?? throw new NotAuthenticatedException();
+
+        return await displayNames.SetAsync(me, displayName, cancellationToken).ConfigureAwait(false)
             ? Results.NoContent()
             : Results.Problem(
                 title: "Not authenticated",

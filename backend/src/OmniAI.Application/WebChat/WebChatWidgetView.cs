@@ -11,11 +11,14 @@ namespace OmniAI.Application.WebChat;
 /// travel as the words they are spelled with, never as ordinals: a client that
 /// switched on <c>2</c> would break silently the day somebody reordered them.
 /// </remarks>
+/// <param name="Greeting">The fallback greeting, or null.</param>
+/// <param name="Greetings">Each page language's own greeting (Phase 39.1).</param>
 public sealed record WebChatWidgetView(
     string? Greeting,
     string AccentColor,
     string LauncherPosition,
-    string Theme)
+    string Theme,
+    WebChatGreetingsView Greetings)
 {
     public static WebChatWidgetView From(WebChatWidgetSettings settings)
     {
@@ -25,9 +28,13 @@ public sealed record WebChatWidgetView(
             settings.Greeting?.Value,
             settings.Accent.Value,
             settings.Position.ToString(),
-            settings.Theme.ToString());
+            settings.Theme.ToString(),
+            new WebChatGreetingsView(settings.GreetingEn?.Value, settings.GreetingAr?.Value));
     }
 }
+
+/// <summary>The greetings of English and Arabic pages, each null when not set (Phase 39.1).</summary>
+public sealed record WebChatGreetingsView(string? En, string? Ar);
 
 /// <summary>
 /// Everything the Website Chat configuration screen needs.

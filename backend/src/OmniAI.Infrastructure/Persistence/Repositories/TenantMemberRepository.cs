@@ -56,14 +56,15 @@ internal sealed class TenantMemberRepository(OmniAiDbContext context) : ITenantM
         // which fails at run time rather than at compile time.
         List<Guid> ids = [.. rows.Select(row => row.UserId.Value)];
 
-        Dictionary<Guid, (string? Email, string? Normalised)> accounts =
+        // Phase 39.1: the display name comes in the same query.
+        Dictionary<Guid, (string? Email, string? Normalised, string? DisplayName)> accounts =
             await _context.Users
                 .AsNoTracking()
                 .Where(user => ids.Contains(user.Id))
-                .Select(user => new { user.Id, user.Email, user.NormalizedEmail })
+                .Select(user => new { user.Id, user.Email, user.NormalizedEmail, user.DisplayName })
                 .ToDictionaryAsync(
                     account => account.Id,
-                    account => (account.Email, account.NormalizedEmail),
+                    account => (account.Email, account.NormalizedEmail, account.DisplayName),
                     cancellationToken)
                 .ConfigureAwait(false);
 
@@ -71,7 +72,7 @@ internal sealed class TenantMemberRepository(OmniAiDbContext context) : ITenantM
 
         foreach (var row in rows)
         {
-            (string? email, string? normalised) =
+            (string? email, string? normalised, string? displayName) =
                 accounts.GetValueOrDefault(row.UserId.Value);
 
             members.Add(new TenantMemberRecord(
@@ -79,7 +80,8 @@ internal sealed class TenantMemberRepository(OmniAiDbContext context) : ITenantM
                 ReadEmail(email, normalised),
                 row.CreatedAt,
                 row.UpdatedAt,
-                await RolesOfAsync(tenantId, row.UserId, cancellationToken).ConfigureAwait(false)));
+                await RolesOfAsync(tenantId, row.UserId, cancellationToken).ConfigureAwait(false),
+                displayName));
         }
 
         return members;
@@ -109,7 +111,7 @@ internal sealed class TenantMemberRepository(OmniAiDbContext context) : ITenantM
         var account = await _context.Users
             .AsNoTracking()
             .Where(user => user.Id == userId.Value)
-            .Select(user => new { user.Email, user.NormalizedEmail })
+            .Select(user => new { user.Email, user.NormalizedEmail, user.DisplayName })
             .FirstOrDefaultAsync(cancellationToken)
             .ConfigureAwait(false);
 
@@ -118,7 +120,8 @@ internal sealed class TenantMemberRepository(OmniAiDbContext context) : ITenantM
             ReadEmail(account?.Email, account?.NormalizedEmail),
             membership.CreatedAt,
             membership.UpdatedAt,
-            await RolesOfAsync(tenantId, userId, cancellationToken).ConfigureAwait(false));
+            await RolesOfAsync(tenantId, userId, cancellationToken).ConfigureAwait(false),
+            account?.DisplayName);
 
         return new Versioned<TenantMemberRecord>(record, CurrentVersion(membership));
     }

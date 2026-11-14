@@ -67,6 +67,20 @@ internal sealed class WebChatEndpointConfiguration : IEntityTypeConfiguration<We
                     .HasConversion(PersistenceConverters.NullableWebChatGreeting)
                     .HasMaxLength(WebChatGreeting.MaxLength);
 
+                // Phase 39.1 (AddWebChatGreetingPerLanguage): a greeting per page
+                // language, the same value object and bound. Nullable, no
+                // backfill: widget_greeting stays the fallback for a language
+                // without its own.
+                widget.Property(settings => settings.GreetingEn)
+                    .HasColumnName("widget_greeting_en")
+                    .HasConversion(PersistenceConverters.NullableWebChatGreeting)
+                    .HasMaxLength(WebChatGreeting.MaxLength);
+
+                widget.Property(settings => settings.GreetingAr)
+                    .HasColumnName("widget_greeting_ar")
+                    .HasConversion(PersistenceConverters.NullableWebChatGreeting)
+                    .HasMaxLength(WebChatGreeting.MaxLength);
+
                 widget.Property(settings => settings.Accent)
                     .HasColumnName("widget_accent_color")
                     .HasConversion(PersistenceConverters.WebChatAccentColor)

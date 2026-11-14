@@ -183,12 +183,31 @@ internal sealed class WorkspaceAnalyticsReader(OmniAiDbContext context)
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 
+        // Phase 39.1 (BA39-1): of the same conversations, those the AI answered
+        // with nobody stepping in. One statement; each EXISTS is an index range
+        // (ix_messages_conversation_ingestion,
+        // ix_conversation_handling_events_conversation). A takeover is the
+        // recorded event or, for one from before events were recorded, the
+        // conversation being with a person now.
+        int answeredByAi = await Conversations(tenantId, window)
+            .Where(conversation =>
+                conversation.Messages.Any(message => message.Sender == MessageSender.AiAgent)
+                && !conversation.Messages.Any(message => message.Sender == MessageSender.HumanAgent)
+                && conversation.Handling != ConversationHandling.Human
+                && !_context.ConversationHandlingEvents.Any(change =>
+                    change.ConversationId == conversation.Id
+                    && change.TenantId == conversation.TenantId
+                    && change.Kind == ConversationHandlingEventKind.TakenOver))
+            .CountAsync(cancellationToken)
+            .ConfigureAwait(false);
+
         return new AnalyticsSummary(
             started,
             Count(bySender, MessageSender.Customer),
             Count(bySender, MessageSender.AiAgent),
             Count(bySender, MessageSender.HumanAgent),
-            Count(bySender, MessageSender.System));
+            Count(bySender, MessageSender.System),
+            answeredByAi);
     }
 
     /// <remarks>

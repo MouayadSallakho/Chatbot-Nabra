@@ -23,6 +23,22 @@ public interface IAccountLanguages
     Task FillIfUnsetAsync(UserId userId, UserLanguage language, CancellationToken cancellationToken = default);
 }
 
+/// <summary>
+/// Each person's display name (Phase 39.1, note 7).
+/// </summary>
+/// <remarks>
+/// <strong>Only the person's own.</strong> The one caller passes the signed-in
+/// account's id; there is no route that names another account, so nobody can edit
+/// a colleague's name. Last write wins, like the language: it is one person's own
+/// value, with no workflow behind it.
+/// </remarks>
+public interface IAccountDisplayNames
+{
+    /// <param name="displayName">The new name, or <see langword="null"/> to clear it.</param>
+    /// <returns>False when the account no longer exists.</returns>
+    Task<bool> SetAsync(UserId userId, MemberDisplayName? displayName, CancellationToken cancellationToken = default);
+}
+
 /// <summary>Writes audit records. Never throws for a record that could not be written.</summary>
 /// <remarks>
 /// <strong>Best effort, and said so.</strong> An audit write that fails is logged

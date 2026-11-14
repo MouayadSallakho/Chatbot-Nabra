@@ -96,8 +96,9 @@ public sealed class MigrationSchemaTests(PostgresTestDatabase database)
         // Phase 35 added exactly one; Phase 37.3 added the four the approved plan
         // lists for it (M1, M3, M2, M2a), in that order; Phase 37.4 the three it
         // lists (M6, M4, M5), in the plan's order; Phase 37.6 the two it lists
-        // (M7, M8); Phase 37.7 the two it lists (M9, M10).
-        Assert.Equal(13, applied.Length);
+        // (M7, M8); Phase 37.7 the two it lists (M9, M10); Phase 39.1 the two its
+        // approved plan lists (AddUserDisplayName, AddWebChatGreetingPerLanguage).
+        Assert.Equal(15, applied.Length);
         Assert.EndsWith("_ProductionReadinessHardening", applied[1], StringComparison.Ordinal);
         Assert.EndsWith("_AddUserLanguage", applied[2], StringComparison.Ordinal);
         Assert.EndsWith("_AddSecurityEvents", applied[3], StringComparison.Ordinal);
@@ -110,6 +111,8 @@ public sealed class MigrationSchemaTests(PostgresTestDatabase database)
         Assert.EndsWith("_AddReportExecutionTimeZone", applied[10], StringComparison.Ordinal);
         Assert.EndsWith("_AddReportExecutionLanguage", applied[11], StringComparison.Ordinal);
         Assert.EndsWith("_AddReportScheduleLanguage", applied[12], StringComparison.Ordinal);
+        Assert.EndsWith("_AddUserDisplayName", applied[13], StringComparison.Ordinal);
+        Assert.EndsWith("_AddWebChatGreetingPerLanguage", applied[14], StringComparison.Ordinal);
     }
 
     /// <remarks>

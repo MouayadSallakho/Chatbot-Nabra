@@ -13,7 +13,9 @@ workspace time zone's code and the analytics comparison's (rows 31 and 34).
 Phase 37.7 reused `language.unsupported` for the report and schedule `language`.
 Phase 38.7b (BA-4) named the last areas that still answered the generic codes:
 customers, conversations, notifications, and reports and schedules; and (BA-12) put
-`limitUnit` beside every knowledge file `limit`.
+`limitUnit` beside every knowledge file `limit`. Phase 39.1 added the display name's
+two codes (with `limit` and `limitUnit`), the `field` member on the three greeting
+refusals, and `mine` as a known conversation filter.
 
 ## Accounts (Phase 37.3)
 
@@ -33,6 +35,18 @@ customers, conversations, notifications, and reports and schedules; and (BA-12) 
 When Identity reports several errors at once, `code` is the first and `codes` lists
 them all, in order, for a form that shows each rule next to its field.
 
+## Display name (Phase 39.1)
+
+`PUT /api/me/display-name` changes the caller's own name; there is no route that
+names another account. A blank, empty or `null` name is not refused: it clears the
+name. Before the rules apply the name is trimmed and every inner run of whitespace
+(spaces, tabs, line breaks) becomes one space.
+
+| Code | Status | Where | Meaning |
+| --- | --- | --- | --- |
+| `account.display_name.too_long` | 400 | `PUT /api/me/display-name` | Longer than 80 characters (UTF-16 code units) after trimming; never truncated. The body also carries `limit: 80` and `limitUnit: "characters"` |
+| `account.display_name.control_characters` | 400 | the same | A control character, or a format character other than the two joiners Arabic and emoji need (U+200C ZWNJ, U+200D ZWJ): a direction mark such as U+200E or U+202E is refused |
+
 ## Conversations (Phase 37.4)
 
 All four are `400` and are checked before membership or permission, so the
@@ -40,7 +54,7 @@ answer is the same for anybody and says nothing about the workspace.
 
 | Code | Status | Where | Meaning |
 | --- | --- | --- | --- |
-| `conversations.filter.invalid` | 400 | `GET …/conversations` | `filter` is not `needs-person` (or empty). Refused rather than ignored, so a misspelt filter never shows every conversation under a heading that promises a few |
+| `conversations.filter.invalid` | 400 | `GET …/conversations` | `filter` is not `needs-person` or, from Phase 39.1, `mine` (or empty). Refused rather than ignored, so a misspelt filter never shows every conversation under a heading that promises a few |
 | `transcript.cursor.conflict` | 400 | `GET …/conversations/{id}/messages` | `after` was combined with `before` or `tail=true`: a page cannot be read forwards and backwards at once |
 | `transcript.include.invalid` | 400 | `GET …/conversations/{id}/messages` | `include` names something other than `events` |
 | `conversations.read.sequence.invalid` | 400 | `POST …/conversations/{id}/read` | `sequence` is missing or negative |
@@ -161,9 +175,18 @@ ever answer with `errors`, it keeps that map unchanged and gets `code`
 `/openapi/v1.json` (Development only) lists the extension members this API writes:
 `code`, `codes`, `limit`, `limitUnit` (with its six values), `entitlement`,
 `current`, `periodFrom`, `periodTo`, `traceId`, and the merged customer's
-`customerId` and `canonicalCustomerId`. All are optional: each appears only on the
-refusals this file names. `OpenApiDocumentContractTests` reads the document and
-fails when one goes missing.
+`customerId` and `canonicalCustomerId`; from Phase 39.1 also `field`. All are
+optional: each appears only on the refusals this file names. `OpenApiDocumentContractTests`
+reads the document and fails when one goes missing.
+
+**`field` (Phase 39.1).** Where one request carries several values that the same
+rule checks, the refusal names which one: `greeting`, `greetings.en` or
+`greetings.ar` on the two `website-chat.greeting.*` codes. The code is the same for
+all three; `field` tells a form which box to mark. Absent everywhere else.
+
+**`limit` and `limitUnit` on a domain rule (Phase 39.1).** Besides the knowledge
+file refusals, `account.display_name.too_long` carries `limit: 80` and
+`limitUnit: "characters"`.
 
 ## Knowledge (Phase 37.5a)
 
@@ -258,8 +281,8 @@ for being uploaded twice.
 | `website-chat.theme.invalid` | 400 | `PUT …/widget` | Not `System`, `Light` or `Dark` |
 | `website-chat.accent_color.required` | 400 | `PUT …/widget` | An accent colour is required where one is given |
 | `website-chat.accent_color.invalid` | 400 | `PUT …/widget` | Not a hex colour such as `#2563eb` |
-| `website-chat.greeting.too_long` | 400 | `PUT …/widget` | Past the greeting bound; never truncated |
-| `website-chat.greeting.control_characters` | 400 | `PUT …/widget` | Control characters other than line feed |
+| `website-chat.greeting.too_long` | 400 | `PUT …/widget` | Past the greeting bound (300); never truncated. From Phase 39.1 the body names the member in `field`: `greeting`, `greetings.en` or `greetings.ar` |
+| `website-chat.greeting.control_characters` | 400 | `PUT …/widget` | Control characters other than line feed. `field` as above |
 | `website-chat.public_key.invalid` | 400 | admin reads | A malformed public key |
 | `website-chat.id.invalid` | 400 | any | An all-zero endpoint id |
 

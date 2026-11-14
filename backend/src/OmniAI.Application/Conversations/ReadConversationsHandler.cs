@@ -10,7 +10,8 @@ namespace OmniAI.Application.Conversations;
 /// <summary>One page of a workspace's conversations.</summary>
 /// <param name="Filter">
 /// <see langword="null"/> or empty for every conversation; <c>needs-person</c>
-/// for the ones waiting on a person (Phase 37.4). Anything else is refused.
+/// for the ones waiting on a person (Phase 37.4); <c>mine</c> for the ones
+/// assigned to or taken over by the reader (Phase 39.1). Anything else is refused.
 /// </param>
 public sealed record ListConversationsQuery(
     Guid TenantId,
@@ -297,7 +298,9 @@ public sealed class ReadConversationsHandler(
             ? ConversationListFilter.All
             : string.Equals(filter.Trim(), "needs-person", StringComparison.OrdinalIgnoreCase)
                 ? ConversationListFilter.NeedsPerson
-                : throw ConversationQueryInvalidException.UnknownFilter();
+                : string.Equals(filter.Trim(), "mine", StringComparison.OrdinalIgnoreCase)
+                    ? ConversationListFilter.Mine
+                    : throw ConversationQueryInvalidException.UnknownFilter();
 
     /// <summary>Reads <c>include</c>: a comma-separated list whose only member is <c>events</c>.</summary>
     private static bool ParseInclude(string? include)

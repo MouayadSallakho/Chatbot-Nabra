@@ -539,3 +539,25 @@ invitations as pending.
 - Invitation audit history beyond the current status
 - Per-workspace invitation lifetime configuration
 - Role deletion, and the orphan-assignment semantics it still requires
+
+## T22. The display name beside the email (Phase 39.1)
+
+Additive, under the same permissions as before (`members.view`):
+
+| Read | New member |
+| --- | --- |
+| `GET …/members` (each `MemberSummaryResponse`) | `displayName`, `null` when the person has none |
+| `GET …/members/{userId}` and `PUT …/members/{userId}/roles` (`MemberResponse`) | `displayName` |
+| `GET …/invitations` and `POST …/invitations` (`InvitationResponse`) | `invitedByDisplayName` beside `invitedByEmail`; `null` when the inviter has none or the account is gone |
+
+The name is read in the statement that already reads the email: the member list's
+one users query for the page, the member detail's account read, and, for the
+invitation list, one `IAccountDirectory.FindPeopleAsync` call for the page (address
+and name together), which replaced the page's `FindEmailsAsync` call. No extra round
+trip. The email is unchanged everywhere. The name is the person's own
+(`PUT /api/me/display-name`, `authentication-tenant-membership.md`); an
+administrator cannot set it. Another workspace's member reads `404` on every one of
+these routes, as before, so a name never crosses workspaces.
+
+The document now also declares the member list's and the member detail's bodies
+(`MemberPageResponse`, `MemberResponse`), metadata only.

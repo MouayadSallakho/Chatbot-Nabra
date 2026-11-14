@@ -52,8 +52,26 @@ public interface IAccountDirectory
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// The addresses and display names of several accounts at once (Phase 39.1),
+    /// with the same address rule as <see cref="FindEmailsAsync"/>.
+    /// </summary>
+    /// <returns>
+    /// One entry per account that exists and has a usable address; the others are
+    /// simply absent. The display name is null when the person gave none.
+    /// </returns>
+    /// <remarks>One statement, like <see cref="FindEmailsAsync"/>: the name comes with the address.</remarks>
+    Task<IReadOnlyDictionary<UserId, AccountPerson>> FindPeopleAsync(
+        IReadOnlyCollection<UserId> userIds,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// The language the person reads what the server sends them in (Phase 37.3).
     /// </summary>
     /// <returns>Their choice, or null when they have none or the account is gone.</returns>
     Task<UserLanguage?> FindLanguageAsync(UserId userId, CancellationToken cancellationToken = default);
 }
+
+/// <summary>An account's address and the name it gave itself (Phase 39.1).</summary>
+/// <param name="Email">The address it signs in with.</param>
+/// <param name="DisplayName">Its display name, or null.</param>
+public sealed record AccountPerson(EmailAddress Email, string? DisplayName);

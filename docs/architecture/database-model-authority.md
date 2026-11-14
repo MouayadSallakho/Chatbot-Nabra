@@ -247,3 +247,16 @@ again.
   create an object the model lacks.
 - `DatabaseModelAuthorityTests` must stay green. A failure there means the
   migrations and the model disagree.
+
+## 13. Migrations after the Initial
+
+Each one generated with `dotnet ef migrations add` from `backend/`, never edited,
+additive, and applied to a fresh database and to a copy of the development database
+before the development database itself.
+
+| Phase | Migration | What |
+| --- | --- | --- |
+| 39.1 | `AddUserDisplayName` | `users.display_name varchar(80) null`, no backfill |
+| 39.1 | `AddWebChatGreetingPerLanguage` | `web_chat_endpoints.widget_greeting_en` and `widget_greeting_ar`, `varchar(300) null`, no backfill |
+
+Earlier phases' migrations are listed in their phase reports.

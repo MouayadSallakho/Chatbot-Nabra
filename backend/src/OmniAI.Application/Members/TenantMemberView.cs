@@ -37,12 +37,14 @@ public sealed record TenantMemberRole(Guid Id, string Name, bool IsSystem);
 /// examined.
 /// </para>
 /// </remarks>
+/// <param name="DisplayName">The name colleagues see, or null (Phase 39.1).</param>
 public sealed record TenantMemberSummary(
     Guid UserId,
     string Email,
     DateTimeOffset JoinedAt,
     IReadOnlyList<TenantMemberRole> Roles,
-    bool IsOwner);
+    bool IsOwner,
+    string? DisplayName = null);
 
 /// <summary>
 /// One member, in full.
@@ -71,6 +73,7 @@ public sealed record TenantMemberSummary(
 /// agents already use.
 /// </para>
 /// </remarks>
+/// <param name="DisplayName">The name colleagues see, or null (Phase 39.1).</param>
 public sealed record TenantMemberView(
     Guid UserId,
     Guid TenantId,
@@ -79,7 +82,8 @@ public sealed record TenantMemberView(
     DateTimeOffset AccessUpdatedAt,
     IReadOnlyList<TenantMemberRole> Roles,
     bool IsOwner,
-    IReadOnlyList<PermissionCode> Permissions);
+    IReadOnlyList<PermissionCode> Permissions,
+    string? DisplayName = null);
 
 /// <summary>
 /// A member as the store holds them, before it is decided what to publish.
@@ -96,9 +100,14 @@ public sealed record TenantMemberView(
 /// and an Owner permits everything while storing nothing. A projection to names
 /// would lose exactly the information the security rules run on.
 /// </remarks>
+/// <param name="DisplayName">
+/// The name the person gave themselves, or null (Phase 39.1). Read beside the
+/// email, in the same query.
+/// </param>
 public sealed record TenantMemberRecord(
     UserId UserId,
     EmailAddress Email,
     DateTimeOffset JoinedAt,
     DateTimeOffset AccessUpdatedAt,
-    IReadOnlyList<TenantRole> Roles);
+    IReadOnlyList<TenantRole> Roles,
+    string? DisplayName = null);

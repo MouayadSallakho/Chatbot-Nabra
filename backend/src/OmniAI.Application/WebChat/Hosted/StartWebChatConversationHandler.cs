@@ -10,7 +10,11 @@ namespace OmniAI.Application.WebChat.Hosted;
 
 /// <summary>Read the public face of one hosted chat endpoint.</summary>
 /// <param name="PublicKey">The key from the page's address.</param>
-public sealed record GetPublicWebChatQuery(string? PublicKey);
+/// <param name="Language">
+/// The page's language (Phase 39.1), or null when it named none this platform
+/// knows: then the fallback greeting, exactly as before.
+/// </param>
+public sealed record GetPublicWebChatQuery(string? PublicKey, Domain.Users.UserLanguage? Language = null);
 
 /// <summary>Start a conversation on one hosted chat endpoint.</summary>
 /// <remarks>
@@ -97,7 +101,7 @@ public sealed class StartWebChatConversationHandler(
             IsServing(endpoint))
         {
             WorkspaceName = endpoint.WorkspaceName,
-            Greeting = endpoint.Widget.Greeting?.Value,
+            Greeting = endpoint.Widget.GreetingFor(query.Language)?.Value,
             AccentColor = endpoint.Widget.Accent.Value,
             Theme = endpoint.Widget.Theme.ToString(),
         };

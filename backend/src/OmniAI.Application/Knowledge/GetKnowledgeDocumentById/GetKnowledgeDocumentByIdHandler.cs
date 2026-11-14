@@ -53,6 +53,19 @@ public sealed class GetKnowledgeDocumentByIdHandler(
             return null;
         }
 
+        // What the last press of "Index" did (Phase 37.5a). One indexed read, and
+        // only in a workspace the caller may view (the read is scoped by it).
+        //
+        // Read before the document (Phase 39.1, Revision 1). An attempt commits
+        // the document's index first and its Succeeded outcome after, in two
+        // statements, and so does this read: in the writer's order a settlement
+        // landing in between showed Succeeded beside "needs an index". In the
+        // reverse order, an outcome seen here was committed after the index, so
+        // the document read next already carries it.
+        KnowledgeIndexAttemptView? lastAttempt = await _attempts
+            .FindLatestAsync(tenantId, documentId, cancellationToken)
+            .ConfigureAwait(false);
+
         Versioned<KnowledgeDocument>? stored = await _documents
             .FindAsync(tenantId, documentId, cancellationToken)
             .ConfigureAwait(false);
@@ -67,12 +80,6 @@ public sealed class GetKnowledgeDocumentByIdHandler(
         // remember to make.
         KnowledgeSource? source = await _sources
             .FindAsync(tenantId, documentId, cancellationToken)
-            .ConfigureAwait(false);
-
-        // What the last press of "Index" did (Phase 37.5a). One indexed read, and
-        // only for a document the caller was already allowed to open.
-        KnowledgeIndexAttemptView? lastAttempt = await _attempts
-            .FindLatestAsync(tenantId, documentId, cancellationToken)
             .ConfigureAwait(false);
 
         return new Versioned<KnowledgeDocumentView>(

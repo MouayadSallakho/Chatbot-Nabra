@@ -81,4 +81,13 @@ internal static class RealtimeEvents
     /// document through the authorised HTTP read.
     /// </remarks>
     internal const string KnowledgeChanged = "knowledgeChanged";
+
+    /// <summary>
+    /// "Your read markers in this workspace moved" (Phase 39.1, mark all read).
+    /// </summary>
+    /// <remarks>
+    /// Structural only: the payload is the workspace id. Sent to the reader's own
+    /// member group, so their other tabs re-read the list; nobody else is told.
+    /// </remarks>
+    internal const string ConversationsRead = "conversationsRead";
 }

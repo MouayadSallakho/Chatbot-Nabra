@@ -258,19 +258,33 @@ public sealed record UnreadCountResponse(int UnreadCount);
 
 public sealed record MarkAllReadResponse(int Marked);
 
-/// <summary>Which categories are emailed. In-app notifications are not a preference.</summary>
-public sealed record EmailPreferencesContract(
+/// <summary>Which categories to email, as a save sends them. In-app notifications are not a preference.</summary>
+/// <remarks>
+/// Nullable so that a missing value is refused with
+/// <c>notifications.preferences.incomplete</c> rather than read as false. Phase 39.1
+/// split it from <see cref="EmailPreferencesResponse"/>, so the document types each
+/// side exactly; the JSON is unchanged.
+/// </remarks>
+public sealed record EmailPreferencesRequest(
     bool? Reports,
     bool? Usage,
     bool? Billing,
     bool? Knowledge,
     bool? ChannelHealth);
 
-public sealed record SaveNotificationPreferencesRequest(EmailPreferencesContract? Email);
+/// <summary>Which categories are emailed, as a read answers: always true or false (Phase 39.1).</summary>
+public sealed record EmailPreferencesResponse(
+    bool Reports,
+    bool Usage,
+    bool Billing,
+    bool Knowledge,
+    bool ChannelHealth);
+
+public sealed record SaveNotificationPreferencesRequest(EmailPreferencesRequest? Email);
 
 /// <param name="EmailConfigured">False when this deployment cannot send email at all.</param>
 public sealed record NotificationPreferencesResponse(
-    EmailPreferencesContract Email,
+    EmailPreferencesResponse Email,
     bool EmailConfigured,
     DateTimeOffset UpdatedAt)
 {
@@ -281,7 +295,7 @@ public sealed record NotificationPreferencesResponse(
         NotificationPreferences preferences = view.Preferences;
 
         return new NotificationPreferencesResponse(
-            new EmailPreferencesContract(
+            new EmailPreferencesResponse(
                 preferences.EmailReports,
                 preferences.EmailUsage,
                 preferences.EmailBilling,

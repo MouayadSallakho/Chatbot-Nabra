@@ -19,12 +19,18 @@ public sealed record AnalyticsPeriodResponse(
     string TimeZone);
 
 /// <summary>What happened during the period.</summary>
+/// <param name="ConversationsAnsweredByAi">
+/// Of <c>conversationsStarted</c>, those the AI replied in and no person replied in
+/// or took over, as of the read (Phase 39.1, BA39-1). With <c>compare=previous</c>
+/// the previous period's summary carries the same figure.
+/// </param>
 public sealed record AnalyticsSummaryResponse(
     long ConversationsStarted,
     long CustomerMessages,
     long AiMessages,
     long HumanMessages,
-    long SystemMessages);
+    long SystemMessages,
+    long ConversationsAnsweredByAi);
 
 /// <summary>What the workspace looks like now, regardless of the period.</summary>
 public sealed record AnalyticsSnapshotResponse(
@@ -309,7 +315,8 @@ public sealed record AnalyticsDashboardResponse(
             summary.CustomerMessages,
             summary.AiMessages,
             summary.HumanMessages,
-            summary.SystemMessages);
+            summary.SystemMessages,
+            summary.ConversationsAnsweredByAi);
 
     private static AnalyticsAiOperationsResponse OperationsOf(AnalyticsAiOperations operations) =>
         new(operations.Attempts, operations.Completed, operations.Failed, operations.InProgress);

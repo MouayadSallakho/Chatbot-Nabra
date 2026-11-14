@@ -251,12 +251,13 @@ public sealed class AuthEndpointsTests(TenantApiFixture api) : IClassFixture<Ten
     }
 
     [Fact]
-    public async Task The_current_account_response_carries_three_fields_and_no_credential()
+    public async Task The_current_account_response_carries_four_fields_and_no_credential()
     {
         // Written out by hand rather than serialised from the Identity entity, so
         // that adding a column there cannot quietly add a field here. The password
         // hash, the security stamp and the lockout state must never appear. Phase
-        // 37.3 added the third field on purpose: the stored language.
+        // 37.3 added the third field on purpose: the stored language; Phase 39.1
+        // the fourth: the display name, null until the person gives one.
         using HttpClient client = api.CreateClient();
         string email = ApiAuthentication.UniqueEmail();
         await ApiAuthentication.RegisterAsync(client, email);
@@ -267,7 +268,7 @@ public sealed class AuthEndpointsTests(TenantApiFixture api) : IClassFixture<Ten
         using JsonDocument document = JsonDocument.Parse(body);
 
         Assert.Equal(
-            ["id", "email", "language"],
+            ["id", "email", "language", "displayName"],
             document.RootElement.EnumerateObject().Select(field => field.Name));
 
         foreach (string forbidden in

@@ -115,11 +115,17 @@ internal static class OpenApiContract
                 + "(registration and password reset); code is the first.",
         };
         schema.Properties["limit"] = Number(
-            "The bound that was broken: for knowledge file refusals in the unit limitUnit "
-            + "names; for an entitlement, the plan's cap of that entitlement.");
+            "The bound that was broken: for knowledge file refusals and "
+            + "account.display_name.too_long in the unit limitUnit names; for an "
+            + "entitlement, the plan's cap of that entitlement.");
         schema.Properties["limitUnit"] = Text(
-            "What limit counts, always beside it on a knowledge file refusal (Phase 38.7b).",
+            "What limit counts, always beside it on a knowledge file refusal (Phase 38.7b) "
+            + "and on account.display_name.too_long (Phase 39.1).",
             [.. KnowledgeFileLimitUnits.All.Order(StringComparer.Ordinal)]);
+        schema.Properties["field"] = Text(
+            "Which request member the rule refused, where one request carries several values "
+            + "the same rule checks (Phase 39.1): greeting, greetings.en or greetings.ar on the "
+            + "website-chat.greeting.* refusals.");
         schema.Properties["entitlement"] = Text(
             "The entitlement a plan limit refused (entitlement.<kind>.exhausted).");
         schema.Properties["current"] = Number(

@@ -550,9 +550,16 @@ internal static class AuthEndpoints
     }
 
     /// <summary>Projects an account onto the fields this API publishes.</summary>
-    /// <remarks>Three from Phase 37.3: the stored language joined the id and the address.</remarks>
+    /// <remarks>
+    /// Three from Phase 37.3: the stored language joined the id and the address.
+    /// Four from Phase 39.1: the display name, beside the address, never instead of it.
+    /// </remarks>
     private static CurrentUserResponse Describe(OmniAiUser user) =>
-        new(user.Id, user.Email ?? string.Empty, UserLanguages.Code(UserLanguages.FromStored(user.Language)));
+        new(
+            user.Id,
+            user.Email ?? string.Empty,
+            UserLanguages.Code(UserLanguages.FromStored(user.Language)),
+            user.DisplayName);
 
     /// <summary>Writes the readable request-token cookie.</summary>
     private static void IssueAntiforgeryCookie(

@@ -365,6 +365,7 @@ public static class AccountsServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(services);
 
         services.AddScoped<IAccountLanguages, AccountLanguages>();
+        services.AddScoped<IAccountDisplayNames, AccountDisplayNames>();
         services.AddScoped<ISecurityEventLog, SecurityEventLog>();
 
         services.AddScoped<AccountEmailOutbox>();

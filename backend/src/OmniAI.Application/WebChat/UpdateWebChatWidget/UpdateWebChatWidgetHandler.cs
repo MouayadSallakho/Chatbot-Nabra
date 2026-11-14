@@ -9,6 +9,10 @@ using OmniAI.Domain.WebChat;
 
 namespace OmniAI.Application.WebChat.UpdateWebChatWidget;
 
+/// <param name="Greetings">
+/// The per-language greetings (Phase 39.1), or <see langword="null"/> to keep the
+/// stored ones: a client that does not know the member never clears them.
+/// </param>
 public sealed record UpdateWebChatWidgetCommand(
     Guid TenantId,
     Guid WebChatEndpointId,
@@ -17,7 +21,17 @@ public sealed record UpdateWebChatWidgetCommand(
     string? LauncherPosition,
     string? Theme,
     IReadOnlyList<string>? AllowedOrigins,
-    ConcurrencyToken Expected);
+    ConcurrencyToken Expected,
+    WebChatGreetingsInput? Greetings = null);
+
+/// <summary>
+/// The greetings a page in each language opens with (Phase 39.1, note 9).
+/// </summary>
+/// <remarks>
+/// Both are set when this is present: null, empty or blank clears one. The
+/// command's own <c>Greeting</c> stays the fallback for a language without its own.
+/// </remarks>
+public sealed record WebChatGreetingsInput(string? En, string? Ar);
 
 /// <summary>
 /// Replaces a widget's appearance and the websites it may be embedded on.
@@ -62,6 +76,7 @@ public sealed class UpdateWebChatWidgetHandler(
 
         WebChatWidgetSettings widget = ReadWidget(command);
         IReadOnlyList<WebChatOrigin> origins = ReadOrigins(command.AllowedOrigins);
+        (WebChatGreeting? En, WebChatGreeting? Ar)? greetings = ReadGreetings(command.Greetings);
 
         if (!await _authorizer
             .RequireAsync(tenantId, PlatformPermissions.WebsiteChatManage, cancellationToken)
@@ -84,6 +99,19 @@ public sealed class UpdateWebChatWidgetHandler(
             throw new WebChatEndpointVersionMismatchException(command.Expected);
         }
 
+        // Phase 39.1: absent greetings keep the stored ones, so a client written
+        // before them saves the rest of the widget without clearing them.
+        (WebChatGreeting? greetingEn, WebChatGreeting? greetingAr) = greetings
+            ?? (stored.Value.Widget.GreetingEn, stored.Value.Widget.GreetingAr);
+
+        widget = WebChatWidgetSettings.Create(
+            widget.Greeting,
+            widget.Accent,
+            widget.Position,
+            widget.Theme,
+            greetingEn,
+            greetingAr);
+
         stored.Value.Configure(widget, origins, _clock.GetUtcNow());
 
         ConcurrencyToken version = await _endpoints
@@ -97,7 +125,7 @@ public sealed class UpdateWebChatWidgetHandler(
 
     private static WebChatWidgetSettings ReadWidget(UpdateWebChatWidgetCommand command) =>
         WebChatWidgetSettings.Create(
-            WebChatGreeting.CreateOrNone(command.Greeting),
+            ReadGreeting(command.Greeting, "greeting"),
             string.IsNullOrWhiteSpace(command.AccentColor)
                 ? WebChatAccentColor.Default
                 : WebChatAccentColor.Create(command.AccentColor),
@@ -106,6 +134,35 @@ public sealed class UpdateWebChatWidgetHandler(
                 "launcher position",
                 "website-chat.launcher_position.invalid"),
             Read<WebChatTheme>(command.Theme, "widget theme", "website-chat.theme.invalid"));
+
+    /// <summary>The per-language greetings, or null when the request carried none.</summary>
+    private static (WebChatGreeting? En, WebChatGreeting? Ar)? ReadGreetings(WebChatGreetingsInput? greetings) =>
+        greetings is null
+            ? null
+            : (ReadGreeting(greetings.En, "greetings.en"), ReadGreeting(greetings.Ar, "greetings.ar"));
+
+    /// <summary>
+    /// Reads one greeting, naming the request member a refusal is about (Phase 39.1).
+    /// </summary>
+    /// <remarks>
+    /// The same rule and the same code for all three; <c>field</c> tells a form
+    /// which box to mark.
+    /// </remarks>
+    private static WebChatGreeting? ReadGreeting(string? value, string field)
+    {
+        try
+        {
+            return WebChatGreeting.CreateOrNone(value);
+        }
+        catch (DomainValidationException refused)
+        {
+            throw new DomainValidationException(refused.Message, refused)
+            {
+                Code = refused.Code,
+                Field = field,
+            };
+        }
+    }
 
     /// <summary>
     /// Reads the intended list of websites, reporting which line is wrong.

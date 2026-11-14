@@ -116,22 +116,27 @@ public sealed class ListTenantInvitationsHandler(
             .FindNamesAsync(tenantId, [.. stored.SelectMany(invitation => invitation.RoleIds)], cancellationToken)
             .ConfigureAwait(false);
 
-        IReadOnlyDictionary<UserId, EmailAddress> inviters = await _accounts
-            .FindEmailsAsync([.. stored.Select(invitation => invitation.InvitedByUserId)], cancellationToken)
+        // Phase 39.1: the inviter's display name comes with the address, in the
+        // same one statement for the page.
+        IReadOnlyDictionary<UserId, AccountPerson> inviters = await _accounts
+            .FindPeopleAsync([.. stored.Select(invitation => invitation.InvitedByUserId)], cancellationToken)
             .ConfigureAwait(false);
 
         List<TenantInvitationView> items = [];
 
         foreach (TenantInvitation invitation in stored)
         {
+            AccountPerson? inviter = inviters.GetValueOrDefault(invitation.InvitedByUserId);
+
             items.Add(new TenantInvitationView(
                 invitation.Id.Value,
                 invitation.Email.Value,
                 TenantInvitations.StatusAt(invitation, now),
                 RoleNames(invitation, roleNames),
-                inviters.TryGetValue(invitation.InvitedByUserId, out EmailAddress inviter) ? inviter.Value : null,
+                inviter?.Email.Value,
                 invitation.CreatedAt,
-                invitation.ExpiresAt));
+                invitation.ExpiresAt,
+                inviter?.DisplayName));
         }
 
         return new TenantInvitationPage(items, page, pageSize, total);

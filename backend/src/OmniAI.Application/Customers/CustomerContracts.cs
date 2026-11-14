@@ -78,6 +78,10 @@ public sealed record CustomerConversationView(
 /// Six characters that tell unnamed customers apart, the same as on the
 /// conversation reads (<c>CustomerShortCode</c>, Phase 38.7a); never a key.
 /// </param>
+/// <param name="Reference">
+/// The newest WhatsApp number, masked as the conversation reads mask it
+/// (<c>••••1234</c>), or null for a web visitor (Phase 39.1).
+/// </param>
 public sealed record CustomerRow(
     Guid Id,
     string? DisplayName,
@@ -87,7 +91,8 @@ public sealed record CustomerRow(
     DateTimeOffset? LastActivityAt,
     DateTimeOffset CreatedAt,
     CustomerLabelCode LabelCode,
-    string ShortCode);
+    string ShortCode,
+    string? Reference = null);
 
 /// <summary>
 /// One page of the directory.
@@ -138,6 +143,7 @@ public sealed record CustomerPage(
 /// </param>
 /// <param name="LabelCode">As on <see cref="CustomerRow"/> (Phase 38.7a).</param>
 /// <param name="ShortCode">As on <see cref="CustomerRow"/> (Phase 38.7a).</param>
+/// <param name="Reference">As on <see cref="CustomerRow"/> (Phase 39.1).</param>
 public sealed record CustomerView(
     Guid Id,
     string? DisplayName,
@@ -153,7 +159,8 @@ public sealed record CustomerView(
     IReadOnlyList<CustomerConversationView> Conversations,
     bool CanReadConversations,
     CustomerLabelCode LabelCode,
-    string ShortCode);
+    string ShortCode,
+    string? Reference = null);
 
 /// <summary>
 /// What a merge did.

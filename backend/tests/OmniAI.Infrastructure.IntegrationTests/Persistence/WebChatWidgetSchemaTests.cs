@@ -52,6 +52,8 @@ public sealed class WebChatWidgetSchemaTests(PostgresTestDatabase database)
         Assert.Equal(
             "widget_accent_color:character varying, "
             + "widget_greeting:character varying, "
+            + "widget_greeting_ar:character varying, "
+            + "widget_greeting_en:character varying, "
             + "widget_launcher_position:character varying, "
             + "widget_theme:character varying",
             columns as string);
@@ -66,13 +68,14 @@ public sealed class WebChatWidgetSchemaTests(PostgresTestDatabase database)
             + "WHERE table_schema = 'public' AND table_name = 'web_chat_endpoints' "
             + "AND column_name LIKE 'widget%'");
 
-        // A greeting is genuinely optional. The other three always have a value,
+        // A greeting is genuinely optional, and so is each language's own
+        // (Phase 39.1). The other three always have a value,
         // because a widget with no colour or no corner could not be rendered at
         // all -- and every row that existed before Phase 18 was backfilled with
         // the platform defaults rather than an empty string.
         Assert.Equal(
-            "widget_accent_color=NO, widget_greeting=YES, "
-            + "widget_launcher_position=NO, widget_theme=NO",
+            "widget_accent_color=NO, widget_greeting=YES, widget_greeting_ar=YES, "
+            + "widget_greeting_en=YES, widget_launcher_position=NO, widget_theme=NO",
             nullable as string);
     }
 

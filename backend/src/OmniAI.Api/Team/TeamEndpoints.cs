@@ -56,8 +56,11 @@ internal static class TeamEndpoints
             .RequireAuthorization()
             .AddEndpointFilter<AntiforgeryEndpointFilter>();
 
+        // Phase 39.1: the body is declared, so the document describes each row's
+        // displayName beside its email.
         workspace.MapGet("/members", ListMembersAsync)
-            .WithName("ListTenantMembers");
+            .WithName("ListTenantMembers")
+            .Produces<MemberPageResponse>(StatusCodes.Status200OK);
 
         // Before the {userId} route, so "assignable-roles" is never mistaken for
         // an identifier. It would not match the guid constraint, but relying on a
@@ -67,7 +70,8 @@ internal static class TeamEndpoints
             .WithName("GetAssignableRoles");
 
         workspace.MapGet("/members/{userId:guid}", GetMemberAsync)
-            .WithName(GetMemberByIdRouteName);
+            .WithName(GetMemberByIdRouteName)
+            .Produces<MemberResponse>(StatusCodes.Status200OK);
 
         workspace.MapPut("/members/{userId:guid}/roles", ReplaceMemberRolesAsync)
             .WithName("ReplaceTenantMemberRoles")
@@ -278,13 +282,16 @@ internal static class TeamEndpoints
 
         http.Response.Headers.CacheControl = "no-store";
 
-        Domain.Users.EmailAddress? inviter = await accounts
-            .FindEmailAsync(issued.Invitation.InvitedByUserId, cancellationToken)
+        // Phase 39.1: the inviter's display name beside the address, in one read.
+        IReadOnlyDictionary<Domain.Users.UserId, AccountPerson> inviters = await accounts
+            .FindPeopleAsync([issued.Invitation.InvitedByUserId], cancellationToken)
             .ConfigureAwait(false);
+
+        AccountPerson? inviter = inviters.GetValueOrDefault(issued.Invitation.InvitedByUserId);
 
         return Results.Created(
             $"/api/tenants/{tenantId}/invitations/{issued.Invitation.Id.Value}",
-            CreatedInvitationResponse.From(issued, clock.GetUtcNow(), inviter?.Value));
+            CreatedInvitationResponse.From(issued, clock.GetUtcNow(), inviter?.Email.Value, inviter?.DisplayName));
     }
 
     /// <summary><c>POST /api/tenants/{tenantId}/invitations/{invitationId}/revoke</c>.</summary>

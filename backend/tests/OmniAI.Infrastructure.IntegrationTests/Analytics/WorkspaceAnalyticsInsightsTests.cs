@@ -199,7 +199,7 @@ public sealed class WorkspaceAnalyticsInsightsTests(PostgresTestDatabase databas
     }
 
     [Fact]
-    public async Task The_comparison_is_three_counting_statements_whatever_the_workspace_holds()
+    public async Task The_comparison_is_four_counting_statements_whatever_the_workspace_holds()
     {
         AnalyticsWorld world = await NewWorldAsync();
         AiAgent agent = await world.AgentAsync("Support", new DateTimeOffset(2026, 9, 1, 0, 0, 0, TimeSpan.Zero));
@@ -219,7 +219,9 @@ public sealed class WorkspaceAnalyticsInsightsTests(PostgresTestDatabase databas
                 AnalyticsRange.ThirtyDays.Window(new DateTimeOffset(2026, 11, 4, 12, 0, 0, TimeSpan.Zero)).Previous());
         }
 
-        Assert.Equal(3, recorded.Statements.Count);
+        // Phase 39.1 (BA39-1): the summary's "answered by the AI" is one more
+        // counting statement, whatever the workspace holds.
+        Assert.Equal(4, recorded.Statements.Count);
         Assert.All(recorded.Statements, statement => Assert.Contains("count(", statement, StringComparison.OrdinalIgnoreCase));
     }
 

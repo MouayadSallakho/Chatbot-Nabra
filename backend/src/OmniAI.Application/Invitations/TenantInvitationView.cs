@@ -12,6 +12,10 @@ namespace OmniAI.Application.Invitations;
 /// <param name="InvitedByEmail">Who issued it, or null if that account is gone.</param>
 /// <param name="CreatedAt">When it was issued.</param>
 /// <param name="ExpiresAt">When it stops working.</param>
+/// <param name="InvitedByDisplayName">
+/// The inviter's display name, or null when they have none or the account is gone
+/// (Phase 39.1).
+/// </param>
 /// <remarks>
 /// <strong>Neither the token nor its digest appears here, and there is no field
 /// they could occupy.</strong> The secret is returned once, by the request that
@@ -32,7 +36,8 @@ public sealed record TenantInvitationView(
     IReadOnlyList<string> Roles,
     string? InvitedByEmail,
     DateTimeOffset CreatedAt,
-    DateTimeOffset ExpiresAt);
+    DateTimeOffset ExpiresAt,
+    string? InvitedByDisplayName = null);
 
 /// <summary>A page of invitations.</summary>
 /// <param name="Items">The invitations on this page.</param>

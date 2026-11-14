@@ -92,6 +92,36 @@ internal sealed class IdentityAccountDirectory(OmniAiDbContext context) : IAccou
                 account => EmailAddress.FromStored(account.Email!, account.NormalizedEmail!));
     }
 
+    public async Task<IReadOnlyDictionary<UserId, AccountPerson>> FindPeopleAsync(
+        IReadOnlyCollection<UserId> userIds,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(userIds);
+
+        if (userIds.Count == 0)
+        {
+            return new Dictionary<UserId, AccountPerson>();
+        }
+
+        List<Guid> ids = [.. userIds.Select(id => id.Value).Distinct()];
+
+        var accounts = await _context.Users
+            .AsNoTracking()
+            .Where(user => ids.Contains(user.Id))
+            .Select(user => new { user.Id, user.Email, user.NormalizedEmail, user.DisplayName })
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        // The same address rule as FindEmailsAsync.
+        return accounts
+            .Where(account => account.Email is not null && !string.IsNullOrEmpty(account.NormalizedEmail))
+            .ToDictionary(
+                account => UserId.From(account.Id),
+                account => new AccountPerson(
+                    EmailAddress.FromStored(account.Email!, account.NormalizedEmail!),
+                    account.DisplayName));
+    }
+
     public async Task<UserLanguage?> FindLanguageAsync(
         UserId userId,
         CancellationToken cancellationToken = default)

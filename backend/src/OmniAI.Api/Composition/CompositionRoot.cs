@@ -255,6 +255,7 @@ internal static class CompositionRoot
 
         services.AddScoped<IConversationRealtimeNotifier, SignalRConversationNotifier>();
         services.AddScoped<INotificationRealtime, SignalRNotificationRealtime>();
+        services.AddScoped<IConversationReadRealtime, SignalRConversationReadRealtime>();
         services.AddScoped<IKnowledgeRealtimeNotifier, SignalRKnowledgeNotifier>();
 
         // The AI runtime. Infrastructure decides which implementation that is:
@@ -353,6 +354,7 @@ internal static class CompositionRoot
         services.AddScoped<ConversationAssignmentHandler>();
         services.AddScoped<ReplyToConversationHandler>();
         services.AddScoped<MarkConversationReadHandler>();
+        services.AddScoped<MarkAllConversationsReadHandler>();
 
         // The one orchestration both channels enter. Website chat and WhatsApp
         // hand it a customer turn and get back the same outcome; neither has a

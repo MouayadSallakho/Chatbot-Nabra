@@ -46,4 +46,22 @@ public sealed class DomainValidationException : Exception
     /// a code; <c>docs/architecture/problem-codes.md</c> lists every specific one.
     /// </remarks>
     public string? Code { get; init; }
+
+    /// <summary>
+    /// Which request member the rule refused, where one request carries several
+    /// values the same rule checks (Phase 39.1: <c>greeting</c>,
+    /// <c>greetings.en</c>, <c>greetings.ar</c>), or <see langword="null"/>.
+    /// </summary>
+    /// <remarks>Published as the problem's <c>field</c>.</remarks>
+    public string? Field { get; init; }
+
+    /// <summary>
+    /// The bound that was broken, where the rule has one (Phase 39.1), or
+    /// <see langword="null"/>. Set together with <see cref="LimitUnit"/>.
+    /// </summary>
+    /// <remarks>Published as the problem's <c>limit</c> and <c>limitUnit</c>.</remarks>
+    public long? Limit { get; init; }
+
+    /// <summary>What <see cref="Limit"/> counts, such as <c>characters</c>.</summary>
+    public string? LimitUnit { get; init; }
 }

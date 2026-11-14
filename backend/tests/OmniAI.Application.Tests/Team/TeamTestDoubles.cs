@@ -304,6 +304,30 @@ internal sealed class InMemoryAccountDirectory : IAccountDirectory
             _accounts.Where(account => userIds.Contains(account.Key)).ToDictionary());
     }
 
+    private readonly Dictionary<UserId, string> _displayNames = [];
+
+    /// <summary>Gives an account a display name (Phase 39.1).</summary>
+    public InMemoryAccountDirectory Named(UserId userId, string displayName)
+    {
+        _displayNames[userId] = displayName;
+
+        return this;
+    }
+
+    public Task<IReadOnlyDictionary<UserId, AccountPerson>> FindPeopleAsync(
+        IReadOnlyCollection<UserId> userIds,
+        CancellationToken cancellationToken = default)
+    {
+        BatchReads++;
+
+        return Task.FromResult<IReadOnlyDictionary<UserId, AccountPerson>>(
+            _accounts
+                .Where(account => userIds.Contains(account.Key))
+                .ToDictionary(
+                    account => account.Key,
+                    account => new AccountPerson(account.Value, _displayNames.GetValueOrDefault(account.Key))));
+    }
+
     public Task<UserLanguage?> FindLanguageAsync(
         UserId userId,
         CancellationToken cancellationToken = default) =>

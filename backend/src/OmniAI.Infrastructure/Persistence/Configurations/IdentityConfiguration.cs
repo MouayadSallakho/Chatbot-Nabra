@@ -74,6 +74,13 @@ internal sealed class OmniAiUserConfiguration : IEntityTypeConfiguration<OmniAiU
             .HasColumnName("language")
             .HasMaxLength(UserLanguages.MaxCodeLength);
 
+        // Phase 39.1 (AddUserDisplayName). Nullable, no backfill: an account
+        // without a name is shown by its email, as before. No index: read by
+        // primary key, beside the email, in the queries that already read it.
+        builder.Property(user => user.DisplayName)
+            .HasColumnName("display_name")
+            .HasMaxLength(MemberDisplayName.MaxLength);
+
         // Identity's own indexes, renamed. The normalized-email index is made
         // unique here rather than left as Identity's non-unique default: email is
         // the login identifier for this platform, RequireUniqueEmail is on, and a

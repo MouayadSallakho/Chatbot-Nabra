@@ -59,6 +59,16 @@ internal sealed class ConversationRepository(OmniAiDbContext context) : IConvers
             // so the filter and the flag cannot disagree.
             owned = owned.Where(handled => handled.Reason != NoReason);
         }
+        else if (filter == ConversationListFilter.Mine)
+        {
+            // Phase 39.1 (BA39-5): assigned to the reader, or taken over by the
+            // reader, by the same takeover expression the row's takenOverBy
+            // publishes, so the tab and the chip cannot disagree.
+            UserId? me = viewer;
+
+            owned = owned.Where(handled =>
+                handled.Conversation.AssignedTo == me || handled.TakenOverBy == me);
+        }
 
         int total = await owned.CountAsync(cancellationToken).ConfigureAwait(false);
 
@@ -638,7 +648,7 @@ internal sealed class ConversationRepository(OmniAiDbContext context) : IConvers
                 .Where(user => members.Contains(user.Id))
                 .ToDictionaryAsync(
                     user => user.Id,
-                    user => new ConversationMessageAuthor(user.Id, user.Email!),
+                    user => new ConversationMessageAuthor(user.Id, user.Email!, user.DisplayName),
                     cancellationToken)
                 .ConfigureAwait(false);
         }
@@ -707,7 +717,7 @@ internal sealed class ConversationRepository(OmniAiDbContext context) : IConvers
             .Where(user => members.Contains(user.Id))
             .ToDictionaryAsync(
                 user => user.Id,
-                user => new ConversationMessageAuthor(user.Id, user.Email!),
+                user => new ConversationMessageAuthor(user.Id, user.Email!, user.DisplayName),
                 cancellationToken)
             .ConfigureAwait(false);
     }
@@ -774,7 +784,7 @@ internal sealed class ConversationRepository(OmniAiDbContext context) : IConvers
             .Where(user => members.Contains(user.Id))
             .ToDictionaryAsync(
                 user => user.Id,
-                user => new ConversationMessageAuthor(user.Id, user.Email!),
+                user => new ConversationMessageAuthor(user.Id, user.Email!, user.DisplayName),
                 cancellationToken)
             .ConfigureAwait(false);
 
