@@ -151,12 +151,18 @@ Every PDF line goes through `PdfText`:
 2. **Bidi.** `Unicode.Bidi` (a port of the Rust `unicode-bidi` crate: UAX #9,
    Unicode 16) gives the paragraph direction and the line's visual runs with
    their embedding levels.
-3. **Shape.** HarfBuzz (`SkiaSharp.HarfBuzz`) shapes each run in the direction its
-   level dictates, never guessed from the script, so digits and punctuation inside
+3. **Pick the font (Phase 39.7b).** Each run is split by script: Arabic letters
+   go to IBM Plex Sans Arabic, Latin letters and every digit to Geist, letters of
+   any other script to DejaVu Sans. Spaces, punctuation, symbols and marks stay
+   with the letters around them, so a word is never set in two fonts; a character
+   a face lacks goes to the next bundled face that has it.
+4. **Shape.** HarfBuzz (`HarfBuzzSharp`, called directly since 39.7b so the
+   `tnum` feature can be asked for) shapes each piece in the direction its level
+   dictates, never guessed from the script, so digits and punctuation inside
    Arabic go the right way. Joining, the lam-alef ligature, marks and kerning come
-   from the font's OpenType tables. Nothing reverses a string, and no letter form
-   is chosen in code.
-4. **Draw.** Runs are placed in visual order as positioned glyph runs that also
+   from the font's OpenType tables; Geist's figures are set tabular. Nothing
+   reverses a string, and no letter form is chosen in code.
+5. **Draw.** Runs are placed in visual order as positioned glyph runs that also
    carry their UTF-8 source and cluster map, so the PDF text layer is real text.
 
 Alignment:
@@ -164,20 +170,51 @@ Alignment:
 - Numbers align right, as before.
 - A label's value starts at its own value column.
 
-**Font.** DejaVu Sans and DejaVu Sans Bold 2.37, taken from the Debian/Ubuntu
-`fonts-dejavu-core` 2.37-8 package.
+**Tables (Phase 39.7b, Phase 38 note 2).**
+- **Columns sized by content.** A column wants its widest value (of the first 200
+  rows) or its heading on one line, plus 5 pt of padding on each side. A table is
+  as wide as its columns and starts at its reader's margin (left in English, right
+  in Arabic); spare width is no longer spread over every column.
+- **Headings wrap, never cut.** When the columns want more than the page, each
+  keeps at least its widest value and its heading's longest word, the rest is
+  shared by how much each heading still wants, and headings wrap at their spaces,
+  bottom-aligned on a shared last line. Only when even that does not fit do the
+  widest text columns give up width (a water level: narrow ones keep theirs, never
+  below 60 pt), and their longest values end with an ellipsis. A number is never
+  shortened.
+- **A number column's heading aligns with its numbers:** at the column's right
+  edge in English and its left edge in Arabic. A text column's heading starts
+  where its values start.
+- Rows are 16 pt; an Arabic report's lines get 1.6 × their size (Plex Arabic
+  reaches higher and lower than Latin type).
+
+**Fonts (Phase 39.7b: the brand's, replacing DejaVu Sans for Latin and Arabic).**
+
+| Face | File | Used for | Licence (beside the files, copied to the build output) |
+| --- | --- | --- | --- |
+| Geist 1.900 Regular, SemiBold | `Reports/Rendering/Fonts/Geist/` (upstream TTF release v1.9.2) | Latin text and every digit, in both languages; SemiBold (600) for titles, headings and summary figures | SIL OFL 1.1, `Geist/OFL.txt` → `OFL-Geist.txt` |
+| IBM Plex Sans Arabic 1.005 Regular, SemiBold | `Reports/Rendering/Fonts/IBMPlexSansArabic/` (IBM's TTF release `@ibm/plex-sans-arabic@1.1.0`) | Arabic text; SemiBold for titles and headings | SIL OFL 1.1 with the Reserved Font Name "Plex", `IBMPlexSansArabic/OFL.txt` → `OFL-IBMPlexSansArabic.txt` |
+| DejaVu Sans 2.37 Regular, Bold | `Reports/Rendering/Fonts/` (Debian `fonts-dejavu-core` 2.37-8) | only scripts neither brand font draws: Greek, Cyrillic, Hebrew and the like | Bitstream Vera / Arev terms, `LICENSE-DejaVu.txt` |
+
 - **Loading:** embedded as assembly resources; never read from the host and never
-  fetched.
-- **Coverage:** Latin, Latin accents and Arabic, with the Arabic GSUB features
-  `init`, `medi`, `fina`, `rlig` and `liga`.
-- **Licence:** Bitstream Vera / Arev terms, which allow use, embedding and
-  redistribution, including commercially. The notices are kept in
-  `Reports/Rendering/Fonts/LICENSE-DejaVu.txt`, which is copied to the build
-  output.
+  fetched. A face no glyph on a page uses is not embedded in that file, so an
+  English report carries only Geist and DejaVu appears only when a value needs it.
+- **Why DejaVu stays:** Geist draws 5 of 144 Greek and 134 of 256 Cyrillic code
+  points and no Hebrew; Plex Arabic draws none of them. Dropping DejaVu would turn
+  such a customer's name into missing-glyph boxes, which the 37.7 files drew.
+- **Arabic shaping:** checked letter by letter at 300 dpi against the DejaVu files
+  (joining, lam-alef, shadda, damma and tanween, ISO dates and Latin inside
+  Arabic). Plex Arabic also forms its own ligatures (sheen-reh, the stacked «في»
+  and «تي»), as it does in the app.
+- The fonts are the same families and weights the app self-hosts in
+  `frontend/public/fonts/` (39.2a), as whole TTFs: the PDF needs full glyph sets,
+  not the web's `unicode-range` subsets.
 - No CJK or other large font families are bundled.
 
 **Libraries** (all MIT):
-- `SkiaSharp` and `SkiaSharp.HarfBuzz` 4.152.1
+- `SkiaSharp` and `SkiaSharp.HarfBuzz` 4.152.1 (since 39.7b only its
+  `ToHarfBuzzBlob` is used, to build a HarfBuzz font over a typeface's bytes
+  exactly as its shaper did)
 - `HarfBuzzSharp` 14.2.1.201
 - the Linux native assets: `SkiaSharp.NativeAssets.Linux.NoDependencies` 4.152.1
   and `HarfBuzzSharp.NativeAssets.Linux` 14.2.1.201
@@ -191,11 +228,12 @@ Rejected:
 
 **Text layer.** Skia names shaped Arabic glyphs by their Unicode presentation
 forms, in visual order: for example U+FEE3 (meem initial) and U+FEFC (lam-alef
-final). Copy and search work, and the forms are compatibility-equivalent to the
-letters.
+final), and Plex Arabic's sheen-reh ligature by U+FD0D. Copy and search work, and
+the forms are compatibility-equivalent to the letters.
 
-**Size.** The Linux Skia build embeds the fonts whole rather than as a subset, so
-a PDF is about 0.75 MB before its data. That is well inside the 25 MiB bound.
+**Size.** Since 39.7b an English PDF is about 125 KB and an Arabic one about
+350 KB for the fixture reports (DejaVu made every PDF about 0.75 MB). That is
+well inside the 25 MiB bound.
 
 ### Report files in the reader's language (Phase 37.7, D-6)
 
@@ -224,7 +262,10 @@ byte-for-byte what it was before 37.7**: `ReportGoldenFileTests` compares all 24
 type × format files with golden files captured from the 37.6 code before any
 change (CSV byte for byte; workbooks part by part, with the SDK's random
 relationship ids numbered; PDFs byte for byte except the clock-derived `/ID`, with
-the two embedded fonts compared by SHA-256).
+the two embedded fonts compared by SHA-256). In Phase 39.7b the eight PDF golden
+files were captured again, through the test's own write mode, after the old and
+new pages were compared as images (the brand's fonts and the table layout); the
+CSV and workbook golden files came out of the same run unchanged.
 
 | Translated | Unchanged |
 | --- | --- |
@@ -246,8 +287,9 @@ the two embedded fonts compared by SHA-256).
   report's own words are drawn as right-to-left paragraphs (`PdfText` with
   `rightToLeft`); every value keeps the direction of its first strong character,
   as an isolate does, so a Latin name, an e-mail address, an id or a number keeps
-  its own order inside the Arabic page. The same bundled DejaVu font and the same
-  HarfBuzz + `Unicode.Bidi` pipeline shape the Arabic; no font was added.
+  its own order inside the Arabic page. The same HarfBuzz + `Unicode.Bidi`
+  pipeline shapes the Arabic; since 39.7b in IBM Plex Sans Arabic (in 37.7 it was
+  the bundled DejaVu font).
 
 **Dates inside Arabic sentences.** UAX #9 rule W2 turns digits that follow Arabic
 letters into Arabic numbers, and the hyphens of an ISO date then split it, so

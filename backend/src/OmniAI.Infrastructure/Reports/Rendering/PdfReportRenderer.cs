@@ -30,14 +30,21 @@ namespace OmniAI.Infrastructure.Reports.Rendering;
 /// the footer puts the title on the right and the page number on the left. The
 /// report's own words are drawn as right-to-left paragraphs; every value keeps its
 /// own direction, so names, e-mail addresses, ids and numbers are isolated from
-/// the Arabic around them. Digits stay Western and dates ISO, as in English. An
-/// English report is drawn exactly as it was before (golden files).
+/// the Arabic around them. Digits stay Western and dates ISO, as in English.
 /// </para>
 /// <para>
-/// <strong>Nothing active, nothing remote.</strong> The only font is the one
-/// bundled in this assembly, embedded in the file (whole, which is why a PDF is
-/// about 0.75 MB before any data; Skia's Linux build does not subset). No image,
-/// no link annotation,
+/// <strong>The brand's type and tables sized by content (Phase 39.7b).</strong>
+/// Latin text and digits are set in Geist, Arabic in IBM Plex Sans Arabic, titles
+/// and headings in each family's 600 weight, with tabular figures (see
+/// <see cref="PdfText"/>). A table's columns are as wide as their content and the
+/// table starts at its reader's margin; a column heading wraps rather than being
+/// cut; and a number column's heading aligns with its numbers, at the column's
+/// end (its left edge in Arabic).
+/// </para>
+/// <para>
+/// <strong>Nothing active, nothing remote.</strong> The only fonts are the ones
+/// bundled in this assembly, embedded in the file (only those a page uses). No
+/// image, no link annotation,
 /// no JavaScript, no form, no open action, and nothing is fetched when the
 /// report is generated or opened.
 /// </para>
@@ -54,7 +61,11 @@ internal sealed class PdfReportRenderer : IReportRenderer
     private const float HeadingSize = 12;
     private const float BodySize = 9.5f;
     private const float SmallSize = 8;
-    private const float RowHeight = 15;
+    private const float RowHeight = 16;
+    private const float RowLift = 1;
+    private const float HeaderLine = 12.5f;
+    private const float CellPadding = 5;
+    private const float MinimumTextColumn = 60;
 
     private static readonly SKColor Ink = new(0x1F, 0x23, 0x2B);
     private static readonly SKColor Muted = new(0x6E, 0x6E, 0x6E);
@@ -217,9 +228,16 @@ internal sealed class PdfReportRenderer : IReportRenderer
 
         public void Gap(float points) => _y += points;
 
+        /// <summary>
+        /// The distance from one line to the next. Arabic letters reach higher and
+        /// lower than Latin ones, so an Arabic report's lines get room in
+        /// proportion to their size.
+        /// </summary>
+        public float Advance(float size) => _rtl ? Math.Max(size + 5, size * 1.6f) : size + 5;
+
         public void Heading(string text)
         {
-            Ensure(RowHeight * 2);
+            Ensure(Advance(HeadingSize) + RowHeight);
             Text(text, HeadingSize, bold: true);
             _y += 2;
         }
@@ -228,9 +246,12 @@ internal sealed class PdfReportRenderer : IReportRenderer
         {
             foreach (string line in _text.Wrap(text, size, bold, ContentWidth, _rtl))
             {
-                Ensure(size + 5);
+                float advance = Advance(size);
 
-                float baseline = _y + size;
+                Ensure(advance);
+
+                // Any extra room goes above the letters, where Arabic needs it.
+                float baseline = _y + advance - 5;
 
                 if (_rtl)
                 {
@@ -241,7 +262,7 @@ internal sealed class PdfReportRenderer : IReportRenderer
                     Current.Add(canvas => _text.DrawAligned(canvas, line, Margin, ContentWidth, baseline, size, bold, Ink, numeric: false));
                 }
 
-                _y += size + 5;
+                _y += advance;
             }
         }
 
@@ -249,7 +270,7 @@ internal sealed class PdfReportRenderer : IReportRenderer
         {
             Ensure(RowHeight);
 
-            float baseline = _y + BodySize;
+            float baseline = _y + BodySize + RowLift;
 
             if (_rtl)
             {
@@ -283,11 +304,15 @@ internal sealed class PdfReportRenderer : IReportRenderer
 
         public void Table(ReportTable table, string noRows)
         {
+            // Sized before the title is placed, so a title never ends a page
+            // without its headings and first row under it.
+            Column[] columns = Columns(table);
+            float headerHeight = HeaderHeight(columns);
+
+            Ensure(Advance(HeadingSize) + 2 + headerHeight + RowHeight);
             Heading(table.Title);
 
-            float[] widths = ColumnWidths(table);
-
-            Header(table, widths);
+            Header(columns, headerHeight);
 
             if (table.Rows.Count == 0)
             {
@@ -303,60 +328,88 @@ internal sealed class PdfReportRenderer : IReportRenderer
                 if (_y + RowHeight > Bottom)
                 {
                     NewPage();
-                    Header(table, widths);
+                    Header(columns, headerHeight);
                 }
 
-                Cells(
-                    [.. row.Select(Display)],
-                    [.. row.Select(value => value.Kind != ReportValueKind.Text)],
-                    widths,
-                    bold: false,
-                    shaded,
-                    header: false);
+                Cells(columns, [.. row.Select(Display)], shaded);
 
                 shaded = !shaded;
             }
         }
 
-        private void Header(ReportTable table, float[] widths)
+        private static float HeaderHeight(Column[] columns) =>
+            (columns.Max(column => column.Heading.Length) * HeaderLine) + 5;
+
+        /// <summary>
+        /// The headings, wrapped inside their columns and set on a shared last line.
+        /// </summary>
+        /// <remarks>
+        /// A heading is never cut: it wraps at its spaces, its column is never
+        /// narrower than its longest word, and every line of it aligns as the
+        /// column's values do: a text column's at its start, a number column's at
+        /// its end, over the numbers (in Arabic both mirrored, so numbers and their
+        /// heading end at the column's left edge).
+        /// </remarks>
+        private void Header(Column[] columns, float height)
         {
-            Ensure(RowHeight * 2);
+            Ensure(height + RowHeight);
 
-            Cells(
-                [.. table.Columns.Select(column => column.Header)],
-                [.. table.Columns.Select(_ => false)],
-                widths,
-                bold: true,
-                shaded: false,
-                header: true);
+            float top = _y;
+            int lines = columns.Max(column => column.Heading.Length);
+            (float tableLeft, float tableWidth) = Extent(columns);
 
-            float y = _y - 3;
+            List<(string Text, float Left, float Width, float Baseline, bool Numeric)> placed = [];
+
+            foreach (Column column in columns)
+            {
+                // Bottom-aligned: a one-line heading sits on the last line of a wrapped one.
+                int offset = lines - column.Heading.Length;
+
+                for (int line = 0; line < column.Heading.Length; line++)
+                {
+                    float baseline = top + ((offset + line) * HeaderLine) + BodySize + 1;
+                    placed.Add((column.Heading[line], column.Left + CellPadding, column.Width - (2 * CellPadding), baseline, column.Numeric));
+                }
+            }
+
+            float rule = top + height - 2;
+
             Current.Add(canvas =>
             {
-                using SKPaint rule = new() { Color = Rule, StrokeWidth = 0.6f, IsAntialias = true };
-                canvas.DrawLine(Margin, y, Margin + ContentWidth, y, rule);
+                foreach ((string text, float left, float width, float baseline, bool numeric) in placed)
+                {
+                    if (_rtl)
+                    {
+                        _text.DrawInBox(canvas, text, left, width, baseline, BodySize, bold: true, Ink, againstRight: !numeric, rightToLeft: true);
+                    }
+                    else
+                    {
+                        _text.DrawAligned(canvas, text, left, width, baseline, BodySize, bold: true, Ink, numeric, alignRightToLeft: false);
+                    }
+                }
+
+                using SKPaint paint = new() { Color = Rule, StrokeWidth = 0.6f, IsAntialias = true };
+                canvas.DrawLine(tableLeft, rule, tableLeft + tableWidth, rule, paint);
             });
+
+            _y += height;
         }
 
-        private void Cells(string[] values, bool[] numeric, float[] widths, bool bold, bool shaded, bool header)
+        private void Cells(Column[] columns, string[] values, bool shaded)
         {
             float top = _y;
-            float baseline = _y + BodySize + 1;
+            float baseline = _y + BodySize + 1 + RowLift;
+            (float tableLeft, float tableWidth) = Extent(columns);
 
-            List<(string Text, float X, float Width, bool Numeric)> placed = [];
+            List<(string Text, float Left, float Width, bool Numeric)> placed = [];
 
-            // Columns run from the left in English and from the right in Arabic.
-            float x = _rtl ? PageWidth - Margin : Margin;
-
-            for (int index = 0; index < widths.Length; index++)
+            for (int index = 0; index < columns.Length; index++)
             {
+                Column column = columns[index];
                 string value = index < values.Length ? values[index] : string.Empty;
+                float inner = column.Width - (2 * CellPadding);
 
-                float cellLeft = _rtl ? x - widths[index] : x;
-
-                // Headings are the report's own words; cells are values, each in its own direction.
-                placed.Add((_text.Fit(value, BodySize, bold, widths[index] - 8, rightToLeft: _rtl && header), cellLeft + 4, widths[index] - 8, numeric.Length > index && numeric[index]));
-                x = _rtl ? x - widths[index] : x + widths[index];
+                placed.Add((_text.Fit(value, BodySize, bold: false, inner), column.Left + CellPadding, inner, column.Numeric));
             }
 
             Current.Add(canvas =>
@@ -364,19 +417,20 @@ internal sealed class PdfReportRenderer : IReportRenderer
                 if (shaded)
                 {
                     using SKPaint fill = new() { Color = Shade, Style = SKPaintStyle.Fill };
-                    canvas.DrawRect(Margin, top, ContentWidth, RowHeight, fill);
+                    canvas.DrawRect(tableLeft, top, tableWidth, RowHeight, fill);
                 }
 
                 foreach ((string text, float left, float width, bool isNumeric) in placed)
                 {
                     if (_rtl)
                     {
-                        // Mirrored: text from the cell's right edge, numbers to its left edge.
-                        _text.DrawInBox(canvas, text, left, width, baseline, BodySize, bold, Ink, againstRight: !isNumeric, rightToLeft: header);
+                        // Mirrored: text from the cell's right edge, numbers to its left edge;
+                        // every value keeps its own direction.
+                        _text.DrawInBox(canvas, text, left, width, baseline, BodySize, bold: false, Ink, againstRight: !isNumeric, rightToLeft: false);
                     }
                     else
                     {
-                        _text.DrawAligned(canvas, text, left, width, baseline, BodySize, bold, Ink, isNumeric);
+                        _text.DrawAligned(canvas, text, left, width, baseline, BodySize, bold: false, Ink, isNumeric);
                     }
                 }
             });
@@ -384,24 +438,128 @@ internal sealed class PdfReportRenderer : IReportRenderer
             _y += RowHeight;
         }
 
-        /// <summary>Proportional to each column's widest value, never below a readable minimum.</summary>
-        private float[] ColumnWidths(ReportTable table)
+        private static (float Left, float Width) Extent(Column[] columns)
         {
-            float[] natural =
-            [
-                .. table.Columns.Select((column, index) =>
-                    table.Rows
-                        .Take(200)
-                        .Select(row => index < row.Count ? _text.Measure(Display(row[index]), BodySize, bold: false) : 0)
-                        .Append(_text.Measure(column.Header, BodySize, bold: true, _rtl))
-                        .Max() + 10),
-            ];
+            float left = columns.Min(column => column.Left);
 
-            float sum = natural.Sum();
+            return (left, columns.Max(column => column.Left + column.Width) - left);
+        }
 
-            return sum <= ContentWidth
-                ? [.. natural.Select(width => width + ((ContentWidth - sum) / natural.Length))]
-                : [.. natural.Select(width => Math.Max(50, width * ContentWidth / sum))];
+        /// <summary>
+        /// Each column as wide as its content, the table no wider than the page.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// A column wants its widest value (of the first 200 rows) or its heading on
+        /// one line, whichever is wider, plus padding. The table is then as wide as
+        /// its columns and starts at the margin its reader starts from (the left in
+        /// English, the right in Arabic), rather than being stretched across the
+        /// page with the spare width spread over every column.
+        /// </para>
+        /// <para>
+        /// When the columns want more than the page, headings wrap first: each
+        /// column keeps at least its widest value and its heading's longest word,
+        /// and the width left over is shared in proportion to how much each heading
+        /// still wants. Only when even that does not fit do the widest text columns
+        /// give up width (the narrow ones keep theirs), never below a readable
+        /// minimum, and their longest values end with an ellipsis. A number is
+        /// never shortened.
+        /// </para>
+        /// </remarks>
+        private Column[] Columns(ReportTable table)
+        {
+            int count = table.Columns.Count;
+            float[] need = new float[count];
+            float[] want = new float[count];
+            bool[] numeric = new bool[count];
+
+            for (int index = 0; index < count; index++)
+            {
+                ReportColumn column = table.Columns[index];
+                int at = index;
+
+                numeric[index] = column.Kind != ReportValueKind.Text;
+
+                float value = table.Rows
+                    .Take(200)
+                    .Select(row => at < row.Count ? _text.Measure(Display(row[at]), BodySize, bold: false) : 0)
+                    .DefaultIfEmpty(0)
+                    .Max();
+
+                float word = _text.WidestWord(column.Header, BodySize, bold: true, _rtl);
+                float whole = _text.Measure(column.Header, BodySize, bold: true, _rtl);
+
+                // Half a point of room so a measured line is never refitted with an ellipsis.
+                need[index] = Math.Max(value, word) + (2 * CellPadding) + 0.5f;
+                want[index] = Math.Max(value, whole) + (2 * CellPadding) + 0.5f;
+            }
+
+            float[] widths;
+
+            if (want.Sum() <= ContentWidth)
+            {
+                widths = want;
+            }
+            else if (need.Sum() <= ContentWidth)
+            {
+                float spare = ContentWidth - need.Sum();
+                float wanting = want.Sum() - need.Sum();
+
+                widths = [.. need.Select((width, index) => width + (spare * (want[index] - width) / wanting))];
+            }
+            else
+            {
+                // Numbers keep their width. Text columns share what is left by a
+                // water level: the narrow ones keep their whole width and only the
+                // widest are shortened, to the same width, never below the minimum.
+                float numbers = need.Where((_, index) => numeric[index]).Sum();
+                float room = Math.Max(0, ContentWidth - numbers);
+                float level = Level([.. need.Where((_, index) => !numeric[index])], room);
+
+                widths = [.. need.Select((width, index) => numeric[index] ? width : Math.Max(MinimumTextColumn, Math.Min(width, level)))];
+
+                float total = widths.Sum();
+
+                if (total > ContentWidth)
+                {
+                    widths = [.. widths.Select(width => width * ContentWidth / total)];
+                }
+            }
+
+            Column[] columns = new Column[count];
+            float x = _rtl ? PageWidth - Margin : Margin;
+
+            for (int index = 0; index < count; index++)
+            {
+                float left = _rtl ? x - widths[index] : x;
+                string[] heading = [.. _text.Wrap(table.Columns[index].Header, BodySize, bold: true, widths[index] - (2 * CellPadding), _rtl)];
+
+                columns[index] = new Column(left, widths[index], numeric[index], heading);
+                x = _rtl ? x - widths[index] : x + widths[index];
+            }
+
+            return columns;
+        }
+
+        /// <summary>The largest width <c>L</c> for which the columns, each capped at <c>L</c>, fit in <paramref name="room"/>.</summary>
+        private static float Level(float[] widths, float room)
+        {
+            float[] sorted = [.. widths.Order()];
+            float used = 0;
+
+            for (int index = 0; index < sorted.Length; index++)
+            {
+                int remaining = sorted.Length - index;
+
+                if (used + (sorted[index] * remaining) > room)
+                {
+                    return (room - used) / remaining;
+                }
+
+                used += sorted[index];
+            }
+
+            return sorted.Length == 0 ? room : sorted[^1];
         }
 
         private void Ensure(float needed)
@@ -417,5 +575,8 @@ internal sealed class PdfReportRenderer : IReportRenderer
             Pages.Add([]);
             _y = Margin;
         }
+
+        /// <summary>One table column as laid out: its box, its alignment and its heading's lines.</summary>
+        private sealed record Column(float Left, float Width, bool Numeric, string[] Heading);
     }
 }

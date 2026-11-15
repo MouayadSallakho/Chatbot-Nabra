@@ -35,7 +35,7 @@ public sealed class PdfUnicodeTests
     public void Arabic_is_shaped_into_joined_forms_with_no_missing_glyph()
     {
         using PdfText text = new();
-        using SKFont font = new(PdfText.Regular, 12);
+        using SKFont font = new(PdfText.Arabic, 12);
 
         foreach (string word in new[] { "محمد", "النور", "شركة" })
         {
@@ -114,7 +114,7 @@ public sealed class PdfUnicodeTests
     public void Accented_latin_uses_real_glyphs()
     {
         using PdfText text = new();
-        using SKFont font = new(PdfText.Regular, 12);
+        using SKFont font = new(PdfText.Latin, 12);
 
         foreach (string name in new[] { "José García", "François Müller" })
         {
@@ -168,8 +168,10 @@ public sealed class PdfUnicodeTests
         // النور: reh isolated, waw final, noon medial, lam initial, alef isolated.
         Assert.Contains("\u0631\uFEEE\uFEE8\uFEDF\u0627", glyphs, StringComparison.Ordinal);
 
-        // شركة: teh marbuta final, kaf medial, reh final, sheen initial.
-        Assert.Contains("\uFE94\uFEDB\uFEAE\uFEB7", glyphs, StringComparison.Ordinal);
+        // شركة: teh marbuta final, kaf medial, then IBM Plex Sans Arabic's
+        // sheen-reh ligature (Phase 39.7b), which the text layer names by its
+        // compatibility character U+FD0D, the same two letters under NFKC.
+        Assert.Contains("\uFE94\uFEDB\uFD0D", glyphs, StringComparison.Ordinal);
 
         // أحمد محمد: two words, each dal final, meem medial, hah, meem/alef-hamza.
         Assert.Contains("\uFEAA\uFEE4\uFEA4\uFEE3\uFEAA\uFEE4\uFEA3\u0623", glyphs, StringComparison.Ordinal);

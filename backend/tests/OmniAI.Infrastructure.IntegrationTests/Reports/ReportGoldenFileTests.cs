@@ -28,8 +28,16 @@ namespace OmniAI.Infrastructure.IntegrationTests.Reports;
 /// is in the compared bytes.
 /// </para>
 /// <para>
-/// Write mode (<c>OMNIAI_WRITE_REPORT_GOLDEN=1</c>) only ever ran once, to
-/// capture; it is not a way to make a failing comparison pass.
+/// <strong>Recaptured once, for the PDFs only, in Phase 39.7b.</strong> The PDFs
+/// moved to the brand's fonts (Geist, IBM Plex Sans Arabic) and to tables sized by
+/// their content with wrapping headings, so the eight English PDF files were written
+/// again in write mode from the 39.7b renderer, after the old and new pages were
+/// compared as images. The CSV and workbook golden files were rewritten by the
+/// same run and came out byte for byte the same: their structure did not change.
+/// </para>
+/// <para>
+/// Write mode (<c>OMNIAI_WRITE_REPORT_GOLDEN=1</c>) runs only to capture a reviewed
+/// change like that one; it is not a way to make a failing comparison pass.
 /// </para>
 /// </remarks>
 public sealed partial class ReportGoldenFileTests
@@ -102,11 +110,11 @@ public sealed partial class ReportGoldenFileTests
     /// The PDF with every stream over 32 KiB replaced by its SHA-256.
     /// </summary>
     /// <remarks>
-    /// Those are the embedded fonts, about 0.7 MB each and identical in every
-    /// report. Replacing them by their digest keeps the comparison exact (a changed
-    /// byte changes the digest) and keeps eight golden PDFs from adding six
-    /// megabytes to the repository. Page content streams are far smaller and stay
-    /// byte for byte.
+    /// Those are the embedded fonts (Geist, about 125 KB each since Phase 39.7b),
+    /// identical in every report. Replacing them by their digest keeps the
+    /// comparison exact (a changed byte changes the digest) and keeps the golden
+    /// PDFs from adding megabytes to the repository. Page content streams are far
+    /// smaller and stay byte for byte.
     /// </remarks>
     private static string HashLargeStreams(string pdf)
     {

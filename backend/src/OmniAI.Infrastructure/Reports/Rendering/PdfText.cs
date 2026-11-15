@@ -1,15 +1,17 @@
 using System.Globalization;
 using System.Reflection;
 using System.Text;
+using HarfBuzzSharp;
 using SkiaSharp;
 using SkiaSharp.HarfBuzz;
 using Unicode.Bidi;
+using Buffer = HarfBuzzSharp.Buffer;
 
 namespace OmniAI.Infrastructure.Reports.Rendering;
 
 /// <summary>
 /// Measures and draws one line of report text, correctly, in any script the
-/// bundled font covers.
+/// bundled fonts cover.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -28,36 +30,67 @@ namespace OmniAI.Infrastructure.Reports.Rendering;
 /// rather than being a picture of letters.
 /// </para>
 /// <para>
-/// <strong>One font, bundled.</strong> DejaVu Sans (regular and bold) is read from
-/// this assembly's resources. Nothing is taken from the host's fonts and nothing
-/// is fetched, so a report renders identically in the Linux container and on a
-/// developer's machine.
+/// <strong>The brand's fonts, bundled (Phase 39.7b).</strong> Latin letters and
+/// every digit are set in Geist, Arabic in IBM Plex Sans Arabic, as in the app;
+/// headings use each family's 600 weight. Both are under the SIL Open Font
+/// License, whose text sits beside the files. Each bidi run is split by script:
+/// an Arabic letter goes to Plex Arabic, a Latin letter or a digit to Geist, and
+/// spaces, punctuation and marks stay with the letters around them, so a word is
+/// never set in two fonts. DejaVu Sans, the 37.7 font, stays only as the last
+/// resort for the scripts neither brand font draws (Greek, Cyrillic, Hebrew and
+/// the like), so a customer's name in those scripts is still real letters. A
+/// font that no glyph on a page uses is not embedded in that file. Geist's
+/// figures are set tabular (<c>tnum</c>), so numbers line up in their columns.
+/// Nothing is taken from the host's fonts and nothing is fetched, so a report
+/// renders identically in the Linux container and on a developer's machine.
 /// </para>
 /// <para>
 /// <strong>Two kinds of line (Phase 37.7).</strong> By default a line takes its
 /// direction from its first strong character, as an isolate does: that is how
 /// every value is drawn, so a Latin name, an e-mail address or a number inside an
-/// Arabic report keeps its own order, and every line of an English report is drawn
-/// exactly as before. An Arabic report's own words (titles, labels, headings,
-/// notes) are drawn with <c>rightToLeft</c>, a right-to-left paragraph, so a label
-/// such as «التاريخ (بتوقيت Asia/Riyadh)» keeps its parentheses and the zone name
-/// where an Arabic reader expects them.
+/// Arabic report keeps its own order. An Arabic report's own words (titles,
+/// labels, headings, notes) are drawn with <c>rightToLeft</c>, a right-to-left
+/// paragraph, so a label such as «التاريخ (بتوقيت Asia/Riyadh)» keeps its
+/// parentheses and the zone name where an Arabic reader expects them.
 /// </para>
 /// </remarks>
 internal sealed class PdfText : IDisposable
 {
     private const string Ellipsis = "…";
 
-    private static readonly Lazy<SKTypeface> RegularFace = new(() => Load("OmniAI.Reports.Fonts.DejaVuSans.ttf"));
-    private static readonly Lazy<SKTypeface> BoldFace = new(() => Load("OmniAI.Reports.Fonts.DejaVuSans-Bold.ttf"));
+    /// <summary>HarfBuzz works in integer units: 16,384 per em keeps positions exact to a hundredth of a point.</summary>
+    private const int ShapingScale = 1 << 14;
 
-    private readonly SKShaper _regular = new(RegularFace.Value);
-    private readonly SKShaper _bold = new(BoldFace.Value);
-    private readonly Dictionary<(float Size, bool Bold), SKFont> _fonts = [];
+    /// <summary>Tabular figures. Plex Arabic's figures are already tabular, so only Geist changes.</summary>
+    private static readonly Feature[] Features = [Feature.Parse("tnum")];
+
+    private static readonly Lazy<ReportFont> LatinRegular = new(() => ReportFont.Load("Geist-Regular.ttf"));
+    private static readonly Lazy<ReportFont> LatinBold = new(() => ReportFont.Load("Geist-SemiBold.ttf"));
+    private static readonly Lazy<ReportFont> ArabicRegular = new(() => ReportFont.Load("IBMPlexSansArabic-Regular.ttf"));
+    private static readonly Lazy<ReportFont> ArabicBold = new(() => ReportFont.Load("IBMPlexSansArabic-SemiBold.ttf"));
+    private static readonly Lazy<ReportFont> FallbackRegular = new(() => ReportFont.Load("DejaVuSans.ttf"));
+    private static readonly Lazy<ReportFont> FallbackBold = new(() => ReportFont.Load("DejaVuSans-Bold.ttf"));
+
+    private readonly Dictionary<ReportFont, HarfBuzzSharp.Font> _shapers = [];
+    private readonly Dictionary<(ReportFont Face, float Size), SKFont> _fonts = [];
     private readonly Dictionary<(string Text, float Size, bool Bold, bool RightToLeft), float> _widths = [];
 
-    /// <summary>The regular face, for tests that need to compare glyphs.</summary>
-    internal static SKTypeface Regular => RegularFace.Value;
+    private enum Family
+    {
+        Neutral,
+        Latin,
+        Arabic,
+        Other,
+    }
+
+    /// <summary>The Latin face (Geist Regular), for tests that need to compare glyphs.</summary>
+    internal static SKTypeface Latin => LatinRegular.Value.Typeface;
+
+    /// <summary>The Arabic face (IBM Plex Sans Arabic Regular), for tests that need to compare glyphs.</summary>
+    internal static SKTypeface Arabic => ArabicRegular.Value.Typeface;
+
+    /// <summary>The last-resort face (DejaVu Sans), for tests that need to compare glyphs.</summary>
+    internal static SKTypeface Fallback => FallbackRegular.Value.Typeface;
 
     /// <summary>
     /// Text that can be laid out safely.
@@ -79,7 +112,7 @@ internal sealed class PdfText : IDisposable
 
         foreach (char character in text)
         {
-            if (character is (>= '\u202A' and <= '\u202E') or (>= '\u2066' and <= '\u2069'))
+            if (character is (>= '‪' and <= '‮') or (>= '⁦' and <= '⁩'))
             {
                 continue;
             }
@@ -149,14 +182,13 @@ internal sealed class PdfText : IDisposable
             return;
         }
 
-        SKFont font = Font(size, bold);
         using SKTextBlobBuilder builder = new();
 
         float advance = 0;
 
         foreach (ShapedRun run in Runs(clean, size, bold, rightToLeft))
         {
-            AddRun(builder, font, run, advance);
+            AddRun(builder, Font(run.Face, size), run, advance);
             advance += run.Shaped.Width;
         }
 
@@ -268,7 +300,7 @@ internal sealed class PdfText : IDisposable
 
             if (line.Length > 0 && Measure(candidate, size, bold, rightToLeft) > available)
             {
-                yield return line;
+                yield return Fit(line, size, bold, available, rightToLeft);
                 line = word;
             }
             else
@@ -279,6 +311,10 @@ internal sealed class PdfText : IDisposable
 
         yield return Fit(line, size, bold, available, rightToLeft);
     }
+
+    /// <summary>The width of the line's widest word: the narrowest box it can wrap into uncut.</summary>
+    public float WidestWord(string text, float size, bool bold, bool rightToLeft = false) =>
+        Clean(text).Split(' ').Select(word => Measure(word, size, bold, rightToLeft)).DefaultIfEmpty(0).Max();
 
     /// <summary>
     /// The shaped runs of a line, in visual order.
@@ -291,8 +327,6 @@ internal sealed class PdfText : IDisposable
         // Phase 37.7: an Arabic report's own words are a right-to-left paragraph;
         // everything else takes its direction from its first strong character.
         BidiInfo bidi = BidiInfo.Create(clean, rightToLeftParagraph ? Level.Rtl() : null);
-        SKShaper shaper = bold ? _bold : _regular;
-        SKFont font = Font(size, bold);
 
         List<ShapedRun> runs = [];
 
@@ -310,16 +344,19 @@ internal sealed class PdfText : IDisposable
                 bool rightToLeft = levels[range.Start].IsRtl();
                 string segment = clean.Substring(range.Start, range.Length);
 
-                using HarfBuzzSharp.Buffer buffer = new();
-                buffer.AddUtf16(segment);
-                buffer.GuessSegmentProperties();
+                // One bidi run can need more than one font; its pieces are shaped
+                // separately and, in a right-to-left run, placed last piece first.
+                List<(string Text, ReportFont Face)> pieces = Itemize(segment, rightToLeft, bold);
 
-                // The run's direction comes from the bidi algorithm, not from a
-                // guess about its script: a run of digits inside Arabic, or of
-                // punctuation, must go the way its embedding level says.
-                buffer.Direction = rightToLeft ? HarfBuzzSharp.Direction.RightToLeft : HarfBuzzSharp.Direction.LeftToRight;
+                if (rightToLeft)
+                {
+                    pieces.Reverse();
+                }
 
-                runs.Add(new ShapedRun(segment, rightToLeft, shaper.Shape(buffer, font)));
+                foreach ((string text, ReportFont face) in pieces)
+                {
+                    runs.Add(new ShapedRun(text, rightToLeft, Shape(text, rightToLeft, face, size), face));
+                }
             }
         }
 
@@ -333,21 +370,202 @@ internal sealed class PdfText : IDisposable
             font.Dispose();
         }
 
-        _regular.Dispose();
-        _bold.Dispose();
+        foreach (HarfBuzzSharp.Font shaper in _shapers.Values)
+        {
+            shaper.Dispose();
+        }
     }
 
-    private SKFont Font(float size, bool bold)
+    /// <summary>
+    /// Splits one bidi run, in logical order, into pieces that each use one font.
+    /// </summary>
+    /// <remarks>
+    /// Arabic letters go to Plex Arabic; Latin letters and digits to Geist; letters
+    /// of any other script to DejaVu. Spaces, punctuation, symbols and marks take the
+    /// family of the letter before them (or after them, at the start of a run), so a
+    /// mark stays on its letter and the spaces of an Arabic phrase are Arabic spaces.
+    /// A run with no letter at all takes Plex Arabic when it runs right to left and
+    /// Geist otherwise. Then, character by character, a face that has no glyph for
+    /// it hands over to the next one that does (Geist, Plex Arabic, DejaVu), so no
+    /// character the fonts can draw becomes a missing-glyph box.
+    /// </remarks>
+    private List<(string Text, ReportFont Face)> Itemize(string segment, bool rightToLeft, bool bold)
     {
-        if (!_fonts.TryGetValue((size, bold), out SKFont? font))
+        List<(int Start, int Length, int CodePoint, Family Family)> characters = [];
+
+        for (int index = 0; index < segment.Length;)
         {
-            font = new SKFont(bold ? BoldFace.Value : RegularFace.Value, size)
+            bool pair = char.IsHighSurrogate(segment[index]) && index + 1 < segment.Length && char.IsLowSurrogate(segment[index + 1]);
+            int length = pair ? 2 : 1;
+            int codePoint = pair ? char.ConvertToUtf32(segment[index], segment[index + 1]) : segment[index];
+            characters.Add((index, length, codePoint, Classify(codePoint)));
+            index += length;
+        }
+
+        Family fallback = rightToLeft ? Family.Arabic : Family.Latin;
+        Family next = characters.Select(character => character.Family).FirstOrDefault(family => family != Family.Neutral, fallback);
+        Family previous = next;
+
+        List<(string Text, ReportFont Face)> pieces = [];
+        StringBuilder piece = new();
+        ReportFont? current = null;
+
+        foreach ((int start, int length, int codePoint, Family family) in characters)
+        {
+            Family resolved = family == Family.Neutral ? previous : family;
+            previous = resolved;
+
+            ReportFont face = Covering(codePoint, resolved, bold, keep: family == Family.Neutral ? current : null);
+
+            if (current is not null && !ReferenceEquals(face, current))
+            {
+                pieces.Add((piece.ToString(), current));
+                piece.Clear();
+            }
+
+            current = face;
+            piece.Append(segment, start, length);
+        }
+
+        if (current is not null)
+        {
+            pieces.Add((piece.ToString(), current));
+        }
+
+        return pieces;
+    }
+
+    /// <summary>The face for one character: its family's first, then whichever bundled face has it.</summary>
+    /// <param name="keep">A neutral character stays in the piece it follows when that face can draw it.</param>
+    private ReportFont Covering(int codePoint, Family family, bool bold, ReportFont? keep)
+    {
+        if (keep is not null && Has(keep, codePoint))
+        {
+            return keep;
+        }
+
+        ReportFont latin = (bold ? LatinBold : LatinRegular).Value;
+        ReportFont arabic = (bold ? ArabicBold : ArabicRegular).Value;
+        ReportFont other = (bold ? FallbackBold : FallbackRegular).Value;
+
+        ReportFont[] order = family switch
+        {
+            Family.Arabic => [arabic, latin, other],
+            Family.Other => [other, latin, arabic],
+            _ => [latin, arabic, other],
+        };
+
+        // Default-ignorable characters (joiners, direction marks) have no glyph in
+        // some faces; HarfBuzz hides them, so they never need a face of their own.
+        if (IsDefaultIgnorable(codePoint))
+        {
+            return keep ?? order[0];
+        }
+
+        return order.FirstOrDefault(face => Has(face, codePoint)) ?? order[0];
+    }
+
+    private bool Has(ReportFont face, int codePoint) => Shaper(face).TryGetNominalGlyph((uint)codePoint, out uint glyph) && glyph != 0;
+
+    private static Family Classify(int codePoint)
+    {
+        if (IsArabic(codePoint))
+        {
+            return Family.Arabic;
+        }
+
+        if (codePoint is >= '0' and <= '9')
+        {
+            return Family.Latin;
+        }
+
+        UnicodeCategory category = CharUnicodeInfo.GetUnicodeCategory(codePoint);
+
+        bool letter = category is UnicodeCategory.UppercaseLetter or UnicodeCategory.LowercaseLetter
+            or UnicodeCategory.TitlecaseLetter or UnicodeCategory.ModifierLetter or UnicodeCategory.OtherLetter;
+
+        if (!letter)
+        {
+            return Family.Neutral;
+        }
+
+        return IsLatin(codePoint) ? Family.Latin : Family.Other;
+    }
+
+    private static bool IsArabic(int codePoint) =>
+        codePoint is (>= 0x0600 and <= 0x06FF) or (>= 0x0750 and <= 0x077F) or (>= 0x0870 and <= 0x08FF)
+            or (>= 0xFB50 and <= 0xFDFF) or (>= 0xFE70 and <= 0xFEFF);
+
+    private static bool IsLatin(int codePoint) =>
+        codePoint is <= 0x024F or (>= 0x0250 and <= 0x02FF) or (>= 0x1D00 and <= 0x1DBF) or (>= 0x1E00 and <= 0x1EFF)
+            or (>= 0x2C60 and <= 0x2C7F) or (>= 0xA720 and <= 0xA7FF) or (>= 0xAB30 and <= 0xAB6F) or (>= 0xFB00 and <= 0xFB06)
+            or (>= 0xFF21 and <= 0xFF5A);
+
+    private static bool IsDefaultIgnorable(int codePoint) =>
+        codePoint is 0x00AD or 0x034F or 0x061C or (>= 0x115F and <= 0x1160) or (>= 0x17B4 and <= 0x17B5)
+            or (>= 0x180B and <= 0x180F) or (>= 0x200B and <= 0x200F) or (>= 0x202A and <= 0x202E)
+            or (>= 0x2060 and <= 0x206F) or 0x3164 or (>= 0xFE00 and <= 0xFE0F) or 0xFEFF or 0xFFA0;
+
+    private ShapedGlyphs Shape(string text, bool rightToLeft, ReportFont face, float size)
+    {
+        using Buffer buffer = new();
+        buffer.AddUtf16(text);
+        buffer.GuessSegmentProperties();
+
+        // The run's direction comes from the bidi algorithm, not from a guess
+        // about its script: a run of digits inside Arabic, or of punctuation, must
+        // go the way its embedding level says.
+        buffer.Direction = rightToLeft ? HarfBuzzSharp.Direction.RightToLeft : HarfBuzzSharp.Direction.LeftToRight;
+
+        Shaper(face).Shape(buffer, Features);
+
+        ReadOnlySpan<GlyphInfo> infos = buffer.GetGlyphInfoSpan();
+        ReadOnlySpan<GlyphPosition> positions = buffer.GetGlyphPositionSpan();
+        int count = infos.Length;
+
+        float scale = size / ShapingScale;
+        uint[] codepoints = new uint[count];
+        uint[] clusters = new uint[count];
+        SKPoint[] points = new SKPoint[count];
+
+        float x = 0;
+        float y = 0;
+
+        for (int index = 0; index < count; index++)
+        {
+            codepoints[index] = infos[index].Codepoint;
+            clusters[index] = infos[index].Cluster;
+            points[index] = new SKPoint(x + (positions[index].XOffset * scale), y - (positions[index].YOffset * scale));
+            x += positions[index].XAdvance * scale;
+            y += positions[index].YAdvance * scale;
+        }
+
+        return new ShapedGlyphs(codepoints, clusters, points, x);
+    }
+
+    private HarfBuzzSharp.Font Shaper(ReportFont face)
+    {
+        if (!_shapers.TryGetValue(face, out HarfBuzzSharp.Font? shaper))
+        {
+            shaper = face.CreateShaper(ShapingScale);
+
+            _shapers[face] = shaper;
+        }
+
+        return shaper;
+    }
+
+    private SKFont Font(ReportFont face, float size)
+    {
+        if (!_fonts.TryGetValue((face, size), out SKFont? font))
+        {
+            font = new SKFont(face.Typeface, size)
             {
                 Subpixel = true,
                 Edging = SKFontEdging.Antialias,
             };
 
-            _fonts[(size, bold)] = font;
+            _fonts[(face, size)] = font;
         }
 
         return font;
@@ -363,7 +581,7 @@ internal sealed class PdfText : IDisposable
     /// </remarks>
     private static void AddRun(SKTextBlobBuilder builder, SKFont font, ShapedRun run, float advance)
     {
-        SKShaper.Result shaped = run.Shaped;
+        ShapedGlyphs shaped = run.Shaped;
         int count = shaped.Codepoints.Length;
 
         if (count == 0)
@@ -403,15 +621,67 @@ internal sealed class PdfText : IDisposable
         utf8.CopyTo(buffer.Text);
     }
 
-    private static SKTypeface Load(string resource)
+    /// <summary>A run of one direction in one face, shaped.</summary>
+    internal sealed record ShapedRun(string Text, bool RightToLeft, ShapedGlyphs Shaped, ReportFont Face);
+
+    /// <summary>HarfBuzz's output for a run: glyph ids, source clusters, positions in points, and the advance.</summary>
+    internal sealed record ShapedGlyphs(uint[] Codepoints, uint[] Clusters, SKPoint[] Points, float Width);
+
+    /// <summary>
+    /// One bundled font file: Skia's typeface for drawing, and HarfBuzz fonts over
+    /// the same bytes for shaping.
+    /// </summary>
+    /// <remarks>
+    /// The typeface is read once per process from this assembly's resources. Each
+    /// <see cref="PdfText"/> makes its own HarfBuzz font from it, as Skia's shaper
+    /// did before 39.7b.
+    /// </remarks>
+    internal sealed class ReportFont
     {
-        using Stream stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(resource)
-            ?? throw new InvalidOperationException($"The report font {resource} is missing from the assembly.");
+        private ReportFont(string name, SKTypeface typeface)
+        {
+            Name = name;
+            Typeface = typeface;
+        }
 
-        return SKTypeface.FromStream(stream)
-            ?? throw new InvalidOperationException($"The report font {resource} could not be read.");
+        public string Name { get; }
+
+        public SKTypeface Typeface { get; }
+
+        public static ReportFont Load(string file)
+        {
+            string resource = "OmniAI.Reports.Fonts." + file;
+
+            using Stream stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(resource)
+                ?? throw new InvalidOperationException($"The report font {resource} is missing from the assembly.");
+
+            SKTypeface typeface = SKTypeface.FromStream(stream)
+                ?? throw new InvalidOperationException($"The report font {resource} could not be read.");
+
+            return new ReportFont(file, typeface);
+        }
+
+        /// <summary>
+        /// A HarfBuzz font over this typeface's own bytes, built exactly as Skia's
+        /// <c>SKShaper</c> builds one; the caller owns and disposes it.
+        /// </summary>
+        public HarfBuzzSharp.Font CreateShaper(int scale)
+        {
+            using SKStreamAsset asset = Typeface.OpenStream(out int index);
+            using Blob blob = asset.ToHarfBuzzBlob();
+            using Face face = new(blob, index)
+            {
+                Index = index,
+                UnitsPerEm = Typeface.UnitsPerEm,
+            };
+
+            HarfBuzzSharp.Font shaper = new(face);
+            shaper.SetScale(scale, scale);
+            shaper.SetFunctionsOpenType();
+
+            return shaper;
+        }
+
+        public override string ToString() => Name;
     }
-
-    /// <summary>A run of one direction, shaped.</summary>
-    internal sealed record ShapedRun(string Text, bool RightToLeft, SKShaper.Result Shaped);
 }

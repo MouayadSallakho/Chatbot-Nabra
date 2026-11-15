@@ -81,11 +81,22 @@
 
   <ItemGroup Label="Report fonts">
     <!--
-      DejaVu Sans, bundled so a PDF renders identically on every host: nothing
-      is read from the operating system's fonts and nothing is fetched. Embedded
-      in the assembly rather than copied beside it, so no file path is involved
-      at run time. The licence travels with the fonts, as it requires.
+      The brand's fonts (Phase 39.7b): Geist 1.900 (Regular, SemiBold) for Latin
+      text and every digit, IBM Plex Sans Arabic 1.005 (Regular, SemiBold) for
+      Arabic, both the upstream TTF releases under the SIL Open Font License.
+      DejaVu Sans stays only as the last resort for scripts neither brand font
+      draws (Greek, Cyrillic, Hebrew and the like). All bundled so a PDF renders
+      identically on every host: nothing is read from the operating system's
+      fonts and nothing is fetched. Embedded in the assembly rather than copied
+      beside it, so no file path is involved at run time. Each licence travels
+      with its fonts, as it requires.
     -->
+    <EmbeddedResource Include="Reports\Rendering\Fonts\Geist\Geist-Regular.ttf" LogicalName="OmniAI.Reports.Fonts.Geist-Regular.ttf" />
+    <EmbeddedResource Include="Reports\Rendering\Fonts\Geist\Geist-SemiBold.ttf" LogicalName="OmniAI.Reports.Fonts.Geist-SemiBold.ttf" />
+    <None Include="Reports\Rendering\Fonts\Geist\OFL.txt" Link="Reports\Rendering\Fonts\OFL-Geist.txt" CopyToOutputDirectory="PreserveNewest" />
+    <EmbeddedResource Include="Reports\Rendering\Fonts\IBMPlexSansArabic\IBMPlexSansArabic-Regular.ttf" LogicalName="OmniAI.Reports.Fonts.IBMPlexSansArabic-Regular.ttf" />
+    <EmbeddedResource Include="Reports\Rendering\Fonts\IBMPlexSansArabic\IBMPlexSansArabic-SemiBold.ttf" LogicalName="OmniAI.Reports.Fonts.IBMPlexSansArabic-SemiBold.ttf" />
+    <None Include="Reports\Rendering\Fonts\IBMPlexSansArabic\OFL.txt" Link="Reports\Rendering\Fonts\OFL-IBMPlexSansArabic.txt" CopyToOutputDirectory="PreserveNewest" />
     <EmbeddedResource Include="Reports\Rendering\Fonts\DejaVuSans.ttf" LogicalName="OmniAI.Reports.Fonts.DejaVuSans.ttf" />
     <EmbeddedResource Include="Reports\Rendering\Fonts\DejaVuSans-Bold.ttf" LogicalName="OmniAI.Reports.Fonts.DejaVuSans-Bold.ttf" />
     <None Include="Reports\Rendering\Fonts\LICENSE-DejaVu.txt" CopyToOutputDirectory="PreserveNewest" />
