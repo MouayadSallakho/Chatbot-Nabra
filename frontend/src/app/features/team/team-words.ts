@@ -1,3 +1,4 @@
+import type { ChipTone } from '@app/shared/chip/chip';
 import type { AppLanguage } from '@app/core/i18n/language';
 import { formatNumber } from '@app/core/i18n/locale-format';
 import { countMessage, pluralMessage } from '@app/core/i18n/plural';
@@ -23,16 +24,22 @@ export function invitationStatusWord(status: string): string {
   return STATUS_WORDS[status as InvitationStatus] ?? status;
 }
 
-export function invitationStatusTone(status: string): string {
+/**
+ * The chip an invitation's state wears (Phase 39.6a): Waiting with the "i",
+ * Accepted with the tick, Expired with the hollow ring (no longer usable, never
+ * used), Revoked (and anything newer) as a plain word. Each differs by its word
+ * and its marker, never by colour alone.
+ */
+export function invitationStatusTone(status: string): ChipTone {
   switch (status) {
     case 'Pending':
-      return 'badge-info';
+      return 'info';
     case 'Accepted':
-      return 'badge-success';
+      return 'success';
     case 'Expired':
-      return 'badge-neutral badge-draft';
+      return 'draft';
     default:
-      return 'badge-neutral';
+      return 'neutral';
   }
 }
 

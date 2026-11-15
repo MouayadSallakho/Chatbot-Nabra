@@ -24,15 +24,27 @@ import { ChannelBadge, channelWord } from '@app/shared/channel/channel-badge';
 import { VoiceChip } from '@app/shared/voice/voice-chip';
 import { Customer, CustomerRow, CustomersApi } from '../customers-api';
 import { ConversationCustomer } from '@app/features/conversations/conversations-api';
-import { CustomerLabel, customerLabelPlain } from '@app/features/conversations/customer-label';
-import { asLabelled, conversationsPhrase } from '../customer-words';
+import {
+  CustomerLabel,
+  customerLabel,
+  customerLabelPlain,
+} from '@app/features/conversations/customer-label';
+import { asLabelled, conversationsPhrase, customerAvatar } from '../customer-words';
 import { Radio } from '@app/shared/choice/choice';
+import { Avatar } from '@app/shared/avatar/avatar';
 
 /** What tells one record apart from another in the merge step. */
 export interface Distinction {
   readonly where: string;
   readonly firstSeen: string;
-  readonly reference: string;
+  /**
+   * The record's short code, when its label does not already show it (a name,
+   * or a WhatsApp customer labelled by the masked number); null when the label
+   * carries it. One code per record, never two (Phase 38 note 15).
+   */
+  readonly code: string | null;
+  /** All of it as one line, the code isolated left to right: the merge sentence. */
+  readonly line: string;
 }
 
 /**
@@ -66,6 +78,7 @@ export interface Distinction {
     VoiceChip,
     CustomerLabel,
     Radio,
+    Avatar,
   ],
   templateUrl: './customer-detail.html',
   styleUrl: './customer-detail.scss',
@@ -78,6 +91,9 @@ export class CustomerDetail implements OnInit, HasUnsavedChanges {
   private readonly permissions = inject(PermissionService);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly injector = inject(Injector);
+
+  /** The summary panel's four fact tiles, while the customer is read. */
+  protected readonly skeletonFacts = [0, 1, 2, 3];
 
   /** How many candidates the merge picker offers at a time. */
   private static readonly CandidatePageSize = 20;
@@ -123,6 +139,14 @@ export class CustomerDetail implements OnInit, HasUnsavedChanges {
     const person = this.customer();
 
     return person ? asLabelled(person) : null;
+  });
+
+  /** The large avatar's letters and badge, as the inbox's customer panel draws them. */
+  protected readonly avatar = computed(() => {
+    const labelled = this.labelled();
+    const person = this.customer();
+
+    return labelled && person ? customerAvatar(labelled, person.channels) : null;
   });
 
   /**
@@ -318,9 +342,10 @@ export class CustomerDetail implements OnInit, HasUnsavedChanges {
    * — never a guess, and never anything taken from what was said.
    *
    * Found again in Phase 33.5: visitors who arrived on the same day still read
-   * identically, so "first seen" is to the minute and every row ends with a
-   * short reference from the record's own identifier -- the same one in its
-   * address, and the only fact guaranteed to differ between two records.
+   * identically, so "first seen" is to the minute. Since Phase 39.6a (note 15)
+   * each record shows one code, its short code, the one every customer screen
+   * uses: in the label for an unnamed visitor, after the facts otherwise. The
+   * second code (the end of the record's id, "ref.") is gone.
    */
   protected distinguish(row: CustomerRow | Customer): Distinction {
     const where =
@@ -328,12 +353,15 @@ export class CustomerDetail implements OnInit, HasUnsavedChanges {
         ? $localize`:@@customer.noChannel:No channel`
         : row.channels.map((channel) => channelWord(channel)).join($localize`:@@list.separator:, `);
     const date = this.date(row.createdAt);
+    const firstSeen = $localize`:@@customer.firstSeenOn:first seen ${date}:date:`;
+    const label = customerLabel(asLabelled(row));
+    const code = label.kind === 'label' && label.code === row.shortCode ? null : row.shortCode;
+    // The code is isolated left to right inside a sentence of either direction
+    // (U+2066 ... U+2069), as <bdi dir="ltr"> does in the candidate list.
+    const line =
+      code === null ? `${where} · ${firstSeen}` : `${where} · ${firstSeen} · \u2066${code}\u2069`;
 
-    return {
-      where,
-      firstSeen: $localize`:@@customer.firstSeenOn:first seen ${date}:date:`,
-      reference: row.id.slice(-6),
-    };
+    return { where, firstSeen, code, line };
   }
 
   /**

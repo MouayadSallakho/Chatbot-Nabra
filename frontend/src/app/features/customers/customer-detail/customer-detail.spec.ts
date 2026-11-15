@@ -31,6 +31,7 @@ describe('CustomerDetail', () => {
     label: 'WhatsApp customer',
     labelCode: 'WhatsAppCustomer',
     shortCode: 'W4T5PQ',
+    reference: '••••0123',
     identities: [{ channel: 'WhatsApp', reference: '••••0123' }],
     channels: ['WhatsApp'],
     conversationCount: 2,
@@ -138,6 +139,39 @@ describe('CustomerDetail', () => {
   });
 
   describe('what it shows', () => {
+    it('leads with the inbox avatar and the facts as tiles, in a calm panel', async () => {
+      await mount('customers.view');
+      await answer();
+
+      const summary = query<HTMLElement>('[data-testid="customer-summary"]')!;
+      const avatar = summary.querySelector('app-avatar')!;
+
+      expect(query('.page')?.classList.contains('page-calm')).toBe(true);
+      // The masked number's first digits, with the WhatsApp badge; decorative.
+      expect(avatar.querySelector('.avatar-letters')?.textContent).toBe('01');
+      expect(avatar.querySelector('.avatar-badge')?.getAttribute('data-channel')).toBe('WhatsApp');
+      expect(avatar.getAttribute('aria-hidden')).toBe('true');
+      expect(summary.querySelectorAll('.facts > div').length).toBe(4);
+      expect(query('[data-testid="label"]')?.textContent?.replace(/\s+/g, ' ').trim()).toBe(
+        'WhatsApp customer ••••0123',
+      );
+    });
+
+    it("draws the skeleton in the loaded page's shape while it reads", async () => {
+      await mount('customers.view');
+
+      const skeleton = query<HTMLElement>('[data-testid="customer-skeleton"]')!;
+
+      expect(skeleton.getAttribute('aria-busy')).toBe('true');
+      expect(skeleton.querySelector('.customer-avatar-skeleton')).not.toBeNull();
+      expect(skeleton.querySelectorAll('.customer-fact-skeleton').length).toBe(4);
+      expect(skeleton.querySelectorAll('.customer-skeleton-card').length).toBe(2);
+
+      await answer();
+
+      expect(query('[data-testid="customer-skeleton"]')).toBeNull();
+    });
+
     it('shows a masked identifier and says what it is', async () => {
       await mount('customers.view');
       await answer();
@@ -392,17 +426,31 @@ describe('CustomerDetail', () => {
 
       await settle();
 
-      // Both named by the server's code, as the inbox names them (BA-1).
+      // Both named by the server's code, as the inbox names them (BA-1): the
+      // WhatsApp customer by its masked number (39.1), so its short code follows
+      // the facts, once; the visitor by its short code, which is not repeated.
       const confirmation = query<HTMLElement>('[data-testid="merge-confirmation"]')!;
+      const said = confirmation.textContent ?? '';
 
-      expect(confirmation.textContent).toContain('WhatsApp customer W4T5PQ');
-      expect(confirmation.textContent).toContain('Visitor 7KQ2MX');
+      expect(said).toContain('WhatsApp customer ••••0123');
+      expect(said).toContain('· \u2066W4T5PQ\u2069)');
+      expect(said).toContain('Visitor 7KQ2MX');
+      expect(said.split('7KQ2MX').length - 1).toBe(1);
+      expect(said.split('W4T5PQ').length - 1).toBe(1);
+      expect(said).not.toContain('ref.');
       expect(text()).toContain('combines their channel identities and conversation history');
 
       const candidate = query<HTMLElement>('[data-testid="candidates"] .candidate-name')!;
 
       expect(candidate.textContent?.replace(/\s+/g, ' ').trim()).toBe('Visitor 7KQ2MX');
       expect(candidate.querySelector('bdi')?.getAttribute('dir')).toBe('ltr');
+
+      // One code per candidate (note 15): the label carries it, so the facts do not.
+      const facts = query<HTMLElement>('[data-testid="candidate-facts"]')!;
+
+      expect(facts.textContent).not.toContain('7KQ2MX');
+      expect(facts.textContent).not.toContain('ref.');
+      expect(facts.querySelector('bdi')).toBeNull();
 
       // It asks the reader to assert it, rather than asserting it for them.
       expect(text()).toContain('Confirm that these records belong to the same customer');
@@ -472,10 +520,11 @@ describe('CustomerDetail', () => {
       expect(on('2026-08-01T10:00:00+00:00')).not.toEqual(on('2026-09-01T10:00:00+00:00'));
     });
 
-    it('tells apart two visitors first seen in the same minute', async () => {
+    it('tells apart two visitors first seen in the same minute, by one code each', async () => {
       // Found in Phase 33.5: seeded visitors who arrived together still read
-      // identically by channel and date. The reference from each record's own
-      // identifier is the one fact guaranteed to differ.
+      // identically by channel and date. Since 39.6a (note 15) the short code in
+      // each label tells them apart; it is read from the same random end of the
+      // id the old "ref." was, with more of it, so nothing is lost.
       const sameMoment = '2026-08-01T10:00:00+00:00';
 
       await mount('customers.view', 'customers.manage');
@@ -499,7 +548,7 @@ describe('CustomerDetail', () => {
               displayName: null,
               label: 'Anonymous visitor',
               labelCode: 'AnonymousVisitor',
-              shortCode: '7KQ2MX',
+              shortCode: 'P3Z9QA',
               channels: ['WebChat'],
               conversationCount: 1,
               lastActivityAt: null,
@@ -518,9 +567,48 @@ describe('CustomerDetail', () => {
 
       const confirmation = query('[data-testid="merge-confirmation"]')!.textContent ?? '';
 
-      expect(customerId.slice(-6)).not.toEqual(otherId.slice(-6));
-      expect(confirmation).toContain(`ref. ${customerId.slice(-6)}`);
-      expect(confirmation).toContain(`ref. ${otherId.slice(-6)}`);
+      expect(confirmation).toContain('Visitor 7KQ2MX');
+      expect(confirmation).toContain('Visitor P3Z9QA');
+      expect(confirmation).not.toContain('ref.');
+      expect(confirmation.split('7KQ2MX').length - 1).toBe(1);
+      expect(confirmation.split('P3Z9QA').length - 1).toBe(1);
+    });
+
+    it('gives a named candidate its short code once, after the facts', async () => {
+      await mount('customers.view', 'customers.manage');
+      await answer();
+
+      query<HTMLButtonElement>('[data-testid="open-merge"]')!.click();
+      http
+        .expectOne((candidate) => candidate.url === directoryUrl)
+        .flush({
+          items: [
+            {
+              id: otherId,
+              displayName: 'Rania Haddad',
+              label: 'Rania Haddad',
+              labelCode: 'Named',
+              shortCode: 'R4N1AH',
+              reference: null,
+              channels: ['WebChat'],
+              conversationCount: 1,
+              lastActivityAt: null,
+              createdAt: '2026-09-01T10:00:00+00:00',
+            },
+          ],
+          page: 1,
+          pageSize: 20,
+          totalCount: 1,
+        });
+      await settle();
+
+      const facts = query<HTMLElement>('[data-testid="candidate-facts"]')!;
+      const code = facts.querySelector('bdi')!;
+
+      expect(code.textContent).toBe('R4N1AH');
+      expect(code.getAttribute('dir')).toBe('ltr');
+      expect(code.getAttribute('translate')).toBe('no');
+      expect(text().split('R4N1AH').length - 1).toBe(1);
     });
 
     async function pickOther(): Promise<void> {

@@ -1,4 +1,12 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input, output } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  input,
+  output,
+  signal,
+} from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { ThemeService } from '@app/core/theme/theme-service';
 import { TransparencyService } from '@app/core/theme/transparency-service';
@@ -16,6 +24,8 @@ import { Menu } from '@app/shared/menu/menu';
 import { PermissionService } from '@app/core/authorization/permission-service';
 import { Sounds } from '@app/core/sounds/sounds';
 import { SoundSettings } from '@app/core/sounds/sound-settings';
+import { memberInitials } from '@app/shared/avatar/member-initials';
+import { DisplayNameDialog } from './display-name-dialog';
 
 const THEME_ICONS: Readonly<Record<ThemePreference, IconName>> = {
   system: 'monitor',
@@ -40,7 +50,7 @@ const THEME_ICONS: Readonly<Record<ThemePreference, IconName>> = {
 @Component({
   selector: 'app-profile-menu',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Menu, Icon, RouterLink],
+  imports: [Menu, Icon, RouterLink, DisplayNameDialog],
   templateUrl: './profile-menu.html',
   styleUrl: './profile-menu.scss',
 })
@@ -109,23 +119,21 @@ export class ProfileMenu {
    * One or two letters from the shown name: the first letters of its first two
    * words for a display name ("Sara Ahmed" → SA, an Arabic name gives Arabic
    * letters), or from the address's local part. Never a guess at a real name.
+   * Shared with the team screens (`memberInitials`), so a member has the same
+   * letters everywhere.
    */
-  protected readonly initials = computed(() => {
-    const display = this.displayName()?.trim();
+  protected readonly initials = computed(() => memberInitials(this.displayName(), this.email()));
 
-    if (display) {
-      const words = display.split(/\s+/).filter(Boolean);
-      const letters = words.length > 1 ? [...words[0]][0] + [...words[1]][0] : [...words[0]][0];
+  /**
+   * How many times "Change display name" was chosen. The first choice loads the
+   * dialog (`@defer`), and every choice opens it, after the menu has closed and
+   * returned focus to its button (where the dialog gives it back).
+   */
+  protected readonly displayNameRequests = signal(0);
 
-      return letters.toLocaleUpperCase();
-    }
-
-    const local = this.email().split('@')[0] ?? '';
-    const parts = local.split(/[._-]+/).filter(Boolean);
-    const letters = parts.length > 1 ? parts[0][0] + parts[1][0] : local.slice(0, 1);
-
-    return letters.toUpperCase() || '?';
-  });
+  protected openDisplayName(): void {
+    this.displayNameRequests.update((count) => count + 1);
+  }
 
   /** "Emails in English": which language the account's emails are written in. */
   protected readonly emailLanguageLine = computed(() => {

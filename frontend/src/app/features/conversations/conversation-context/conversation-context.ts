@@ -13,7 +13,6 @@ import { firstValueFrom } from 'rxjs';
 import { PermissionService } from '@app/core/authorization/permission-service';
 import { LocaleFormat } from '@app/core/i18n/locale-format';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
-import { Avatar } from '@app/shared/avatar/avatar';
 import { channelWord } from '@app/shared/channel/channel-badge';
 import type { WhatsAppConversationFacts } from '@app/features/channels/whatsapp-api';
 import {
@@ -25,7 +24,7 @@ import type { ConversationDetail } from '../conversations-api';
 import { messagesPhrase, statusWord } from '../conversation-words';
 import { CustomerLabel, customerLabel, customerLabelPlain } from '../customer-label';
 import { MemberName, memberName } from '../inbox-rows';
-import { codeInitials } from '../conversation-list/conversation-list';
+import { Avatar, codeInitials } from '@app/shared/avatar/avatar';
 
 /** How many of the customer's other conversations the panel lists (board Inbox: three). */
 export const EARLIER_SHOWN = 3;

@@ -1,4 +1,4 @@
-<div class="page">
+<div class="page page-calm">
   <app-page-header
     heading="Team"
     i18n-heading="@@team.heading"
@@ -29,11 +29,23 @@
     </div>
   } @else if (loading()) {
     <div class="page-section">
-      <div class="data-list member-list" aria-busy="true">
+      <!-- The loaded rows' shape: the avatar and two lines, the roles, the date. -->
+      <div class="data-list member-list" aria-busy="true" data-testid="team-skeleton">
         <p class="visually-hidden" role="status" i18n="@@team.loading">Loading the team…</p>
+        <div class="data-list-head" aria-hidden="true">
+          <span i18n="@@team.column.member">Member</span>
+          <span i18n="@@team.column.roles">Roles</span>
+          <span i18n="@@team.column.joined">Joined</span>
+        </div>
         @for (row of skeletonRows; track row) {
           <div class="data-row data-row-skeleton" aria-hidden="true">
-            <span class="skeleton skeleton-title"></span>
+            <span class="member-who">
+              <span class="skeleton member-avatar-skeleton"></span>
+              <span class="member-lines">
+                <span class="skeleton skeleton-title"></span>
+                <span class="skeleton skeleton-text"></span>
+              </span>
+            </span>
             <span class="skeleton skeleton-text"></span>
             <span class="skeleton skeleton-text"></span>
           </div>
@@ -63,7 +75,7 @@
       </div>
     </div>
   } @else {
-    <dl class="admin-facts page-section" data-testid="team-facts">
+    <dl class="admin-facts facts page-section" data-testid="team-facts">
       <div>
         <dt i18n="@@team.facts.members">Members</dt>
         <dd>{{ memberTotal() | localNumber }}</dd>
@@ -89,20 +101,36 @@
                 [routerLink]="['/team', member.userId]"
                 [attr.data-testid]="'member-' + member.userId"
               >
-                <span class="data-row-title member-title">
-                  <!-- An address: always left to right, isolated from the page. -->
-                  <span class="member-email" dir="ltr">{{ member.email }}</span>
+                <span class="member-who">
+                  <!-- A colleague, in the team's gold: their letters, decorative. -->
+                  <app-avatar tone="member" [text]="initials(member)" />
+                  <span class="member-lines">
+                    <span class="data-row-title member-title">
+                      @if (member.displayName?.trim()) {
+                        <!-- The name they chose: whatever they typed, in its own direction. -->
+                        <bdi class="member-name" dir="auto" data-testid="member-name">{{
+                          shownName(member)
+                        }}</bdi>
+                      } @else {
+                        <!-- An address: always left to right, isolated from the page. -->
+                        <span class="member-email" dir="ltr">{{ member.email }}</span>
+                      }
 
-                  @if (member.isOwner) {
-                    <!--
-                      Marked, not hidden: whoever owns the workspace can be
-                      found, and it shows their access is not edited here.
-                    -->
-                    <span class="badge badge-neutral" i18n="@@team.owner">Owner</span>
-                  }
-                  @if (member.userId === myId()) {
-                    <span class="badge badge-plain" i18n="@@team.you">You</span>
-                  }
+                      @if (member.isOwner) {
+                        <!--
+                          Marked, not hidden: whoever owns the workspace can be
+                          found, and it shows their access is not edited here.
+                        -->
+                        <app-chip size="sm" i18n="@@team.owner">Owner</app-chip>
+                      }
+                      @if (member.userId === myId()) {
+                        <app-chip size="sm" tone="draft" i18n="@@team.you">You</app-chip>
+                      }
+                    </span>
+                    @if (member.displayName?.trim()) {
+                      <span class="member-email member-address" dir="ltr">{{ member.email }}</span>
+                    }
+                  </span>
                 </span>
 
                 <span class="data-row-meta">
@@ -198,7 +226,10 @@
           </p>
           @for (row of invitationSkeletonRows; track row) {
             <div class="data-row data-row-skeleton" aria-hidden="true">
-              <span class="skeleton skeleton-title"></span>
+              <span class="member-title">
+                <span class="skeleton skeleton-title"></span>
+                <span class="skeleton invitation-chip-skeleton"></span>
+              </span>
               <span class="skeleton skeleton-text"></span>
               <span class="skeleton skeleton-text"></span>
             </div>
@@ -206,13 +237,13 @@
         </div>
       } @else if (invitationsFailure()) {
         <div class="card card-body invitation-note" data-testid="invitations-failed">
-          <span class="badge badge-neutral" i18n="@@team.invitations.notChecked">Not checked</span>
+          <app-chip i18n="@@team.invitations.notChecked">Not checked</app-chip>
           <span class="text-small text-secondary" i18n="@@team.invitations.failed"
             >Invitations could not be read just now.</span
           >
           <button
             type="button"
-            class="btn btn-ghost btn-sm"
+            class="btn btn-quiet btn-sm"
             (click)="retryInvitations()"
             i18n="@@team.tryAgain"
           >
@@ -231,7 +262,11 @@
         </p>
 
         @if (invitations().length > 0) {
-          <div class="data-list invitation-list" [attr.aria-busy]="invitationsBusy()">
+          <div
+            class="data-list invitation-list"
+            [class.invitation-list-past]="shownStatus() !== 'Pending'"
+            [attr.aria-busy]="invitationsBusy()"
+          >
             <div class="data-list-head" aria-hidden="true">
               <span i18n="@@team.column.invited">Invited</span>
               @if (shownStatus() === 'Pending') {
@@ -251,9 +286,9 @@
                   >
                     <span class="data-row-title member-title">
                       <span class="member-email" dir="ltr">{{ invitation.email }}</span>
-                      <span class="badge" [class]="statusTone(invitation.status)">{{
+                      <app-chip size="sm" [tone]="statusTone(invitation.status)">{{
                         statusWord(invitation.status)
-                      }}</span>
+                      }}</app-chip>
                     </span>
 
                     <span class="data-row-meta">
@@ -285,10 +320,22 @@
                           [attr.datetime]="invitation.createdAt"
                           >{{ invitation.createdAt | localDate: 'date' }}</time
                         >
-                        @if (invitation.invitedByEmail; as by) {
-                          · <span i18n="@@team.past.by">by</span>&nbsp;<span dir="ltr">{{
-                            by
-                          }}</span>
+                        @if (invitation.invitedByDisplayName?.trim() || invitation.invitedByEmail) {
+                          <!-- Who sent it, on its own line: the name they chose beside their address. -->
+                          <span class="invitation-sender" data-testid="invited-by"
+                            ><span i18n="@@team.past.by">by</span>{{ ' ' }}
+                            @if (invitation.invitedByDisplayName?.trim()) {
+                              <bdi dir="auto" data-testid="invited-by-name">{{
+                                invitation.invitedByDisplayName
+                              }}</bdi>
+                              @if (invitation.invitedByEmail; as by) {
+                                {{ ' ' }}(<span dir="ltr">{{ by }}</span
+                                >)
+                              }
+                            } @else if (invitation.invitedByEmail; as by) {
+                              <span dir="ltr">{{ by }}</span>
+                            }
+                          </span>
                         }
                       </span>
                     }

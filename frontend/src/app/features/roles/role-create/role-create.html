@@ -1,4 +1,4 @@
-<div class="page">
+<div class="page page-calm">
   <app-page-header
     backLink="/roles"
     backLabel="Roles & permissions"
@@ -42,13 +42,11 @@
         <span class="skeleton skeleton-title"></span>
         <span class="skeleton skeleton-bar"></span>
       </div>
-      @for (row of [0, 1]; track row) {
-        <div class="card card-body admin-skeleton" aria-hidden="true">
-          <span class="skeleton skeleton-text"></span>
-          <span class="skeleton skeleton-text"></span>
-          <span class="skeleton skeleton-text"></span>
-        </div>
-      }
+      <div class="card card-body perm-skeleton" aria-hidden="true">
+        @for (row of [0, 1, 2, 3]; track row) {
+          <span class="skeleton perm-area-skeleton"></span>
+        }
+      </div>
     </div>
   } @else if (loadFailure(); as error) {
     <div class="page-section">

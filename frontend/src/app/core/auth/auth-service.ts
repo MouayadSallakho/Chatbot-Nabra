@@ -221,6 +221,25 @@ export class AuthService {
   }
 
   /**
+   * Saves the signed-in account's display name, and shows it at once.
+   *
+   * The server keeps the name trimmed with inner spaces made one, which the
+   * caller has already worked out (`name`), so the account is updated without
+   * a second read; the next page load reads it from the session as usual.
+   *
+   * @throws The raw failure, so the dialog can word the refusal by its code.
+   */
+  async saveDisplayName(name: string | null): Promise<void> {
+    await firstValueFrom(this.api.saveDisplayName(name));
+
+    const current = this.account();
+
+    if (current !== null) {
+      this.account.set({ ...current, displayName: name });
+    }
+  }
+
+  /**
    * Ends the session.
    *
    * <strong>It never throws, and local state is cleared whatever the server

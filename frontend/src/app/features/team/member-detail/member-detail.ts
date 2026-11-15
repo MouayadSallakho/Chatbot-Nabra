@@ -33,6 +33,9 @@ import {
 import { AssignableRole, Member, TeamApi } from '../team-api';
 import { roleList, rolesSelected } from '../team-words';
 import { Check } from '@app/shared/choice/choice';
+import { Avatar } from '@app/shared/avatar/avatar';
+import { Chip } from '@app/shared/chip/chip';
+import { memberInitials, memberShownName } from '@app/shared/avatar/member-initials';
 
 /** One area of a member's access, for the at-a-glance list. */
 interface AccessArea {
@@ -65,7 +68,17 @@ interface AccessArea {
 @Component({
   selector: 'app-member-detail',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, PageHeader, EmptyState, Icon, ConfirmDialog, LocalDatePipe, Check],
+  imports: [
+    RouterLink,
+    PageHeader,
+    EmptyState,
+    Icon,
+    ConfirmDialog,
+    LocalDatePipe,
+    Check,
+    Avatar,
+    Chip,
+  ],
   templateUrl: './member-detail.html',
   styleUrl: './member-detail.scss',
 })
@@ -106,6 +119,26 @@ export class MemberDetail implements OnInit, HasUnsavedChanges {
 
   protected readonly isOwner = computed(() => this.member()?.isOwner ?? false);
 
+  /**
+   * The page's heading: the name the member chose (39.1), else their address.
+   * The address stays on the page beside it in either case.
+   */
+  protected readonly shownName = computed(() => {
+    const current = this.member();
+
+    return current ? memberShownName(current.displayName, current.email) : '';
+  });
+
+  /** Whether the heading is a chosen name, so the address is shown under it. */
+  protected readonly hasDisplayName = computed(() => !!this.member()?.displayName?.trim());
+
+  /** The gold avatar's letters, as the team list and the account menu draw them. */
+  protected readonly initials = computed(() => {
+    const current = this.member();
+
+    return current ? memberInitials(current.displayName, current.email) : '';
+  });
+
   /** Whether this row is the reader's own account. */
   protected readonly isSelf = computed(() => this.member()?.userId === this.auth.user()?.id);
 
@@ -126,6 +159,9 @@ export class MemberDetail implements OnInit, HasUnsavedChanges {
   protected readonly editable = computed(
     () => this.canManage() && !this.isOwner() && !this.isSelf() && !this.outranksMe(),
   );
+
+  /** The summary panel's three fact tiles, while the member is read. */
+  protected readonly skeletonFacts = [0, 1, 2];
 
   /** Why it is read-only, when it is. Ordered from most absolute to least. */
   protected readonly readOnlyReason = computed<'owner' | 'self' | 'cannotManage' | 'outranked'>(

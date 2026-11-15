@@ -29,6 +29,7 @@ describe('CustomerList', () => {
         label: 'WhatsApp customer',
         labelCode: 'WhatsAppCustomer',
         shortCode: 'W4T5PQ',
+        reference: '••••4821',
         channels: ['WhatsApp'],
         conversationCount: 3,
         lastActivityAt: '2026-09-22T10:00:00+00:00',
@@ -40,6 +41,7 @@ describe('CustomerList', () => {
         label: 'Anonymous visitor',
         labelCode: 'AnonymousVisitor',
         shortCode: '7KQ2MX',
+        reference: null,
         channels: ['WebChat'],
         conversationCount: 1,
         lastActivityAt: null,
@@ -128,28 +130,103 @@ describe('CustomerList', () => {
     // The server's code, worded as the inbox words it (BA-1), the code left to right.
     const labels = [...host().querySelectorAll('[data-testid="row-label"]')];
 
+    // An unnamed WhatsApp customer reads its masked number, exactly as in the
+    // inbox (39.1, note 18); a visitor its short code.
     expect(labels.map((label) => label.textContent?.replace(/\s+/g, ' ').trim())).toEqual([
-      'WhatsApp customer W4T5PQ',
+      'WhatsApp customer ••••4821',
       'Visitor 7KQ2MX',
     ]);
-    expect(labels[1].querySelector('bdi')?.getAttribute('dir')).toBe('ltr');
-    expect(labels[1].querySelector('bdi')?.getAttribute('translate')).toBe('no');
+
+    for (const label of labels) {
+      expect(label.querySelector('bdi')?.getAttribute('dir')).toBe('ltr');
+      expect(label.querySelector('bdi')?.getAttribute('translate')).toBe('no');
+    }
+
+    // Never the full number: the server sends only the masked one.
+    expect(text()).not.toMatch(/\d{5,}/);
   });
 
-  it('shows a name somebody chose exactly, with its initial, and an outline for nobody', async () => {
+  it('falls back to the short code when a read carries no masked number', async () => {
+    await mount('customers.view');
+    await answer({ ...page, items: [{ ...page.items[0], reference: null }] });
+
+    expect(
+      host().querySelector('[data-testid="row-label"]')?.textContent?.replace(/\s+/g, ' ').trim(),
+    ).toBe('WhatsApp customer W4T5PQ');
+  });
+
+  it('leads each row with the inbox avatar: initials or the code, and the channel badge', async () => {
     await mount('customers.view');
     await answer({
       ...page,
-      items: [{ ...page.items[0], displayName: 'Rania Haddad', labelCode: 'Named' }, page.items[1]],
+      items: [
+        { ...page.items[0], displayName: 'Rania Haddad', labelCode: 'Named' },
+        page.items[1],
+        { ...page.items[0], id: 'cccccccc-cccc-cccc-cccc-cccccccccccc' },
+      ],
     });
 
     const labels = [...host().querySelectorAll('[data-testid="row-label"]')];
-    const tiles = [...host().querySelectorAll('.customer-tile')];
+    const avatars = [
+      ...host().querySelectorAll<HTMLElement>('[data-testid="customers"] app-avatar'),
+    ];
 
     expect(labels[0].textContent?.trim()).toBe('Rania Haddad');
     expect(labels[0].querySelector('bdi')?.getAttribute('dir')).toBe('auto');
-    expect(tiles[0].textContent?.trim()).toBe('R');
-    expect(tiles[1].classList.contains('is-unnamed')).toBe(true);
+
+    expect(avatars.map((avatar) => avatar.querySelector('.avatar-letters')?.textContent)).toEqual([
+      'RH',
+      '7K',
+      '48',
+    ]);
+    expect(
+      avatars.map((avatar) => avatar.querySelector('.avatar-badge')?.getAttribute('data-channel')),
+    ).toEqual(['WhatsApp', 'WebChat', 'WhatsApp']);
+
+    // Decorative: the label beside it says all of it in words.
+    expect(avatars.every((avatar) => avatar.getAttribute('aria-hidden') === 'true')).toBe(true);
+  });
+
+  it("draws the skeleton in the loaded rows' shape, then replaces it", async () => {
+    await mount('customers.view');
+
+    const skeleton = host().querySelector<HTMLElement>('[data-testid="customers-skeleton"]')!;
+
+    expect(skeleton.getAttribute('aria-busy')).toBe('true');
+    expect(skeleton.querySelectorAll('.data-list-head span').length).toBe(4);
+
+    const rows = [...skeleton.querySelectorAll('.data-row-skeleton')];
+
+    expect(rows.length).toBe(5);
+    expect(rows.every((row) => row.getAttribute('aria-hidden') === 'true')).toBe(true);
+    // The avatar's disc, the label's bar, a channel and the two end-aligned cells.
+    expect(rows[0].querySelector('.customer-avatar-skeleton')).not.toBeNull();
+    expect(rows[0].querySelectorAll('.skeleton').length).toBe(5);
+    expect(rows[0].querySelectorAll('.data-cell-end').length).toBe(2);
+    expect(text()).toContain('Loading customers');
+
+    await answer(page);
+
+    expect(host().querySelector('[data-testid="customers-skeleton"]')).toBeNull();
+  });
+
+  it('lays the list out as a calm panel of rows', async () => {
+    await mount('customers.view');
+    await answer(page);
+
+    expect(host().querySelector('.page')?.classList.contains('page-calm')).toBe(true);
+  });
+
+  it('says a load failure in words and offers Try again', async () => {
+    await mount('customers.view');
+    http
+      .expectOne((request) => request.url === url)
+      .flush({ title: 'Down', code: 'something.down' }, { status: 503, statusText: 'Down' });
+    await settle();
+
+    expect(text()).toContain('Could not load customers');
+    expect(text()).toContain('Try again');
+    expect(text()).not.toContain('Down');
   });
 
   it('says a channel in words rather than by colour alone', async () => {

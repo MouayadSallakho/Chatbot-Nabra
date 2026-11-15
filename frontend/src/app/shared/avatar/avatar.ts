@@ -42,6 +42,13 @@ export function initialsOf(name: string): string {
   return (first[0] + last[0]).toLocaleUpperCase();
 }
 
+/** The first two letters or digits of a code: "7KQ2MX" gives "7K", "••••1234" gives "12". */
+export function codeInitials(code: string): string {
+  return Array.from(code.replace(/[^\p{L}\p{N}]/gu, ''))
+    .slice(0, 2)
+    .join('');
+}
+
 /**
  * A person's avatar (calm-glass.md §6): initials or a short code on cream, 40px
  * in rows, 34px for the member, 64px on the customer panel, with the channel's

@@ -1,4 +1,5 @@
-// Column template for the shared data list; the rest is the primitive's.
+// Column template for the shared data list; the rest is the primitive's and
+// `.page-calm`'s (styles/_authoring.scss).
 .customer-list {
   --data-list-columns: minmax(0, 2fr) minmax(0, 1.6fr) 9rem 11rem;
 }
@@ -10,33 +11,9 @@
   min-inline-size: 0;
 }
 
-// Neutral, never a voice colour: a customer is the other side of the duet.
-.customer-tile {
-  display: inline-grid;
-  flex: none;
-  place-items: center;
-  inline-size: 2rem;
-  block-size: 2rem;
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-control);
-  background-color: var(--surface-muted);
-  color: var(--text-secondary);
-  font: var(--text-label);
-
-  &.is-unnamed {
-    border-style: dashed;
-    background-color: transparent;
-    color: var(--text-muted);
-  }
-
-  .icon {
-    inline-size: 1rem;
-    block-size: 1rem;
-  }
-}
-
+// A label (no name) reads quieter than a name somebody chose.
 .customer-name.is-unnamed {
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
   font-weight: 400;
 }
 
@@ -46,12 +23,14 @@
   gap: var(--space-1) var(--space-3);
 }
 
-.customer-skeleton {
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: center;
-  gap: var(--space-3);
+// The skeleton draws the loaded row: a 40px disc, then the bars.
+.customer-avatar-skeleton {
+  flex: none;
+  inline-size: var(--avatar-size);
+  block-size: var(--avatar-size);
+  border-radius: var(--radius-pill);
+}
 
-  .skeleton-title {
-    margin: 0;
-  }
+.customer-channel-skeleton {
+  inline-size: 7rem;
 }

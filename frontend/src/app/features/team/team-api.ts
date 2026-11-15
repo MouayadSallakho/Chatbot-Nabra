@@ -15,6 +15,13 @@ export interface MemberRole {
 export interface MemberSummary {
   readonly userId: string;
   readonly email: string;
+
+  /**
+   * The name the member chose to be shown by (Phase 39.1, note 7), or null when
+   * they chose none: then the address stands in. Staff-facing only. Optional for
+   * an older server that does not send it.
+   */
+  readonly displayName?: string | null;
   readonly joinedAt: string;
   readonly roles: readonly MemberRole[];
   readonly isOwner: boolean;
@@ -60,6 +67,9 @@ export interface Invitation {
   readonly status: InvitationStatus;
   readonly roles: readonly string[];
   readonly invitedByEmail: string | null;
+
+  /** The inviter's display name (Phase 39.1), when they chose one; shown beside the address. */
+  readonly invitedByDisplayName?: string | null;
   readonly createdAt: string;
   readonly expiresAt: string;
 }

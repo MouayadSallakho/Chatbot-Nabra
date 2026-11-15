@@ -1,4 +1,4 @@
-<div class="page">
+<div class="page page-calm">
   <app-page-header
     backLink="/customers"
     backLabel="Customers"
@@ -19,10 +19,17 @@
       />
     </div>
   } @else if (loading()) {
-    <!-- The real layout's shapes: the facts strip, then the two columns. -->
-    <div class="customer-skeleton" aria-busy="true">
+    <!-- The real layout's shapes: the summary panel, then the two columns. -->
+    <div class="customer-skeleton" aria-busy="true" data-testid="customer-skeleton">
       <p class="visually-hidden" role="status" i18n="@@customer.loading">Loading customer…</p>
-      <span class="skeleton customer-skeleton-facts" aria-hidden="true"></span>
+      <div class="card customer-summary" aria-hidden="true">
+        <span class="skeleton customer-avatar-skeleton"></span>
+        <div class="customer-facts">
+          @for (fact of skeletonFacts; track fact) {
+            <span class="skeleton customer-fact-skeleton"></span>
+          }
+        </div>
+      </div>
       <div class="customer-layout" aria-hidden="true">
         <span class="skeleton customer-skeleton-card"></span>
         <span class="skeleton customer-skeleton-card"></span>
@@ -64,34 +71,44 @@
       </div>
     }
 
-    <dl class="customer-facts">
-      <div>
-        <dt i18n="@@customer.name">Name</dt>
-        <dd data-testid="label">
-          @if (labelled(); as label) {
-            <app-customer-label [customer]="label" />
-          }
-        </dd>
-      </div>
-      <div>
-        <dt i18n="@@customer.firstSeen">First seen</dt>
-        <dd>{{ date(person.createdAt) }}</dd>
-      </div>
-      <div>
-        <dt i18n="@@customers.column.conversations">Conversations</dt>
-        <dd data-testid="conversation-count">{{ conversations(person.conversationCount) }}</dd>
-      </div>
-      <div>
-        <dt i18n="@@customers.column.lastActivity">Last activity</dt>
-        <dd>
-          @if (person.lastActivityAt) {
-            {{ date(person.lastActivityAt) }}
-          } @else {
-            <span i18n="@@customers.noActivity">No activity yet</span>
-          }
-        </dd>
-      </div>
-    </dl>
+    <!--
+      Who this is, at a glance: the inbox's large avatar (initials, or the code's
+      first characters, with the first channel's badge) beside the four facts as
+      soft tiles. The avatar is decorative; the Name tile says it in words.
+    -->
+    <div class="card customer-summary" data-testid="customer-summary">
+      @if (avatar(); as face) {
+        <app-avatar size="lg" [name]="face.name" [text]="face.text" [channel]="face.channel" />
+      }
+      <dl class="customer-facts facts">
+        <div>
+          <dt i18n="@@customer.name">Name</dt>
+          <dd data-testid="label">
+            @if (labelled(); as label) {
+              <app-customer-label [customer]="label" />
+            }
+          </dd>
+        </div>
+        <div>
+          <dt i18n="@@customer.firstSeen">First seen</dt>
+          <dd>{{ date(person.createdAt) }}</dd>
+        </div>
+        <div>
+          <dt i18n="@@customers.column.conversations">Conversations</dt>
+          <dd data-testid="conversation-count">{{ conversations(person.conversationCount) }}</dd>
+        </div>
+        <div>
+          <dt i18n="@@customers.column.lastActivity">Last activity</dt>
+          <dd>
+            @if (person.lastActivityAt) {
+              {{ date(person.lastActivityAt) }}
+            } @else {
+              <span i18n="@@customers.noActivity">No activity yet</span>
+            }
+          </dd>
+        </div>
+      </dl>
+    </div>
 
     <div class="customer-layout">
       <div class="customer-main">
@@ -314,10 +331,16 @@
                               channels they used, when it first heard from them and
                               the record's own reference.
                             -->
-                            <span class="text-small text-muted" i18n="@@customer.candidate.facts"
-                              >{{ facts.where }} · {{ facts.firstSeen }} · ref.
-                              <bdi dir="ltr">{{ facts.reference }}</bdi></span
-                            >
+                            <!--
+                              One code per record (note 15): the short code, here
+                              only when the label above does not already show it.
+                            -->
+                            <span class="text-small text-muted" data-testid="candidate-facts"
+                              >{{ facts.where }} · {{ facts.firstSeen }}
+                              @if (facts.code; as code) {
+                                · <bdi dir="ltr" translate="no">{{ code }}</bdi>
+                              }
+                            </span>
                           </span>
                           <span class="text-small text-muted candidate-count">{{
                             conversations(candidate.conversationCount)
@@ -344,13 +367,8 @@
                   @let chosenName = customerName(chosen);
                   <div class="merge-confirmation" role="alert" data-testid="merge-confirmation">
                     <p class="text-small" i18n="@@customer.merge.summary">
-                      <strong dir="auto">{{ name() }}</strong> ({{ here.where }} ·
-                      {{ here.firstSeen }} · ref. <bdi dir="ltr">{{ here.reference }}</bdi
-                      >) will be combined into <strong dir="auto">{{ chosenName }}</strong> ({{
-                        there.where
-                      }}
-                      · {{ there.firstSeen }} · ref. <bdi dir="ltr">{{ there.reference }}</bdi
-                      >).
+                      <strong dir="auto">{{ name() }}</strong> ({{ here.line }}) will be combined
+                      into <strong dir="auto">{{ chosenName }}</strong> ({{ there.line }}).
                     </p>
                     <p class="text-small" i18n="@@customer.merge.consequence">
                       This combines their channel identities and conversation history. Confirm that

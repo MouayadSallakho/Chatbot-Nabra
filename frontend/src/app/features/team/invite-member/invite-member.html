@@ -1,4 +1,4 @@
-<div class="page page-narrow">
+<div class="page page-narrow page-calm">
   <app-page-header
     backLink="/team"
     backLabel="Team"
@@ -28,9 +28,7 @@
       -->
       <section class="card card-body invite-created" aria-labelledby="invite-created-heading">
         <p class="invite-created-status">
-          <span class="badge badge-success" i18n="@@team.invite.created.badge"
-            >Invitation created</span
-          >
+          <app-chip tone="success" i18n="@@team.invite.created.badge">Invitation created</app-chip>
         </p>
         <h2 id="invite-created-heading" class="text-section-title" tabindex="-1">
           <span i18n="@@team.invite.created.heading">Send this link to</span>&nbsp;<bdi dir="ltr">{{

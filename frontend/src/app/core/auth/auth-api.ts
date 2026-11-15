@@ -134,6 +134,16 @@ export class AuthApi {
     return this.http.put<void>('/api/me/language', { language });
   }
 
+  /**
+   * Sets or clears the name the signed-in account is shown by to colleagues
+   * (Phase 39.1): `null` or blank clears it. 204; refused with
+   * `account.display_name.too_long` or `account.display_name.control_characters`.
+   * The caller's own account only: there is no route with a user id.
+   */
+  saveDisplayName(displayName: string | null): Observable<void> {
+    return this.http.put<void>('/api/me/display-name', { displayName });
+  }
+
   /** Signs in. 401 for any failure, deliberately without saying which. */
   login(credentials: Credentials): Observable<AuthenticatedUser> {
     return this.http.post<AuthenticatedUser>('/api/auth/login', credentials);

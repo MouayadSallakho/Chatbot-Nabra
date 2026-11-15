@@ -113,6 +113,7 @@ describe('ConversationContext', () => {
       label: 'Visitor',
       labelCode: 'AnonymousVisitor',
       shortCode: '7KQ2MX',
+      reference: null,
       identities: [],
       channels: ['WebChat'],
       conversationCount: 6,

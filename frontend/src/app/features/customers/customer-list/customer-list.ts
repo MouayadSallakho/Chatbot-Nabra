@@ -14,7 +14,8 @@ import { LocaleFormat } from '@app/core/i18n/locale-format';
 import { CustomerPage, CustomerRow, CustomersApi } from '../customers-api';
 import { ConversationCustomer } from '@app/features/conversations/conversations-api';
 import { CustomerLabel, customerLabel } from '@app/features/conversations/customer-label';
-import { asLabelled, conversationsPhrase, initialOf } from '../customer-words';
+import { Avatar } from '@app/shared/avatar/avatar';
+import { asLabelled, conversationsPhrase, customerAvatar } from '../customer-words';
 
 /** One directory row, with what its template shows worked out once per read. */
 interface DirectoryRow {
@@ -22,7 +23,8 @@ interface DirectoryRow {
   /** The record in the inbox's label shape: the server's code, the same words (BA-1). */
   readonly label: ConversationCustomer;
   readonly named: boolean;
-  readonly initial: string;
+  /** The avatar's letters and channel badge, as the inbox draws them. */
+  readonly avatar: ReturnType<typeof customerAvatar>;
   readonly conversations: string;
   readonly activity: string;
 }
@@ -40,6 +42,11 @@ interface DirectoryRow {
  * names the other and confirms it, which is a decision this screen deliberately
  * does not make easier to take by accident.
  *
+ * <strong>Calm Glass rows (Phase 39.6a).</strong> One panel of radius-16 rows, each
+ * led by the customer's avatar with the badge of the channel they first used, as
+ * in the inbox: initials for a name, the code's first two characters for a label
+ * ("Visitor 7KQ2MX", "WhatsApp customer ••••1234", the masked number from 39.1).
+ *
  * <strong>Every label is escaped, and takes its own direction.</strong> A
  * customer's name is untrusted text that may have come from a person typing
  * anything at all. It is interpolated, never bound as HTML, and marked
@@ -48,7 +55,16 @@ interface DirectoryRow {
 @Component({
   selector: 'app-customer-list',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [PageHeader, EmptyState, RouterLink, Icon, Pagination, ChannelBadge, CustomerLabel],
+  imports: [
+    PageHeader,
+    EmptyState,
+    RouterLink,
+    Icon,
+    Pagination,
+    ChannelBadge,
+    CustomerLabel,
+    Avatar,
+  ],
   templateUrl: './customer-list.html',
   styleUrl: './customer-list.scss',
 })
@@ -99,7 +115,7 @@ export class CustomerList {
         customer,
         label,
         named: said.kind === 'name',
-        initial: said.kind === 'name' ? initialOf(said.name) : '',
+        avatar: customerAvatar(label, customer.channels),
         conversations: conversationsPhrase(this.locale.language, customer.conversationCount),
         activity:
           customer.lastActivityAt === null

@@ -49,6 +49,21 @@
     </span>
   </div>
 
+  <!--
+    The member's own name, as colleagues see it (Phase 39.6a). A dialog, not a
+    page: one field, saved for every workspace the account belongs to.
+  -->
+  <button
+    type="button"
+    class="menu-item"
+    role="menuitem"
+    data-testid="display-name-item"
+    (click)="openDisplayName()"
+  >
+    <app-icon name="person" [strokeWidth]="1.75" />
+    <span i18n="@@account.displayName.item">Change display name</span>
+  </button>
+
   <hr class="menu-separator" role="separator" />
 
   <div role="group" aria-labelledby="profile-theme-label">
@@ -178,3 +193,14 @@
     <span i18n="@@account.signOut">Sign out</span>
   </button>
 </app-menu>
+
+<!--
+  Loaded the first time it is asked for, so the startup JavaScript does not
+  carry it; kept afterwards. Outside the menu, so closing the menu leaves it.
+-->
+@defer (when displayNameRequests() > 0) {
+  <app-display-name-dialog
+    [current]="displayName()?.trim() || null"
+    [requests]="displayNameRequests()"
+  />
+}

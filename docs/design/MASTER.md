@@ -442,6 +442,13 @@ chip (owner decision Q4).
 | 2026-11-14 | Knowledge rows carry their document's glyph (written text, a table for CSV, a file); agent rows the orb, resting (faded) when the agent is not in service | Decorative and `aria-hidden`; the Type column and the status chip say the same in words | Phase 39.5a |
 | 2026-11-14 | The visitor's transcript (widget, hosted page, agent preview) speaks in the three voices from the visitor's side: their own words on the end side in cream; the AI on the start side beside the orb (in the widget, the workspace's checked tint); a person on the start side in gold beside a gold person mark, named only "Support" | calm-glass.md §6; owner decision Q5; the preview is the chat customers see (Phase 36.11). The widget's header, greeting and composer stay for 39.5b | Phase 39.5a |
 | 2026-11-14 | The switcher's border is the control border, not the board's line | Owner decision Q3: every control boundary meets 3:1 | Phase 39.3 |
+| 2026-11-15 | Customers, team, member, invite and roles move to `.page-calm`; a fact strip under a page header is a row of soft tiles (`.admin-facts.facts`), a permission area a frameless soft tile inside its panel | The 39.5a page modifier, applied in the step that redraws these screens; the role editor keeps the family's checkbox with its 44 px row target | Phase 39.6a |
+| 2026-11-15 | The customer directory and the customer page lead with the inbox's avatar (initials, or the label code's first two characters, with the first channel's badge); an unnamed WhatsApp customer reads its masked number from `reference` (39.1), exactly as in the inbox | calm-glass §6 rows; Phase 38 note 18 | Phase 39.6a |
+| 2026-11-15 | A merge candidate shows one code: its short code, in the label for an unnamed visitor, after the facts otherwise; "ref." (the end of the record's id) is gone | Phase 38 note 15. The short code is 30 bits from the same random end of the id that "ref." read 24 bits of, so nothing that told two records apart is lost | Phase 39.6a |
+| 2026-11-15 | Members appear by the display name they chose, the address under it (always shown); without one, the address alone. Members' avatars are gold with the account menu's letters (`memberInitials`); Owner and You are chips (neutral, and the hollow ring) | Note 7; owner Q5 (staff-facing only) | Phase 39.6a |
+| 2026-11-15 | Invitation states are chips: Waiting "i", Accepted tick, Expired hollow ring, Revoked plain; a past invitation names its sender by display name beside the address | Owner Q4 (a status word with its glyph); 39.1 `invitedByDisplayName` | Phase 39.6a |
+| 2026-11-15 | The member edits their own display name in a small glass dialog from the account menu ("Change display name", the first item), loaded on demand (`@defer`); the two rules are said before sending, in the server's words, and a refusal from the server is worded by its code | Plan 3.6; the dialog costs the startup JavaScript nothing | Phase 39.6a |
+| 2026-11-15 | Arabic sounds state: «الأصوات تعمل» / «الأصوات متوقفة» in the member block | «مفعّلة» can be misread at 13 px (39.5b, risk 3); owner's assistant's note | Phase 39.6a |
 
 ## 13. Contrast table (Calm Glass, Phase 39.2a)
 
@@ -657,6 +664,24 @@ Measured in Chrome from computed colours on the live pages, with translucent lay
 | Preview | visitor's bubble text | 4.5:1 | 13.27 | 10.35 |
 | Preview | AI text and speaker name on the accent tint | 4.5:1 | 12.18 / 12.18 | 12.97 / 12.44 |
 
+### 13.5 Customers, team, roles and the display name (Phase 39.6a)
+
+Measured in Chrome from computed colours on the live pages, with translucent layers composited (`p39-6a/scratch/contrast.mjs`, `p39-6a/chrome/contrast.json`). The dialog's glass is composited on the page ground. Every pair passes.
+
+| Part | Pair | Needs | Light | Dark |
+| --- | --- | --- | --- | --- |
+| Lists | column head on the panel | 4.5:1 | 5.73 | 6.05 |
+| Customers | avatar letters on cream; an unnamed label on the panel | 4.5:1 | 8.32; 9.98 | 7.42; 10.24 |
+| Customer | fact term / value on its tile; history time | 4.5:1 | 5.17 / 14.36; 5.73 | 5.47 / 11.96; 6.05 |
+| Team | address under a name; member avatar letters on gold | 4.5:1 | 9.98; 7.08 | 10.24; 7.08 |
+| Chips | Owner / You / Waiting / Accepted | 4.5:1 | 9.00 / 9.00 / 9.00 / 7.34 | 9.24 / 9.24 / 9.24 / 4.95 |
+| Roles | glyph on its tile | 3:1 | 9.00 | 9.24 |
+| Role editor | area name / permission sentence / count on the soft tile | 4.5:1 | 14.36 / 9.00 / 5.17 | 11.96 / 9.24 / 5.47 |
+| Role editor | checkbox edge on the soft tile | 3:1 | 3.41 | 3.27 |
+| Role editor | impact pill text; summary title on its tile | 4.5:1 | 9.98; 14.36 | 10.24; 11.96 |
+| Display name | sentence / hint / refusal on glass | 4.5:1 | 9.54 / 5.47 / 6.76 | 10.77 / 6.37 / 7.68 |
+| Display name | field edge on glass (focused) | 3:1 | 8.36 | 7.06 |
+
 ## 14. Components (Calm Glass, Phase 39.2b)
 
 Each is shown in the Design Lab in both languages and themes, with "Reduce transparency". A
@@ -737,3 +762,13 @@ the event line, `.bubble-human` = the team's bubble). Tests: a Vitest spec besid
 - **Upload:** the drop zone is a soft tile with a dashed control border and the upload glyph on a 56 px panel disc; the chosen file is a soft tile.
 - **Agent editor:** the channels that use the agent are 44 px soft tiles with a chevron, each a link to the channel. The preview is the shared chat panel in its widget look, framed by a radius-24 line.
 - **The visitor's transcript (shared/chat):** their own words on the end side in cream (`--voice-customer-own-bubble`), the small corner at the end; the AI on the start side beside the 26 px orb, its bubble the AI voice or, in the widget, the workspace accent's checked tint, the agent's name inside; a person on the start side in gold with a 26 px gold person mark and the word "Support"; event lines between. Only the newest message rises into place. Typing: the breathing orb, three dots in the AI's bubble and "<agent> is typing…". A screen reader hears the speaker and the words apart ("Support It ships today.").
+
+### 14.5 Customers, team, roles and the display name (Phase 39.6a)
+
+- **Customer rows:** the inbox's 40 px avatar (initials for a name, the label code's first two characters otherwise, the first channel's badge), then the label (a name in its own direction; a label word with its code left to right: "Visitor 7KQ2MX", "WhatsApp customer ••••4821"). The skeleton draws the avatar's disc, the label, a channel and the two end-aligned cells.
+- **Customer page:** a summary panel with the 64 px avatar beside four fact tiles (Name, First seen, Conversations, Last activity); "How they reach you" and the conversation history as radius-16 tiles inside their panels, the words aligned with the panel heading; rename and combine in the side column. A merge candidate is a radio tile showing one code; the confirmation names both records with their facts and one code each, and says it cannot be undone.
+- **Team rows:** the gold 40 px member avatar, the display name (in its own direction) above the address (left to right), Owner and You as small chips; roles; joined date. Without a display name the address is the title, once.
+- **Member page:** the heading is the display name or the address; a summary panel holds the 64 px gold avatar, the address when a name heads the page, and three fact tiles. Owner, You and Protected are chips.
+- **Invitations:** the four lists stay links in the segmented track; each state is a chip (Waiting "i", Accepted tick, Expired hollow ring, Revoked plain); a past invitation says "Sent <date> · by <display name> (<address>)", or the address alone.
+- **Roles:** rows lead with a 36 px soft tile holding the roles glyph; Protected (neutral) and Custom (hollow ring) chips. In the editor each area is a frameless soft tile (radius 16) with its name in title-3 and "n of m granted"; each permission is the family's checkbox, the whole row its 44 px target; the impact summary is a soft tile of small pills on the panel colour. The skeleton draws the area tiles, two columns from 80rem like the picker.
+- **Display name dialog:** "Change display name" is the account menu's first item. It opens a glass dialog (the confirm dialog's material, radius 24, scrim) with the title, a sentence (how the team sees you; customers read "Support"), one field (`dir="auto"`, `autocomplete="name"`), a hint (empty shows the address) and Cancel / Save name. The field is selected when it opens; Escape and the scrim close it; focus returns to the account menu's button. Loaded with `@defer` on first use.

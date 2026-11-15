@@ -1,3 +1,4 @@
+import { Chip } from '@app/shared/chip/chip';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -45,7 +46,7 @@ import { Check } from '@app/shared/choice/choice';
 @Component({
   selector: 'app-invite-member',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, RouterLink, PageHeader, EmptyState, Icon, Check],
+  imports: [ReactiveFormsModule, RouterLink, PageHeader, EmptyState, Icon, Check, Chip],
   templateUrl: './invite-member.html',
   styleUrl: './invite-member.scss',
 })

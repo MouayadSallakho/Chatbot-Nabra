@@ -1,4 +1,4 @@
-<div class="page">
+<div class="page page-calm">
   <app-page-header
     heading="Roles & permissions"
     i18n-heading="@@roles.heading"
@@ -30,11 +30,22 @@
         />
       </div>
     } @else if (loading()) {
-      <div class="data-list role-list" aria-busy="true">
+      <!-- The loaded rows' shape: the glyph tile and name, two counts, a date. -->
+      <div class="data-list role-list" aria-busy="true" data-testid="roles-skeleton">
         <p class="visually-hidden" role="status" i18n="@@roles.loading">Loading roles…</p>
+        <div class="data-list-head" aria-hidden="true">
+          <span i18n="@@roles.column.role">Role</span>
+          <span i18n="@@roles.column.members">Members</span>
+          <span i18n="@@roles.column.permissions">Permissions</span>
+          <span i18n="@@roles.column.updated">Last changed</span>
+        </div>
         @for (row of skeletonRows; track row) {
           <div class="data-row data-row-skeleton" aria-hidden="true">
-            <span class="skeleton skeleton-title"></span>
+            <span class="record-title">
+              <span class="skeleton record-glyph"></span>
+              <span class="skeleton skeleton-title"></span>
+            </span>
+            <span class="skeleton skeleton-text"></span>
             <span class="skeleton skeleton-text"></span>
             <span class="skeleton skeleton-text"></span>
           </div>
@@ -78,18 +89,26 @@
                 [routerLink]="['/roles', role.id]"
                 [attr.data-testid]="'role-' + role.id"
               >
-                <span class="data-row-title role-title">
-                  <span class="role-name" dir="auto">{{ roleName(role.name, role.isSystem) }}</span>
+                <span class="record-title">
+                  <!-- Decorative: the chip beside the name says which kind it is. -->
+                  <span class="record-glyph" aria-hidden="true">
+                    <app-icon name="roles" [strokeWidth]="1.6" />
+                  </span>
+                  <span class="data-row-title role-title">
+                    <span class="role-name" dir="auto">{{
+                      roleName(role.name, role.isSystem)
+                    }}</span>
 
-                  <!--
-                    Owner is marked, not hidden: somebody looking for "who can do
-                    everything here" must find it, and see it is not theirs to edit.
-                  -->
-                  @if (role.isSystem) {
-                    <span class="badge badge-neutral" i18n="@@roles.protected">Protected</span>
-                  } @else {
-                    <span class="badge badge-plain" i18n="@@roles.custom">Custom</span>
-                  }
+                    <!--
+                      Owner is marked, not hidden: somebody looking for "who can do
+                      everything here" must find it, and see it is not theirs to edit.
+                    -->
+                    @if (role.isSystem) {
+                      <app-chip size="sm" i18n="@@roles.protected">Protected</app-chip>
+                    } @else {
+                      <app-chip size="sm" tone="draft" i18n="@@roles.custom">Custom</app-chip>
+                    }
+                  </span>
                 </span>
 
                 <span class="data-row-meta num" data-testid="role-members">{{

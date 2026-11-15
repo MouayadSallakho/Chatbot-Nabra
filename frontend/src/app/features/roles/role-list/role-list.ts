@@ -1,3 +1,4 @@
+import { Chip } from '@app/shared/chip/chip';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
@@ -28,7 +29,7 @@ import { PageHeader } from '@app/shared/page-header/page-header';
 @Component({
   selector: 'app-role-list',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, PageHeader, EmptyState, Icon, LocalDatePipe],
+  imports: [RouterLink, PageHeader, EmptyState, Icon, LocalDatePipe, Chip],
   templateUrl: './role-list.html',
   styleUrl: './role-list.scss',
 })

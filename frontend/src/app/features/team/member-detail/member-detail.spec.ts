@@ -112,6 +112,46 @@ describe('MemberDetail', () => {
 
   afterEach(() => http.verify());
 
+  it("draws the loading skeleton in the page's shape: avatar, address, three fact tiles", async () => {
+    TestBed.configureTestingModule({
+      imports: [MemberDetail],
+      providers: [
+        provideRouter([]),
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        TeamApi,
+        { provide: LOCAL_STORAGE, useValue: memoryStorage() },
+        { provide: TenantApi, useValue: { get: () => undefined, create: () => undefined } },
+        { provide: PermissionApi, useValue: permissionApiGranting('members.view') },
+        {
+          provide: AuthService,
+          useValue: { user: () => ({ id: actorId, email: 'm@example.test' }) },
+        },
+      ],
+    });
+    await TestBed.inject(WorkspaceContextService).adopt({
+      id: tenantId,
+      name: 'Acme Trading',
+      slug: 'acme',
+      status: 'Active',
+    });
+    http = TestBed.inject(HttpTestingController);
+    fixture = TestBed.createComponent(MemberDetail);
+    fixture.componentRef.setInput('userId', userId);
+    fixture.detectChanges();
+
+    const skeleton = host().querySelector<HTMLElement>('[data-testid="member-skeleton"]')!;
+
+    expect(skeleton.getAttribute('aria-busy')).toBe('true');
+    expect(skeleton.querySelector('.member-avatar-skeleton')).not.toBeNull();
+    expect(skeleton.querySelectorAll('.member-fact-skeleton').length).toBe(3);
+
+    http.expectOne(memberUrl).flush(bob, { headers: { ETag: '"v1"' } });
+    await settle();
+
+    expect(host().querySelector('[data-testid="member-skeleton"]')).toBeNull();
+  });
+
   it('asks before taking every role away, and sends nothing if the reader keeps them', async () => {
     const held: Member = {
       ...bob,
@@ -283,6 +323,58 @@ describe('MemberDetail', () => {
 
     expect(text()).not.toContain('This team member was updated elsewhere.');
     expect(tick('Support')?.checked).toBe(false);
+  });
+
+  it('heads the page with the name the member chose, the address beside it', async () => {
+    await mount({ ...bob, displayName: 'Omar Saleh' }, ['members.view']);
+
+    const heading = host().querySelector('h1')!;
+
+    expect(heading.textContent?.trim()).toBe('Omar Saleh');
+    expect(heading.querySelector('bdi')).not.toBeNull();
+    expect(host().querySelector('[data-testid="member-email"]')?.textContent).toContain(
+      'bob@example.test',
+    );
+    expect(
+      host().querySelector('[data-testid="member-email"] [dir="ltr"]')?.textContent?.trim(),
+    ).toBe('bob@example.test');
+    expect(host().querySelector('.page')?.classList.contains('page-calm')).toBe(true);
+  });
+
+  it('heads the page with the address when no name was chosen, and says it once', async () => {
+    await mount(bob, ['members.view']);
+
+    expect(host().querySelector('h1')?.textContent?.trim()).toBe('bob@example.test');
+    expect(host().querySelector('[data-testid="member-email"]')).toBeNull();
+    expect(text().split('bob@example.test').length - 1).toBe(1);
+  });
+
+  it('shows the gold avatar and the facts as tiles', async () => {
+    await mount({ ...bob, displayName: 'Omar Saleh' }, ['members.view']);
+
+    const avatar = host().querySelector<HTMLElement>('.member-summary app-avatar')!;
+
+    expect(avatar.querySelector('.avatar-letters')?.textContent).toBe('OS');
+    expect(avatar.classList.contains('avatar-member')).toBe(true);
+    expect(avatar.classList.contains('avatar-lg')).toBe(true);
+    expect(host().querySelectorAll('[data-testid="member-facts"] > div').length).toBe(3);
+  });
+
+  it('marks the owner with a chip', async () => {
+    await mount(
+      {
+        ...bob,
+        isOwner: true,
+        roles: [{ id: 'role-owner', name: 'Owner', isSystem: true }],
+        permissions: ['members.view'],
+      },
+      ['members.view'],
+    );
+
+    const chips = [...host().querySelectorAll('app-chip')].map((chip) => chip.textContent?.trim());
+
+    expect(chips).toContain('Owner');
+    expect(chips).toContain('Protected');
   });
 
   it('renders the owner read-only and explains why', async () => {

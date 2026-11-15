@@ -45,6 +45,9 @@ import {
   roleList,
 } from '../team-words';
 import { Segmented } from '@app/shared/segmented/segmented';
+import { Avatar } from '@app/shared/avatar/avatar';
+import { Chip } from '@app/shared/chip/chip';
+import { memberInitials, memberShownName } from '@app/shared/avatar/member-initials';
 
 /** Members per page; the server allows up to 100. */
 const MEMBER_PAGE_SIZE = 20;
@@ -70,6 +73,11 @@ const INVITATION_PAGE_PARAM = 'invitationsPage';
  * waiting invitation shows when its link stops working and a Revoke that asks
  * first.
  *
+ * <strong>Calm Glass (Phase 39.6a).</strong> Each member is a row with their gold
+ * avatar, the display name they chose (39.1) above their address, and Owner and
+ * You as chips; each invitation's state is a chip with its word and marker, and
+ * a past invitation names who sent it by display name beside the address.
+ *
  * <strong>Both need `members.view`, and nothing is fetched without it.</strong>
  * Somebody without the permission gets an explanation and no request is made.
  */
@@ -86,6 +94,8 @@ const INVITATION_PAGE_PARAM = 'invitationsPage';
     LocalNumberPipe,
     Pagination,
     Segmented,
+    Avatar,
+    Chip,
   ],
   templateUrl: './team-page.html',
   styleUrl: './team-page.scss',
@@ -202,6 +212,16 @@ export class TeamPage {
         }
       });
     });
+  }
+
+  /** The name a member is shown by: their display name, else their address. */
+  protected shownName(member: MemberSummary): string {
+    return memberShownName(member.displayName, member.email);
+  }
+
+  /** The member avatar's letters, as the account menu draws them. */
+  protected initials(member: MemberSummary): string {
+    return memberInitials(member.displayName, member.email);
   }
 
   protected roleNames(names: readonly string[]): string {

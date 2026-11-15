@@ -103,6 +103,36 @@ describe('RoleList', () => {
     expect(counts).toEqual(['1 member', '3 members', 'No members']);
   });
 
+  it('draws each role as a calm row: a glyph tile, the name and a chip with its kind', async () => {
+    await mount('roles.view');
+
+    http.expectOne(rolesUrl).flush([owner, role()]);
+    await settle();
+
+    const rows = [...host().querySelectorAll<HTMLElement>('[data-testid="roles"] .data-row')];
+    const chips = rows.map((row) => row.querySelector('app-chip'));
+
+    expect(host().querySelector('.page')?.classList.contains('page-calm')).toBe(true);
+    expect(rows.every((row) => row.querySelector('.record-glyph[aria-hidden="true"]'))).toBe(true);
+    expect(chips.map((chip) => chip?.textContent?.trim())).toEqual(['Protected', 'Custom']);
+    expect(chips.map((chip) => chip?.getAttribute('data-tone'))).toEqual(['neutral', 'draft']);
+  });
+
+  it("draws the skeleton in the loaded rows' shape while it reads", async () => {
+    await mount('roles.view');
+
+    const skeleton = host().querySelector<HTMLElement>('[data-testid="roles-skeleton"]')!;
+
+    expect(skeleton.getAttribute('aria-busy')).toBe('true');
+    expect(skeleton.querySelectorAll('.data-list-head span').length).toBe(4);
+    expect(skeleton.querySelector('.data-row-skeleton .record-glyph')).not.toBeNull();
+
+    http.expectOne(rolesUrl).flush([owner]);
+    await settle();
+
+    expect(host().querySelector('[data-testid="roles-skeleton"]')).toBeNull();
+  });
+
   it('marks the protected role and says it holds everything', async () => {
     // Owner is shown rather than hidden: somebody looking for "who can do
     // everything here" must be able to find it, and must be able to see at a

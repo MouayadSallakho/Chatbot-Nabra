@@ -423,4 +423,49 @@ describe('AuthService', () => {
       expect(surface).not.toContain('cookie');
     });
   });
+  describe('the display name (Phase 39.6a)', () => {
+    it('saves it for the signed-in account and shows it at once, without asking again', async () => {
+      const restoring = auth.restore();
+      await answerStartup({ authenticated: true, user: { ...account, displayName: null } });
+      await restoring;
+
+      const saving = auth.saveDisplayName('Omar Saleh');
+      const request = http.expectOne('/api/me/display-name');
+
+      expect(request.request.method).toBe('PUT');
+      expect(request.request.body).toEqual({ displayName: 'Omar Saleh' });
+      request.flush(null, { status: 204, statusText: 'No Content' });
+      await saving;
+
+      expect(auth.user()?.displayName).toBe('Omar Saleh');
+      // No second read of the session: it is read on page load and focus only.
+      http.expectNone('/api/auth/session');
+    });
+
+    it('clears it with null', async () => {
+      const restoring = auth.restore();
+      await answerStartup({ authenticated: true, user: { ...account, displayName: 'Omar' } });
+      await restoring;
+
+      const saving = auth.saveDisplayName(null);
+      http.expectOne('/api/me/display-name').flush(null, { status: 204, statusText: 'No Content' });
+      await saving;
+
+      expect(auth.user()?.displayName).toBeNull();
+    });
+
+    it('changes nothing when the server refuses, and lets the caller say why', async () => {
+      const restoring = auth.restore();
+      await answerStartup({ authenticated: true, user: { ...account, displayName: 'Omar' } });
+      await restoring;
+
+      const saving = auth.saveDisplayName('x'.repeat(81));
+      http
+        .expectOne('/api/me/display-name')
+        .flush({ code: 'account.display_name.too_long' }, { status: 400, statusText: 'Bad' });
+
+      await expect(saving).rejects.toBeTruthy();
+      expect(auth.user()?.displayName).toBe('Omar');
+    });
+  });
 });

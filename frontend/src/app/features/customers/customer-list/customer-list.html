@@ -1,4 +1,4 @@
-<div class="page">
+<div class="page page-calm">
   <app-page-header
     heading="Customers"
     i18n-heading="@@customers.heading"
@@ -41,12 +41,24 @@
         />
       </div>
     } @else if (loading()) {
-      <div class="data-list customer-list" aria-busy="true">
+      <!-- The loaded rows' shape: the avatar, the label, a channel, a count, a date. -->
+      <div class="data-list customer-list" aria-busy="true" data-testid="customers-skeleton">
         <p class="visually-hidden" role="status" i18n="@@customers.loading">Loading customers…</p>
+        <div class="data-list-head" aria-hidden="true">
+          <span i18n="@@customers.column.customer">Customer</span>
+          <span i18n="@@customers.column.channels">Channels</span>
+          <span class="data-cell-end" i18n="@@customers.column.conversations">Conversations</span>
+          <span class="data-cell-end" i18n="@@customers.column.lastActivity">Last activity</span>
+        </div>
         @for (row of skeletonRows; track row) {
-          <div class="data-row customer-skeleton" aria-hidden="true">
-            <span class="skeleton customer-tile"></span>
-            <span class="skeleton skeleton-title"></span>
+          <div class="data-row data-row-skeleton" aria-hidden="true">
+            <span class="customer-who">
+              <span class="skeleton customer-avatar-skeleton"></span>
+              <span class="skeleton skeleton-title"></span>
+            </span>
+            <span class="skeleton skeleton-text customer-channel-skeleton"></span>
+            <span class="skeleton skeleton-text data-cell-end"></span>
+            <span class="skeleton skeleton-text data-cell-end"></span>
           </div>
         }
       </div>
@@ -105,17 +117,15 @@
               >
                 <span class="customer-who">
                   <!--
-                    A first letter for somebody with a name, a person outline for
-                    somebody without one: the difference between "Rania Haddad"
-                    and "Anonymous visitor" is visible before either is read.
+                    The inbox's avatar: initials for a name, the code's first two
+                    characters for a label, with the first channel's badge. The
+                    label beside it says all of it in words.
                   -->
-                  <span class="customer-tile" [class.is-unnamed]="!row.named" aria-hidden="true">
-                    @if (row.initial) {
-                      {{ row.initial }}
-                    } @else {
-                      <app-icon name="person" [strokeWidth]="1.6" />
-                    }
-                  </span>
+                  <app-avatar
+                    [name]="row.avatar.name"
+                    [text]="row.avatar.text"
+                    [channel]="row.avatar.channel"
+                  />
                   <span
                     class="data-row-title customer-name"
                     [class.is-unnamed]="!row.named"

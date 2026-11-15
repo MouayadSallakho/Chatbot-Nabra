@@ -61,6 +61,14 @@ export interface CustomerRow {
   /** A short code that tells unnamed customers apart. Shown, never used as a key. */
   readonly shortCode: string;
 
+  /**
+   * The customer's WhatsApp number, masked by the server (`••••` and the last
+   * four digits) exactly as the inbox's conversation reads mask it (Phase 39.1,
+   * note 18); the most recent identity when there are several. Null for a website
+   * visitor. The full number is never sent.
+   */
+  readonly reference: string | null;
+
   readonly channels: readonly CustomerChannel[];
   readonly conversationCount: number;
   readonly lastActivityAt: string | null;
@@ -83,6 +91,14 @@ export interface Customer {
   /** As on a directory row (BA-1). */
   readonly labelCode: string;
   readonly shortCode: string;
+
+  /**
+   * As on a directory row: the customer's WhatsApp number, masked by the server (`••••` and the last
+   * four digits) exactly as the inbox's conversation reads mask it (Phase 39.1,
+   * note 18); the most recent identity when there are several. Null for a website
+   * visitor. The full number is never sent.
+   */
+  readonly reference: string | null;
   readonly identities: readonly CustomerIdentity[];
   readonly channels: readonly CustomerChannel[];
   readonly conversationCount: number;

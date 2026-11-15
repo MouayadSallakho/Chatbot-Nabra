@@ -948,6 +948,117 @@ describe('Arabic renders', () => {
     });
   });
 
+  describe('customers, team, roles and the display name (Phase 39.6a)', () => {
+    it('labels an unnamed WhatsApp customer by its masked number, left to right', async () => {
+      const { asLabelled } = await import('@app/features/customers/customer-words');
+      const { customerLabelPlain } = await import('@app/features/conversations/customer-label');
+
+      const person = {
+        id: 'a',
+        displayName: null,
+        labelCode: 'WhatsAppCustomer',
+        shortCode: 'W4T5PQ',
+        reference: '••••4821',
+      };
+
+      expect(customerLabelPlain(asLabelled(person))).toBe('عميل واتساب ••••4821');
+      expect(customerLabelPlain(asLabelled({ ...person, reference: null }))).toBe(
+        'عميل واتساب W4T5PQ',
+      );
+    });
+
+    it('wears the invitation states as chips with Arabic words', async () => {
+      const { invitationStatusTone, invitationStatusWord } =
+        await import('@app/features/team/team-words');
+
+      expect(invitationStatusWord('Expired')).not.toBe('Expired');
+      expect(invitationStatusTone('Pending')).toBe('info');
+      expect(invitationStatusTone('Accepted')).toBe('success');
+      expect(invitationStatusTone('Expired')).toBe('draft');
+      expect(invitationStatusTone('Revoked')).toBe('neutral');
+    });
+
+    it('says the sounds state with the plainer pair «تعمل» / «متوقفة»', async () => {
+      const { LOCAL_STORAGE } = await import('@app/core/storage/local-storage');
+      const { MEDIA_QUERY_FACTORY, MediaQueries } = await import('@app/core/media/media');
+      const { FakeMediaMatcher, memoryStorage, permissionApiGranting } =
+        await import('@app/testing/test-doubles');
+      const { PermissionApi } = await import('@app/core/authorization/permission-api');
+      const { PermissionService } = await import('@app/core/authorization/permission-service');
+      const { SoundSettings } = await import('@app/core/sounds/sound-settings');
+      const { ProfileMenu } = await import('@app/layout/profile-menu/profile-menu');
+      TestBed.configureTestingModule({
+        providers: [
+          provideRouter([]),
+          { provide: LOCAL_STORAGE, useValue: memoryStorage() },
+          { provide: PermissionApi, useValue: permissionApiGranting('conversations.view') },
+          {
+            provide: MEDIA_QUERY_FACTORY,
+            useValue: new FakeMediaMatcher({ [MediaQueries.prefersDark]: false }).factory,
+          },
+        ],
+      });
+      const fixture = TestBed.createComponent(ProfileMenu);
+      fixture.componentRef.setInput('email', 'ada.owner@omniai.example');
+      fixture.componentRef.setInput('variant', 'member');
+      fixture.componentRef.setInput('displayName', 'سارة أحمد');
+      await TestBed.inject(PermissionService).load('t1');
+      fixture.detectChanges();
+      const root = fixture.nativeElement as HTMLElement;
+
+      expect(text(root.querySelector('.member-status'))).toBe('الأصوات تعمل');
+      expect(text(root.querySelector('.member-name'))).toBe('سارة أحمد');
+
+      TestBed.inject(SoundSettings).setEnabled(false);
+      fixture.detectChanges();
+
+      expect(text(root.querySelector('.member-status'))).toBe('الأصوات متوقفة');
+    });
+
+    it('writes the display-name dialog and its refusals in Arabic, with Western digits', async () => {
+      const { AuthService } = await import('@app/core/auth/auth-service');
+      const { ToastService } = await import('@app/core/feedback/toast-service');
+      const { LanguageService } = await import('@app/core/i18n/language-service');
+      const { stubDialogs } = await import('@app/testing/test-doubles');
+      const { DisplayNameDialog } = await import('@app/layout/profile-menu/display-name-dialog');
+      const { displayNameTooLong, DISPLAY_NAME_CONTROL_CHARACTERS } =
+        await import('@app/layout/profile-menu/display-name-problems');
+      TestBed.configureTestingModule({
+        providers: [
+          { provide: AuthService, useValue: { saveDisplayName: () => Promise.resolve() } },
+          { provide: ToastService, useValue: { success: () => undefined } },
+          { provide: LanguageService, useValue: { current: 'ar' } },
+        ],
+      });
+      const fixture = TestBed.createComponent(DisplayNameDialog);
+      fixture.detectChanges();
+      stubDialogs(fixture.nativeElement);
+      fixture.componentRef.setInput('requests', 1);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+      const root = fixture.nativeElement as HTMLElement;
+
+      expect(text(root.querySelector('#display-name-title'))).toBe('اسمك الظاهر');
+      expect(text(root.querySelector('#display-name-lede'))).toBe(
+        'اسمك كما يراه فريقك. لا يراه العملاء، فهم يرون «فريق الدعم» بدلًا منه.',
+      );
+      expect(text(root.querySelector('label[for="display-name-input"]'))).toBe('الاسم الظاهر');
+      expect(text(root.querySelector('[data-testid="save-display-name"]'))).toBe('حفظ الاسم');
+
+      // 80 takes the "many" form, in Western digits.
+      expect(displayNameTooLong('ar')).toBe(
+        'يمكن أن يتكوّن اسمك الظاهر من 80 حرفًا على الأكثر. اختصره ثم احفظ مرة أخرى.',
+      );
+      expect(displayNameTooLong('ar', 2)).toBe(
+        'يمكن أن يتكوّن اسمك الظاهر من حرفين على الأكثر. اختصره ثم احفظ مرة أخرى.',
+      );
+      expect(DISPLAY_NAME_CONTROL_CHARACTERS).toBe(
+        'يحوي اسمك الظاهر رمزًا مخفيًا، مثل علامة اتجاه. احذفه ثم احفظ مرة أخرى.',
+      );
+    });
+  });
+
   describe('the 38.7 contracts (Phase 38.8)', () => {
     async function refuse(
       catalogue: Record<string, unknown>,

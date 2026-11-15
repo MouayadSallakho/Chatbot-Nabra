@@ -1,4 +1,4 @@
-<div class="page">
+<div class="page page-calm">
   @if (!canView()) {
     <app-page-header
       backLink="/team"
@@ -28,11 +28,19 @@
       i18n-heading="@@team.member.heading"
     />
 
-    <div class="page-section" aria-busy="true">
+    <!-- The loaded page's shape: the summary panel, then the roles panel. -->
+    <div class="page-section" aria-busy="true" data-testid="member-skeleton">
       <p class="visually-hidden" role="status" i18n="@@team.member.loading">Loading member…</p>
-      <div class="admin-facts" aria-hidden="true">
-        <span class="skeleton skeleton-text"></span>
-        <span class="skeleton skeleton-text"></span>
+      <div class="card member-summary" aria-hidden="true">
+        <span class="skeleton member-avatar-skeleton"></span>
+        <div class="member-summary-text">
+          <span class="skeleton skeleton-text"></span>
+          <div class="admin-facts facts">
+            @for (fact of skeletonFacts; track fact) {
+              <span class="skeleton member-fact-skeleton"></span>
+            }
+          </div>
+        </div>
       </div>
       <div class="card card-body admin-skeleton" aria-hidden="true">
         <span class="skeleton skeleton-title"></span>
@@ -89,19 +97,22 @@
       </div>
     </div>
   } @else if (member(); as current) {
-    <!-- The heading is an address: isolated, left to right, in a page-direction heading. -->
+    <!--
+      The heading is the name the member chose, or their address: either way
+      isolated in its own direction inside a page-direction heading.
+    -->
     <app-page-header
       backLink="/team"
       backLabel="Team"
       i18n-backLabel="@@back.team"
-      [heading]="current.email"
+      [heading]="shownName()"
       headingDir="auto"
     >
       @if (current.isOwner) {
-        <span pageStatus class="badge badge-neutral" i18n="@@team.owner">Owner</span>
+        <app-chip pageStatus i18n="@@team.owner">Owner</app-chip>
       }
       @if (isSelf()) {
-        <span pageStatus class="badge badge-plain" i18n="@@team.you">You</span>
+        <app-chip pageStatus tone="draft" i18n="@@team.you">You</app-chip>
       }
     </app-page-header>
 
@@ -133,26 +144,44 @@
       </div>
     }
 
-    <dl class="admin-facts page-section" data-testid="member-facts">
-      <div>
-        <dt i18n="@@team.facts.joined">Joined</dt>
-        <dd>
-          <time [attr.datetime]="current.joinedAt">{{ current.joinedAt | localDate: 'date' }}</time>
-        </dd>
+    <!--
+      Who this is: the gold avatar, their address (always shown: it is how they
+      sign in and where their invitations went), then the facts as soft tiles.
+    -->
+    <div class="card member-summary page-section">
+      <app-avatar size="lg" tone="member" [text]="initials()" />
+      <div class="member-summary-text">
+        @if (hasDisplayName()) {
+          <!-- Under a chosen name, the address; without one, the heading is the address. -->
+          <p class="member-summary-email" data-testid="member-email">
+            <span class="visually-hidden" i18n="@@team.member.emailLabel">Email address: </span>
+            <span dir="ltr">{{ current.email }}</span>
+          </p>
+        }
+        <dl class="admin-facts facts" data-testid="member-facts">
+          <div>
+            <dt i18n="@@team.facts.joined">Joined</dt>
+            <dd>
+              <time [attr.datetime]="current.joinedAt">{{
+                current.joinedAt | localDate: 'date'
+              }}</time>
+            </dd>
+          </div>
+          <div>
+            <dt i18n="@@team.facts.accessChanged">Access last changed</dt>
+            <dd>
+              <time [attr.datetime]="current.accessUpdatedAt">{{
+                current.accessUpdatedAt | localDate: 'dateTime'
+              }}</time>
+            </dd>
+          </div>
+          <div>
+            <dt i18n="@@team.facts.access">Access</dt>
+            <dd data-testid="permission-total">{{ permissionTotal() }}</dd>
+          </div>
+        </dl>
       </div>
-      <div>
-        <dt i18n="@@team.facts.accessChanged">Access last changed</dt>
-        <dd>
-          <time [attr.datetime]="current.accessUpdatedAt">{{
-            current.accessUpdatedAt | localDate: 'dateTime'
-          }}</time>
-        </dd>
-      </div>
-      <div>
-        <dt i18n="@@team.facts.access">Access</dt>
-        <dd data-testid="permission-total">{{ permissionTotal() }}</dd>
-      </div>
-    </dl>
+    </div>
 
     @if (accessAreas().length || accessImpacts().length) {
       <!-- What they can do now, from the access the server published for them. -->
@@ -253,7 +282,7 @@
               <li>
                 <span class="role-name" dir="auto">{{ roleName(role.name, role.isSystem) }}</span>
                 @if (role.isSystem) {
-                  <span class="badge badge-neutral" i18n="@@roles.protected">Protected</span>
+                  <app-chip size="sm" i18n="@@roles.protected">Protected</app-chip>
                 }
               </li>
             }

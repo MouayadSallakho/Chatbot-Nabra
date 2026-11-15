@@ -166,6 +166,125 @@ describe('TeamPage', () => {
     expect(text()).toContain('Owner');
   });
 
+  it('shows the name a member chose above their address, and the address alone otherwise', async () => {
+    await mount('members.view');
+
+    flush(
+      [
+        { ...owner, displayName: 'Sara Ahmed' },
+        { ...bob, displayName: null },
+      ],
+      [],
+    );
+    await settle();
+
+    const rows = [...host().querySelectorAll<HTMLElement>('[data-testid="members"] .data-row')];
+    const name = rows[0].querySelector('[data-testid="member-name"]')!;
+
+    // The chosen name, in its own direction, with the address under it, left to right.
+    expect(name.tagName).toBe('BDI');
+    expect(name.getAttribute('dir')).toBe('auto');
+    expect(name.textContent?.trim()).toBe('Sara Ahmed');
+    expect(rows[0].querySelector('.member-address')?.textContent?.trim()).toBe(
+      'owner@example.test',
+    );
+    expect(rows[0].querySelector('.member-address')?.getAttribute('dir')).toBe('ltr');
+
+    // Nobody chose a name: the address is the title, once.
+    expect(rows[1].querySelector('[data-testid="member-name"]')).toBeNull();
+    expect(rows[1].textContent?.split('bob@example.test').length).toBe(2);
+  });
+
+  it("gives each member the gold avatar with the account menu's letters", async () => {
+    await mount('members.view');
+
+    flush(
+      [{ ...owner, displayName: 'Sara Ahmed' }, bob, { ...bob, userId: 'x', displayName: 'سارة' }],
+      [],
+    );
+    await settle();
+
+    const avatars = [...host().querySelectorAll<HTMLElement>('[data-testid="members"] app-avatar')];
+
+    expect(avatars.map((avatar) => avatar.querySelector('.avatar-letters')?.textContent)).toEqual([
+      'SA',
+      'B',
+      'س',
+    ]);
+    expect(avatars.every((avatar) => avatar.classList.contains('avatar-member'))).toBe(true);
+    expect(avatars.every((avatar) => avatar.getAttribute('aria-hidden') === 'true')).toBe(true);
+  });
+
+  it('marks the owner and the reader as chips with words', async () => {
+    await mount('members.view');
+
+    flush([owner], []);
+    await settle();
+
+    const chips = [...host().querySelectorAll<HTMLElement>('[data-testid="members"] app-chip')];
+
+    expect(chips.map((chip) => chip.textContent?.trim())).toContain('Owner');
+    expect(chips.every((chip) => chip.classList.contains('chip-sm'))).toBe(true);
+  });
+
+  it('wears each invitation state as a chip with its own marker', async () => {
+    await mountAt('/?invitations=expired', 'members.view');
+
+    http.expectOne(membersUrl).flush({ items: [owner], page: 1, pageSize: 20, total: 1 });
+    flushInvitations([{ ...pendingInvitation, status: 'Expired' }], { status: 'Expired' });
+    await settle();
+
+    const chip = host().querySelector<HTMLElement>('[data-testid="invitations"] app-chip')!;
+
+    expect(chip.textContent?.trim()).toBe('Expired');
+    expect(chip.getAttribute('data-tone')).toBe('draft');
+  });
+
+  it('names who sent a past invitation by display name, beside the address', async () => {
+    await mountAt('/?invitations=accepted', 'members.view');
+
+    http.expectOne(membersUrl).flush({ items: [owner], page: 1, pageSize: 20, total: 1 });
+    flushInvitations(
+      [
+        { ...pendingInvitation, status: 'Accepted', invitedByDisplayName: 'Sara Ahmed' },
+        { ...pendingInvitation, id: 'second', status: 'Accepted', invitedByDisplayName: null },
+      ],
+      { status: 'Accepted' },
+    );
+    await settle();
+
+    const rows = [...host().querySelectorAll<HTMLElement>('[data-testid="invitations"] .data-row')];
+    const name = rows[0].querySelector('[data-testid="invited-by-name"]')!;
+
+    expect(name.getAttribute('dir')).toBe('auto');
+    expect(rows[0].textContent?.replace(/\s+/g, ' ')).toContain(
+      'by Sara Ahmed (owner@example.test)',
+    );
+    // Without a chosen name, the address alone, as before.
+    expect(rows[1].querySelector('[data-testid="invited-by-name"]')).toBeNull();
+    expect(rows[1].textContent?.replace(/\s+/g, ' ')).toContain('by owner@example.test');
+  });
+
+  it("draws the skeleton in the loaded rows' shape: avatar, two lines, roles, date", async () => {
+    await mount('members.view');
+
+    const skeleton = host().querySelector<HTMLElement>('[data-testid="team-skeleton"]')!;
+
+    expect(skeleton.getAttribute('aria-busy')).toBe('true');
+    expect(skeleton.querySelectorAll('.data-list-head span').length).toBe(3);
+
+    const row = skeleton.querySelector('.data-row-skeleton')!;
+
+    expect(row.querySelector('.member-avatar-skeleton')).not.toBeNull();
+    expect(row.querySelectorAll('.member-lines .skeleton').length).toBe(2);
+    expect(host().querySelector('.page')?.classList.contains('page-calm')).toBe(true);
+
+    flush([owner], []);
+    await settle();
+
+    expect(host().querySelector('[data-testid="team-skeleton"]')).toBeNull();
+  });
+
   it('says plainly when a member holds nothing yet', async () => {
     await mount('members.view');
 

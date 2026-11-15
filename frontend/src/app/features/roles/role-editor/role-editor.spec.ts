@@ -167,6 +167,40 @@ describe('RoleEditor', () => {
     expect(summary()).toContain('Uses the AI provider, which costs money');
   });
 
+  it('draws a custom role as calm panels, with its kind as a chip', async () => {
+    await mount(custom, 'roles.view', 'roles.manage');
+
+    const chip = host().querySelector<HTMLElement>('app-page-header app-chip')!;
+
+    expect(host().querySelector('.page')?.classList.contains('page-calm')).toBe(true);
+    expect(chip.textContent?.trim()).toBe('Custom');
+    expect(chip.getAttribute('data-tone')).toBe('draft');
+    // The facts strip is a row of soft tiles.
+    expect(host().querySelector('[data-testid="role-facts"]')?.classList.contains('facts')).toBe(
+      true,
+    );
+  });
+
+  it("offers each permission as the family's checkbox, the whole row its target", async () => {
+    await mount(custom, ...ManagerWithAgents);
+
+    const options = [...host().querySelectorAll<HTMLLabelElement>('label.perm-option')];
+
+    expect(options.length).toBeGreaterThan(0);
+    // `choice choice-check`: a 20px box inside a 44px target that includes the words.
+    expect(options.every((option) => option.classList.contains('choice-check'))).toBe(true);
+    expect(options.every((option) => option.querySelector('input[type="checkbox"]'))).toBe(true);
+  });
+
+  it('marks the protected role with a chip', async () => {
+    await mount(owner, 'roles.view');
+
+    const chip = host().querySelector<HTMLElement>('app-page-header app-chip')!;
+
+    expect(chip.textContent?.trim()).toBe('Protected');
+    expect(chip.getAttribute('data-tone')).toBe('neutral');
+  });
+
   it('renders the protected role read-only and explains why', async () => {
     // Deliberately not a form of disabled checkboxes: showing somebody a
     // control and then refusing it reads as a fault rather than a rule.

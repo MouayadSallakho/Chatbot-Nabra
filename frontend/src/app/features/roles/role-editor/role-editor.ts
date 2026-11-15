@@ -1,3 +1,4 @@
+import { Chip } from '@app/shared/chip/chip';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -66,6 +67,7 @@ import { ROLE_NAME_MAX } from '../role-limits';
     Icon,
     PermissionPicker,
     LocalDatePipe,
+    Chip,
   ],
   templateUrl: './role-editor.html',
   styleUrl: './role-editor.scss',

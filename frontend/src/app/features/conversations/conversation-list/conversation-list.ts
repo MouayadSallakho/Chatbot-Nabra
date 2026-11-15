@@ -26,7 +26,7 @@ import { Icon } from '@app/shared/icon/icon';
 import { Pagination } from '@app/shared/pagination/pagination';
 import { PAGE_QUERY_PARAM, initialPage } from '@app/shared/pagination/page-query';
 import { VoiceChip } from '@app/shared/voice/voice-chip';
-import { Avatar } from '@app/shared/avatar/avatar';
+import { Avatar, codeInitials } from '@app/shared/avatar/avatar';
 import { Chip } from '@app/shared/chip/chip';
 import { Segmented } from '@app/shared/segmented/segmented';
 import { ConversationSummary, ConversationView, ConversationsApi } from '../conversations-api';
@@ -55,12 +55,8 @@ interface ConversationRow extends InboxRow {
 /** The views the address can name; anything else is the full list. */
 const VIEWS: readonly ConversationView[] = ['all', 'needs-person', 'mine'];
 
-/** The first two letters or digits of a code: "7KQ2MX" gives "7K", "••••1234" gives "12". */
-export function codeInitials(code: string): string {
-  return Array.from(code.replace(/[^\p{L}\p{N}]/gu, ''))
-    .slice(0, 2)
-    .join('');
-}
+/** Kept here for the callers that import it from the list (it lives with the avatar). */
+export { codeInitials };
 
 /**
  * The conversations customers have had with this workspace: the inbox's list

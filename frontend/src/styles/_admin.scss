@@ -365,6 +365,96 @@ app-permission-picker {
   }
 }
 
+// -----------------------------------------------------------------------------
+// Calm Glass (Phase 39.6a): team, member, invite, roles
+// -----------------------------------------------------------------------------
+// Under `.page-calm` the facts strip is a row of soft tiles, each permission
+// area a soft tile inside its panel (radius 16, no frame), the impact hints
+// small pills on the panel colour, and a read-only list of roles rows of
+// tiles. The permissions keep the family's checkbox with its 44px target, the
+// whole row; an area's name and count stay one line apart from its options.
+.page-calm {
+  .admin-facts {
+    gap: var(--space-2);
+  }
+
+  .perm-area {
+    padding: var(--space-4);
+    border: 0;
+    border-radius: var(--radius-tile);
+    background-color: var(--color-panel-soft);
+  }
+
+  .perm-area-name {
+    font: var(--text-title-3);
+  }
+
+  .perm-area-count {
+    color: var(--color-text-quiet);
+  }
+
+  .perm-readout li {
+    border-block-start-color: var(--color-line);
+  }
+
+  .impact {
+    border-color: var(--color-line);
+    background-color: var(--color-panel);
+    color: var(--color-text-secondary);
+  }
+
+  .impact-summary {
+    padding: var(--space-4);
+    border: 0;
+    border-radius: var(--radius-tile);
+    background-color: var(--color-panel-soft);
+  }
+
+  .role-readout {
+    gap: var(--gap-hairline);
+    padding: var(--space-2);
+
+    li {
+      min-block-size: 2.75rem;
+      padding: var(--space-2) var(--space-3);
+      border-radius: var(--radius-tile);
+    }
+
+    li + li {
+      border-block-start: 0;
+    }
+  }
+
+  // A frameless tile needs an edge where the system draws the colours.
+  @media (forced-colors: active) {
+    .perm-area,
+    .impact-summary {
+      border: 1px solid CanvasText;
+    }
+  }
+}
+
+// The editor's skeleton: the area tiles, two columns from 80rem like the picker.
+.role-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.perm-skeleton {
+  display: grid;
+  gap: var(--space-3);
+
+  @media (min-width: 80rem) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.perm-area-skeleton {
+  block-size: 11rem;
+  border-radius: var(--radius-tile);
+}
+
 // The save row's start: "Unsaved changes" and what saving would change, or how
 // many roles are ticked.
 .unsaved-or-count {

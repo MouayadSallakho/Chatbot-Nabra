@@ -421,4 +421,61 @@ describe('ProfileMenu', () => {
       expect(root().querySelector('.avatar')?.textContent?.trim()).toBe('لح');
     });
   });
+
+  describe('the display name (Phase 39.6a)', () => {
+    it('offers "Change display name" as a menu item under who is signed in', async () => {
+      await render();
+      await open();
+
+      const item = root().querySelector<HTMLButtonElement>('[data-testid="display-name-item"]')!;
+      const items = [...root().querySelectorAll('[role^="menuitem"]')];
+
+      expect(item.getAttribute('role')).toBe('menuitem');
+      expect(item.textContent?.trim()).toBe('Change display name');
+      // The first item: it is about the person, like the identity above it.
+      expect(items[0]).toBe(item);
+    });
+
+    it('loads the dialog only when asked, and opens it on the saved name', async () => {
+      // jsdom has no modal dialogs: the top layer is the browser's (checked in Chrome).
+      const prototype = HTMLDialogElement.prototype as Partial<HTMLDialogElement>;
+      const native = { showModal: prototype.showModal, close: prototype.close };
+      prototype.showModal = function (this: HTMLDialogElement) {
+        this.setAttribute('open', '');
+      };
+      prototype.close = function (this: HTMLDialogElement) {
+        this.removeAttribute('open');
+        this.dispatchEvent(new Event('close'));
+      };
+      TestBed.configureTestingModule({
+        providers: [
+          { provide: AuthService, useValue: { saveDisplayName: () => Promise.resolve() } },
+        ],
+      });
+      await render('ada.owner@omniai.example', false, { displayName: 'Sara Ahmed' });
+
+      // Nothing of it on the page before it is asked for (@defer).
+      expect(root().querySelector('app-display-name-dialog')).toBeNull();
+
+      await open();
+      root().querySelector<HTMLButtonElement>('[data-testid="display-name-item"]')!.click();
+      fixture.detectChanges();
+      await fixture.whenStable();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      fixture.detectChanges();
+
+      const dialog = root().querySelector<HTMLDialogElement>('[data-testid="display-name-dialog"]');
+
+      expect(dialog).not.toBeNull();
+      expect(dialog!.hasAttribute('open')).toBe(true);
+      expect(
+        root().querySelector<HTMLInputElement>('[data-testid="display-name-input"]')?.value,
+      ).toBe('Sara Ahmed');
+      // The menu has closed: one layer at a time.
+      expect(trigger().getAttribute('aria-expanded')).toBe('false');
+
+      dialog!.close();
+      Object.assign(prototype, native);
+    });
+  });
 });

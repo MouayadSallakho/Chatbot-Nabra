@@ -1,5 +1,5 @@
 import { customerLabelPlain } from '@app/features/conversations/customer-label';
-import { asLabelled, conversationsPhrase, initialOf } from './customer-words';
+import { asLabelled, conversationsPhrase, customerAvatar } from './customer-words';
 
 describe('asLabelled', () => {
   const record = (over: object) => ({
@@ -28,7 +28,14 @@ describe('asLabelled', () => {
     ).toBe('  Rania Haddad ');
   });
 
-  it('tells an unnamed WhatsApp customer apart by the short code: the directory sends no number', () => {
+  it('labels an unnamed WhatsApp customer by its masked number, as the inbox does (39.1)', () => {
+    const labelled = asLabelled(record({ labelCode: 'WhatsAppCustomer', reference: '••••4821' }));
+
+    expect(labelled.reference).toBe('••••4821');
+    expect(customerLabelPlain(labelled)).toBe('WhatsApp customer ••••4821');
+  });
+
+  it('falls back to the short code when a read carries no masked number', () => {
     const labelled = asLabelled(record({ labelCode: 'WhatsAppCustomer' }));
 
     expect(labelled.reference).toBeNull();
@@ -48,26 +55,39 @@ describe('asLabelled', () => {
 
 describe('conversationsPhrase', () => {
   it('counts in words, with a plural form for every count', () => {
+    expect(conversationsPhrase('en', 0)).toBe('No conversations');
     expect(conversationsPhrase('en', 1)).toBe('1 conversation');
     expect(conversationsPhrase('en', 3)).toBe('3 conversations');
     expect(conversationsPhrase('en', 1200)).toBe('1,200 conversations');
   });
 });
 
-describe('initialOf', () => {
-  it('takes the first letter, as a whole grapheme', () => {
-    expect(initialOf('rania')).toBe('R');
-    expect(initialOf('Élodie')).toBe('É');
-    expect(initialOf('ليلى')).toBe('ل');
-  });
+describe('customerAvatar', () => {
+  const record = (over: object) =>
+    asLabelled({
+      id: 'p1',
+      displayName: null,
+      labelCode: 'AnonymousVisitor',
+      shortCode: '7KQ2MX',
+      ...over,
+    });
 
-  it('skips punctuation and markup-looking characters before the first letter', () => {
-    expect(initialOf('<b>Bold Customer</b>')).toBe('B');
-    expect(initialOf('"Sam"')).toBe('S');
-  });
-
-  it('gives nothing when there is no letter at all', () => {
-    expect(initialOf('1234')).toBe('');
-    expect(initialOf('')).toBe('');
+  it("draws a name's initials, or the label code's first two characters, with the first channel", () => {
+    expect(
+      customerAvatar(record({ displayName: 'Rania Haddad', labelCode: 'Named' }), ['WhatsApp']),
+    ).toEqual({
+      name: 'Rania Haddad',
+      text: '',
+      channel: 'WhatsApp',
+    });
+    expect(customerAvatar(record({}), ['WebChat', 'WhatsApp'])).toEqual({
+      name: 'Visitor 7KQ2MX',
+      text: '7K',
+      channel: 'WebChat',
+    });
+    expect(
+      customerAvatar(record({ labelCode: 'WhatsAppCustomer', reference: '••••4821' }), []).text,
+    ).toBe('48');
+    expect(customerAvatar(record({}), []).channel).toBe('');
   });
 });

@@ -3,3 +3,40 @@
 :host {
   display: block;
 }
+
+// Who this is: the gold avatar beside the address and the facts as soft tiles
+// (the tiles' fill and radius are `.page-calm .facts`'s).
+.member-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4) var(--space-5);
+  padding: var(--panel-padding);
+}
+
+.member-summary-text {
+  display: flex;
+  flex: 1 1 20rem;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-inline-size: 0;
+}
+
+.member-summary-email {
+  margin: 0;
+  color: var(--color-text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.member-avatar-skeleton {
+  flex: none;
+  inline-size: var(--avatar-size-lg);
+  block-size: var(--avatar-size-lg);
+  border-radius: var(--radius-pill);
+}
+
+.member-fact-skeleton {
+  inline-size: 9rem;
+  block-size: 3.5rem;
+  border-radius: var(--radius-tile);
+}

@@ -1,4 +1,4 @@
-<div class="page">
+<div class="page page-calm">
   @if (!canView()) {
     <app-page-header
       backLink="/roles"
@@ -28,20 +28,18 @@
       i18n-heading="@@roles.editor.heading"
     />
 
-    <!-- The shape of the editor that is coming: a name card, then two areas. -->
-    <div class="page-section" aria-busy="true">
+    <!-- The shape of the editor that is coming: a name panel, then the area tiles. -->
+    <div class="page-section role-skeleton" aria-busy="true" data-testid="role-skeleton">
       <p class="visually-hidden" role="status" i18n="@@roles.editor.loading">Loading role…</p>
       <div class="card card-body admin-skeleton" aria-hidden="true">
         <span class="skeleton skeleton-title"></span>
         <span class="skeleton skeleton-bar"></span>
       </div>
-      @for (row of [0, 1]; track row) {
-        <div class="card card-body admin-skeleton" aria-hidden="true">
-          <span class="skeleton skeleton-text"></span>
-          <span class="skeleton skeleton-text"></span>
-          <span class="skeleton skeleton-text"></span>
-        </div>
-      }
+      <div class="card card-body perm-skeleton" aria-hidden="true">
+        @for (row of [0, 1, 2, 3]; track row) {
+          <span class="skeleton perm-area-skeleton"></span>
+        }
+      </div>
     </div>
   } @else if (failure(); as error) {
     <app-page-header
@@ -101,9 +99,9 @@
       [description]="current.isSystem ? ownerDescription : customDescription"
     >
       @if (current.isSystem) {
-        <span pageStatus class="badge badge-neutral" i18n="@@roles.protected">Protected</span>
+        <app-chip pageStatus i18n="@@roles.protected">Protected</app-chip>
       } @else {
-        <span pageStatus class="badge badge-plain" i18n="@@roles.custom">Custom</span>
+        <app-chip pageStatus tone="draft" i18n="@@roles.custom">Custom</app-chip>
       }
     </app-page-header>
 
@@ -136,7 +134,7 @@
       </div>
     }
 
-    <dl class="admin-facts page-section" data-testid="role-facts">
+    <dl class="admin-facts facts page-section" data-testid="role-facts">
       <div>
         <dt i18n="@@roles.facts.access">Access</dt>
         <dd data-testid="grant-summary">{{ grantText() }}</dd>
