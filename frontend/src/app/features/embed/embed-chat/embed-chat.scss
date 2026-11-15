@@ -1,6 +1,7 @@
 // The embedded widget's frame. The loader sizes the iframe (84px closed, its
 // panel size open, the whole viewport on a phone); this only fills what it was
-// given. The launcher and the panel are shared components (shared/chat/).
+// given. The panel (Calm Glass) paints the visitor's ground, its glows, the
+// glass header and the glass composer itself. The launcher and the panel are shared components (shared/chat/).
 
 :host {
   display: block;
@@ -12,12 +13,12 @@
 .embed-panel {
   position: absolute;
   inset: 0;
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-card);
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-panel);
   transform-origin: bottom right;
   // motion-audit-ignore: no-reduced-motion -- the duration token collapses to
   // 0.01 ms under prefers-reduced-motion at the source (styles/_tokens.scss).
-  animation: embed-open var(--duration-md) var(--ease-enter);
+  animation: embed-open var(--duration-dialog) var(--ease-calm);
 }
 
 // The corner is the workspace's physical setting, whatever the language.

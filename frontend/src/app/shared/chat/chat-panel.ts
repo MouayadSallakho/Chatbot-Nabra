@@ -15,6 +15,7 @@ import {
 import type { ApiError, ApiErrorKind } from '@app/core/api/api-error';
 import type { ChatHandling, ChatMessage } from '@app/features/chat/hosted-chat-api';
 import { Icon } from '@app/shared/icon/icon';
+import { Orb } from '@app/shared/orb/orb';
 import { ChatTranscript } from './chat-transcript';
 
 /** What the panel is showing. Only `ready` has a transcript and a composer. */
@@ -38,25 +39,27 @@ let nextPanel = 0;
  * composition is left alone). The same code runs on the hosted page, which has
  * no sandbox, so the two cannot behave differently.
  *
- * <strong>Two looks, one structure.</strong> In the widget (`variant="widget"`)
- * the header and Send take the workspace's accent from `--chat-accent` and
- * `--chat-on-accent`, set from `accent-color.ts`, and the AI's replies its
- * tint. The hosted page wears the same accent when the workspace has a usable
- * one (`accented`); without one it is Nabra's own: an ink Send and the AI voice's
- * tint.
+ * <strong>One look, Calm Glass</strong> (Phase 39.5b, boards Widget and
+ * WidgetAr): a glass header with the workspace's tile, name and status; the
+ * orb with the greeting; the three voices; a glass composer; and the honesty
+ * line with "Powered by Nabra" at the foot. The workspace's colour stands in
+ * for emerald on the tile and Send only in a theme where `accent-color.ts`
+ * proved every pair: the page sets `--chat-brand-light` / `--chat-brand-dark`
+ * (and their `--chat-on-brand-*` text colours) only then. The voices never
+ * take it: the AI speaks in emerald on every screen.
  */
 @Component({
   selector: 'app-chat-panel',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ChatTranscript, Icon],
+  imports: [ChatTranscript, Icon, Orb],
   templateUrl: './chat-panel.html',
   styleUrl: './chat-panel.scss',
   host: {
     class: 'chat-panel',
     '[class.is-widget]': 'variant() === "widget"',
     '[class.is-page]': 'variant() === "page"',
-    '[class.has-accent]': 'accented()',
     '[class.is-preview]': 'preview()',
+    '[class.is-inset]': '!titleIsHeading()',
   },
 })
 export class ChatPanel {
@@ -72,9 +75,6 @@ export class ChatPanel {
 
   /** Whose chat this is. Heads the panel when the page knows it. */
   readonly workspaceName = input('');
-
-  /** On the hosted page: `--chat-accent` and `--chat-on-accent` hold a checked colour. */
-  readonly accented = input(false);
 
   readonly greeting = input<string | null>(null);
   readonly messages = input<readonly ChatMessage[]>([]);
@@ -133,6 +133,30 @@ export class ChatPanel {
   /** The workspace's name; the agent's where a page has none to give. */
   protected readonly title = computed(
     () => this.workspaceName() || this.agentName() || this.defaultTitle,
+  );
+
+  /** The tile's letter: the first character of the name that heads the chat. */
+  protected readonly initial = computed(() => {
+    const name = (this.workspaceName() || this.agentName()).trim();
+
+    return name ? Array.from(name)[0].toLocaleUpperCase() : '';
+  });
+
+  /**
+   * The status line: only what is true today. The agent who answers, once the
+   * chat is open and the header is not already that agent's name; "Unavailable"
+   * when the chat cannot be used. Nothing about how fast anybody replies.
+   */
+  protected readonly status = computed<{ readonly off: boolean; readonly name: string } | null>(
+    () => {
+      if (this.state() === 'unavailable') {
+        return { off: true, name: '' };
+      }
+
+      const name = this.agentName();
+
+      return this.state() === 'ready' && name && this.workspaceName() ? { off: false, name } : null;
+    },
   );
 
   constructor() {

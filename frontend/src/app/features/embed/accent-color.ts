@@ -159,6 +159,110 @@ export function pageAccent(value: unknown): PageAccent | null {
 }
 
 /**
+ * The grounds the chat itself is drawn on (Calm Glass, Phase 39.5b): the
+ * visitor's page (cream-50 / emerald-950) and the panel colour of its header
+ * and composer (white / emerald-900). Fixed here because the rule has to be
+ * proved in TypeScript, before a colour reaches a style; they must stay equal
+ * to `--color-ground-visitor` and `--color-panel` in styles/_tokens.scss
+ * (accent-color.spec.ts reads that file and fails if they drift).
+ */
+export const CHAT_GROUNDS = {
+  light: ['#fbfaf6', '#ffffff'], // token-lint-ignore: cream-50 and the light panel
+  dark: ['#051f20', '#0b2b26'], // token-lint-ignore: emerald-950 and emerald-900
+} as const;
+
+/** A theme of the visitor's chat. */
+export type ChatTheme = keyof typeof CHAT_GROUNDS;
+
+/** What the accent rule decided for one theme of the chat. */
+export interface ChatBrandCheck {
+  /** The text on the accent, and its contrast (0 when no candidate reaches 4.5:1). */
+  readonly foreground: string;
+  readonly labelContrast: number;
+  /** The accent against the lowest-contrast ground of that theme. */
+  readonly onGround: number;
+  /** Whether every pair holds, so the accent may replace emerald in that theme. */
+  readonly used: boolean;
+}
+
+/** The workspace's colour in the chat, per theme: the accent when it holds, else null (emerald). */
+export interface ChatBrand {
+  readonly light: PageAccent | null;
+  readonly dark: PageAccent | null;
+}
+
+/**
+ * Whether the workspace's colour may stand in for emerald in one theme of the
+ * chat (the workspace tile and Send; calm-glass.md §7, Phase 39.5b).
+ *
+ * Every pair must hold: a label on the accent at 4.5:1 or more in the lighter
+ * or the darker ink (never the last-resort black), and the accent against each
+ * ground of that theme at 3:1 or more (WCAG 1.4.11, the boundary of the
+ * button). Otherwise the chat keeps emerald in that theme, and the settings
+ * preview says so. The three voices never take the accent: the AI speaks in
+ * emerald on every screen.
+ */
+export function checkChatBrand(value: unknown, theme: ChatTheme): ChatBrandCheck {
+  const accent = pageAccent(value);
+
+  if (accent === null) {
+    return {
+      foreground: LIGHT_FOREGROUND,
+      labelContrast:
+        typeof value === 'string' ? (contrastRatio(value, readableForeground(value)) ?? 0) : 0,
+      onGround: groundContrast(value, theme),
+      used: false,
+    };
+  }
+
+  const onGround = groundContrast(accent.accent, theme);
+
+  return {
+    foreground: accent.foreground,
+    labelContrast: contrastRatio(accent.accent, accent.foreground) ?? 0,
+    onGround,
+    used: onGround >= BOUNDARY_CONTRAST,
+  };
+}
+
+/** The chat's colour in each theme: the accent where {@link checkChatBrand} allows it. */
+export function chatBrand(value: unknown): ChatBrand {
+  const accent = pageAccent(value);
+  const pick = (theme: ChatTheme): PageAccent | null =>
+    accent !== null && checkChatBrand(value, theme).used ? accent : null;
+
+  return { light: pick('light'), dark: pick('dark') };
+}
+
+/**
+ * Paints the chat's colour onto an element: `--chat-brand-light`,
+ * `--chat-on-brand-light` and their `-dark` twins, each only where the accent
+ * holds in that theme; the panel falls back to emerald where one is missing.
+ */
+export function applyChatBrand(element: HTMLElement, brand: ChatBrand): void {
+  for (const theme of ['light', 'dark'] as const) {
+    const accent = brand[theme];
+
+    if (accent) {
+      element.style.setProperty(`--chat-brand-${theme}`, accent.accent);
+      element.style.setProperty(`--chat-on-brand-${theme}`, accent.foreground);
+    } else {
+      element.style.removeProperty(`--chat-brand-${theme}`);
+      element.style.removeProperty(`--chat-on-brand-${theme}`);
+    }
+  }
+}
+
+/** The accent's lowest contrast against the grounds of one theme, or 0 when it is not a colour. */
+function groundContrast(value: unknown, theme: ChatTheme): number {
+  if (typeof value !== 'string' || !isAccent(value)) {
+    return 0;
+  }
+
+  return Math.min(...CHAT_GROUNDS[theme].map((ground) => contrastRatio(value, ground) ?? 0));
+}
+
+/**
  * Paints an accent onto an element as custom properties, after checking it.
  *
  * `setProperty` with an already-validated `#rrggbb` cannot introduce a

@@ -1,6 +1,7 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { APP_LANGUAGE } from '@app/core/i18n/language';
 import { PublicChatRealtime } from '@app/core/realtime/public-chat-realtime';
 import { FakePublicChatRealtime } from '@app/testing/test-doubles';
 import { EmbedBridge } from '../embed-bridge';
@@ -13,7 +14,9 @@ describe('EmbedChat', () => {
   const parentOrigin = 'https://shop.example.com';
   const conversationId = '11111111-1111-7111-8111-111111111111';
   const credential = 'ZmFrZS1lbWJlZC1jcmVkZW50aWFs';
-  const configUrl = `/api/public/embed/${publicKey}`;
+  // The frame sends its language with the public read (Phase 39.1).
+  const baseUrl = `/api/public/embed/${publicKey}`;
+  const configUrl = `${baseUrl}?lang=en`;
   const messagesUrl = `/api/public/embed/conversations/${conversationId}/messages`;
 
   let fixture: ComponentFixture<EmbedChat>;
@@ -59,7 +62,7 @@ describe('EmbedChat', () => {
   }
 
   /** Mounts the widget and completes the handshake, leaving the config pending. */
-  async function mount(): Promise<void> {
+  async function mount(extra: unknown[] = []): Promise<void> {
     TestBed.configureTestingModule({
       providers: [
         provideHttpClient(),
@@ -68,6 +71,7 @@ describe('EmbedChat', () => {
         EmbedSessionStore,
         EmbedBridge,
         { provide: PublicChatRealtime, useClass: FakePublicChatRealtime },
+        ...(extra as []),
       ],
     });
 
@@ -260,7 +264,7 @@ describe('EmbedChat', () => {
     button('Send')!.click();
     await settle();
 
-    const start = http.expectOne(`${configUrl}/conversations`);
+    const start = http.expectOne(`${baseUrl}/conversations`);
 
     expect(start.request.headers.get('X-OmniAI-Embed-Origin')).toBe(parentOrigin);
 
@@ -303,7 +307,7 @@ describe('EmbedChat', () => {
     await settle();
 
     http
-      .expectOne(`${configUrl}/conversations`)
+      .expectOne(`${baseUrl}/conversations`)
       .flush({ conversationId, agentName: 'Concierge', credential });
     await settle();
 
@@ -329,7 +333,7 @@ describe('EmbedChat', () => {
     await settle();
 
     http
-      .expectOne(`${configUrl}/conversations`)
+      .expectOne(`${baseUrl}/conversations`)
       .flush({ conversationId, agentName: 'Concierge', credential });
     await settle();
 
@@ -418,7 +422,7 @@ describe('EmbedChat', () => {
     await settle();
 
     http
-      .expectOne(`${configUrl}/conversations`)
+      .expectOne(`${baseUrl}/conversations`)
       .flush({ conversationId, agentName: 'Concierge', credential });
     await settle();
 
@@ -448,7 +452,7 @@ describe('EmbedChat', () => {
     await settle();
 
     http
-      .expectOne(`${configUrl}/conversations`)
+      .expectOne(`${baseUrl}/conversations`)
       .flush({ conversationId, agentName: 'Concierge', credential });
     await settle();
 
@@ -530,6 +534,39 @@ describe('EmbedChat', () => {
     expect(style.getPropertyValue('--chat-accent')).toBe('#2563eb');
     expect(style.getPropertyValue('--chat-on-accent')).toBe('#ffffff');
     expect(style.cssText).not.toContain('url(');
+    // Inside the panel the same default blue stands in for emerald in the light
+    // look (4.95:1 on the ground); in the dark one it falls under 3:1 against
+    // the panel colour, so emerald stays (Phase 39.5b).
+    expect(style.getPropertyValue('--chat-brand-light')).toBe('#2563eb');
+    expect(style.getPropertyValue('--chat-brand-dark')).toBe('');
+  });
+
+  it("asks for the greeting in the frame's language", async () => {
+    await mount([{ provide: APP_LANGUAGE, useValue: 'ar' }]);
+
+    http.expectOne(`${baseUrl}?lang=ar`).flush(config({ greeting: 'أهلًا بك.' }));
+    await settle();
+
+    launcher()!.click();
+    await settle();
+
+    expect(host().querySelector('[data-testid="chat-greeting"]')?.textContent).toContain(
+      'أهلًا بك.',
+    );
+  });
+
+  it('wears a pale accent inside the panel only in the dark look', async () => {
+    await mount();
+
+    http.expectOne(configUrl).flush(config({ accentColor: '#ffe066' }));
+    await settle();
+
+    const style = host().style;
+
+    expect(style.getPropertyValue('--chat-accent')).toBe('#ffe066');
+    expect(style.getPropertyValue('--chat-brand-light')).toBe('');
+    expect(style.getPropertyValue('--chat-brand-dark')).toBe('#ffe066');
+    expect(style.getPropertyValue('--chat-on-brand-dark')).toBe('#111827');
   });
 
   it('starts listening before the first turn is attempted', async () => {
@@ -542,7 +579,7 @@ describe('EmbedChat', () => {
     const realtime = TestBed.inject(PublicChatRealtime) as unknown as FakePublicChatRealtime;
 
     http
-      .expectOne(`${configUrl}/conversations`)
+      .expectOne(`${baseUrl}/conversations`)
       .flush({ conversationId, agentName: 'Concierge', credential });
     await settle();
 
@@ -564,7 +601,7 @@ describe('EmbedChat', () => {
     await settle();
 
     http
-      .expectOne(`${configUrl}/conversations`)
+      .expectOne(`${baseUrl}/conversations`)
       .flush({ conversationId, agentName: 'Concierge', credential });
     await settle();
 
@@ -619,7 +656,7 @@ describe('EmbedChat', () => {
       button('Send')!.click();
       await settle();
       http
-        .expectOne(`${configUrl}/conversations`)
+        .expectOne(`${baseUrl}/conversations`)
         .flush({ conversationId, agentName: 'Concierge', credential });
       await settle();
     }

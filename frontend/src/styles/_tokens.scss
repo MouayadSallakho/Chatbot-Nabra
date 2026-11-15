@@ -132,6 +132,7 @@
   --scrim: rgb(0 0 0 / 50%);
   --glow-a: rgb(142 182 155 / 16%);
   --glow-b: rgb(200 169 106 / 12%);
+  --orb-ring: rgb(142 182 155 / 14%);
 
   --skeleton-base: var(--emerald-800);
   --skeleton-sheen: var(--emerald-750);
@@ -150,6 +151,12 @@
   --event-failed-line: rgb(240 160 143 / 35%);
 
   color-scheme: dark;
+
+  // The visitor chat's colour in the dark look (see `.chat-panel` below).
+  .chat-panel {
+    --chat-brand: var(--chat-brand-dark, var(--color-primary));
+    --chat-on-brand: var(--chat-on-brand-dark, var(--color-on-primary));
+  }
 }
 
 // -----------------------------------------------------------------------------
@@ -322,6 +329,14 @@
   // gold at the end-bottom.
   --glow-a: rgb(35 83 71 / 18%);
   --glow-b: rgb(200 169 106 / 24%);
+  // The soft ring around the widget's 64px orb (boards Widget and WidgetAr).
+  --orb-ring: rgb(35 83 71 / 10%);
+  // The visitor chat's two glows (boards Widget and WidgetAr): emerald at the
+  // start-top, gold at the end-bottom. Resolved here, so they follow the theme.
+  --chat-glows:
+    radial-gradient(closest-side, var(--glow-a), transparent) -12rem -12rem / 32rem 32rem no-repeat,
+    radial-gradient(closest-side, var(--glow-b), transparent) calc(100% + 11rem) calc(100% - 4rem) /
+      27rem 27rem no-repeat;
   // The AI's presence (calm-glass.md §6), the same in both themes.
   --orb-gradient: radial-gradient(
     circle at 35% 30%,
@@ -482,6 +497,8 @@
   --text-title-1: 600 clamp(1.5rem, 1.3rem + 0.65vw, 1.875rem) / 1.2 var(--font-sans); // 30/36
   --text-title-2: 600 1.25rem / 1.4 var(--font-sans); // 20/28
   --text-title-3: 600 1rem / 1.5 var(--font-sans); // 16/24
+  // The widget's greeting under the orb (boards Widget and WidgetAr).
+  --text-greeting: 600 1.375rem / 1.3636 var(--font-sans); // 22/30
   --text-body: 400 0.9375rem / 1.6 var(--font-sans); // 15/24
   --text-body-strong: 500 0.9375rem / 1.6 var(--font-sans);
   --text-small: 400 0.8125rem / 1.5385 var(--font-sans); // 13/20
@@ -563,6 +580,7 @@
   --text-title-1: 600 clamp(1.5rem, 1.3rem + 0.65vw, 1.875rem) / 1.4 var(--font-sans); // 30/42
   --text-title-2: 600 1.25rem / 1.5 var(--font-sans); // 20/30
   --text-title-3: 600 1rem / 1.625 var(--font-sans); // 16/26
+  --text-greeting: 600 1.375rem / 1.5455 var(--font-sans); // 22/34
   --text-body: 400 0.9375rem / 1.7333 var(--font-sans); // 15/26
   --text-body-strong: 500 0.9375rem / 1.7333 var(--font-sans);
   --text-small: 400 0.8125rem / 1.6923 var(--font-sans); // 13/22
@@ -604,6 +622,17 @@
     --motion-travel: 0;
     --orb-breath: 1;
   }
+}
+
+// The visitor chat's colour (Calm Glass, Phase 39.5b): the workspace's accent
+// stands in for emerald on the tile and Send only in a look where accent-color.ts
+// proved every contrast pair; the page then sets `--chat-brand-light` and/or
+// `--chat-brand-dark` (with their `--chat-on-brand-*` text colours) on or above
+// the panel. Resolved on the panel itself, per look; the dark-palette mixin
+// above carries the dark half.
+.chat-panel {
+  --chat-brand: var(--chat-brand-light, var(--color-primary));
+  --chat-on-brand: var(--chat-on-brand-light, var(--color-on-primary));
 }
 
 // An explicit choice wins, in both directions.

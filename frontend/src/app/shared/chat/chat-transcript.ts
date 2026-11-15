@@ -19,8 +19,7 @@ interface TranscriptRow {
  * three voices of Calm Glass (Phase 39.5a), as the inbox thread has them since
  * 39.4b, seen from the visitor's side. The visitor's own messages sit on the
  * end side in cream; the AI's replies on the start side beside the orb, in
- * emerald (in the widget, the workspace's checked accent as a tint) with the
- * agent's name; a person's replies on the start side in gold beside the person
+ * emerald with the agent's name; a person's replies on the start side in gold beside the person
  * glyph, with the word "Support". Never an employee's name: the server sends
  * none, and there is no field here that could hold one (owner decision Q5).
  *

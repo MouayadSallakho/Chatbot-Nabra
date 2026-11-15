@@ -7,16 +7,17 @@ test('the widget settings offer corners that follow the page, drawn for the read
   await page.goto('/channels/website-chat');
   await page.locator('a[href*="/channels/website-chat/"]').first().click();
 
+  // The corners are four radio cards in one group (Phase 39.5b), still under #widget-position.
   const corner = page.locator('#widget-position');
   const launcher = page.getByTestId('widget-preview').locator('app-chat-launcher');
 
-  await expect(corner.locator('option')).toHaveCount(4);
+  await expect(corner.getByRole('radio')).toHaveCount(4);
   await expect(page.getByTestId('visitors-see-name')).toBeVisible();
 
   // Nothing is saved: the preview follows the form.
-  await corner.selectOption('Start');
+  await corner.locator('input[value="Start"]').check();
   await expect(launcher).toHaveClass(appLanguage === 'ar' ? /^(?!.*is-left)/ : /is-left/);
 
-  await corner.selectOption('End');
+  await corner.locator('input[value="End"]').check();
   await expect(launcher).toHaveClass(appLanguage === 'ar' ? /is-left/ : /^(?!.*is-left)/);
 });

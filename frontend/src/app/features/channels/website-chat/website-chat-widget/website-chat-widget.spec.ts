@@ -6,6 +6,8 @@ import { PermissionApi } from '@app/core/authorization/permission-api';
 import { LOCAL_STORAGE } from '@app/core/storage/local-storage';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
 import { memoryStorage, permissionApiGranting } from '@app/testing/test-doubles';
+import { registerProblemWords } from '@app/core/problems/problem-words';
+import { CHANNEL_PROBLEM_WORDS } from '../../channel-problems';
 import { WebChatAdminApi } from '../../website-chat-api';
 import { WebsiteChatWidget } from './website-chat-widget';
 
@@ -24,6 +26,7 @@ describe('WebsiteChatWidget', () => {
     widget: {
       greeting: null,
       accentColor: '#2563eb',
+      greetings: { en: null, ar: null },
       launcherPosition: 'Right',
       theme: 'System',
     },
@@ -361,6 +364,7 @@ describe('WebsiteChatWidget', () => {
         widget: {
           greeting: 'Hello there',
           accentColor: '#2563eb',
+          greetings: { en: null, ar: null },
           launcherPosition: 'Left',
           theme: 'Dark',
         },
@@ -399,6 +403,7 @@ describe('WebsiteChatWidget', () => {
         widget: {
           greeting: null,
           accentColor: '#2563eb',
+          greetings: { en: null, ar: null },
           launcherPosition: 'Start',
           theme: 'System',
         },
@@ -407,18 +412,27 @@ describe('WebsiteChatWidget', () => {
     );
     await settle();
 
-    const select = host().querySelector<HTMLSelectElement>('#widget-position')!;
+    const radios = [
+      ...host().querySelectorAll<HTMLInputElement>('#widget-position input[type="radio"]'),
+    ];
 
-    expect([...select.options].map((option) => option.value)).toEqual([
-      'Right',
-      'Left',
-      'Start',
-      'End',
-    ]);
-    expect(select.value).toBe('Start');
-    expect(select.selectedOptions[0].textContent).toContain('right in Arabic pages');
-    // An English page: Start is the left-hand corner.
+    expect(radios.map((radio) => radio.value)).toEqual(['Right', 'Left', 'Start', 'End']);
+    // One group, each radio inside its own 44px label with its words and picture.
+    expect(new Set(radios.map((radio) => radio.name)).size).toBe(1);
+    expect(radios.every((radio) => radio.closest('label.choice'))).toBe(true);
+
+    const checked = radios.find((radio) => radio.checked)!;
+
+    expect(checked.value).toBe('Start');
+    expect(checked.closest('label')?.textContent).toContain('right in Arabic pages');
+    // An English page: Start is the left-hand corner, in the preview and in its picture.
     expect(host().querySelector('app-chat-launcher.is-left')).not.toBeNull();
+    expect(
+      host().querySelector('[data-testid="corner-Start"] .corner-picture')?.classList,
+    ).toContain('is-left');
+    expect(
+      host().querySelector('[data-testid="corner-End"] .corner-picture')?.classList,
+    ).not.toContain('is-left');
   });
 
   it('sends End as End', async () => {
@@ -427,10 +441,7 @@ describe('WebsiteChatWidget', () => {
     http.expectOne(url).flush(configuration(), { headers: { ETag: '"v1"' } });
     await settle();
 
-    const select = host().querySelector<HTMLSelectElement>('#widget-position')!;
-
-    select.value = 'End';
-    select.dispatchEvent(new Event('change'));
+    host().querySelector<HTMLInputElement>('#widget-position input[value="End"]')!.click();
     await settle();
 
     // An English page: End is the right-hand corner.
@@ -484,6 +495,194 @@ describe('WebsiteChatWidget', () => {
 
     expect(text()).toContain('six digits or letters');
     expect(button('Save widget settings')!.disabled).toBe(true);
+  });
+
+  describe('the greeting per language (Phase 39.1)', () => {
+    const box = (id: string): HTMLTextAreaElement =>
+      host().querySelector<HTMLTextAreaElement>(`#${id}`)!;
+
+    async function typeInto(id: string, value: string): Promise<void> {
+      box(id).value = value;
+      box(id).dispatchEvent(new Event('input'));
+      await settle();
+    }
+
+    it('shows English, Arabic and the default, each in its own direction', async () => {
+      await mount('website-chat.view', 'website-chat.manage');
+
+      http.expectOne(url).flush(
+        configuration({
+          widget: {
+            ...configuration().widget,
+            greeting: 'Hello.',
+            greetings: { en: 'Hi there!', ar: 'أهلًا بك!' },
+          },
+        }),
+        { headers: { ETag: '"v1"' } },
+      );
+      await settle();
+
+      expect(box('widget-greeting-en').value).toBe('Hi there!');
+      expect(box('widget-greeting-en').getAttribute('dir')).toBe('ltr');
+      expect(box('widget-greeting-ar').value).toBe('أهلًا بك!');
+      expect(box('widget-greeting-ar').getAttribute('dir')).toBe('rtl');
+      expect(box('widget-greeting-ar').getAttribute('lang')).toBe('ar');
+      expect(box('widget-greeting').value).toBe('Hello.');
+      expect(text()).toContain('Visitors whose language has no greeting of its own see this one.');
+      // The preview shows what a visitor reading this page's language sees.
+      expect(
+        host().querySelector('[data-testid="widget-preview"] [data-testid="chat-greeting"]')
+          ?.textContent,
+      ).toContain('Hi there!');
+    });
+
+    it('falls back to the default in the preview when this language has none', async () => {
+      await mount('website-chat.view', 'website-chat.manage');
+
+      http.expectOne(url).flush(
+        configuration({
+          widget: {
+            ...configuration().widget,
+            greeting: 'Hello.',
+            greetings: { en: null, ar: 'أهلًا' },
+          },
+        }),
+        { headers: { ETag: '"v1"' } },
+      );
+      await settle();
+
+      expect(
+        host().querySelector('[data-testid="widget-preview"] [data-testid="chat-greeting"]')
+          ?.textContent,
+      ).toContain('Hello.');
+    });
+
+    it('always sends both greetings, trimmed, an empty one as null', async () => {
+      await mount('website-chat.view', 'website-chat.manage');
+
+      http.expectOne(url).flush(configuration(), { headers: { ETag: '"v1"' } });
+      await settle();
+
+      await typeInto('widget-greeting-en', '  Hi!  ');
+      await typeInto('widget-greeting-ar', '   ');
+
+      button('Save widget settings')!.click();
+      await settle();
+
+      const save = http.expectOne(url);
+
+      expect(save.request.body.greetings).toEqual({ en: 'Hi!', ar: null });
+      save.flush(configuration(), { headers: { ETag: '"v2"' } });
+      await settle();
+    });
+
+    it('caps each box at the server bound before anything is sent', async () => {
+      await mount('website-chat.view', 'website-chat.manage');
+
+      http.expectOne(url).flush(configuration(), { headers: { ETag: '"v1"' } });
+      await settle();
+
+      for (const id of ['widget-greeting-en', 'widget-greeting-ar', 'widget-greeting']) {
+        expect(box(id).getAttribute('maxlength')).toBe('300');
+      }
+
+      await typeInto('widget-greeting-ar', 'ا'.repeat(301));
+
+      expect(button('Save widget settings')!.disabled).toBe(true);
+    });
+
+    it('words a refusal by the greeting the server names, beside that box', async () => {
+      // The channels' routes register these words; a component test does it itself.
+      registerProblemWords(CHANNEL_PROBLEM_WORDS);
+      await mount('website-chat.view', 'website-chat.manage');
+
+      http.expectOne(url).flush(configuration(), { headers: { ETag: '"v1"' } });
+      await settle();
+
+      await typeInto('widget-greeting-ar', 'مرحبًا');
+
+      button('Save widget settings')!.click();
+      await settle();
+
+      http.expectOne(url).flush(
+        {
+          title: 'Refused',
+          detail: 'The English sentence from the server.',
+          code: 'website-chat.greeting.control_characters',
+          field: 'greetings.ar',
+        },
+        { status: 400, statusText: 'Bad Request' },
+      );
+      await settle();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      const arabic = box('widget-greeting-ar');
+      const error = host().querySelector('#widget-greeting-ar-error');
+
+      expect(error?.textContent).toContain('The Arabic greeting has characters');
+      expect(arabic.getAttribute('aria-invalid')).toBe('true');
+      expect(arabic.getAttribute('aria-describedby')).toContain('widget-greeting-ar-error');
+      expect(box('widget-greeting-en').getAttribute('aria-invalid')).toBeNull();
+      expect(document.activeElement).toBe(arabic);
+      expect(text()).not.toContain('The English sentence');
+    });
+  });
+
+  describe('the colour inside the chat (Phase 39.5b)', () => {
+    const stage = (): HTMLElement =>
+      host().querySelector<HTMLElement>('[data-testid="widget-preview"] .preview-stage')!;
+
+    it('keeps emerald where the colour fails, and says so in the preview', async () => {
+      await mount('website-chat.view', 'website-chat.manage');
+
+      http.expectOne(url).flush(configuration(), { headers: { ETag: '"v1"' } });
+      await settle();
+
+      // A navy: fine on the light ground, lost on the dark one.
+      await setAccent('#1d3557');
+
+      expect(stage().style.getPropertyValue('--chat-brand-light')).toBe('#1d3557');
+      expect(stage().style.getPropertyValue('--chat-brand-dark')).toBe('');
+      expect(host().querySelector('[data-testid="chat-check-light"]')?.textContent).toContain(
+        'use your colour',
+      );
+      expect(host().querySelector('[data-testid="chat-check-dark"]')?.textContent).toContain(
+        "Nabra's emerald",
+      );
+      expect(host().querySelector('[data-testid="preview-emerald"]')?.textContent).toContain(
+        'In the dark look',
+      );
+    });
+
+    it('says nothing about emerald when the colour holds everywhere it is seen', async () => {
+      await mount('website-chat.view', 'website-chat.manage');
+
+      http
+        .expectOne(url)
+        .flush(configuration({ widget: { ...configuration().widget, theme: 'Light' } }), {
+          headers: { ETag: '"v1"' },
+        });
+      await settle();
+
+      // Only the light look is checked when visitors always see it light.
+      expect(host().querySelector('[data-testid="chat-check-dark"]')).toBeNull();
+      expect(host().querySelector('[data-testid="chat-check-light"]')).not.toBeNull();
+      expect(host().querySelector('[data-testid="preview-emerald"]')).toBeNull();
+    });
+
+    it('names both looks when the colour fails in each', async () => {
+      await mount('website-chat.view', 'website-chat.manage');
+
+      http.expectOne(url).flush(configuration(), { headers: { ETag: '"v1"' } });
+      await settle();
+
+      // A mid grey: neither ink reaches 4.5:1 on it, so it holds in neither look.
+      await setAccent('#7a7a7a');
+
+      expect(host().querySelector('[data-testid="preview-emerald"]')?.textContent).toContain(
+        'inside the chat',
+      );
+    });
   });
 
   it('knows when it holds unsaved changes, and says so beside Save', async () => {

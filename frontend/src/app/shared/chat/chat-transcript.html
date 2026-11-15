@@ -1,15 +1,23 @@
 <ol class="chat-log" [attr.aria-label]="label" aria-live="polite" data-testid="chat-transcript">
+  <!--
+    The opening (boards Widget and WidgetAr): the 64px orb above the
+    workspace's greeting, in the visitor's language when it has one. Not a
+    bubble and not attributed to the agent: nothing generated it, it is not in
+    the transcript the server holds, and presenting it as something the AI said
+    would pass a fixed string off as an answer. With no greeting, the orb sits
+    above an invitation to start, until the first message.
+  -->
   @if (greeting(); as text) {
-    <!--
-      The workspace's greeting. Not a bubble and not attributed to the agent:
-      nothing generated it, it is not in the transcript the server holds, and
-      presenting it as something the AI said would pass a fixed string off as an
-      answer.
-    -->
-    <li class="chat-greeting" dir="auto" data-testid="chat-greeting">{{ text }}</li>
+    <li class="chat-intro">
+      <app-orb size="lg" />
+      <p class="chat-greeting" dir="auto" data-testid="chat-greeting">{{ text }}</p>
+    </li>
   } @else if (showEmpty() && rows().length === 0 && !typing()) {
-    <li class="chat-empty" data-testid="chat-empty" i18n="@@visitor.transcript.empty">
-      Ask anything to start the conversation.
+    <li class="chat-intro">
+      <app-orb size="lg" />
+      <p class="chat-empty" data-testid="chat-empty" i18n="@@visitor.transcript.empty">
+        Ask anything to start the conversation.
+      </p>
     </li>
   }
 
@@ -29,8 +37,8 @@
 
     <!--
       The three voices (calm-glass.md §6), from the visitor's side: their own
-      words on the end side in cream; the AI on the start side in emerald (or
-      the workspace's checked tint) beside the orb; a person on the start side
+      words on the end side in cream; the AI on the start side in emerald beside
+      the orb (never the workspace's colour: a voice means the same everywhere); a person on the start side
       in gold beside the person glyph, named only "Support". The spaces keep
       the speaker and the words apart when a screen reader reads them as one.
     -->
@@ -78,9 +86,11 @@
   -->
   <p class="chat-typing" role="status" data-testid="chat-typing">
     <app-orb class="chat-mark" [thinking]="true" />
-    <span class="chat-dots" aria-hidden="true"><span></span><span></span><span></span></span>
-    <span i18n="@@visitor.typing"
-      ><bdi>{{ agentName() }}</bdi> is typing…</span
-    >
+    <span class="chat-typing-pill">
+      <span class="chat-dots" aria-hidden="true"><span></span><span></span><span></span></span>
+      <span i18n="@@visitor.typing"
+        ><bdi>{{ agentName() }}</bdi> is typing…</span
+      >
+    </span>
   </p>
 }

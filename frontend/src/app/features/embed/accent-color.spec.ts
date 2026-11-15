@@ -1,7 +1,14 @@
+// @ts-expect-error No Node type declarations are installed in this workspace.
+import { readFileSync } from 'node:fs';
 import {
+  BOUNDARY_CONTRAST,
+  CHAT_GROUNDS,
   DEFAULT_ACCENT,
   applyAccent,
+  applyChatBrand,
+  chatBrand,
   checkAccent,
+  checkChatBrand,
   contrastRatio,
   pageAccent,
   readableForeground,
@@ -141,5 +148,92 @@ describe('applyAccent', () => {
     applyAccent(element, '#1d3557');
 
     expect(element.style.getPropertyValue('--chat-accent-edge')).toBe('');
+  });
+});
+
+/**
+ * The workspace's colour inside the chat (Calm Glass, Phase 39.5b): it stands in
+ * for emerald on the tile and Send only in a theme where every pair holds.
+ */
+describe('checkChatBrand and chatBrand', () => {
+  it('keeps the grounds equal to the tokens they stand for', () => {
+    const tokens: string = readFileSync('src/styles/_tokens.scss', 'utf8');
+    const raw = (name: string): string =>
+      new RegExp(`--${name}:\\s*(#[0-9a-f]{3,6})`, 'i').exec(tokens)?.[1]?.toLowerCase() ?? '';
+    const expand = (hex: string): string =>
+      hex.length === 4 ? '#' + [...hex.slice(1)].map((c) => c + c).join('') : hex;
+
+    expect(CHAT_GROUNDS.light).toEqual([raw('cream-50'), expand(raw('white'))]);
+    expect(CHAT_GROUNDS.dark).toEqual([raw('emerald-950'), raw('emerald-900')]);
+  });
+
+  it('uses a navy in the light look and keeps emerald in the dark one', () => {
+    expect(checkChatBrand('#1d3557', 'light').used).toBe(true);
+    expect(checkChatBrand('#1d3557', 'dark').used).toBe(false);
+    expect(chatBrand('#1d3557')).toEqual({
+      light: { accent: '#1d3557', foreground: '#ffffff' },
+      dark: null,
+    });
+  });
+
+  it('uses a pale yellow in the dark look only, with the dark ink', () => {
+    expect(chatBrand('#FFE066')).toEqual({
+      light: null,
+      dark: { accent: '#ffe066', foreground: '#111827' },
+    });
+  });
+
+  it('keeps emerald in both looks for a mid-tone no ink reads on at 4.5:1', () => {
+    expect(checkChatBrand('#7a7a7a', 'light').onGround).toBeGreaterThanOrEqual(BOUNDARY_CONTRAST);
+    expect(chatBrand('#7a7a7a')).toEqual({ light: null, dark: null });
+  });
+
+  it.each([undefined, null, 42, 'red', '#fff', ' #1d3557', 'url(x)'])(
+    'never lets %s through',
+    (value) => {
+      expect(chatBrand(value)).toEqual({ light: null, dark: null });
+      expect(checkChatBrand(value, 'light').used).toBe(false);
+    },
+  );
+
+  it('proves every pair for each colour it lets through, in both looks', () => {
+    for (let r = 0; r <= 255; r += 51) {
+      for (let g = 0; g <= 255; g += 51) {
+        for (let b = 0; b <= 255; b += 51) {
+          const value = '#' + [r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('');
+          const brand = chatBrand(value);
+
+          for (const theme of ['light', 'dark'] as const) {
+            const accent = brand[theme];
+
+            if (accent) {
+              expect(contrastRatio(accent.accent, accent.foreground)).toBeGreaterThanOrEqual(4.5);
+
+              for (const ground of CHAT_GROUNDS[theme]) {
+                expect(contrastRatio(accent.accent, ground)).toBeGreaterThanOrEqual(3);
+              }
+            }
+          }
+        }
+      }
+    }
+  });
+});
+
+describe('applyChatBrand', () => {
+  it('sets the properties of each look the colour holds in, and clears the others', () => {
+    const element = document.createElement('div');
+
+    applyChatBrand(element, chatBrand('#ffe066'));
+
+    expect(element.style.getPropertyValue('--chat-brand-dark')).toBe('#ffe066');
+    expect(element.style.getPropertyValue('--chat-on-brand-dark')).toBe('#111827');
+    expect(element.style.getPropertyValue('--chat-brand-light')).toBe('');
+
+    applyChatBrand(element, chatBrand('#1d3557'));
+
+    expect(element.style.getPropertyValue('--chat-brand-light')).toBe('#1d3557');
+    expect(element.style.getPropertyValue('--chat-brand-dark')).toBe('');
+    expect(element.style.getPropertyValue('--chat-on-brand-dark')).toBe('');
   });
 });

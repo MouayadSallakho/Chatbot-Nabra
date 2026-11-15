@@ -1,6 +1,7 @@
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
+import type { AppLanguage } from '@app/core/i18n/language';
 import { ChatMessagePage, ChatTurn, RealtimeTicket } from '@app/features/chat/hosted-chat-api';
 import type { LauncherPosition } from './launcher-position';
 
@@ -65,10 +66,20 @@ export interface StartedEmbeddedConversation {
 export class EmbedChatApi {
   private readonly http = inject(HttpClient);
 
-  /** What to render, before anybody has said anything. Creates nothing. */
-  config(publicKey: string, parentOrigin: string): Observable<EmbeddedChatConfig> {
+  /**
+   * What to render, before anybody has said anything. Creates nothing.
+   *
+   * `lang` is the frame's language, which the loader took from the host page
+   * (Phase 39.1): the greeting comes back in it when the workspace wrote one.
+   */
+  config(
+    publicKey: string,
+    parentOrigin: string,
+    lang: AppLanguage,
+  ): Observable<EmbeddedChatConfig> {
     return this.http.get<EmbeddedChatConfig>(`/api/public/embed/${encodeURIComponent(publicKey)}`, {
       headers: this.headers(parentOrigin),
+      params: { lang },
     });
   }
 

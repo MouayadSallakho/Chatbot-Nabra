@@ -1,7 +1,6 @@
 // The visitor's transcript in the three voices (calm-glass.md §6, Phase 39.5a).
 // The bubbles are the shared `.bubble` primitive; this places them from the
-// visitor's side. `--_ai-bg` and `--_ai-border` come from the panel around it:
-// the AI voice by default, the workspace accent's checked tint in the widget.
+// visitor's side. The voices never take the workspace's colour (39.5b).
 // Logical properties only, so everything mirrors under RTL.
 
 :host {
@@ -17,21 +16,34 @@
   list-style: none;
 }
 
+.chat-intro {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  padding-block: var(--space-2) var(--space-2);
+  text-align: center;
+
+  .orb {
+    box-shadow: 0 0 0 var(--space-2) var(--orb-ring);
+  }
+}
+
+// The greeting: 22/30 600 (boards Widget and WidgetAr), at most ~280px.
 .chat-greeting,
 .chat-empty {
-  padding: var(--space-3);
-  border-radius: var(--radius-tile);
-  color: var(--text-secondary);
-  font: var(--text-small);
+  max-inline-size: 18rem;
+  margin: 0;
   white-space: pre-wrap;
 }
 
 .chat-greeting {
-  background-color: var(--color-panel-soft);
+  font: var(--text-greeting);
 }
 
 .chat-empty {
-  text-align: center;
+  color: var(--color-text-secondary);
+  font: var(--text-small);
 }
 
 // One message: the speaker's mark (the orb, the person glyph) on the start
@@ -84,8 +96,8 @@
 }
 
 .chat-msg-ai .chat-bubble {
-  background-color: var(--_ai-bg, var(--voice-ai-bubble));
-  box-shadow: inset 0 0 0 1px var(--_ai-border, var(--voice-ai-edge));
+  background-color: var(--voice-ai-bubble);
+  box-shadow: inset 0 0 0 1px var(--voice-ai-edge);
 }
 
 // A person's mark: a 26px gold disc with the person glyph (no name, Q5).
@@ -121,24 +133,31 @@
   align-items: center;
   gap: var(--space-2);
   margin: var(--space-3) 0 0;
-  color: var(--text-secondary);
-  font: var(--text-small);
+}
+
+// One pill in the AI's bubble colour: three dots and the sentence.
+.chat-typing-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-block-size: 2.25rem;
+  padding-inline: var(--space-4);
+  border-radius: var(--radius-pill);
+  background-color: var(--voice-ai-bubble);
+  color: var(--voice-ai-text);
+  font: var(--text-caption);
+  font-weight: 400;
 }
 
 .chat-dots {
   display: inline-flex;
-  gap: 3px; // token-lint-ignore: the dots read as one mark
-  padding: var(--space-3) var(--space-3);
-  border-radius: var(--radius-bubble);
-  border-end-start-radius: var(--radius-bubble-tail);
-  background-color: var(--_ai-bg, var(--voice-ai-bubble));
-  box-shadow: inset 0 0 0 1px var(--_ai-border, var(--voice-ai-edge));
+  gap: 5px; // token-lint-ignore: the dots read as one mark
 
   span {
     inline-size: 6px;
     block-size: 6px;
     border-radius: 50%;
-    background-color: var(--voice-ai-label);
+    background-color: var(--voice-ai-dot);
     // A status, removed the moment the reply arrives (never decorative over 5 s),
     // and stopped under reduced motion below.
     // motion-audit-ignore: infinite-animation

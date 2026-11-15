@@ -1,6 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
+import type { AppLanguage } from '@app/core/i18n/language';
 
 /** What the hosted page is told about where it is running. */
 export interface HostedChatConfig {
@@ -11,10 +12,10 @@ export interface HostedChatConfig {
   /** Whose chat this is. Heads the page. */
   readonly workspaceName: string;
 
-  /** The workspace's own words, shown before anybody types. */
+  /** The workspace's own words, shown before anybody types, in the page's language when it has them. */
   readonly greeting: string | null;
 
-  /** Untrusted until `pageAccent` has checked it. */
+  /** Untrusted until `chatBrand` has checked it. */
   readonly accentColor: string;
 
   /** `System`, `Light` or `Dark`. */
@@ -95,9 +96,16 @@ export interface ChatTurn {
 export class HostedChatApi {
   private readonly http = inject(HttpClient);
 
-  /** What to render, before anybody has said anything. */
-  config(publicKey: string): Observable<HostedChatConfig> {
-    return this.http.get<HostedChatConfig>(`/api/public/webchat/${encodeURIComponent(publicKey)}`);
+  /**
+   * What to render, before anybody has said anything.
+   *
+   * `lang` is the page's language (Phase 39.1): the greeting comes back in it
+   * when the workspace wrote one, else the default greeting.
+   */
+  config(publicKey: string, lang: AppLanguage): Observable<HostedChatConfig> {
+    return this.http.get<HostedChatConfig>(`/api/public/webchat/${encodeURIComponent(publicKey)}`, {
+      params: { lang },
+    });
   }
 
   /**

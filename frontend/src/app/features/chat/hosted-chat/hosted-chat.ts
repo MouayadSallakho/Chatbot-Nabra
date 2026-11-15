@@ -17,8 +17,7 @@ import { registerProblemWords } from '@app/core/problems/problem-words';
 import { PublicChatRealtime } from '@app/core/realtime/public-chat-realtime';
 import { BootState } from '@app/core/boot/boot-state';
 import { THEME_ATTRIBUTE } from '@app/core/theme/theme';
-import { PageAccent, pageAccent } from '@app/features/embed/accent-color';
-import { BrandMark } from '@app/shared/brand-mark/brand-mark';
+import { ChatBrand, chatBrand } from '@app/features/embed/accent-color';
 import { ChatPanel } from '@app/shared/chat/chat-panel';
 import { CHAT_PROBLEM_WORDS } from '@app/shared/chat/chat-problems';
 import { visitorFailure } from '@app/shared/chat/visitor-copy';
@@ -65,9 +64,10 @@ type ChatState = 'opening' | 'unavailable' | 'ready' | 'failed';
  * <strong>The same chat as the widget</strong> (Phase 36.9): one shared panel,
  * full height.
  *
- * <strong>The workspace's own look</strong> (Phase 38.3): its name heads the
- * chat, with its greeting, accent and theme from the public read. An accent that
- * is invalid, or that no text can be read on, leaves Nabra's own look.
+ * <strong>The workspace's own look</strong> (Phase 38.3, Calm Glass in 39.5b):
+ * its name heads the chat, with its greeting in the page's language, its theme,
+ * and its colour on the workspace tile and Send in each theme where that colour
+ * holds every contrast pair (`accent-color.ts`); elsewhere, emerald.
  *
  * <strong>No flash of the other theme.</strong> The script in `index.html` paints
  * the visitor's system theme before anything is known. Only the loading lockup
@@ -78,7 +78,7 @@ type ChatState = 'opening' | 'unavailable' | 'ready' | 'failed';
 @Component({
   selector: 'app-hosted-chat',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [BootState, BrandMark, ChatPanel],
+  imports: [BootState, ChatPanel],
   templateUrl: './hosted-chat.html',
   styleUrl: './hosted-chat.scss',
 })
@@ -96,8 +96,11 @@ export class HostedChat implements OnInit {
   protected readonly workspaceName = signal('');
   protected readonly greeting = signal<string | null>(null);
 
-  /** Null keeps Nabra's own look. Checked before it can reach a style. */
-  protected readonly accent = signal<PageAccent | null>(null);
+  /**
+   * The workspace's colour in each theme, where it holds every contrast pair;
+   * null in a theme keeps emerald there. Checked before it can reach a style.
+   */
+  protected readonly brand = signal<ChatBrand>({ light: null, dark: null });
 
   /** Whether the public read has answered, so the chat can be drawn in its theme. */
   protected readonly appearanceKnown = signal(false);
@@ -165,7 +168,7 @@ export class HostedChat implements OnInit {
     }
 
     try {
-      const config = await firstValueFrom(this.api.config(publicKey));
+      const config = await firstValueFrom(this.api.config(publicKey, this.language));
 
       this.adoptAppearance(config);
 
@@ -200,7 +203,7 @@ export class HostedChat implements OnInit {
     this.agentName.set(config.agentName);
     this.workspaceName.set(config.workspaceName);
     this.greeting.set(config.greeting);
-    this.accent.set(pageAccent(config.accentColor));
+    this.brand.set(chatBrand(config.accentColor));
     this.appearanceKnown.set(true);
   }
 

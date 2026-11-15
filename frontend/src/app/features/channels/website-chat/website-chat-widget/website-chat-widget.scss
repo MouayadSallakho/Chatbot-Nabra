@@ -13,9 +13,11 @@
 }
 
 // -----------------------------------------------------------------------------
-// Appearance: the accent and its checks
+// Appearance: greetings, the accent and its checks, the corners
 // -----------------------------------------------------------------------------
-.accent {
+.greetings,
+.accent,
+.corners {
   display: grid;
   gap: var(--space-2);
   min-inline-size: 0;
@@ -24,19 +26,41 @@
   border: 0;
 }
 
+// A legend is not a grid item, so its space below is its own.
+.greetings,
+.accent,
+.corners {
+  > legend {
+    margin-block-end: var(--space-2);
+  }
+}
+
+.greetings {
+  gap: var(--space-3);
+
+  > .field-hint {
+    margin: 0;
+  }
+}
+
+.field-label-quiet {
+  color: var(--color-text-secondary);
+}
+
 .accent-field {
   display: flex;
   align-items: center;
   gap: var(--space-2);
 }
 
+// The swatch: the size of a control, with the control border.
 .accent-swatch {
-  inline-size: 3rem;
+  inline-size: var(--control-height);
   block-size: var(--control-height);
-  padding: 2px; // token-lint-ignore: the native swatch's own inset
-  border: 1px solid var(--border-control);
-  border-radius: var(--radius-control);
-  background-color: var(--surface-default);
+  padding: 3px; // token-lint-ignore: the native swatch's own inset
+  border: 1px solid var(--color-control-border);
+  border-radius: var(--radius-input);
+  background-color: var(--color-panel);
   cursor: pointer;
 }
 
@@ -77,10 +101,59 @@
   font-variant-numeric: tabular-nums;
 }
 
-.appearance-row {
+// Four corners as cards: the radio, a small picture of the page, the words.
+.corner-options {
   display: grid;
-  gap: var(--space-4);
-  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: var(--space-2);
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+}
+
+.corner-option {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-tile);
+
+  &:has(input:checked) {
+    border-color: var(--color-primary);
+    background-color: var(--color-selected);
+  }
+}
+
+.corner-words {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+// A page in miniature with the launcher's dot in its corner.
+.corner-picture {
+  position: relative;
+  flex: none;
+  inline-size: var(--space-8);
+  block-size: var(--space-7);
+  border: 1px solid var(--color-text-quiet);
+  border-radius: var(--radius-badge);
+  background-color: var(--color-panel-soft);
+
+  &::after {
+    content: '';
+    position: absolute;
+    inset-block-end: 3px; // token-lint-ignore: the dot's place in the picture
+    right: 3px; // rtl-lint-ignore: a physical corner, as the setting is
+    inline-size: var(--space-2);
+    block-size: var(--space-2);
+    border-radius: var(--radius-pill);
+    background-color: var(--color-primary);
+  }
+
+  &.is-left::after {
+    right: auto; // rtl-lint-ignore: a physical corner
+    left: 3px; // rtl-lint-ignore: a physical corner
+  }
+}
+
+.theme-field {
+  max-inline-size: 20rem;
 }
 
 // -----------------------------------------------------------------------------
@@ -95,20 +168,14 @@
   display: grid;
   gap: var(--space-2);
   padding: var(--space-3);
-  border-radius: var(--radius-control);
-  background-color: var(--surface-inset);
+  border-radius: var(--radius-tile);
+  background-color: var(--color-panel-soft);
 }
 
 .preview-panel {
-  block-size: 26rem;
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-card);
-}
-
-// The loader's closed frame: 84px, with the 56px launcher 16px from its corner.
-.preview-closed {
-  position: relative;
-  block-size: 84px; // token-lint-ignore: the loader's closed frame size (Widget/v1.js)
+  block-size: 30rem;
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-panel);
 }
 
 // -----------------------------------------------------------------------------
@@ -129,9 +196,9 @@
   gap: var(--space-3);
   padding-block: var(--space-1);
   padding-inline: var(--space-3) var(--space-1);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-control);
-  background-color: var(--surface-muted);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-tile);
+  background-color: var(--color-panel-soft);
 }
 
 .origin-value {
@@ -171,14 +238,34 @@
   text-align: end;
 }
 
-// The snippet is a single long line. It scrolls inside its own box rather than
-// wrapping, because a wrapped script tag invites a hand copy that gets it wrong.
+// The snippet: a code block with a bar for its name and Copy. One long line
+// that scrolls inside the block rather than wrapping, because a wrapped
+// script tag invites a hand copy that gets it wrong.
+.code-block {
+  overflow: hidden;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-tile);
+  background-color: var(--color-panel-soft);
+}
+
+.code-block-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding-block: var(--space-1);
+  padding-inline: var(--space-4) var(--space-1);
+  border-block-end: 1px solid var(--color-line);
+  color: var(--color-text-quiet);
+  font: var(--text-caption);
+}
+
+.code-block-name {
+  margin-inline-end: auto;
+}
+
 .snippet {
   margin: 0;
-  padding: var(--space-3);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-badge);
-  background-color: var(--surface-inset);
+  padding: var(--space-4);
   overflow-x: auto;
   font: var(--text-small);
   font-family: var(--font-mono);

@@ -1,7 +1,7 @@
 <!--
   The lockup until the public read answers, so the chat is never drawn in the
   wrong theme (only the lockup's own background can change, once). After that,
-  the panel in the workspace's look.
+  the panel in the workspace's look, on the visitor's ground and its two glows.
 -->
 @if (state() === 'opening' && !appearanceKnown()) {
   <app-boot-state data-testid="chat-loading" />
@@ -10,9 +10,10 @@
     <app-chat-panel
       class="chat-page-panel"
       variant="page"
-      [accented]="accent() !== null"
-      [style.--chat-accent]="accent()?.accent"
-      [style.--chat-on-accent]="accent()?.foreground"
+      [style.--chat-brand-light]="brand().light?.accent"
+      [style.--chat-on-brand-light]="brand().light?.foreground"
+      [style.--chat-brand-dark]="brand().dark?.accent"
+      [style.--chat-on-brand-dark]="brand().dark?.foreground"
       [state]="state()"
       [agentName]="agentName()"
       [workspaceName]="workspaceName()"
@@ -29,11 +30,6 @@
       (send)="send()"
       (newChat)="startNewConversation()"
       (retry)="open()"
-    >
-      <!-- Nabra's mark belongs to Nabra's own look; a workspace's colour stands alone. -->
-      @if (accent() === null) {
-        <app-brand-mark chatBrand class="chat-page-mark" />
-      }
-    </app-chat-panel>
+    />
   </main>
 }

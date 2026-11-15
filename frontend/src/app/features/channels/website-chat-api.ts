@@ -27,9 +27,20 @@ export interface WebChatEndpoint {
   readonly updatedAt: string;
 }
 
-/** The four appearance settings a workspace may choose. */
+/**
+ * The greeting in each language (Phase 39.1). Either may be empty; a visitor
+ * whose language has none of its own sees the default `greeting`.
+ */
+export interface WebChatGreetings {
+  readonly en: string | null;
+  readonly ar: string | null;
+}
+
+/** The appearance settings a workspace may choose. */
 export interface WebChatWidget {
+  /** The default greeting: for visitors whose language has no greeting of its own. */
   readonly greeting: string | null;
+  readonly greetings: WebChatGreetings;
   readonly accentColor: string;
   readonly launcherPosition: LauncherPosition;
   readonly theme: 'System' | 'Light' | 'Dark';
@@ -60,6 +71,11 @@ export interface WebChatWidgetConfiguration {
  */
 export interface UpdateWebChatWidgetRequest {
   readonly greeting: string | null;
+  /**
+   * Both greetings, always sent: an empty one clears it. (Leaving the member out
+   * would keep the stored ones, which is for clients that do not know it.)
+   */
+  readonly greetings: WebChatGreetings;
   readonly accentColor: string;
   readonly launcherPosition: LauncherPosition;
   readonly theme: 'System' | 'Light' | 'Dark';

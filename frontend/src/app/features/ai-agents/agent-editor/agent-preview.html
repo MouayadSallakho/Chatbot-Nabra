@@ -46,6 +46,10 @@
       [style.--chat-accent]="accent().accent"
       [style.--chat-on-accent]="accent().foreground"
       [style.--chat-accent-edge]="accent().edge"
+      [style.--chat-brand-light]="brand().light?.accent"
+      [style.--chat-on-brand-light]="brand().light?.foreground"
+      [style.--chat-brand-dark]="brand().dark?.accent"
+      [style.--chat-on-brand-dark]="brand().dark?.foreground"
       data-testid="preview-frame"
     >
       <app-chat-panel

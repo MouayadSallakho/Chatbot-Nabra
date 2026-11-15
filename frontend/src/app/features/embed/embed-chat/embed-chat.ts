@@ -20,7 +20,7 @@ import { mergeTurn } from '@app/features/chat/merge-turn';
 import { ChatLauncher } from '@app/shared/chat/chat-launcher';
 import { ChatPanel } from '@app/shared/chat/chat-panel';
 import { visitorFailure } from '@app/shared/chat/visitor-copy';
-import { DEFAULT_ACCENT, applyAccent } from '../accent-color';
+import { DEFAULT_ACCENT, applyAccent, applyChatBrand, chatBrand } from '../accent-color';
 import { EmbedBridge } from '../embed-bridge';
 import { EmbedChatApi, EmbeddedChatConfig } from '../embed-chat-api';
 import { EmbedSessionStore } from '../embed-session';
@@ -155,8 +155,14 @@ export class EmbedChat implements OnInit {
     // The one thing a workspace configures that reaches CSS, and it reaches it
     // as a checked value: anything but `#rrggbb` becomes the default before it
     // is used, and the label colour is chosen to reach 4.5:1 on it.
+    //
+    // The launcher wears the accent as the loader always has; inside the panel
+    // it stands in for emerald (the workspace tile and Send) only in a theme
+    // where it holds every contrast pair (Phase 39.5b).
     effect(() => {
-      applyAccent(this.host.nativeElement, this.accent());
+      const checked = applyAccent(this.host.nativeElement, this.accent());
+
+      applyChatBrand(this.host.nativeElement, chatBrand(checked.accent));
     });
 
     /**
@@ -222,7 +228,7 @@ export class EmbedChat implements OnInit {
     this.becomeTransparent();
 
     try {
-      const config = await firstValueFrom(this.api.config(publicKey, origin));
+      const config = await firstValueFrom(this.api.config(publicKey, origin, this.language));
 
       this.apply(config);
 

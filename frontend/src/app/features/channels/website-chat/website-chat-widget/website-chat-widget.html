@@ -84,27 +84,44 @@
               Visitors see your workspace's name at the top of the chat.
             </p>
 
-            <div class="field">
-              <label class="field-label" for="widget-greeting" i18n="@@widget.greeting"
-                >Greeting</label
-              >
-              <textarea
-                id="widget-greeting"
-                class="textarea"
-                rows="2"
-                dir="auto"
-                formControlName="greeting"
-                [attr.maxlength]="maxGreetingLength"
-                aria-describedby="widget-greeting-hint"
-                placeholder="Hi, ask us anything."
-                i18n-placeholder="@@widget.greeting.placeholder"
-              ></textarea>
+            <!--
+              The greeting per language (Phase 39.1): English and Arabic, each
+              optional, and the default for visitors whose language has none.
+            -->
+            <fieldset class="greetings" aria-describedby="widget-greeting-hint">
+              <legend class="field-label" i18n="@@widget.greeting">Greeting</legend>
               <p id="widget-greeting-hint" class="field-hint" i18n="@@widget.greeting.hint">
                 Shown at the top of the chat before anybody types, as your words rather than as
                 something the AI said. Up to {{ maxGreetingLength }} characters; it may be left
                 empty.
               </p>
-            </div>
+
+              @for (box of greetingBoxes; track box.id) {
+                <div class="field">
+                  <label class="field-label field-label-quiet" [for]="box.id">{{
+                    box.label
+                  }}</label>
+                  <textarea
+                    [id]="box.id"
+                    class="textarea"
+                    rows="2"
+                    [attr.dir]="box.dir"
+                    [attr.lang]="box.lang"
+                    [formControlName]="box.control"
+                    [attr.maxlength]="maxGreetingLength"
+                    [attr.aria-describedby]="describedBy(box)"
+                    [attr.aria-invalid]="greetingProblem()?.field === box.field ? true : null"
+                    [attr.data-testid]="box.testId"
+                  ></textarea>
+                  <p [id]="box.id + '-hint'" class="field-hint">{{ box.hint }}</p>
+                  @if (greetingProblem()?.field === box.field) {
+                    <p [id]="box.id + '-error'" class="field-error" role="alert">
+                      {{ greetingProblem()?.message }}
+                    </p>
+                  }
+                </div>
+              }
+            </fieldset>
 
             <!-- The accent, and what the widget's rules make of it. -->
             <fieldset class="accent">
@@ -140,8 +157,10 @@
                 />
               </div>
               <p id="widget-accent-hint" class="field-hint" i18n="@@widget.accent.hint">
-                The launcher, the header and Send use it, and the AI's replies a light tint of it.
-                The text on top is chosen so it can always be read.
+                The launcher wears it on your website. Inside the chat, the workspace tile and Send
+                wear it wherever it keeps the contrast rules, and Nabra's emerald otherwise; the
+                AI's replies always stay emerald. The text on top is chosen so it can always be
+                read.
               </p>
               @if (accentInvalid()) {
                 <p
@@ -201,36 +220,101 @@
                     >
                   }
                 </li>
+                @for (check of chatChecks(); track check.theme) {
+                  <li
+                    class="check"
+                    [class.is-pass]="check.used"
+                    [attr.data-testid]="'chat-check-' + check.theme"
+                  >
+                    <app-icon [name]="check.used ? 'check' : 'info'" [strokeWidth]="2" />
+                    @switch (check.theme + (check.used ? '-used' : '-emerald')) {
+                      @case ('light-used') {
+                        <span i18n="@@widget.check.chatLightUsed"
+                          >Inside the chat, light:
+                          <bdi dir="ltr" class="check-ratio">{{ ratio(check.onGround) }}</bdi>
+                          against its background, so the tile and Send use your colour</span
+                        >
+                      }
+                      @case ('dark-used') {
+                        <span i18n="@@widget.check.chatDarkUsed"
+                          >Inside the chat, dark:
+                          <bdi dir="ltr" class="check-ratio">{{ ratio(check.onGround) }}</bdi>
+                          against its background, so the tile and Send use your colour</span
+                        >
+                      }
+                      @case ('light-emerald') {
+                        <span i18n="@@widget.check.chatLightEmerald"
+                          >Inside the chat, light: your colour does not keep the contrast rules
+                          there, so the tile and Send use Nabra's emerald</span
+                        >
+                      }
+                      @default {
+                        <span i18n="@@widget.check.chatDarkEmerald"
+                          >Inside the chat, dark: your colour does not keep the contrast rules
+                          there, so the tile and Send use Nabra's emerald</span
+                        >
+                      }
+                    }
+                  </li>
+                }
               </ul>
             </fieldset>
 
-            <div class="appearance-row">
-              <div class="field">
-                <label class="field-label" for="widget-position" i18n="@@widget.position"
-                  >Launcher position</label
-                >
-                <select id="widget-position" class="select" formControlName="launcherPosition">
-                  <option value="Right" i18n="@@widget.position.right">Bottom right</option>
-                  <option value="Left" i18n="@@widget.position.left">Bottom left</option>
-                  <option value="Start" i18n="@@widget.position.start">
-                    Start: right in Arabic pages, left in English pages
-                  </option>
-                  <option value="End" i18n="@@widget.position.end">
-                    End: left in Arabic pages, right in English pages
-                  </option>
-                </select>
+            <!--
+              The corner: four choices, each with a picture of where the
+              launcher sits on a page in the reader's language.
+            -->
+            <fieldset class="corners" id="widget-position" data-testid="widget-position">
+              <legend class="field-label" i18n="@@widget.position">Launcher position</legend>
+              <div class="corner-options">
+                @for (corner of corners; track corner) {
+                  <label app-radio class="corner-option" [attr.data-testid]="'corner-' + corner">
+                    <input
+                      type="radio"
+                      name="launcherPosition"
+                      formControlName="launcherPosition"
+                      [value]="corner"
+                      [attr.value]="corner"
+                    />
+                    <span class="corner-words">
+                      <span
+                        class="corner-picture"
+                        [class.is-left]="cornerSide(corner) === 'Left'"
+                        aria-hidden="true"
+                      ></span>
+                      @switch (corner) {
+                        @case ('Right') {
+                          <span i18n="@@widget.position.right">Bottom right</span>
+                        }
+                        @case ('Left') {
+                          <span i18n="@@widget.position.left">Bottom left</span>
+                        }
+                        @case ('Start') {
+                          <span i18n="@@widget.position.start"
+                            >Start: right in Arabic pages, left in English pages</span
+                          >
+                        }
+                        @default {
+                          <span i18n="@@widget.position.end"
+                            >End: left in Arabic pages, right in English pages</span
+                          >
+                        }
+                      }
+                    </span>
+                  </label>
+                }
               </div>
+            </fieldset>
 
-              <div class="field">
-                <label class="field-label" for="widget-theme" i18n="@@widget.theme">Theme</label>
-                <select id="widget-theme" class="select" formControlName="theme">
-                  <option value="System" i18n="@@widget.theme.system">
-                    Match the visitor's device
-                  </option>
-                  <option value="Light" i18n="@@widget.theme.light">Light</option>
-                  <option value="Dark" i18n="@@widget.theme.dark">Dark</option>
-                </select>
-              </div>
+            <div class="field theme-field">
+              <label class="field-label" for="widget-theme" i18n="@@widget.theme">Theme</label>
+              <select id="widget-theme" class="select" formControlName="theme">
+                <option value="System" i18n="@@widget.theme.system">
+                  Match the visitor's device
+                </option>
+                <option value="Light" i18n="@@widget.theme.light">Light</option>
+                <option value="Dark" i18n="@@widget.theme.dark">Dark</option>
+              </select>
             </div>
           </div>
         </section>
@@ -263,6 +347,10 @@
                 [style.--chat-accent]="accent().accent"
                 [style.--chat-on-accent]="accent().foreground"
                 [style.--chat-accent-edge]="accent().edge"
+                [style.--chat-brand-light]="brand().light?.accent"
+                [style.--chat-on-brand-light]="brand().light?.foreground"
+                [style.--chat-brand-dark]="brand().dark?.accent"
+                [style.--chat-on-brand-dark]="brand().dark?.foreground"
                 inert
                 aria-hidden="true"
               >
@@ -285,6 +373,32 @@
                   />
                 </div>
               </div>
+              @if (emeraldIn(); as where) {
+                <!-- The fallback, said where the colour is shown (Phase 39.5b). -->
+                <p class="check text-small text-secondary m-0" data-testid="preview-emerald">
+                  <app-icon name="info" [strokeWidth]="2" />
+                  @switch (where) {
+                    @case ('light') {
+                      <span i18n="@@widget.preview.emeraldLight"
+                        >In the light look your colour does not keep the contrast rules, so visitors
+                        see Nabra's emerald on the tile and Send there.</span
+                      >
+                    }
+                    @case ('dark') {
+                      <span i18n="@@widget.preview.emeraldDark"
+                        >In the dark look your colour does not keep the contrast rules, so visitors
+                        see Nabra's emerald on the tile and Send there.</span
+                      >
+                    }
+                    @default {
+                      <span i18n="@@widget.preview.emeraldBoth"
+                        >Your colour does not keep the contrast rules inside the chat, so visitors
+                        see Nabra's emerald on the tile and Send.</span
+                      >
+                    }
+                  }
+                </p>
+              }
               <p class="text-small text-secondary" data-testid="preview-theme-note">
                 @switch (previewTheme()) {
                   @case ('Light') {
@@ -470,28 +584,32 @@
       </div>
 
       <div class="card-body">
-        <pre
-          class="snippet"
-          dir="ltr"
-          appScrollRegion="Installation snippet"
-          i18n-appScrollRegion="@@widget.install.snippetLabel"
-        ><code>{{ current.installSnippet }}</code></pre>
-
-        <div class="install-actions">
-          <button
-            type="button"
-            class="btn btn-secondary btn-sm"
-            (click)="copy('snippet')"
-            i18n="@@widget.install.copy"
-          >
-            Copy snippet
-          </button>
-
-          @if (copied() === 'snippet') {
-            <span class="text-small text-muted" role="status" i18n="@@websiteChat.copied"
-              >Copied.</span
+        <!-- The snippet as a code block, its Copy button in its own bar. -->
+        <div class="code-block" data-testid="install-snippet">
+          <div class="code-block-bar">
+            <span class="code-block-name" dir="ltr">HTML</span>
+            @if (copied() === 'snippet') {
+              <span class="check is-pass" role="status">
+                <app-icon name="check" [strokeWidth]="2" />
+                <span i18n="@@websiteChat.copied">Copied.</span>
+              </span>
+            }
+            <button
+              type="button"
+              class="btn btn-quiet btn-sm"
+              (click)="copy('snippet')"
+              data-testid="copy-snippet"
+              i18n="@@widget.install.copy"
             >
-          }
+              Copy snippet
+            </button>
+          </div>
+          <pre
+            class="snippet"
+            dir="ltr"
+            appScrollRegion="Installation snippet"
+            i18n-appScrollRegion="@@widget.install.snippetLabel"
+          ><code>{{ current.installSnippet }}</code></pre>
         </div>
 
         <p class="text-small text-secondary" i18n="@@widget.install.csp">

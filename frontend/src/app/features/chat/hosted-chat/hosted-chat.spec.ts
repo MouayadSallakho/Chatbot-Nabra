@@ -1,6 +1,7 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { APP_LANGUAGE } from '@app/core/i18n/language';
 import { PublicChatRealtime } from '@app/core/realtime/public-chat-realtime';
 import { FakePublicChatRealtime } from '@app/testing/test-doubles';
 import { HostedChatApi } from '../hosted-chat-api';
@@ -12,7 +13,8 @@ describe('HostedChat', () => {
   const conversationId = '11111111-1111-7111-8111-111111111111';
   const otherConversationId = '22222222-2222-7222-8222-222222222222';
 
-  const configUrl = `/api/public/webchat/${publicKey}`;
+  // The page sends its language with the public read (Phase 39.1).
+  const configUrl = `/api/public/webchat/${publicKey}?lang=en`;
   const startUrl = `/api/public/webchat/${publicKey}/conversations`;
   const messagesUrl = `/api/public/webchat/conversations/${conversationId}/messages`;
 
@@ -34,7 +36,7 @@ describe('HostedChat', () => {
    * browser reload is modelled: the component is destroyed and rebuilt while
    * `sessionStorage` survives, exactly as it does across a refresh.
    */
-  async function mount(): Promise<void> {
+  async function mount(extra: unknown[] = []): Promise<void> {
     TestBed.resetTestingModule();
 
     TestBed.configureTestingModule({
@@ -44,6 +46,7 @@ describe('HostedChat', () => {
         HostedChatApi,
         HostedChatSessionStore,
         { provide: PublicChatRealtime, useClass: FakePublicChatRealtime },
+        ...(extra as []),
       ],
     });
 
@@ -197,27 +200,71 @@ describe('HostedChat', () => {
       );
     });
 
-    it('wears a valid accent with the ink that reads on it', async () => {
+    // Calm Glass (Phase 39.5b): the workspace's colour stands in for emerald on
+    // the tile and Send only in a theme where every contrast pair holds.
+    const brand = (name: string): string => panel().style.getPropertyValue(name);
+
+    it('wears a navy accent in the light look only: it sinks into the dark ground', async () => {
+      await openWith({ accentColor: '#1d3557' });
+
+      expect(brand('--chat-brand-light')).toBe('#1d3557');
+      expect(brand('--chat-on-brand-light')).toBe('#ffffff');
+      expect(brand('--chat-brand-dark')).toBe('');
+      expect(brand('--chat-on-brand-dark')).toBe('');
+    });
+
+    it('wears a pale accent in the dark look only, with the ink that reads on it', async () => {
       await openWith({ accentColor: '#FFE066' });
 
-      expect(panel().style.getPropertyValue('--chat-accent')).toBe('#ffe066');
-      expect(panel().style.getPropertyValue('--chat-on-accent')).toBe('#111827');
-      expect(panel().classList).toContain('has-accent');
-      expect(host().querySelector('app-brand-mark')).toBeNull();
+      expect(brand('--chat-brand-light')).toBe('');
+      expect(brand('--chat-brand-dark')).toBe('#ffe066');
+      expect(brand('--chat-on-brand-dark')).toBe('#111827');
     });
 
     it.each(['red;background:url(x)', '#fff', ' #1d3557', 'var(--x)', '#2e8b57'])(
-      'keeps the product look for the accent %s, silently',
+      'keeps emerald for the accent %s, silently',
       async (accentColor) => {
         await openWith({ accentColor });
 
-        expect(panel().style.getPropertyValue('--chat-accent')).toBe('');
+        expect(brand('--chat-brand-light')).toBe('');
+        expect(brand('--chat-brand-dark')).toBe('');
         expect(panel().getAttribute('style') ?? '').not.toContain('url');
-        expect(panel().classList).not.toContain('has-accent');
-        expect(host().querySelector('app-brand-mark')).not.toBeNull();
         expect(host().querySelector('[role="alert"]')).toBeNull();
       },
     );
+
+    it("draws the workspace's first letter on its tile, and says who answers", async () => {
+      await openWith({ workspaceName: 'northwind', agentName: 'Concierge' });
+
+      expect(host().querySelector('.chat-tile')?.textContent?.trim()).toBe('N');
+      expect(host().querySelector('[data-testid="chat-status"]')?.textContent).toContain(
+        'Concierge',
+      );
+      expect(host().querySelector('app-brand-mark')).toBeNull();
+    });
+
+    it('says "Powered by Nabra" quietly, without a link', async () => {
+      await openWith({});
+
+      const powered = host().querySelector('.chat-powered');
+
+      expect(powered?.textContent?.trim()).toBe('Powered by Nabra');
+      expect(powered?.closest('a')).toBeNull();
+    });
+
+    it('asks for the greeting in the page language', async () => {
+      openAt(publicKey);
+      await mount([{ provide: APP_LANGUAGE, useValue: 'ar' }]);
+
+      http
+        .expectOne(`/api/public/webchat/${publicKey}?lang=ar`)
+        .flush(publicRead({ greeting: 'أهلًا بك في نورثويند.' }));
+      await settle();
+
+      expect(host().querySelector('[data-testid="chat-greeting"]')?.textContent).toContain(
+        'أهلًا بك في نورثويند.',
+      );
+    });
 
     it('applies a configured theme over the system one', async () => {
       await openWith({ theme: 'Dark' });

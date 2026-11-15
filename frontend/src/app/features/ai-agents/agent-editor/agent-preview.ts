@@ -5,7 +5,8 @@ import { Icon } from '@app/shared/icon/icon';
 import { ChatPanel } from '@app/shared/chat/chat-panel';
 import type { ChatMessage } from '@app/features/chat/hosted-chat-api';
 import type { WebChatWidget } from '@app/features/channels/website-chat-api';
-import { DEFAULT_ACCENT, checkAccent } from '@app/features/embed/accent-color';
+import { APP_LANGUAGE } from '@app/core/i18n/language';
+import { DEFAULT_ACCENT, chatBrand, checkAccent } from '@app/features/embed/accent-color';
 import { AGENT_LIMITS } from '../ai-agent-limits';
 import { AiAgentApi } from '../ai-agent-api';
 
@@ -59,6 +60,7 @@ interface Exchange {
 })
 export class AgentPreview {
   private readonly api = inject(AiAgentApi);
+  private readonly language = inject(APP_LANGUAGE);
 
   readonly tenantId = input.required<string>();
   readonly aiAgentId = input.required<string>();
@@ -80,7 +82,20 @@ export class AgentPreview {
     checkAccent(this.widget()?.accentColor ?? DEFAULT_ACCENT),
   );
 
-  protected readonly greeting = computed(() => this.widget()?.greeting ?? null);
+  /**
+   * The workspace's colour inside the chat (the tile and Send), per theme, only
+   * where it holds every contrast pair; emerald elsewhere (Phase 39.5b).
+   */
+  protected readonly brand = computed(() =>
+    chatBrand(this.widget()?.accentColor ?? DEFAULT_ACCENT),
+  );
+
+  /** The greeting a visitor reading this page's language would see (Phase 39.1). */
+  protected readonly greeting = computed(() => {
+    const widget = this.widget();
+
+    return widget?.greetings?.[this.language] || widget?.greeting || null;
+  });
 
   protected readonly limits = AGENT_LIMITS;
 

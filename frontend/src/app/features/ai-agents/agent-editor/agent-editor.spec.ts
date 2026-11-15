@@ -285,6 +285,7 @@ describe('AgentEditor', () => {
       widget = {
         greeting: 'Hello from Acme.',
         accentColor: '#0e7c72',
+        greetings: { en: null, ar: null },
         launcherPosition: 'Right',
         theme: 'System',
       };

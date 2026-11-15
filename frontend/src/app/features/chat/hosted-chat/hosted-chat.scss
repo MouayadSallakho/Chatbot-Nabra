@@ -1,38 +1,26 @@
-// The hosted chat page: the shared chat panel (shared/chat/), full height on a
-// phone and a centred column with room around it on anything wider. Outside
-// the admin shell, on the same tokens, so it follows the visitor's light or
-// dark setting.
+// The hosted chat page (Calm Glass, boards Widget and WidgetAr): the visitor's
+// ground with its two soft glows (`--chat-glows`), and the shared chat panel
+// (shared/chat/) as one column, full height, centred on anything wider than a
+// phone. Outside the admin shell, on the same tokens, so it follows the
+// visitor's light or dark.
 
 .chat-page {
   display: flex;
   justify-content: center;
   min-block-size: 100dvh;
-  background-color: var(--surface-inset);
+  background: var(--chat-glows), var(--color-ground-visitor);
 
   &:focus {
     outline: none;
   }
 
-  @media (min-width: 640px) {
-    align-items: center;
-    padding: var(--space-6) var(--space-4);
+  @media (forced-colors: active) {
+    background: Canvas;
   }
 }
 
 .chat-page-panel {
   inline-size: 100%;
-  max-inline-size: 44rem;
+  max-inline-size: 46rem;
   block-size: 100dvh;
-
-  @media (min-width: 640px) {
-    block-size: min(48rem, calc(100dvh - var(--space-6) * 2));
-    border: 1px solid var(--border-default);
-    border-radius: var(--radius-card);
-  }
-}
-
-.chat-page-mark {
-  --brand-mark-size: 1.75rem;
-
-  flex: none;
 }

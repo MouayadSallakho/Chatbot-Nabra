@@ -77,4 +77,40 @@ describe('area refusals by code (Phase 38.3)', () => {
   ])('words %s by its code', (code, words) => {
     expect(toApiError(refusal(code)).message).toContain(words);
   });
+
+  describe('the greeting refusals, by the field the server names (Phase 39.1)', () => {
+    const named = (code: string, field?: string) =>
+      new HttpErrorResponse({
+        status: 400,
+        error: { title: 'Refused', detail: 'The English sentence from the server.', code, field },
+      });
+
+    it.each([
+      ['website-chat.greeting.too_long', 'greetings.en', 'The English greeting is too long'],
+      ['website-chat.greeting.too_long', 'greetings.ar', 'The Arabic greeting is too long'],
+      ['website-chat.greeting.too_long', 'greeting', 'The default greeting is too long'],
+      ['website-chat.greeting.too_long', undefined, 'This greeting is too long'],
+      ['website-chat.greeting.control_characters', 'greetings.en', 'The English greeting has'],
+      ['website-chat.greeting.control_characters', 'greetings.ar', 'The Arabic greeting has'],
+      ['website-chat.greeting.control_characters', 'greeting', 'The default greeting has'],
+      ['website-chat.greeting.control_characters', 'nonsense', 'This greeting has'],
+    ])('words %s for field %s', (code, field, words) => {
+      const error = toApiError(named(code, field));
+
+      expect(error.message).toContain(words);
+      expect(error.field).toBe(field === undefined ? undefined : field);
+    });
+
+    it('keeps only a string field', () => {
+      const error = toApiError(
+        new HttpErrorResponse({
+          status: 400,
+          error: { code: 'website-chat.greeting.too_long', field: { en: true } },
+        }),
+      );
+
+      expect(error.field).toBeUndefined();
+      expect(error.message).toContain('This greeting is too long');
+    });
+  });
 });

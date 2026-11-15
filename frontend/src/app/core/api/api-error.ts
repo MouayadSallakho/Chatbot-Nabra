@@ -97,6 +97,12 @@ export interface ApiError {
   readonly fields?: readonly string[];
 
   /**
+   * Which member a refusal is about, where the server names one in `field`
+   * (Phase 39.1: `greeting`, `greetings.en` or `greetings.ar`).
+   */
+  readonly field?: string;
+
+  /**
    * A sentence safe to show a reader, in the reader's language.
    *
    * Worded by `code` wherever a catalogue knows it (`core/problems/`), and
@@ -156,6 +162,7 @@ export function toApiError(failure: unknown): ApiError {
   const codes = problemCodes(failure);
   const limit = problemLimit(failure);
   const limitUnit = limit === undefined ? undefined : problemLimitUnit(failure);
+  const field = problemField(failure);
   const worded =
     code === undefined
       ? undefined
@@ -164,6 +171,7 @@ export function toApiError(failure: unknown): ApiError {
           retryAfterSeconds,
           limit,
           limitUnit,
+          field,
           codes: codes ?? [code],
         });
 
@@ -174,6 +182,7 @@ export function toApiError(failure: unknown): ApiError {
     limit,
     limitUnit,
     fields: problemFields(failure),
+    field,
     status: failure.status,
     retryAfterSeconds,
     message: worded ?? readableMessage(failure, kind),
@@ -336,6 +345,13 @@ function problemLimitUnit(failure: HttpErrorResponse): LimitUnit | undefined {
   const unit = problemBody(failure)?.['limitUnit'];
 
   return LIMIT_UNITS.find((known) => known === unit);
+}
+
+/** A string `field` member, or nothing. */
+function problemField(failure: HttpErrorResponse): string | undefined {
+  const field = problemBody(failure)?.['field'];
+
+  return typeof field === 'string' && field.length > 0 ? field : undefined;
 }
 
 /** The names in an `errors` map. Its values are the server's English and stay unread. */

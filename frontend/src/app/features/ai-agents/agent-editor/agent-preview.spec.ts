@@ -262,6 +262,7 @@ describe('AgentPreview', () => {
       fixture.componentRef.setInput('widget', {
         greeting: null,
         accentColor: '#f2c94c',
+        greetings: { en: null, ar: null },
         launcherPosition: 'Right',
         theme: 'System',
       });
@@ -277,6 +278,7 @@ describe('AgentPreview', () => {
       fixture.componentRef.setInput('widget', {
         greeting: null,
         accentColor: 'red; background: url(x)',
+        greetings: { en: null, ar: null },
         launcherPosition: 'Right',
         theme: 'System',
       });
@@ -291,6 +293,7 @@ describe('AgentPreview', () => {
       fixture.componentRef.setInput('widget', {
         greeting: 'Hello! Ask us about orders.',
         accentColor: '#0e7c72',
+        greetings: { en: null, ar: null },
         launcherPosition: 'Right',
         theme: 'System',
       });
@@ -300,6 +303,43 @@ describe('AgentPreview', () => {
         'Ask us about orders',
       );
       expect(host().querySelector('[data-testid="chat-message"]')).toBeNull();
+    });
+
+    it("prefers the greeting in the reader's language, else the default (Phase 39.1)", async () => {
+      mount();
+      fixture.componentRef.setInput('widget', {
+        greeting: 'Hello.',
+        accentColor: '#0e7c72',
+        greetings: { en: 'Hi, ask us anything!', ar: 'أهلًا بك!' },
+        launcherPosition: 'Right',
+        theme: 'System',
+      });
+      await settle();
+
+      expect(host().querySelector('[data-testid="chat-greeting"]')?.textContent).toContain(
+        'Hi, ask us anything!',
+      );
+
+      fixture.componentRef.setInput('widget', {
+        greeting: 'Hello.',
+        accentColor: '#0e7c72',
+        greetings: { en: null, ar: 'أهلًا بك!' },
+        launcherPosition: 'Right',
+        theme: 'System',
+      });
+      await settle();
+
+      expect(host().querySelector('[data-testid="chat-greeting"]')?.textContent).toContain(
+        'Hello.',
+      );
+    });
+
+    it('paints the tile and Send in the colour only where it holds (Phase 39.5b)', async () => {
+      mount();
+
+      // The default blue holds in the light look only.
+      expect(frame().style.getPropertyValue('--chat-brand-light')).toBe('#2563eb');
+      expect(frame().style.getPropertyValue('--chat-brand-dark')).toBe('');
     });
 
     it('keeps each message in its writer direction and the AI on its own side', async () => {

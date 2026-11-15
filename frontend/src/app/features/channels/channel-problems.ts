@@ -17,8 +17,24 @@ export const CHANNEL_PROBLEM_WORDS: ProblemCatalogue = {
   'website-chat.theme.invalid': $localize`:@@problem.websiteChat.theme.invalid:That theme is not available. Choose one from the list.`,
   'website-chat.accent_color.required': $localize`:@@problem.websiteChat.accent_color.required:Choose an accent colour.`,
   'website-chat.accent_color.invalid': $localize`:@@problem.websiteChat.accent_color.invalid:Write the colour as # and six digits or letters from a to f, for example #2563eb.`,
-  'website-chat.greeting.too_long': $localize`:@@problem.websiteChat.greeting.too_long:This greeting is too long. Shorten it and save again.`,
-  'website-chat.greeting.control_characters': $localize`:@@problem.websiteChat.greeting.control_characters:This greeting has characters that cannot be saved. Paste it as plain text and try again.`,
+  // Worded by the greeting the server names in `field` (Phase 39.1): the
+  // default one, or the English or the Arabic one.
+  'website-chat.greeting.too_long': ({ field }) =>
+    field === 'greetings.en'
+      ? $localize`:@@problem.websiteChat.greeting.too_long.en:The English greeting is too long. Shorten it and save again.`
+      : field === 'greetings.ar'
+        ? $localize`:@@problem.websiteChat.greeting.too_long.ar:The Arabic greeting is too long. Shorten it and save again.`
+        : field === 'greeting'
+          ? $localize`:@@problem.websiteChat.greeting.too_long.default:The default greeting is too long. Shorten it and save again.`
+          : $localize`:@@problem.websiteChat.greeting.too_long:This greeting is too long. Shorten it and save again.`,
+  'website-chat.greeting.control_characters': ({ field }) =>
+    field === 'greetings.en'
+      ? $localize`:@@problem.websiteChat.greeting.control_characters.en:The English greeting has characters that cannot be saved. Paste it as plain text and try again.`
+      : field === 'greetings.ar'
+        ? $localize`:@@problem.websiteChat.greeting.control_characters.ar:The Arabic greeting has characters that cannot be saved. Paste it as plain text and try again.`
+        : field === 'greeting'
+          ? $localize`:@@problem.websiteChat.greeting.control_characters.default:The default greeting has characters that cannot be saved. Paste it as plain text and try again.`
+          : $localize`:@@problem.websiteChat.greeting.control_characters:This greeting has characters that cannot be saved. Paste it as plain text and try again.`,
   'entitlement.webchatendpoints.exhausted': $localize`:@@problem.entitlement.webchatendpoints.exhausted:This workspace has reached the number of website chat links its plan allows. Nothing was created.`,
 
   'whatsapp.agent.required': $localize`:@@problem.whatsapp.agent.required:Choose an agent for this number.`,

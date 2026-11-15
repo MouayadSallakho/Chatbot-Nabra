@@ -89,6 +89,7 @@ describe('WebsiteChatDetail', () => {
         widget: {
           greeting: null,
           accentColor: '#2563eb',
+          greetings: { en: null, ar: null },
           launcherPosition: 'Right',
           theme: 'System',
         },

@@ -21,6 +21,9 @@ export interface ProblemFacts {
   /** What `limit` counts, when the server says (BA-12). */
   readonly limitUnit?: LimitUnit;
 
+  /** Which member the refusal is about, when the server names one in `field`. */
+  readonly field?: string;
+
   /** Every rule the server named, the first one included. */
   readonly codes: readonly string[];
 }
