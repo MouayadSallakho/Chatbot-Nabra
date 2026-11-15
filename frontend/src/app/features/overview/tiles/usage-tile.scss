@@ -1,0 +1,121 @@
+@use 'tile';
+
+@include tile.chrome;
+
+// The deep tile (board Overview): emerald-900 in the light look, emerald-800
+// with a line in the dark one. The roles below are re-pointed at the tile's
+// tokens, so the text, the meter, the chip and the focus ring inside it take
+// the dark look's colours (each pair measured in MASTER.md §13).
+:host {
+  --color-text: var(--tile-deep-text);
+  --color-text-secondary: var(--tile-deep-text-secondary);
+  --color-text-quiet: var(--tile-deep-text-quiet);
+  --color-link: var(--tile-deep-link);
+  --color-link-hover: var(--tile-deep-text);
+  --color-focus-ring: var(--tile-deep-focus);
+  --meter-track: var(--tile-deep-meter-track);
+  --meter-fill: var(--tile-deep-meter-fill);
+  --meter-warning: var(--tile-deep-meter-warning);
+  --meter-critical: var(--tile-deep-meter-critical);
+  --status-success-bg: var(--tile-deep-success-bg);
+  --status-success-fg: var(--tile-deep-success-fg);
+  --status-warning-bg: var(--tile-deep-warning-bg);
+  --status-warning-fg: var(--tile-deep-warning-fg);
+  --status-danger-bg: var(--tile-deep-danger-bg);
+  --status-danger-fg: var(--tile-deep-danger-fg);
+  --skeleton-base: var(--tile-deep-meter-track);
+  --skeleton-sheen: var(--tile-deep-success-bg);
+
+  border-color: var(--tile-deep-edge);
+  background-color: var(--tile-deep-bg);
+  color: var(--color-text);
+}
+
+.usage-head,
+.usage-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+}
+
+.usage-foot {
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.usage-limit,
+.usage-note {
+  font: var(--text-small);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-quiet);
+}
+
+.usage-figure {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-3);
+}
+
+.usage-value {
+  font: var(--text-title-1);
+  font-variant-numeric: tabular-nums;
+}
+
+.usage-unit {
+  font: var(--text-small);
+  color: var(--color-text-secondary);
+}
+
+.usage-link {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  min-block-size: var(--target-min);
+  margin-block-start: auto;
+  font: var(--text-label);
+  color: var(--color-link);
+  text-decoration: underline;
+
+  &:hover {
+    color: var(--color-link-hover);
+  }
+
+  &:focus-visible {
+    outline-color: var(--color-focus-ring);
+  }
+}
+
+.usage-retry {
+  align-self: flex-start;
+}
+
+.usage-skeleton-figure {
+  inline-size: 8rem;
+  block-size: 2.25rem;
+}
+
+.usage-skeleton-meter {
+  inline-size: 100%;
+  block-size: var(--meter-height);
+  border-radius: var(--radius-pill);
+}
+
+@media (forced-colors: active) {
+  :host {
+    border-color: CanvasText;
+  }
+}
+
+// While the read is out the tile holds its loaded size, so nothing below it
+// moves when it arrives (measured in Chrome on Northwind, Phase 39.7a, per
+// layout and language: Arabic lines are one step taller).
+:host([aria-busy='true']) {
+  min-block-size: 12.5rem;
+
+  @media (min-width: 80rem) {
+    min-block-size: 20rem;
+  }
+}

@@ -239,7 +239,8 @@ export class AnalyticsDashboardPage {
     {
       key: 'conversations',
       label: $localize`:@@analytics.series.conversations:Conversations started`,
-      tone: 'neutral',
+      // The period being read, in emerald (calm-glass.md §2; Phase 39.7a).
+      tone: 'current',
     },
   ];
 

@@ -5,7 +5,8 @@
  * only what a caller hands them -- counts the API returned -- and add no number
  * of their own beyond a sum or a share of the ones they were given. Colour comes
  * from the chart tokens and is always repeated in words (MASTER.md, section 3):
- * Lagoon is the AI, Ember is a person, customers and single series are neutral,
+ * emerald is the AI, gold a person, customers and single series are neutral,
+ * `current` is the period being read (emerald, calm-glass.md §2; Phase 39.7a),
  * and status colours appear only for a status, with its word.
  */
 
@@ -18,7 +19,8 @@
  * danger, anything unsettled in a lighter step of the neutral (`muted`), each
  * with its word and count.
  */
-export type ChartTone = 'ai' | 'human' | 'customer' | 'neutral' | 'danger' | 'warning' | 'muted';
+export type ChartTone =
+  'ai' | 'human' | 'customer' | 'neutral' | 'current' | 'danger' | 'warning' | 'muted';
 
 /** One thing being counted, in the order it is stacked or listed. */
 export interface ChartSeries {

@@ -1,186 +1,237 @@
+@use 'tiles/tile';
+
 // -----------------------------------------------------------------------------
-// Needs attention: a compact list, one line per item, most serious first. The
-// panel is three rows and a footer high in every state (loading, nothing, a
-// few, many), so nothing below it moves while the sources answer; only the
-// reader's own "+N more" makes it taller (Phase 36.12, revision 1).
+// The greeting (board Overview): the day and the workspace in quiet text, the
+// greeting in the display face: Instrument Serif 44/48, or Plex Arabic 600.
 // -----------------------------------------------------------------------------
-.attention-panel {
+.overview-head {
+  display: grid;
+  gap: var(--space-1);
+  margin-block-end: var(--space-5);
+  padding-inline: var(--space-1);
+}
+
+.overview-day {
   display: flex;
-  flex-direction: column;
-  // Three 3rem rows and a 2.75rem footer; border-box, so the card's 1px border
-  // on both sides is inside the height.
-  block-size: calc(11.75rem + 2px);
-
-  &.is-expanded {
-    block-size: auto;
-  }
-}
-
-// The most serious rows carry their status colour on the inline-start edge
-// too, beside the icon and the word; the others keep the same indent.
-.attention-row {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  block-size: 3rem;
-  border-inline-start: 3px solid transparent;
-
-  & + & {
-    border-block-start: 1px solid var(--border-subtle);
-  }
-
-  &.is-critical {
-    border-inline-start-color: var(--danger-fg);
-  }
-
-  &.is-warning {
-    border-inline-start-color: var(--warning-fg);
-  }
-}
-
-.attention-target {
-  display: flex;
-  flex: 1;
-  align-items: center;
-  gap: var(--space-3);
-  min-inline-size: 0;
-  block-size: 100%;
-  padding-inline: var(--space-4);
-  border: 0;
-  background: none;
-  color: var(--text-primary);
-  text-align: start;
-  text-decoration: none;
-  cursor: pointer;
-
-  &:hover {
-    background-color: var(--surface-hover);
-    text-decoration: none;
-  }
-
-  // Inside the row, so the ring is never cut by the panel's edge.
-  &:focus-visible {
-    outline-offset: calc(-1 * var(--focus-ring-width) - 2px);
-  }
-}
-
-.attention-tone,
-.attention-figure,
-.attention-action,
-.attention-arrow {
-  flex: none;
-}
-
-.attention-title,
-.attention-detail {
-  min-inline-size: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.attention-title {
-  flex: 1 1 auto;
-  font: var(--text-body-strong);
-}
-
-.attention-figure,
-.attention-detail,
-.attention-clear {
+  flex-wrap: wrap;
+  gap: var(--space-2);
   font: var(--text-small);
-  color: var(--text-secondary);
+  color: var(--color-text-quiet);
 }
 
-.attention-detail {
-  flex: 1 1 0;
-}
-
-.attention-action {
-  font: var(--text-label);
-  color: var(--link);
-}
-
-.attention-arrow {
-  inline-size: var(--icon-size);
-  block-size: var(--icon-size);
-  color: var(--text-secondary);
-}
-
-.attention-footer {
-  display: flex;
-  align-items: center;
-  block-size: 2.75rem;
-  margin-block-start: auto;
-  padding-inline: var(--space-2);
-}
-
-.attention-placeholder {
-  padding-inline: var(--space-4);
-}
-
-.attention-skeleton {
-  inline-size: 60%;
+.overview-greeting {
+  font: var(--text-display);
+  color: var(--color-text);
+  overflow-wrap: anywhere;
 }
 
 // -----------------------------------------------------------------------------
-// Right now, beside the week from 1280px.
+// The bento: one column on a phone, two from 768px, four from 1280px with the
+// board's spans. Tiles keep their place in every state (each draws its own
+// skeleton at its loaded size), so nothing moves while the sources answer.
 // -----------------------------------------------------------------------------
-.overview-numbers {
+.bento {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 0 var(--space-6);
+  gap: var(--bento-gap);
+  align-items: stretch;
+}
+
+.bento-wide {
+  grid-column: 1 / -1;
+}
+
+@media (min-width: 48rem) {
+  // Dense, so the ring and "Right now" (one column each) share a row. Neither
+  // holds anything focusable, so the keyboard order is unaffected. Channels
+  // and the month's AI usage share a row too.
+  .bento.has-numbers {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-auto-flow: dense;
+  }
+
+  .tile-conversations,
+  .tile-waiting,
+  .tile-attention,
+  .tile-messages {
+    grid-column: span 2;
+  }
+
+  // Without a monthly AI usage to show, the channels take its column too.
+  .tile-channels:not(:has(+ .tile-usage)) {
+    grid-column: span 2;
+  }
+
+  // Without the numbers: the waiting conversations beside what needs attention.
+  .bento:not(.has-numbers) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+
+    .tile-waiting,
+    .tile-attention {
+      grid-column: span 1;
+    }
+  }
+}
+
+@media (min-width: 80rem) {
+  .bento.has-numbers {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .bento.has-numbers .tile-conversations {
+    grid-row: span 2;
+  }
+
+  .bento.has-numbers .tile-answered,
+  .bento.has-numbers .tile-now {
+    grid-column: span 1;
+  }
+
+  .bento.has-numbers .tile-waiting {
+    grid-column: span 1;
+    grid-row: span 2;
+  }
+
+  // Messages per day across the whole width, under what needs attention, the
+  // channels and the month's AI usage.
+  .bento.has-numbers .tile-messages {
+    grid-column: 1 / -1;
+  }
+
+  // Nobody waiting is shown to a reader who may not open conversations: the
+  // ring and "Right now" take the two columns the gold tile would have.
+  .bento.has-numbers:not(.has-waiting) .tile-answered,
+  .bento.has-numbers:not(.has-waiting) .tile-now {
+    grid-column: span 2;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// While a tile's read is out it holds its loaded size, so nothing below it moves
+// when the numbers arrive (measured in Chrome on Northwind, Phase 39.7a, per
+// layout and language). The tile components hold their own; these are the two
+// drawn here.
+// -----------------------------------------------------------------------------
+.tile-now[aria-busy='true'] {
+  min-block-size: 12.375rem;
+
+  @media (min-width: 48rem) {
+    min-block-size: 19.5rem;
+  }
 
   @media (min-width: 80rem) {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
-    align-items: start;
+    min-block-size: 14.75rem;
+
+    &:lang(ar) {
+      min-block-size: 15rem;
+    }
+  }
+
+  @media (min-width: 90rem) {
+    min-block-size: 13rem;
+  }
+
+  @media (min-width: 110rem) {
+    &:lang(ar) {
+      min-block-size: 13.25rem;
+    }
   }
 }
 
-.section-link {
-  font: var(--text-label);
+.tile-messages[aria-busy='true'] {
+  min-block-size: 44.5rem;
+
+  @media (min-width: 48rem) {
+    min-block-size: 29.625rem;
+  }
+
+  @media (min-width: 80rem) {
+    min-block-size: 26.625rem;
+
+    &:lang(ar) {
+      min-block-size: 27.5rem;
+    }
+  }
 }
 
-.now-card {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: var(--space-3);
+// -----------------------------------------------------------------------------
+// The two tiles drawn here: "Right now" and "Messages per day".
+// -----------------------------------------------------------------------------
+// Only the two sections drawn here: each tile component draws its own frame,
+// and a parent rule on its host would win over the tile's own (the deep and
+// gold tiles would lose their colour).
+section.bento-tile {
+  @include tile.frame;
 }
 
-.now-label {
-  font: var(--text-label);
-  color: var(--text-secondary);
-}
+@include tile.words;
 
 .now-value {
   font: var(--text-figure);
-  color: var(--text-primary);
-}
-
-.now-note {
-  font: var(--text-small);
-  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text);
 }
 
 .now-skeleton {
   inline-size: 5rem;
-  block-size: 2.5rem;
+  block-size: 2.75rem;
 }
 
-.week-chart {
-  margin-block-start: var(--space-4);
+.now-skeleton-line {
+  inline-size: 50%;
+  block-size: 1.25rem;
 }
 
-// Which zone the days are in, and how far back the data goes. Below the chart,
-// so nothing above it moves when it arrives.
-.week-note {
-  margin-block-start: var(--space-2);
-  font: var(--text-small);
-  color: var(--text-muted);
+.now-skeleton-split {
+  block-size: 1.75rem;
+}
+
+.messages-skeleton-line {
+  inline-size: 70%;
+}
+
+.messages-skeleton-plot {
+  block-size: 15rem;
+}
+
+// The three senders' week figures under the chart, each with its change
+// (the change line is the charts' own `.figure-change`).
+.senders {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: var(--space-3) var(--space-5);
+  margin: 0;
+}
+
+.sender {
+  display: grid;
+  align-content: start;
+  gap: var(--space-1);
+
+  dt {
+    font: var(--text-label);
+    color: var(--color-text-secondary);
+  }
+
+  dd {
+    margin: 0;
+  }
+}
+
+.sender-value {
+  font: var(--text-title-2);
+  font-variant-numeric: tabular-nums;
 }
 
 // -----------------------------------------------------------------------------
-// Shortcuts
+// Shortcuts: soft tiles under the bento.
 // -----------------------------------------------------------------------------
+.overview-shortcuts {
+  display: grid;
+  gap: var(--space-3);
+  margin-block-start: var(--space-7);
+}
+
 .shortcuts {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
@@ -199,75 +250,29 @@
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  min-block-size: 3rem;
+  min-block-size: var(--target-min);
   padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-card);
-  background-color: var(--surface-default);
-  color: var(--text-primary);
-  font: var(--text-body-strong);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-tile);
+  background-color: var(--color-panel);
+  color: var(--color-text);
+  font: var(--text-label);
+  font-weight: 600;
   text-decoration: none;
-  transition:
-    border-color var(--motion-fast) var(--ease-standard),
-    background-color var(--motion-fast) var(--ease-standard);
+  transition: background-color var(--duration-press) var(--ease-calm);
 
   .icon {
     inline-size: var(--icon-size);
     block-size: var(--icon-size);
-    color: var(--text-secondary);
+    color: var(--color-text-secondary);
   }
 
   &:hover {
-    border-color: var(--border-strong);
-    background-color: var(--surface-hover);
+    background-color: var(--color-hover);
     text-decoration: none;
   }
 }
 
 .shortcut-arrow {
   margin-inline-start: auto;
-}
-
-// Loading states hold the loaded geometry (measured in Phase 36.11 at 390 to
-// 1440px), so nothing below them moves when the figures arrive. "Needs
-// attention" needs no rule here: its panel has one height in every state.
-.now-card[aria-busy='true'] {
-  min-block-size: 11.75rem;
-}
-
-// With the change against the previous seven days (38.5), measured at 768 to
-// 1920px: 10.6rem in English, 11.3rem in Arabic.
-.figures[aria-busy='true'] .figure {
-  min-block-size: 10.875rem;
-}
-
-.week-chart[aria-hidden='true'] {
-  min-block-size: 21.125rem;
-}
-
-@media (max-width: 47.99rem) {
-  .now-card[aria-busy='true'] {
-    min-block-size: 12.5rem;
-  }
-
-  // 12.7rem (Arabic) to 12.9rem (English) at 390px, with the change line.
-  .figures[aria-busy='true'] .figure {
-    min-block-size: 12.75rem;
-  }
-
-  .week-chart[aria-hidden='true'] {
-    min-block-size: 26rem;
-  }
-}
-
-@media (min-width: 48rem) and (max-width: 63.99rem) {
-  .week-chart[aria-hidden='true'] {
-    min-block-size: 22.375rem;
-  }
-}
-
-@media (min-width: 80rem) {
-  .now-card[aria-busy='true'] {
-    min-block-size: 13.25rem;
-  }
 }

@@ -1,117 +1,29 @@
-<div class="page">
-  <app-page-header
-    heading="Overview"
-    i18n-heading="@@overview.heading"
-    [description]="description()"
-  />
-
-  <!-- 1. What needs me -->
-  <section class="page-section" aria-labelledby="attention-heading">
-    <div class="section-header">
-      <h2 id="attention-heading" class="text-section-title" i18n="@@overview.attention.heading">
-        Needs attention
-      </h2>
-    </div>
-
-    <!--
-      One panel of the same height in every state (loading, nothing, a few,
-      many): three one-line rows and a footer row, so "Right now" and
-      everything below it never move while the sources answer. Only the
-      reader's own "+N more" makes it taller.
-    -->
-    <div
-      class="card attention-panel"
-      [class.is-expanded]="expanded()"
-      [attr.aria-busy]="loading()"
-      data-testid="attention-panel"
-    >
-      @if (loading()) {
-        <p class="visually-hidden" role="status" i18n="@@overview.attention.loading">
-          Checking what needs attention…
-        </p>
-        <ul class="attention-list" aria-hidden="true">
-          @for (row of [0, 1, 2]; track row) {
-            <li class="attention-row attention-placeholder">
-              <span class="skeleton skeleton-text attention-skeleton"></span>
-            </li>
-          }
-        </ul>
-      } @else if (attention().length === 0) {
-        <div
-          class="attention-row attention-placeholder attention-clear"
-          data-testid="attention-clear"
-        >
-          <span class="badge badge-success" aria-hidden="true"></span>
-          <p i18n="@@overview.attention.clear">Nothing needs you right now.</p>
-        </div>
-      } @else {
-        <ul class="attention-list" id="attention-list" data-testid="attention">
-          @for (item of visibleAttention(); track item.id) {
-            <li
-              [class]="'attention-row is-' + item.tone"
-              [attr.data-testid]="'attention-' + item.id"
-            >
-              <ng-template #rowContent>
-                <!--
-                  Severity is the product's status badge: its glyph's shape and
-                  its word as well as its colour (a stop, a triangle, an "i", a
-                  dot). The word stays visible at every width (Phase 38.5, E10);
-                  on a phone the title gives way instead.
-                -->
-                <span [class]="'badge attention-tone ' + toneBadges[item.tone]">
-                  <span>{{ toneWords[item.tone] }}</span>
-                </span>
-                <span class="attention-title">{{ item.title }}</span>
-                @if (item.meter; as meter) {
-                  <span class="attention-figure visually-hidden-below-md">{{ meter.text }}</span>
-                }
-                <span class="attention-detail visually-hidden-below-lg">{{ item.detail }}</span>
-                <!-- "Try again" stays visible: the only sign the row is a button. -->
-                <span class="attention-action" [class.visually-hidden-below-md]="!!item.link">{{
-                  item.action
-                }}</span>
-              </ng-template>
-
-              @if (item.link; as link) {
-                <a class="attention-target" [routerLink]="link" [queryParams]="item.linkQuery">
-                  <ng-container [ngTemplateOutlet]="rowContent" />
-                  <app-icon class="attention-arrow" name="chevron-end" [strokeWidth]="1.75" />
-                </a>
-              } @else {
-                <button type="button" class="attention-target" (click)="retry()">
-                  <ng-container [ngTemplateOutlet]="rowContent" />
-                </button>
-              }
-            </li>
-          }
-        </ul>
+<div class="page overview">
+  <!--
+    The greeting (board Overview): the reader's day and the workspace above, the
+    greeting in the display face (Instrument Serif in English, IBM Plex Sans
+    Arabic 600 in Arabic) as the page's one heading.
+  -->
+  <header class="overview-head">
+    <p class="overview-day">
+      <span>{{ today }}</span>
+      @if (workspaceName(); as name) {
+        <span aria-hidden="true">·</span>
+        <bdi dir="auto" class="overview-workspace">{{ name }}</bdi>
       }
+    </p>
+    <h1 class="overview-greeting" data-testid="greeting">{{ greeting() }}</h1>
+  </header>
 
-      <div class="attention-footer">
-        @if (!loading() && hiddenAttention() > 0) {
-          <button
-            type="button"
-            class="btn btn-ghost btn-sm"
-            aria-controls="attention-list"
-            [attr.aria-expanded]="expanded()"
-            (click)="expanded.set(!expanded())"
-            data-testid="attention-more"
-          >
-            @if (expanded()) {
-              <span i18n="@@overview.attention.fewer">Show fewer</span>
-            } @else {
-              {{ moreLabel() }}
-            }
-          </button>
-        }
-      </div>
-    </div>
-  </section>
-
-  @if (canSeeNumbers()) {
-    @if (dashboardFailed()) {
-      <div class="page-section">
-        <div class="alert alert-danger" role="alert" data-testid="numbers-failed">
+  <div
+    class="bento"
+    [class.has-numbers]="canSeeNumbers()"
+    [class.has-waiting]="canSeeConversations()"
+    data-testid="bento"
+  >
+    @if (canSeeNumbers()) {
+      @if (dashboardFailed()) {
+        <div class="bento-wide alert alert-danger" role="alert" data-testid="numbers-failed">
           <app-icon name="alert" [strokeWidth]="1.75" />
           <span i18n="@@overview.numbersFailed"
             >Activity numbers could not be loaded. Everything else on this page is current.</span
@@ -120,123 +32,130 @@
             <span i18n="@@overview.action.tryAgain">Try again</span>
           </button>
         </div>
-      </div>
-    } @else {
-      <div class="overview-numbers">
-        <!-- 2. What is happening now: the page's one signature, the voice split. -->
-        <section class="page-section now" aria-labelledby="now-heading">
-          <div class="section-header">
-            <h2 id="now-heading" class="text-section-title" i18n="@@overview.now.heading">
-              Right now
-            </h2>
-            @if (canSeeConversations()) {
-              <a class="section-link" routerLink="/conversations" i18n="@@overview.now.link"
-                >Open conversations</a
-              >
-            }
-          </div>
+      } @else {
+        <app-conversations-tile class="tile-conversations" [dashboard]="dashboard()" />
 
-          <div class="card card-body now-card" [attr.aria-busy]="loading()" data-testid="now">
-            <p class="now-label" i18n="@@overview.now.open">Open conversations</p>
-            @if (dashboard(); as d) {
-              <p class="now-value">{{ d.current.openConversations | localNumber }}</p>
-              <app-voice-split
-                [ai]="d.current.openHandledByAi"
-                [human]="d.current.openHandledByHuman"
-                subject="openConversations"
-              />
-              <p class="now-note" i18n="@@overview.now.note">
-                Whoever is answering each one at this moment, whatever day it started.
-              </p>
-            } @else {
-              <span class="skeleton now-skeleton" aria-hidden="true"></span>
-              <span class="skeleton skeleton-bar" aria-hidden="true"></span>
-            }
-          </div>
-        </section>
+        <app-answered-tile
+          class="tile-answered"
+          [loading]="!dashboard()"
+          [answered]="dashboard()?.summary?.conversationsAnsweredByAi ?? 0"
+          [started]="dashboard()?.summary?.conversationsStarted ?? 0"
+          [previousAnswered]="dashboard()?.previous?.summary?.conversationsAnsweredByAi ?? null"
+          [previousStarted]="dashboard()?.previous?.summary?.conversationsStarted ?? null"
+          [earlierData]="earlierData()"
+        />
+      }
+    }
 
-        <!-- 3. How the week went -->
-        <section class="page-section week" aria-labelledby="week-heading">
-          <div class="section-header">
-            <h2 id="week-heading" class="text-section-title" i18n="@@overview.week.heading">
-              Last 7 days
-            </h2>
-            <a class="section-link" routerLink="/analytics" i18n="@@overview.week.link"
-              >View analytics</a
-            >
-          </div>
+    @if (canSeeConversations()) {
+      <app-needs-person-tile
+        class="tile-waiting"
+        [loading]="waitingLoading()"
+        [failed]="waitingFailed()"
+        [conversations]="waiting()"
+        [total]="waitingTotal()"
+        (retry)="retryWaiting()"
+      />
+    }
 
-          <dl class="figures" [attr.aria-busy]="loading()" data-testid="week">
-            @if (dashboard()) {
-              @for (figure of figures(); track figure.key) {
-                <div class="figure">
-                  <dt>{{ figure.label }}</dt>
-                  <dd class="figure-value">{{ figure.value | localNumber }}</dd>
-                  @if (figure.change; as change) {
-                    <!-- The words carry the direction; the glyph only repeats them. -->
-                    <dd
-                      class="figure-change"
-                      [attr.data-direction]="change.direction"
-                      [attr.data-testid]="'week-' + figure.key + '-change'"
-                    >
-                      @if (change.glyph) {
-                        <span class="figure-change-glyph" aria-hidden="true">{{
-                          change.glyph
-                        }}</span>
-                      }
-                      <span>{{ change.text }}</span>
-                    </dd>
-                  }
-                  <dd class="figure-shape">
-                    <app-sparkline [values]="figure.days" [tone]="figure.tone" />
+    @if (canSeeNumbers() && !dashboardFailed()) {
+      <!-- Right now, whatever the period: the voice split. -->
+      <section
+        class="bento-tile tile-now"
+        aria-labelledby="now-heading"
+        [attr.aria-busy]="!dashboard()"
+        data-testid="now"
+      >
+        <h2 id="now-heading" class="tile-title" i18n="@@overview.now.heading">Right now</h2>
+        @if (dashboard(); as d) {
+          <p class="now-value">{{ d.current.openConversations | localNumber }}</p>
+          <p class="tile-quiet" i18n="@@overview.now.open">Open conversations</p>
+          <app-voice-split
+            [ai]="d.current.openHandledByAi"
+            [human]="d.current.openHandledByHuman"
+            subject="openConversations"
+          />
+        } @else {
+          <span class="skeleton now-skeleton" aria-hidden="true"></span>
+          <span class="skeleton now-skeleton-line" aria-hidden="true"></span>
+          <span class="skeleton now-skeleton-split" aria-hidden="true"></span>
+        }
+      </section>
+    }
+
+    <app-attention-tile
+      class="tile-attention"
+      [loading]="loading()"
+      [items]="attention()"
+      (retry)="retry()"
+    />
+
+    @if (canSeeNumbers() && !dashboardFailed()) {
+      <app-channels-tile
+        class="tile-channels"
+        [loading]="!dashboard()"
+        [channels]="dashboard()?.channels ?? []"
+      />
+
+      @if (loading() || planFailed() || usage()) {
+        <app-usage-tile
+          class="tile-usage"
+          [loading]="loading()"
+          [failed]="planFailed()"
+          [entitlement]="usage()"
+          (retry)="retry()"
+        />
+      }
+
+      <section class="bento-tile tile-messages" [attr.aria-busy]="!dashboard()" data-testid="week">
+        @if (dashboard()) {
+          <app-column-chart
+            heading="Messages per day"
+            i18n-heading="@@overview.week.chart"
+            categoryLabel="Day"
+            i18n-categoryLabel="@@analytics.table.day"
+            [level]="2"
+            [summary]="weekSummary()"
+            [series]="series"
+            [points]="points()"
+            [plotHeight]="132"
+          />
+          <dl class="senders">
+            @for (sender of senders(); track sender.key) {
+              <div class="sender">
+                <dt>{{ sender.label }}</dt>
+                <dd class="sender-value">{{ sender.value | localNumber }}</dd>
+                @if (sender.change; as change) {
+                  <!-- The words carry the direction; the glyph only repeats them. -->
+                  <dd
+                    class="figure-change"
+                    [attr.data-direction]="change.direction"
+                    [attr.data-testid]="'week-' + sender.key + '-change'"
+                  >
+                    @if (change.glyph) {
+                      <span class="figure-change-glyph" aria-hidden="true">{{ change.glyph }}</span>
+                    }
+                    <span>{{ change.text }}</span>
                   </dd>
-                </div>
-              }
-            } @else {
-              @for (cell of [0, 1, 2, 3]; track cell) {
-                <div class="figure" aria-hidden="true">
-                  <dt><span class="skeleton skeleton-text figure-skeleton-label"></span></dt>
-                  <dd><span class="skeleton figure-skeleton"></span></dd>
-                  <dd><span class="skeleton skeleton-text figure-change-skeleton"></span></dd>
-                </div>
-              }
+                }
+              </div>
             }
           </dl>
-
-          @if (dashboard()) {
-            <div class="card card-body week-chart">
-              <app-column-chart
-                heading="Messages per day"
-                i18n-heading="@@overview.week.chart"
-                categoryLabel="Day"
-                i18n-categoryLabel="@@analytics.table.day"
-                [summary]="weekSummary()"
-                [series]="series"
-                [points]="points()"
-                [tableExtras]="tableExtras"
-                [plotHeight]="140"
-              />
-            </div>
-            <p class="week-note" data-testid="week-note">{{ weekNote() }}</p>
-          } @else {
-            <!-- The chart's place, held at its loaded size while the figures arrive. -->
-            <div class="card card-body week-chart" aria-hidden="true">
-              <span class="skeleton skeleton-text"></span>
-            </div>
-          }
-        </section>
-      </div>
+        } @else {
+          <h2 class="tile-title">{{ messagesHeading }}</h2>
+          <span class="skeleton skeleton-text messages-skeleton-line" aria-hidden="true"></span>
+          <span class="skeleton messages-skeleton-plot" aria-hidden="true"></span>
+        }
+      </section>
     }
-  }
+  </div>
 
-  <!-- 4. Where next -->
+  <!-- Where next -->
   @if (shortcuts().length > 0) {
-    <section class="page-section" aria-labelledby="shortcuts-heading">
-      <div class="section-header">
-        <h2 id="shortcuts-heading" class="text-section-title" i18n="@@overview.shortcuts.heading">
-          Shortcuts
-        </h2>
-      </div>
+    <section class="overview-shortcuts" aria-labelledby="shortcuts-heading">
+      <h2 id="shortcuts-heading" class="tile-title" i18n="@@overview.shortcuts.heading">
+        Shortcuts
+      </h2>
 
       <ul class="shortcuts">
         @for (shortcut of shortcuts(); track shortcut.link) {

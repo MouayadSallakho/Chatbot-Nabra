@@ -42,6 +42,7 @@ import { LocaleFormat } from '@app/core/i18n/locale-format';
 import { ScrollRegion } from '@app/shared/scroll-region/scroll-region';
 import { Radio } from '@app/shared/choice/choice';
 import { Segmented } from '@app/shared/segmented/segmented';
+import { Chip } from '@app/shared/chip/chip';
 
 /**
  * Weekly and monthly reports, generated automatically.
@@ -76,6 +77,7 @@ import { Segmented } from '@app/shared/segmented/segmented';
     Icon,
     Radio,
     Segmented,
+    Chip,
   ],
   templateUrl: './report-schedules.html',
   styleUrl: './report-schedules.scss',

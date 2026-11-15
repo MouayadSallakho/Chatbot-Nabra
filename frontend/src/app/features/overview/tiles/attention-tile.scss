@@ -1,0 +1,163 @@
+@use 'tile';
+
+@include tile.chrome;
+
+// Three rows and the "+N more" line high in every state, so the bento never
+// moves while the sources answer. Each row is two lines from 768px (title,
+// then chip and detail), and wraps freely on a phone.
+:host {
+  min-block-size: 20rem;
+}
+
+:host(.is-expanded) {
+  min-block-size: 0;
+}
+
+.attention-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.attention-row.is-placeholder {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--space-2);
+  min-block-size: 3.75rem;
+  padding: var(--space-3);
+  border-radius: var(--radius-tile);
+  background-color: var(--color-panel-soft);
+}
+
+.attention-skeleton-title {
+  inline-size: 55%;
+  block-size: 1rem;
+}
+
+.attention-skeleton-chip {
+  inline-size: 6rem;
+  block-size: var(--chip-height-sm);
+  border-radius: var(--radius-pill);
+}
+
+// The whole row is one target: a soft tile, the title over the chip and the
+// detail, the action at the end. The most serious keep a status edge at the
+// start, beside the chip's word and glyph (never the colour alone).
+.attention-target {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'title action'
+    'meta action';
+  align-items: center;
+  gap: var(--space-1) var(--space-3);
+  inline-size: 100%;
+  min-block-size: 4.25rem;
+  padding: var(--space-3);
+  border: 0;
+  border-inline-start: 3px solid transparent;
+  border-radius: var(--radius-tile);
+  background-color: var(--color-panel-soft);
+  color: var(--color-text);
+  font: inherit;
+  text-align: start;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color var(--duration-press) var(--ease-calm);
+
+  &:hover {
+    background-color: var(--color-hover);
+    text-decoration: none;
+  }
+
+  .is-critical & {
+    border-inline-start-color: var(--status-danger-fg);
+  }
+
+  .is-warning & {
+    border-inline-start-color: var(--status-warning-fg);
+  }
+}
+
+.attention-title {
+  grid-area: title;
+  overflow-wrap: anywhere;
+  font: var(--text-label);
+  font-weight: 600;
+}
+
+.attention-meta {
+  grid-area: meta;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+  min-inline-size: 0;
+}
+
+.attention-detail {
+  min-inline-size: 0;
+  font: var(--text-small);
+  color: var(--color-text-secondary);
+}
+
+.attention-action {
+  grid-area: action;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font: var(--text-label);
+  color: var(--color-link);
+}
+
+.attention-arrow {
+  inline-size: var(--icon-size);
+  block-size: var(--icon-size);
+  color: var(--color-text-secondary);
+}
+
+.attention-more {
+  align-self: flex-start;
+  margin-block-start: auto;
+}
+
+.attention-clear {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  font: var(--text-small);
+  color: var(--color-text-secondary);
+}
+
+// On a phone the detail leaves the screen (screen readers still read it), so
+// each row is its title and its chip: the new row shape of note 10.
+@media (max-width: 47.99rem) {
+  :host {
+    min-block-size: 0;
+  }
+
+  // Two placeholder rows, the height of the two-line rows a phone shows.
+  .attention-row.is-placeholder:nth-child(3) {
+    display: none;
+  }
+
+  .attention-detail {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
+@media (forced-colors: active) {
+  .attention-target {
+    border: 1px solid CanvasText;
+  }
+}

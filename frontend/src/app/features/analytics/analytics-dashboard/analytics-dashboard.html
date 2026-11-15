@@ -1,4 +1,4 @@
-<div class="page">
+<div class="page page-calm">
   <app-page-header
     heading="Analytics"
     i18n-heading="@@analytics.heading"
@@ -263,6 +263,7 @@
                     [level]="2"
                     [summary]="channelsSummary()"
                     [bars]="channelBars()"
+                    tone="current"
                     categoryLabel="Channel"
                     i18n-categoryLabel="@@analytics.table.channel"
                     valueLabel="Conversations"

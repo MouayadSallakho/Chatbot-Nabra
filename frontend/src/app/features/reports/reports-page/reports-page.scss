@@ -135,7 +135,13 @@ fieldset.field {
   gap: var(--space-2);
 }
 
-// The generated list.
+// The generated list: one Calm Glass panel (radius 24, a 1px line).
+.table-wrap {
+  border-color: var(--color-line);
+  border-radius: var(--radius-panel);
+  background-color: var(--color-panel);
+}
+
 .report-title {
   display: block;
   font-weight: 600;
@@ -179,6 +185,12 @@ fieldset.field {
 
 .nowrap {
   white-space: nowrap;
+}
+
+// A refused download, worded by its code (note 16): under its button, in the
+// danger text colour, beside the row it is about.
+.download-failure {
+  color: var(--status-danger-fg);
 }
 
 .retention-note {

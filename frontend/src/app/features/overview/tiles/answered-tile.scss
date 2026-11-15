@@ -1,0 +1,114 @@
+@use 'tile';
+
+@include tile.chrome;
+
+// 116px, as on the board: a 12px track in the selected tint and the share in
+// the current period's emerald, from twelve o'clock. Mirrored in Arabic so it
+// fills in the reading direction.
+.ring,
+.ring-skeleton {
+  position: relative;
+  align-self: center;
+  inline-size: 7.25rem;
+  block-size: 7.25rem;
+}
+
+.ring-skeleton {
+  border-radius: var(--radius-pill);
+}
+
+.ring svg {
+  display: block;
+  inline-size: 100%;
+  block-size: 100%;
+
+  &:dir(rtl) {
+    transform: scaleX(-1);
+  }
+}
+
+.ring-track,
+.ring-arc {
+  fill: none;
+  stroke-width: 12;
+}
+
+.ring-track {
+  stroke: var(--color-selected);
+}
+
+.ring-arc {
+  stroke: var(--chart-current);
+  stroke-linecap: round;
+}
+
+.ring-value {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font: var(--text-title-1);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text);
+}
+
+.answered-counts {
+  font: var(--text-numeric);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text);
+}
+
+.answered-note {
+  font: var(--text-small);
+  color: var(--color-text-secondary);
+}
+
+.answered-before {
+  margin-block-start: auto;
+  font: var(--text-small);
+  color: var(--color-text-quiet);
+}
+
+.answered-skeleton {
+  inline-size: 80%;
+}
+
+@media (forced-colors: active) {
+  .ring-track {
+    stroke: GrayText;
+  }
+
+  .ring-arc {
+    stroke: CanvasText;
+  }
+}
+
+// While the read is out the tile holds its loaded size, so nothing below it
+// moves when it arrives (measured in Chrome on Northwind, Phase 39.7a, per
+// layout and language: Arabic lines are one step taller).
+:host([aria-busy='true']) {
+  min-block-size: 19.25rem;
+
+  @media (min-width: 48rem) {
+    min-block-size: 19.5rem;
+  }
+
+  @media (min-width: 80rem) {
+    min-block-size: 20.375rem;
+  }
+
+  @media (min-width: 90rem) {
+    min-block-size: 19.625rem;
+  }
+}
+
+:host([aria-busy='true']:lang(ar)) {
+  @media (min-width: 80rem) {
+    min-block-size: 20.25rem;
+  }
+
+  @media (min-width: 110rem) {
+    min-block-size: 18.875rem;
+  }
+}

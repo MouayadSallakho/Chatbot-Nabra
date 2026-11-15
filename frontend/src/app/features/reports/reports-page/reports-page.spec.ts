@@ -7,6 +7,8 @@ import { PermissionApi } from '@app/core/authorization/permission-api';
 import { LOCAL_STORAGE } from '@app/core/storage/local-storage';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
 import { memoryStorage, permissionApiGranting } from '@app/testing/test-doubles';
+import { registerProblemWords } from '@app/core/problems/problem-words';
+import { REPORT_PROBLEM_WORDS } from '../report-problems';
 import { ReportCatalog, ReportExecution, ReportExecutionPage, ReportsApi } from '../reports-api';
 import { ReportsPage } from './reports-page';
 
@@ -15,7 +17,8 @@ import { ReportsPage } from './reports-page';
  *
  * What matters: the page asks for nothing it may not have, it offers only what
  * the server said this member may generate, a request carries an idempotency
- * key, downloads are plain links to the API, and a failure is said in words.
+ * key, downloads go through the client (note 16) so a refusal is worded by its
+ * code and a ready file keeps the server's name, and a failure is said in words.
  */
 describe('ReportsPage', () => {
   const tenantId = '11111111-1111-1111-1111-111111111111';
@@ -155,17 +158,127 @@ describe('ReportsPage', () => {
     expect(host().querySelector('[data-testid="generate"]')).toBeNull();
   });
 
-  it('downloads through the API with a meaningful accessible name', async () => {
-    await mount('reports.view', 'reports.generate', 'analytics.view');
-    await answerInitial();
+  describe('downloads through the client (note 16)', () => {
+    let saved: { href: string; download: string }[];
+    const createObjectURL = URL.createObjectURL;
+    const revokeObjectURL = URL.revokeObjectURL;
 
-    const link = host().querySelector<HTMLAnchorElement>('[data-testid="download"]');
+    beforeEach(() => {
+      saved = [];
+      URL.createObjectURL = vi.fn(() => 'blob:report-file');
+      URL.revokeObjectURL = vi.fn();
+      vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
+        this: HTMLAnchorElement,
+      ) {
+        saved.push({ href: this.href, download: this.download });
+      });
+    });
 
-    expect(link).not.toBeNull();
-    expect(link!.getAttribute('href')).toBe(`${base}/executions/${completed.id}/download`);
-    expect(link!.getAttribute('aria-label')).toContain('Download Conversation activity');
-    expect(link!.getAttribute('aria-label')).toContain('CSV');
-    expect(link!.getAttribute('aria-label')).toContain('English file');
+    afterEach(() => {
+      URL.createObjectURL = createObjectURL;
+      URL.revokeObjectURL = revokeObjectURL;
+      vi.restoreAllMocks();
+    });
+
+    const button = (): HTMLButtonElement =>
+      host().querySelector<HTMLButtonElement>('[data-testid="download"]')!;
+
+    it('is a button with a meaningful accessible name, not a link to the API', async () => {
+      await mount('reports.view', 'reports.generate', 'analytics.view');
+      await answerInitial();
+
+      expect(button().tagName).toBe('BUTTON');
+      expect(button().getAttribute('href')).toBeNull();
+      expect(button().getAttribute('aria-label')).toContain('Download Conversation activity');
+      expect(button().getAttribute('aria-label')).toContain('CSV');
+      expect(button().getAttribute('aria-label')).toContain('English file');
+    });
+
+    it('reads the file and saves it under the name the server gave it', async () => {
+      await mount('reports.view', 'reports.generate', 'analytics.view');
+      await answerInitial();
+
+      button().click();
+      fixture.detectChanges();
+
+      expect(button().getAttribute('aria-busy')).toBe('true');
+      expect(button().textContent).toContain('Downloading…');
+
+      const request = http.expectOne(`${base}/executions/${completed.id}/download`);
+
+      expect(request.request.responseType).toBe('blob');
+      request.flush(new Blob(['a,b']), {
+        headers: {
+          'Content-Disposition':
+            "attachment; filename=report.csv; filename*=UTF-8''conversation-activity_2026-09-01_2026-09-30.csv",
+        },
+      });
+      await settle();
+
+      expect(saved).toEqual([
+        { href: 'blob:report-file', download: 'conversation-activity_2026-09-01_2026-09-30.csv' },
+      ]);
+      expect(host().querySelector('[data-testid="announcement"]')?.textContent).toBe(
+        'Conversation activity downloaded.',
+      );
+      expect(button().getAttribute('aria-busy')).toBe('false');
+    });
+
+    it('words a refusal by its code beside the row, and reads the list again', async () => {
+      registerProblemWords(REPORT_PROBLEM_WORDS);
+      await mount('reports.view', 'reports.generate', 'analytics.view');
+      await answerInitial();
+
+      button().click();
+      http.expectOne(`${base}/executions/${completed.id}/download`).flush(
+        new Blob(
+          [
+            JSON.stringify({
+              status: 410,
+              title: 'This report is no longer available',
+              detail: 'The retention policy removed the file.',
+              code: 'reports.file.expired',
+            }),
+          ],
+          { type: 'application/problem+json' },
+        ),
+        { status: 410, statusText: 'Gone' },
+      );
+      await settle();
+
+      // The list is read again, so the row says where the report really is.
+      http
+        .expectOne((request) => request.url === `${base}/executions`)
+        .flush(page([{ ...completed, status: 'Expired', canDownload: false }]));
+      await settle();
+
+      const error = host().querySelector('[data-testid="download-error"]');
+
+      expect(error?.getAttribute('role')).toBe('alert');
+      expect(error?.textContent?.trim()).toBe(
+        "This report's file is no longer kept. Generate the report again.",
+      );
+      // The server's English detail is never what the reader sees.
+      expect(text()).not.toContain('retention policy');
+      expect(saved).toEqual([]);
+    });
+
+    it('keeps the generic wording for a refusal it does not know', async () => {
+      await mount('reports.view', 'reports.generate', 'analytics.view');
+      await answerInitial();
+
+      button().click();
+      http
+        .expectOne(`${base}/executions/${completed.id}/download`)
+        .flush(new Blob(['not json']), { status: 500, statusText: 'Server Error' });
+      await settle();
+      http.expectOne((request) => request.url === `${base}/executions`).flush(page([completed]));
+      await settle();
+
+      expect(host().querySelector('[data-testid="download-error"]')?.textContent?.trim()).toBe(
+        'Something went wrong. Try again, and contact an administrator if it continues.',
+      );
+    });
   });
 
   it('states status in words and shows the failure reason, rendering names as text', async () => {

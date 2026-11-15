@@ -1,0 +1,95 @@
+@use 'tile';
+
+@include tile.chrome;
+
+.conv-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-1) var(--space-4);
+}
+
+// The big figure (board: 52px, 600, tabular) and its change in words.
+.conv-figure {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-3);
+}
+
+.conv-value {
+  font: var(--text-figure-hero);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  color: var(--color-text);
+
+  :host-context(:lang(ar)) & {
+    letter-spacing: 0;
+  }
+}
+
+.conv-change {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-1);
+  font: var(--text-small);
+  color: var(--color-text-secondary);
+}
+
+.conv-change-glyph {
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.conv-note {
+  margin-block-start: auto;
+}
+
+// The loading shape: the figure, the chart's title, its plot and the note,
+// at their loaded sizes.
+.conv-skeleton-figure {
+  inline-size: 8rem;
+  block-size: 3.5rem;
+}
+
+.conv-skeleton-line {
+  inline-size: 60%;
+}
+
+.conv-skeleton-plot {
+  block-size: 12rem;
+}
+
+// While the read is out the tile holds its loaded size, so nothing below it
+// moves when it arrives (measured in Chrome on Northwind, Phase 39.7a, per
+// layout and language: Arabic lines are one step taller).
+:host([aria-busy='true']) {
+  min-block-size: 32rem;
+
+  @media (min-width: 48rem) {
+    min-block-size: 26.75rem;
+  }
+
+  @media (min-width: 80rem) {
+    min-block-size: 36.5rem;
+  }
+
+  @media (min-width: 90rem) {
+    min-block-size: 33.5rem;
+  }
+}
+
+:host([aria-busy='true']:lang(ar)) {
+  @media (min-width: 80rem) {
+    min-block-size: 36rem;
+  }
+
+  @media (min-width: 90rem) {
+    min-block-size: 36.25rem;
+  }
+
+  @media (min-width: 110rem) {
+    min-block-size: 33rem;
+  }
+}

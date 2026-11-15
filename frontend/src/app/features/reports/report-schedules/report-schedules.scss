@@ -108,3 +108,10 @@
   font: var(--text-small);
   color: var(--text-muted);
 }
+
+// The schedules: one Calm Glass panel (radius 24, a 1px line).
+.table-wrap {
+  border-color: var(--color-line);
+  border-radius: var(--radius-panel);
+  background-color: var(--color-panel);
+}

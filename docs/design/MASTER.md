@@ -457,6 +457,14 @@ chip (owner decision Q4).
 | 2026-11-15 | The workspace's time zone shows its name in the reader's language where the browser offers one (`Intl` `longGeneric`, then `long`; never an offset), with the IANA id always under it, left to right; managers also see "Report schedules in this zone" with the count (BA-9), zero included; a chosen zone is named before it is saved | Phase 38 note 8; the id is what is stored and what the report files print, so it never leaves the screen | Phase 39.6b |
 | 2026-11-15 | Notifications: the two halves are the segmented control's links (`aria-current="page"`); the history is one panel of row tiles under quiet day captions, unread said by the dot, the word and the heavier title (the bell's 3 px bar is dropped on the page only); each email category is a soft tile with the family's switch; "Email not set up" is an "i" chip | calm-glass §6 rows and segmented control; the item stays shared with the bell | Phase 39.6b |
 | 2026-11-15 | A chip inside a soft tile composites its translucent tint over the panel colour | Measured: the dark "Within the limit" chip read 4.48:1 straight on the tile, 4.95:1 with it | Phase 39.6b |
+| 2026-11-15 | The overview is the board's bento: a 4-column grid from 1280 px (2 from 768, 1 on a phone) with 14 px gaps (`--bento-gap`), every tile a solid panel (radius 24): Conversations 2×2, Answered by the AI, Needs a person now (gold, 1×2), Right now, Needs attention, Channels, AI usage this month (deep) and Messages per day across the width. The board's First reply tile is left out (BA39-2) and its dashed line for the week before is not drawn (the API returns the previous period's totals, not its days: BA39-7a-1) | Board Overview, plan 39.0 §3.2.4; only real data | Phase 39.7a |
+| 2026-11-15 | The overview's heading is the greeting in the display face (`--text-display`: Instrument Serif in English, Plex Arabic 600 in Arabic), "Good morning/afternoon/evening, <display name>" from the reader's own clock, the name isolated (FSI…PDI); without a display name the greeting stands alone, never with an email. The reader's day and the workspace's name sit above it in quiet text | Board Overview; plan 39.0 §3.2.4 | Phase 39.7a |
+| 2026-11-15 | Two tile looks beyond the panel: the gold tile (`--tile-need-*`: gold-100 → gold-50 with a gold edge drawn inside, title and count gold-850, rows on white at 75%) and the deep tile (`--tile-deep-*`: emerald-900 in the light look, emerald-800 with a line in the dark one, every colour inside it the dark look's, re-pointed on the tile's host) | Board Overview; each pair measured in §13.7 | Phase 39.7a |
+| 2026-11-15 | Needs-a-person rows on the overview are two lines, never truncated: who the conversation is with (the inbox's customer label), then the reason as a chip with its word (coral for a failed AI reply, gold otherwise); "Needs attention" rows the same shape: the title, then the severity as a status chip with its glyph and the detail (the detail leaves the screen on a phone, never the screen reader) | Phase 38 note 10 | Phase 39.7a |
+| 2026-11-15 | A chart's colour role `current` (`--chart-current`: emerald-700 / emerald-300) draws the period being read: the overview's conversations line, Analytics' conversations per day and its channel bars. Team lines stay gold-800, never gold-500 | calm-glass §2; plan 39.0 §4 | Phase 39.7a |
+| 2026-11-15 | Headline numbers are tabular everywhere (`.figure-value`, the bento's figures, the ring, the legend shares) | calm-glass §4 | Phase 39.7a |
+| 2026-11-15 | Report files download through the client: a button reads the file (`responseType: 'blob'`) and saves it under the server's `Content-Disposition` name (`filename*` first, path and control characters dropped); a refusal is read back out of its blob and worded by its code under the button (`role="alert"`), then the list is read again | Phase 38 note 16 | Phase 39.7a |
+| 2026-11-15 | A report's and a schedule's file language is a small neutral chip; a schedule's state is a chip (On: tick; Off: hollow ring) | Owner Q4; the language tag of plan 39.0 §3.7 | Phase 39.7a |
 
 ## 13. Contrast table (Calm Glass, Phase 39.2a)
 
@@ -711,6 +719,27 @@ Measured in Chrome from computed colours on the live pages, with translucent lay
 | Preferences | category name / sentence on its tile | 4.5:1 | 14.36 / 9.00 | 11.96 / 9.24 |
 | Preferences | switch track edge on the tile | 3:1 | 3.41 | 3.27 |
 
+### 13.7 The overview, analytics and reports (Phase 39.7a)
+
+Computed from the token values, translucent layers composited over what lies under them and each gradient measured at both ends (`p39-7a/scratch/contrast.py`, `p39-7a/chrome/contrast.json`, 71 pairs). The meters' warning and critical fills exist live only in the Design Lab (no capped plan on the dev stack). Every pair passes.
+
+| Part | Pair | Needs | Light | Dark |
+| --- | --- | --- | --- | --- |
+| Gold tile | title and count, at the tile's two ends | 4.5:1 | 6.20 / 6.75 | 6.72 / 8.45 |
+| Gold tile | secondary text ("and 149 more"), at the two ends | 4.5:1 | 8.49 / 9.25 | 7.33 / 9.22 |
+| Gold tile | a row's name on its wash | 4.5:1 | 15.25 | 12.47 |
+| Gold tile | reason chips: waiting / the AI could not reply | 4.5:1 | 6.20 / 6.03 | 6.31 / 5.29 |
+| Gold tile | "Open the inbox" edge on the tile | 3:1 | 7.45 | 4.81 |
+| Deep tile | text / secondary / quiet / link | 4.5:1 | 13.24 / 10.24 / 6.05 / 12.70 | 11.17 / 8.63 / 5.11 / 10.70 |
+| Deep tile | state chips: within (emerald-100) / approaching / nearly or reached | 4.5:1 | 9.39 / 6.72 / 5.69 | 7.98 / 5.77 / 4.77 |
+| Deep tile | focus ring on the tile | 3:1 | 6.71 | 5.66 |
+| Deep tile | meter fills on the track: normal / approaching / nearly | 3:1 | 4.75 / 6.64 / 5.16 | 4.03 / 5.63 / 4.38 |
+| Ring | arc on its track / on the panel | 3:1 | 7.89 / 8.75 | 5.35 / 6.71 |
+| Channels | first / second part on the panel | 3:1 | 8.75 / 4.18 | 6.71 / 12.70 |
+| Needs attention | title / detail / action on the soft row | 4.5:1 | 14.36 / 9.00 / 7.90 | — / 9.24 / 6.06 |
+| Reports | a refused download's sentence on the panel | 4.5:1 | 7.08 | 7.30 |
+| Overview | the day line on the ground | 4.5:1 | 5.08 | 6.87 |
+
 ## 14. Components (Calm Glass, Phase 39.2b)
 
 Each is shown in the Design Lab in both languages and themes, with "Reduce transparency". A
@@ -809,3 +838,9 @@ the event line, `.bubble-human` = the team's bubble). Tests: a Vitest spec besid
 - **Workspace settings:** the name and time-zone panels; the zone in use as fact tiles: its localised name over the IANA id (left to right), and "Report schedules in this zone" with the count for a manager. Under the list, "Selected zone: <name>" while a choice is unsaved. A reader who cannot manage sees the same tiles with no form. The skeleton draws both panels and the zone tiles.
 - **Notifications:** "All notifications" and "Email preferences" as the segmented control's links. The history is one panel: the summary ("43 unread of 44." and how long they are kept), each day a quiet caption, each notification a row tile with hover. The skeleton draws rows of an icon and two lines.
 - **Email preferences:** the in-app note as a soft tile; "Email not set up" as an "i" chip with its sentence when the deployment cannot send email; each category a soft tile with the family's switch (its 44 px row) and the sentence under the name; "In this browser" keeps volume and the test sound in one tile and desktop alerts in another. The skeleton draws a tile per category.
+
+### 14.7 The overview, analytics and reports (Phase 39.7a)
+
+- **Overview:** the greeting (`h1`, display face) under the reader's day and the workspace; the bento (`.bento`): Conversations (the figure in `--text-figure-hero`, its change in words with the glyph, the area chart in `current` with its summary and table, the zone and "Data since"), Answered by the AI (a 116 px ring, 12 px stroke, from twelve o'clock and mirrored in Arabic, the share as text in its middle, "25 of 40", the sentence, the share the 7 days before), Needs a person now (gold; the count; three two-line rows; "and N more in the inbox"; "Open the inbox" at its foot), Right now (the voice split), Needs attention (three soft two-line rows, then "+N more"; "All clear" as a tick chip), Channels (one 14 px split pill and a legend line per channel: name, share, conversations), AI usage this month (deep; the month's figure, the plan limit or "No monthly limit on this plan", the meter and the state chip when capped, "View plan & usage"), Messages per day (the column chart across the width and the three senders' figures with their changes). While a source is out each tile draws its skeleton at its loaded size (measured per layout and language). Shortcuts are soft tiles under the bento.
+- **Analytics:** `.page-calm` panels; the conversations per day line and the channel bars in `current`; figures tabular.
+- **Reports and schedules:** `.page-calm`; the generated list and the schedules one panel (radius 24); Download is a button with its full accessible name, "Downloading…" while it reads, and a refusal's sentence under it; file-language chips; schedule states as chips; every radio group named, so the arrow keys move within it and Tab stops once.

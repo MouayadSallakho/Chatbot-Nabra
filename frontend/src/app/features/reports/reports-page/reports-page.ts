@@ -1,6 +1,7 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  DOCUMENT,
   DestroyRef,
   computed,
   inject,
@@ -56,6 +57,8 @@ import { LocaleFormat } from '@app/core/i18n/locale-format';
 import { ScrollRegion } from '@app/shared/scroll-region/scroll-region';
 import { Radio } from '@app/shared/choice/choice';
 import { Segmented } from '@app/shared/segmented/segmented';
+import { Chip } from '@app/shared/chip/chip';
+import { fallbackFileName, saveFile } from '../save-file';
 
 /**
  * Generate a report, and download the ones already generated.
@@ -77,9 +80,12 @@ import { Segmented } from '@app/shared/segmented/segmented';
  * everything else refreshes only when the reader asks. A page left open in a tab
  * therefore never polls on its own.
  *
- * <strong>Downloads are links to the API.</strong> The browser fetches the file
- * with the session it already has, so there is no public URL, no storage path and
- * nothing held in this page's memory.
+ * <strong>Downloads go through the client</strong> (Phase 38 note 16): the
+ * page reads the file with the session it already has and saves it under the
+ * server's name, so a refusal (still being prepared, failed, expired, missing)
+ * is said in Nabra's words by its code, beside the row, and the list is read
+ * again so the row shows where the report really is. There is still no public
+ * URL and no storage path.
  */
 @Component({
   selector: 'app-reports-page',
@@ -94,6 +100,7 @@ import { Segmented } from '@app/shared/segmented/segmented';
     Icon,
     Radio,
     Segmented,
+    Chip,
   ],
   templateUrl: './reports-page.html',
   styleUrl: './reports-page.scss',
@@ -102,6 +109,7 @@ export class ReportsPage {
   private readonly locale = inject(LocaleFormat);
 
   private readonly api = inject(ReportsApi);
+  private readonly document = inject(DOCUMENT);
   private readonly workspace = inject(WorkspaceContextService);
   private readonly permissions = inject(PermissionService);
 
@@ -131,6 +139,15 @@ export class ReportsPage {
   protected readonly submitFailure = signal<ApiError | null>(null);
   protected readonly formError = signal<string | null>(null);
   protected readonly announcement = signal('');
+
+  /** The report whose file is being read, so its button says so and is not pressed twice. */
+  protected readonly downloading = signal<string | null>(null);
+
+  /** The last refused download: which report, and why in the reader's words. */
+  protected readonly downloadFailure = signal<{
+    readonly id: string;
+    readonly message: string;
+  } | null>(null);
 
   /** The catalogue, in the reader's language. The server decides which reports appear. */
   protected readonly reports = computed(() =>
@@ -320,8 +337,36 @@ export class ReportsPage {
     }
   }
 
-  protected downloadUrl(execution: ReportExecution): string {
-    return this.api.downloadUrl(this.workspace.tenantId() ?? '', execution.id);
+  /**
+   * Reads a report's file and saves it under the server's name. A refusal is
+   * worded by its code beside the row, and the list is read again, because the
+   * refusal means the row no longer says where the report is.
+   */
+  protected async download(execution: ReportExecution): Promise<void> {
+    const tenantId = this.workspace.tenantId();
+
+    if (!tenantId || this.downloading() !== null) {
+      return;
+    }
+
+    this.downloading.set(execution.id);
+    this.downloadFailure.set(null);
+
+    try {
+      const file = await firstValueFrom(this.api.download(tenantId, execution.id));
+      const name = file.fileName ?? fallbackFileName(execution.periodFrom, execution.format);
+
+      saveFile(this.document, file.blob, name);
+
+      const title = this.title(execution);
+
+      this.announcement.set($localize`:@@reports.announce.downloaded:${title}:title: downloaded.`);
+    } catch (failure) {
+      this.downloadFailure.set({ id: execution.id, message: toApiError(failure).message });
+      await this.loadPage();
+    } finally {
+      this.downloading.set(null);
+    }
   }
 
   protected period(execution: ReportExecution): string {

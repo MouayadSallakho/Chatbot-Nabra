@@ -42,7 +42,11 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
       border-block-end: 1px solid var(--border-subtle);
     }
 
+    /* A 44px target in either language (Phase 39.7a). */
     .reports-nav-link {
+      display: inline-flex;
+      align-items: center;
+      min-block-size: var(--target-min);
       padding: var(--space-2) var(--space-3);
       border-block-end: 2px solid transparent;
       color: var(--text-secondary);

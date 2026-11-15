@@ -1,13 +1,19 @@
-import { signal } from '@angular/core';
+import { WritableSignal, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { NEVER, of, throwError } from 'rxjs';
+import { NEVER, Observable, of, throwError } from 'rxjs';
+import { AuthService } from '@app/core/auth/auth-service';
 import { PermissionService } from '@app/core/authorization/permission-service';
 import { NotificationCenter } from '@app/core/notifications/notification-center';
 import { InboxSignals } from '@app/core/sounds/inbox-signals';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
 import { AnalyticsApi, AnalyticsDashboard } from '@app/features/analytics/analytics-api';
 import { BillingApi, WorkspaceBilling } from '@app/features/billing/billing-api';
+import {
+  ConversationPage,
+  ConversationSummary,
+  ConversationsApi,
+} from '@app/features/conversations/conversations-api';
 import { PlanUsage, PlanUsageApi } from '@app/features/plan-usage/plan-usage-api';
 import { Overview } from './overview';
 
@@ -18,6 +24,7 @@ function dashboard(
     whatsappFailed?: number;
     previous?: AnalyticsDashboard['previous'];
     timeZone?: string;
+    channels?: AnalyticsDashboard['channels'];
   } = {},
 ): AnalyticsDashboard {
   const days = ['12', '13', '14', '15', '16', '17', '18'].map((day, index) => ({
@@ -42,10 +49,26 @@ function dashboard(
       aiMessages: 25,
       humanMessages: 4,
       systemMessages: 0,
+      conversationsAnsweredByAi: 9,
     },
     current: { openConversations: 7, openHandledByAi: 5, openHandledByHuman: 2 },
     dailyActivity: days,
-    channels: [],
+    channels: overrides.channels ?? [
+      {
+        channel: 'WebChat',
+        conversationsStarted: 9,
+        customerMessages: 20,
+        aiMessages: 20,
+        humanMessages: 2,
+      },
+      {
+        channel: 'WhatsApp',
+        conversationsStarted: 3,
+        customerMessages: 10,
+        aiMessages: 5,
+        humanMessages: 2,
+      },
+    ],
     agents: [],
     aiOperations: { attempts: 25, completed: 25, failed: overrides.failed ?? 0, inProgress: 0 },
     aiUsage: null,
@@ -66,6 +89,25 @@ function dashboard(
     ...(overrides.previous ? { previous: overrides.previous } : {}),
   };
 }
+
+const PREVIOUS: AnalyticsDashboard['previous'] = {
+  period: {
+    range: '7d',
+    from: '2026-10-05T00:00:00+00:00',
+    to: '2026-10-12T00:00:00+00:00',
+    days: 7,
+    timeZone: 'UTC',
+  },
+  summary: {
+    conversationsStarted: 8,
+    customerMessages: 30,
+    aiMessages: 50,
+    humanMessages: 0,
+    systemMessages: 0,
+    conversationsAnsweredByAi: 6,
+  },
+  aiOperations: { attempts: 0, completed: 0, failed: 0, inProgress: 0 },
+};
 
 const PLAN_WITH_WARNING = {
   entitlements: [
@@ -96,24 +138,59 @@ const PLAN_WITH_WARNING = {
   ],
 } as unknown as PlanUsage;
 
-describe('Overview', () => {
+/** One waiting conversation, as the needs-a-person view lists it. */
+function waiting(id: string, reason: string, name: string | null = null): ConversationSummary {
+  return {
+    id,
+    channel: 'WebChat',
+    status: 'Open',
+    handling: 'Ai',
+    startedAt: '2026-10-18T10:00:00Z',
+    lastActivityAt: '2026-10-18T10:05:00Z',
+    agentName: null,
+    messageCount: 2,
+    lastMessagePreview: 'Hello',
+    lastMessageSender: 'Customer',
+    assignedTo: null,
+    customer: {
+      id: `cust-${id}`,
+      displayName: name,
+      labelCode: 'AnonymousVisitor',
+      reference: null,
+      shortCode: `V${id.toUpperCase()}`,
+    },
+    unread: true,
+    takenOverBy: null,
+    needsPerson: true,
+    needsPersonReason: reason,
+  };
+}
+
+describe('Overview (the bento, Phase 39.7a)', () => {
   let fixture: ComponentFixture<Overview>;
+  let count: WritableSignal<number | null>;
 
   const host = (): HTMLElement => fixture.nativeElement as HTMLElement;
   const text = (): string => host().textContent ?? '';
+  const by = (testid: string): HTMLElement | null =>
+    host().querySelector<HTMLElement>(`[data-testid="${testid}"]`);
   const titles = (): string[] =>
     [...host().querySelectorAll('.attention-title')].map(
       (element) => element.textContent?.trim() ?? '',
     );
   const more = (): HTMLButtonElement =>
     host().querySelector<HTMLButtonElement>('[data-testid="attention-more"]')!;
-  const tones = (): string[] =>
-    [...host().querySelectorAll('.attention-tone')].map(
-      (element) => element.textContent?.trim() ?? '',
-    );
 
-  /** What the page asked the analytics endpoint for, call by call. */
+  /** What the page asked each endpoint for, call by call. */
   let dashboardCalls: unknown[][] = [];
+  let listCalls: unknown[][] = [];
+
+  async function settle(): Promise<void> {
+    // The sources settle through chained promises; let them all finish.
+    await new Promise((resolve) => setTimeout(resolve));
+    await fixture.whenStable();
+    fixture.detectChanges();
+  }
 
   async function render(options: {
     granted?: readonly string[];
@@ -121,22 +198,29 @@ describe('Overview', () => {
     plan?: PlanUsage | 'fail';
     billing?: WorkspaceBilling;
     unread?: number;
-    needsPerson?: number;
+    waiting?: ConversationPage | 'fail' | 'never';
+    displayName?: string | null;
   }) {
     const granted = new Set(options.granted ?? ['analytics.view', 'billing.view']);
 
     dashboardCalls = [];
+    listCalls = [];
+    count = signal<number | null>(null);
 
     TestBed.configureTestingModule({
       providers: [
         provideRouter([]),
         { provide: PermissionService, useValue: { has: (code: string) => granted.has(code) } },
         { provide: NotificationCenter, useValue: { unread: signal(options.unread ?? 0) } },
+        { provide: InboxSignals, useValue: { count, showCount: () => () => undefined } },
         {
-          provide: InboxSignals,
+          provide: AuthService,
           useValue: {
-            count: signal(options.needsPerson ?? null),
-            showCount: () => () => undefined,
+            user: signal({
+              id: 'u1',
+              email: 'rana@acme.test',
+              displayName: options.displayName === undefined ? 'Rana' : options.displayName,
+            }),
           },
         },
         {
@@ -172,307 +256,390 @@ describe('Overview', () => {
         },
       ],
     });
+    TestBed.overrideComponent(Overview, {
+      set: {
+        providers: [
+          {
+            provide: ConversationsApi,
+            useValue: {
+              list: (...args: unknown[]): Observable<ConversationPage> => {
+                listCalls.push(args);
+
+                return options.waiting === 'fail'
+                  ? throwError(() => new Error('down'))
+                  : options.waiting === 'never'
+                    ? NEVER
+                    : of(options.waiting ?? { items: [], page: 1, pageSize: 3, total: 0 });
+              },
+            },
+          },
+        ],
+      },
+    });
 
     fixture = TestBed.createComponent(Overview);
     fixture.detectChanges();
-    // The three sources settle through chained promises; let them all finish.
-    await new Promise((resolve) => setTimeout(resolve));
-    await fixture.whenStable();
-    fixture.detectChanges();
+    await settle();
   }
 
-  describe('conversations that need a person', () => {
+  describe('the greeting', () => {
+    it('greets the reader by the display name they chose, as the page heading', async () => {
+      await render({});
+
+      const heading = host().querySelector('h1');
+
+      expect(host().querySelectorAll('h1').length).toBe(1);
+      expect(heading?.getAttribute('data-testid')).toBe('greeting');
+      expect(heading?.textContent).toMatch(/^Good (morning|afternoon|evening), ⁨Rana⁩$/);
+      expect(text()).toContain('Acme Trading');
+    });
+
+    it('never falls back to an email address', async () => {
+      await render({ displayName: null });
+
+      expect(by('greeting')?.textContent?.trim()).toMatch(/^Good (morning|afternoon|evening)$/);
+      expect(text()).not.toContain('rana@acme.test');
+    });
+  });
+
+  describe('needs a person now (the gold tile)', () => {
     const conversations = ['analytics.view', 'billing.view', 'conversations.view'];
+    const page: ConversationPage = {
+      items: [
+        waiting('a1', 'AiTurnFailed', 'Khalid M.'),
+        waiting('a2', 'PersonHandling'),
+        waiting('a3', 'ReturnedUnanswered'),
+      ],
+      page: 1,
+      pageSize: 3,
+      total: 152,
+    };
 
-    it('adds one row, from the shared count, that opens that view', async () => {
-      await render({ granted: conversations, needsPerson: 3 });
-      const row = host().querySelector('[data-testid="attention-needs-person"]');
+    it('reads the first three of the inbox view once, and shows them with why they wait', async () => {
+      await render({ granted: conversations, waiting: page });
 
-      expect(row?.textContent).toContain('3 conversations need a person');
-      expect(row?.querySelector('a')?.getAttribute('href')).toBe(
+      expect(listCalls).toEqual([['tenant-1', 1, 3, 'needs-person']]);
+      expect(by('needs-person-total')?.textContent?.trim()).toBe('152');
+
+      const rows = [...host().querySelectorAll('[data-testid^="needs-person-row-"]')];
+
+      expect(rows.length).toBe(3);
+      // Two lines each: who it is with, then the reason as a chip with its word.
+      expect(rows[0].querySelector('app-customer-label')?.textContent?.trim()).toBe('Khalid M.');
+      expect(rows[0].querySelector('app-chip')?.textContent?.trim()).toBe('The AI could not reply');
+      expect(rows[0].querySelector('app-chip')?.getAttribute('data-tone')).toBe('failed');
+      expect(rows[1].querySelector('app-chip')?.textContent?.trim()).toBe('Waiting for the team');
+      expect(rows[2].querySelector('app-chip')?.getAttribute('data-tone')).toBe('need');
+      expect(rows[0].getAttribute('href')).toBe('/conversations/a1');
+      expect(by('needs-person-more')?.textContent?.trim()).toBe('and 149 more in the inbox');
+      expect(by('needs-person-open')?.getAttribute('href')).toBe(
         '/conversations?view=needs-person',
       );
     });
 
-    it('adds nothing when nobody is waiting', async () => {
-      await render({ granted: conversations, needsPerson: 0 });
+    it('says plainly when nobody is waiting', async () => {
+      await render({ granted: conversations });
 
-      expect(host().querySelector('[data-testid="attention-needs-person"]')).toBeNull();
+      expect(by('needs-person-none')?.textContent?.trim()).toBe('No conversations need a person');
+      expect(by('needs-person-more')).toBeNull();
     });
 
-    it('adds nothing for somebody who cannot read conversations', async () => {
-      await render({ needsPerson: 3 });
+    it('reads the rows again when the shared count changes, and never polls on its own', async () => {
+      await render({ granted: conversations, waiting: page });
+      count.set(152);
+      fixture.detectChanges();
+      count.set(153);
+      fixture.detectChanges();
+      await settle();
 
-      expect(host().querySelector('[data-testid="attention-needs-person"]')).toBeNull();
+      expect(listCalls.length).toBe(2);
+    });
+
+    it('says the read failed and offers to read it again', async () => {
+      await render({ granted: conversations, waiting: 'fail' });
+
+      const tile = by('tile-needs-person')!;
+
+      expect(tile.textContent).toContain('The waiting conversations could not be read.');
+      tile.querySelector<HTMLButtonElement>('.need-retry')!.click();
+      await settle();
+
+      expect(listCalls.length).toBe(2);
+    });
+
+    it('is not offered, and nothing is read, to somebody who may not open conversations', async () => {
+      await render({});
+
+      expect(by('tile-needs-person')).toBeNull();
+      expect(listCalls).toEqual([]);
+    });
+
+    it('holds three placeholder rows while the read is out', async () => {
+      await render({ granted: conversations, waiting: 'never' });
+
+      expect(by('tile-needs-person')?.querySelectorAll('.need-row.is-placeholder').length).toBe(3);
+      expect(by('needs-person-total')).toBeNull();
     });
   });
 
-  it('says plainly when nothing needs attention', async () => {
-    await render({});
+  describe('needs attention', () => {
+    it('says plainly when nothing else needs attention, with a word and a glyph', async () => {
+      await render({});
 
-    expect(host().querySelector('[data-testid="attention-clear"]')?.textContent).toContain(
-      'Nothing needs you right now.',
-    );
-  });
+      const clear = by('attention-clear');
 
-  it('lists limits that are running out, the reached one first, each with its figure, and ignores unlimited ones', async () => {
-    await render({ plan: PLAN_WITH_WARNING });
-
-    // Plan & usage's own words: the limit's name and the server's state.
-    expect(titles()).toEqual(['Members: Limit reached', 'AI agents: Approaching the limit']);
-
-    // Severity is a word as well as a colour and a glyph.
-    expect(tones()).toEqual(['Critical', 'Warning']);
-
-    const figures = [...host().querySelectorAll('.attention-figure')].map((figure) =>
-      figure.textContent?.trim(),
-    );
-
-    expect(figures).toEqual(['10 of 10', '4 of 5']);
-    expect(text()).toContain('New ones are refused until the plan allows more.');
-    expect(text()).toContain('Nothing is refused yet. Only reaching the limit stops new ones.');
-    expect(text()).not.toContain('Knowledge documents');
-  });
-
-  it('raises a suspended subscription above everything else', async () => {
-    await render({
-      plan: PLAN_WITH_WARNING,
-      unread: 3,
-      billing: { subscription: { status: 'Suspended' } } as unknown as WorkspaceBilling,
+      expect(clear?.textContent).toContain('Nothing needs you right now.');
+      expect(clear?.querySelector('app-chip')?.getAttribute('data-tone')).toBe('success');
     });
 
-    expect(titles()[0]).toBe('Subscription suspended');
+    it('lists limits running out, the reached one first, each with its severity as a chip', async () => {
+      await render({ plan: PLAN_WITH_WARNING });
 
-    // Three rows, then the rest on request.
-    more().click();
-    fixture.detectChanges();
+      expect(titles()).toEqual(['Members: Limit reached', 'AI agents: Approaching the limit']);
 
-    expect(titles().at(-1)).toBe('3 unread notifications');
-  });
+      const chips = [...host().querySelectorAll('.attention-row app-chip')];
 
-  it('makes every row one way on: a link, or "Try again" in place', async () => {
-    await render({
-      plan: PLAN_WITH_WARNING,
-      unread: 3,
-      dashboard: dashboard({ failed: 2 }),
-    });
-    more().click();
-    fixture.detectChanges();
-
-    const rows = [...host().querySelectorAll('.attention-row')];
-
-    expect(rows.length).toBe(4);
-
-    for (const row of rows) {
-      expect(row.querySelectorAll('a, button').length).toBe(1);
-    }
-  });
-
-  it('shows three items and "+N more", reveals the rest on request, and folds them again', async () => {
-    await render({
-      plan: PLAN_WITH_WARNING,
-      unread: 3,
-      dashboard: dashboard({ failed: 2 }),
+      expect(chips.map((chip) => chip.textContent?.trim())).toEqual(['Critical', 'Warning']);
+      expect(chips.map((chip) => chip.getAttribute('data-tone'))).toEqual(['danger', 'warning']);
+      expect(text()).toContain('10 of 10. New ones are refused until the plan allows more.');
+      expect(text()).not.toContain('Knowledge documents');
     });
 
-    expect(titles()).toEqual([
-      'Members: Limit reached',
-      'AI agents: Approaching the limit',
-      '2 AI replies failed',
-    ]);
-    expect(more().textContent?.trim()).toBe('+1 more');
-    expect(more().getAttribute('aria-expanded')).toBe('false');
-    expect(more().getAttribute('aria-controls')).toBe('attention-list');
+    it('puts every title on its own line, never truncated (note 10)', async () => {
+      await render({ unread: 3 });
 
-    more().click();
-    fixture.detectChanges();
+      const row = by('attention-notifications')!;
 
-    expect(titles().length).toBe(4);
-    expect(more().textContent?.trim()).toBe('Show fewer');
-    expect(more().getAttribute('aria-expanded')).toBe('true');
+      expect(row.querySelector('.attention-title')?.textContent?.trim()).toBe(
+        '3 unread notifications',
+      );
+      expect(row.querySelector('.attention-meta app-chip')?.textContent?.trim()).toBe(
+        'For your information',
+      );
+    });
 
-    more().click();
-    fixture.detectChanges();
+    it('raises a suspended subscription above everything else, three rows then "+N more"', async () => {
+      await render({
+        plan: PLAN_WITH_WARNING,
+        unread: 3,
+        billing: { subscription: { status: 'Suspended' } } as unknown as WorkspaceBilling,
+      });
 
-    expect(titles().length).toBe(3);
+      expect(titles()[0]).toBe('Subscription suspended');
+      expect(titles().length).toBe(3);
+      expect(more().textContent?.trim()).toBe('+1 more');
+      expect(more().getAttribute('aria-expanded')).toBe('false');
+
+      more().click();
+      fixture.detectChanges();
+
+      expect(titles().at(-1)).toBe('3 unread notifications');
+      expect(more().textContent?.trim()).toBe('Show fewer');
+
+      more().click();
+      fixture.detectChanges();
+
+      expect(titles().length).toBe(3);
+    });
+
+    it('makes every row one way on: a link, or "Try again" in place', async () => {
+      await render({ plan: 'fail', unread: 1, dashboard: dashboard({ failed: 2 }) });
+
+      const rows = [...host().querySelectorAll('.attention-row')];
+
+      expect(rows.length).toBe(3);
+
+      for (const row of rows) {
+        expect(row.querySelectorAll('a, button').length).toBe(1);
+      }
+
+      const unavailable = by('attention-plan-unavailable')!;
+
+      expect(unavailable.textContent).toContain('Not checked');
+      expect(unavailable.querySelector('button')?.textContent).toContain('Try again');
+      expect(by('attention-clear')).toBeNull();
+    });
+
+    it('reports failed AI replies and undelivered WhatsApp messages from the server counts', async () => {
+      await render({ dashboard: dashboard({ failed: 1, whatsappFailed: 2 }) });
+
+      expect(titles()).toEqual(['1 AI reply failed', '2 WhatsApp messages were not delivered']);
+      expect(text()).toContain('Out of 25 attempts in the last 7 days.');
+    });
+
+    it('holds three placeholder rows while the sources answer', async () => {
+      await render({ dashboard: 'never' });
+
+      const tile = by('attention-panel');
+
+      expect(tile?.getAttribute('aria-busy')).toBe('true');
+      expect(tile?.querySelectorAll('.attention-row.is-placeholder').length).toBe(3);
+      expect(text()).toContain('Checking what needs attention…');
+    });
   });
 
-  it('offers no "more" when three or fewer items need attention', async () => {
-    await render({ plan: PLAN_WITH_WARNING, unread: 3 });
+  describe('the numbers', () => {
+    it('asks for the previous seven days on the one dashboard read', async () => {
+      await render({ dashboard: dashboard({ previous: PREVIOUS }) });
 
-    expect(titles().length).toBe(3);
-    expect(host().querySelector('[data-testid="attention-more"]')).toBeNull();
+      expect(dashboardCalls).toEqual([['tenant-1', '7d', { compare: true }]]);
+    });
+
+    it('shows the conversations, how they moved in words, and the days as a line', async () => {
+      await render({ dashboard: dashboard({ previous: PREVIOUS }) });
+
+      const tile = by('tile-conversations')!;
+
+      expect(by('week-conversations')?.textContent?.trim()).toBe('12');
+      expect(
+        tile.querySelector('[data-testid="week-conversations-change"] > span:last-child')
+          ?.textContent,
+      ).toBe('So far, up 50% on the previous period');
+      expect(tile.querySelector('.conv-change-glyph')?.textContent?.trim()).toBe('↑');
+      expect(tile.querySelector('.chart-line.chart-tone-current')).not.toBeNull();
+    });
+
+    it('says which zone the days are in and how far back the data goes', async () => {
+      await render({ dashboard: dashboard({ timeZone: 'Asia/Riyadh' }) });
+
+      expect(by('week-note')?.textContent).toBe(
+        'Whole days in ⁦Asia/Riyadh⁩ time. Data since Sep 1, 2026.',
+      );
+    });
+
+    it('shows the share the AI answered with nobody stepping in, and the share before', async () => {
+      await render({ dashboard: dashboard({ previous: PREVIOUS }) });
+
+      expect(by('answered-share')?.textContent?.trim()).toBe('75%');
+      expect(by('answered-counts')?.textContent?.trim()).toBe('9 of 12');
+      expect(by('answered-before')?.textContent?.trim()).toBe('The 7 days before: 75%');
+      expect(by('tile-answered')?.textContent).toContain(
+        'Conversations the AI answered with nobody stepping in.',
+      );
+    });
+
+    it('shows what is open right now as the voice split, exactly as returned', async () => {
+      await render({});
+
+      const now = by('now');
+
+      expect(now?.querySelector('.now-value')?.textContent?.trim()).toBe('7');
+      expect(now?.querySelector('app-voice-split')?.textContent).toContain(
+        '7 open conversations: 5 with the AI, 2 with people on the team.',
+      );
+    });
+
+    it('splits the conversations by channel, each share in words and figures', async () => {
+      await render({});
+
+      const parts = (testid: string): string[] =>
+        [...(by(testid)?.querySelectorAll('span:not([aria-hidden])') ?? [])].map(
+          (part) => part.textContent?.trim() ?? '',
+        );
+
+      expect(parts('channel-WebChat')).toEqual(['Website chat', '75%', '9 conversations']);
+      expect(by('channel-WhatsApp')?.textContent).toContain('25%');
+    });
+
+    it("shows the messages per day with each sender's week figure and change", async () => {
+      await render({ dashboard: dashboard({ previous: PREVIOUS }) });
+
+      const values = [...host().querySelectorAll('.sender-value')].map((value) =>
+        value.textContent?.trim(),
+      );
+
+      expect(values).toEqual(['30', '25', '4']);
+      expect(host().querySelectorAll('.chart-column').length).toBe(7);
+      expect(host().querySelectorAll('.chart-column.is-partial').length).toBe(1);
+      expect(by('week-human-change')?.querySelector('span:last-child')?.textContent?.trim()).toBe(
+        'None in the previous period',
+      );
+    });
+
+    it('invents no comparison when the server sent no previous period', async () => {
+      await render({});
+
+      expect(by('week-conversations-change')).toBeNull();
+      expect(by('answered-before')).toBeNull();
+    });
+
+    it('draws every number tile in its loaded shape while the read is out', async () => {
+      await render({ dashboard: 'never' });
+
+      expect(by('tile-conversations')?.querySelector('.conv-skeleton-plot')).not.toBeNull();
+      expect(by('tile-answered')?.querySelector('.ring-skeleton')).not.toBeNull();
+      expect(by('now')?.getAttribute('aria-busy')).toBe('true');
+      expect(by('tile-channels')?.querySelector('.split-skeleton')).not.toBeNull();
+      expect(by('week')?.querySelector('.messages-skeleton-plot')).not.toBeNull();
+    });
+
+    it('keeps the rest of the page when the numbers fail to load', async () => {
+      await render({ dashboard: 'fail', unread: 2 });
+
+      expect(by('numbers-failed')?.textContent).toContain('Activity numbers could not be loaded');
+      expect(by('tile-conversations')).toBeNull();
+      expect(titles()).toEqual(['2 unread notifications']);
+    });
+
+    it('shows no numbers, and asks for none, without analytics.view', async () => {
+      await render({ granted: ['conversations.view'], unread: 1 });
+
+      expect(dashboardCalls).toEqual([]);
+      expect(by('tile-conversations')).toBeNull();
+      expect(by('tile-usage')).toBeNull();
+      expect(by('bento')?.classList.contains('has-numbers')).toBe(false);
+      expect(titles()).toEqual(['1 unread notification']);
+    });
   });
 
-  it('holds the same panel, with three placeholder rows, while the sources answer', async () => {
-    await render({ dashboard: 'never' });
-
-    const panel = host().querySelector('[data-testid="attention-panel"]');
-
-    expect(panel?.getAttribute('aria-busy')).toBe('true');
-    expect(panel?.querySelectorAll('.attention-row').length).toBe(3);
-    expect(panel?.querySelector('.attention-footer')).not.toBeNull();
-    expect(text()).toContain('Checking what needs attention…');
-  });
-
-  it('reports failed AI replies and undelivered WhatsApp messages from the server counts', async () => {
-    await render({ dashboard: dashboard({ failed: 1, whatsappFailed: 2 }) });
-
-    expect(titles()).toContain('1 AI reply failed');
-    expect(titles()).toContain('2 WhatsApp messages were not delivered');
-    expect(text()).toContain('Out of 25 attempts in the last 7 days.');
-  });
-
-  it('says a monthly limit that ran out stops AI work until the month resets', async () => {
-    await render({
-      plan: {
+  describe('AI usage this month (the deep tile)', () => {
+    const monthly = (state: string, used: number, limit: number | null) =>
+      ({
         entitlements: [
           {
             entitlement: 'monthlyProviderOperations',
-            used: 500,
-            limit: 500,
-            unlimited: false,
-            state: 'Exhausted',
+            used,
+            limit,
+            unlimited: limit === null,
+            state,
             period: { from: '2026-10-01T00:00:00Z', to: '2026-11-01T00:00:00Z' },
           },
         ],
-      } as unknown as PlanUsage,
+      }) as unknown as PlanUsage;
+
+    it('shows the month against the plan limit, with a meter and the state in words', async () => {
+      await render({ plan: monthly('Warning', 160, 200) });
+
+      const tile = by('tile-usage')!;
+
+      expect(by('usage-used')?.textContent?.trim()).toBe('160');
+      expect(by('usage-limit')?.textContent?.trim()).toBe('Plan limit: 200');
+      expect(tile.querySelector('app-meter')?.getAttribute('aria-valuetext')).toBe(
+        '160 of 200. Approaching the limit',
+      );
+      expect(by('usage-state')?.getAttribute('data-tone')).toBe('warning');
+      // The same limit is also something that needs attention.
+      expect(titles()).toEqual(['AI provider operations: Approaching the limit']);
     });
 
-    expect(titles()).toEqual(['AI provider operations: Limit reached']);
-    expect(text()).toContain('do not run until the month resets');
-    expect(host().querySelector('.attention-figure')?.textContent?.trim()).toBe('500 of 500');
-  });
+    it('draws no meter against no limit, and says the plan has none', async () => {
+      await render({ plan: monthly('Normal', 31, null) });
 
-  it('says a source that did not answer was not checked, and offers to try again', async () => {
-    await render({ plan: 'fail' });
-
-    const card = host().querySelector('[data-testid="attention-plan-unavailable"]');
-
-    expect(card?.textContent).toContain('Plan limits could not be checked');
-    expect(card?.textContent).toContain('Not checked');
-    expect(card?.querySelector('button')?.textContent).toContain('Try again');
-
-    // "All clear" would be a claim the page cannot make.
-    expect(host().querySelector('[data-testid="attention-clear"]')).toBeNull();
-  });
-
-  it('shows what is open right now as the voice split, exactly as returned', async () => {
-    await render({});
-
-    const now = host().querySelector('[data-testid="now"]');
-
-    expect(now?.querySelector('.now-value')?.textContent?.trim()).toBe('7');
-    expect(now?.querySelector('app-voice-split')?.textContent).toContain(
-      '7 open conversations: 5 with the AI, 2 with people on the team.',
-    );
-  });
-
-  it('shows the last seven days as returned, with a daily chart and its table', async () => {
-    await render({});
-
-    const values = [...host().querySelectorAll('[data-testid="week"] .figure-value')].map((value) =>
-      value.textContent?.trim(),
-    );
-
-    expect(values).toEqual(['12', '30', '25', '4']);
-
-    // One column group per day the API returned, the running day marked.
-    expect(host().querySelectorAll('.chart-column').length).toBe(7);
-    expect(host().querySelectorAll('.chart-column.is-partial').length).toBe(1);
-    expect(host().querySelector('[data-testid="chart-partial"]')).not.toBeNull();
-
-    // No comparison is invented when the server sent no previous period.
-    expect(host().querySelector('.figure-change')).toBeNull();
-
-    // Every sparkline's days are in the chart's table, conversations included.
-    host().querySelector<HTMLButtonElement>('[data-testid="chart-view-toggle"]')!.click();
-    fixture.detectChanges();
-
-    const table = host().querySelector('[data-testid="chart-table"]');
-
-    expect(table?.querySelectorAll('tbody tr').length).toBe(7);
-    expect(table?.querySelector('thead')?.textContent).toContain('Conversations started');
-    expect(table?.textContent).toContain('so far');
-  });
-
-  it('asks for the previous seven days on the same read, and says how each figure moved', async () => {
-    await render({
-      dashboard: dashboard({
-        previous: {
-          period: {
-            range: '7d',
-            from: '2026-10-05T00:00:00+00:00',
-            to: '2026-10-12T00:00:00+00:00',
-            days: 7,
-            timeZone: 'UTC',
-          },
-          summary: {
-            conversationsStarted: 8,
-            customerMessages: 30,
-            aiMessages: 50,
-            humanMessages: 0,
-            systemMessages: 0,
-          },
-          aiOperations: { attempts: 0, completed: 0, failed: 0, inProgress: 0 },
-        },
-      }),
+      expect(by('usage-limit')?.textContent?.trim()).toBe('No monthly limit on this plan');
+      expect(by('tile-usage')?.querySelector('app-meter')).toBeNull();
     });
 
-    expect(dashboardCalls).toEqual([['tenant-1', '7d', { compare: true }]]);
+    it('says the plan could not be checked when its read failed', async () => {
+      await render({ plan: 'fail' });
 
-    const change = (key: string): string =>
-      host()
-        .querySelector(`[data-testid="week-${key}-change"] > span:last-child`)
-        ?.textContent?.replace(/\s+/g, ' ')
-        .trim() ?? '';
+      expect(by('tile-usage')?.textContent).toContain('Plan limits could not be checked');
+    });
 
-    expect(change('conversations')).toBe('So far, up 50% on the previous period');
-    expect(change('customer')).toBe('So far, the same as the previous period');
-    expect(change('ai')).toBe('So far, down 50% on the previous period');
-    expect(change('human')).toBe('None in the previous period');
-  });
+    it('is left out when the plan has no monthly AI limit to report', async () => {
+      await render({});
 
-  it('says which zone the days are in and how far back the data goes', async () => {
-    await render({ dashboard: dashboard({ timeZone: 'Asia/Riyadh' }) });
-
-    expect(host().querySelector('[data-testid="week-note"]')?.textContent).toBe(
-      'Whole days in \u2066Asia/Riyadh\u2069 time. Data since Sep 1, 2026.',
-    );
-  });
-
-  it('keeps the status word beside its glyph at every width (E10)', async () => {
-    await render({ unread: 3 });
-
-    const tone = host().querySelector('.attention-tone')!;
-
-    expect(tone.textContent?.trim()).toBe('For your information');
-    // Not hidden on phones any more: the title gives way instead.
-    expect(tone.querySelector('.visually-hidden-below-md')).toBeNull();
-    expect(host().querySelector('.attention-title')).not.toBeNull();
-  });
-
-  it('shows no numbers, and asks for none, without analytics.view', async () => {
-    await render({ granted: [], unread: 1 });
-
-    expect(text()).not.toContain('Last 7 days');
-    expect(text()).not.toContain('Right now');
-    expect(titles()).toEqual(['1 unread notification']);
-  });
-
-  it('keeps the rest of the page when the numbers fail to load', async () => {
-    await render({ dashboard: 'fail', unread: 2 });
-
-    expect(text()).toContain('Activity numbers could not be loaded');
-    expect(titles()).toEqual(['2 unread notifications']);
-  });
-
-  it('links to the conversations only for somebody who may open them', async () => {
-    await render({ granted: ['analytics.view'] });
-
-    expect(
-      [...host().querySelectorAll('.section-link')].map((link) => link.textContent?.trim()),
-    ).toEqual(['View analytics']);
+      expect(by('tile-usage')).toBeNull();
+    });
   });
 
   it('offers only the shortcuts this person may use', async () => {

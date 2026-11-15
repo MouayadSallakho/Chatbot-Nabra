@@ -12,9 +12,11 @@
 // role (`.chart-tone-*`), and every role is repeated in words on the page.
 // -----------------------------------------------------------------------------
 
-// Roles. Lagoon and Ember are the voices and nothing else; customers and single
-// series are neutral; danger only for a failure; muted is a lighter step of the
-// neutral for something unsettled ("still running"), always with its word.
+// Roles. Emerald and gold are the voices and nothing else; customers and single
+// series are neutral; `current` is the period being read (emerald-700 light,
+// emerald-300 dark; Phase 39.7a); danger only for a failure; muted is a lighter
+// step of the neutral for something unsettled ("still running"), always with
+// its word. Team lines are gold-800, never gold-500 (2.2:1; plan 39.0 §4).
 .chart-tone-ai {
   --chart-tone: var(--chart-ai);
 }
@@ -29,6 +31,10 @@
 
 .chart-tone-neutral {
   --chart-tone: var(--chart-neutral);
+}
+
+.chart-tone-current {
+  --chart-tone: var(--chart-current);
 }
 
 .chart-tone-danger {
@@ -373,8 +379,8 @@
 }
 
 // -----------------------------------------------------------------------------
-// Figures: a strip of headline counts (Overview, Analytics). Proportional
-// figures at this size; tabular only where numbers align in columns.
+// Figures: a strip of headline counts (Analytics). Numbers are tabular
+// everywhere (calm-glass.md §4), so a refreshed figure never changes width.
 // -----------------------------------------------------------------------------
 .figures {
   display: grid;
@@ -411,7 +417,8 @@
 
 .figure-value {
   font: 600 1.75rem / 1.2 var(--font-sans);
-  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text);
 }
 
 .figure-skeleton {

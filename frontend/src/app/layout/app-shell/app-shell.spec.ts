@@ -204,7 +204,9 @@ describe('AppShell', () => {
     it('renders the overview page', async () => {
       await render('/overview');
 
-      expect(query('h1')?.textContent?.trim()).toBe('Overview');
+      // The overview's one heading is its greeting (Phase 39.7a, board Overview).
+      expect(query('h1')?.getAttribute('data-testid')).toBe('greeting');
+      expect(query('h1')?.textContent?.trim()).toMatch(/^Good (morning|afternoon|evening)/);
     });
 
     it('offers no unbuilt area in the primary navigation', async () => {

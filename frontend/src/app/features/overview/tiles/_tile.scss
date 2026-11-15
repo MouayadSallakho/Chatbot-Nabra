@@ -1,0 +1,34 @@
+// The bento tile's frame (board Overview, Phase 39.7a), shared by every tile
+// of the overview: a solid panel, radius 24, a 1px line and no shadow, the
+// panel's padding, and a quiet title. Each tile draws its own inside.
+@mixin frame {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-inline-size: 0;
+  padding: var(--space-5) var(--panel-padding) var(--panel-padding);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-panel);
+  background-color: var(--color-panel);
+  color: var(--color-text);
+}
+
+@mixin words {
+  .tile-title {
+    font: var(--text-title-3);
+    color: var(--color-text-secondary);
+  }
+
+  .tile-quiet {
+    font: var(--text-small);
+    color: var(--color-text-quiet);
+  }
+}
+
+@mixin chrome {
+  :host {
+    @include frame;
+  }
+
+  @include words;
+}

@@ -351,6 +351,22 @@ describe('ReportSchedules', () => {
           ?.textContent?.trim(),
       ).toBe('Arabic file');
     });
+
+    it('says each state as a chip with a word and its own marker (Phase 39.7a)', async () => {
+      await mount(...owner);
+      await answerInitial([schedule, { ...schedule, id: 'off-1', enabled: false }]);
+
+      const chip = (id: string): Element | null =>
+        host().querySelector(`[data-testid="schedule-${id}"] td:nth-child(5) app-chip`);
+
+      expect(chip(schedule.id)?.textContent?.trim()).toBe('On');
+      expect(chip(schedule.id)?.getAttribute('data-tone')).toBe('success');
+      expect(chip('off-1')?.textContent?.trim()).toBe('Off');
+      expect(chip('off-1')?.getAttribute('data-tone')).toBe('draft');
+      expect(
+        host().querySelector(`[data-testid="schedule-language-${schedule.id}"]`)?.tagName,
+      ).toBe('APP-CHIP');
+    });
   });
 
   describe('the workspace time zone (E2)', () => {

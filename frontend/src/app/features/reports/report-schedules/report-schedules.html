@@ -1,4 +1,4 @@
-<div class="page">
+<div class="page page-calm">
   <app-page-header
     heading="Report schedules"
     i18n-heading="@@schedules.heading"
@@ -112,7 +112,7 @@
               <div app-segmented>
                 @for (format of formatsFor(form.controls.type.value); track format) {
                   <label class="segmented-option">
-                    <input type="radio" formControlName="format" [value]="format" />
+                    <input type="radio" name="format" formControlName="format" [value]="format" />
                     <span dir="auto">{{ formatLabel(format) }}</span>
                   </label>
                 }
@@ -127,6 +127,7 @@
                   <label class="segmented-option">
                     <input
                       type="radio"
+                      name="language"
                       formControlName="language"
                       [value]="language"
                       [attr.data-testid]="'schedule-language-' + language"
@@ -141,7 +142,7 @@
               <legend class="field-label" i18n="@@schedules.field.frequency">How often</legend>
               <div class="frequency-options">
                 <label app-radio class="frequency-option">
-                  <input type="radio" formControlName="frequency" value="Weekly" />
+                  <input type="radio" name="frequency" formControlName="frequency" value="Weekly" />
                   <span class="frequency-text">
                     <span i18n="@@schedules.frequency.weekly">Weekly</span>
                     <span class="frequency-hint" i18n="@@schedules.frequency.weeklyHint"
@@ -150,7 +151,12 @@
                   </span>
                 </label>
                 <label app-radio class="frequency-option">
-                  <input type="radio" formControlName="frequency" value="Monthly" />
+                  <input
+                    type="radio"
+                    name="frequency"
+                    formControlName="frequency"
+                    value="Monthly"
+                  />
                   <span class="frequency-text">
                     <span i18n="@@schedules.frequency.monthly">Monthly</span>
                     <span class="frequency-hint" i18n="@@schedules.frequency.monthlyHint"
@@ -270,19 +276,18 @@
                     <span class="format">{{ formatLabel(schedule.format) }}</span>
                   </td>
                   <td class="frequency">{{ frequencyLabel(schedule) }}</td>
-                  <td class="nowrap" [attr.data-testid]="'schedule-language-' + schedule.id">
-                    {{ fileLanguageLabel(schedule.language) }}
+                  <td class="nowrap">
+                    <!-- The file's language, as a small chip (Phase 38.5, E8). -->
+                    <app-chip size="sm" [attr.data-testid]="'schedule-language-' + schedule.id">{{
+                      fileLanguageLabel(schedule.language)
+                    }}</app-chip>
                   </td>
                   <td>
-                    <!-- The word is the state; the badge's own glyph and colour repeat it. -->
+                    <!-- The word is the state; the chip's glyph and colour repeat it. -->
                     @if (schedule.enabled) {
-                      <span class="badge badge-success">
-                        <span i18n="@@schedules.on">On</span>
-                      </span>
+                      <app-chip tone="success" i18n="@@schedules.on">On</app-chip>
                     } @else {
-                      <span class="badge badge-neutral">
-                        <span i18n="@@schedules.off">Off</span>
-                      </span>
+                      <app-chip tone="draft" i18n="@@schedules.off">Off</app-chip>
                     }
                     @if (disabledReason(schedule); as reason) {
                       <p class="reason">{{ reason }}</p>

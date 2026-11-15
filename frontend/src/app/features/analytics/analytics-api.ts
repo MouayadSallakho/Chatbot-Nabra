@@ -45,6 +45,13 @@ export interface AnalyticsSummary {
   readonly aiMessages: number;
   readonly humanMessages: number;
   readonly systemMessages: number;
+
+  /**
+   * The conversations started in the period in which the AI replied and no
+   * person replied or took over (Phase 39.1, BA39-1): "answered by the AI".
+   * One of `conversationsStarted`, never more.
+   */
+  readonly conversationsAnsweredByAi: number;
 }
 
 /** What the workspace looks like now, whatever period is selected. */

@@ -1,4 +1,4 @@
-<div class="page">
+<div class="page page-calm">
   <app-page-header
     heading="Reports"
     i18n-heading="@@reports.heading"
@@ -98,7 +98,7 @@
               <legend class="visually-hidden" i18n="@@reports.field.report">Report</legend>
               @for (entry of reports(); track entry.type) {
                 <label app-radio class="catalogue-item" [attr.data-testid]="'report-' + entry.type">
-                  <input type="radio" formControlName="type" [value]="entry.type" />
+                  <input type="radio" name="type" formControlName="type" [value]="entry.type" />
                   <span class="catalogue-text">
                     <span class="catalogue-title">{{ entry.title }}</span>
                     <span class="catalogue-description">{{ entry.description }}</span>
@@ -172,7 +172,7 @@
                 <div app-segmented>
                   @for (format of formats(); track format) {
                     <label class="segmented-option">
-                      <input type="radio" formControlName="format" [value]="format" />
+                      <input type="radio" name="format" formControlName="format" [value]="format" />
                       <span dir="auto">{{ formatLabel(format) }}</span>
                     </label>
                   }
@@ -187,6 +187,7 @@
                     <label class="segmented-option">
                       <input
                         type="radio"
+                        name="language"
                         formControlName="language"
                         [value]="language"
                         [attr.data-testid]="'report-language-' + language"
@@ -279,11 +280,12 @@
                           <span aria-hidden="true">·</span>
                           <span>{{ size(execution.byteLength) }}</span>
                         }
-                        <!-- The file's language, as a small tag (Phase 38.5, E8). -->
-                        <span
-                          class="badge badge-neutral file-language"
+                        <!-- The file's language, as a small chip (Phase 38.5, E8). -->
+                        <app-chip
+                          size="sm"
+                          class="file-language"
                           [attr.data-testid]="'language-' + execution.language"
-                          >{{ fileLanguageLabel(execution.language) }}</span
+                          >{{ fileLanguageLabel(execution.language) }}</app-chip
                         >
                       </span>
                     </td>
@@ -308,19 +310,43 @@
                     </td>
                     <td class="actions">
                       @if (execution.canDownload) {
-                        <a
+                        <!--
+                          Read through the client (note 16): a refusal is worded
+                          by its code under the button, and a ready file is saved
+                          under the server's name.
+                        -->
+                        <button
+                          type="button"
                           class="btn btn-secondary btn-sm"
-                          [href]="downloadUrl(execution)"
                           [attr.aria-label]="downloadName(execution)"
+                          [attr.aria-disabled]="downloading() === execution.id"
+                          [attr.aria-busy]="downloading() === execution.id"
+                          (click)="download(execution)"
                           data-testid="download"
                         >
-                          <app-icon name="download" [strokeWidth]="1.75" />
-                          <span i18n="@@reports.download">Download</span>
-                        </a>
+                          @if (downloading() === execution.id) {
+                            <span class="spinner" aria-hidden="true"></span>
+                            <span i18n="@@reports.downloading">Downloading…</span>
+                          } @else {
+                            <app-icon name="download" [strokeWidth]="1.75" />
+                            <span i18n="@@reports.download">Download</span>
+                          }
+                        </button>
                       } @else if (execution.status === 'Completed') {
                         <span class="report-meta" i18n="@@reports.download.needsAccess"
                           >Needs more access</span
                         >
+                      }
+                      @if (downloadFailure(); as refused) {
+                        @if (refused.id === execution.id) {
+                          <p
+                            class="failure download-failure"
+                            role="alert"
+                            data-testid="download-error"
+                          >
+                            {{ refused.message }}
+                          </p>
+                        }
                       }
                     </td>
                   </tr>

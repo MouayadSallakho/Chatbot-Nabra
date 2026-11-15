@@ -3,6 +3,7 @@ import { provideRouter } from '@angular/router';
 import { Subject } from 'rxjs';
 import { TenantApi } from '@app/core/api/tenant-api';
 import { PermissionApi } from '@app/core/authorization/permission-api';
+import { LOCAL_STORAGE } from '@app/core/storage/local-storage';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
 import {
   Customer,
@@ -10,7 +11,7 @@ import {
   CustomersApi,
   VersionedCustomer,
 } from '@app/features/customers/customers-api';
-import { permissionApiGranting } from '@app/testing/test-doubles';
+import { memoryStorage, permissionApiGranting } from '@app/testing/test-doubles';
 import type { WhatsAppConversationFacts } from '@app/features/channels/whatsapp-api';
 import type { ConversationCustomer, ConversationDetail } from '../conversations-api';
 import { ConversationContext } from './conversation-context';
@@ -133,6 +134,8 @@ describe('ConversationContext', () => {
       TestBed.configureTestingModule({
         providers: [
           provideRouter([]),
+          // `adopt` remembers the workspace; keep it out of the real localStorage.
+          { provide: LOCAL_STORAGE, useValue: memoryStorage() },
           { provide: PermissionApi, useValue: permissionApiGranting(...permissions) },
           { provide: TenantApi, useValue: { get: () => undefined, create: () => undefined } },
           {

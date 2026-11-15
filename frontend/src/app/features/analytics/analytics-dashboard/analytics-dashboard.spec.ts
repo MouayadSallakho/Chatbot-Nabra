@@ -37,6 +37,7 @@ describe('AnalyticsDashboardPage', () => {
       aiMessages: 0,
       humanMessages: 0,
       systemMessages: 0,
+      conversationsAnsweredByAi: 0,
     },
     current: { openConversations: 0, openHandledByAi: 0, openHandledByHuman: 0 },
     dailyActivity: [
@@ -75,6 +76,7 @@ describe('AnalyticsDashboardPage', () => {
       aiMessages: 31,
       humanMessages: 7,
       systemMessages: 2,
+      conversationsAnsweredByAi: 0,
     },
     current: { openConversations: 5, openHandledByAi: 3, openHandledByHuman: 2 },
     dailyActivity: [
@@ -273,6 +275,7 @@ describe('AnalyticsDashboardPage', () => {
         aiMessages: 31,
         humanMessages: 0,
         systemMessages: 0,
+        conversationsAnsweredByAi: 0,
       },
       aiOperations: { attempts: 30, completed: 30, failed: 0, inProgress: 0 },
     } as const;
@@ -428,6 +431,16 @@ describe('AnalyticsDashboardPage', () => {
       expect(query('[data-testid="messages-chart"]')).toBeNull();
       expect(query('.chart-column')).toBeNull();
       expect(query('[data-testid="agents"]')).toBeNull();
+    });
+
+    it('draws the period being read in emerald and the channels in it (Phase 39.7a)', async () => {
+      await mount();
+      await answer(busy);
+
+      expect(query('.page')?.classList.contains('page-calm')).toBe(true);
+      expect(query('[data-testid="conversations-chart"] .chart-line')?.classList).toContain(
+        'chart-tone-current',
+      );
     });
 
     it('still shows real zeroes rather than hiding the cards', async () => {

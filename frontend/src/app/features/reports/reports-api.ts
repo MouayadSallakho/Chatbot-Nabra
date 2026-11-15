@@ -1,6 +1,6 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { Observable, map } from 'rxjs';
+import { Observable, catchError, from, map, mergeMap, throwError } from 'rxjs';
 import { AppLanguage } from '@app/core/i18n/language';
 import { formatLocalDate } from '@app/core/i18n/time-zone';
 import { Versioned, withEntityTag } from '@app/core/api/versioned';
@@ -194,9 +194,13 @@ export function parameterValues(entry: ReportCatalogEntry, code: string): readon
  * The Reports endpoints.
  *
  * <strong>Asking is not downloading.</strong> A request is accepted and queued;
- * a worker produces the file; the list says when it is ready. Downloads are
- * ordinary links to the API, so the browser streams the file with the session it
- * already has and nothing is held in this page's memory.
+ * a worker produces the file; the list says when it is ready.
+ *
+ * <strong>Downloads go through this client</strong> (Phase 38 note 16, Phase
+ * 39.7a), so a refusal (still being prepared, failed, expired, missing) reaches
+ * the page as a problem with its `code` and is worded in the reader's language,
+ * instead of the browser showing the API's JSON. A ready file is saved under
+ * the name the server gave it.
  */
 @Injectable()
 export class ReportsApi {
@@ -220,9 +224,29 @@ export class ReportsApi {
     return this.http.get<ReportExecution>(`${base(tenantId)}/executions/${executionId}`);
   }
 
-  /** The API route a download link points at. Never a file path. */
+  /** The API route a download reads. Never a file path. */
   downloadUrl(tenantId: string, executionId: string): string {
     return `${base(tenantId)}/executions/${executionId}/download`;
+  }
+
+  /**
+   * Reads a generated report's file, with the name the server gave it.
+   *
+   * A refusal arrives as a blob too; it is read back into the problem the API
+   * sent, so `toApiError` sees its `code` exactly as for any other route.
+   */
+  download(tenantId: string, executionId: string): Observable<ReportFile> {
+    return this.http
+      .get(this.downloadUrl(tenantId, executionId), { observe: 'response', responseType: 'blob' })
+      .pipe(
+        map((response) => ({
+          blob: response.body ?? new Blob([]),
+          fileName: fileNameFrom(response.headers.get('Content-Disposition')),
+        })),
+        catchError((failure: unknown) =>
+          from(problemFromBlob(failure)).pipe(mergeMap((error) => throwError(() => error))),
+        ),
+      );
   }
 
   schedules(tenantId: string): Observable<readonly ReportSchedule[]> {
@@ -278,6 +302,74 @@ export class ReportsApi {
 
 function base(tenantId: string): string {
   return `/api/tenants/${tenantId}/reports`;
+}
+
+/** A downloaded report: its bytes and the name to save them under (null when the server gave none). */
+export interface ReportFile {
+  readonly blob: Blob;
+  readonly fileName: string | null;
+}
+
+/**
+ * The file name in a `Content-Disposition` header: the RFC 6266 `filename*`
+ * (UTF-8, percent-encoded) when present, else the plain `filename`. Only the
+ * last path segment is kept and control characters are dropped, so a header
+ * can never name a folder.
+ */
+export function fileNameFrom(header: string | null): string | null {
+  if (!header) {
+    return null;
+  }
+
+  let name: string | null = null;
+  const extended = /filename\*\s*=\s*(?:UTF-8|utf-8)''([^;]+)/.exec(header);
+
+  if (extended) {
+    try {
+      name = decodeURIComponent(extended[1].trim().replace(/^"|"$/g, ''));
+    } catch {
+      name = null;
+    }
+  }
+
+  if (name === null) {
+    const plain = /filename\s*=\s*("([^"]*)"|[^;]+)/i.exec(header);
+
+    name = plain ? (plain[2] ?? plain[1]).trim() : null;
+  }
+
+  const safe = name
+    ?.split(/[\\/]/)
+    .pop()
+    // eslint-disable-next-line no-control-regex
+    ?.replace(/[\u0000-\u001f\u007f]/g, '')
+    .trim();
+
+  return safe ? safe : null;
+}
+
+/**
+ * A failed blob request, with the problem body parsed back out of the blob, so
+ * the refusal's `code` reaches `toApiError`. Anything that is not JSON is left
+ * as it was.
+ */
+export async function problemFromBlob(failure: unknown): Promise<unknown> {
+  if (!(failure instanceof HttpErrorResponse) || !(failure.error instanceof Blob)) {
+    return failure;
+  }
+
+  try {
+    const body: unknown = JSON.parse(await failure.error.text());
+
+    return new HttpErrorResponse({
+      error: body,
+      headers: failure.headers,
+      status: failure.status,
+      url: failure.url ?? undefined,
+    });
+  } catch {
+    return failure;
+  }
 }
 
 /**

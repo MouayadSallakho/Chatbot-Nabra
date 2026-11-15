@@ -1,0 +1,126 @@
+@use 'tile';
+
+@include tile.chrome;
+
+// The gold tile: a gradient from gold-100, a gold edge drawn inside, the title
+// and the count in gold-850, rows on a near-white wash (board Overview).
+:host {
+  border-color: transparent;
+  background: var(--tile-need-bg);
+  box-shadow: inset 0 0 0 1px var(--tile-need-edge);
+}
+
+.need-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.need-title {
+  font: var(--text-title-3);
+  color: var(--tile-need-title);
+}
+
+.need-count {
+  font: var(--text-title-1);
+  font-variant-numeric: tabular-nums;
+  color: var(--tile-need-title);
+}
+
+.need-rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+// Two lines, never truncated (Phase 38 note 10): who it is with, then why it
+// waits. 16px radius, the row's own wash; a 44px target at least.
+.need-row {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+  min-block-size: var(--target-min);
+  padding: var(--space-3);
+  border-radius: var(--radius-tile);
+  background-color: var(--tile-need-row-bg);
+  color: var(--color-text);
+  text-decoration: none;
+  transition: background-color var(--duration-press) var(--ease-calm);
+
+  &:hover {
+    background-color: var(--tile-need-row-hover);
+    text-decoration: none;
+  }
+
+  &.is-placeholder {
+    block-size: 4.25rem;
+  }
+}
+
+.need-name {
+  max-inline-size: 100%;
+  overflow-wrap: anywhere;
+  font: var(--text-label);
+  font-weight: 600;
+}
+
+// A long reason (Arabic especially) wraps inside its chip rather than leaving
+// the row.
+.need-row app-chip {
+  max-inline-size: 100%;
+  block-size: auto;
+  white-space: normal;
+}
+
+.need-skeleton-name {
+  inline-size: 60%;
+}
+
+.need-skeleton-chip {
+  inline-size: 8rem;
+  block-size: var(--chip-height);
+  border-radius: var(--radius-pill);
+}
+
+.need-message,
+.need-more {
+  font: var(--text-small);
+  color: var(--color-text-secondary);
+}
+
+.need-retry {
+  align-self: flex-start;
+}
+
+// The one action, at the foot of the tile whatever it holds.
+.need-open {
+  margin-block-start: auto;
+  inline-size: 100%;
+}
+
+.need-open-arrow {
+  inline-size: var(--icon-size);
+  block-size: var(--icon-size);
+}
+
+@media (forced-colors: active) {
+  :host {
+    border-color: CanvasText;
+  }
+
+  .need-row {
+    border: 1px solid CanvasText;
+  }
+}
+
+// While the read is out the tile holds its loaded size, so nothing below it
+// moves when it arrives (measured in Chrome on Northwind, Phase 39.7a, per
+// layout and language: Arabic lines are one step taller).
+:host([aria-busy='true']) {
+  min-block-size: 25.5rem;
+}

@@ -438,12 +438,15 @@ describe('Arabic renders', () => {
         'لا أحد بانتظار الفريق',
       );
       expect(CATALOGUE.translations['inbox.unread']).toBe('غير مقروءة');
-      expect(CATALOGUE.translations['overview.attention.needsPerson.two']).toBe(
-        'محادثتان بحاجة إلى الفريق',
+      // The overview's gold tile (Phase 39.7a) uses the same words.
+      expect(CATALOGUE.translations['overview.needsPerson.heading']).toBe('بحاجة إلى الفريق الآن');
+      expect(CATALOGUE.translations['overview.needsPerson.more.two']).toBe(
+        'ومحادثتان أخريان في صندوق المحادثات',
       );
-      expect(CATALOGUE.translations['overview.attention.needsPerson.many']).toBe(
-        '{$count} محادثة بحاجة إلى الفريق',
+      expect(CATALOGUE.translations['overview.needsPerson.more.many']).toBe(
+        'و{$count} محادثة أخرى في صندوق المحادثات',
       );
+      expect(CATALOGUE.translations['overview.attention.needsPerson.zero']).toBeDefined();
     });
 
     it('words the inbox refusals in Arabic, by their codes', async () => {

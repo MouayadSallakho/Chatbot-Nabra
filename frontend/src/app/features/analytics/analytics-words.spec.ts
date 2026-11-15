@@ -29,6 +29,7 @@ describe('analytics words', () => {
       aiMessages: 2,
       humanMessages: 1,
       systemMessages: 0,
+      conversationsAnsweredByAi: 0,
     },
     dailyActivity: [
       {

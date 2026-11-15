@@ -209,6 +209,14 @@ describe('time charts', () => {
     // One series needs no legend: the title says what is plotted.
     expect(area.querySelector('.chart-legend')).toBeNull();
   });
+
+  it('takes its colour from the series role, the period being read included', () => {
+    mount();
+
+    const line = host().querySelector('[data-testid="area"] .chart-line')!;
+
+    expect([...line.classList].some((name) => name.startsWith('chart-tone-'))).toBe(true);
+  });
 });
 
 @Component({

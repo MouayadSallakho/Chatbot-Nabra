@@ -1,0 +1,115 @@
+@use 'tile';
+
+@include tile.chrome;
+
+// One 14px pill split by share, a 3px gap of the panel between the parts.
+.split,
+.split-skeleton {
+  display: flex;
+  gap: 3px; // token-lint-ignore: the board's gap between touching parts
+  block-size: 0.875rem;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+}
+
+.split-part {
+  flex-basis: 0;
+  min-inline-size: 0.375rem;
+  background-color: var(--_hue);
+}
+
+.is-current {
+  --_hue: var(--chart-current);
+}
+
+.is-second {
+  --_hue: var(--chart-channel-2);
+}
+
+.is-third {
+  --_hue: var(--chart-ramp-3);
+}
+
+.is-fourth {
+  --_hue: var(--chart-ramp-2);
+}
+
+.legend {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font: var(--text-small);
+  color: var(--color-text-secondary);
+
+  // One channel per line: the swatch and its name, then its share and count.
+  li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-1) var(--space-2);
+
+    > span {
+      white-space: nowrap;
+    }
+  }
+}
+
+.legend-swatch {
+  flex: none;
+  inline-size: 0.625rem;
+  block-size: 0.625rem;
+  border-radius: 3px; // token-lint-ignore: the board's swatch corner
+  background-color: var(--_hue);
+}
+
+.legend-share {
+  font: var(--text-numeric);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text);
+}
+
+.legend-count {
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-quiet);
+}
+
+.legend-skeleton {
+  inline-size: 60%;
+  block-size: 1.25rem;
+}
+
+@media (forced-colors: active) {
+  .split-part,
+  .legend-swatch {
+    forced-color-adjust: none;
+    background-color: CanvasText;
+  }
+
+  .split-part.is-second,
+  .legend-swatch.is-second {
+    background-color: Highlight;
+  }
+
+  .split-part.is-third,
+  .legend-swatch.is-third {
+    background-color: GrayText;
+  }
+}
+
+// While the read is out the tile holds its loaded size, so nothing below it
+// moves when it arrives (measured in Chrome on Northwind, Phase 39.7a, per
+// layout and language: Arabic lines are one step taller).
+:host([aria-busy='true']) {
+  min-block-size: 8.125rem;
+
+  @media (min-width: 48rem) {
+    min-block-size: 12.5rem;
+  }
+
+  @media (min-width: 80rem) {
+    min-block-size: 20rem;
+  }
+}
