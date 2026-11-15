@@ -1,9 +1,56 @@
 // The subscription summary is shared with the Design Lab and lives in
-// `_admin.scss`; this is the page's own layout.
-.billing {
+// `_admin.scss`; the panels are `.page-calm`'s (styles/_authoring.scss). This
+// is the page's own layout (Phase 39.6b).
+.billing,
+.billing-skeleton {
   display: flex;
   flex-direction: column;
   gap: var(--space-5);
+}
+
+// The subscription's state when there is none to show (payments not set up):
+// the glyph tile beside the title, its chip, the sentences and the plan.
+.billing-state {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-4);
+  padding: var(--panel-padding);
+}
+
+.billing-state-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-inline-size: 0;
+
+  > p {
+    margin: 0;
+  }
+}
+
+.billing-state-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+
+.billing-state-title {
+  margin: 0;
+  color: var(--color-text);
+  font: var(--text-title-2);
+}
+
+.billing-state-lead {
+  color: var(--color-text);
+  font: var(--text-body-strong);
+}
+
+.billing-state-body {
+  max-inline-size: 60ch;
+  color: var(--color-text-secondary);
+  font: var(--text-small);
 }
 
 .billing-current {
@@ -16,23 +63,30 @@
   }
 }
 
+// The provider's portal: a soft tile with its one button and what it opens.
 .billing-manage {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: var(--space-2);
-  padding-block-start: var(--space-4);
-  border-block-start: 1px solid var(--border-subtle);
+  padding: var(--space-4);
+  border-radius: var(--radius-tile);
+  background-color: var(--color-panel-soft);
 
   > p {
     margin: 0;
   }
+
+  @media (forced-colors: active) {
+    border: 1px solid CanvasText;
+  }
 }
 
+// Offers: soft tiles, the price raised in tabular figures, Subscribe at the end.
 .offer-list {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-2);
   margin: 0;
   padding: 0;
   list-style: none;
@@ -44,13 +98,17 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--space-4);
-  padding: var(--space-4);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-card);
+  padding: var(--space-4) var(--space-5);
+  border-radius: var(--radius-tile);
+  background-color: var(--color-panel-soft);
 
   @media (max-width: 33.75rem) {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  @media (forced-colors: active) {
+    border: 1px solid CanvasText;
   }
 }
 
@@ -66,38 +124,78 @@
 }
 
 .offer-name {
-  color: var(--text-primary);
-  font: var(--text-card-title);
+  color: var(--color-text);
+  font: var(--text-title-3);
 }
 
 .offer-price {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
   gap: var(--space-2);
 
   strong {
-    color: var(--text-primary);
-    font-size: 1.25rem;
+    color: var(--color-text);
+    font: var(--text-title-2);
+    font-variant-numeric: tabular-nums;
   }
+}
+
+.offer-cadence {
+  color: var(--color-text-quiet);
+  font: var(--text-small);
 }
 
 .billing-footnote {
   margin: 0;
+  max-inline-size: 72ch;
 }
 
 // Plan limits: the plan in effect beside the fallback plan, one row per limit.
+// A calm table: no frame of its own inside the panel, quiet column captions,
+// rows parted by the panel's line, the numbers end-aligned and tabular.
 .plan-limits {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-4);
 
   > p {
     margin: 0;
   }
 
+  .table-scroll {
+    border: 0;
+    border-radius: 0;
+    background-color: transparent;
+  }
+
   thead th {
+    border-block-end: 1px solid var(--color-line);
+    background-color: transparent;
+    color: var(--color-text-quiet);
     white-space: normal;
     vertical-align: bottom;
+  }
+
+  tbody th,
+  tbody td {
+    border-block-end: 1px solid var(--color-line);
+  }
+
+  tbody tr:last-child > * {
+    border-block-end: 0;
+  }
+
+  td {
+    color: var(--color-text);
+    font: var(--text-numeric);
+    font-variant-numeric: tabular-nums;
+  }
+
+  // "Unlimited" is a word, not a figure: quieter than a number beside it.
+  .limit-unlimited {
+    color: var(--color-text-secondary);
+    font: var(--text-small);
   }
 }
 
@@ -107,18 +205,43 @@
 }
 
 .plan-column-name {
-  color: var(--text-primary);
+  color: var(--color-text);
   font: var(--text-label);
 }
 
+// A row header stays a table cell (a flex cell would break the row's line);
+// its name and sentence are blocks inside it.
 .limit-name {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
+  color: var(--color-text);
+  font: var(--text-body-strong);
+
+  > span {
+    display: block;
+  }
 }
 
 .limit-description {
+  margin-block-start: var(--space-1);
   max-inline-size: 36rem;
-  color: var(--text-muted);
+  color: var(--color-text-quiet);
   font: var(--text-small);
+}
+
+.billing-glyph-skeleton {
+  flex: none;
+  inline-size: 2.25rem;
+  block-size: 2.25rem;
+  border-radius: var(--radius-input);
+}
+
+.billing-fact-skeleton {
+  inline-size: 11rem;
+  block-size: 3.5rem;
+  border-radius: var(--radius-tile);
+}
+
+.billing-limit-skeleton {
+  block-size: 3.5rem;
+  margin-block-start: var(--space-3);
+  border-radius: var(--radius-tile);
 }

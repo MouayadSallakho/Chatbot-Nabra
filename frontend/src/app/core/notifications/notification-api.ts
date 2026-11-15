@@ -47,8 +47,12 @@ export interface NotificationPage {
   readonly unreadCount: number;
 }
 
-/** Which categories are emailed. In-app notifications are not a preference. */
-export interface EmailPreferences {
+/**
+ * Which categories are emailed, as the server reads them back
+ * (`EmailPreferencesResponse`, Phase 39.1): five booleans, never null. In-app
+ * notifications are not a preference.
+ */
+export interface EmailPreferencesResponse {
   readonly reports: boolean;
   readonly usage: boolean;
   readonly billing: boolean;
@@ -56,8 +60,23 @@ export interface EmailPreferences {
   readonly channelHealth: boolean;
 }
 
+/**
+ * Which categories to email, as a save sends them (`EmailPreferencesRequest`,
+ * Phase 39.1). The server's schema allows a member to be null and refuses the
+ * whole request when one is (`notifications.preferences.incomplete`), so this
+ * client always sends all five as booleans.
+ */
+export interface EmailPreferencesRequest {
+  readonly reports: boolean;
+  readonly usage: boolean;
+  readonly billing: boolean;
+  readonly knowledge: boolean;
+  readonly channelHealth: boolean;
+}
+
+/** `NotificationPreferencesResponse`: the member's choices and whether email can be sent at all. */
 export interface NotificationPreferences {
-  readonly email: EmailPreferences;
+  readonly email: EmailPreferencesResponse;
 
   /** False when this deployment cannot send email at all. */
   readonly emailConfigured: boolean;
@@ -102,7 +121,7 @@ export class NotificationApi {
 
   savePreferences(
     tenantId: string,
-    email: EmailPreferences,
+    email: EmailPreferencesRequest,
     etag: string,
   ): Observable<Versioned<NotificationPreferences>> {
     return this.http

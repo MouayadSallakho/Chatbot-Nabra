@@ -449,6 +449,14 @@ chip (owner decision Q4).
 | 2026-11-15 | Invitation states are chips: Waiting "i", Accepted tick, Expired hollow ring, Revoked plain; a past invitation names its sender by display name beside the address | Owner Q4 (a status word with its glyph); 39.1 `invitedByDisplayName` | Phase 39.6a |
 | 2026-11-15 | The member edits their own display name in a small glass dialog from the account menu ("Change display name", the first item), loaded on demand (`@defer`); the two rules are said before sending, in the server's words, and a refusal from the server is worded by its code | Plan 3.6; the dialog costs the startup JavaScript nothing | Phase 39.6a |
 | 2026-11-15 | Arabic sounds state: «الأصوات تعمل» / «الأصوات متوقفة» in the member block | «مفعّلة» can be misread at 13 px (39.5b, risk 3); owner's assistant's note | Phase 39.6a |
+| 2026-11-15 | Plan & usage, billing, workspace settings and notifications move to `.page-calm`. Each limit is a soft tile (radius 16): its name and the state's chip, the count raised in title-1 inside its own sentence, the 10 px pill meter, then the numbers in words; the monthly allowance is one wide tile | Board Overview ("AI usage this month"); calm-glass §5–§6. The sentence is cut around its number, so no message changed and Arabic keeps its own order | Phase 39.6b |
+| 2026-11-15 | Quota and subscription states are chips with the three hues and a glyph each (owner Q4): within the limit an emerald tick, approaching a gold triangle, nearly at it a coral octagon, limit reached the solid coral chip with a "no entry" disc; Unlimited the "i" chip. Subscriptions: awaiting payment hollow ring, trial "i", active tick, payment failed triangle, suspended octagon, ended plain | Owner Q4; the server's states, never re-derived from the percentage | Phase 39.6b |
+| 2026-11-15 | Meter tokens: `--meter-height` 10 px, `--meter-track` (emerald-700 at 14% / sage at 18%), `--meter-fill` primary, `--meter-warning` gold-800 / gold-300, `--meter-critical` coral-600 / coral-300; every fill 3:1 or more on its track and on the soft tile | Board Overview; WCAG 1.4.11 for the fill, though the words beside it carry the state | Phase 39.6b |
+| 2026-11-15 | Plan & usage says how the limits stand at a glance beside the plan's name: the worst state of any capped limit, in that state's chip, or "Unlimited" | One honest summary from the server's own states; no new words | Phase 39.6b |
+| 2026-11-15 | Billing on a deployment that takes no payments is a panel, not an empty state: "Subscription", the "Payments not set up" chip, the existing sentences and the plan in effect as a fact tile | An honest state of a real setting, read beside the plan; nothing invented | Phase 39.6b |
+| 2026-11-15 | The workspace's time zone shows its name in the reader's language where the browser offers one (`Intl` `longGeneric`, then `long`; never an offset), with the IANA id always under it, left to right; managers also see "Report schedules in this zone" with the count (BA-9), zero included; a chosen zone is named before it is saved | Phase 38 note 8; the id is what is stored and what the report files print, so it never leaves the screen | Phase 39.6b |
+| 2026-11-15 | Notifications: the two halves are the segmented control's links (`aria-current="page"`); the history is one panel of row tiles under quiet day captions, unread said by the dot, the word and the heavier title (the bell's 3 px bar is dropped on the page only); each email category is a soft tile with the family's switch; "Email not set up" is an "i" chip | calm-glass §6 rows and segmented control; the item stays shared with the bell | Phase 39.6b |
+| 2026-11-15 | A chip inside a soft tile composites its translucent tint over the panel colour | Measured: the dark "Within the limit" chip read 4.48:1 straight on the tile, 4.95:1 with it | Phase 39.6b |
 
 ## 13. Contrast table (Calm Glass, Phase 39.2a)
 
@@ -682,6 +690,27 @@ Measured in Chrome from computed colours on the live pages, with translucent lay
 | Display name | sentence / hint / refusal on glass | 4.5:1 | 9.54 / 5.47 / 6.76 | 10.77 / 6.37 / 7.68 |
 | Display name | field edge on glass (focused) | 3:1 | 8.36 | 7.06 |
 
+### 13.6 Plan & usage, billing, workspace settings and notifications (Phase 39.6b)
+
+Measured in Chrome from computed colours on the live pages, with translucent layers (and a flat tint drawn as a one-colour gradient) composited (`p39-6b/scratch/contrast.mjs`, `p39-6b/chrome/contrast.json`). The meters were measured on the Design Lab's sample limits, the only place a capped limit exists on the dev stack. Every pair passes.
+
+| Part | Pair | Needs | Light | Dark |
+| --- | --- | --- | --- | --- |
+| Meter | fill on its track: normal / approaching / nearly at the limit | 3:1 | 6.33 / 4.50 / 4.01 | 4.31 / 6.02 / 4.68 |
+| Meter | fill on the soft tile: normal / approaching / nearly at the limit | 3:1 | 7.90 / 5.61 / 5.01 | 6.06 / 8.47 / 6.59 |
+| Quota tile | raised count / sentence / percent and left / description | 4.5:1 | 14.36 / 9.00 / 5.17 / 9.00 | 11.96 / 9.24 / 5.47 / 9.24 |
+| Quota chips | within / approaching / nearly / reached (solid) / unlimited | 4.5:1 | 7.34 / 6.20 / 6.03 / 5.55 / 9.98 | 4.95 / 6.74 / 5.67 / 8.28 / 10.24 |
+| Plan | "Current plan" label; glance chip; source sentence | 4.5:1 | 5.73; 9.00; 9.98 | 6.05; 9.24; 10.24 |
+| Plan | glyph on its tile | 3:1 | 9.00 | 9.24 |
+| Billing | grace tile text on the gold tint | 4.5:1 | 13.54 | 9.52 |
+| Billing | grace tile's start edge on the gold tint | 3:1 | 6.20 | 6.74 |
+| Billing | "Payments not set up" chip; sentence | 4.5:1 | 9.00; 9.98 | 9.24; 10.24 |
+| Billing | limits caption / description / "Unlimited" / figure | 4.5:1 | 5.73 / 5.73 / 9.98 / 9.98 | 6.05 / 6.05 / 10.24 / 10.24 |
+| Settings | zone name / IANA id under it / fact term, on the tile | 4.5:1 | 14.36 / 9.00 / 5.17 | 11.96 / 9.24 / 5.47 |
+| Notifications | summary; day caption; current / other segment | 4.5:1 | 5.73; 5.73; 15.91 / 9.00 | 6.05; 6.05; 11.17 / 9.24 |
+| Preferences | category name / sentence on its tile | 4.5:1 | 14.36 / 9.00 | 11.96 / 9.24 |
+| Preferences | switch track edge on the tile | 3:1 | 3.41 | 3.27 |
+
 ## 14. Components (Calm Glass, Phase 39.2b)
 
 Each is shown in the Design Lab in both languages and themes, with "Reduce transparency". A
@@ -772,3 +801,11 @@ the event line, `.bubble-human` = the team's bubble). Tests: a Vitest spec besid
 - **Invitations:** the four lists stay links in the segmented track; each state is a chip (Waiting "i", Accepted tick, Expired hollow ring, Revoked plain); a past invitation says "Sent <date> · by <display name> (<address>)", or the address alone.
 - **Roles:** rows lead with a 36 px soft tile holding the roles glyph; Protected (neutral) and Custom (hollow ring) chips. In the editor each area is a frameless soft tile (radius 16) with its name in title-3 and "n of m granted"; each permission is the family's checkbox, the whole row its 44 px target; the impact summary is a soft tile of small pills on the panel colour. The skeleton draws the area tiles, two columns from 80rem like the picker.
 - **Display name dialog:** "Change display name" is the account menu's first item. It opens a glass dialog (the confirm dialog's material, radius 24, scrim) with the title, a sentence (how the team sees you; customers read "Support"), one field (`dir="auto"`, `autocomplete="name"`), a hint (empty shows the address) and Cancel / Save name. The field is selected when it opens; Escape and the scrim close it; focus returns to the account menu's button. Loaded with `@defer` on first use.
+
+### 14.6 Plan & usage, billing, workspace settings and notifications (Phase 39.6b)
+
+- **Plan & usage:** a summary panel (the usage glyph on a 36 px soft tile; "Current plan"; the plan's name in title-1 with the glance chip; "In effect since" as a fact tile; where the plan comes from, with "Open billing" for a reader who may see billing). Below, the thresholds once as four chips with their ranges, then a quota tile per limit (two a row from 48rem, three from 90rem) and the monthly allowance as one wide tile. A quota tile: name (title-3) and chip; the count in title-1 within its sentence ("23 of 25", «23 من 25», «قيد الاستخدام: 11»); for a capped limit the 10 px pill meter (`role="meter"`, its value text the same sentence and state) and "n% used" / "n left"; "No limit on this plan." otherwise; the period of a monthly limit; the consequence in 600; the description. The skeleton draws the summary panel and six tiles.
+- **Billing:** with payments not set up, one panel (the billing glyph, "Subscription" with the "Payments not set up" chip, the two sentences, "In effect now" as a fact tile). With a subscription, the summary (the plan in title-1 with its status chip, the sentence, the grace and cancellation tiles, the fallback and the dates as fact tiles) and the provider's portal as a soft tile. Offers are soft tiles with the price in title-2. The limits comparison stays a table (the plan in effect beside the fallback plan) without a frame of its own: quiet captions, rows parted by the panel's line, figures end-aligned and tabular, "Unlimited" a quieter word. The skeleton draws the subscription panel and six rows.
+- **Workspace settings:** the name and time-zone panels; the zone in use as fact tiles: its localised name over the IANA id (left to right), and "Report schedules in this zone" with the count for a manager. Under the list, "Selected zone: <name>" while a choice is unsaved. A reader who cannot manage sees the same tiles with no form. The skeleton draws both panels and the zone tiles.
+- **Notifications:** "All notifications" and "Email preferences" as the segmented control's links. The history is one panel: the summary ("43 unread of 44." and how long they are kept), each day a quiet caption, each notification a row tile with hover. The skeleton draws rows of an icon and two lines.
+- **Email preferences:** the in-app note as a soft tile; "Email not set up" as an "i" chip with its sentence when the deployment cannot send email; each category a soft tile with the family's switch (its 44 px row) and the sentence under the name; "In this browser" keeps volume and the test sound in one tile and desktop alerts in another. The skeleton draws a tile per category.

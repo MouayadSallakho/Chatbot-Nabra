@@ -14,8 +14,10 @@ import { formatDate, type DateStyle } from './locale-format';
  * that use them, never in the startup JavaScript.
  *
  * <strong>Zones are named by their IANA id</strong>, as the report files name
- * them (37.7): `Asia/Riyadh`, never a localised city name. The id is wrapped in
- * a left-to-right isolate, so it keeps its order inside an Arabic sentence.
+ * them (37.7): `Asia/Riyadh`. The workspace settings add the zone's localised
+ * name beside the id where the browser offers one (`zoneName`, 39.6b), never in
+ * its place. The id is wrapped in a left-to-right isolate, so it keeps its
+ * order inside an Arabic sentence.
  */
 
 /** The zone every workspace has until somebody chooses another. */
@@ -189,6 +191,44 @@ export function nextLocalDate(date: string): string {
   next.setUTCDate(next.getUTCDate() + 1);
 
   return next.toISOString().slice(0, 10);
+}
+
+/**
+ * The zone's name in the reader's language, where this browser offers one
+ * (Phase 38 note 8, Phase 39.6b): "Arabian Standard Time" /
+ * «التوقيت العربي الرسمي» for `Asia/Riyadh`, "Coordinated Universal Time" /
+ * «التوقيت العالمي المنسق» for `UTC`.
+ *
+ * The generic name first ("Eastern Time"), then the long one where the
+ * generic is only an offset (UTC). A name that is an offset ("GMT+03:00"), the
+ * id itself, or a zone this browser does not know gives null: the screen then
+ * shows the id alone. The id always stays visible beside the name, because it
+ * is what the server stores and what the report files print.
+ */
+export function zoneName(
+  zone: string,
+  language: AppLanguage,
+  at: Date = new Date(),
+): string | null {
+  for (const style of ['longGeneric', 'long'] as const) {
+    try {
+      const name = new Intl.DateTimeFormat(language, {
+        timeZone: zone,
+        timeZoneName: style,
+        numberingSystem: 'latn',
+      })
+        .formatToParts(at)
+        .find((part) => part.type === 'timeZoneName')?.value;
+
+      if (name && !/\d/.test(name) && name !== zone) {
+        return name;
+      }
+    } catch {
+      return null;
+    }
+  }
+
+  return null;
 }
 
 /** The browser's own zone, offered as a suggestion; null if the browser does not say. */

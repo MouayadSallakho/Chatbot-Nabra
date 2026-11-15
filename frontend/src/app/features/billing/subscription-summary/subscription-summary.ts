@@ -6,7 +6,7 @@ import { daysLeft, grantsPlan, intervalWord, subscriptionStatus } from '../billi
 /**
  * What the workspace's subscription says (Phase 36.10).
  *
- * The status as a word with a marker of its own and one sentence; while a
+ * The status as a chip (a word with a glyph of its own) and one sentence; while a
  * payment has failed, the grace deadline in words ("Plan kept until 27
  * October, 5 days left"); whenever the fallback applies, which plan is in
  * effect now beside the one subscribed to; a scheduled cancellation said
@@ -23,16 +23,15 @@ import { daysLeft, grantsPlan, intervalWord, subscriptionStatus } from '../billi
   template: `
     <div class="subscription-head">
       <p class="subscription-plan" dir="auto">{{ subscription().planName }}</p>
-      <span class="badge" [class]="status().badge" data-testid="status">{{ status().word }}</span>
+      <span class="chip" [class]="status().chip" data-testid="status">{{ status().word }}</span>
     </div>
     <p class="subscription-sentence" data-testid="status-sentence">{{ status().sentence }}</p>
 
     @if (grace(); as deadline) {
       <div class="subscription-callout is-warning" data-testid="grace">
         <p class="subscription-callout-title">
-          <span i18n="@@billing.grace.until">Plan kept until</span>&nbsp;<time
-            [attr.datetime]="subscription().graceEndsAt"
-            >{{ deadline.date }}</time
+          <span i18n="@@billing.grace.until">Plan kept until</span>{{ ' '
+          }}<time [attr.datetime]="subscription().graceEndsAt">{{ deadline.date }}</time
           ><span class="subscription-days"> · {{ deadline.left }}</span>
         </p>
         <p i18n="@@billing.grace.body">
@@ -43,7 +42,7 @@ import { daysLeft, grantsPlan, intervalWord, subscriptionStatus } from '../billi
     }
 
     @if (fallback()) {
-      <dl class="subscription-callout subscription-plans" data-testid="fallback">
+      <dl class="admin-facts facts subscription-plans" data-testid="fallback">
         <div>
           <dt i18n="@@billing.plan.inEffect">In effect now</dt>
           <dd dir="auto" data-testid="plan-in-effect">{{ currentPlanName() }}</dd>
@@ -52,7 +51,9 @@ import { daysLeft, grantsPlan, intervalWord, subscriptionStatus } from '../billi
           <dt i18n="@@billing.plan.subscribed">Subscribed plan</dt>
           <dd>
             <span dir="auto">{{ subscription().planName }}</span>
-            <span class="text-muted" i18n="@@billing.plan.notInEffect">(not in effect)</span>
+            <span class="subscription-not-in-effect" i18n="@@billing.plan.notInEffect"
+              >(not in effect)</span
+            >
           </dd>
         </div>
       </dl>
@@ -60,7 +61,7 @@ import { daysLeft, grantsPlan, intervalWord, subscriptionStatus } from '../billi
 
     @if (subscription().cancelAtPeriodEnd && subscription().status !== 'Canceled') {
       <!--
-        Said outright: the badge still reads Active, correctly, and a reader
+        Said outright: the chip still reads Active, correctly, and a reader
         scanning it would otherwise not know it will not renew.
       -->
       <p
@@ -73,7 +74,7 @@ import { daysLeft, grantsPlan, intervalWord, subscriptionStatus } from '../billi
       </p>
     }
 
-    <dl class="admin-facts">
+    <dl class="admin-facts facts">
       <div>
         <dt i18n="@@billing.facts.period">Billing period</dt>
         <dd>{{ interval() }}</dd>

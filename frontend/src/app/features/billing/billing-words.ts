@@ -7,9 +7,11 @@ import type { SubscriptionStatus } from './billing-api';
  * Billing's words, written once (Phase 36.10).
  *
  * The statuses are the server's own (normalised from the payment provider's).
- * Each has a word and a marker of its own: a hollow ring while awaiting the
- * first payment, an "i" for a trial, a tick for active, a triangle when a
- * payment failed, an octagon when suspended, a filled dot once ended.
+ * Each has a word and a marker of its own, drawn as a chip (Phase 39.6b,
+ * owner decision Q4: the three hues, each with its glyph): a hollow ring while
+ * awaiting the first payment, an "i" for a trial, an emerald tick for active,
+ * a gold triangle when a payment failed, a coral octagon when suspended, a
+ * plain dot once ended.
  *
  * Which plan is in effect follows the server's policy (`GrantsPlan`): a
  * trial, an active subscription and one past due keep the subscribed plan;
@@ -18,39 +20,40 @@ import type { SubscriptionStatus } from './billing-api';
  */
 interface StatusWords {
   readonly word: string;
-  readonly badge: string;
+  /** The chip's class: its hue and its glyph. */
+  readonly chip: string;
   readonly sentence: string;
 }
 
 const STATUSES: Readonly<Record<SubscriptionStatus, StatusWords>> = {
   PendingActivation: {
     word: $localize`:@@billing.status.pending:Awaiting first payment`,
-    badge: 'badge-neutral badge-draft',
+    chip: 'chip-draft',
     sentence: $localize`:@@billing.status.pending.sentence:The subscription has been started but its first payment has not completed. Until it does, the workspace stays on its current plan.`,
   },
   Trialing: {
     word: $localize`:@@billing.status.trialing:Trial`,
-    badge: 'badge-info',
+    chip: 'chip-info',
     sentence: $localize`:@@billing.status.trialing.sentence:The trial is running. The subscribed plan is available in full until it ends.`,
   },
   Active: {
     word: $localize`:@@billing.status.active:Active`,
-    badge: 'badge-success',
+    chip: 'chip-success',
     sentence: $localize`:@@billing.status.active.sentence:Payments are up to date.`,
   },
   PastDue: {
     word: $localize`:@@billing.status.pastDue:Payment failed`,
-    badge: 'badge-warning',
+    chip: 'chip-warning',
     sentence: $localize`:@@billing.status.pastDue.sentence:A payment did not go through. The workspace keeps its plan during a grace period; update the payment method to keep it after that.`,
   },
   Suspended: {
     word: $localize`:@@billing.status.suspended:Suspended`,
-    badge: 'badge-danger',
+    chip: 'chip-danger',
     sentence: $localize`:@@billing.status.suspended.sentence:The grace period ended without a successful payment, so the workspace moved to a smaller plan. Nothing was deleted.`,
   },
   Canceled: {
     word: $localize`:@@billing.status.canceled:Ended`,
-    badge: 'badge-neutral',
+    chip: 'chip-neutral',
     sentence: $localize`:@@billing.status.canceled.sentence:This subscription has ended and the workspace moved to a smaller plan. Nothing was deleted.`,
   },
 };
@@ -60,7 +63,7 @@ export function subscriptionStatus(status: string): StatusWords {
   return (
     STATUSES[status as SubscriptionStatus] ?? {
       word: status,
-      badge: 'badge-neutral',
+      chip: 'chip-neutral',
       sentence: '',
     }
   );

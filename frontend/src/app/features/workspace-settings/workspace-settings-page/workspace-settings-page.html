@@ -1,4 +1,4 @@
-<div class="page page-narrow">
+<div class="page page-narrow page-calm">
   <app-page-header
     heading="Workspace settings"
     i18n-heading="@@workspaceSettings.heading"
@@ -19,14 +19,25 @@
         />
       </div>
     } @else if (loading()) {
-      <!-- The shape of the name card that is coming. -->
-      <div class="card card-body admin-skeleton" aria-busy="true">
+      <!-- The loaded page's shape: the name panel, then the time-zone panel. -->
+      <div class="settings-skeleton" aria-busy="true" data-testid="settings-skeleton">
         <p class="visually-hidden" role="status" i18n="@@workspaceSettings.loading">
           Loading the workspace settings…
         </p>
-        <span class="skeleton skeleton-title" aria-hidden="true"></span>
-        <span class="skeleton skeleton-text" aria-hidden="true"></span>
-        <span class="skeleton skeleton-bar" aria-hidden="true"></span>
+        <div class="card card-body admin-skeleton" aria-hidden="true">
+          <span class="skeleton skeleton-title"></span>
+          <span class="skeleton skeleton-text"></span>
+          <span class="skeleton skeleton-bar"></span>
+        </div>
+        <div class="card card-body admin-skeleton" aria-hidden="true">
+          <span class="skeleton skeleton-title"></span>
+          <span class="skeleton skeleton-text"></span>
+          <div class="admin-facts facts">
+            <span class="skeleton zone-fact-skeleton"></span>
+            <span class="skeleton zone-count-skeleton"></span>
+          </div>
+          <span class="skeleton skeleton-bar"></span>
+        </div>
       </div>
     } @else if (failure(); as error) {
       <div class="card">
@@ -123,9 +134,8 @@
                 } @else if (dirty()) {
                   <!-- What is saved now, beside what is typed: the reader decides with both. -->
                   <p id="workspace-name-saved" class="form-hint" data-testid="saved-name">
-                    <span i18n="@@workspaceSettings.name.saved">Saved name:</span>&nbsp;<bdi>{{
-                      workspace.name
-                    }}</bdi>
+                    <span i18n="@@workspaceSettings.name.saved">Saved name:</span>{{ ' '
+                    }}<bdi>{{ workspace.name }}</bdi>
                   </p>
                 }
               </div>
@@ -190,6 +200,35 @@
         </div>
 
         <div class="card-body">
+          <!--
+            The zone in use: its name in the reader's language where the browser
+            offers one, and always the IANA id, which is what is stored and what
+            the report files print (Phase 38 note 8). Managers also see how many
+            report schedules follow it (BA-9).
+          -->
+          <dl class="admin-facts facts zone-facts" data-testid="zone-current">
+            <div class="zone-fact">
+              <dt i18n="@@workspaceSettings.zone.inUse">Time zone in use</dt>
+              <dd>
+                @if (savedZoneName(); as name) {
+                  <span class="zone-name" data-testid="zone-name">{{ name }}</span>
+                }
+                <span
+                  class="zone-id"
+                  dir="ltr"
+                  [attr.data-testid]="canManage() ? 'zone-id' : 'time-zone-text'"
+                  >{{ workspace.timeZone }}</span
+                >
+              </dd>
+            </div>
+            @if (scheduleCountText(); as count) {
+              <div data-testid="schedule-count">
+                <dt i18n="@@workspaceSettings.zone.schedules">Report schedules in this zone</dt>
+                <dd>{{ count }}</dd>
+              </div>
+            }
+          </dl>
+
           @if (zoneStale()) {
             <!-- The workspace changed underneath this section; the choice is kept. -->
             <div class="stale-notice" role="alert" data-testid="zone-stale">
@@ -276,6 +315,13 @@
                   already generated keep the zone they were made in.
                 </p>
 
+                @if (chosenZoneName(); as name) {
+                  <p class="form-hint zone-chosen" data-testid="chosen-zone-name">
+                    <span i18n="@@workspaceSettings.zone.selected">Selected zone:</span>{{ ' '
+                    }}<span class="zone-chosen-name">{{ name }}</span>
+                  </p>
+                }
+
                 @if (zoneDirty() && saved(); as workspace) {
                   <p class="form-hint" data-testid="saved-zone">
                     <span i18n="@@workspaceSettings.zone.saved.label">Saved time zone:</span
@@ -325,10 +371,6 @@
                 </button>
               </div>
             </form>
-          } @else {
-            <p class="settings-value" dir="ltr" data-testid="time-zone-text">
-              {{ workspace.timeZone }}
-            </p>
           }
         </div>
       </section>

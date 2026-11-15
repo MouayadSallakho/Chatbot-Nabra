@@ -149,6 +149,13 @@
   --nav-hover-bg: rgb(142 182 155 / 10%);
   --channel-web: var(--emerald-300);
   --event-failed-line: rgb(240 160 143 / 35%);
+  // The usage meter (board Overview, "AI usage this month"): a sage track, the
+  // fill in the state's hue. Each fill is at least 3:1 on the panel and on the
+  // soft tile, and the words beside it carry the state.
+  --meter-track: rgb(142 182 155 / 18%);
+  --meter-fill: var(--emerald-300);
+  --meter-warning: var(--gold-300);
+  --meter-critical: var(--coral-300);
 
   color-scheme: dark;
 
@@ -381,6 +388,17 @@
   --chip-neutral-fg: var(--color-text-secondary);
   --chip-neutral-dot: var(--color-text-quiet);
   --event-failed-line: rgb(180 67 47 / 35%);
+
+  // The usage meter (Plan & usage, Phase 39.6b; board Overview): a 10px pill,
+  // the track a 14% emerald tint, the fill the primary, then gold-800 when the
+  // limit is near and coral-600 from 90% (owner decision Q4: the three hues,
+  // always beside a chip with its word and glyph). Fills are 3:1 or more on
+  // the panel and on the soft tile.
+  --meter-height: 0.625rem;
+  --meter-track: rgb(35 83 71 / 14%);
+  --meter-fill: var(--color-primary);
+  --meter-warning: var(--gold-800);
+  --meter-critical: var(--coral-600);
 
   // Choice controls (Phase 38 notes 3 and 4): a visible 20px box or a 40×24
   // track, inside a 44px target that includes the label.

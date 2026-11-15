@@ -9,6 +9,7 @@ import {
   supportedZones,
   todayIn,
   zoneLabel,
+  zoneName,
   zonePhrase,
 } from './time-zone';
 
@@ -88,5 +89,27 @@ describe('time zone helpers', () => {
 
     expect(zones.length).toBeGreaterThan(100);
     expect(zones).toContain('Asia/Riyadh');
+  });
+
+  describe('zoneName (Phase 39.6b, Phase 38 note 8)', () => {
+    it("names a zone in the reader's language, the generic name first", () => {
+      expect(zoneName('Asia/Riyadh', 'en')).toBe('Arabian Standard Time');
+      expect(zoneName('America/New_York', 'en')).toBe('Eastern Time');
+      expect(zoneName('Asia/Riyadh', 'ar')).toBe('التوقيت العربي الرسمي');
+    });
+
+    it('falls back to the long name where the generic one is only an offset', () => {
+      expect(zoneName('UTC', 'en')).toBe('Coordinated Universal Time');
+      expect(zoneName('UTC', 'ar')).toBe('التوقيت العالمي المنسق');
+    });
+
+    it('gives no name for a zone the browser can only say as an offset', () => {
+      expect(zoneName('Etc/GMT+5', 'en')).toBeNull();
+      expect(zoneName('Etc/GMT+5', 'ar')).toBeNull();
+    });
+
+    it('gives no name for a zone this browser does not know', () => {
+      expect(zoneName('Mars/Olympus_Mons', 'en')).toBeNull();
+    });
   });
 });

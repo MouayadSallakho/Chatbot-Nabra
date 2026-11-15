@@ -20,6 +20,7 @@ import {
   browserZone,
   isolatedZone,
   supportedZones,
+  zoneName,
 } from '@app/core/i18n/time-zone';
 import type { AppLanguage } from '@app/core/i18n/language';
 import { LocaleFormat, formatNumber } from '@app/core/i18n/locale-format';
@@ -269,6 +270,34 @@ export class WorkspaceSettingsPage implements HasUnsavedChanges {
   protected readonly zoneDialogBody = signal(ZONE_MOVES_SCHEDULES);
 
   protected readonly isolated = isolatedZone;
+
+  /**
+   * The saved zone's name in the reader's language, where the browser offers
+   * one (Phase 38 note 8): shown beside the IANA id, never instead of it.
+   */
+  protected readonly savedZoneName = computed(() => {
+    const saved = this.saved();
+
+    return saved ? zoneName(saved.timeZone, this.format.language) : null;
+  });
+
+  /** The chosen zone's name, while it differs from the saved one. */
+  protected readonly chosenZoneName = computed(() =>
+    this.zoneDirty() ? zoneName(this.chosenZone(), this.format.language) : null,
+  );
+
+  /**
+   * How many report schedules follow the zone (BA-9), in the reader's digits.
+   * Only a manager's read carries it; absent, the fact is left out rather than
+   * shown as zero.
+   */
+  protected readonly scheduleCountText = computed(() => {
+    const count = this.saved()?.scheduleCount;
+
+    return typeof count === 'number' && Number.isInteger(count) && count >= 0
+      ? this.format.number(count)
+      : null;
+  });
 
   constructor() {
     // Closing or reloading the tab is the other way an unsaved setting is lost.

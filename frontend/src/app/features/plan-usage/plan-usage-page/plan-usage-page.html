@@ -1,4 +1,4 @@
-<div class="page">
+<div class="page page-calm">
   <app-page-header
     heading="Plan & usage"
     i18n-heading="@@plan.heading"
@@ -39,19 +39,25 @@
         />
       </div>
     } @else if (loading()) {
-      <!-- The shape of the page that is coming: the plan, then rows of limits. -->
-      <div class="card card-body admin-skeleton" aria-busy="true">
+      <!-- The loaded page's shape: the plan's summary panel, then the tiles of limits. -->
+      <div class="plan-skeleton" aria-busy="true" data-testid="plan-skeleton">
         <p class="visually-hidden" role="status" i18n="@@plan.loading">Loading plan and usage…</p>
-        <span class="skeleton skeleton-title" aria-hidden="true"></span>
-        <span class="skeleton skeleton-text" aria-hidden="true"></span>
-      </div>
-      <div class="card card-body quota-list" aria-hidden="true">
-        @for (row of [0, 1, 2]; track row) {
-          <div class="quota">
+        <div class="card plan-summary" aria-hidden="true">
+          <span class="skeleton plan-glyph-skeleton"></span>
+          <div class="plan-summary-text">
             <span class="skeleton skeleton-text"></span>
-            <span class="skeleton skeleton-bar"></span>
+            <span class="skeleton skeleton-title"></span>
+            <span class="skeleton plan-fact-skeleton"></span>
           </div>
-        }
+        </div>
+        <div class="card card-body" aria-hidden="true">
+          <span class="skeleton skeleton-title"></span>
+          <div class="quota-list">
+            @for (tile of skeletonTiles; track tile) {
+              <span class="skeleton quota-skeleton"></span>
+            }
+          </div>
+        </div>
       </div>
     } @else if (!usage()) {
       @if (failure(); as error) {
@@ -86,37 +92,50 @@
         </p>
       }
 
-      <!-- The plan itself: its name, and nothing implying a price. -->
-      <section
-        class="card card-body plan-current"
-        aria-labelledby="plan-heading"
-        data-testid="current-plan"
-      >
-        <h2 id="plan-heading" class="text-label text-muted" i18n="@@plan.current">Current plan</h2>
-        <p class="plan-name" dir="auto">{{ plan.planName }}</p>
-        <p class="text-small text-muted">
-          <span i18n="@@plan.assigned">In effect since</span>&nbsp;<time
-            [attr.datetime]="plan.assignedAt"
-            >{{ plan.assignedAt | localDate: 'longDate' }}</time
-          >
-        </p>
-        <!--
-          A plan changes by subscribing, so this points at Billing for whoever
-          may see it; still not an Upgrade button, which would be a commercial
-          decision on a screen read by people who cannot make it.
-        -->
-        <p class="text-small text-secondary" data-testid="no-plan-change">
-          @if (canSeeBilling()) {
-            <span i18n="@@plan.changeHow.billing"
-              >The plan comes from the workspace's subscription.</span
-            >&nbsp;<a routerLink="/billing" i18n="@@plan.openBilling">Open billing</a>
-          } @else {
-            <span i18n="@@plan.changeHow.other"
-              >The plan comes from the workspace's subscription, which somebody with access to
-              billing can change.</span
-            >
-          }
-        </p>
+      <!--
+        The plan itself: its name, how the limits stand at a glance (the worst
+        state of any capped limit, or Unlimited), and nothing implying a price.
+      -->
+      <section class="card plan-summary" aria-labelledby="plan-heading" data-testid="current-plan">
+        <span class="record-glyph plan-glyph" aria-hidden="true">
+          <app-icon name="usage" [strokeWidth]="1.75" />
+        </span>
+        <div class="plan-summary-text">
+          <h2 id="plan-heading" class="plan-summary-label" i18n="@@plan.current">Current plan</h2>
+          <div class="plan-summary-head">
+            <p class="plan-name" dir="auto">{{ plan.planName }}</p>
+            <span class="chip" [class]="glance().chip" data-testid="plan-glance">{{
+              glance().word
+            }}</span>
+          </div>
+          <dl class="admin-facts facts">
+            <div>
+              <dt i18n="@@plan.assigned">In effect since</dt>
+              <dd>
+                <time [attr.datetime]="plan.assignedAt">{{
+                  plan.assignedAt | localDate: 'longDate'
+                }}</time>
+              </dd>
+            </div>
+          </dl>
+          <!--
+            A plan changes by subscribing, so this points at Billing for whoever
+            may see it; still not an Upgrade button, which would be a commercial
+            decision on a screen read by people who cannot make it.
+          -->
+          <p class="plan-change" data-testid="no-plan-change">
+            @if (canSeeBilling()) {
+              <span i18n="@@plan.changeHow.billing"
+                >The plan comes from the workspace's subscription.</span
+              >{{ ' ' }}<a routerLink="/billing" i18n="@@plan.openBilling">Open billing</a>
+            } @else {
+              <span i18n="@@plan.changeHow.other"
+                >The plan comes from the workspace's subscription, which somebody with access to
+                billing can change.</span
+              >
+            }
+          </p>
+        </div>
       </section>
 
       <section class="card" aria-labelledby="resources-heading" [attr.aria-busy]="refreshing()">
@@ -136,25 +155,23 @@
             <!-- The thresholds, said once: the states below are the server's. -->
             <ul class="quota-legend" data-testid="threshold-legend">
               <li>
-                <span class="badge badge-neutral" i18n="@@plan.state.normal">Within the limit</span>
+                <span class="chip chip-success" i18n="@@plan.state.normal">Within the limit</span>
                 <span i18n="@@plan.legend.normal">below 70%</span>
               </li>
               <li>
-                <span class="badge badge-warning" i18n="@@plan.state.warning"
+                <span class="chip chip-warning" i18n="@@plan.state.warning"
                   >Approaching the limit</span
                 >
                 <span i18n="@@plan.legend.warning">from 70%</span>
               </li>
               <li>
-                <span class="badge badge-danger" i18n="@@plan.state.critical"
+                <span class="chip chip-danger" i18n="@@plan.state.critical"
                   >Nearly at the limit</span
                 >
                 <span i18n="@@plan.legend.critical">from 90%</span>
               </li>
               <li>
-                <span class="badge badge-exhausted" i18n="@@plan.state.exhausted"
-                  >Limit reached</span
-                >
+                <span class="chip chip-exhausted" i18n="@@plan.state.exhausted">Limit reached</span>
                 <span i18n="@@plan.legend.exhausted">100%: new ones are refused</span>
               </li>
             </ul>
@@ -184,13 +201,15 @@
               </p>
             </div>
           </div>
-          <div class="card-body quota-list" [class.is-refreshing]="refreshing()">
-            @for (entitlement of monthly(); track entitlement.entitlement) {
-              <app-quota-row
-                [entitlement]="entitlement"
-                [attr.data-testid]="'usage-' + entitlement.entitlement"
-              />
-            }
+          <div class="card-body">
+            <div class="quota-list is-monthly" [class.is-refreshing]="refreshing()">
+              @for (entitlement of monthly(); track entitlement.entitlement) {
+                <app-quota-row
+                  [entitlement]="entitlement"
+                  [attr.data-testid]="'usage-' + entitlement.entitlement"
+                />
+              }
+            </div>
           </div>
         </section>
       }

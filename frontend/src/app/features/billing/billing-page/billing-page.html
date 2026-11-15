@@ -1,4 +1,4 @@
-<div class="page">
+<div class="page page-calm">
   <app-page-header
     heading="Billing"
     i18n-heading="@@billing.heading"
@@ -38,11 +38,23 @@
         />
       </div>
     } @else if (loading()) {
-      <div class="card card-body admin-skeleton" aria-busy="true">
+      <!-- The loaded page's shape: the subscription panel, then the limits panel. -->
+      <div class="billing-skeleton" aria-busy="true" data-testid="billing-skeleton">
         <p class="visually-hidden" role="status" i18n="@@billing.loading">Loading billing…</p>
-        <span class="skeleton skeleton-title" aria-hidden="true"></span>
-        <span class="skeleton skeleton-text" aria-hidden="true"></span>
-        <span class="skeleton skeleton-text" aria-hidden="true"></span>
+        <div class="card billing-state" aria-hidden="true">
+          <span class="skeleton billing-glyph-skeleton"></span>
+          <div class="billing-state-text">
+            <span class="skeleton skeleton-title"></span>
+            <span class="skeleton skeleton-text"></span>
+            <span class="skeleton billing-fact-skeleton"></span>
+          </div>
+        </div>
+        <div class="card card-body" aria-hidden="true">
+          <span class="skeleton skeleton-title"></span>
+          @for (row of [0, 1, 2, 3, 4, 5]; track row) {
+            <span class="skeleton billing-limit-skeleton"></span>
+          }
+        </div>
       </div>
     } @else if (!billing()) {
       @if (failure(); as error) {
@@ -83,25 +95,45 @@
 
       @if (!workspace.isManaged) {
         <!--
-          A deployment that sells nothing: said plainly, rather than an empty
-          catalogue that would read as an outage.
+          A deployment that sells nothing: said plainly, with the plan the
+          workspace is on, rather than an empty catalogue that would read as an
+          outage.
         -->
-        <div class="card">
-          <app-empty-state
-            icon="billing"
-            heading="Subscriptions are not available on this deployment"
-            i18n-heading="@@billing.notManaged.heading"
-            description="This installation is not set up to take payments. Nothing is for sale here and nothing is owed. The workspace's plan is set by whoever runs this installation."
-            i18n-description="@@billing.notManaged.body"
-            data-testid="not-managed"
-          />
-        </div>
-        <dl class="admin-facts" data-testid="plan-in-effect">
-          <div>
-            <dt i18n="@@billing.plan.inEffect">In effect now</dt>
-            <dd dir="auto">{{ workspace.currentPlanName }}</dd>
+        <section
+          class="card billing-state"
+          aria-labelledby="subscription-heading"
+          data-testid="not-managed"
+        >
+          <span class="record-glyph" aria-hidden="true">
+            <app-icon name="billing" [strokeWidth]="1.75" />
+          </span>
+          <div class="billing-state-text">
+            <div class="billing-state-head">
+              <h2 id="subscription-heading" class="billing-state-title" i18n="@@billing.current">
+                Subscription
+              </h2>
+              <span
+                class="chip chip-info"
+                data-testid="billing-state"
+                i18n="@@billing.state.notSetUp"
+                >Payments not set up</span
+              >
+            </div>
+            <p class="billing-state-lead" i18n="@@billing.notManaged.heading">
+              Subscriptions are not available on this deployment
+            </p>
+            <p class="billing-state-body" i18n="@@billing.notManaged.body">
+              This installation is not set up to take payments. Nothing is for sale here and nothing
+              is owed. The workspace's plan is set by whoever runs this installation.
+            </p>
+            <dl class="admin-facts facts" data-testid="plan-in-effect">
+              <div>
+                <dt i18n="@@billing.plan.inEffect">In effect now</dt>
+                <dd dir="auto">{{ workspace.currentPlanName }}</dd>
+              </div>
+            </dl>
           </div>
-        </dl>
+        </section>
       } @else {
         <section class="card" aria-labelledby="subscription-heading">
           <div class="card-header">
@@ -154,7 +186,7 @@
             </div>
           } @else {
             <div class="card-body billing-current" data-testid="no-subscription">
-              <dl class="admin-facts">
+              <dl class="admin-facts facts">
                 <div>
                   <dt i18n="@@billing.plan.inEffect">In effect now</dt>
                   <dd dir="auto">{{ workspace.currentPlanName }}</dd>
@@ -192,7 +224,7 @@
                       <h3 class="offer-name" dir="auto">{{ offer.planName }}</h3>
                       <p class="offer-price">
                         <strong class="num">{{ offer.price }}</strong>
-                        <span class="text-small text-muted">{{ offer.cadence }}</span>
+                        <span class="offer-cadence">{{ offer.cadence }}</span>
                       </p>
                       @if (offer.trial) {
                         <p class="text-small text-secondary">{{ offer.trial }}</p>

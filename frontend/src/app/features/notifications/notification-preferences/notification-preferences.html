@@ -1,4 +1,4 @@
-<div class="page">
+<div class="page page-calm">
   <app-page-header
     heading="Notifications"
     i18n-heading="@@notifications.heading"
@@ -18,23 +18,28 @@
     </p>
 
     @if (!emailConfigured()) {
-      <p
-        class="alert alert-warning"
-        data-testid="email-unavailable"
-        i18n="@@notificationPreferences.emailUnavailable"
-      >
-        Email is not set up on this deployment, so nothing is emailed yet. Your choices are saved
-        and take effect once it is.
-      </p>
+      <!-- Honest: nothing can be emailed yet, and the choices still count. -->
+      <div class="prefs-state" data-testid="email-unavailable">
+        <span class="chip chip-info" i18n="@@notificationPreferences.emailNotSetUp"
+          >Email not set up</span
+        >
+        <p i18n="@@notificationPreferences.emailUnavailable">
+          Email is not set up on this deployment, so nothing is emailed yet. Your choices are saved
+          and take effect once it is.
+        </p>
+      </div>
     }
 
     @if (loading()) {
-      <div class="card card-body admin-skeleton" aria-busy="true">
+      <!-- The loaded form's shape: the heading, then a tile per category. -->
+      <div class="card card-body prefs-skeleton" aria-busy="true" data-testid="prefs-skeleton">
         <p class="visually-hidden" role="status" i18n="@@notificationPreferences.loading">
           Loading preferences…
         </p>
+        <span class="skeleton skeleton-title" aria-hidden="true"></span>
+        <span class="skeleton skeleton-text" aria-hidden="true"></span>
         @for (row of [0, 1, 2, 3, 4]; track row) {
-          <span class="skeleton skeleton-text" aria-hidden="true"></span>
+          <span class="skeleton category-skeleton" aria-hidden="true"></span>
         }
       </div>
     } @else if (failure(); as error) {
@@ -177,40 +182,45 @@
             </p>
           }
 
-          <div class="volume">
-            <label class="category-label" for="sound-volume" i18n="@@notificationPreferences.volume"
-              >Volume</label
-            >
-            <input
-              id="sound-volume"
-              class="volume-range"
-              type="range"
-              min="0"
-              max="100"
-              step="5"
-              data-testid="sound-volume"
-              [value]="volume()"
-              [attr.aria-valuetext]="volumeText()"
-              (input)="setVolume($event)"
-            />
-            <output for="sound-volume" class="volume-value" data-testid="sound-volume-value">{{
-              volumeText()
-            }}</output>
-          </div>
+          <div class="sound-tile">
+            <div class="volume">
+              <label
+                class="category-label"
+                for="sound-volume"
+                i18n="@@notificationPreferences.volume"
+                >Volume</label
+              >
+              <input
+                id="sound-volume"
+                class="volume-range"
+                type="range"
+                min="0"
+                max="100"
+                step="5"
+                data-testid="sound-volume"
+                [value]="volume()"
+                [attr.aria-valuetext]="volumeText()"
+                (input)="setVolume($event)"
+              />
+              <output for="sound-volume" class="volume-value" data-testid="sound-volume-value">{{
+                volumeText()
+              }}</output>
+            </div>
 
-          <div>
-            <button
-              type="button"
-              class="btn btn-secondary"
-              data-testid="sound-test"
-              (click)="playTest()"
-              i18n="@@notificationPreferences.testSound"
-            >
-              Play a test sound
-            </button>
-            <p class="visually-hidden" aria-live="polite" data-testid="sound-test-announcement">
-              {{ browserAnnouncement() }}
-            </p>
+            <div>
+              <button
+                type="button"
+                class="btn btn-secondary"
+                data-testid="sound-test"
+                (click)="playTest()"
+                i18n="@@notificationPreferences.testSound"
+              >
+                Play a test sound
+              </button>
+              <p class="visually-hidden" aria-live="polite" data-testid="sound-test-announcement">
+                {{ browserAnnouncement() }}
+              </p>
+            </div>
           </div>
 
           <div class="category browser-alerts">

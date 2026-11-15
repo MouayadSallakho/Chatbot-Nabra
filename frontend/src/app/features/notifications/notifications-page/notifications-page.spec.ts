@@ -151,4 +151,51 @@ describe('NotificationsPage', () => {
 
     expect(host().textContent).toContain('Page 2 of 3');
   });
+
+  describe('Calm Glass (Phase 39.6b)', () => {
+    it('draws the loading page as rows of an icon and two lines, in one panel', async () => {
+      await mount();
+
+      const skeleton = host().querySelector('[data-testid="history-skeleton"]')!;
+
+      expect(skeleton.getAttribute('aria-busy')).toBe('true');
+      expect(skeleton.querySelectorAll('.history-row-skeleton').length).toBe(4);
+      expect(skeleton.querySelector('.history-icon-skeleton')).not.toBeNull();
+
+      http.expectOne(`${base}/unread-count`).flush({ unreadCount: 0 });
+      for (const list of http.match((request) => request.url === base)) {
+        list.flush(page([item(1, '2026-09-24T11:00:00Z')], 1, 1, 0));
+      }
+      await settle();
+      for (const list of http.match((request) => request.url === base)) {
+        list.flush(page([item(1, '2026-09-24T11:00:00Z')], 1, 1, 0));
+      }
+      await settle();
+
+      expect(host().querySelector('[data-testid="history-skeleton"]')).toBeNull();
+      expect(host().querySelector('.page')!.classList).toContain('page-calm');
+      expect(
+        host().querySelector('.history-list > li [data-testid="notification"]'),
+      ).not.toBeNull();
+    });
+
+    it('offers its two halves as the segmented control, the current one marked', async () => {
+      await mount();
+
+      const nav = host().querySelector('app-notifications-nav nav')!;
+
+      expect(nav.classList).toContain('segmented');
+      expect(nav.querySelectorAll('a.segmented-option').length).toBe(2);
+      expect(nav.getAttribute('aria-label')).toBe('Notifications');
+
+      http.expectOne(`${base}/unread-count`).flush({ unreadCount: 0 });
+      for (const list of http.match((request) => request.url === base)) {
+        list.flush(page([], 1, 0, 0));
+      }
+      await settle();
+      for (const list of http.match((request) => request.url === base)) {
+        list.flush(page([], 1, 0, 0));
+      }
+    });
+  });
 });

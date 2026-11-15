@@ -574,4 +574,95 @@ describe('BillingPage', () => {
       expect(formatAmount(2900, 'JPY')).toContain('2,900');
     });
   });
+
+  describe('Calm Glass (Phase 39.6b)', () => {
+    it('says a deployment that takes no payments in a panel: its chip, the sentence and the plan', async () => {
+      await mount();
+      await answer(unmanaged);
+
+      expect(query('.page')!.classList).toContain('page-calm');
+
+      const panel = query('[data-testid="not-managed"]')!;
+      const chip = panel.querySelector('[data-testid="billing-state"]')!;
+
+      expect(panel.querySelector('h2')!.textContent?.trim()).toBe('Subscription');
+      expect(chip.textContent?.trim()).toBe('Payments not set up');
+      expect(chip.classList).toContain('chip-info');
+      expect(panel.querySelector('.record-glyph')).not.toBeNull();
+      expect(panel.textContent).toContain('Subscriptions are not available on this deployment');
+      expect(query('[data-testid="plan-in-effect"]')!.classList).toContain('facts');
+      expect(query('[data-testid="plan-in-effect"]')!.textContent).toContain(
+        'Development (unlimited)',
+      );
+      // Nothing to buy and nothing to manage: no button suggests otherwise.
+      expect(query('[data-testid="manage-billing"]')).toBeNull();
+      expect(host().querySelectorAll('[data-testid^="buy-"]').length).toBe(0);
+    });
+
+    it('wears each subscription status as a chip with its own glyph', async () => {
+      const tones: Record<string, string> = {
+        PendingActivation: 'chip-draft',
+        Trialing: 'chip-info',
+        Active: 'chip-success',
+        PastDue: 'chip-warning',
+        Suspended: 'chip-danger',
+        Canceled: 'chip-neutral',
+      };
+
+      for (const [status, tone] of Object.entries(tones)) {
+        TestBed.resetTestingModule();
+        await mount();
+        await answer({
+          ...subscribed,
+          subscription: {
+            ...subscribed.subscription!,
+            status: status as NonNullable<WorkspaceBilling['subscription']>['status'],
+          },
+        });
+
+        const chip = query('[data-testid="status"]')!;
+
+        expect(chip.classList).toContain('chip');
+        expect(chip.classList).toContain(tone);
+        expect(chip.textContent?.trim().length).toBeGreaterThan(0);
+        http.verify();
+      }
+    });
+
+    it('lays an offer out as a tile with its price raised', async () => {
+      await mount();
+      await answer(forSale);
+
+      const offer = query(`[data-testid="offer-${monthlyOfferId}"]`)!;
+
+      expect(offer.classList).toContain('offer');
+      expect(offer.querySelector('.offer-price strong')!.textContent).toContain('29');
+      expect(offer.querySelector('.offer-cadence')!.textContent).toContain('per month');
+    });
+
+    it('draws the loading page in its loaded shape: the subscription panel, then the limits', async () => {
+      await mount();
+
+      const skeleton = query('[data-testid="billing-skeleton"]')!;
+
+      expect(skeleton.getAttribute('aria-busy')).toBe('true');
+      expect(skeleton.querySelector('.billing-state .billing-glyph-skeleton')).not.toBeNull();
+      expect(skeleton.querySelectorAll('.billing-limit-skeleton').length).toBe(6);
+
+      await answer(unmanaged);
+
+      expect(query('[data-testid="billing-skeleton"]')).toBeNull();
+    });
+
+    it('keeps the grace deadline in a warning tile, worded', async () => {
+      await mount();
+      await answer(inArrears);
+
+      const grace = query('[data-testid="grace"]')!;
+
+      expect(grace.classList).toContain('subscription-callout');
+      expect(grace.classList).toContain('is-warning');
+      expect(query('[data-testid="status"]')!.classList).toContain('chip-warning');
+    });
+  });
 });

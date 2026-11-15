@@ -472,9 +472,10 @@ app-permission-picker {
 
 // -----------------------------------------------------------------------------
 // Limit reached: the one quota state that refuses something, so it is the
-// strongest badge (a solid fill) with a marker of its own, a "no entry" disc,
-// beside the warning triangle and the danger octagon of the states before it.
+// strongest chip (a solid coral fill) with a marker of its own, a "no entry"
+// disc, beside the tick, the triangle and the octagon of the states before it.
 // -----------------------------------------------------------------------------
+.chip-exhausted,
 .badge-exhausted {
   --badge-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Ccircle cx='6' cy='6' r='5.4' fill='%23fff'/%3E%3Cpath d='M3.2 6h5.6' stroke='%23000' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E");
 
@@ -492,16 +493,28 @@ app-permission-picker {
 }
 
 // -----------------------------------------------------------------------------
-// Quotas (Plan & usage, the Design Lab)
+// Quotas (Plan & usage, the Design Lab), Calm Glass from Phase 39.6b
 // -----------------------------------------------------------------------------
+// Each limit is a soft tile (radius 16, the panel's soft fill, no frame): its
+// name and the state's chip, the count raised in title-1 with the rest of the
+// sentence beside it, the 10px pill meter, then the numbers in words. Two
+// tiles a row from 48rem, three from 90rem; the monthly allowance is one wide
+// tile (board Overview, "AI usage this month").
 .quota-list {
   display: grid;
-  gap: var(--space-6);
+  gap: var(--space-3);
   transition: opacity var(--duration-sm) var(--ease-standard);
 
-  @media (min-width: 64rem) {
+  @media (min-width: 48rem) {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: var(--space-6) var(--space-8);
+  }
+
+  @media (min-width: 90rem) {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  &.is-monthly {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   // A refresh dims what is there instead of blanking it.
@@ -515,13 +528,17 @@ app-permission-picker {
   flex-direction: column;
   gap: var(--space-2);
   min-inline-size: 0;
+  padding: var(--space-4) var(--space-5) var(--space-5);
+  border-radius: var(--radius-tile);
+  background-color: var(--color-panel-soft);
 
   > p {
     margin: 0;
   }
 
-  .meter {
-    block-size: 0.625rem;
+  // A frameless tile needs an edge where the system draws the colours.
+  @media (forced-colors: active) {
+    border: 1px solid CanvasText;
   }
 }
 
@@ -533,16 +550,36 @@ app-permission-picker {
   gap: var(--space-1) var(--space-3);
 }
 
+// A chip's tint is translucent and was measured on the panel colour; on a
+// soft tile it is laid over the panel colour again, so its word keeps 4.5:1
+// (the dark "Within the limit" chip drops to 4.48 straight on the tile). The
+// neutral and "i" chips share the soft fill, so they take the panel colour
+// itself and the pill still shows. The solid "Limit reached" chip is its own.
+.quota .chip:not(.chip-exhausted) {
+  background: linear-gradient(var(--chip-bg), var(--chip-bg)) var(--color-panel);
+}
+
+.quota .chip-info,
+.quota .chip-neutral {
+  --chip-bg: var(--color-panel);
+}
+
 .quota-label {
   margin: 0;
-  color: var(--text-primary);
-  font: var(--text-card-title);
+  color: var(--color-text);
+  font: var(--text-title-3);
 }
 
 .quota-figure {
-  color: var(--text-primary);
-  font: var(--text-numeric);
-  font-size: 1.25rem;
+  color: var(--color-text-secondary);
+  font: var(--text-body);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.quota-used {
+  color: var(--color-text);
+  font: var(--text-title-1);
   font-variant-numeric: tabular-nums;
 }
 
@@ -551,31 +588,31 @@ app-permission-picker {
   flex-wrap: wrap;
   justify-content: space-between;
   gap: var(--space-1) var(--space-3);
-  color: var(--text-muted);
+  color: var(--color-text-quiet);
   font: var(--text-small);
   font-variant-numeric: tabular-nums;
 }
 
 .quota-consequence {
-  color: var(--text-primary);
+  color: var(--color-text);
   font: var(--text-small);
-  font-weight: 550;
+  font-weight: 600;
 }
 
 .quota-description {
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
   font: var(--text-small);
 }
 
+// The thresholds, said once above the tiles: each state's chip and its range.
 .quota-legend {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2) var(--space-5);
-  margin: 0 0 var(--space-5);
-  padding: 0 0 var(--space-4);
-  border-block-end: 1px solid var(--border-subtle);
+  margin: 0 0 var(--space-4);
+  padding: 0;
   list-style: none;
-  color: var(--text-muted);
+  color: var(--color-text-quiet);
   font: var(--text-small);
 
   li {
@@ -606,36 +643,42 @@ app-permission-picker {
 }
 
 .subscription-plan {
-  color: var(--text-primary);
-  font: var(--text-page-title);
-  font-size: 1.5rem;
+  color: var(--color-text);
+  font: var(--text-title-1);
+  text-align: match-parent;
+  overflow-wrap: anywhere;
 }
 
 .subscription-sentence {
   max-inline-size: 60ch;
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
   font: var(--text-small);
 }
 
-// A fact the reader must not miss (grace, cancellation, fallback): framed,
-// with its words carrying the meaning; the warning tone only adds to them.
+// A fact the reader must not miss (grace, cancellation): a soft tile (radius
+// 16, no frame) with its words carrying the meaning; the warning tile takes
+// the gold tint and a gold edge at its start, which only adds to the words.
 .subscription-callout {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
   margin: 0;
   padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--border-default);
-  border-inline-start-width: 3px;
-  border-radius: var(--radius-control);
-  background-color: var(--surface-muted);
-  color: var(--text-primary);
+  border: 0;
+  border-inline-start: 3px solid var(--color-line-strong);
+  border-radius: var(--radius-tile);
+  background-color: var(--color-panel-soft);
+  color: var(--color-text);
   font: var(--text-small);
 
   &.is-warning {
-    border-color: var(--warning-border);
     border-inline-start-color: var(--warning-fg);
     background-color: var(--warning-bg);
+  }
+
+  @media (forced-colors: active) {
+    border: 1px solid CanvasText;
+    border-inline-start-width: 3px;
   }
 }
 
@@ -644,27 +687,32 @@ app-permission-picker {
   font-variant-numeric: tabular-nums;
 }
 
-.subscription-plans {
-  flex-direction: row;
+.subscription-plans dd {
+  display: flex;
   flex-wrap: wrap;
-  gap: var(--space-2) var(--space-7);
+  gap: var(--space-1);
+}
 
-  > div {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-1);
-  }
+.subscription-not-in-effect {
+  color: var(--color-text-quiet);
+  font-weight: 400;
+}
 
-  dt {
-    color: var(--text-muted);
-    font: var(--text-caption);
-  }
+// -----------------------------------------------------------------------------
+// Notification history (Phase 39.6b)
+// -----------------------------------------------------------------------------
+// On the page each notification is a row tile (radius 16), and unread is the
+// dot, the word "Unread" and the heavier title (calm-glass.md §6): the bell's
+// 3px start bar would curl round the tile's corners, so the page drops it. Set
+// here because the row's own style is encapsulated in the shared item.
+.page-calm .notification-history .history-list .is-unread {
+  box-shadow: none;
+}
 
-  dd {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-1);
-    margin: 0;
-    font-weight: 600;
+// On touch the row's link ("Open Reports") is a 44px target like the rest of
+// the page; the item's own 28px suits the bell's dense panel on a desktop.
+@media (pointer: coarse), (max-width: 61.999rem) {
+  .page-calm .notification-history .history-list .notification-action {
+    min-block-size: var(--target-min);
   }
 }

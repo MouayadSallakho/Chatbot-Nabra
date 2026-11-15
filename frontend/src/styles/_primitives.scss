@@ -808,6 +808,15 @@ select.input {
     left 1.125rem center;
 }
 
+// A list of left-to-right values (IANA time zones) declares `dir="ltr"`: its
+// arrow stays at its own end, so it never covers the first letters in an
+// Arabic page (Phase 39.6b).
+[dir='rtl'] :is(.select, .form-select, select.input)[dir='ltr'] {
+  background-position:
+    right 1.125rem center,
+    right 0.8125rem center;
+}
+
 // Checkboxes, radios, switches and segmented controls are the choice-control
 // family (shared/choice, shared/segmented): there is no global
 // input[type=checkbox] rule and no `.switch` escape class (Phase 38 notes 3

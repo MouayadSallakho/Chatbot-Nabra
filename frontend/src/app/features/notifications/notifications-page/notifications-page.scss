@@ -1,4 +1,6 @@
-// Every value is a semantic token, so light and dark need no separate rules.
+// The panel is `.page-calm`'s (styles/_authoring.scss). One panel holds the
+// page: the summary, each day as a quiet caption, and each notification as a
+// row tile (radius 16) parted by space rather than lines (Phase 39.6b).
 .page-section {
   display: flex;
   flex-direction: column;
@@ -6,35 +8,78 @@
 }
 
 .notification-history {
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-2) var(--space-2) var(--space-3);
   overflow: hidden;
 }
 
 .history-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
   margin: 0;
-  padding: var(--space-3) var(--space-4);
-  border-block-end: 1px solid var(--border-subtle);
+  padding: var(--space-3) var(--space-3) var(--space-2);
+  color: var(--color-text-quiet);
+  font: var(--text-small);
 }
 
-// One day's notifications: a quiet label, then the rows.
+.history-count {
+  color: var(--color-text);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+// One day's notifications: a quiet caption, then the rows.
 .history-day {
   margin: 0;
-  padding: var(--space-2) var(--space-4);
-  border-block-end: 1px solid var(--border-subtle);
-  background-color: var(--surface-muted);
-  color: var(--text-secondary);
+  padding: var(--space-4) var(--space-3) var(--space-1);
+  color: var(--color-text-quiet);
   font: var(--text-caption);
 }
 
 .history-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-hairline);
   margin: 0;
   padding: 0;
   list-style: none;
 
-  > li + li {
-    border-block-start: 1px solid var(--border-subtle);
-  }
+  > li {
+    overflow: hidden;
+    border-radius: var(--radius-tile);
+    transition: background-color var(--duration-press) var(--ease-calm);
 
-  & + .history-day {
-    border-block-start: 1px solid var(--border-subtle);
+    &:hover {
+      background-color: var(--color-hover);
+    }
   }
+}
+
+// The loading shape: the summary line, then rows of an icon and two lines.
+.history-summary-skeleton {
+  inline-size: min(20rem, 70%);
+  block-size: 1rem;
+  margin: var(--space-3);
+}
+
+.history-row-skeleton {
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+
+.history-icon-skeleton {
+  flex: none;
+  inline-size: 1.25rem;
+  block-size: 1.25rem;
+  border-radius: var(--radius-pill);
+}
+
+.history-lines-skeleton {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-2);
 }

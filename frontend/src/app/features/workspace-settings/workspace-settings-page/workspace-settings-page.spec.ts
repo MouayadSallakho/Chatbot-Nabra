@@ -391,6 +391,105 @@ describe('WorkspaceSettingsPage', () => {
       host().querySelectorAll('form')[1].dispatchEvent(new Event('submit'));
     }
 
+    describe('the zone in use (Phase 39.6b, Phase 38 note 8)', () => {
+      it('names the zone in words where the browser offers a name, and keeps its IANA id', async () => {
+        await open('workspace.manage');
+
+        const tile = host().querySelector('[data-testid="zone-current"]')!;
+
+        expect(tile.classList).toContain('facts');
+        expect(tile.querySelector('[data-testid="zone-name"]')!.textContent?.trim()).toBe(
+          'Coordinated Universal Time',
+        );
+
+        const id = tile.querySelector('[data-testid="zone-id"]')!;
+
+        expect(id.textContent?.trim()).toBe('UTC');
+        expect(id.getAttribute('dir')).toBe('ltr');
+      });
+
+      it("says how many report schedules follow the zone, from the manager's read", async () => {
+        await mount('workspace.view', 'workspace.manage');
+        http
+          .expectOne(tenantUrl)
+          .flush({ ...acme, scheduleCount: 3 }, { headers: { ETag: '"v1"' } });
+        await settle();
+
+        const count = host().querySelector('[data-testid="schedule-count"]')!;
+
+        expect(count.textContent).toContain('Report schedules in this zone');
+        expect(count.querySelector('dd')!.textContent?.trim()).toBe('3');
+      });
+
+      it('says a zero count rather than hiding it', async () => {
+        await mount('workspace.view', 'workspace.manage');
+        http
+          .expectOne(tenantUrl)
+          .flush({ ...acme, scheduleCount: 0 }, { headers: { ETag: '"v1"' } });
+        await settle();
+
+        expect(host().querySelector('[data-testid="schedule-count"] dd')!.textContent?.trim()).toBe(
+          '0',
+        );
+      });
+
+      it('leaves the count out when the read carries none (a member who cannot manage)', async () => {
+        await open();
+
+        expect(host().querySelector('[data-testid="schedule-count"]')).toBeNull();
+        expect(host().querySelector('[data-testid="zone-name"]')!.textContent?.trim()).toBe(
+          'Coordinated Universal Time',
+        );
+      });
+
+      it('names a chosen zone before it is saved, and only while it differs', async () => {
+        await open('workspace.manage');
+
+        expect(host().querySelector('[data-testid="chosen-zone-name"]')).toBeNull();
+
+        choose('Asia/Riyadh');
+        await settle();
+
+        const chosen = host().querySelector('[data-testid="chosen-zone-name"]')!;
+
+        expect(chosen.textContent).toContain('Selected zone:');
+        expect(chosen.textContent).toContain('Arabian Standard Time');
+
+        choose('UTC');
+        await settle();
+
+        expect(host().querySelector('[data-testid="chosen-zone-name"]')).toBeNull();
+      });
+
+      it('shows the id alone when the browser has only an offset for it', async () => {
+        await mount('workspace.view');
+        http
+          .expectOne(tenantUrl)
+          .flush({ ...acme, timeZone: 'Etc/GMT+5' }, { headers: { ETag: '"v1"' } });
+        await settle();
+
+        expect(host().querySelector('[data-testid="zone-name"]')).toBeNull();
+        expect(host().querySelector('[data-testid="time-zone-text"]')!.textContent?.trim()).toBe(
+          'Etc/GMT+5',
+        );
+      });
+
+      it('draws the loading page as its two panels, the zone tiles included', async () => {
+        await mount('workspace.view');
+
+        const skeleton = host().querySelector('[data-testid="settings-skeleton"]')!;
+
+        expect(skeleton.getAttribute('aria-busy')).toBe('true');
+        expect(skeleton.querySelectorAll('.card').length).toBe(2);
+        expect(skeleton.querySelector('.zone-fact-skeleton')).not.toBeNull();
+
+        http.expectOne(tenantUrl).flush(acme, { headers: { ETag: '"v1"' } });
+        await settle();
+
+        expect(host().querySelector('.page')!.classList).toContain('page-calm');
+      });
+    });
+
     it('offers UTC first, then every zone grouped by region, left to right', async () => {
       await open('workspace.manage');
 

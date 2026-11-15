@@ -1059,6 +1059,133 @@ describe('Arabic renders', () => {
     });
   });
 
+  describe('plan and usage, billing, settings and notifications (Phase 39.6b)', () => {
+    async function quota(entitlement: Record<string, unknown>): Promise<HTMLElement> {
+      const { QuotaRow } = await import('@app/features/plan-usage/quota-row/quota-row');
+      const fixture = TestBed.createComponent(QuotaRow);
+
+      fixture.componentRef.setInput('entitlement', entitlement);
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      return fixture.nativeElement as HTMLElement;
+    }
+
+    it('says a limit in Arabic: the state as a chip, the count raised in its own sentence', async () => {
+      const root = await quota({
+        entitlement: 'members',
+        used: 4,
+        limit: 5,
+        unlimited: false,
+        percentUsed: 80,
+        state: 'Warning',
+        remaining: 1,
+        period: null,
+      });
+
+      const chip = root.querySelector('[data-testid="state-members"]')!;
+
+      expect(text(chip)).toBe('يقترب من الحد');
+      expect(chip.classList).toContain('chip-warning');
+      expect(text(root.querySelector('[data-testid="figure-members"]'))).toBe('4 من 5');
+      expect(text(root.querySelector('.quota-used'))).toBe('4');
+      expect(root.querySelector('app-meter')?.getAttribute('aria-valuetext')).toBe(
+        '4 من 5. يقترب من الحد',
+      );
+    });
+
+    it('raises the count where the Arabic sentence puts it last (unlimited)', async () => {
+      const root = await quota({
+        entitlement: 'aiAgents',
+        used: 11,
+        limit: null,
+        unlimited: true,
+        percentUsed: null,
+        state: 'Normal',
+        remaining: null,
+        period: null,
+      });
+
+      expect(text(root.querySelector('[data-testid="figure-aiAgents"]'))).toBe('قيد الاستخدام: 11');
+      expect(text(root.querySelector('.quota-used'))).toBe('11');
+      expect(text(root.querySelector('[data-testid="state-aiAgents"]'))).toBe('غير محدود');
+      expect(root.querySelector('app-meter')).toBeNull();
+    });
+
+    it('names the zone in use in Arabic beside its IANA id', async () => {
+      const { provideHttpClient } = await import('@angular/common/http');
+      const { HttpTestingController, provideHttpClientTesting } =
+        await import('@angular/common/http/testing');
+      const { PermissionApi } = await import('@app/core/authorization/permission-api');
+      const { LOCAL_STORAGE } = await import('@app/core/storage/local-storage');
+      const { WorkspaceContextService } =
+        await import('@app/core/workspace/workspace-context-service');
+      const { memoryStorage, permissionApiGranting } = await import('@app/testing/test-doubles');
+      const { WorkspaceSettingsPage } =
+        await import('@app/features/workspace-settings/workspace-settings-page/workspace-settings-page');
+
+      TestBed.configureTestingModule({
+        providers: [
+          provideRouter([]),
+          provideHttpClient(),
+          provideHttpClientTesting(),
+          { provide: LOCAL_STORAGE, useValue: memoryStorage() },
+          {
+            provide: PermissionApi,
+            useValue: permissionApiGranting('workspace.view', 'workspace.manage'),
+          },
+        ],
+      });
+
+      const workspace = {
+        id: 't-1',
+        name: 'شركة النور',
+        slug: 'alnoor',
+        status: 'Active' as const,
+        timeZone: 'Asia/Riyadh',
+      };
+
+      await TestBed.inject(WorkspaceContextService).adopt(workspace);
+
+      const fixture = TestBed.createComponent(WorkspaceSettingsPage);
+
+      fixture.detectChanges();
+      TestBed.inject(HttpTestingController)
+        .expectOne('/api/tenants/t-1')
+        .flush({ ...workspace, scheduleCount: 2 }, { headers: { ETag: '"v1"' } });
+      await fixture.whenStable();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      fixture.detectChanges();
+
+      const root = fixture.nativeElement as HTMLElement;
+      const tile = root.querySelector('[data-testid="zone-current"]');
+
+      expect(text(tile?.querySelector('dt'))).toBe('المنطقة الزمنية المستخدمة');
+      expect(text(root.querySelector('[data-testid="zone-name"]'))).toBe('التوقيت العربي الرسمي');
+      expect(text(root.querySelector('[data-testid="zone-id"]'))).toBe('Asia/Riyadh');
+      expect(root.querySelector('[data-testid="zone-id"]')?.getAttribute('dir')).toBe('ltr');
+      expect(text(root.querySelector('[data-testid="schedule-count"] dt'))).toBe(
+        'التقارير المجدولة وفق هذه المنطقة',
+      );
+      expect(text(root.querySelector('[data-testid="schedule-count"] dd'))).toBe('2');
+    });
+
+    it('says the billing and email states in Arabic chips', async () => {
+      const { subscriptionStatus } = await import('@app/features/billing/billing-words');
+
+      expect(subscriptionStatus('Active').chip).toBe('chip-success');
+      expect(subscriptionStatus('PastDue').chip).toBe('chip-warning');
+      expect(subscriptionStatus('Suspended').chip).toBe('chip-danger');
+      expect(subscriptionStatus('PendingActivation').chip).toBe('chip-draft');
+      expect(subscriptionStatus('Active').word).not.toBe('Active');
+      expect(CATALOGUE.translations['billing.state.notSetUp']).toBe('المدفوعات غير مُعدّة');
+      expect(CATALOGUE.translations['notificationPreferences.emailNotSetUp']).toBe(
+        'البريد الإلكتروني غير مُعدّ',
+      );
+      expect(CATALOGUE.translations['workspaceSettings.zone.selected']).toBe('المنطقة المختارة:');
+    });
+  });
+
   describe('the 38.7 contracts (Phase 38.8)', () => {
     async function refuse(
       catalogue: Record<string, unknown>,

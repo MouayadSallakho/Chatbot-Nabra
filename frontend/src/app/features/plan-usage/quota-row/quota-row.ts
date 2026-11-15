@@ -12,7 +12,8 @@ import {
 /**
  * One limit of the plan (Phase 36.10): its name, its state as a word with a
  * marker of its own, the numbers in tabular figures, a meter, and what the
- * state means for the next one.
+ * state means for the next one. Phase 39.6b draws it as a soft tile: a chip
+ * with the state's word and glyph, the count raised, and a 10px pill meter.
  *
  * <strong>Presentational.</strong> It draws the entitlement it is given and
  * calls nothing, so the plan page draws the server's figures and the Design
@@ -31,21 +32,23 @@ import {
     <div class="quota-head">
       <h3 class="quota-label" [id]="id() + '-label'">{{ label() }}</h3>
       @if (entitlement().unlimited) {
-        <span class="badge badge-plain" [attr.data-testid]="'state-' + entitlement().entitlement">{{
+        <span class="chip chip-info" [attr.data-testid]="'state-' + entitlement().entitlement">{{
           unlimitedWord
         }}</span>
       } @else {
         <span
-          class="badge"
-          [class]="state().badge"
+          class="chip"
+          [class]="state().chip"
           [attr.data-testid]="'state-' + entitlement().entitlement"
           >{{ state().word }}</span
         >
       }
     </div>
 
+    <!-- The sentence as written, with its first number raised (board Overview). -->
     <p class="quota-figure" [attr.data-testid]="'figure-' + entitlement().entitlement">
-      {{ figure() }}
+      {{ figureParts().before }}<span class="quota-used">{{ figureParts().used }}</span
+      >{{ figureParts().after }}
     </p>
 
     @if (!entitlement().unlimited && entitlement().limit !== null) {
@@ -112,6 +115,25 @@ export class QuotaRow {
     const limit = this.locale.number(e.limit);
 
     return $localize`:@@plan.figure.limited:${used}:used: of ${limit}:limit:`;
+  });
+
+  /**
+   * The figure cut around its first number, so the count reads large and the
+   * rest of the sentence ("of 10", "in use") stays as the language wrote it,
+   * in its own order. A sentence without the number is shown whole.
+   */
+  protected readonly figureParts = computed(() => {
+    const sentence = this.figure();
+    const used = this.locale.number(this.entitlement().used);
+    const at = sentence.indexOf(used);
+
+    return at < 0
+      ? { before: '', used: '', after: sentence }
+      : {
+          before: sentence.slice(0, at),
+          used,
+          after: sentence.slice(at + used.length),
+        };
   });
 
   protected readonly percent = computed(() => {

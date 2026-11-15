@@ -233,16 +233,18 @@ describe('PlanUsagePage', () => {
 
       const state = (name: string) => query(`[data-testid="state-${name}"]`)!;
 
-      // A word and a marker of its own for each state (the badge class draws a
-      // triangle, an octagon, a "no entry" disc), never the colour alone.
+      // A word and a glyph of its own for each state, as a chip (Phase 39.6b,
+      // owner decision Q4: a tick, a triangle, an octagon, a "no entry" disc),
+      // never the colour alone.
       expect(state('members').textContent).toContain('Approaching the limit');
-      expect(state('members').classList).toContain('badge-warning');
+      expect(state('members').classList).toContain('chip');
+      expect(state('members').classList).toContain('chip-warning');
       expect(state('knowledgeDocuments').textContent).toContain('Nearly at the limit');
-      expect(state('knowledgeDocuments').classList).toContain('badge-danger');
+      expect(state('knowledgeDocuments').classList).toContain('chip-danger');
       expect(state('aiAgents').textContent).toContain('Limit reached');
-      expect(state('aiAgents').classList).toContain('badge-exhausted');
+      expect(state('aiAgents').classList).toContain('chip-exhausted');
       expect(state('webChatEndpoints').textContent).toContain('Within the limit');
-      expect(state('webChatEndpoints').classList).toContain('badge-neutral');
+      expect(state('webChatEndpoints').classList).toContain('chip-success');
       expect(query('[data-testid="threshold-legend"]')).not.toBeNull();
     });
 
@@ -442,6 +444,108 @@ describe('PlanUsagePage', () => {
 
       expect(query('[data-testid="refresh-failed"]')).not.toBeNull();
       expect(query('[data-testid="figure-members"]')!.textContent).toContain('4 of 5');
+    });
+  });
+
+  describe('Calm Glass (Phase 39.6b)', () => {
+    it('lays the page out as calm panels with the plan beside its glyph', async () => {
+      await mount();
+      await answer(starter);
+
+      expect(query('.page')!.classList).toContain('page-calm');
+      expect(query('[data-testid="current-plan"] .record-glyph')).not.toBeNull();
+      expect(query('[data-testid="current-plan"] .facts')!.textContent).toContain(
+        'In effect since',
+      );
+    });
+
+    it('says how the limits stand at a glance: the worst capped state, in its own chip', async () => {
+      await mount();
+      await answer(starter);
+
+      const glance = query('[data-testid="plan-glance"]')!;
+
+      expect(glance.textContent?.trim()).toBe('Limit reached');
+      expect(glance.classList).toContain('chip-exhausted');
+    });
+
+    it('reads "Within the limit" when nothing capped is near it', async () => {
+      await mount();
+      await answer({
+        ...starter,
+        entitlements: [entitlement('members', 1, 5), entitlement('aiAgents', 2, null)],
+      });
+
+      const glance = query('[data-testid="plan-glance"]')!;
+
+      expect(glance.textContent?.trim()).toBe('Within the limit');
+      expect(glance.classList).toContain('chip-success');
+    });
+
+    it('says "Unlimited" with the "i" glyph when the plan caps nothing', async () => {
+      await mount();
+      await answer(unlimited);
+
+      const glance = query('[data-testid="plan-glance"]')!;
+
+      expect(glance.textContent?.trim()).toBe('Unlimited');
+      expect(glance.classList).toContain('chip-info');
+      expect(query('[data-testid="state-members"]')!.classList).toContain('chip-info');
+    });
+
+    it('raises the count and keeps the rest of the sentence as written', async () => {
+      await mount();
+      await answer(starter);
+
+      const figure = query('[data-testid="figure-knowledgeDocuments"]')!;
+
+      expect(figure.querySelector('.quota-used')!.textContent).toBe('23');
+      expect(figure.textContent?.replace(/\s+/g, ' ').trim()).toBe('23 of 25');
+    });
+
+    it('draws the meter in the state of its limit, with the sentence as its value', async () => {
+      await mount();
+      await answer(starter);
+
+      const meter = query('[data-testid="usage-members"] app-meter')!;
+
+      expect(meter.getAttribute('role')).toBe('meter');
+      expect(meter.classList).toContain('is-warning');
+      expect(meter.getAttribute('aria-valuetext')).toBe('4 of 5. Approaching the limit');
+      expect(query('[data-testid="usage-aiAgents"] app-meter')!.classList).toContain(
+        'is-exhausted',
+      );
+    });
+
+    it('draws the loading page in its loaded shape: the summary, then six tiles', async () => {
+      await mount();
+
+      const skeleton = query('[data-testid="plan-skeleton"]')!;
+
+      expect(skeleton.getAttribute('aria-busy')).toBe('true');
+      expect(skeleton.querySelector('.plan-summary .plan-glyph-skeleton')).not.toBeNull();
+      expect(skeleton.querySelectorAll('.quota-list .quota-skeleton').length).toBe(6);
+
+      await answer(starter);
+
+      expect(query('[data-testid="plan-skeleton"]')).toBeNull();
+      expect(query('[data-testid="current-plan"]')!.classList).toContain('plan-summary');
+    });
+
+    it('says the thresholds once, as chips with their ranges', async () => {
+      await mount();
+      await answer(starter);
+
+      const legend = query('[data-testid="threshold-legend"]')!;
+      const chips = [...legend.querySelectorAll('.chip')].map((chip) => chip.className);
+
+      expect(chips).toEqual([
+        'chip chip-success',
+        'chip chip-warning',
+        'chip chip-danger',
+        'chip chip-exhausted',
+      ]);
+      expect(legend.textContent).toContain('from 90%');
     });
   });
 });

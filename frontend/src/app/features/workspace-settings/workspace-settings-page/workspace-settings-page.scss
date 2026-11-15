@@ -1,6 +1,8 @@
 // The numbered-section card, field and actions are the shared authoring layer's
-// (`_authoring.scss`); this is the page's own spacing and the read-only value.
-.workspace-settings {
+// (`_authoring.scss`), the panels and the fact tiles `.page-calm`'s; this is
+// the page's own spacing, the read-only value and the zone tile (Phase 39.6b).
+.workspace-settings,
+.settings-skeleton {
   display: flex;
   flex-direction: column;
   gap: var(--space-5);
@@ -14,11 +16,61 @@ form {
 
 .settings-value {
   margin: 0;
-  color: var(--text-primary);
+  color: var(--color-text);
   font: var(--text-body-strong);
   overflow-wrap: anywhere;
 }
 
 .workspace-settings .stale-notice {
   margin-block-end: 0;
+}
+
+// The zone in use: its localised name over the IANA id, and the count of
+// schedules that follow it, as soft tiles.
+.zone-facts {
+  margin-block-end: var(--space-5);
+}
+
+.zone-fact dd {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-hairline);
+}
+
+.zone-name {
+  color: var(--color-text);
+  font: var(--text-body-strong);
+}
+
+// The id as the server stores it: Latin, left to right in both languages, and
+// quieter when the localised name stands above it.
+.zone-id {
+  // Its own width at the tile's start edge, so in Arabic it sits under the
+  // name on the right instead of drifting to the left of the tile.
+  align-self: flex-start;
+  color: var(--color-text);
+  font: var(--text-body-strong);
+  unicode-bidi: isolate;
+
+  .zone-name + & {
+    color: var(--color-text-secondary);
+    font: var(--text-small);
+  }
+}
+
+.zone-chosen-name {
+  color: var(--color-text);
+  font-weight: 500;
+}
+
+.zone-fact-skeleton {
+  inline-size: 14rem;
+  block-size: 4.25rem;
+  border-radius: var(--radius-tile);
+}
+
+.zone-count-skeleton {
+  inline-size: 10rem;
+  block-size: 4.25rem;
+  border-radius: var(--radius-tile);
 }

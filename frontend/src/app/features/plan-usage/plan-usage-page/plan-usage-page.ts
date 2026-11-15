@@ -10,6 +10,7 @@ import { Icon } from '@app/shared/icon/icon';
 import { PageHeader } from '@app/shared/page-header/page-header';
 import { PlanEntitlement, PlanUsage, PlanUsageApi } from '../plan-usage-api';
 import { QuotaRow } from '../quota-row/quota-row';
+import { quotaState } from '../plan-words';
 
 /**
  * What this workspace's plan allows, and how much of it is used (Phase 36.10).
@@ -25,6 +26,17 @@ import { QuotaRow } from '../quota-row/quota-row';
  * who may see it. Nothing here is enforcement either; the server refuses what
  * the plan does not allow, and this screen reports.
  */
+/** The same word a limit's tile uses for a limit that is not there. */
+const UNLIMITED = $localize`:@@plan.unlimited:Unlimited`;
+
+/** The server's states, mildest first; an unknown state counts as the mildest. */
+const SEVERITY: Readonly<Record<string, number>> = {
+  Normal: 0,
+  Warning: 1,
+  Critical: 2,
+  Exhausted: 3,
+};
+
 @Component({
   selector: 'app-plan-usage-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -62,6 +74,26 @@ export class PlanUsagePage {
   protected readonly allUnlimited = computed(() =>
     (this.usage()?.entitlements ?? []).every((e) => e.unlimited),
   );
+
+  /** The skeleton's tiles: the five resource limits and the monthly one. */
+  protected readonly skeletonTiles = [0, 1, 2, 3, 4, 5];
+
+  /**
+   * How the limits stand at a glance (Phase 39.6b): the worst state of any
+   * capped limit, in the same word and glyph as its tile, or "Unlimited" when
+   * the plan caps nothing. The server's states, never re-derived here.
+   */
+  protected readonly glance = computed<{ readonly word: string; readonly chip: string }>(() => {
+    const capped = (this.usage()?.entitlements ?? []).filter((e) => !e.unlimited);
+
+    if (capped.length === 0) {
+      return { word: UNLIMITED, chip: 'chip-info' };
+    }
+
+    const worst = capped.reduce((a, b) => (SEVERITY[b.state] > SEVERITY[a.state] ? b : a));
+
+    return quotaState(worst.state);
+  });
 
   constructor() {
     void this.load();

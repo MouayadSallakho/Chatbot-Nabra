@@ -47,32 +47,39 @@ export function entitlementDescription(name: string): string {
   return ENTITLEMENT_WORDS[name as PlanEntitlementName]?.description ?? '';
 }
 
-/** One state as the reader sees it: a word, a badge with its own marker, a meter tone. */
+/**
+ * One state as the reader sees it: a word, a chip with its own glyph, a meter
+ * tone (Phase 39.6b, owner decision Q4). The three hues each with a glyph of
+ * their own: within the limit an emerald tick, approaching a gold triangle,
+ * nearly at it a coral octagon, and limit reached a solid coral chip with a
+ * "no entry" disc, the one state that refuses something.
+ */
 export interface QuotaStateWords {
   readonly word: string;
-  readonly badge: string;
+  readonly chip:
+    'chip-success' | 'chip-warning' | 'chip-danger' | 'chip-exhausted' | 'chip-neutral';
   readonly meter: 'normal' | 'warning' | 'critical' | 'exhausted';
 }
 
 const STATES: Readonly<Record<PlanEntitlementState, QuotaStateWords>> = {
   Normal: {
     word: $localize`:@@plan.state.normal:Within the limit`,
-    badge: 'badge-neutral',
+    chip: 'chip-success',
     meter: 'normal',
   },
   Warning: {
     word: $localize`:@@plan.state.warning:Approaching the limit`,
-    badge: 'badge-warning',
+    chip: 'chip-warning',
     meter: 'warning',
   },
   Critical: {
     word: $localize`:@@plan.state.critical:Nearly at the limit`,
-    badge: 'badge-danger',
+    chip: 'chip-danger',
     meter: 'critical',
   },
   Exhausted: {
     word: $localize`:@@plan.state.exhausted:Limit reached`,
-    badge: 'badge-exhausted',
+    chip: 'chip-exhausted',
     meter: 'exhausted',
   },
 };
@@ -82,7 +89,7 @@ export function quotaState(state: string): QuotaStateWords {
   return (
     STATES[state as PlanEntitlementState] ?? {
       word: state,
-      badge: 'badge-neutral',
+      chip: 'chip-neutral',
       meter: 'normal',
     }
   );

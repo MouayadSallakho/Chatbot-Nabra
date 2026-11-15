@@ -19,7 +19,11 @@ import { firstValueFrom } from 'rxjs';
 import { ApiError, toApiError } from '@app/core/api/api-error';
 import { PermissionService } from '@app/core/authorization/permission-service';
 import { LocaleFormat } from '@app/core/i18n/locale-format';
-import { EmailPreferences, NotificationApi } from '@app/core/notifications/notification-api';
+import {
+  EmailPreferencesRequest,
+  EmailPreferencesResponse,
+  NotificationApi,
+} from '@app/core/notifications/notification-api';
 import { DesktopAlerts } from '@app/core/sounds/desktop-alerts';
 import { Sounds } from '@app/core/sounds/sounds';
 import { SoundSettings } from '@app/core/sounds/sound-settings';
@@ -33,7 +37,7 @@ const BROWSER_SECTION = 'in-this-browser';
 
 /** One category, as the member reads it. */
 interface Category {
-  readonly key: keyof EmailPreferences;
+  readonly key: keyof EmailPreferencesResponse;
   readonly label: string;
   readonly description: string;
 }
@@ -202,7 +206,7 @@ export class NotificationPreferencesPage implements HasUnsavedChanges {
   }
 
   /** What the server holds, for comparing against the switches. */
-  private stored: EmailPreferences | null = null;
+  private stored: EmailPreferencesResponse | null = null;
 
   /**
    * Compared by value, so turning a switch on and off again leaves the page
@@ -214,7 +218,9 @@ export class NotificationPreferencesPage implements HasUnsavedChanges {
 
     this.dirty.set(
       stored !== null &&
-        (Object.keys(now) as (keyof EmailPreferences)[]).some((key) => now[key] !== stored[key]),
+        (Object.keys(now) as (keyof EmailPreferencesResponse)[]).some(
+          (key) => now[key] !== stored[key],
+        ),
     );
     this.onCount.set(Object.values(this.form.getRawValue()).filter(Boolean).length);
   }
@@ -231,7 +237,7 @@ export class NotificationPreferencesPage implements HasUnsavedChanges {
 
     try {
       const saved = await firstValueFrom(
-        this.api.savePreferences(tenantId, this.form.getRawValue(), this.etag),
+        this.api.savePreferences(tenantId, this.request(), this.etag),
       );
 
       this.etag = saved.etag;
@@ -252,6 +258,22 @@ export class NotificationPreferencesPage implements HasUnsavedChanges {
     } finally {
       this.saving.set(false);
     }
+  }
+
+  /**
+   * The five choices as the save sends them (`EmailPreferencesRequest`): every
+   * category named, each a boolean, so the server never meets a missing one.
+   */
+  private request(): EmailPreferencesRequest {
+    const value = this.form.getRawValue();
+
+    return {
+      reports: value.reports,
+      usage: value.usage,
+      billing: value.billing,
+      knowledge: value.knowledge,
+      channelHealth: value.channelHealth,
+    };
   }
 
   /** Discards this tab's choices and starts again from what is stored now. */

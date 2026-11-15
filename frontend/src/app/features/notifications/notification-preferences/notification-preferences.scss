@@ -1,10 +1,32 @@
-// Every value is a semantic token, so light and dark need no separate rules.
+// The panels are `.page-calm`'s (styles/_authoring.scss). Each category is a
+// soft tile holding the family's switch (its 44px target the whole row, the
+// name part of it) and the sentence under the name; the browser's settings
+// are tiles too (Phase 39.6b).
 
 .preferences-page {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
   max-inline-size: 48rem;
+}
+
+// An honest state the reader must see before choosing: a soft tile with its
+// chip (a word and the "i" glyph) and the sentence.
+.prefs-state {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border-radius: var(--radius-tile);
+  background-color: var(--color-panel);
+  border: 1px solid var(--color-line);
+
+  > p {
+    margin: 0;
+    color: var(--color-text-secondary);
+    font: var(--text-small);
+  }
 }
 
 .categories {
@@ -16,12 +38,17 @@
   border: 0;
 }
 
-// A category: the switch with its name (the family's 44px target, the name
-// part of it), and the sentence under the name, outside the label so it is the
-// switch's description rather than part of its name.
+// A category (or a browser setting): a soft tile, the switch row first.
 .category {
   display: flex;
   flex-direction: column;
+  padding: 0 var(--space-4) var(--space-3);
+  border-radius: var(--radius-tile);
+  background-color: var(--color-panel-soft);
+
+  @media (forced-colors: active) {
+    border: 1px solid CanvasText;
+  }
 }
 
 .category-label {
@@ -44,11 +71,6 @@
   margin-inline-start: 0;
 }
 
-.category + .category {
-  padding-block-start: var(--space-2);
-  border-block-start: 1px solid var(--color-line);
-}
-
 .browser-section {
   // Lands clear of the page's top edge when the account menu opens it.
   scroll-margin-block-start: var(--space-4);
@@ -57,16 +79,25 @@
 .browser-body {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: var(--space-3);
 }
 
 .browser-note {
   margin-block: var(--space-2) 0;
 }
 
-.browser-alerts {
-  padding-block-start: var(--space-2);
-  border-block-start: 1px solid var(--color-line);
+// Volume and the test sound share one tile: what you set, then hear it.
+.sound-tile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4) var(--space-4);
+  border-radius: var(--radius-tile);
+  background-color: var(--color-panel-soft);
+
+  @media (forced-colors: active) {
+    border: 1px solid CanvasText;
+  }
 }
 
 .volume {
@@ -79,14 +110,25 @@
 .volume-range {
   inline-size: 100%;
   // A comfortable target, on touch as well; the browser draws the track inside it.
-  min-block-size: 44px;
+  min-block-size: var(--target-min);
   accent-color: var(--color-primary);
 }
 
 .volume-value {
   min-inline-size: 3em;
   font: var(--text-small);
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
   text-align: end;
   font-variant-numeric: tabular-nums;
+}
+
+.prefs-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.category-skeleton {
+  block-size: 4.75rem;
+  border-radius: var(--radius-tile);
 }

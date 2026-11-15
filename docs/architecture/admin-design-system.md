@@ -213,6 +213,13 @@ controls draw a `--choice-size` 20px box or a `--switch-inline` ×
 `-sm` 34 / `-lg` 64; the orb `--orb-size` 26 / `-lg` 64. Icon sizes:
 `--icon-size-sm` 16 · `--icon-size` 18 · `--icon-size-nav` 20.
 
+The usage meter (Phase 39.6b): `--meter-height` 10px, a pill;
+`--meter-track` (emerald-700 at 14%, dark sage at 18%) and the fills
+`--meter-fill` (the primary), `--meter-warning` (gold-800 / gold-300) and
+`--meter-critical` (coral-600 / coral-300), each 3:1 or more on its track and
+on the soft tile. The state's chip and the figures beside it carry the
+meaning; the fill never does alone.
+
 ### Layers
 
 `--z-sticky` 10 · `--z-sidebar` 20 (the side bar and the phone's bars) · `--z-dropdown` 30 ·

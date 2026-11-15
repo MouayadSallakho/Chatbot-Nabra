@@ -190,7 +190,90 @@ describe('NotificationPreferencesPage', () => {
   it('says plainly when this deployment cannot email', async () => {
     await mount({ ...defaults, emailConfigured: false });
 
-    expect(host().querySelector('[data-testid="email-unavailable"]')).not.toBeNull();
+    const note = host().querySelector('[data-testid="email-unavailable"]')!;
+
+    expect(note).not.toBeNull();
+    // An honest state as a chip with a word and the "i" glyph (Phase 39.6b).
+    expect(note.querySelector('.chip')!.textContent?.trim()).toBe('Email not set up');
+    expect(note.querySelector('.chip')!.classList).toContain('chip-info');
+    expect(note.textContent).toContain('take effect once it is');
+  });
+
+  it('says nothing about email set-up when email can be sent', async () => {
+    await mount();
+
+    expect(host().querySelector('[data-testid="email-unavailable"]')).toBeNull();
+  });
+
+  describe('Calm Glass (Phase 39.6b)', () => {
+    it("draws each category as a soft tile with the family's switch", async () => {
+      await mount();
+
+      const tiles = host().querySelectorAll('.categories > .category');
+
+      expect(tiles.length).toBe(5);
+      tiles.forEach((tile) => {
+        expect(tile.querySelector('label.category-switch input[role="switch"]')).not.toBeNull();
+      });
+      expect(host().querySelector('.page')!.classList).toContain('page-calm');
+    });
+
+    it('draws the loading form as the heading and a tile per category', async () => {
+      await mount();
+
+      void (fixture.componentInstance as unknown as { reload(): Promise<void> }).reload();
+      fixture.detectChanges();
+
+      const skeleton = host().querySelector('[data-testid="prefs-skeleton"]')!;
+
+      expect(skeleton.getAttribute('aria-busy')).toBe('true');
+      expect(skeleton.querySelectorAll('.category-skeleton').length).toBe(5);
+
+      http.expectOne(url).flush(defaults, { headers: { ETag: '"v1"' } });
+      await settle();
+
+      expect(host().querySelector('[data-testid="prefs-skeleton"]')).toBeNull();
+    });
+
+    it('sends the five choices as booleans, the request schema of 39.1', async () => {
+      await mount({
+        ...defaults,
+        email: { ...defaults.email, usage: true, knowledge: true },
+      });
+
+      toggle('channelHealth').click();
+      await settle();
+      host().querySelector<HTMLButtonElement>('[data-testid="save"]')!.click();
+      await settle();
+
+      const save = http.expectOne(url);
+      const email = (save.request.body as { email: Record<string, unknown> }).email;
+
+      expect(Object.keys(email).sort()).toEqual([
+        'billing',
+        'channelHealth',
+        'knowledge',
+        'reports',
+        'usage',
+      ]);
+      expect(Object.values(email).every((value) => typeof value === 'boolean')).toBe(true);
+      expect(email).toEqual({
+        reports: false,
+        usage: true,
+        billing: false,
+        knowledge: true,
+        channelHealth: true,
+      });
+
+      save.flush(
+        {
+          ...defaults,
+          email: { ...defaults.email, usage: true, knowledge: true, channelHealth: true },
+        },
+        { headers: { ETag: '"v2"' } },
+      );
+      await settle();
+    });
   });
 
   describe('in this browser (Phase 38.1b)', () => {

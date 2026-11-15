@@ -1,4 +1,4 @@
-<div class="page">
+<div class="page page-calm">
   <app-page-header
     heading="Notifications"
     i18n-heading="@@notifications.heading"
@@ -26,12 +26,16 @@
   <div class="page-section">
     @if (loading()) {
       <!-- The shape of a page of notifications, so nothing jumps when they arrive. -->
-      <div class="card notification-history" aria-busy="true">
+      <div class="card notification-history" aria-busy="true" data-testid="history-skeleton">
         <p class="visually-hidden" role="status">{{ loadingLabel }}</p>
-        @for (row of [0, 1, 2]; track row) {
-          <div class="card-body admin-skeleton" aria-hidden="true">
-            <span class="skeleton skeleton-title"></span>
-            <span class="skeleton skeleton-text"></span>
+        <span class="skeleton history-summary-skeleton" aria-hidden="true"></span>
+        @for (row of [0, 1, 2, 3]; track row) {
+          <div class="history-row-skeleton" aria-hidden="true">
+            <span class="skeleton history-icon-skeleton"></span>
+            <div class="history-lines-skeleton">
+              <span class="skeleton skeleton-title"></span>
+              <span class="skeleton skeleton-text"></span>
+            </div>
           </div>
         }
       </div>
@@ -60,8 +64,8 @@
         <h2 id="history-heading" class="visually-hidden" i18n="@@notifications.history">
           Notification history
         </h2>
-        <p class="history-summary text-small text-secondary" data-testid="summary">
-          {{ summary() }}
+        <p class="history-summary" data-testid="summary">
+          <span class="history-count">{{ summary() }}</span>
           <span i18n="@@notifications.kept">Notifications are kept for 90 days.</span>
         </p>
 
