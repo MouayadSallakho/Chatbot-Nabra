@@ -42,9 +42,17 @@ namespace OmniAI.Infrastructure.Reports.Rendering;
 /// end (its left edge in Arabic).
 /// </para>
 /// <para>
+/// <strong>The brand, small and quiet (Phase 39.8a).</strong> Every page's
+/// footer starts with the mark, the two circles drawn as vectors in their
+/// light-ground colours, and the product's name in the reader's language
+/// ("Nabra", or the Arabic name), before the title; at the left margin in
+/// English and the right one in Arabic. The mark is a logo: it is never
+/// mirrored, so its emerald circle stays on the left in both.
+/// </para>
+/// <para>
 /// <strong>Nothing active, nothing remote.</strong> The only fonts are the ones
 /// bundled in this assembly, embedded in the file (only those a page uses). No
-/// image, no link annotation,
+/// image (the mark is paths), no link annotation,
 /// no JavaScript, no form, no open action, and nothing is fetched when the
 /// report is generated or opened.
 /// </para>
@@ -71,6 +79,22 @@ internal sealed class PdfReportRenderer : IReportRenderer
     private static readonly SKColor Muted = new(0x6E, 0x6E, 0x6E);
     private static readonly SKColor Rule = new(0x78, 0x78, 0x78);
     private static readonly SKColor Shade = new(0xF4, 0xF5, 0xF7);
+
+    // The mark (brand.md): circles r 40 at (52, 60) and (88, 60) in a 140 x 120
+    // box, their overlap the one tone; light-ground colours.
+    private const float MarkBoxWidth = 140;
+    private const float MarkBoxHeight = 120;
+    private const string MarkLens = "M70 24.28 A40 40 0 0 1 70 95.72 A40 40 0 0 1 70 24.28 Z";
+    private static readonly SKColor MarkAi = new(0x23, 0x53, 0x47);
+    private static readonly SKColor MarkTeam = new(0xC8, 0xA9, 0x6A);
+    private static readonly SKColor MarkLensColour = new(0x0B, 0x2B, 0x26);
+
+    // In the footer: the mark's box is 1.2 times the footer's type (brand.md's
+    // lockup rule), then the name, then the title.
+    internal const float FooterMarkHeight = SmallSize * 1.2f;
+    internal const float FooterMarkWidth = FooterMarkHeight * MarkBoxWidth / MarkBoxHeight;
+    private const float FooterNameGap = 3;
+    private const float FooterTitleGap = 10;
 
     public ReportFormat Format => ReportFormat.Pdf;
 
@@ -127,16 +151,24 @@ internal sealed class PdfReportRenderer : IReportRenderer
 
                 float footer = PageHeight - Margin;
                 string page = words.PageOf(number, total);
+                string product = words.Product;
+                float name = text.Measure(product, SmallSize, bold: false, rightToLeft: rtl);
+                float lead = FooterMarkWidth + FooterNameGap + name + FooterTitleGap;
 
                 if (rtl)
                 {
-                    // Mirrored: the title at the right margin, the page number at the left.
-                    text.DrawInBox(canvas, document.Title, Margin, ContentWidth, footer, SmallSize, bold: false, Muted, againstRight: true, rightToLeft: true);
+                    // Mirrored: the mark and the name at the right margin, then the
+                    // title to their left, the page number at the left margin.
+                    DrawMark(canvas, PageWidth - Margin - FooterMarkWidth, footer);
+                    text.DrawInBox(canvas, product, Margin, ContentWidth - FooterMarkWidth - FooterNameGap, footer, SmallSize, bold: false, Muted, againstRight: true, rightToLeft: true);
+                    text.DrawInBox(canvas, document.Title, Margin, ContentWidth - lead, footer, SmallSize, bold: false, Muted, againstRight: true, rightToLeft: true);
                     text.DrawInBox(canvas, page, Margin, ContentWidth, footer, SmallSize, bold: false, Muted, againstRight: false, rightToLeft: true);
                 }
                 else
                 {
-                    text.Draw(canvas, document.Title, Margin, footer, SmallSize, bold: false, Muted);
+                    DrawMark(canvas, Margin, footer);
+                    text.Draw(canvas, product, Margin + FooterMarkWidth + FooterNameGap, footer, SmallSize, bold: false, Muted);
+                    text.Draw(canvas, document.Title, Margin + lead, footer, SmallSize, bold: false, Muted);
                     text.Draw(canvas, page, PageWidth - Margin - text.Measure(page, SmallSize, bold: false), footer, SmallSize, bold: false, Muted);
                 }
 
@@ -147,6 +179,35 @@ internal sealed class PdfReportRenderer : IReportRenderer
         }
 
         return buffer.ToArray();
+    }
+
+    /// <summary>
+    /// The mark as vector paths, its box <see cref="FooterMarkWidth"/> wide with
+    /// its left edge at <paramref name="left"/>, its circles centred on the
+    /// footer's x-height so it sits with the text beside it.
+    /// </summary>
+    internal static void DrawMark(SKCanvas canvas, float left, float baseline)
+    {
+        float scale = FooterMarkHeight / MarkBoxHeight;
+        float middle = baseline - (SmallSize * 0.36f);
+
+        canvas.Save();
+        canvas.Translate(left, middle - (60 * scale));
+        canvas.Scale(scale);
+
+        using SKPaint paint = new() { IsAntialias = true, Style = SKPaintStyle.Fill };
+
+        paint.Color = MarkAi;
+        canvas.DrawCircle(52, 60, 40, paint);
+        paint.Color = MarkTeam;
+        canvas.DrawCircle(88, 60, 40, paint);
+
+        using SKPath lens = SKPath.ParseSvgPathData(MarkLens)
+            ?? throw new InvalidOperationException("The mark's lens path could not be parsed.");
+
+        paint.Color = MarkLensColour;
+        canvas.DrawPath(lens, paint);
+        canvas.Restore();
     }
 
     private static void Compose(ReportDocument document, ReportWording words, Layout layout, CancellationToken cancellationToken)

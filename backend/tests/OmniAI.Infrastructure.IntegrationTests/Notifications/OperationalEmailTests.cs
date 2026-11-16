@@ -456,7 +456,10 @@ public sealed class OperationalEmailTests(PostgresTestDatabase database)
 
         Assert.Contains("&lt;script&gt;alert(1)&lt;/script&gt;", html, StringComparison.Ordinal);
         Assert.DoesNotContain("<script", html, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("<img", html, StringComparison.OrdinalIgnoreCase);
+        // The one image is the mark, inline by Content-ID (Phase 39.8a): the
+        // injected <img> is text, so it is not a second one.
+        Assert.Equal(1, html.Split("<img", StringSplitOptions.None).Length - 1);
+        Assert.Contains("<img src=\"cid:nabra-mark@nabra\"", html, StringComparison.Ordinal);
 
         // The only link is the trusted application address, with no token in it.
         Assert.Contains("http://localhost:4200/billing", decoded, StringComparison.Ordinal);

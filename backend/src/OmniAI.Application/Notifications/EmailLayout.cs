@@ -48,12 +48,47 @@ public static class EmailWords
 /// isolated: FSI…PDI in text, <c>&lt;bdi&gt;</c> in HTML.
 /// </para>
 /// <para>
-/// <strong>Nothing to load.</strong> No image, web font, remote stylesheet or
-/// tracking pixel, so opening an email tells nobody that it was opened.
+/// <strong>Nothing to load.</strong> No remote image, web font, remote stylesheet
+/// or tracking pixel, so opening an email tells nobody that it was opened. The
+/// one picture, the brand's mark in the header, travels inside the message as
+/// an inline part referenced by Content-ID (<see cref="MarkContentId"/>): never
+/// a link, never inline SVG and never a <c>data:</c> URI, which Gmail, Outlook
+/// and Apple Mail do not all show. The sender attaches it; a client that hides
+/// images still shows the name beside it.
+/// </para>
+/// <para>
+/// <strong>Calm Glass, in what an email client can draw (Phase 39.8a).</strong>
+/// The cream ground, a white card with a sand line, ink text, quiet text in
+/// stone, and one emerald pill for the action. Font stacks that read well when
+/// no web font loads: the system's sans in English, and Segoe UI, Tahoma, Geeza
+/// Pro or Noto Sans Arabic in Arabic, with Arabic's taller lines. No email
+/// shows a conversation today, so the three voices' colours appear nowhere.
 /// </para>
 /// </remarks>
 public static class EmailLayout
 {
+    /// <summary>
+    /// The Content-ID of the brand's mark, which the HTML part shows as
+    /// <c>cid:nabra-mark@nabra</c> and the sender attaches as an inline part.
+    /// </summary>
+    public const string MarkContentId = "nabra-mark@nabra";
+
+    // Calm Glass colours (calm-glass.md section 2), as an email can carry them.
+    private const string Ground = "#f4f1ea"; // cream-100
+    private const string Panel = "#ffffff";
+    private const string Line = "#e3dccc"; // sand-300
+    private const string Ink = "#1b2420"; // ink-900: 15.2:1 on cream-50, more on white
+    private const string Secondary = "#3a4540"; // ink-700
+    private const string Quiet = "#6b6658"; // stone-600: 5.7:1 on white
+    private const string Deep = "#0b2b26"; // emerald-900: the name beside the mark
+    private const string Primary = "#235347"; // emerald-700: white on it 8.8:1
+
+    private const string LatinFonts =
+        "'Geist',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Helvetica,Arial,sans-serif";
+
+    private const string ArabicFonts =
+        "'IBM Plex Sans Arabic','Segoe UI',Tahoma,'Geeza Pro','Noto Sans Arabic','Arabic Typesetting',Arial,sans-serif";
+
     /// <param name="language">The reader's language.</param>
     /// <param name="workspace">A workspace name, already reduced to one line, or empty.</param>
     /// <param name="heading">The email's title.</param>
@@ -100,44 +135,63 @@ public static class EmailLayout
 
         text.Append('\n').Append(footer).Append('\n');
 
+        string fonts = arabic ? ArabicFonts : LatinFonts;
+        string body = arabic ? "15px;line-height:27px" : "15px;line-height:24px";
+        string small = arabic ? "13px;line-height:22px" : "12px;line-height:18px";
+
         StringBuilder html = new();
         html.Append("<!DOCTYPE html><html lang=\"").Append(lang).Append("\" dir=\"").Append(dir).Append("\"><head><meta charset=\"utf-8\">")
-            .Append("<meta name=\"viewport\" content=\"width=device-width\"><title>")
+            .Append("<meta name=\"viewport\" content=\"width=device-width\">")
+            .Append("<meta name=\"color-scheme\" content=\"light\"><meta name=\"supported-color-schemes\" content=\"light\"><title>")
             .Append(Encode(heading))
             .Append("</title></head>")
-            .Append("<body dir=\"").Append(dir).Append("\" style=\"margin:0;padding:24px;background:#f4f5f7;font-family:Arial,Helvetica,sans-serif;color:#1f232b;\">")
-            .Append("<table role=\"presentation\" dir=\"").Append(dir).Append("\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:560px;margin:0 auto;background:#ffffff;border:1px solid #dfe1e6;border-radius:8px;\">")
-            .Append("<tr><td style=\"padding:24px;\">")
-            .Append("<p style=\"margin:0 0 16px;font-weight:bold;font-size:16px;\">").Append(Encode(product)).Append("</p>");
+            .Append("<body dir=\"").Append(dir).Append("\" style=\"margin:0;padding:24px 12px;background:").Append(Ground)
+            .Append(";font-family:").Append(fonts).Append(";color:").Append(Ink).Append(";\">")
+            .Append("<table role=\"presentation\" dir=\"").Append(dir).Append("\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:560px;margin:0 auto;background:")
+            .Append(Panel).Append(";border:1px solid ").Append(Line).Append(";border-radius:24px;\">")
+            .Append("<tr><td style=\"padding:28px 28px 24px;\">");
+
+        // The header: the mark, then the name in the reader's language, on one
+        // line; in Arabic the row runs right to left, so the mark leads there too.
+        html.Append("<table role=\"presentation\" dir=\"").Append(dir).Append("\" cellpadding=\"0\" cellspacing=\"0\" style=\"margin:0 0 20px;\"><tr>")
+            .Append("<td style=\"padding:0;vertical-align:middle;\"><img src=\"cid:").Append(MarkContentId)
+            .Append("\" width=\"28\" height=\"24\" alt=\"\" style=\"display:block;border:0;width:28px;height:24px;\"></td>")
+            .Append("<td style=\"padding:0 10px;vertical-align:middle;font-family:").Append(fonts)
+            .Append(";font-size:17px;line-height:24px;font-weight:600;color:").Append(Deep).Append(";\">")
+            .Append(Encode(product))
+            .Append("</td></tr></table>");
 
         if (workspaceLine.Length > 0)
         {
-            html.Append("<p style=\"margin:0 0 16px;font-size:13px;color:#5e6470;\">")
+            html.Append("<p style=\"margin:0 0 16px;font-size:").Append(small).Append(";color:").Append(Quiet).Append(";\">")
                 .Append(Encode(workspaceLine))
                 .Append("</p>");
         }
 
-        html.Append("<h1 style=\"margin:0 0 12px;font-size:20px;\">")
+        html.Append("<h1 style=\"margin:0 0 12px;font-size:22px;line-height:").Append(arabic ? "34px" : "30px")
+            .Append(";font-weight:600;color:").Append(Ink).Append(";\">")
             .Append(Encode(heading))
             .Append("</h1>");
 
         foreach (string paragraph in paragraphs)
         {
-            html.Append("<p style=\"margin:0 0 20px;font-size:15px;line-height:1.5;\">")
+            html.Append("<p style=\"margin:0 0 18px;font-size:").Append(body).Append(";color:").Append(Secondary).Append(";\">")
                 .Append(Encode(paragraph))
                 .Append("</p>");
         }
 
         if (action is (string actionLabel, Uri actionLink))
         {
-            html.Append("<p style=\"margin:0 0 24px;\"><a href=\"")
+            html.Append("<p style=\"margin:4px 0 24px;\"><a href=\"")
                 .Append(WebUtility.HtmlEncode(actionLink.AbsoluteUri))
-                .Append("\" style=\"display:inline-block;padding:10px 16px;background:#2f5bd3;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:bold;\">")
+                .Append("\" style=\"display:inline-block;padding:12px 22px;background:").Append(Primary)
+                .Append(";color:#ffffff;text-decoration:none;border-radius:999px;font-weight:600;font-size:15px;line-height:20px;\">")
                 .Append(Encode(actionLabel))
                 .Append("</a></p>");
         }
 
-        html.Append("<p style=\"margin:0;font-size:12px;color:#5e6470;line-height:1.5;\">")
+        html.Append("<p style=\"margin:0;padding-top:16px;border-top:1px solid ").Append(Line).Append(";font-size:").Append(small)
+            .Append(";color:").Append(Quiet).Append(";\">")
             .Append(Encode(footer))
             .Append("</p></td></tr></table></body></html>");
 

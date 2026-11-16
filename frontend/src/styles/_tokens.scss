@@ -439,6 +439,24 @@
   --tile-deep-danger-bg: rgb(240 160 143 / 14%);
   --tile-deep-danger-fg: var(--coral-300);
 
+  // The entry pages' brand side (Phase 39.8a): the deep tile's ground in each
+  // look (emerald-900; emerald-800 with a line in the dark one), its words in
+  // the dark look's text colours, the dark look's two glows inside it, and the
+  // mark in its dark-ground colours (brand.md). Every pair measured in
+  // MASTER.md §13.
+  --entry-brand-bg: var(--tile-deep-bg);
+  --entry-brand-edge: var(--tile-deep-edge);
+  --entry-brand-text: var(--tile-deep-text);
+  --entry-brand-text-secondary: var(--tile-deep-text-secondary);
+  --entry-brand-glow-a: rgb(142 182 155 / 16%);
+  --entry-brand-glow-b: rgb(200 169 106 / 12%);
+  --brand-on-deep-ai: var(--emerald-100);
+  --brand-on-deep-team: var(--gold-500);
+  --brand-on-deep-lens: var(--emerald-300);
+  --entry-form-width: 26rem; // 416px: the form panel's measure
+  --entry-mark-size: 7.5rem; // 120px: the brand side's mark
+  --entry-mark-size-sm: 3.5rem; // 56px: on a phone, after the form
+
   // Choice controls (Phase 38 notes 3 and 4): a visible 20px box or a 40×24
   // track, inside a 44px target that includes the label.
   --choice-size: 1.25rem;

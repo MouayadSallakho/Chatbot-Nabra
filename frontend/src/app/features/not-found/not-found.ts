@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { HOME_PATH } from '@app/layout/navigation';
 import { Icon } from '@app/shared/icon/icon';
+import { BrandMark } from '@app/shared/brand-mark/brand-mark';
 import { PageHeader } from '@app/shared/page-header/page-header';
 
 /**
@@ -20,11 +21,15 @@ import { PageHeader } from '@app/shared/page-header/page-header';
  * changed. It shows the path that matched nothing, as a left-to-right island,
  * so the reader can see a typo or report the link. Only the path: a query or a
  * fragment is never echoed back, in case a link carried something private.
+ *
+ * Calm Glass (Phase 39.8a): the mark above one serif line, the sentence, the
+ * address and one action, on the page's panel. It stays inside the shell (see
+ * above), so it is not the entry pages' split.
  */
 @Component({
   selector: 'app-not-found',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, PageHeader, Icon],
+  imports: [RouterLink, PageHeader, Icon, BrandMark],
   template: `
     <div class="page">
       <app-page-header [heading]="heading" [description]="description" />
@@ -32,9 +37,8 @@ import { PageHeader } from '@app/shared/page-header/page-header';
       <div class="page-section">
         <div class="card">
           <div class="state" data-testid="not-found">
-            <span class="state-icon">
-              <app-icon name="search" [strokeWidth]="1.5" />
-            </span>
+            <!-- The mark, quiet and decorative: an address that is not here, in Nabra's own frame. -->
+            <app-brand-mark class="not-found-mark" />
             <p class="state-title" i18n="@@notFound.state.title">Nothing at this address</p>
             <p class="state-description" i18n="@@notFound.state.description">
               The link may be out of date or mistyped. Nothing in your workspace has changed.
@@ -54,6 +58,12 @@ import { PageHeader } from '@app/shared/page-header/page-header';
     </div>
   `,
   styles: `
+    .not-found-mark {
+      --brand-mark-size: var(--entry-mark-size-sm);
+
+      margin-block-end: var(--space-2);
+    }
+
     .not-found-address {
       margin: 0;
       max-inline-size: 100%;
@@ -63,8 +73,8 @@ import { PageHeader } from '@app/shared/page-header/page-header';
     .not-found-address code {
       padding: var(--gap-hairline) var(--space-2);
       border-radius: var(--radius-badge);
-      background-color: var(--surface-inset);
-      color: var(--text-secondary);
+      background-color: var(--color-panel-soft);
+      color: var(--color-text-secondary);
       font: var(--text-small);
       font-family: var(--font-mono);
     }

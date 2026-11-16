@@ -6,15 +6,23 @@
     <base href="/" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <!--
-      The mark as SVG (it follows the browser's colour scheme), with the .ico for
-      browsers that cannot use an SVG icon. Both are unhashed files from public/,
-      which the edge caches for a year by extension (`public, max-age=31536000,
-      immutable` in deploy/edge), while this page is served `no-cache`: a new
-      mark needs a new file name, never a new file under the old one. Versioned
-      since the Nabra brand step; the next change is v2.
+      The mark (brand.md, direction A). The SVG follows the browser's colour
+      scheme; the .ico (16, 32 and 48 px) is for browsers that cannot use an SVG
+      icon, and the PNGs are its sizes on their own. The app icon (a rounded
+      square with the mark at 62%) is the Apple touch icon and the manifest's.
+      Every image is an unhashed file from public/, which the edge caches for a
+      year by extension (`public, max-age=31536000, immutable` in deploy/edge),
+      while this page and the manifest are served `no-cache`: a new mark needs
+      new file names, never new files under the old ones. v2 since the Calm
+      Glass brand step (Phase 39.8a); the next change is v3.
     -->
-    <link rel="icon" type="image/svg+xml" href="nabra-icon.v1.svg" />
-    <link rel="icon" href="nabra-icon.v1.ico" sizes="16x16 32x32 48x48" />
+    <link rel="icon" href="nabra-icon.v2.ico" sizes="16x16 32x32 48x48" />
+    <link rel="icon" type="image/png" href="nabra-icon.v2-16.png" sizes="16x16" />
+    <link rel="icon" type="image/png" href="nabra-icon.v2-32.png" sizes="32x32" />
+    <link rel="icon" type="image/png" href="nabra-icon.v2-48.png" sizes="48x48" />
+    <link rel="icon" type="image/svg+xml" href="nabra-icon.v2.svg" sizes="any" />
+    <link rel="apple-touch-icon" href="nabra-app-icon.v2-180.png" />
+    <link rel="manifest" href="manifest.webmanifest" />
     <!--
       Theme and language resolution, before first paint.
 

@@ -234,11 +234,14 @@ public sealed class ArabicReportFileTests
         Assert.Contains("2026-10-01", arabic.Text, StringComparison.Ordinal);
         Assert.Contains("2026-10-07", arabic.Text, StringComparison.Ordinal);
 
-        // Footer: page number at the left margin, title at the right.
+        // Footer: page number at the left margin; at the right, the mark (paths,
+        // not letters) at the margin, then the name and the title to its left
+        // (Phase 39.8a).
         Letter[] footer = [.. arabic.Letters.Where(letter => letter.StartBaseLine.Y < 60)];
         Assert.NotEmpty(footer);
         Assert.InRange(footer.Min(letter => letter.StartBaseLine.X), 39, 42);
-        Assert.InRange(footer.Max(letter => letter.EndBaseLine.X), PageWidth - 42, PageWidth - 39);
+        double markStart = PageWidth - 40 - PdfReportRenderer.FooterMarkWidth;
+        Assert.InRange(footer.Max(letter => letter.EndBaseLine.X), markStart - 4, markStart - 2);
 
         // No Arabic-Indic digit anywhere: localisation decision 3.
         Assert.DoesNotContain(arabic.Letters, letter => letter.Value.Any(character => character is >= '\u0660' and <= '\u0669'));

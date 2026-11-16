@@ -1,6 +1,7 @@
 // The content of the single-purpose pages before the shell: sign-in,
-// registration and an invitation. The page around it (the lockup, the
-// language switch, the story panel) is EntryFrame's.
+// registration, the password pages and an invitation. The page around it (the
+// lockup, the language switch, the form's panel and the brand side) is
+// EntryFrame's (Calm Glass, Phase 39.8a).
 //
 // Every value is a design token. Nothing here introduces a colour, a spacing
 // step or a type scale of its own, so these screens inherit light and dark
@@ -52,7 +53,7 @@
   gap: var(--space-1);
   margin-block-start: var(--space-6);
   padding-block-start: var(--space-5);
-  border-block-start: 1px solid var(--border-subtle);
+  border-block-start: 1px solid var(--color-line);
 }
 
 // The password field and the control that reveals it share a row, so the
@@ -73,7 +74,7 @@
   inset-inline-end: var(--space-1);
   // Not part of the field's own focus ring: it is a separate control and gets
   // its own, which the primitive already provides.
-  color: var(--text-muted);
+  color: var(--color-text-quiet);
 }
 
 // The way to a new password, under the password field on sign-in. Padded so
@@ -87,29 +88,28 @@
   margin-block-start: var(--space-4);
 }
 
-// The workspace just joined, drawn as the top bar draws it: a neutral tile with
-// its first letter, then the name in its own direction.
+// The workspace just joined, drawn as the side bar draws it: a neutral tile
+// with its first letter, then the name in its own direction, on a soft tile.
 .joined-workspace {
   display: flex;
   align-items: center;
   gap: var(--space-3);
   margin-block-start: var(--space-5);
   padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-card);
-  background-color: var(--surface-muted);
+  border-radius: var(--radius-tile);
+  background-color: var(--color-panel-soft);
 }
 
 .joined-workspace-tile {
   display: grid;
   place-items: center;
   flex: none;
-  inline-size: 2.5rem;
-  block-size: 2.5rem;
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-control);
-  background-color: var(--surface-default);
-  font: var(--text-section-title);
+  inline-size: var(--avatar-size);
+  block-size: var(--avatar-size);
+  border-radius: var(--radius-input);
+  background-color: var(--avatar-bg);
+  color: var(--avatar-fg);
+  font: var(--text-title-3);
 }
 
 .joined-workspace-text {

@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="12 2 116 116">
+  <!-- The Nabra mark (brand.md, direction A): two voices, the AI in emerald and
+       the team in gold, and their overlap, the one tone. Same geometry as
+       src/app/shared/brand-mark/brand-geometry.ts, cropped to the circles; it
+       follows the browser's colour scheme. Keep the two in step, and give a
+       changed mark a new file name (v3). -->
+  <style>
+    .ai { fill: #235347; }
+    .team { fill: #c8a96a; }
+    .lens { fill: #0b2b26; }
+    @media (prefers-color-scheme: dark) {
+      .ai { fill: #daf1de; }
+      .lens { fill: #8eb69b; }
+    }
+  </style>
+  <circle class="ai" cx="52" cy="60" r="40"/>
+  <circle class="team" cx="88" cy="60" r="40"/>
+  <path class="lens" d="M70 24.28 A40 40 0 0 1 70 95.72 A40 40 0 0 1 70 24.28 Z"/>
+</svg>

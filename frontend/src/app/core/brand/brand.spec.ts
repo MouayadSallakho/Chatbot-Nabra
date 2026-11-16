@@ -80,7 +80,13 @@ describe('the product name', () => {
       (match) => match[1],
     );
 
-    expect(icons).toEqual(['nabra-icon.v1.svg', 'nabra-icon.v1.ico']);
+    expect(icons).toEqual([
+      'nabra-icon.v2.ico',
+      'nabra-icon.v2-16.png',
+      'nabra-icon.v2-32.png',
+      'nabra-icon.v2-48.png',
+      'nabra-icon.v2.svg',
+    ]);
 
     for (const icon of icons) {
       expect(existsSync(`public/${icon}`), icon).toBe(true);
@@ -89,6 +95,55 @@ describe('the product name', () => {
     // The old names are gone: the edge caches them for a year.
     expect(existsSync('public/favicon.svg')).toBe(false);
     expect(existsSync('public/favicon.ico')).toBe(false);
+    expect(existsSync('public/nabra-icon.v1.svg')).toBe(false);
+    expect(existsSync('public/nabra-icon.v1.ico')).toBe(false);
+  });
+
+  it('draws the favicon as the two-circle mark, following the colour scheme (Phase 39.8a)', () => {
+    const svg = readFileSync('public/nabra-icon.v2.svg', 'utf8');
+
+    expect(svg).toContain(BRAND_MARK.lens);
+    expect(svg).toContain(
+      `cx="${BRAND_MARK.ai.cx}" cy="${BRAND_MARK.ai.cy}" r="${BRAND_MARK.ai.r}"`,
+    );
+    expect(svg).toContain(
+      `cx="${BRAND_MARK.team.cx}" cy="${BRAND_MARK.team.cy}" r="${BRAND_MARK.team.r}"`,
+    );
+    // Light-ground colours, and the dark-ground ones under a dark scheme (brand.md).
+    expect(svg).toMatch(/\.ai \{ fill: #235347; \}/);
+    expect(svg).toMatch(/prefers-color-scheme: dark\)[\s\S]*\.ai \{ fill: #daf1de; \}/);
+    expect(svg).not.toMatch(/omniai|<image|href=/i);
+  });
+
+  it('names an Apple touch icon and a manifest whose icons all exist (Phase 39.8a)', () => {
+    const html = readFileSync('src/index.html', 'utf8');
+    const apple = /<link rel="apple-touch-icon" href="([^"]+)"/.exec(html)?.[1];
+    const manifestHref = /<link rel="manifest" href="([^"]+)"/.exec(html)?.[1];
+
+    expect(apple).toBe('nabra-app-icon.v2-180.png');
+    expect(existsSync(`public/${apple}`)).toBe(true);
+    expect(manifestHref).toBe('manifest.webmanifest');
+
+    const manifest = JSON.parse(readFileSync(`public/${manifestHref}`, 'utf8'));
+
+    // The public name only, and no link to a domain the product does not own yet.
+    expect(manifest.name).toBe('Nabra');
+    expect(manifest.short_name).toBe('Nabra');
+    expect(JSON.stringify(manifest)).not.toMatch(/omniai|https?:/i);
+    expect(manifest.start_url).toBe('/');
+    expect(
+      manifest.icons.map((icon: { sizes: string; purpose: string }) => [icon.sizes, icon.purpose]),
+    ).toEqual([
+      ['192x192', 'any'],
+      ['512x512', 'any'],
+      ['512x512', 'maskable'],
+    ]);
+
+    for (const icon of manifest.icons as { src: string }[]) {
+      // Versioned like every other image: the edge caches PNGs for a year.
+      expect(icon.src).toMatch(/^\/nabra-app-icon\.v\d+-/);
+      expect(existsSync(`public${icon.src}`), icon.src).toBe(true);
+    }
   });
 
   describe('in the browser tab', () => {

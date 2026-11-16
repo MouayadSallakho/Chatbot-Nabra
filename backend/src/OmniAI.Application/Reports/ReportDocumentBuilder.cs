@@ -393,7 +393,7 @@ public sealed class ReportDocumentBuilder(
                         Column(w["Output tokens"], ReportValueKind.Count),
                     ],
                     read.Models.Select(model => Row(
-                        ReportValue.Text(model.Provider),
+                        ReportValue.Text(w.Provider(model.Provider)),
                         ReportValue.Text(model.Model),
                         ReportValue.Text(w.Operation(model.OperationType)),
                         ReportValue.Count(model.Calls),
@@ -448,7 +448,7 @@ public sealed class ReportDocumentBuilder(
                         Column(w["Unrated calls"], ReportValueKind.Count),
                     ],
                     read.Models.Select(model => Row(
-                        ReportValue.Text(model.Provider),
+                        ReportValue.Text(w.Provider(model.Provider)),
                         ReportValue.Text(model.Model),
                         ReportValue.Text(w.Operation(model.OperationType)),
                         ReportValue.Count(model.Calls),

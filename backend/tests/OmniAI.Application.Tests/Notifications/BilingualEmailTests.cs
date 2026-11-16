@@ -64,7 +64,11 @@ public sealed class BilingualEmailTests
         Assert.Contains("<bdi>Northwind</bdi>", email.HtmlBody, StringComparison.Ordinal);
         Assert.Contains("\u2068Northwind\u2069", email.TextBody, StringComparison.Ordinal);
         Assert.Equal(1, Occurrences(email.HtmlBody, "href="));
-        Assert.DoesNotContain("<img", email.HtmlBody, StringComparison.OrdinalIgnoreCase);
+        // One picture only: the mark, by Content-ID (Phase 39.8a).
+        Assert.Equal(1, Occurrences(email.HtmlBody, "<img"));
+        Assert.Contains("<img src=\"cid:" + EmailLayout.MarkContentId + "\"", email.HtmlBody, StringComparison.Ordinal);
+        Assert.DoesNotContain("data:", email.HtmlBody, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("<svg", email.HtmlBody, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("url(", email.HtmlBody, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("omniai", email.Subject + email.TextBody + email.HtmlBody, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(arabic, HasArabic(email.TextBody));

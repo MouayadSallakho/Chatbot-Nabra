@@ -167,10 +167,11 @@ describe('Arabic renders', () => {
     expect(text(root.querySelector('#password-hint'))).toBe(
       '12 حرفًا على الأقل. العبارة التي يسهل تذكّرها خيار جيد.',
     );
-    expect(text(root.querySelector('#entry-story-title'))).toBe('صوتان… بنبرة واحدة');
-    expect(text(root.querySelector('figcaption'))).toBe('محادثة توضيحية');
-    expect(text(root.querySelector('.bubble-ai .bubble-speaker'))).toBe('الذكاء الاصطناعي');
-    expect(text(root.querySelector('.handoff-divider'))).toBe('استلم أحد أعضاء الفريق المحادثة');
+    expect(text(root.querySelector('.entry-tagline'))).toBe('صوتان… بنبرة واحدة');
+    expect(text(root.querySelector('.entry-promise'))).toContain('الذكاء الاصطناعي');
+    expect(root.querySelector('[data-testid="entry-lockup"]')?.getAttribute('aria-label')).toBe(
+      'نبرة',
+    );
     expect(text(root.querySelector('[data-testid="entry-language"]'))).toBe('English العربية');
   });
 

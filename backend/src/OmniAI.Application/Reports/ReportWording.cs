@@ -227,6 +227,9 @@ public sealed class ReportWording
 
     public UserLanguage Language { get; }
 
+    /// <summary>The product's public name in this language: Nabra, or the Arabic name (brand.md).</summary>
+    public string Product => EmailWords.Product(Language);
+
     /// <summary>Whether the file reads right to left: an Arabic report.</summary>
     public bool IsRightToLeft => Language == UserLanguage.Arabic;
 
@@ -328,6 +331,26 @@ public sealed class ReportWording
         AiOperationType.Embedding => "Embedding",
         _ => operation.ToString(),
     }];
+
+    /// <summary>
+    /// The name of the provider a call went to, as a reader knows it, rather than
+    /// the code the usage ledger stores (Phase 39.8a): "OpenAI" for
+    /// <see cref="AiProvider.OpenAi"/>, and "Local test stand-in" for the
+    /// Development-only <see cref="AiProvider.DevelopmentStandIn"/> (Phase 37.2),
+    /// whose replies already say "Local test reply". A code this file does not
+    /// know is printed as it is stored, so nothing is ever hidden.
+    /// </summary>
+    /// <remarks>
+    /// OpenAI is the company's own name and stays in Latin script in an Arabic
+    /// file too, like WhatsApp's model names; the stand-in is a description, so
+    /// it is translated.
+    /// </remarks>
+    public string Provider(string code) => code switch
+    {
+        nameof(AiProvider.OpenAi) => "OpenAI",
+        nameof(AiProvider.DevelopmentStandIn) => IsRightToLeft ? "البديل التجريبي المحلي" : "Local test stand-in",
+        _ => code,
+    };
 
     /// <summary>
     /// Channel names joined into one cell: <c>Website, WhatsApp</c> or

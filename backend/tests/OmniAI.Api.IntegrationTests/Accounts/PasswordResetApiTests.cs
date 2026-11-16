@@ -319,7 +319,14 @@ public sealed class PasswordResetApiTests(AccountApiFixture api) : IClassFixture
         Assert.Contains("<html lang=\"ar\" dir=\"rtl\">", arabic.HtmlBody, StringComparison.Ordinal);
         Assert.Contains("30 دقيقة", arabic.TextBody, StringComparison.Ordinal);
         Assert.DoesNotContain("omniai", arabic.TextBody + arabic.HtmlBody + arabic.Subject, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("<img", arabic.HtmlBody, StringComparison.OrdinalIgnoreCase);
+        // One picture only: the mark, carried inside the message by Content-ID
+        // (Phase 39.8a). Nothing remote, no inline SVG, no data: URI.
+        string arabicHtml = arabic.HtmlBody ?? string.Empty;
+        Assert.Single(arabicHtml.Split("<img", StringSplitOptions.None)[1..]);
+        Assert.Contains("<img src=\"cid:nabra-mark@nabra\"", arabic.HtmlBody, StringComparison.Ordinal);
+        Assert.Contains(arabic.BodyParts, part => part.ContentId == "nabra-mark@nabra" && part.ContentType.MimeType == "image/png");
+        Assert.DoesNotContain("data:", arabic.HtmlBody, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("<svg", arabic.HtmlBody, StringComparison.OrdinalIgnoreCase);
 
         string token = AccountApiFixture.Fragment(AccountApiFixture.LinkTo(arabic, "/reset-password"), "token");
         (await AccountApiFixture.ResetAsync(visitor, userId.ToString("D"), token, NewPassword)).Dispose();

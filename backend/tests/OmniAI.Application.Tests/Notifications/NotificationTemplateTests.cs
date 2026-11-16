@@ -57,7 +57,7 @@ public sealed class NotificationTemplateTests
 
         Assert.StartsWith("Nabra: ", email.Subject, StringComparison.Ordinal);
         Assert.StartsWith("Nabra\n", email.TextBody, StringComparison.Ordinal);
-        Assert.Contains(">Nabra</p>", email.HtmlBody, StringComparison.Ordinal);
+        Assert.Contains(">Nabra</td>", email.HtmlBody, StringComparison.Ordinal);
         Assert.Contains("your Nabra notification preferences", email.TextBody, StringComparison.Ordinal);
         Assert.Contains("your Nabra notification preferences", email.HtmlBody, StringComparison.Ordinal);
 
@@ -96,9 +96,14 @@ public sealed class NotificationTemplateTests
         Assert.Contains("&lt;script&gt;alert(1)&lt;/script&gt;", email.HtmlBody, StringComparison.Ordinal);
         Assert.Contains("&lt;img src=x onerror=alert(1)&gt;", email.HtmlBody, StringComparison.Ordinal);
         Assert.DoesNotContain("<script", email.HtmlBody, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("<img", email.HtmlBody, StringComparison.OrdinalIgnoreCase);
 
         // No remote resource of any kind: nothing to load, nothing to track.
+        // The one image is the mark, which travels inside the message by
+        // Content-ID (Phase 39.8a); the injected <img> above is only text.
+        Assert.Equal(1, Occurrences(email.HtmlBody, "<img"));
+        Assert.Contains("<img src=\"cid:" + EmailLayout.MarkContentId + "\"", email.HtmlBody, StringComparison.Ordinal);
+        Assert.DoesNotContain("src=\"http", email.HtmlBody, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("data:", email.HtmlBody, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("<link", email.HtmlBody, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("url(", email.HtmlBody, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(1, Occurrences(email.HtmlBody, "href="));

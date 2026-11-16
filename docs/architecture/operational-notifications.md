@@ -248,8 +248,16 @@ Unknown, Skipped.
 `نبرة: {title}` in Arabic), a
 text/plain and an HTML part (multipart/alternative), fixed markup with every
 inserted value HTML-encoded, the workspace name reduced to one line, one link built
-from `AppBaseUrl` + the internal action path, no image, font, stylesheet or
-tracking pixel, `Auto-Submitted: auto-generated`, no attachment — a report email
+from `AppBaseUrl` + the internal action path, no remote image, web font,
+stylesheet or tracking pixel, `Auto-Submitted: auto-generated`, no attachment.
+The one picture is the brand's mark in the header (Phase 39.8a): a 56 × 48 PNG
+embedded in the Infrastructure assembly and carried inside the message as an
+inline part of a multipart/related HTML body, shown by `cid:nabra-mark@nabra`
+(never a link, inline SVG or `data:` URI, which Gmail, Outlook and Apple Mail do
+not all show), with the product's name as text beside it. The HTML follows Calm
+Glass as far as mail clients draw it (cream ground, white card, ink text, one
+emerald pill), with system font stacks in each language. No email shows a
+conversation, so the three voices' colours appear in none — a report email
 links to Reports, where the authenticated download remains the only way to the
 file. No token, session, key or invitation ever appears in a link of an
 operational email. The account emails (section 14) are the one exception, under

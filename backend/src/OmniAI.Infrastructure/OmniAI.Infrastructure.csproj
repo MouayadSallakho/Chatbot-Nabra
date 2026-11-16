@@ -102,4 +102,13 @@
     <None Include="Reports\Rendering\Fonts\LICENSE-DejaVu.txt" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!--
+      The brand's mark for the header of every email (Phase 39.8a): 56 x 48 px,
+      shown at 28 x 24, rendered from brand.md's SVG. Attached to each message
+      as an inline part by Content-ID, so no client has to fetch anything.
+    -->
+    <EmbeddedResource Include="Notifications\Email\Brand\nabra-mark.v1.png" LogicalName="OmniAI.Notifications.Email.nabra-mark.v1.png" />
+  </ItemGroup>
+
 </Project>

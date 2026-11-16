@@ -7,9 +7,8 @@ import {
 } from '@app/core/i18n/language';
 import { LanguageService } from '@app/core/i18n/language-service';
 import { RouteFocus } from '@app/core/navigation/route-focus';
-import { BrandMark } from '@app/shared/brand-mark/brand-mark';
+import { BrandLockup } from '@app/shared/brand-mark/brand-lockup';
 import { BRAND_MARK } from '@app/shared/brand-mark/brand-geometry';
-import { VOICE_WORDS } from '@app/shared/voice/voice';
 import { Segmented } from '@app/shared/segmented/segmented';
 
 /**
@@ -34,25 +33,28 @@ export class EntrySignature {
 
 /**
  * The frame of the pages a person meets before the admin shell: sign-in,
- * registration, an invitation, and choosing or creating a workspace.
+ * registration, the password pages, an invitation, and choosing or creating a
+ * workspace (Calm Glass, Phase 39.8a).
+ *
+ * <strong>A calm split.</strong> On the ground with the shell's two glows: the
+ * form column (the lockup, the language switch and the page on one solid
+ * panel) and, from 1024px, a deep emerald panel beside it with the mark, one
+ * Instrument Serif line and one sentence of promise. On a phone the split is
+ * one column: the lockup, the form, then the brand panel, smaller, after it.
  *
  * <strong>The form comes first.</strong> In the document, for a keyboard and a
- * screen reader, and on a phone. From 1024px a story panel sits beside it,
- * at the inline end, and says what Nabra is with the product's own parts: the
- * tagline, one sentence of promise, and an example conversation in which the AI
- * answers and a person takes over. Below 1024px the panel is not drawn at all.
+ * screen reader, and on a phone. The brand side is decoration and is hidden
+ * from assistive technology: every heading, word and action a reader needs is
+ * in the form.
  *
- * <strong>The example is labelled as one, and hidden from assistive
- * technology.</strong> It is an illustration built from the transcript
- * primitives, with no names, numbers or anything a reader could take for their
- * own data (docs/design/pages/entry.md records the exception to MASTER rule 10).
- * The tagline and the promise are real text and are read out.
+ * <strong>No glass.</strong> Nothing here floats, so nothing is blurred: the
+ * panels are solid, as calm-glass.md §1 asks of forms.
  *
- * <strong>One signature moment.</strong> The Ember shape of the mark settles
- * into the space the Lagoon shape keeps for it: the AI is already there, and a
- * person steps in. Translate only, about 600ms, once per page load, nothing at
- * all under reduced motion, and never on the heading or the form, which are
- * readable in their final place in the first frame.
+ * <strong>One signature moment.</strong> The team's circle settles into the
+ * space the AI's circle keeps for it, and only then does their overlap, the one
+ * tone, appear. Translate and opacity only, about 600ms, once per page load,
+ * nothing at all under reduced motion, and never on the heading or the form,
+ * which are readable in their final place in the first frame.
  *
  * <strong>The language switch reloads the page</strong> (LanguageService). The
  * page that hosts this frame says whether that is safe: an invitation waiting
@@ -62,7 +64,7 @@ export class EntrySignature {
 @Component({
   selector: 'app-entry-frame',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [BrandMark, Segmented],
+  imports: [BrandLockup, Segmented],
   templateUrl: './entry-frame.html',
   styleUrl: './entry-frame.scss',
 })
@@ -88,8 +90,6 @@ export class EntryFrame {
   protected readonly settle = inject(EntrySignature).claim();
 
   protected readonly mark = BRAND_MARK;
-
-  protected readonly voiceWords = VOICE_WORDS;
 
   protected choose(language: AppLanguage): void {
     void this.language.choose(language);

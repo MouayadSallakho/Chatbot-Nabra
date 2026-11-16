@@ -242,8 +242,12 @@ a changed file is `v2`.
   `--brand-team` (gold-500), and the lens where they overlap in `--brand-lens` (emerald-900;
   dark emerald-300). One colour (`tone="mono"`, and forced colours): the two outlines and the
   filled lens in `currentColor`. Never rotated, mirrored or given a gradient; clear space half a
-  radius; smallest 16 px. `--brand-mark-size` sets its width. Favicons and app icons follow in
-  39.8a (`nabra-icon.v1.*` still draws the Phase 36 shapes until then).
+  radius; smallest 16 px. `--brand-mark-size` sets its width. Favicons and app icons (Phase 39.8a):
+  `public/nabra-icon.v2.svg` (the mark cropped to its circles, following the colour scheme),
+  PNGs at 16, 32 and 48 and `nabra-icon.v2.ico`; the app icon (radius 22%, emerald-600 →
+  emerald-900, a soft top sheen, the mark at 62% in its dark-ground colours) at 180 for Apple
+  and 192/512 plus a maskable 512 in `public/manifest.webmanifest`. Emails carry the mark as a
+  56 × 48 PNG attached inline by Content-ID; report PDFs draw it as paths in the footer.
 - Icons: one authored 24 px outline set (`app-icon`), stroke 1.6 with round caps and joins.
   Voice glyphs `ai` (a calm bot face, never a sparkle) and `person`. Channel glyphs are generic
   (`website`, `whatsapp` as a phone in a bubble, `instagram` as a camera, `messenger` as two
@@ -739,6 +743,23 @@ Computed from the token values, translucent layers composited over what lies und
 | Needs attention | title / detail / action on the soft row | 4.5:1 | 14.36 / 9.00 / 7.90 | — / 9.24 / 6.06 |
 | Reports | a refused download's sentence on the panel | 4.5:1 | 7.08 | 7.30 |
 | Overview | the day line on the ground | 4.5:1 | 5.08 | 6.87 |
+
+### 13.8 The entry pages, emails, report footer and icons (Phase 39.8a)
+
+Computed from the token values, each glow composited over its panel at full strength (`p39-8a/scratch/contrast.py`, 30 pairs). Every pair passes.
+
+| Part | Pair | Needs | Light | Dark |
+| --- | --- | --- | --- | --- |
+| Entry brand side | the serif line (mist-50) on the panel / emerald glow / gold glow | 3:1 (large) | 13.24 / 9.79 / 10.73 | 11.17 / 8.32 / 9.02 |
+| Entry brand side | the promise (mist-200) on the panel / emerald glow / gold glow | 4.5:1 | 10.24 / 7.57 / 8.30 | 8.63 / 6.43 / 6.97 |
+| Entry brand side | the mark's emerald-100 / gold-500 on the panel | 3:1 | 12.70 / 6.73 | 10.70 / 5.67 |
+| Emails | text ink-900 / paragraphs ink-700 / quiet stone-600 / the name emerald-900, on the white card | 4.5:1 | 15.91 / 9.98 / 5.73 / 15.13 | — |
+| Emails | the action: white on the emerald-700 pill | 4.5:1 | 8.75 | — |
+| Report footer | the name (#6E6E6E) / the mark's emerald-700 on the page | 4.5:1 / 3:1 | 5.10 / 8.75 | — |
+| App icon | the mark's emerald-100 / gold-500 where the gradient under it is lightest | 3:1 | 6.15 / 3.26 | — |
+| Favicon | emerald-700 on a light tab / emerald-100 on a dark tab | 3:1 | 8.75 | 10.12 |
+
+The gold circle on white (emails, the report footer, the light favicon) is 2.25:1: it is part of the logo, which WCAG exempts, and the emerald circle and the overlap beside it carry the shape.
 
 ## 14. Components (Calm Glass, Phase 39.2b)
 

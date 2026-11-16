@@ -1,4 +1,4 @@
 ﻿Provider,Model,Operation,Calls,Input tokens,Output tokens
-OpenAi,gpt-4.1-mini,Text generation,280,512340,86002
-OpenAi,text-embedding-3-small,Embedding,124,60000,0
-DevelopmentStandIn,local-stand-in,Embedding,6,4000,0
+OpenAI,gpt-4.1-mini,Text generation,280,512340,86002
+OpenAI,text-embedding-3-small,Embedding,124,60000,0
+Local test stand-in,local-stand-in,Embedding,6,4000,0

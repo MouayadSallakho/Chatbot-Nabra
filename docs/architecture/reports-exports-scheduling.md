@@ -139,7 +139,7 @@ the API with `Content-Disposition: attachment` built only from server parts
 | --- | --- | --- |
 | CSV | CsvHelper (already pinned) | Primary table only. UTF-8 **with BOM** so Excel reads non-Latin names. Text beginning `= + - @ \t \r` is prefixed with `'` (OWASP). Numbers invariant; dates ISO. |
 | XLSX | DocumentFormat.OpenXml (already pinned) | Summary sheet + one sheet per table, bold frozen header, content-sized columns, numeric counts/money (`0.000000`) beside a currency column, real dates. Text is only ever an inline string; the renderer never writes a formula element; no macros, external links or data connections. |
-| PDF | SkiaSharp PDF backend + HarfBuzz + Unicode.Bidi | A4 landscape, title, workspace label (only if the requester holds `workspace.view`), UTC period, generated time, summary, tables, notes, "Page n of m". Bundled font embedded; no fetched font, image, link, annotation, JavaScript, form or open action. Document properties: Creator `Nabra reports`, Producer `Nabra` (Phase 37.1; were `OmniAI`). |
+| PDF | SkiaSharp PDF backend + HarfBuzz + Unicode.Bidi | A4 landscape, title, workspace label (only if the requester holds `workspace.view`), UTC period, generated time, summary, tables, notes, "Page n of m"; since Phase 39.8a the footer starts with the brand: the two-circle mark drawn as vector paths and the product's name ("Nabra", or the Arabic name in an Arabic file) before the title. The provider usage and cost files name each provider as a reader knows it ("OpenAI"; "Local test stand-in" for the Development stand-in) in all three formats, where they printed the ledger's code. Bundled font embedded; no fetched font, image, link, annotation, JavaScript, form or open action. Document properties: Creator `Nabra reports`, Producer `Nabra` (Phase 37.1; were `OmniAI`). |
 
 ### Unicode PDF text
 
@@ -283,7 +283,8 @@ CSV and workbook golden files came out of the same run unchanged.
 - **PDF:** the page is mirrored. Title, headings, notes and labels start at the
   right margin; each label's value sits to its left; table columns run from the
   right; text cells start at a column's right edge and numbers end at its left
-  edge; the footer has the title on the right and "صفحة n من m" on the left. The
+  edge; the footer has the mark, the Arabic name and the title on the right
+  (Phase 39.8a) and "صفحة n من m" on the left. The
   report's own words are drawn as right-to-left paragraphs (`PdfText` with
   `rightToLeft`); every value keeps the direction of its first strong character,
   as an isolate does, so a Latin name, an e-mail address, an id or a number keeps

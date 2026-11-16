@@ -1,6 +1,7 @@
-# Page brief: the entry pages (Phase 36.5)
+# Page brief: the entry pages (Phase 36.5, Calm Glass in Phase 39.8a)
 
-Sign-in (`/sign-in`), registration (`/create-account`), an invitation (`/accept-invitation`) and
+Sign-in (`/sign-in`, and its "session ended" state), registration (`/create-account`), forgot and
+reset password (`/forgot-password`, `/reset-password`), an invitation (`/accept-invitation`) and
 choosing or creating a workspace (`/workspace`): the pages a person meets before the admin shell.
 They share one frame, `EntryFrame` (`frontend/src/app/layout/entry-frame/`).
 
@@ -19,45 +20,36 @@ They share one frame, `EntryFrame` (`frontend/src/app/layout/entry-frame/`).
 - **LCP element:** the `h1`. Never animated, never hidden, in its final place in the first frame
   the page paints.
 
-## Layout
+## Layout (Calm Glass, Phase 39.8a)
 
-| Width                | Layout                                                                                                                                                                                                                                                                                                                       |
-| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1024 px and wider    | Two equal columns. Inline start: the lockup and the language switch on one row, then the page's content, centred, at most 25 rem wide, on `--surface-default`. Inline end: the story panel on `--surface-page` behind a hairline: the mark, the tagline (display size), the promise, and the example conversation in a card. |
-| 1023 px and narrower | One column: a compact header (lockup at the start, language switch at the end), then the content. The story panel is not drawn.                                                                                                                                                                                              |
+| Width                | Layout                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1024 px and wider    | A calm split on the ground (`--color-ground`, the shell's two glows), 14 px from the window's edges. Inline start: the lockup (mark, Nabra, «نبرة», the page's language first) and the language switch on one row, then the page on one solid panel (`--color-panel`, a `--color-line` edge, radius 24, no shadow), at most 26 rem of content, centred. Inline end, 12 px away: the brand side, a deep panel (`--entry-brand-*`: emerald-900; emerald-800 with a line in the dark look; the dark look's two glows inside it) with the mark at 120 px in its dark-ground colours, one serif line (the tagline, `--text-display`: Instrument Serif 44/48, Plex Arabic 600 in Arabic) and the promise. |
+| 1023 px and narrower | One column: the lockup and the language switch, the page's panel, then the brand side as a short band after it (the mark at 56 px, the tagline at `--text-empty`, the promise).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 
 The form is first in the document at every width, so the keyboard and screen-reader order is the
-task first; the panel follows. Arabic mirrors the whole frame with logical properties; the mark
-does not mirror.
+task first; the brand side follows on screen and in the document. Arabic mirrors the whole frame
+with logical properties; the mark does not mirror. Nothing here floats, so nothing is glass: the
+entry pages draw no blurred layer at all.
 
-## The story panel
+## The brand side
 
-- Built only from the product's own parts: the mark, the transcript bubbles (`.bubble`), the
-  voice words (`VOICE_WORDS`) and the handoff divider (`.handoff-divider`). No image and no
-  script.
-- The tagline and the promise are real text (an `aside` named by the tagline `h2`). The example is
-  `aria-hidden`: it is decoration for a screen reader and adds nothing the promise has not said.
-- The bubbles do not play their arrival animation here: it is a still picture.
-
-## Exception to MASTER rules 7 and 10 (sample content)
-
-MASTER rule 10 keeps sample content in the Design Lab, and rule 7 draws voice displays only from
-real API data. The story panel shows an **example conversation** outside the Design Lab, because
-the phase brief asks for "real UI fragments, not abstract art". It stays honest because:
-
-1. It is labelled **"Example conversation" / «محادثة توضيحية»** on screen.
-2. It has no names, dates, counts, ratings or anything a reader could take for their own data,
-   and it shows only what the product does today: the AI answers from knowledge (a returns
-   policy), a person takes over.
-3. It appears only on the pages before the shell, never next to a workspace's data.
-
-Rule 7 still governs every voice chip, split, track and divider inside the admin.
+- Decoration only, so it is `aria-hidden` and holds nothing a reader needs: no heading, link or
+  control. The page's own `h1`, words and actions are all in the form.
+- Drawn with CSS and inline SVG only: the mark is three shapes, the glows are radial gradients.
+  No image, no script, no font beyond the ones the page already uses (the serif line may swap;
+  nothing is preloaded for it).
+- Phase 36's example conversation is gone, and with it the exception to MASTER rules 7 and 10
+  that it needed: one line and one sentence say what Nabra is.
+- Forced colours: both panels become `Canvas` with a `CanvasText` edge, the glows are not drawn,
+  and the mark is its one-colour form (outlines and the filled overlap).
 
 ## Signature moment
 
-The mark's Ember shape (a person) settles into the room the Lagoon shape (the AI) keeps for it:
-translate only, from 26% / 18% of its own box to rest, `--duration-xl + --duration-sm` (600 ms)
-on `--ease-emphasized` after `--duration-sm` (150 ms). Both shapes are fully drawn at every moment.
+The team's circle (gold) settles beside the AI's (emerald), which is in place from the first
+frame; only then does their overlap, the one tone, fade in: translate 28 px over
+`--duration-dialog + --duration-press` (400 ms) on `--ease-calm` after `--duration-press`, then
+the lens over `--duration-menu`.
 It plays once per page load (`EntrySignature`), not on every move between sign-in and
 registration, and not at all under `prefers-reduced-motion: reduce`. The mark is a logo, so its
 travel never mirrors.
@@ -72,7 +64,8 @@ and the invitation page until the token is spent), because the reload would lose
 
 ## Not found and the unbuilt-area placeholder
 
-Inside the shell, as before. A calm state (never the error tone): what happened, that nothing in
+Inside the shell, as before (so not the split). A calm state (never the error tone), under
+the mark at 56 px and one serif line (Phase 39.8a): what happened, that nothing in
 the workspace changed, the path that matched nothing as an LTR island (without query or
 fragment), and one primary way back to the overview. The placeholder is reached by no navigation
 entry today; the development-only route `/design-lab-unbuilt-area` shows it with a sample name.

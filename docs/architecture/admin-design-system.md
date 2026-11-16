@@ -591,10 +591,13 @@ name Nabra (نبرة, "tone of voice") says. Until the brand step the shapes als
 as the "O" of the code name; the geometry is unchanged. The Lagoon shape is pre-cut around
 the Ember one, so it needs no mask or `url(#id)`, reads at 16px, works in a
 single colour (`tone="mono"`, and in forced colours) and is never mirrored. The
-same geometry is in `public/nabra-icon.v1.svg` (which follows the browser's
-colour scheme), `public/nabra-icon.v1.ico` (16, 32, 48) and the `index.html`
-loading state. The icon files carry a version in their names because the edge
-caches them for a year: a changed mark ships as v2, never under the old name.
+same geometry is in `public/nabra-icon.v2.svg` (the two-circle mark since
+Phase 39.8a, following the browser's colour scheme), its PNGs at 16, 32 and 48
+and `public/nabra-icon.v2.ico`, the app icons `public/nabra-app-icon.v2-*.png`
+(Apple 180, and 192, 512 and a maskable 512 in `public/manifest.webmanifest`)
+and the `index.html` loading state. The image files carry a version in their
+names because the edge caches them for a year: a changed mark ships as v3,
+never under the old name.
 
 ## D18. Accessibility baseline
 
@@ -801,12 +804,12 @@ creating a workspace: the pages before the shell, sharing `EntryFrame`
 (`layout/entry-frame/`). The full brief, the layout per width and the one
 exception to MASTER rules 7 and 10 are in `docs/design/pages/entry.md`.
 
-**Frame.** A `header` (the lockup, then English / العربية), one `main` holding
-the page's content, and from 1024px an `aside` story panel named by its tagline:
-the mark, the promise, and an example conversation built from the transcript
-primitives, labelled "Example conversation" and `aria-hidden`. Below 1024px the
-panel is not drawn and the form follows a compact header. The `h1` is the task
-("Sign in"), never animated.
+**Frame (Calm Glass, Phase 39.8a).** On the ground with the shell's glows: a
+`header` (the lockup `app-brand-lockup`, then English / العربية), one `main`
+holding the page on a solid panel, and the brand side, an `aside` that is
+`aria-hidden` (decoration: the mark, one serif line and the promise on a deep
+emerald panel), beside the form from 1024px and after it, smaller, on a phone.
+No glass. The `h1` is the task ("Sign in"), never animated.
 
 **Language before sign-in.** A `.segmented` group of buttons (`aria-pressed`)
 that reloads into the chosen language through `LanguageService`. Withheld while

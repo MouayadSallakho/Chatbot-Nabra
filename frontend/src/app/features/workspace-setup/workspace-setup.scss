@@ -63,41 +63,47 @@
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 0 var(--space-3);
+  min-block-size: var(--target-min);
   padding: var(--space-3) var(--space-4);
   text-align: start;
-  background-color: var(--surface-default);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-control);
+  background-color: var(--color-panel-soft);
+  border: 1px solid transparent;
+  border-radius: var(--radius-tile);
   color: inherit;
   cursor: pointer;
   transition:
-    background-color var(--motion-fast),
-    border-color var(--motion-fast);
+    background-color var(--duration-press) var(--ease-calm),
+    border-color var(--duration-press) var(--ease-calm);
 
   &:hover {
-    background-color: var(--surface-hover);
-    border-color: var(--border-control);
+    background-color: var(--color-hover);
+    border-color: var(--color-control-border);
   }
 
   &:focus-visible {
-    outline: var(--focus-ring-width) solid var(--focus-ring);
+    outline: var(--focus-ring-width) solid var(--color-focus-ring);
     outline-offset: var(--focus-ring-offset);
+  }
+
+  @media (forced-colors: active) {
+    border-color: CanvasText;
   }
 }
 
-// The same mark the top bar gives a workspace: its first letter on a neutral
-// tile. Never a colour: the voices are not decoration.
+// The same mark the side bar gives a workspace: its first letter on a neutral
+// tile. Never a colour: the voices are not decoration. Each workspace is a row
+// tile (radius 16) on the panel's soft fill (Calm Glass, Phase 39.8a).
 .workspace-tile {
   grid-column: 1;
   grid-row: 1 / span 2;
   display: grid;
   place-items: center;
-  inline-size: 2.25rem;
-  block-size: 2.25rem;
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-control);
-  background-color: var(--surface-muted);
-  font: var(--text-card-title);
+  inline-size: var(--avatar-size);
+  block-size: var(--avatar-size);
+  border-radius: var(--radius-input);
+  background-color: var(--avatar-bg);
+  color: var(--avatar-fg);
+  font: var(--text-title-3);
 }
 
 .workspace-name,
@@ -109,7 +115,7 @@
 .workspace-chevron {
   grid-column: 3;
   grid-row: 1 / span 2;
-  color: var(--text-muted);
+  color: var(--color-text-quiet);
 }
 
 // The account this screen is acting for, and the way out of it. Quiet: it is
@@ -122,6 +128,6 @@
   gap: var(--space-2);
   margin-block-start: var(--space-6);
   padding-block-start: var(--space-5);
-  border-block-start: 1px solid var(--border-subtle);
+  border-block-start: 1px solid var(--color-line);
   overflow-wrap: anywhere;
 }

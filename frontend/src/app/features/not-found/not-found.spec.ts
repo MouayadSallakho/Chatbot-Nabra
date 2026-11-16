@@ -34,6 +34,19 @@ describe('NotFound', () => {
     expect(root.textContent).not.toContain('secret-value');
   });
 
+  it('shows the mark above the serif line, as decoration only (Phase 39.8a)', async () => {
+    const root = await render('/no-such-page');
+    const mark = root.querySelector('app-brand-mark.not-found-mark');
+    const title = root.querySelector('.state-title');
+
+    expect(mark).not.toBeNull();
+    expect(mark?.querySelector('svg')?.getAttribute('aria-hidden')).toBe('true');
+    expect(mark!.compareDocumentPosition(title!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(title?.textContent).toContain('Nothing at this address');
+    // The old search glyph is gone: one picture, the mark.
+    expect(root.querySelector('.state-icon')).toBeNull();
+  });
+
   it('offers exactly one way back, to the overview', async () => {
     const root = await render('/no-such-page');
     const links = root.querySelectorAll('a');

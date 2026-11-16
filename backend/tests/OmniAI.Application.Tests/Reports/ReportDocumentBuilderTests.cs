@@ -6,6 +6,7 @@ using OmniAI.Domain.Conversations;
 using OmniAI.Domain.Customers;
 using OmniAI.Domain.Reports;
 using OmniAI.Domain.Tenants;
+using OmniAI.Domain.Users;
 
 namespace OmniAI.Application.Tests.Reports;
 
@@ -48,6 +49,32 @@ public sealed class ReportDocumentBuilderTests
         // The same window the dashboard's reader is asked for: whole days, half-open.
         Assert.Equal(September.From, analytics.LastWindow!.From);
         Assert.Equal(September.To, analytics.LastWindow.To);
+    }
+
+    [Theory]
+    [InlineData(ReportType.ProviderUsage, UserLanguage.English, "OpenAi", "OpenAI")]
+    [InlineData(ReportType.ProviderUsage, UserLanguage.English, "DevelopmentStandIn", "Local test stand-in")]
+    [InlineData(ReportType.ProviderCost, UserLanguage.English, "DevelopmentStandIn", "Local test stand-in")]
+    [InlineData(ReportType.ProviderUsage, UserLanguage.Arabic, "OpenAi", "OpenAI")]
+    [InlineData(ReportType.ProviderCost, UserLanguage.Arabic, "DevelopmentStandIn", "البديل التجريبي المحلي")]
+    [InlineData(ReportType.ProviderCost, UserLanguage.English, "SomeFutureProvider", "SomeFutureProvider")]
+    public async Task Provider_files_name_each_provider_as_a_reader_knows_it(
+        ReportType type, UserLanguage language, string code, string expected)
+    {
+        WorkspaceAnalytics read = Analytics() with
+        {
+            Models = [new AnalyticsModelUsage(code, "test-model", AiOperationType.TextGeneration, 3, 10, 5, null, null, 3)],
+        };
+
+        ReportDocument document = await new ReportDocumentBuilder(new FakeAnalytics { Result = read }, new FakeCustomers())
+            .BuildAsync(Workspace, type, September, "Acme", Generated, 1000, language);
+
+        ReportTable models = document.Tables[0];
+
+        // The name, not the ledger's code (Phase 39.8a); a code it does not know
+        // is printed as stored, so nothing is hidden.
+        Assert.Equal(expected, models.Rows.Single()[0].TextValue);
+        Assert.Equal("test-model", models.Rows.Single()[1].TextValue);
     }
 
     [Fact]

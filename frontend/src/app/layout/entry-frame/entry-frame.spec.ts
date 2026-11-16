@@ -19,8 +19,9 @@ class Host {
 }
 
 /**
- * The frame of the pages before the shell: the lockup, the language switch,
- * the projected page, and the story panel with its one signature moment.
+ * The frame of the pages before the shell (Calm Glass, Phase 39.8a): the
+ * lockup, the language switch, the projected page on its panel, and the brand
+ * side with its one signature moment.
  */
 describe('EntryFrame', () => {
   let reload: ReturnType<typeof vi.fn>;
@@ -45,11 +46,24 @@ describe('EntryFrame', () => {
   it('puts the page inside one main landmark, after the lockup', () => {
     const { root } = setup();
     const main = root.querySelector('main');
+    const lockup = root.querySelector('header [data-testid="entry-lockup"]');
 
     expect(root.querySelectorAll('main')).toHaveLength(1);
     expect(main?.id).toBe('main-content');
     expect(main?.querySelector('h1')?.textContent).toBe('Sign in');
-    expect(root.querySelector('header .entry-wordmark')?.textContent?.trim()).toBe('Nabra');
+    // The lockup: one image named by the public name, the mark and both scripts.
+    expect(lockup?.getAttribute('role')).toBe('img');
+    expect(lockup?.getAttribute('aria-label')).toBe('Nabra');
+    expect(lockup?.querySelector('app-brand-mark')).not.toBeNull();
+    expect(lockup?.querySelectorAll('svg.lockup-name')).toHaveLength(2);
+  });
+
+  it('puts the Arabic name first in the lockup on an Arabic page', () => {
+    const { root } = setup('ar');
+    const names = root.querySelectorAll('[data-testid="entry-lockup"] svg.lockup-name');
+
+    expect(names[0].classList).toContain('lockup-name-arabic');
+    expect(names[1].classList).not.toContain('lockup-name-arabic');
   });
 
   it('offers each language in its own name, language and direction, the current one pressed', () => {
@@ -94,22 +108,36 @@ describe('EntryFrame', () => {
     expect(root.querySelector('[data-testid="entry-language"]')).toBeNull();
   });
 
-  it('names the story panel by its tagline and hides the example from assistive technology', () => {
+  it('lays the brand side out after the form, hidden from assistive technology', () => {
     const { root } = setup();
-    const story = root.querySelector('aside[data-testid="entry-story"]');
-    const example = story?.querySelector('figure');
+    const brand = root.querySelector('aside[data-testid="entry-brand"]');
+    const h1 = root.querySelector('main h1');
 
-    expect(story?.getAttribute('aria-labelledby')).toBe('entry-story-title');
-    expect(root.querySelector('#entry-story-title')?.textContent?.trim()).toBe(
+    // Decoration: nothing on it is a reader's to find, so it is out of the tree.
+    expect(brand?.getAttribute('aria-hidden')).toBe('true');
+    expect(brand?.querySelectorAll('a, button, input, h1, h2, h3')).toHaveLength(0);
+    // The form first in the document, so a phone shows it first and a keyboard
+    // and a screen reader reach it first.
+    expect(h1!.compareDocumentPosition(brand!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // The one serif line and the sentence of promise.
+    expect(brand?.querySelector('.entry-tagline')?.textContent?.trim()).toBe(
       'Two voices. One tone.',
     );
-    expect(example?.getAttribute('aria-hidden')).toBe('true');
-    // Labelled as an example on screen, so nobody takes it for their own data.
-    expect(example?.querySelector('figcaption')?.textContent?.trim()).toBe('Example conversation');
-    // The handoff is drawn with the product's own pieces: an AI reply, then a person.
-    expect(example?.querySelector('.bubble-ai')).not.toBeNull();
-    expect(example?.querySelector('.handoff-divider.handoff-to-human')).not.toBeNull();
-    expect(example?.querySelector('.bubble-human')).not.toBeNull();
+    expect(brand?.querySelector('.entry-promise')?.textContent).toContain(
+      'A person on your team steps in',
+    );
+    // The Phase 36 example conversation is gone: one line, one sentence.
+    expect(brand?.querySelector('figure, .bubble')).toBeNull();
+  });
+
+  it('draws the mark as inline SVG, never as an image to download', () => {
+    const { root } = setup();
+    const brand = root.querySelector('.entry-brand')!;
+
+    expect(brand.querySelector('svg.entry-brand-mark circle.mark-ai')).not.toBeNull();
+    expect(brand.querySelector('svg.entry-brand-mark circle.mark-team')).not.toBeNull();
+    expect(brand.querySelector('svg.entry-brand-mark path.mark-lens')).not.toBeNull();
+    expect(root.querySelector('img, picture, video, canvas')).toBeNull();
   });
 
   it('plays the signature once per page load, never on the second frame', () => {
@@ -117,15 +145,16 @@ describe('EntryFrame', () => {
     const second = TestBed.createComponent(Host);
     second.detectChanges();
 
-    expect(root.querySelector('.entry-story-mark')?.classList).toContain('is-settling');
+    expect(root.querySelector('.entry-brand-mark')?.classList).toContain('is-settling');
     expect(
-      (second.nativeElement as HTMLElement).querySelector('.entry-story-mark')?.classList,
+      (second.nativeElement as HTMLElement).querySelector('.entry-brand-mark')?.classList,
     ).not.toContain('is-settling');
   });
 
-  it('keeps the story mark out of the accessibility tree', () => {
+  it('puts the form on one panel inside the main landmark', () => {
     const { root } = setup('ar');
+    const panel = root.querySelector('main .entry-panel');
 
-    expect(root.querySelector('.entry-story-mark')?.getAttribute('aria-hidden')).toBe('true');
+    expect(panel?.querySelector('h1')?.textContent).toBe('Sign in');
   });
 });
