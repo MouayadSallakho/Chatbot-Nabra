@@ -23,12 +23,10 @@
 // Colour never carries meaning alone: every chip has a word, every status a
 // glyph or a word.
 //
-// THE ALIAS LAYER (end of this file). Phase 39 moves screen by screen. Every
-// "Two Voices" role name (`--surface-page`, `--action`, `--voice-human-fg`, …)
-// is re-pointed at its Calm Glass role, so every screen takes the new palette
-// and type at once without a layout change, and each screen step moves its own
-// components to the new names. 39.8b deletes the alias block, and a grep gate
-// proves no old name is left. Do not use an alias name in new code.
+// The Two Voices role names (`--surface-page`, `--action`, `--voice-human-fg`,
+// …) were deprecated aliases while Phase 39 moved screen by screen; 39.8b
+// deleted them. `src/styles/retired-names.spec.ts` lists every retired
+// name and fails `npm run test:ci` if one comes back anywhere under `src/`.
 //
 // Axes, one switch each: theme `data-theme` (light | dark); transparency
 // `data-transparency="reduced"` or `prefers-reduced-transparency`; forced
@@ -518,6 +516,7 @@
   --control-height-lg: 2.75rem; // 44px
   --control-height-dense: 2.5rem; // 40px: dense desktop headers
   --target-min: 2.75rem; // 44px: every touch target, the label included
+  --target-min-pointer: 1.5rem; // 24px: the WCAG 2.5.8 floor with a mouse
   --chip-height: 1.5rem; // 24px (the spec allows 22-28)
   --chip-height-sm: 1.375rem; // 22px: inside dense rows
   --icon-size-sm: 1rem; // 16px
@@ -783,109 +782,4 @@
     --color-focus-ring: Highlight;
     --color-focus-halo: transparent;
   }
-}
-
-// =============================================================================
-// DEPRECATED ALIAS LAYER (Two Voices names -> Calm Glass roles)
-// =============================================================================
-// Kept so every screen takes Calm Glass at once; each screen step moves its
-// components to the new names, and 39.8b deletes this block (a grep gate
-// proves no old name is left). Declared once on :root: every alias is a var()
-// that resolves on <html>, where the theme, transparency and contrast switches
-// also live, so it follows them. Never use these names in new code.
-:root {
-  // Surfaces
-  --surface-page: var(--color-ground);
-  --surface-default: var(--color-panel);
-  --surface-muted: var(--color-panel-soft);
-  --surface-raised: var(--color-panel-raised);
-  --surface-inset: var(--color-panel-soft);
-  --surface-hover: var(--color-hover);
-  --surface-selected: var(--color-selected);
-
-  // Text
-  --text-primary: var(--color-text);
-  --text-secondary: var(--color-text-secondary);
-  --text-muted: var(--color-text-quiet);
-
-  // Lines
-  --border-subtle: var(--color-line);
-  --border-default: var(--color-line);
-  --border-strong: var(--color-line-strong);
-  --border-control: var(--color-control-border);
-
-  // Action, links, focus
-  --action: var(--color-primary);
-  --action-hover: var(--color-primary-hover);
-  --action-pressed: var(--color-primary-pressed);
-  --on-action: var(--color-on-primary);
-  --link: var(--color-link);
-  --link-hover: var(--color-link-hover);
-  --focus-ring: var(--color-focus-ring);
-  --selection: var(--color-selection);
-
-  // Voices: Lagoon (AI) -> emerald, Ember (a person) -> gold. `fg` was the
-  // voice as a glyph or a bar, so it maps to the label colour that passes on a
-  // panel (gold-500 itself is 2.2:1 on white).
-  --voice-ai-fg: var(--voice-ai-label);
-  --voice-ai-strong: var(--chip-ai-fg);
-  --voice-ai-tint: var(--voice-ai-bubble);
-  --voice-ai-border: var(--voice-ai-edge);
-  --voice-human-fg: var(--voice-team-label);
-  --voice-human-strong: var(--chip-need-fg);
-  --voice-human-tint: var(--voice-team-bubble);
-  --voice-human-border: var(--voice-team-edge);
-
-  // Status
-  --success-fg: var(--status-success-fg);
-  --success-bg: var(--status-success-bg);
-  --success-border: var(--status-success-border);
-  --warning-fg: var(--status-warning-fg);
-  --warning-bg: var(--status-warning-bg);
-  --warning-border: var(--status-warning-border);
-  --danger-fg: var(--status-danger-fg);
-  --danger-bg: var(--status-danger-bg);
-  --danger-border: var(--status-danger-border);
-  --danger-solid: var(--status-danger-solid);
-  --danger-solid-hover: var(--status-danger-solid-hover);
-  --danger-contrast: var(--status-on-danger-solid);
-  --info-fg: var(--status-info-fg);
-  --info-bg: var(--status-info-bg);
-  --info-border: var(--status-info-border);
-
-  // Charts
-  --chart-human: var(--chart-team);
-
-  // Elevation: only glass casts a shadow, so the overlays' shadow is glass's.
-  --shadow-overlay: var(--glass-shadow);
-
-  // Shape
-  --radius-control: var(--radius-input);
-  --radius-card: var(--radius-tile);
-  --radius-overlay: var(--radius-dialog);
-
-  // Motion
-  --duration-xs: var(--duration-press);
-  --duration-sm: var(--duration-press);
-  --duration-md: var(--duration-menu);
-  --duration-lg: var(--duration-dialog);
-  --duration-xl: var(--duration-dialog);
-  --ease-standard: var(--ease-calm);
-  --ease-enter: var(--ease-calm);
-  --ease-exit: var(--ease-calm);
-  --ease-emphasized: var(--ease-calm);
-  --motion-fast: var(--duration-press);
-  --motion-normal: var(--duration-menu);
-  --motion-slow: var(--duration-dialog);
-}
-
-// Type aliases, re-declared wherever the type roles change (:lang(ar)), so an
-// Arabic fragment inside an English page gets the Arabic leading through the
-// old names too.
-:root,
-:lang(ar) {
-  --text-page-title: var(--text-title-1);
-  --text-section-title: var(--text-title-2);
-  --text-card-title: var(--text-title-3);
-  --text-reading: var(--text-body);
 }

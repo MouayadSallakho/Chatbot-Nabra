@@ -254,6 +254,50 @@ describe('ConversationTranscript', () => {
       vi.restoreAllMocks();
     });
 
+    // 39.8b: focusing the button scrolls it into range; that is not a request, and
+    // the page it brings keeps the focused button in view (WCAG 2.4.11).
+    it('reads nothing when the edge comes into range because the keyboard is on its button', async () => {
+      await mountLong();
+
+      testId<HTMLButtonElement>('show-earlier')!.focus();
+      FakeObserver.latest().fire();
+
+      expect(requested).toBe(0);
+
+      testId<HTMLButtonElement>('show-earlier')!.click();
+
+      expect(requested).toBe(1);
+    });
+
+    it('keeps the focused button in view when the page it asked for goes in above', async () => {
+      await mountLong();
+
+      const scroller = host();
+      vi.spyOn(window, 'getComputedStyle').mockReturnValue({
+        overflowY: 'auto',
+      } as CSSStyleDeclaration);
+      measure(scroller, 400, 300);
+      const button = testId<HTMLButtonElement>('show-earlier')!;
+      const edge = testId('earlier-edge')!;
+      const shown = vi.fn();
+      edge.scrollIntoView = shown;
+      button.focus();
+
+      fixture.componentRef.setInput('messages', [
+        message(39),
+        message(40),
+        message(41),
+        message(42),
+      ]);
+      await settle();
+
+      expect(shown).toHaveBeenCalledWith({ block: 'nearest' });
+      // Not put back 900 px from the end, which would leave the button a page above.
+      expect(scroller.scrollTop).toBe(300);
+      expect(document.activeElement).toBe(button);
+      vi.restoreAllMocks();
+    });
+
     it('neither announces nor animates earlier messages as new', async () => {
       await mount([message(41), message(42)]);
       const unseen: number[] = [];

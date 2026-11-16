@@ -21,7 +21,7 @@
 
   &:hover .avatar,
   &[aria-expanded='true'] .avatar {
-    border-color: var(--border-control);
+    border-color: var(--color-control-border);
   }
 }
 
@@ -96,10 +96,10 @@
   place-items: center;
   inline-size: 2rem;
   block-size: 2rem;
-  border: 1px solid var(--border-strong);
+  border: 1px solid var(--color-line-strong);
   border-radius: var(--radius-pill);
-  background-color: var(--surface-selected);
-  color: var(--text-primary);
+  background-color: var(--color-selected);
+  color: var(--color-text);
   font: 600 0.75rem / 1 var(--font-sans);
   transition: border-color var(--duration-press) var(--ease-calm);
 }
@@ -162,12 +162,12 @@
 
 .identity-email {
   font: var(--text-body-strong);
-  color: var(--text-primary);
+  color: var(--color-text);
 }
 
 .identity-workspace {
   font: var(--text-small);
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
 }
 
 // The read-only line under the language choices: which language the account's
@@ -175,13 +175,13 @@
 .menu-note {
   margin: 0;
   padding: var(--space-1) var(--space-3) var(--space-2);
-  color: var(--text-muted);
+  color: var(--color-text-quiet);
   font: var(--text-caption);
 }
 
 .menu-check {
   margin-inline-start: auto;
-  color: var(--text-primary);
+  color: var(--color-text);
 }
 
 // Stands where the theme items have an icon: a sample of each script, so the
@@ -192,5 +192,5 @@
   inline-size: 1.25em;
   block-size: 1.25em;
   font: 600 0.75rem / 1 var(--font-sans);
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
 }

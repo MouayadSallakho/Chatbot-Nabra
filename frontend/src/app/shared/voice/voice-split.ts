@@ -62,7 +62,7 @@ export type VoiceSplitSubject = 'conversations' | 'openConversations';
       block-size: 0.5rem;
       overflow: hidden;
       border-radius: var(--radius-pill);
-      background-color: var(--surface-inset);
+      background-color: var(--color-panel-soft);
     }
 
     .voice-split-part {
@@ -75,7 +75,7 @@ export type VoiceSplitSubject = 'conversations' | 'openConversations';
     }
 
     .voice-split-human {
-      background-color: var(--chart-human);
+      background-color: var(--chart-team);
     }
 
     .voice-split-legend {
@@ -93,7 +93,7 @@ export type VoiceSplitSubject = 'conversations' | 'openConversations';
     .voice-split-count {
       font: var(--text-numeric);
       font-variant-numeric: tabular-nums;
-      color: var(--text-primary);
+      color: var(--color-text);
     }
 
     @media (forced-colors: active) {

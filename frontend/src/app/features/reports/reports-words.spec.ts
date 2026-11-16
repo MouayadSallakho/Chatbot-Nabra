@@ -8,6 +8,7 @@ import {
   reportTitle,
   sizeLabel,
   statusLabel,
+  statusTone,
 } from './reports-words';
 
 /** Reports' words: translated by stable code or type, never guessed for an unknown one. */
@@ -65,5 +66,13 @@ describe('reports words', () => {
     expect(knownReportTitle('ChannelUsage')).toBe('Channel usage');
     expect(knownReportTitle('FutureReport')).toBeNull();
     expect(knownReportTitle('toString')).toBeNull();
+  });
+
+  it('draws each status as a chip with its own marker, never a retired badge class', () => {
+    expect(statusTone('Completed')).toBe('chip-success');
+    expect(statusTone('Failed')).toBe('chip-danger');
+    expect(statusTone('Expired')).toBe('chip-neutral');
+    expect(statusTone('Running')).toBe('chip-info');
+    expect(statusTone('Pending')).toBe('chip-info');
   });
 });

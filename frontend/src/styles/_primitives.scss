@@ -154,9 +154,7 @@ app-page-header + * > .page-section:first-child {
 }
 
 // Quiet: text only, for actions inside dense surfaces such as toolbars.
-// `.btn-ghost` is the Two Voices name of the same button (39.8b removes it).
-.btn-quiet,
-.btn-ghost {
+.btn-quiet {
   background-color: transparent;
   color: var(--color-text-secondary);
 
@@ -289,8 +287,7 @@ app-page-header + * > .page-section:first-child {
 }
 
 .btn-secondary.btn-loading > .spinner,
-.btn-quiet.btn-loading > .spinner,
-.btn-ghost.btn-loading > .spinner {
+.btn-quiet.btn-loading > .spinner {
   color: var(--color-text);
 }
 
@@ -349,9 +346,9 @@ app-page-header + * > .page-section:first-child {
 // A card is a grouping device, not a default wrapper. Separation comes from a
 // hairline and the porcelain page behind it; cards never cast a shadow.
 .card {
-  background-color: var(--surface-default);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-card);
+  background-color: var(--color-panel);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-tile);
 }
 
 .card-body {
@@ -365,7 +362,7 @@ app-page-header + * > .page-section:first-child {
   justify-content: space-between;
   gap: var(--space-3) var(--space-4);
   padding: var(--space-4) var(--space-5);
-  border-block-end: 1px solid var(--border-subtle);
+  border-block-end: 1px solid var(--color-line);
 }
 
 // A sentence of context in a card header belongs under the title it explains.
@@ -374,12 +371,12 @@ app-page-header + * > .page-section:first-child {
   order: 1;
   margin-block-start: calc(-1 * var(--space-2));
   font: var(--text-small);
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
 }
 
 .card-title {
-  font: var(--text-card-title);
-  color: var(--text-primary);
+  font: var(--text-title-3);
+  color: var(--color-text);
 }
 
 .card-actions {
@@ -393,10 +390,10 @@ app-page-header + * > .page-section:first-child {
 .card > .card-actions {
   justify-content: flex-end;
   padding: var(--space-4) var(--space-5);
-  border-block-start: 1px solid var(--border-subtle);
-  background-color: var(--surface-muted);
-  border-end-start-radius: var(--radius-card);
-  border-end-end-radius: var(--radius-card);
+  border-block-start: 1px solid var(--color-line);
+  background-color: var(--color-panel-soft);
+  border-end-start-radius: var(--radius-tile);
+  border-end-end-radius: var(--radius-tile);
 }
 
 .card-footer {
@@ -406,7 +403,7 @@ app-page-header + * > .page-section:first-child {
   justify-content: space-between;
   gap: var(--space-3);
   padding: var(--space-3) var(--space-5);
-  border-block-start: 1px solid var(--border-subtle);
+  border-block-start: 1px solid var(--color-line);
 }
 
 // A section of a page that is not a card. Most of a page should be this.
@@ -423,17 +420,17 @@ app-page-header + * > .page-section:first-child {
   margin-block-start: var(--space-1);
   max-inline-size: 72ch;
   font: var(--text-small);
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
 }
 
 // -----------------------------------------------------------------------------
-// Chips (calm-glass.md §6) and the status badges they replace
+// Chips (calm-glass.md §6)
 // -----------------------------------------------------------------------------
 // A 24px pill (22px in dense rows): a 7px dot, then a word. The dot is the
 // voice's mark; the word carries the meaning, so a chip survives greyscale and
-// every colour-vision difference. `app-chip` draws these classes; the Two
-// Voices `.badge-*` names are the same rules, restyled in place, until each
-// screen step moves its markup (39.8b removes them).
+// every colour-vision difference. `app-chip` draws these classes; a template
+// that needs a chip on a plain element (a status word bound by `[class]`) uses
+// them directly. (The Two Voices `.badge-*` names were retired in 39.8b.)
 //
 //   need, team, waiting  gold     needs a person, handled by, waiting
 //   ai                   emerald  the AI is answering
@@ -444,10 +441,8 @@ app-page-header + * > .page-section:first-child {
 // hues with their own glyph in place of the dot (owner decision Q4): a tick,
 // a triangle, an octagon, an "i". The glyphs are masks filled with the text
 // colour, so they follow the theme with no extra markup.
-.chip,
-.badge {
+.chip {
   --chip-glyph: none;
-  --badge-glyph: var(--chip-glyph);
 
   display: inline-flex;
   align-items: center;
@@ -472,14 +467,11 @@ app-page-header + * > .page-section:first-child {
     background-color: var(--chip-dot, currentcolor);
   }
 
-  // Windows high contrast: the fill is gone, so the pill keeps an outline and
-  // the dot takes the text colour.
+  // Windows high contrast: the fill is gone, so the pill keeps an outline. The
+  // marker is drawn in the text's system colour (see "Forced colours" below the
+  // chip sizes).
   @media (forced-colors: active) {
     border-color: CanvasText;
-
-    &::before {
-      background-color: CanvasText;
-    }
   }
 }
 
@@ -503,8 +495,7 @@ app-page-header + * > .page-section:first-child {
   --chip-dot: var(--chip-failed-dot);
 }
 
-.chip-neutral,
-.badge-neutral {
+.chip-neutral {
   --chip-bg: var(--chip-neutral-bg);
   --chip-fg: var(--chip-neutral-fg);
   --chip-dot: var(--chip-neutral-dot);
@@ -514,11 +505,7 @@ app-page-header + * > .page-section:first-child {
 .chip-success,
 .chip-warning,
 .chip-danger,
-.chip-info,
-.badge-success,
-.badge-warning,
-.badge-danger,
-.badge-info {
+.chip-info {
   &::before {
     inline-size: 0.75rem;
     block-size: 0.75rem;
@@ -528,15 +515,13 @@ app-page-header + * > .page-section:first-child {
   }
 }
 
-.chip-success,
-.badge-success {
+.chip-success {
   --chip-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 6.3 5 8.7l4.5-5.2' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   --chip-bg: var(--status-success-bg);
   --chip-fg: var(--status-success-fg);
 }
 
-.chip-warning,
-.badge-warning {
+.chip-warning {
   --chip-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M6 1.2 11.2 10.4H.8z' fill='%23fff'/%3E%3Cpath d='M6 4.6v2.6' stroke='%23000' stroke-width='1.4' stroke-linecap='round'/%3E%3Ccircle cx='6' cy='8.8' r='.75' fill='%23000'/%3E%3C/svg%3E");
   --chip-bg: var(--status-warning-bg);
   --chip-fg: var(--status-warning-fg);
@@ -547,8 +532,7 @@ app-page-header + * > .page-section:first-child {
   }
 }
 
-.chip-danger,
-.badge-danger {
+.chip-danger {
   --chip-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M4 .9h4L11.1 4v4L8 11.1H4L.9 8V4z' fill='%23fff'/%3E%3Cpath d='M6 3.4v3.2' stroke='%23000' stroke-width='1.4' stroke-linecap='round'/%3E%3Ccircle cx='6' cy='8.5' r='.75' fill='%23000'/%3E%3C/svg%3E");
   --chip-bg: var(--status-danger-bg);
   --chip-fg: var(--status-danger-fg);
@@ -558,8 +542,7 @@ app-page-header + * > .page-section:first-child {
   }
 }
 
-.chip-info,
-.badge-info {
+.chip-info {
   --chip-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Ccircle cx='6' cy='6' r='5.2' fill='%23fff'/%3E%3Cpath d='M6 5.4v3.2' stroke='%23000' stroke-width='1.4' stroke-linecap='round'/%3E%3Ccircle cx='6' cy='3.6' r='.75' fill='%23000'/%3E%3C/svg%3E");
   --chip-bg: var(--status-info-bg);
   --chip-fg: var(--status-info-fg);
@@ -571,7 +554,7 @@ app-page-header + * > .page-section:first-child {
 
 // Metadata rather than state: a channel, a file type. No glyph and no dot,
 // because either would say "this is a status".
-.badge-plain {
+.chip-plain {
   --chip-bg: transparent;
   --chip-fg: var(--color-text-secondary);
 
@@ -582,10 +565,24 @@ app-page-header + * > .page-section:first-child {
   }
 }
 
-.chip-sm,
-.badge-sm {
+.chip-sm {
   min-block-size: var(--chip-height-sm);
   padding-inline: 0.4375rem 0.5rem;
+}
+
+// Forced colours (39.8b; 39.6b risk 2). The browser repaints every background
+// with Canvas, so a dot or a status glyph drawn as a (masked) background took
+// the pill's own colour and vanished: only the word stayed. The marker opts out
+// of the override and is painted in CanvasText, the system colour the word
+// itself gets, so it follows the reader's theme. This covers every chip and
+// marker: voice, status, language, schedule state, limit reached. The hollow
+// draft ring keeps its inset ring (`_authoring.scss`), which this opt-out
+// stops the browser from dropping. Last in the chip rules so it wins.
+@media (forced-colors: active) {
+  .chip::before {
+    forced-color-adjust: none;
+    background-color: CanvasText;
+  }
 }
 
 // A count on an icon or a tab: a number, not a state.
@@ -646,7 +643,7 @@ app-page-header + * > .page-section:first-child {
 .field-label,
 .form-label {
   font: var(--text-label);
-  color: var(--text-primary);
+  color: var(--color-text);
 }
 
 // Utility forms of type tokens that templates reach for by name.
@@ -660,7 +657,7 @@ app-page-header + * > .page-section:first-child {
 
 .text-caption {
   font: var(--text-caption);
-  color: var(--text-muted);
+  color: var(--color-text-quiet);
 }
 
 // Numbers compared down a column line up digit for digit.
@@ -678,13 +675,13 @@ app-page-header + * > .page-section:first-child {
 .field-required::after {
   content: '*';
   margin-inline-start: var(--space-1);
-  color: var(--danger-fg);
+  color: var(--status-danger-fg);
 }
 
 .field-hint,
 .form-hint {
   font: var(--text-small);
-  color: var(--text-muted);
+  color: var(--color-text-quiet);
 }
 
 // The error message. `role="alert"` belongs on the element in the template.
@@ -695,7 +692,7 @@ app-page-header + * > .page-section:first-child {
   gap: var(--space-2);
   margin: 0;
   font: var(--text-small);
-  color: var(--danger-fg);
+  color: var(--status-danger-fg);
 
   .icon {
     inline-size: var(--icon-size-sm);
@@ -832,9 +829,9 @@ select.input {
   position: relative; // keeps a visually hidden caption inside the frame
   inline-size: 100%;
   overflow-x: auto;
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-card);
-  background-color: var(--surface-default);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-tile);
+  background-color: var(--color-panel);
 }
 
 .table {
@@ -849,21 +846,28 @@ select.input {
     vertical-align: middle;
   }
 
+  // A row's header (a name in the first column) is 600, the weight of every
+  // other emphasis, never the browser's default bold: a 700 face is a font file
+  // no page needs (39.8b; 39.7a risk 6, Plex Arabic 700 on Arabic analytics).
+  tbody th {
+    font-weight: 600;
+  }
+
   // Column headers are captions: small, quiet, sentence case, on a muted band.
   thead th {
     position: sticky;
     inset-block-start: 0;
     padding-block: var(--space-2);
-    background-color: var(--surface-muted);
-    color: var(--text-secondary);
+    background-color: var(--color-panel-soft);
+    color: var(--color-text-secondary);
     font: var(--text-caption);
-    border-block-end: 1px solid var(--border-default);
+    border-block-end: 1px solid var(--color-line);
     white-space: nowrap;
   }
 
   tbody tr {
-    border-block-start: 1px solid var(--border-subtle);
-    transition: background-color var(--duration-sm) var(--ease-standard);
+    border-block-start: 1px solid var(--color-line);
+    transition: background-color var(--duration-press) var(--ease-calm);
   }
 
   tbody tr:first-child {
@@ -871,14 +875,14 @@ select.input {
   }
 
   tbody tr:hover {
-    background-color: var(--surface-hover);
+    background-color: var(--color-hover);
   }
 
   // Selection is announced by aria-selected and shown by an ink edge on the
   // start side, so it survives greyscale and mirrors under RTL.
   tbody tr[aria-selected='true'] {
-    background-color: var(--surface-selected);
-    box-shadow: inset calc(var(--direction-flip) * 2px) 0 0 0 var(--action);
+    background-color: var(--color-selected);
+    box-shadow: inset calc(var(--direction-flip) * 2px) 0 0 0 var(--color-primary);
   }
 
   .numeric,
@@ -902,9 +906,9 @@ select.input {
 // appearance on a wide screen, a stack of readable rows on a narrow one. A
 // feature supplies only its column template, via --data-list-columns.
 .data-list {
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-card);
-  background-color: var(--surface-default);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-tile);
+  background-color: var(--color-panel);
   overflow: hidden;
 
   ul {
@@ -923,20 +927,20 @@ select.input {
   gap: var(--space-1) var(--space-4);
   min-block-size: 3.25rem;
   padding: var(--space-3) var(--space-4);
-  color: var(--text-primary);
+  color: var(--color-text);
   font: var(--text-table);
   text-decoration: none;
-  transition: background-color var(--duration-sm) var(--ease-standard);
+  transition: background-color var(--duration-press) var(--ease-calm);
 }
 
 a.data-row:hover {
-  background-color: var(--surface-hover);
-  color: var(--text-primary);
+  background-color: var(--color-hover);
+  color: var(--color-text);
   text-decoration: none;
 }
 
 a.data-row:active {
-  background-color: var(--surface-selected);
+  background-color: var(--color-selected);
 }
 
 // Focus draws inside the row, so the list's clipped frame cannot cut it off.
@@ -946,7 +950,7 @@ a.data-row:focus-visible {
 
 .data-list li + li .data-row,
 .data-row + .data-row {
-  border-block-start: 1px solid var(--border-subtle);
+  border-block-start: 1px solid var(--color-line);
 }
 
 .data-row-title {
@@ -956,23 +960,23 @@ a.data-row:focus-visible {
 
 .data-row-meta {
   min-inline-size: 0;
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
   overflow-wrap: anywhere;
 }
 
 // Inline labels, shown only while the row is stacked and has no column header.
 .data-cell-label {
-  color: var(--text-muted);
+  color: var(--color-text-quiet);
 }
 
 .data-row-chevron {
   display: none;
-  color: var(--text-muted);
-  transition: transform var(--duration-sm) var(--ease-standard);
+  color: var(--color-text-quiet);
+  transition: transform var(--duration-press) var(--ease-calm);
 }
 
 a.data-row:hover .data-row-chevron {
-  color: var(--text-primary);
+  color: var(--color-text);
   transform: translateX(calc(var(--direction-flip) * 2px));
 }
 
@@ -992,9 +996,9 @@ a.data-row:hover .data-row-chevron {
   .data-list-head {
     display: grid;
     padding: var(--space-2) var(--space-4);
-    background-color: var(--surface-muted);
-    border-block-end: 1px solid var(--border-default);
-    color: var(--text-secondary);
+    background-color: var(--color-panel-soft);
+    border-block-end: 1px solid var(--color-line);
+    color: var(--color-text-secondary);
     font: var(--text-caption);
   }
 
@@ -1045,7 +1049,7 @@ a.data-row:hover .data-row-chevron {
 
 .pager-summary {
   font: var(--text-small);
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
   font-variant-numeric: tabular-nums;
 }
 
@@ -1054,7 +1058,7 @@ a.data-row:hover .data-row-chevron {
   align-items: center;
   gap: var(--space-2);
   font: var(--text-small);
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
   font-variant-numeric: tabular-nums;
 }
 
@@ -1404,7 +1408,6 @@ a.data-row:hover .data-row-chevron {
   background-color: var(--voice-ai-bubble);
   color: var(--voice-ai-text);
   // The time inside the bubble: quiet text is below 4.5:1 on the dark AI bubble.
-  --text-muted: var(--voice-ai-meta);
   --color-text-quiet: var(--voice-ai-meta);
 
   // The speaker inside the bubble: emerald-300 is 4.42:1 on the dark AI
@@ -1487,11 +1490,11 @@ a.data-row:hover .data-row-chevron {
   border-radius: var(--radius-pill);
 
   &.from-ai {
-    background-color: var(--voice-ai-tint);
+    background-color: var(--voice-ai-bubble);
   }
 
   &.from-human {
-    background-color: var(--voice-human-tint);
+    background-color: var(--voice-team-bubble);
   }
 
   &.is-sweeping app-voice-chip {
@@ -1575,7 +1578,7 @@ a.data-row:hover .data-row-chevron {
   gap: var(--space-3);
   padding: var(--space-3) var(--space-4);
   border: 1px solid transparent;
-  border-radius: var(--radius-control);
+  border-radius: var(--radius-input);
   font: var(--text-small);
 
   .icon {
@@ -1587,28 +1590,28 @@ a.data-row:hover .data-row-chevron {
 }
 
 .alert-danger {
-  background-color: var(--danger-bg);
-  border-color: var(--danger-border);
-  color: var(--danger-fg);
+  background-color: var(--status-danger-bg);
+  border-color: var(--status-danger-border);
+  color: var(--status-danger-fg);
 }
 
 .alert-success {
-  background-color: var(--success-bg);
-  border-color: var(--success-border);
-  color: var(--success-fg);
+  background-color: var(--status-success-bg);
+  border-color: var(--status-success-border);
+  color: var(--status-success-fg);
 }
 
 .alert-info {
-  background-color: var(--info-bg);
-  border-color: var(--info-border);
-  color: var(--info-fg);
+  background-color: var(--status-info-bg);
+  border-color: var(--status-info-border);
+  color: var(--status-info-fg);
 }
 
 // Something the reader has to act on, but which has broken nothing.
 .alert-warning {
-  background-color: var(--warning-bg);
-  border-color: var(--warning-border);
-  color: var(--warning-fg);
+  background-color: var(--status-warning-bg);
+  border-color: var(--status-warning-border);
+  color: var(--status-warning-fg);
 }
 
 // The stale-version notice. One treatment wherever an item changed underneath
@@ -1620,10 +1623,10 @@ a.data-row:hover .data-row-chevron {
   gap: var(--space-2);
   margin-block-end: var(--space-5);
   padding: var(--space-4) var(--space-5);
-  border: 1px solid var(--warning-border);
-  border-radius: var(--radius-card);
-  background-color: var(--warning-bg);
-  color: var(--text-primary);
+  border: 1px solid var(--status-warning-border);
+  border-radius: var(--radius-tile);
+  background-color: var(--status-warning-bg);
+  color: var(--color-text);
   font: var(--text-small);
 
   &:has(> app-icon) {
@@ -1632,7 +1635,7 @@ a.data-row:hover .data-row-chevron {
   }
 
   > app-icon {
-    color: var(--warning-fg);
+    color: var(--status-warning-fg);
   }
 }
 

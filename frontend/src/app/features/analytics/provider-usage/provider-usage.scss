@@ -13,7 +13,7 @@
 .usage-none {
   max-inline-size: 72ch;
   font: var(--text-small);
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
 }
 
 .usage-grid {
@@ -34,8 +34,8 @@
 }
 
 .usage-cost-title {
-  font: var(--text-card-title);
-  color: var(--text-primary);
+  font: var(--text-title-3);
+  color: var(--color-text);
 }
 
 .usage-cost-list {
@@ -56,23 +56,23 @@
 .usage-cost-value {
   justify-self: start;
   font: 600 1.75rem / 1.2 var(--font-sans);
-  color: var(--text-primary);
+  color: var(--color-text);
 }
 
 .usage-cost-note,
 .usage-cost-none {
   font: var(--text-small);
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
 }
 
 // "Unrated does not mean free": a warning about the figure, in warning ink on
 // its own background, with the words carrying the meaning.
 .usage-warning {
   padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--warning-border);
-  border-radius: var(--radius-control);
-  background-color: var(--warning-bg);
-  color: var(--warning-fg);
+  border: 1px solid var(--status-warning-border);
+  border-radius: var(--radius-input);
+  background-color: var(--status-warning-bg);
+  color: var(--status-warning-fg);
   font: var(--text-small);
 }
 
@@ -85,7 +85,7 @@
 .model-unrated {
   display: block;
   font: var(--text-small);
-  color: var(--text-muted);
+  color: var(--color-text-quiet);
 }
 
 // The purpose table's second lines: a cost per currency, and the counts that
@@ -97,5 +97,5 @@
 
 .purpose-meta {
   font: var(--text-small);
-  color: var(--text-muted);
+  color: var(--color-text-quiet);
 }

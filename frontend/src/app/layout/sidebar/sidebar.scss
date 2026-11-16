@@ -67,6 +67,15 @@
   gap: var(--gap-hairline);
 }
 
+// The search and the bell are the dense header's 40px icon buttons (44px on a
+// coarse pointer, through --control-height-sm), so the name keeps its room: at
+// 44px the head needed 196px of the bar's 188 and the name ran under the search
+// button, which forced colours showed by drawing its edge (39.8b).
+:host ::ng-deep .sidebar-tools .btn-icon {
+  inline-size: var(--control-height-sm);
+  min-block-size: var(--control-height-sm);
+}
+
 // -----------------------------------------------------------------------------
 // Areas
 // -----------------------------------------------------------------------------

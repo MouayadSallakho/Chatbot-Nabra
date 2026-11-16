@@ -253,12 +253,16 @@ select {
 
 // The first thing in the tab order. Hidden until focused, then a real, visible
 // control -- a keyboard reader should not have to tab through the whole sidebar
-// on every page to reach the content.
+// on every page to reach the content. At least 44px tall (39.8b): on a phone
+// or a tablet with a keyboard it is a touch target too.
 .skip-link {
   position: absolute;
   inset-block-start: var(--space-2);
   inset-inline-start: var(--space-2);
   z-index: var(--z-skip-link);
+  display: inline-flex;
+  align-items: center;
+  min-block-size: var(--target-min);
   padding: var(--space-2) var(--space-4);
   background-color: var(--color-primary);
   color: var(--color-on-primary);

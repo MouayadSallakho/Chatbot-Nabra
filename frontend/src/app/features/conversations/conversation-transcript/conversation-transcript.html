@@ -148,11 +148,11 @@
                     -->
                   <span class="bubble-delivery">
                     <span
-                      class="badge badge-sm"
-                      [class.badge-success]="status === 'Delivered' || status === 'Read'"
-                      [class.badge-danger]="status === 'Failed'"
-                      [class.badge-warning]="status === 'Unknown'"
-                      [class.badge-neutral]="
+                      class="chip chip-sm"
+                      [class.chip-success]="status === 'Delivered' || status === 'Read'"
+                      [class.chip-danger]="status === 'Failed'"
+                      [class.chip-warning]="status === 'Unknown'"
+                      [class.chip-neutral]="
                         status !== 'Delivered' &&
                         status !== 'Read' &&
                         status !== 'Failed' &&

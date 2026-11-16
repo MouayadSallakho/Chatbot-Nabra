@@ -40,7 +40,7 @@ import { CHART_WORDS, chartId } from './chart-model';
       </div>
       <button
         type="button"
-        class="btn btn-ghost btn-sm chart-frame-toggle"
+        class="btn btn-quiet btn-sm chart-frame-toggle"
         (click)="showTable.set(!showTable())"
         data-testid="chart-view-toggle"
       >

@@ -39,7 +39,7 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
       display: flex;
       flex-wrap: wrap;
       gap: var(--space-2);
-      border-block-end: 1px solid var(--border-subtle);
+      border-block-end: 1px solid var(--color-line);
     }
 
     /* A 44px target in either language (Phase 39.7a). */
@@ -49,17 +49,17 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
       min-block-size: var(--target-min);
       padding: var(--space-2) var(--space-3);
       border-block-end: 2px solid transparent;
-      color: var(--text-secondary);
+      color: var(--color-text-secondary);
       font-weight: 600;
       text-decoration: none;
 
       &:hover {
-        color: var(--text-primary);
+        color: var(--color-text);
       }
 
       &.active {
-        border-block-end-color: var(--action);
-        color: var(--text-primary);
+        border-block-end-color: var(--color-primary);
+        color: var(--color-text);
       }
     }
   `,

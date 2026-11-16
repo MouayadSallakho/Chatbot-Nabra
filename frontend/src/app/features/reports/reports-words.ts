@@ -128,13 +128,13 @@ export function statusLabel(status: ReportStatus): string {
 export function statusTone(status: ReportStatus): string {
   switch (status) {
     case 'Completed':
-      return 'badge-success';
+      return 'chip-success';
     case 'Failed':
-      return 'badge-danger';
+      return 'chip-danger';
     case 'Expired':
-      return 'badge-neutral';
+      return 'chip-neutral';
     default:
-      return 'badge-info';
+      return 'chip-info';
   }
 }
 

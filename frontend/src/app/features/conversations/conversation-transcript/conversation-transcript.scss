@@ -201,21 +201,21 @@
 
 .transcript-earlier-failed {
   margin: 0;
-  color: var(--danger-fg);
+  color: var(--status-danger-fg);
   font: var(--text-small);
   text-align: center;
 }
 
 .transcript-start {
   margin: 0;
-  color: var(--text-muted);
+  color: var(--color-text-quiet);
   font: var(--text-caption);
 }
 
 .transcript-empty {
   max-inline-size: 36rem;
   margin: var(--space-6) auto;
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
   font: var(--text-small);
   text-align: center;
 }

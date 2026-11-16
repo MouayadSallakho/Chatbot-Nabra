@@ -91,7 +91,7 @@
               class="lifecycle-step"
               [attr.aria-current]="step === current.status ? 'step' : null"
             >
-              <span class="badge" [class]="statusTone(step)">{{ statusWord(step) }}</span>
+              <span class="chip" [class]="statusTone(step)">{{ statusWord(step) }}</span>
             </li>
           }
         </ol>
@@ -99,9 +99,9 @@
 
         <div class="status-row">
           <span
-            class="badge"
-            [class.badge-success]="hasCredential()"
-            [class.badge-warning]="!hasCredential()"
+            class="chip"
+            [class.chip-success]="hasCredential()"
+            [class.chip-warning]="!hasCredential()"
             data-testid="credential-status"
           >
             @if (hasCredential()) {

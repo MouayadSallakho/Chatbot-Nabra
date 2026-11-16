@@ -69,7 +69,7 @@ import {
         0 8px 20px -6px rgb(0 0 0 / 30%) /* token-lint-ignore */;
       color: var(--chat-on-accent);
       cursor: pointer;
-      transition: transform var(--duration-sm) var(--ease-standard);
+      transition: transform var(--duration-press) var(--ease-calm);
 
       svg {
         inline-size: 26px;

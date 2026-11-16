@@ -409,6 +409,11 @@ export class ConversationTranscript {
    * The distance from the bottom does not change when rows are added at the top, so
    * it is what is put back. `overflow-anchor: none` keeps the browser from also
    * compensating. Read here, before the rows render, on whichever element scrolls.
+   *
+   * A reader whose focus is on "Show earlier messages" asked from the keyboard:
+   * the button stays in view, with the messages it brought just under it. Keeping
+   * the old place instead would leave the focused button a page above the view
+   * (39.8b; WCAG 2.4.11).
    */
   private keepPlaceAbove(): void {
     const scroller = this.scroller();
@@ -418,11 +423,24 @@ export class ConversationTranscript {
 
     afterNextRender(
       () => {
-        scroller.scrollTop = scroller.scrollHeight - fromEnd;
+        const edge = this.earlierEdge()?.nativeElement;
+
+        if (edge && this.edgeHasFocus()) {
+          edge.scrollIntoView({ block: 'nearest' });
+        } else {
+          scroller.scrollTop = scroller.scrollHeight - fromEnd;
+        }
         this.watchEarlierEdge();
       },
       { injector: this.injector },
     );
+  }
+
+  /** Whether the keyboard is on the start of what is loaded (its button). */
+  private edgeHasFocus(): boolean {
+    const edge = this.earlierEdge()?.nativeElement;
+
+    return !!edge && edge.contains(edge.ownerDocument.activeElement);
   }
 
   private settleIn(arrived: readonly TranscriptMessage[]): void {
@@ -464,7 +482,13 @@ export class ConversationTranscript {
 
     this.observer = new IntersectionObserver(
       (entries) => {
-        if (entries.some((entry) => entry.isIntersecting) && this.earlierFailure() === null) {
+        // Reading by scrolling. A reader whose focus is on the button reads with
+        // the button: focusing it scrolls it into range, and that is not a request.
+        if (
+          entries.some((entry) => entry.isIntersecting) &&
+          this.earlierFailure() === null &&
+          !this.edgeHasFocus()
+        ) {
           this.requestEarlier();
         }
       },

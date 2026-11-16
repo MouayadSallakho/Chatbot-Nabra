@@ -8,15 +8,15 @@
 // -----------------------------------------------------------------------------
 
 // A Draft chip: the neutral chip with a hollow ring instead of a filled dot,
-// so Draft and Disabled differ by marker as well as by word. `.badge-draft`
-// is its Two Voices name (the channels' lifecycle, until 39.5b).
+// so Draft and Disabled differ by marker as well as by word. In forced
+// colours the ring is kept: `.chip::before` opts out of the browser's
+// override (`_primitives.scss`), so this box-shadow is not dropped.
 .chip-draft {
   --chip-bg: var(--chip-neutral-bg);
   --chip-fg: var(--chip-neutral-fg);
 }
 
-.chip-draft::before,
-.badge-draft::before {
+.chip-draft::before {
   background-color: transparent;
   box-shadow: inset 0 0 0 1.5px currentcolor;
   inline-size: 0.5rem;
@@ -30,8 +30,10 @@
 // solid panels (radius 24, the panel colour, a 1px line, no shadow) with the
 // panel's padding and no inner rules, and its data lists one panel of rows
 // (radius 16) separated by space rather than lines. Pages that have not moved
-// keep the Two Voices card until their own step adds the class; 39.8b makes it
-// the default and deletes the modifier.
+// keep the Two Voices card until their own step adds the class. It stays a
+// modifier (39.8b): every list, form and settings page carries it, and the
+// screens without it (the inbox thread, the entry pages, the design lab) were
+// redesigned on their own terms, so making it global would restyle them.
 .page-calm {
   .card {
     border-color: var(--color-line);
@@ -255,21 +257,21 @@
   place-items: center;
   inline-size: 1.5rem;
   block-size: 1.5rem;
-  border: 1px solid var(--border-strong);
+  border: 1px solid var(--color-line-strong);
   border-radius: var(--radius-pill);
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
   font: var(--text-caption);
   font-variant-numeric: tabular-nums;
 }
 
 .form-section-title {
   margin: 0;
-  font: var(--text-card-title);
+  font: var(--text-title-3);
 }
 
 .form-section-lede {
   margin: var(--space-1) 0 0;
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
   font: var(--text-small);
 }
 
@@ -293,7 +295,7 @@
   align-items: center;
   gap: var(--space-1);
   margin-inline-end: auto;
-  color: var(--warning-fg);
+  color: var(--status-warning-fg);
   font: var(--text-small);
   font-weight: 550;
 
@@ -306,12 +308,12 @@
 // Long text fields (instructions, knowledge content).
 .long-text {
   min-block-size: 18rem;
-  font: var(--text-reading);
+  font: var(--text-body);
 }
 
 .long-text[readonly] {
-  background-color: var(--surface-inset);
-  color: var(--text-secondary);
+  background-color: var(--color-panel-soft);
+  color: var(--color-text-secondary);
 }
 
 .counter {
@@ -321,7 +323,7 @@
 }
 
 .counter-low {
-  color: var(--warning-fg);
+  color: var(--status-warning-fg);
   font-weight: 550;
 }
 
@@ -329,11 +331,11 @@
 .guidance {
   margin: 0;
   padding: var(--space-3) var(--space-4);
-  border-inline-start: 2px solid var(--border-strong);
-  background-color: var(--surface-muted);
-  border-start-end-radius: var(--radius-control);
-  border-end-end-radius: var(--radius-control);
-  color: var(--text-secondary);
+  border-inline-start: 2px solid var(--color-line-strong);
+  background-color: var(--color-panel-soft);
+  border-start-end-radius: var(--radius-input);
+  border-end-end-radius: var(--radius-input);
+  color: var(--color-text-secondary);
   font: var(--text-small);
 
   ul {
@@ -351,12 +353,12 @@
   gap: var(--space-2);
   margin: 0;
   padding-inline-start: var(--space-5);
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
   font: var(--text-small);
   list-style: disc;
 
   strong {
-    color: var(--text-primary);
+    color: var(--color-text);
     font-weight: 550;
   }
 }
@@ -382,7 +384,7 @@ ol.help-list {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-  color: var(--text-muted);
+  color: var(--color-text-quiet);
   font: var(--text-small);
 
   // A short rule between steps, in reading order.
@@ -390,17 +392,17 @@ ol.help-list {
     content: '';
     inline-size: 0.875rem;
     block-size: 1px;
-    background-color: var(--border-strong);
+    background-color: var(--color-line-strong);
   }
 }
 
 .lifecycle-step[aria-current='step'] {
-  color: var(--text-primary);
+  color: var(--color-text);
   font-weight: 550;
 
-  .badge,
+  .chip,
   app-chip {
-    outline: 1.5px solid var(--text-primary);
+    outline: 1.5px solid var(--color-text);
     outline-offset: 1px;
   }
 }
@@ -437,8 +439,8 @@ ol.help-list {
   background-color: var(--color-panel-soft);
   text-align: center;
   transition:
-    background-color var(--duration-sm) var(--ease-standard),
-    border-color var(--duration-sm) var(--ease-standard);
+    background-color var(--duration-press) var(--ease-calm),
+    border-color var(--duration-press) var(--ease-calm);
 }
 
 .drop-zone.is-dragging {
@@ -474,7 +476,7 @@ ol.help-list {
 
 .drop-zone-limits {
   margin: 0;
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
   font: var(--text-small);
 }
 
@@ -489,7 +491,7 @@ ol.help-list {
 }
 
 .file-card .file-card-glyph {
-  color: var(--text-muted);
+  color: var(--color-text-quiet);
 
   .icon {
     inline-size: 1.25rem;
@@ -510,7 +512,7 @@ ol.help-list {
 }
 
 .file-card-meta {
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
   font: var(--text-small);
 }
 
@@ -555,7 +557,7 @@ ol.help-list {
 }
 
 .chooser-count {
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
   font: var(--text-caption);
   font-variant-numeric: tabular-nums;
 }
@@ -576,10 +578,10 @@ ol.help-list {
   padding: var(--space-2) var(--space-3);
 
   & + & {
-    border-block-start: 1px solid var(--border-subtle);
+    border-block-start: 1px solid var(--color-line);
   }
 
-  > .badge,
+  > .chip,
   > app-chip {
     justify-self: start;
     grid-column: 1;
@@ -600,7 +602,7 @@ ol.help-list {
 .chooser-empty {
   margin: 0;
   padding: var(--space-4) var(--space-3);
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
   font: var(--text-small);
 }
 
@@ -613,7 +615,7 @@ ol.help-list {
 
   dt {
     margin-block-end: 2px; // token-lint-ignore: a term sits tight on its value
-    color: var(--text-muted);
+    color: var(--color-text-quiet);
     font: var(--text-caption);
   }
 

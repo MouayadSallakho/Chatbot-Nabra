@@ -60,7 +60,7 @@
           </button>
           <a
             stateActions
-            class="btn btn-ghost btn-sm"
+            class="btn btn-quiet btn-sm"
             routerLink="/knowledge"
             i18n="@@knowledge.backToKnowledge"
             >Back to knowledge</a
@@ -240,7 +240,7 @@
                 }
                 <button
                   type="button"
-                  class="btn btn-ghost btn-sm"
+                  class="btn btn-quiet btn-sm"
                   (click)="reset()"
                   [disabled]="!dirty() || saving()"
                   i18n="@@knowledge.discardChanges"
@@ -558,7 +558,7 @@
                     <!-- erp-lint-ignore: destructive-confirm -- forgets a file chosen but not yet sent; the document is untouched -->
                     <button
                       type="button"
-                      class="btn btn-ghost btn-sm"
+                      class="btn btn-quiet btn-sm"
                       (click)="clearReplacement()"
                       [disabled]="replacing()"
                     >

@@ -301,7 +301,7 @@
                     </td>
                     <td>
                       <!-- The word is the status; the badge's own glyph and colour repeat it. -->
-                      <span [class]="'badge ' + statusTone(execution.status)">
+                      <span [class]="'chip ' + statusTone(execution.status)">
                         <span>{{ statusLabel(execution.status) }}</span>
                       </span>
                       @if (failureSentence(execution); as reason) {

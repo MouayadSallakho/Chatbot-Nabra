@@ -17,7 +17,7 @@
 .calm-note {
   max-inline-size: 72ch;
   font: var(--text-small);
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
 }
 
 // The catalogue beside its panel from 64rem; the panel stays in view while a
@@ -46,13 +46,13 @@
   align-items: flex-start;
   gap: var(--space-3);
   padding: var(--space-4);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-card);
-  background-color: var(--surface-default);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-tile);
+  background-color: var(--color-panel);
   cursor: pointer;
   transition:
-    border-color var(--duration-sm) var(--ease-standard),
-    background-color var(--duration-sm) var(--ease-standard);
+    border-color var(--duration-press) var(--ease-calm),
+    background-color var(--duration-press) var(--ease-calm);
 
   &:hover {
     border-color: var(--color-control-border);
@@ -79,12 +79,12 @@
 
 .catalogue-title {
   font: var(--text-body-strong);
-  color: var(--text-primary);
+  color: var(--color-text);
 }
 
 .catalogue-description {
   font: var(--text-small);
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
 }
 
 .catalogue-meta {
@@ -93,7 +93,7 @@
   gap: var(--space-1) var(--space-3);
   margin-block-start: var(--space-1);
   font: var(--text-caption);
-  color: var(--text-muted);
+  color: var(--color-text-quiet);
 }
 
 .catalogue-schedulable {
@@ -154,7 +154,7 @@ fieldset.field {
   align-items: center;
   gap: var(--space-1);
   font: var(--text-small);
-  color: var(--text-muted);
+  color: var(--color-text-quiet);
 }
 
 // The file's language: a neutral tag, after the format and the size.
@@ -180,7 +180,7 @@ fieldset.field {
   min-inline-size: 11rem;
   max-inline-size: 18rem;
   font: var(--text-small);
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
 }
 
 .nowrap {
@@ -195,5 +195,5 @@ fieldset.field {
 
 .retention-note {
   font: var(--text-small);
-  color: var(--text-muted);
+  color: var(--color-text-quiet);
 }

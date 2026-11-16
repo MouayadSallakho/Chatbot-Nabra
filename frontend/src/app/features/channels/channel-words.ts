@@ -20,18 +20,18 @@ export function channelStatusWord(status: string): string {
 }
 
 /**
- * The badge classes for a status: each has its own marker as well as its word,
+ * The chip classes for a status: each has its own marker as well as its word,
  * so none is told apart by colour (a tick for Active, a hollow ring for a
  * Draft, a filled dot for Disabled), as on the agents' pages.
  */
 export function channelStatusTone(status: string): string {
   switch (status) {
     case 'Active':
-      return 'badge-success';
+      return 'chip-success';
     case 'Draft':
-      return 'badge-neutral badge-draft';
+      return 'chip-neutral chip-draft';
     default:
-      return 'badge-neutral';
+      return 'chip-neutral';
   }
 }
 

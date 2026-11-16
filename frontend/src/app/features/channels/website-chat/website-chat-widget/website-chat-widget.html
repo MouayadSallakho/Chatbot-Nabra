@@ -463,7 +463,7 @@
                 @if (canManage()) {
                   <button
                     type="button"
-                    class="btn btn-ghost btn-sm"
+                    class="btn btn-quiet btn-sm"
                     [attr.aria-label]="removeLabel(origin)"
                     (click)="removeOrigin(origin)"
                     i18n="@@widget.origins.remove"
@@ -621,7 +621,7 @@
         <div class="install-actions">
           <button
             type="button"
-            class="btn btn-ghost btn-sm"
+            class="btn btn-quiet btn-sm"
             (click)="copy('loader')"
             i18n="@@widget.install.copyLoader"
           >

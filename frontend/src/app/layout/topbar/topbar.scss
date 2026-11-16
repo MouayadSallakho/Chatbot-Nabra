@@ -53,6 +53,12 @@
   font: var(--text-title-3);
 }
 
+// Alone it has no title to reach over: a plain 44px target, centred.
+:host ::ng-deep .topbar-workspace.is-alone .switcher-trigger.is-bar {
+  margin-block-start: 0;
+  padding-block-start: 0;
+}
+
 .topbar-actions {
   display: flex;
   flex: none;

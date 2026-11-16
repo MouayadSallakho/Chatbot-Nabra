@@ -24,10 +24,10 @@
   margin-inline-start: calc(-1 * var(--space-1));
   padding-inline: var(--space-1) var(--space-2);
   border-radius: var(--radius-badge);
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
   font: var(--text-label);
   text-decoration: none;
-  transition: color var(--duration-sm) var(--ease-standard);
+  transition: color var(--duration-press) var(--ease-calm);
 
   .icon {
     inline-size: var(--icon-size-sm);
@@ -35,7 +35,7 @@
   }
 
   &:hover {
-    color: var(--text-primary);
+    color: var(--color-text);
     text-decoration: underline;
     text-underline-offset: 3px;
   }
@@ -80,7 +80,7 @@
   // A readable measure: full-width prose on a 1600px page is harder to read.
   max-inline-size: 72ch;
   font: var(--text-body);
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
   text-wrap: pretty;
 }
 

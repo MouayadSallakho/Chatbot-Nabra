@@ -139,7 +139,7 @@
                 class="lifecycle-step"
                 [attr.aria-current]="step === current.status ? 'step' : null"
               >
-                <span class="badge" [class]="statusTone(step)">{{ statusWord(step) }}</span>
+                <span class="chip" [class]="statusTone(step)">{{ statusWord(step) }}</span>
               </li>
             }
           </ol>
@@ -288,7 +288,7 @@
             Copy chat link
           </button>
           <a
-            class="btn btn-ghost btn-sm"
+            class="btn btn-quiet btn-sm"
             [href]="chatUrl()"
             target="_blank"
             rel="noopener noreferrer"

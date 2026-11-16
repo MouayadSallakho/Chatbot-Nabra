@@ -42,7 +42,7 @@
 
 .frequency-hint {
   font: var(--text-small);
-  color: var(--text-muted);
+  color: var(--color-text-quiet);
 }
 
 .schedule-editor {
@@ -68,7 +68,7 @@
   align-items: center;
   gap: var(--space-2);
   margin: 0;
-  color: var(--danger-fg);
+  color: var(--status-danger-fg);
 }
 
 .alert-text {
@@ -106,7 +106,7 @@
 .format {
   display: block;
   font: var(--text-small);
-  color: var(--text-muted);
+  color: var(--color-text-quiet);
 }
 
 // The schedules: one Calm Glass panel (radius 24, a 1px line).

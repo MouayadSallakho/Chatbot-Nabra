@@ -122,7 +122,7 @@
                         <!-- erp-lint-ignore: destructive-confirm -- moves an unsaved choice back to Available; nothing is written until Save, and Add reverses it -->
                         <button
                           type="button"
-                          class="btn btn-ghost btn-sm"
+                          class="btn btn-quiet btn-sm"
                           [attr.data-move]="option.knowledgeDocumentId"
                           [attr.aria-label]="removeLabel(option.title)"
                           (click)="move(option, false)"
@@ -194,7 +194,7 @@
             }
             <button
               type="button"
-              class="btn btn-ghost btn-sm"
+              class="btn btn-quiet btn-sm"
               (click)="reset()"
               [disabled]="!dirty() || saving()"
               i18n="@@knowledge.discardChanges"

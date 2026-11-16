@@ -21,11 +21,11 @@
   border-radius: var(--radius-pill);
   // A count, in ink: unread is news, not an alarm. Severity is shown on each
   // notification, where it can be read with its words.
-  background: var(--action);
-  color: var(--on-action);
+  background: var(--color-primary);
+  color: var(--color-on-primary);
   font: 600 0.6875rem / 1 var(--font-sans);
   font-variant-numeric: tabular-nums;
-  box-shadow: 0 0 0 2px var(--surface-default);
+  box-shadow: 0 0 0 2px var(--color-panel);
 
   // Its own system pair in forced colours, so the number never sits on a
   // colour the browser did not choose (39.2a, risk 4).
@@ -72,7 +72,7 @@
 
 .panel-title {
   margin: 0;
-  font: var(--text-card-title);
+  font: var(--text-title-3);
 
   // Focused by the palette's "Open the notification panel": a reading
   // position, like a page heading after a navigation, not a control.
@@ -82,7 +82,7 @@
 }
 
 .panel-count {
-  color: var(--text-muted);
+  color: var(--color-text-quiet);
   font: var(--text-caption);
 }
 
@@ -154,12 +154,12 @@
   block-size: 2.5rem;
   margin-block-end: var(--space-1);
   border-radius: var(--radius-pill);
-  background: var(--surface-inset);
-  color: var(--text-secondary);
+  background: var(--color-panel-soft);
+  color: var(--color-text-secondary);
 
   &.is-error {
-    background: var(--danger-bg);
-    color: var(--danger-fg);
+    background: var(--status-danger-bg);
+    color: var(--status-danger-fg);
   }
 }
 
@@ -169,7 +169,7 @@
 
 .panel-state-text {
   max-inline-size: 30ch;
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
   font: var(--text-small);
   overflow-wrap: anywhere;
 }
@@ -189,7 +189,7 @@
     display: inline-flex;
     align-items: center;
     min-block-size: 2rem;
-    color: var(--link);
+    color: var(--color-link);
     font-weight: 600;
   }
 }

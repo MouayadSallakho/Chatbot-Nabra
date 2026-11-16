@@ -52,7 +52,7 @@ export function channelWord(channel: string): string {
       align-items: center;
       gap: var(--space-1);
       min-inline-size: 0;
-      color: var(--text-secondary);
+      color: var(--color-text-secondary);
       font: var(--text-small);
       white-space: nowrap;
     }
@@ -61,7 +61,7 @@ export function channelWord(channel: string): string {
       flex: none;
       inline-size: 1rem;
       block-size: 1rem;
-      color: var(--text-muted);
+      color: var(--color-text-quiet);
     }
   `,
 })

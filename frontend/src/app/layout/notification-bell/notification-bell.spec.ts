@@ -1,3 +1,5 @@
+// @ts-expect-error No Node type declarations are installed in this workspace.
+import { readFileSync } from 'node:fs';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
@@ -391,5 +393,25 @@ describe('NotificationBell', () => {
     await settle();
 
     expect(host().classList).toContain('is-side');
+  });
+
+  it('marks unread with the dot, the word and the heavier title, not a start bar (39.8b)', async () => {
+    await mount();
+    await answerCount(1);
+    await openPanel([unread, critical], 1);
+
+    const items = host().querySelectorAll('[data-testid="notification"]');
+
+    expect(items[0].querySelector('.notification-dot')).not.toBeNull();
+    expect(items[1].querySelector('.notification-dot')).toBeNull();
+
+    // jsdom draws no box-shadow and has no coarse pointer, so the rules are read:
+    // no 3px bar, and the action link is 44px on touch and narrow widths.
+    const item = readFileSync('src/app/core/notifications/notification-item.ts', 'utf8');
+
+    expect(item).not.toMatch(/inset -?3px 0 0/);
+    expect(item).toMatch(
+      /@media \(pointer: coarse\), \(max-width: 61\.999rem\) \{\s*min-block-size: var\(--target-min\);/,
+    );
   });
 });

@@ -22,7 +22,7 @@
 }
 
 .chart-tone-human {
-  --chart-tone: var(--chart-human);
+  --chart-tone: var(--chart-team);
 }
 
 .chart-tone-customer {
@@ -38,15 +38,15 @@
 }
 
 .chart-tone-danger {
-  --chart-tone: var(--danger-fg);
+  --chart-tone: var(--status-danger-fg);
 }
 
 .chart-tone-warning {
-  --chart-tone: var(--warning-fg);
+  --chart-tone: var(--status-warning-fg);
 }
 
 .chart-tone-muted {
-  --chart-tone: color-mix(in srgb, var(--chart-neutral) 45%, var(--surface-default));
+  --chart-tone: color-mix(in srgb, var(--chart-neutral) 45%, var(--color-panel));
 }
 
 // -----------------------------------------------------------------------------
@@ -84,14 +84,14 @@
 }
 
 .chart-frame-title {
-  font: var(--text-card-title);
-  color: var(--text-primary);
+  font: var(--text-title-3);
+  color: var(--color-text);
 }
 
 .chart-frame-summary {
   max-inline-size: 72ch;
   font: var(--text-small);
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
 }
 
 .chart-frame-toggle {
@@ -111,7 +111,7 @@
   touch-action: pan-y;
 
   &:focus-visible {
-    outline: var(--focus-ring-width) solid var(--focus-ring);
+    outline: var(--focus-ring-width) solid var(--color-focus-ring);
     outline-offset: 2px;
   }
 }
@@ -130,18 +130,18 @@
   shape-rendering: crispEdges;
 
   &.is-baseline {
-    stroke: var(--border-strong);
+    stroke: var(--color-line-strong);
   }
 }
 
 .chart-tick {
-  fill: var(--text-muted);
+  fill: var(--color-text-quiet);
   font: var(--text-caption);
   font-variant-numeric: tabular-nums;
 }
 
 .chart-active-band {
-  fill: var(--surface-hover);
+  fill: var(--color-hover);
 }
 
 .chart-mark {
@@ -168,12 +168,12 @@
 
 .chart-dot {
   fill: var(--chart-tone);
-  stroke: var(--surface-default);
+  stroke: var(--color-panel);
   stroke-width: 2;
 }
 
 .chart-crosshair {
-  stroke: var(--border-strong);
+  stroke: var(--color-line-strong);
   stroke-width: 1;
   shape-rendering: crispEdges;
 }
@@ -189,16 +189,16 @@
   gap: 2px; // token-lint-ignore: tight readout rows, below the 4px scale on purpose
   inline-size: 12.25rem;
   padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-control);
-  background-color: var(--surface-raised);
-  box-shadow: var(--shadow-overlay);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-input);
+  background-color: var(--color-panel-raised);
+  box-shadow: var(--glass-shadow);
   pointer-events: none;
 }
 
 .chart-readout-title {
   font: var(--text-caption);
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
 }
 
 .chart-readout-row {
@@ -206,14 +206,14 @@
   align-items: center;
   gap: var(--space-2);
   font: var(--text-small);
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
 }
 
 .chart-readout-value {
   min-inline-size: 2.5ch;
   font: var(--text-numeric);
   font-variant-numeric: tabular-nums;
-  color: var(--text-primary);
+  color: var(--color-text);
 }
 
 .chart-key {
@@ -239,7 +239,7 @@
   padding: 0;
   list-style: none;
   font: var(--text-small);
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
 
   li {
     display: inline-flex;
@@ -265,12 +265,12 @@
 .chart-legend-value {
   font: var(--text-numeric);
   font-variant-numeric: tabular-nums;
-  color: var(--text-primary);
+  color: var(--color-text);
 }
 
 .chart-note {
   font: var(--text-small);
-  color: var(--text-muted);
+  color: var(--color-text-quiet);
 }
 
 .chart-table {
@@ -303,7 +303,7 @@
   min-inline-size: 0;
   overflow-wrap: anywhere;
   font: var(--text-small);
-  color: var(--text-primary);
+  color: var(--color-text);
 }
 
 .bar-chart-track {
@@ -318,7 +318,7 @@
 .bar-chart-value {
   font: var(--text-numeric);
   font-variant-numeric: tabular-nums;
-  color: var(--text-primary);
+  color: var(--color-text);
   white-space: nowrap;
 }
 
@@ -330,7 +330,7 @@
 }
 
 .stacked-bar-track {
-  fill: var(--surface-inset);
+  fill: var(--color-panel-soft);
 }
 
 .sparkline {
@@ -387,9 +387,9 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   margin: 0;
   overflow: hidden;
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-card);
-  background-color: var(--surface-default);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-tile);
+  background-color: var(--color-panel);
 
   @media (min-width: 48rem) {
     grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -402,12 +402,12 @@
   gap: var(--space-1);
   padding: var(--space-4) var(--space-5);
   box-shadow:
-    1px 0 0 var(--border-subtle),
-    0 1px 0 var(--border-subtle);
+    1px 0 0 var(--color-line),
+    0 1px 0 var(--color-line);
 
   dt {
     font: var(--text-label);
-    color: var(--text-secondary);
+    color: var(--color-text-secondary);
   }
 
   dd {
@@ -438,13 +438,13 @@
   align-items: baseline;
   gap: var(--space-1);
   font: var(--text-small);
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
 }
 
 .figure-change-glyph {
   flex: none;
   font-weight: 600;
-  color: var(--text-primary);
+  color: var(--color-text);
 }
 
 .figure-change-skeleton {

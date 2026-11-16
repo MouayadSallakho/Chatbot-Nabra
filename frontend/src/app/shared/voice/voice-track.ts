@@ -58,11 +58,11 @@ import { VOICE_WORDS, replyRuns, repliesPhrase } from './voice';
     }
 
     .voice-track-ai {
-      background-color: var(--voice-ai-fg);
+      background-color: var(--voice-ai-label);
     }
 
     .voice-track-human {
-      background-color: var(--voice-human-fg);
+      background-color: var(--voice-team-label);
     }
 
     @media (forced-colors: active) {

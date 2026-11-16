@@ -172,16 +172,17 @@ Three tiers:
   `-highlight`, `-blur`, `-solid-bg`), `--scrim`, `--glow-a`/`-b`,
   `--orb-gradient`, `--skeleton-*`, `--channel-whatsapp`/`-web`.
 
-**The alias layer.** At the end of the file every Two Voices name (`--surface-*`,
-`--text-primary|secondary|muted`, `--border-*`, `--action*`, `--link*`,
-`--focus-ring`, `--selection`, `--voice-ai|human-*`, `--success|warning|danger|info-*`,
-`--chart-human`, `--shadow-overlay`, `--radius-control|card|overlay`,
-`--text-page-title|section-title|card-title|reading`, `--duration-xs…xl`,
-`--ease-*`, `--motion-*`) is a deprecated alias of its Calm Glass role. Every
-screen took the new palette and type at once; each Phase 39 screen step moves its
-components to the new names, and 39.8b deletes the block. The aliases are
-declared on `:root` (and the type aliases also on `:lang(ar)`), where every axis
-switch lives, so they follow the theme, transparency and contrast.
+**The alias layer is gone (39.8b).** From 39.2a to 39.8a every Two Voices name
+(`--surface-*`, `--text-primary|secondary|muted`, `--border-*`, `--action*`,
+`--link*`, `--focus-ring`, `--selection`, `--voice-ai|human-*`,
+`--success|warning|danger|info-*`, `--chart-human`, `--shadow-overlay`,
+`--radius-control|card|overlay`, `--text-page-title|section-title|card-title|reading`,
+`--duration-xs…xl`, `--ease-*`, `--motion-*`) was a deprecated alias of its Calm
+Glass role, so every screen took the new palette at once. 39.8b moved the last
+uses and deleted the block. `src/styles/retired-names.spec.ts` (run by
+`npm run test:ci`) lists every retired name, with the retired classes
+`.btn-ghost` and `.badge-*`, and fails if one is used again or if a `var(--x)`
+without a fallback names a property nothing declares.
 
 The embedded widget, the hosted chat and the agent preview still take the
 workspace's own colour as `--chat-accent` / `--chat-on-accent` (checked by
@@ -514,7 +515,7 @@ place, without changing a class name or DOM contract, and added the components
 the screen steps build from. The catalogue, with tokens, is MASTER.md section 14.
 
 - **Buttons** -- `.btn-primary` (emerald) / `-secondary` (a panel with a line) /
-  `-quiet` (text only; `.btn-ghost` is the same rule) / `-danger` /
+  `-quiet` (text only) / `-danger` /
   `-danger-ghost` / `.btn-link`, pills of 44px (`.btn-sm` 40px), weight 600,
   plus round icon-only buttons with an accessible name. Press is a 1px settle in
   120ms. Busy overlays a spinner and keeps the button's size and its visually
@@ -534,9 +535,11 @@ the screen steps build from. The catalogue, with tokens, is MASTER.md section 14
   forced colours); invalid by `aria-invalid`.
 - **Chips** -- `app-chip` with a tone (need, team, waiting, ai, failed, neutral;
   success, warning, danger, info with their glyphs): a 24px pill, a dot and a
-  word. The `.badge-*` classes are the same rules until each screen moves to
-  `app-chip`; `.count-badge` stays for numbers. `app-voice-chip` is a chip that
-  names the voice.
+  word; a template that binds a status by `[class]` uses the `.chip-*` classes
+  directly (the `.badge-*` twins were retired in 39.8b). In forced colours the
+  marker is painted `CanvasText` (`forced-color-adjust: none` on `::before`), so
+  the dot or glyph stays beside the word. `.count-badge` stays for numbers.
+  `app-voice-chip` is a chip that names the voice.
 - **Panels and tiles** -- `.panel-surface` (radius 24, a line, no shadow) and
   `.tile-surface` (radius 16, the soft fill); `.card` keeps radius 16 until each
   screen's step.

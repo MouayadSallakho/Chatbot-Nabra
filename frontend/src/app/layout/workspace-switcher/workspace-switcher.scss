@@ -72,10 +72,14 @@
     padding: 0;
   }
 
-  // The phone's top bar: a quiet line under the area's title, still 24px tall.
+  // The phone's top bar: a quiet 24px line under the area's title. The target
+  // is 44px tall (39.8b, 39.8a risk 3): it reaches 20px up over the title, so
+  // the line stays where it was and the bar keeps its height; tapping the
+  // title opens the workspaces too. The ring is drawn round the visible line.
   &.is-bar {
-    min-block-size: 1.5rem;
-    padding: 0;
+    min-block-size: var(--target-min);
+    margin-block-start: calc(1.5rem - var(--target-min));
+    padding: calc(var(--target-min) - 1.5rem) 0 0;
     border: 0;
     background: none;
     color: var(--color-text-secondary);
@@ -84,6 +88,16 @@
     &[aria-expanded='true'] {
       background: none;
       color: var(--color-text);
+    }
+
+    &:focus-visible {
+      outline: none;
+
+      .switcher-face {
+        outline: var(--focus-ring-width) solid var(--color-focus-ring);
+        outline-offset: var(--focus-ring-offset);
+        border-radius: var(--radius-badge);
+      }
     }
   }
 }

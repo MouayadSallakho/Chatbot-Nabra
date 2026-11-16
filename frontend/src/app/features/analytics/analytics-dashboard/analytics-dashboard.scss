@@ -20,7 +20,7 @@
 
 .range-note {
   font: var(--text-small);
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
 }
 
 // The page under the period. While a refresh is out, the previous figures stay
@@ -33,7 +33,7 @@
 }
 
 .analytics-body {
-  transition: opacity var(--duration-sm) var(--ease-standard);
+  transition: opacity var(--duration-press) var(--ease-calm);
 
   &.is-refreshing {
     opacity: 0.6;
@@ -59,7 +59,7 @@
 .figures-note {
   margin-block-start: calc(var(--space-3) * -1);
   font: var(--text-small);
-  color: var(--text-muted);
+  color: var(--color-text-quiet);
 }
 
 .stale-figures {
@@ -79,14 +79,14 @@
 }
 
 .panel-title {
-  font: var(--text-card-title);
-  color: var(--text-primary);
+  font: var(--text-title-3);
+  color: var(--color-text);
 }
 
 .panel-note {
   max-inline-size: 72ch;
   font: var(--text-small);
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
 }
 
 .now-panel {
@@ -98,7 +98,7 @@
 .now-value {
   margin-block: var(--space-2) var(--space-1);
   font: var(--text-figure);
-  color: var(--text-primary);
+  color: var(--color-text);
 }
 
 .day-panel {
@@ -122,9 +122,9 @@
   justify-content: space-between;
   gap: var(--space-3);
   padding-block: var(--space-2);
-  border-block-end: 1px solid var(--border-subtle);
+  border-block-end: 1px solid var(--color-line);
   font: var(--text-small);
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
 
   dt {
     display: inline-flex;
@@ -136,11 +136,11 @@
     margin: 0;
     font: var(--text-numeric);
     font-variant-numeric: tabular-nums;
-    color: var(--text-primary);
+    color: var(--color-text);
   }
 
   &.is-failed dt {
-    color: var(--danger-fg);
+    color: var(--status-danger-fg);
   }
 
   .icon {

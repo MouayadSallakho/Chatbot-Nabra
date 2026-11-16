@@ -96,11 +96,11 @@
                   <span class="data-row-title" dir="auto">{{ endpoint.aiAgentName }}</span>
 
                   <span class="endpoint-status">
-                    <span class="badge" [class]="statusTone(endpoint.status)">{{
+                    <span class="chip" [class]="statusTone(endpoint.status)">{{
                       statusWord(endpoint.status)
                     }}</span>
                     @if (endpoint.status === 'Active' && endpoint.aiAgentStatus !== 'Active') {
-                      <span class="badge badge-warning" i18n="@@websiteChat.agentNotActive"
+                      <span class="chip chip-warning" i18n="@@websiteChat.agentNotActive"
                         >Agent not active</span
                       >
                     }

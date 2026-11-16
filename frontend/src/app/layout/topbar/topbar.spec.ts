@@ -1,3 +1,5 @@
+// @ts-expect-error No Node type declarations are installed in this workspace.
+import { readFileSync } from 'node:fs';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { provideRouter } from '@angular/router';
@@ -97,5 +99,22 @@ describe('Topbar', () => {
     root().querySelector<HTMLButtonElement>('[data-testid="palette-trigger"]')!.click();
 
     expect(asked).toBe(1);
+  });
+
+  // jsdom lays nothing out, so these read the rules; the Chrome pass of 39.8b
+  // measures 44px at 390 and 768 in both languages.
+  it('gives the workspace line and the skip link 44px touch targets (39.8b)', () => {
+    const switcher = readFileSync(
+      'src/app/layout/workspace-switcher/workspace-switcher.scss',
+      'utf8',
+    );
+    const bar = switcher.slice(switcher.indexOf('&.is-bar {'));
+    const base = readFileSync('src/styles/_base.scss', 'utf8');
+    const skip = base.slice(base.indexOf('.skip-link {'), base.indexOf('.skip-link {') + 600);
+
+    expect(bar).toMatch(/min-block-size:\s*var\(--target-min\)/);
+    // It reaches up over the title rather than growing the bar.
+    expect(bar).toMatch(/margin-block-start:\s*calc\(1\.5rem - var\(--target-min\)\)/);
+    expect(skip).toMatch(/min-block-size:\s*var\(--target-min\)/);
   });
 });

@@ -107,7 +107,7 @@ export class Menu {
   readonly label = input('');
 
   /** Classes for the trigger button: it is styled as whatever button it is. */
-  readonly triggerClass = input('btn btn-ghost btn-icon btn-sm');
+  readonly triggerClass = input('btn btn-quiet btn-icon btn-sm');
 
   /**
    * Which edge of the trigger the menu lines up with, when there is room.

@@ -261,6 +261,20 @@
   font: var(--text-caption);
 }
 
+// One grid cell for the shown wording and both hidden ones: as wide as the
+// longer, whichever is shown.
+.live-words {
+  display: inline-grid;
+
+  > * {
+    grid-area: 1 / 1;
+  }
+}
+
+.live-sizer {
+  visibility: hidden;
+}
+
 .live-dot {
   inline-size: var(--live-dot-size);
   block-size: var(--live-dot-size);

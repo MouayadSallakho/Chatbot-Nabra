@@ -77,7 +77,7 @@
   margin: var(--space-1) 0 0;
   padding: 0;
   list-style: none;
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
   font: var(--text-small);
 }
 
@@ -88,16 +88,16 @@
 
   app-icon {
     margin-block-start: 1px;
-    color: var(--info-fg);
+    color: var(--status-info-fg);
   }
 
   &.is-pass app-icon {
-    color: var(--success-fg);
+    color: var(--status-success-fg);
   }
 }
 
 .check-ratio {
-  color: var(--text-primary);
+  color: var(--color-text);
   font-variant-numeric: tabular-nums;
 }
 
@@ -290,7 +290,7 @@
   max-inline-size: 80ch;
   margin: 0;
   padding-inline-start: var(--space-5);
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
   font: var(--text-small);
   list-style: disc;
 }

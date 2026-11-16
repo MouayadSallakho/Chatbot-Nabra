@@ -132,13 +132,15 @@ team, cream is the customer.** Colour never carries meaning alone.
 12: Q3 the control border, Q4 the status hues) or measured in 39.2a (chart channel 2, the AI
 bubble's meta text): see the decisions log.
 
-**The alias layer (Phase 39 only).** Every Two Voices role name is re-pointed at its Calm Glass
-role at the end of `_tokens.scss` (`--surface-page` → `--color-ground`, `--action` →
-`--color-primary`, `--voice-human-fg` → `--voice-team-label`, `--text-page-title` →
-`--text-title-1`, `--duration-sm` → `--duration-press`, …), so every screen took the new
-palette and type at once with no layout change. Each screen step moves its components to the
-new names; 39.8b deletes the block and a grep gate proves no old name is left. New code never
-uses an alias name.
+**The alias layer is gone (39.8b).** From 39.2a to 39.8a every Two Voices role name was
+re-pointed at its Calm Glass role at the end of `_tokens.scss` (`--surface-page` →
+`--color-ground`, `--action` → `--color-primary`, `--voice-human-fg` → `--voice-team-label`,
+`--text-page-title` → `--text-title-1`, `--duration-sm` → `--duration-press`, …), so every
+screen took the new palette and type at once. 39.8b moved the last 323 uses to the Calm Glass
+names and deleted the block, with the Two Voices class twins (`.btn-ghost`, `.badge-*`).
+`src/styles/retired-names.spec.ts` lists all 66 retired token names and the retired classes and
+fails `npm run test:ci` if one comes back; it also fails on any `var(--x)` without a fallback
+that nothing declares.
 
 ### 3.1 Glass, transparency and the other axes
 
@@ -267,7 +269,7 @@ a changed file is `v2`.
   message rises `--motion-rise` (8 px); the orb breathes to `--orb-breath` (1.04) while the AI
   answers, still under reduced motion.
 - The Two Voices names (`--duration-xs…xl`, `--ease-standard/-enter/-exit/-emphasized`,
-  `--motion-fast/-normal/-slow`) are aliases of these until 39.8b.
+  `--motion-fast/-normal/-slow`) were retired in 39.8b; only the names above exist.
 - Not in the admin: count-ups, stagger on every visit, parallax, fade-up on sections, bounce.
 - Reduced motion: the press, menu and dialog durations collapse to ~0 at the source and travel
   to 0, so every component follows; the base layer's universal rule stops literal infinite
@@ -312,8 +314,8 @@ a changed file is `v2`.
 7. Voice displays (chip, split, track, event line) are drawn only from real API data.
 8. No CDN, font service or third-party request from the application.
 9. Components use semantic tokens only; shared rules go to the global layers, not budgets.
-10. Sample content exists only in the development-only Design Lab, labelled as sample. One
-    page exception: the labelled example conversation on the entry pages (`pages/entry.md`).
+10. Sample content exists only in the development-only Design Lab, labelled as sample. (The
+    entry pages' labelled example conversation, the one page exception, was retired in 39.8a.)
 11. Checkboxes, radios, switches and segmented controls are the choice-control family (section
     14), on the consumer's own `<label>` and native `<input>`. There is no global
     `input[type=checkbox]` rule and no `.switch` escape class (Phase 38 notes 3 and 4); a bare
@@ -469,6 +471,17 @@ chip (owner decision Q4).
 | 2026-11-15 | Headline numbers are tabular everywhere (`.figure-value`, the bento's figures, the ring, the legend shares) | calm-glass §4 | Phase 39.7a |
 | 2026-11-15 | Report files download through the client: a button reads the file (`responseType: 'blob'`) and saves it under the server's `Content-Disposition` name (`filename*` first, path and control characters dropped); a refusal is read back out of its blob and worded by its code under the button (`role="alert"`), then the list is read again | Phase 38 note 16 | Phase 39.7a |
 | 2026-11-15 | A report's and a schedule's file language is a small neutral chip; a schedule's state is a chip (On: tick; Off: hollow ring) | Owner Q4; the language tag of plan 39.0 §3.7 | Phase 39.7a |
+| 2026-11-16 | The alias layer is deleted: every use moved to its Calm Glass name, with the class twins `.btn-ghost` and `.badge-*`; `retired-names.spec.ts` keeps them out and fails on an undeclared `var()` without a fallback | Plan 39.0 decision 1; names like `--voice-human-*` and `--action` lied about Calm Glass | Phase 39.8b |
+| 2026-11-16 | `.page-calm` stays a modifier rather than the default | Every list, form and settings page carries it; the inbox thread, the entry pages and the design lab were designed without it, and a global rule would restyle them | Phase 39.8b |
+| 2026-11-16 | In forced colours a chip's dot or glyph opts out of the browser's override (`forced-color-adjust: none`) and is painted `CanvasText`; the draft ring keeps its inset ring | 39.6b risk 2: the browser painted the marker with the pill's Canvas and it vanished, leaving only the word | Phase 39.8b |
+| 2026-11-16 | The skip link and the phone/tablet top bar's workspace line are 44 px targets; the line reaches 20 px up over the area's title so the bar keeps its 56 px and the text does not move | 39.8a risk 3 (40 px and 24 px measured) | Phase 39.8b |
+| 2026-11-16 | An on/off status label in Arabic says that something works: «تعمل» / «يعمل» (live updates, a schedule's On, an agent's or a channel's Active, «الوكيل لا يعمل»), never «مفعّل»; settings switches and sentences keep «تفعيل» | At a small size «مفعّلة» reads like «مقفلة», the opposite; follows 39.6a's sounds | Owner's assistant, Phase 39.8b |
+| 2026-11-16 | The phone's bottom bar gives each name the whole fifth (no side padding) and, under 360 px, shares the bar by content (`grid-auto-columns: auto`); `hyphens: auto` before `overflow-wrap: anywhere` | Every name on one line at 320–390 px in both languages without new strings or smaller type (39.5a risk 2) | Phase 39.8b |
+| 2026-11-16 | The side bar's search and bell are the dense header's 40 px icon buttons (44 px on a coarse pointer) | At 44 px the head needed 196 px of 188 and the name ran under the search button | Phase 39.8b |
+| 2026-11-16 | Unread in the bell's panel is the dot, the word and the heavier title (the 3 px start bar is gone); its action link is 44 px on touch | One unread signal everywhere (calm-glass.md §6); 39.6b risk 5 | Phase 39.8b |
+| 2026-11-16 | "Show earlier messages": focus on the button is not a request to read; a read the keyboard asked for keeps the button in view with the new messages under it | Focus moved the button into range, the read kept the old place, and the focused button ended a page above the view (WCAG 2.4.11) | Phase 39.8b |
+| 2026-11-16 | A status word that changes in place (the inbox's live state) reserves the width of its longest wording with hidden sizers in the same grid cell | In Arabic the long "paused" wrapped the title row and "on" moved the list up 24 px (CLS 0.03) | Phase 39.8b |
+| 2026-11-16 | A table's row header (`tbody th`) is 600 | No page needs a 700 face (Plex Arabic 700 loaded on Arabic analytics, 39.7a risk 6) | Phase 39.8b |
 
 ## 13. Contrast table (Calm Glass, Phase 39.2a)
 
@@ -763,10 +776,10 @@ The gold circle on white (emails, the report footer, the light favicon) is 2.25:
 
 ## 14. Components (Calm Glass, Phase 39.2b)
 
-Each is shown in the Design Lab in both languages and themes, with "Reduce transparency". A
-screen step moves its markup onto these; until then the Two Voices class names are restyled in
-place to the same look (`.btn-ghost` = `.btn-quiet`, `.badge-*` = chips, `.handoff-divider` =
-the event line, `.bubble-human` = the team's bubble). Tests: a Vitest spec beside each.
+Each is shown in the Design Lab in both languages and themes, with "Reduce transparency". The
+Two Voices class twins `.btn-ghost` and `.badge-*` were retired in 39.8b (use `.btn-quiet` and
+`app-chip` or the `.chip-*` classes); `.handoff-divider` (the event line) and `.bubble-human`
+(the team's bubble) remain as the names those rules carry. Tests: a Vitest spec beside each.
 
 | Component                                                                                                                            | What it is                                                                                                                                                                                                                                                                                                                                                                        | Tokens                                                                                                           |
 | ------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |

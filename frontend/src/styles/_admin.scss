@@ -24,13 +24,13 @@
   }
 
   dt {
-    color: var(--text-muted);
+    color: var(--color-text-quiet);
     font: var(--text-caption);
   }
 
   dd {
     margin: 0;
-    color: var(--text-primary);
+    color: var(--color-text);
     font: var(--text-body-strong);
     font-variant-numeric: tabular-nums;
     overflow-wrap: anywhere;
@@ -87,9 +87,9 @@ app-permission-picker {
   min-inline-size: 0;
   margin: 0;
   padding: var(--space-4) var(--space-4) var(--space-3);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-control);
-  background-color: var(--surface-default);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-input);
+  background-color: var(--color-panel);
 }
 
 // Floated, a legend leaves the fieldset's border and becomes ordinary content.
@@ -98,13 +98,13 @@ app-permission-picker {
   inline-size: 100%;
   margin: 0;
   padding: 0;
-  color: var(--text-primary);
-  font: var(--text-card-title);
+  color: var(--color-text);
+  font: var(--text-title-3);
 }
 
 .perm-area-count {
   margin: 0;
-  color: var(--text-muted);
+  color: var(--color-text-quiet);
   font: var(--text-small);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -130,13 +130,13 @@ app-permission-picker {
 }
 
 .perm-label {
-  color: var(--text-primary);
+  color: var(--color-text);
   font: var(--text-body-strong);
   overflow-wrap: anywhere;
 }
 
 .perm-description {
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
   font: var(--text-small);
 }
 
@@ -149,7 +149,7 @@ app-permission-picker {
 
   li {
     padding-block: var(--space-2);
-    border-block-start: 1px solid var(--border-subtle);
+    border-block-start: 1px solid var(--color-line);
   }
 }
 
@@ -169,10 +169,10 @@ app-permission-picker {
   gap: var(--space-1);
   min-block-size: 1.375rem;
   padding-inline: var(--space-2);
-  border: 1px solid var(--border-default);
+  border: 1px solid var(--color-line);
   border-radius: var(--radius-badge);
-  background-color: var(--surface-muted);
-  color: var(--text-secondary);
+  background-color: var(--color-panel-soft);
+  color: var(--color-text-secondary);
   font: var(--text-caption);
 
   .icon {
@@ -187,9 +187,9 @@ app-permission-picker {
   flex-direction: column;
   gap: var(--space-2);
   padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-control);
-  background-color: var(--surface-muted);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-input);
+  background-color: var(--color-panel-soft);
 
   .perm-impacts {
     margin: 0;
@@ -198,7 +198,7 @@ app-permission-picker {
 
 .impact-summary-title {
   margin: 0;
-  color: var(--text-primary);
+  color: var(--color-text);
   font: var(--text-body-strong);
   font-variant-numeric: tabular-nums;
 }
@@ -216,7 +216,7 @@ app-permission-picker {
   gap: var(--space-2);
   min-block-size: 2.75rem;
   padding: var(--space-2) var(--space-5);
-  color: var(--text-primary);
+  color: var(--color-text);
   font: var(--text-body-strong);
   cursor: pointer;
   list-style: none;
@@ -226,11 +226,11 @@ app-permission-picker {
   }
 
   &:hover {
-    background-color: var(--surface-hover);
+    background-color: var(--color-hover);
   }
 
   &:focus-visible {
-    outline: var(--focus-ring-width) solid var(--focus-ring);
+    outline: var(--focus-ring-width) solid var(--color-focus-ring);
     outline-offset: calc(-1 * var(--focus-ring-width));
   }
 }
@@ -239,7 +239,7 @@ app-permission-picker {
 // page's direction, not by the icon set.
 .past-chevron {
   transform: rotate(calc(-90deg * var(--direction-flip, 1)));
-  transition: transform var(--duration-sm) var(--ease-standard);
+  transition: transform var(--duration-press) var(--ease-calm);
 
   [open] > summary > & {
     transform: none;
@@ -250,7 +250,7 @@ app-permission-picker {
   margin: 0;
   padding: 0;
   list-style: none;
-  border-block-start: 1px solid var(--border-subtle);
+  border-block-start: 1px solid var(--color-line);
 }
 
 .past-row {
@@ -261,7 +261,7 @@ app-permission-picker {
   padding: var(--space-3) var(--space-5);
 
   & + & {
-    border-block-start: 1px solid var(--border-subtle);
+    border-block-start: 1px solid var(--color-line);
   }
 }
 
@@ -307,7 +307,7 @@ app-permission-picker {
 }
 
 .role-name {
-  color: var(--text-primary);
+  color: var(--color-text);
   font: var(--text-body-strong);
   overflow-wrap: anywhere;
 }
@@ -329,7 +329,7 @@ app-permission-picker {
   }
 
   li + li {
-    border-block-start: 1px solid var(--border-subtle);
+    border-block-start: 1px solid var(--color-line);
   }
 }
 
@@ -360,7 +360,7 @@ app-permission-picker {
     justify-content: space-between;
     gap: var(--space-3);
     padding-block: var(--space-1);
-    border-block-end: 1px solid var(--border-subtle);
+    border-block-end: 1px solid var(--color-line);
     font: var(--text-small);
   }
 }
@@ -475,19 +475,18 @@ app-permission-picker {
 // strongest chip (a solid coral fill) with a marker of its own, a "no entry"
 // disc, beside the tick, the triangle and the octagon of the states before it.
 // -----------------------------------------------------------------------------
-.chip-exhausted,
-.badge-exhausted {
-  --badge-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Ccircle cx='6' cy='6' r='5.4' fill='%23fff'/%3E%3Cpath d='M3.2 6h5.6' stroke='%23000' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E");
+.chip-exhausted {
+  --chip-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Ccircle cx='6' cy='6' r='5.4' fill='%23fff'/%3E%3Cpath d='M3.2 6h5.6' stroke='%23000' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E");
 
-  background-color: var(--danger-solid);
-  border-color: var(--danger-solid);
-  color: var(--danger-contrast);
+  background-color: var(--status-danger-solid);
+  border-color: var(--status-danger-solid);
+  color: var(--status-on-danger-solid);
 
   &::before {
     inline-size: 0.75rem;
     block-size: 0.75rem;
     border-radius: 0;
-    mask: var(--badge-glyph) center / contain no-repeat;
+    mask: var(--chip-glyph) center / contain no-repeat;
     mask-mode: luminance;
   }
 }
@@ -503,7 +502,7 @@ app-permission-picker {
 .quota-list {
   display: grid;
   gap: var(--space-3);
-  transition: opacity var(--duration-sm) var(--ease-standard);
+  transition: opacity var(--duration-press) var(--ease-calm);
 
   @media (min-width: 48rem) {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -672,8 +671,8 @@ app-permission-picker {
   font: var(--text-small);
 
   &.is-warning {
-    border-inline-start-color: var(--warning-fg);
-    background-color: var(--warning-bg);
+    border-inline-start-color: var(--status-warning-fg);
+    background-color: var(--status-warning-bg);
   }
 
   @media (forced-colors: active) {
@@ -701,18 +700,7 @@ app-permission-picker {
 // -----------------------------------------------------------------------------
 // Notification history (Phase 39.6b)
 // -----------------------------------------------------------------------------
-// On the page each notification is a row tile (radius 16), and unread is the
-// dot, the word "Unread" and the heavier title (calm-glass.md §6): the bell's
-// 3px start bar would curl round the tile's corners, so the page drops it. Set
-// here because the row's own style is encapsulated in the shared item.
-.page-calm .notification-history .history-list .is-unread {
-  box-shadow: none;
-}
-
-// On touch the row's link ("Open Reports") is a 44px target like the rest of
-// the page; the item's own 28px suits the bell's dense panel on a desktop.
-@media (pointer: coarse), (max-width: 61.999rem) {
-  .page-calm .notification-history .history-list .notification-action {
-    min-block-size: var(--target-min);
-  }
-}
+// On the page each notification is a row tile (radius 16). Unread (the dot,
+// the word "Unread" and the heavier title) and the 44px touch target of the
+// row's link live in the shared item since 39.8b, so the bell's panel and this
+// page draw them the same way.

@@ -61,7 +61,7 @@ import { ToastService } from './toast-service';
         <span class="toast-text">{{ toast.text }}</span>
         <button
           type="button"
-          class="btn btn-ghost btn-icon btn-sm toast-dismiss"
+          class="btn btn-quiet btn-icon btn-sm toast-dismiss"
           (click)="dismiss(toast.id)"
         >
           <app-icon name="close" [strokeWidth]="1.75" />

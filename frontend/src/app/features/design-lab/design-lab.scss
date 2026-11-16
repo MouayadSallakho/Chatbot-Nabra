@@ -45,6 +45,20 @@
   padding-block-end: var(--space-4);
   border-block-end: 1px solid var(--color-line);
   font: var(--text-small);
+
+  // Each section link is a real target: 24px tall with a mouse, 44px on touch
+  // (39.8b; they were 20–22px, the line's height).
+  a {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-block-size: var(--target-min-pointer);
+    min-inline-size: var(--target-min-pointer);
+
+    @media (pointer: coarse), (max-width: 61.999rem) {
+      min-block-size: var(--target-min);
+    }
+  }
 }
 
 .lab-section {

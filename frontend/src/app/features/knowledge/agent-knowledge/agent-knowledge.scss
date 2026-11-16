@@ -9,7 +9,7 @@
   flex-direction: column;
   gap: var(--space-3);
   padding-block-start: var(--space-5);
-  border-block-start: 1px solid var(--border-subtle);
+  border-block-start: 1px solid var(--color-line);
 
   h3,
   > p {
@@ -40,9 +40,9 @@
 
 .hit {
   padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-control);
-  background-color: var(--surface-inset);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-input);
+  background-color: var(--color-panel-soft);
 }
 
 .hit-head {
@@ -65,5 +65,5 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   font: var(--text-small);
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
 }

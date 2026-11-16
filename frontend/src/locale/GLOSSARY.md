@@ -9,8 +9,11 @@ its Arabic translation does not contain the **Match** text (any of them, when se
 (ال), so the definite and indefinite forms both pass. The check is a reminder, not a gate: a
 sentence can have a good reason to word it differently.
 
-Arabic copy uses Arabic punctuation (، ؛ ؟) and «» for quoted names. Status adjectives agree with
-their noun (an agent is مفعّل, a channel is مفعّلة), so they are separate messages per entity.
+Arabic copy uses Arabic punctuation (، ؛ ؟) and «» for quoted names. Status words agree with
+their noun (an agent يعمل, a channel تعمل), so they are separate messages per entity. An on/off
+status label says that something works («تعمل» / «يعمل», off «متوقفة» or «معطّل»), never «مفعّل»:
+at a small size «مفعّلة» reads like «مقفلة», the opposite (39.8b). Settings switches and whole
+sentences keep «تفعيل» and «مفعّلة».
 
 | English              | Arabic                       | Match                     | Checked | Note                                                                                                                   |
 | -------------------- | ---------------------------- | ------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------- |
@@ -37,7 +40,7 @@ their noun (an agent is مفعّل, a channel is مفعّلة), so they are sepa
 | AI (voice)           | الذكاء الاصطناعي             |                           | no      | the Lagoon voice                                                                                                       |
 | Person (voice)       | الفريق                       |                           | no      | the Ember voice; gender-neutral                                                                                        |
 | Draft                | مسودة                        | مسودة                     | no      |                                                                                                                        |
-| Active               | مفعّل                        |                           | no      | agrees with its noun: مفعّلة for a channel                                                                             |
+| Active               | يعمل                         |                           | no      | the status label; agrees with its noun: تعمل for a channel or a schedule; the action is تفعيل                          |
 | Disabled             | معطّل                        |                           | no      | agrees with its noun: معطّلة for a channel                                                                             |
 | Sign in              | تسجيل الدخول                 | الدخول                    | yes     |                                                                                                                        |
 | Sign out             | تسجيل الخروج                 | الخروج                    | yes     |                                                                                                                        |

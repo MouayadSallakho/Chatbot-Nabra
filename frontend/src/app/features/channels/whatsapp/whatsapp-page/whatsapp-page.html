@@ -114,18 +114,18 @@
                   </span>
 
                   <span>
-                    <span class="badge" [class]="statusTone(connection.status)">{{
+                    <span class="chip" [class]="statusTone(connection.status)">{{
                       statusWord(connection.status)
                     }}</span>
                   </span>
 
                   <span>
                     @if (connection.hasCredential) {
-                      <span class="badge badge-success" i18n="@@whatsapp.token.stored"
+                      <span class="chip chip-success" i18n="@@whatsapp.token.stored"
                         >Token stored</span
                       >
                     } @else {
-                      <span class="badge badge-warning" i18n="@@whatsapp.token.missing"
+                      <span class="chip chip-warning" i18n="@@whatsapp.token.missing"
                         >No access token</span
                       >
                     }

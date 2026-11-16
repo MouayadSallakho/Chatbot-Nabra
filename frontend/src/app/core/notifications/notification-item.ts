@@ -76,7 +76,7 @@ import { categoryWord, notificationText } from './notification-words';
           @if (unread()) {
             <button
               type="button"
-              class="btn btn-ghost btn-sm notification-read"
+              class="btn btn-quiet btn-sm notification-read"
               (click)="markedRead.emit(notification())"
               data-testid="mark-read"
             >
@@ -105,14 +105,14 @@ import { categoryWord, notificationText } from './notification-words';
       display: inline-flex;
       // token-lint-ignore: optical alignment of the 20px icon with the title's first line
       margin-block-start: 2px;
-      color: var(--info-fg);
+      color: var(--status-info-fg);
 
       &[data-severity='Warning'] {
-        color: var(--warning-fg);
+        color: var(--status-warning-fg);
       }
 
       &[data-severity='Critical'] {
-        color: var(--danger-fg);
+        color: var(--status-danger-fg);
       }
     }
 
@@ -132,7 +132,7 @@ import { categoryWord, notificationText } from './notification-words';
 
     .notification-title {
       font: var(--text-body);
-      color: var(--text-primary);
+      color: var(--color-text);
       overflow-wrap: anywhere;
     }
 
@@ -140,19 +140,15 @@ import { categoryWord, notificationText } from './notification-words';
       font: var(--text-body-strong);
     }
 
-    .is-unread {
-      box-shadow: inset 3px 0 0 var(--action);
-    }
-
-    :host-context([dir='rtl']) .is-unread {
-      box-shadow: inset -3px 0 0 var(--action);
-    }
+    // Unread is the dot, the word and the heavier title (calm-glass.md §6), in
+    // the bell's panel as on the history page: the Two Voices 3px start bar is
+    // gone (39.8b; 39.6b decision 8).
 
     .notification-unread {
       display: inline-flex;
       align-items: center;
       gap: var(--space-1);
-      color: var(--text-primary);
+      color: var(--color-text);
       font-weight: 600;
     }
 
@@ -162,17 +158,17 @@ import { categoryWord, notificationText } from './notification-words';
       block-size: 8px;
       border-radius: var(--radius-pill);
       // Unread is news, not an alarm, and not a voice: ink.
-      background: var(--action);
+      background: var(--color-primary);
     }
 
     .notification-category {
-      color: var(--text-muted);
+      color: var(--color-text-quiet);
     }
 
     .notification-body {
       margin: 0;
       font: var(--text-small);
-      color: var(--text-secondary);
+      color: var(--color-text-secondary);
       overflow-wrap: anywhere;
     }
 
@@ -185,17 +181,23 @@ import { categoryWord, notificationText } from './notification-words';
     }
 
     .notification-time {
-      color: var(--text-muted);
+      color: var(--color-text-quiet);
     }
 
     // A link, so ink and underlined; its target is taller than its text
-    // (WCAG 2.5.8 asks for 24px, the panel gives 28px).
+    // (WCAG 2.5.8 asks for 24px, the panel gives 28px with a mouse). On touch,
+    // and on phone and tablet widths, it is 44px in the panel as on the page
+    // (39.8b; 39.6b risk 5).
     .notification-action {
       display: inline-flex;
       align-items: center;
       min-block-size: 1.75rem;
-      color: var(--link);
+      color: var(--color-link);
       font-weight: 600;
+
+      @media (pointer: coarse), (max-width: 61.999rem) {
+        min-block-size: var(--target-min);
+      }
     }
 
     .notification-read {

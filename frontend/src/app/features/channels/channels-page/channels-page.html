@@ -54,13 +54,13 @@
             }
             @case ('failed') {
               <div class="channel-note">
-                <span class="badge badge-neutral" i18n="@@channels.notChecked">Not checked</span>
+                <span class="chip chip-neutral" i18n="@@channels.notChecked">Not checked</span>
                 <span class="text-small text-secondary" i18n="@@channels.webChat.failed"
                   >Website chat could not be read just now.</span
                 >
                 <button
                   type="button"
-                  class="btn btn-ghost btn-sm"
+                  class="btn btn-quiet btn-sm"
                   (click)="loadWebChat()"
                   i18n="@@channels.tryAgain"
                 >
@@ -121,13 +121,13 @@
             }
             @case ('failed') {
               <div class="channel-note">
-                <span class="badge badge-neutral" i18n="@@channels.notChecked">Not checked</span>
+                <span class="chip chip-neutral" i18n="@@channels.notChecked">Not checked</span>
                 <span class="text-small text-secondary" i18n="@@channels.whatsapp.failed"
                   >WhatsApp numbers could not be read just now.</span
                 >
                 <button
                   type="button"
-                  class="btn btn-ghost btn-sm"
+                  class="btn btn-quiet btn-sm"
                   (click)="loadWhatsApp()"
                   i18n="@@channels.tryAgain"
                 >
@@ -149,7 +149,7 @@
                 </dl>
                 @if (facts.withoutToken > 0) {
                   <p class="channel-note">
-                    <span class="badge badge-warning" i18n="@@channels.whatsapp.withoutToken"
+                    <span class="chip chip-warning" i18n="@@channels.whatsapp.withoutToken"
                       >Without an access token: {{ facts.withoutToken | localNumber }}</span
                     >
                   </p>
@@ -186,14 +186,14 @@
             ><app-icon name="instagram"
           /></span>
           <span class="later-name">{{ words.Instagram }}</span>
-          <span class="badge badge-neutral" i18n="@@channels.notAvailable">Not available yet</span>
+          <span class="chip chip-neutral" i18n="@@channels.notAvailable">Not available yet</span>
         </li>
         <li class="later" data-testid="channel-messenger">
           <span class="channel-glyph is-quiet" aria-hidden="true"
             ><app-icon name="messenger"
           /></span>
           <span class="later-name">{{ words.Messenger }}</span>
-          <span class="badge badge-neutral" i18n="@@channels.notAvailable">Not available yet</span>
+          <span class="chip chip-neutral" i18n="@@channels.notAvailable">Not available yet</span>
         </li>
       </ul>
     </section>

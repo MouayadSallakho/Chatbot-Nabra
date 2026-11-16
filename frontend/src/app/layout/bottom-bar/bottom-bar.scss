@@ -27,6 +27,14 @@
   margin: 0;
   padding: var(--space-1);
   list-style: none;
+
+  // Under 360px a fifth of the bar is narrower than "Customers" or "Knowledge"
+  // in English, so the columns share the bar by their content instead: each
+  // takes its name's width and an equal part of what is left ("Inbox" and
+  // "More" have room to give). Every name stays on one line at 320px (39.8b).
+  @media (max-width: 22.49rem) {
+    grid-auto-columns: auto;
+  }
 }
 
 .bottom-bar-list li {
@@ -43,7 +51,9 @@
   justify-content: center;
   gap: var(--gap-hairline);
   min-inline-size: 0;
-  padding: 0 var(--space-1);
+  // No side padding: the name gets the whole fifth of the bar (39.8b), so
+  // "Knowledge" and "Customers" fit on one line from 360px.
+  padding: 0;
   border: 0;
   border-radius: var(--radius-tile);
   background: none;
@@ -82,11 +92,14 @@
 }
 
 // One line per name: the inbox uses its short form here (`shortLabel`, 39.4a), so
-// both languages keep the 64px bar. A name still too long for a fifth of the
-// width wraps rather than losing its end.
+// both languages keep the 64px bar; under 360px the columns share the bar by
+// content (above). A name that still cannot fit (enlarged text) is hyphenated
+// where the browser has the language's patterns, and `anywhere` stays the last
+// resort, so nothing is ever cut off (39.8b; 39.5a risk 2).
 .bar-label {
   max-inline-size: 100%;
   text-align: center;
+  hyphens: auto;
   overflow-wrap: anywhere;
 }
 

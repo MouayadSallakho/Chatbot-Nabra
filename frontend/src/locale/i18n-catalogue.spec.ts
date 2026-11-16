@@ -130,4 +130,29 @@ describe('the Arabic catalogue', () => {
 
     expect(marked).toEqual([]);
   });
+
+  // At a small size «مفعّلة» reads like «مقفلة», which means the opposite, so an
+  // on/off status label says that something works (39.8b, like 39.6a's sounds).
+  // Settings switches and whole sentences keep «تفعيل» and «مفعّلة».
+  it('words an on/off status label as «تعمل» / «يعمل», never «مفعّل»', () => {
+    const t = ARABIC.translations;
+
+    expect(t['inbox.live.on']).toBe('التحديثات المباشرة تعمل');
+    expect(t['inbox.live.off']).toBe('التحديثات المباشرة متوقفة مؤقتًا');
+    expect(t['account.soundsOn']).toBe('الأصوات تعمل');
+    expect(t['schedules.on']).toBe('تعمل');
+    expect(t['agents.status.active']).toBe('يعمل');
+    expect(t['channels.status.active']).toBe('تعمل');
+    expect(t['channels.lifecycle.label']).toContain('ثم تعمل');
+    expect(t['websiteChat.agentNotActive']).toBe('الوكيل لا يعمل');
+
+    // The labels only: `websiteChat.detail.agentNotActive` is a sentence.
+    const statusLabels = Object.keys(t).filter((id) =>
+      /(\.status\.(active|on)|\.live\.on|^schedules\.on|^websiteChat\.agentNotActive)$/.test(id),
+    );
+    const enabledWording = statusLabels.filter((id) => /مفع/.test(t[id]));
+
+    expect(statusLabels.length).toBeGreaterThanOrEqual(5);
+    expect(enabledWording).toEqual([]);
+  });
 });

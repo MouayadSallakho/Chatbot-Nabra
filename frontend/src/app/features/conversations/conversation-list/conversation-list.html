@@ -26,11 +26,25 @@
         -->
         <span class="live-state" [class.is-live]="live()" role="status">
           <span class="live-dot" aria-hidden="true"></span>
-          @if (live()) {
-            <span i18n="@@inbox.live.on">Live updates on</span>
-          } @else {
-            <span i18n="@@inbox.live.off">Live updates paused</span>
-          }
+          <!--
+            Both wordings sit, hidden, in the same cell as the one shown, so the
+            state is always as wide as its longer wording and the row never
+            reflows when the connection comes up (39.8b: in Arabic the long
+            "paused" wrapped the title row, and "on" moved the list up 24px).
+          -->
+          <span class="live-words">
+            @if (live()) {
+              <span i18n="@@inbox.live.on">Live updates on</span>
+            } @else {
+              <span i18n="@@inbox.live.off">Live updates paused</span>
+            }
+            <span class="live-sizer" aria-hidden="true" i18n="@@inbox.live.on"
+              >Live updates on</span
+            >
+            <span class="live-sizer" aria-hidden="true" i18n="@@inbox.live.off"
+              >Live updates paused</span
+            >
+          </span>
         </span>
       }
     </div>

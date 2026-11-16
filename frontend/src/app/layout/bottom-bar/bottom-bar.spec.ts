@@ -1,3 +1,5 @@
+// @ts-expect-error No Node type declarations are installed in this workspace.
+import { readFileSync } from 'node:fs';
 import { Component, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
@@ -187,5 +189,18 @@ describe('BottomBar', () => {
 
     expect(barLabels()).toEqual(['Inbox', 'Overview']);
     expect(more()).toBeNull();
+  });
+
+  // jsdom lays nothing out; the Chrome pass of 39.8b checks 320 to 768px.
+  it('gives each name the whole fifth of the bar and hyphenates rather than breaking a word (39.8b)', () => {
+    const css = readFileSync('src/app/layout/bottom-bar/bottom-bar.scss', 'utf8');
+    const item = css.slice(css.indexOf('.bar-item {'), css.indexOf('.bar-item {') + 700);
+    const label = css.slice(css.indexOf('.bar-label {'), css.indexOf('.bar-label {') + 200);
+
+    expect(item).toMatch(/\n  padding: 0;/);
+    // Under 360px the columns share the bar by their names' widths.
+    expect(css).toMatch(/@media \(max-width: 22\.49rem\) \{\s*grid-auto-columns: auto;/);
+    expect(label).toMatch(/hyphens: auto;/);
+    expect(label.indexOf('hyphens: auto')).toBeLessThan(label.indexOf('overflow-wrap: anywhere'));
   });
 });

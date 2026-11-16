@@ -1,7 +1,7 @@
 <button
   #bell
   type="button"
-  class="btn btn-ghost btn-icon bell"
+  class="btn btn-quiet btn-icon bell"
   [class.has-unread]="center.unread() > 0"
   [attr.aria-expanded]="open()"
   aria-controls="notification-panel"
@@ -53,7 +53,7 @@
       @if (center.unread() > 0) {
         <button
           type="button"
-          class="btn btn-ghost btn-sm panel-mark-all"
+          class="btn btn-quiet btn-sm panel-mark-all"
           (click)="markAllRead()"
           data-testid="mark-all-read"
         >

@@ -115,6 +115,28 @@ describe('ConversationList', () => {
 
   afterEach(() => http.verify());
 
+  // 39.8b: in Arabic the long "paused" wrapped the title row and "on" moved the
+  // list up 24px when the connection came up (CLS 0.03). Both wordings now hold
+  // the cell, hidden, so the state is as wide as its longer one in either state.
+  it('keeps the live state as wide as its longer wording, and says only the one that holds', async () => {
+    await mount('conversations.view');
+    http.expectOne(url).flush({ items: [], page: 1, pageSize: 20, total: 0 });
+    await settle();
+
+    const state = host().querySelector('.live-state')!;
+    const sizers = [...state.querySelectorAll('.live-sizer')];
+    const shown = [...state.querySelectorAll('.live-words > span:not(.live-sizer)')];
+
+    expect(state.getAttribute('role')).toBe('status');
+    expect(sizers.map((sizer) => sizer.textContent?.trim())).toEqual([
+      'Live updates on',
+      'Live updates paused',
+    ]);
+    expect(sizers.every((sizer) => sizer.getAttribute('aria-hidden') === 'true')).toBe(true);
+    expect(shown.length).toBe(1);
+    expect(['Live updates on', 'Live updates paused']).toContain(shown[0].textContent?.trim());
+  });
+
   describe('the needs-a-person view', () => {
     const viewUrl = `${url}&filter=needs-person`;
     const emptyPage = { items: [], page: 1, pageSize: 20, total: 0 };

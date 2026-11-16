@@ -1,3 +1,5 @@
+// @ts-expect-error No Node type declarations are installed in this workspace.
+import { readFileSync } from 'node:fs';
 import { Component, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Chip, ChipTone } from './chip';
@@ -81,5 +83,22 @@ describe('Chip', () => {
       fixture.detectChanges();
       expect(chip().classList).toContain(`chip-${tone}`);
     }
+  });
+
+  // jsdom has no forced-colours mode, so this reads the rule itself; the Chrome
+  // pass of 39.8b checks it on every screen with forced colours emulated.
+  it('keeps the dot or glyph in forced colours: the marker opts out and takes CanvasText (39.8b)', () => {
+    const css = readFileSync('src/styles/_primitives.scss', 'utf8');
+    const block = css.slice(css.indexOf('// Forced colours (39.8b'));
+    const rule = block.slice(
+      block.indexOf('@media (forced-colors: active)'),
+      block.indexOf('// A count on an icon'),
+    );
+
+    expect(rule).toMatch(
+      /\.chip::before\s*\{[^}]*forced-color-adjust:\s*none;[^}]*background-color:\s*CanvasText;/,
+    );
+    // Last of the chip rules, so no tone's own `::before` overrides it.
+    expect(css.lastIndexOf('.chip-sm')).toBeLessThan(css.indexOf('// Forced colours (39.8b'));
   });
 });
