@@ -1,167 +1,49 @@
-# OmniAI Platform
+# Nabra · نبرة
 
-Multi-tenant omnichannel AI customer engagement platform.
+Nabra gives each workspace a shared customer inbox. A website visitor can ask an AI agent a question grounded in the workspace's knowledge documents, then continue the conversation with a team member. The Angular admin and visitor experiences support English and Arabic, including right-to-left layouts.
 
-> **Status: Phase 1 — repository foundation only.**
-> No product features are implemented. The sections below describe what exists
-> today, not what the platform is intended to become.
+## Channel readiness
 
----
-
-## Purpose
-
-One platform serving many customer businesses, rather than a separate codebase
-per customer. The product direction covers website chat, WhatsApp, Instagram and
-Messenger channels, AI support and sales, knowledge/RAG, human handoff, customer
-and lead management, reporting, scheduling, integrations, usage tracking and
-billing.
-
-**None of that is built yet.** See [Current state](#current-state).
-
----
-
-## Architectural direction
-
-### Backend — Clean Architecture
-
-The backend is a .NET solution with a strictly inward dependency direction:
-
-```
-OmniAI.Api  ──────────►  OmniAI.Infrastructure
-    │                            │
-    │                            ▼
-    └──────────────────►  OmniAI.Application
-                                 │
-                                 ▼
-                           OmniAI.Domain
-```
-
-| Project | Role | May reference |
+| Channel | Available in this version | Next validation |
 | --- | --- | --- |
-| `OmniAI.Domain` | Business model and rules | nothing |
-| `OmniAI.Application` | Use cases and the abstractions the outer layers implement | Domain |
-| `OmniAI.Infrastructure` | Implementations of Application abstractions | Application, Domain |
-| `OmniAI.Api` | Composition root, hosting and the HTTP surface | Application, Infrastructure |
+| Website chat | Hosted page, embeddable widget, local AI replies, human takeover and realtime inbox | Run the browser journeys against the local development stack |
+| WhatsApp | Local text adapter, signed webhooks, encrypted credentials, inbound deduplication, durable outbound delivery and receipts | Exchange messages with a Meta test number when the owner is ready |
+| Messenger | Channel label and availability indicator | Build and exercise the Page adapter locally |
+| Instagram Direct | Channel label and availability indicator | Build and exercise the professional-account adapter locally |
 
-This is enforced, not merely documented: each test project carries an
-architecture guard that reads the compiled assembly's metadata and fails the
-build's test stage if a forbidden dependency appears.
+Production approval for the Meta channels is pending. The WhatsApp adapter currently defaults to Graph API v26.0. Keep that tested default for the local baseline and validate the version supported by the new Meta app before enabling live traffic.
 
-### Standing constraints
+## Repository
 
-- **No n8n dependency.** The backend owns workflows, orchestration, scheduling,
-  background processing and integrations. If n8n is ever supported it will be an
-  optional adapter, and the product must work fully without it.
-- **AI stays provider-independent.** Domain and Application must never depend on
-  OpenAI, Anthropic or any other vendor SDK. Providers live behind
-  Application-owned abstractions in Infrastructure.
-- **Channels stay provider-independent.** Meta and other external channel APIs
-  must not leak into the Domain.
-- **Multi-tenancy is a first-class concern** and will be designed in before
-  tenant-scoped data exists. It is deliberately not implemented yet.
-- **TLS terminates at the reverse proxy.** The API does not perform its own HTTPS
-  redirection.
+- `backend/` contains the .NET 10 domain, application use cases, infrastructure and HTTP API. PostgreSQL with pgvector stores tenant data and knowledge embeddings. Redis supports realtime and protection services.
+- `frontend/` contains the Angular admin, website chat and Playwright journeys.
+- `deploy/` contains the production edge, API and database migration configuration.
+- [Architecture index](docs/architecture/README.md) and [Phase 39 handoff](docs/phase-reports/PHASE_39_SUMMARY.md) describe the inbox, agents, knowledge, channels, customers, team permissions, billing, analytics and reports.
 
-### Frontend
+## Verify a checkout
 
-`frontend/` is the administration application: Angular, standalone components,
-zoneless change detection, strict TypeScript and strict Angular templates.
+Run from the repository root using PowerShell 7 and Docker with Linux containers.
 
----
-
-## Current state
-
-Implemented in Phase 1:
-
-- Backend solution, four source projects and four test projects, wired with the
-  dependency direction above
-- One API endpoint: `GET /health` (liveness only — it reports that the process is
-  up, not that dependencies are reachable)
-- OpenAPI document generation, served in Development at `/openapi/v1.json`
-- RFC 9457 `application/problem+json` error responses
-- Architecture guard tests
-- Angular application shell with accessibility landmarks and a skip link
-
-Not implemented: everything else, including entities, tenancy, persistence,
-authentication, AI, channels, background work, billing and reporting.
-
----
-
-## Prerequisites
-
-| Tool | Version used |
-| --- | --- |
-| .NET SDK | 10.0.203 |
-| Node.js | 24.19.0 |
-| npm | 11.17.0 |
-| Git | 2.55.0 |
-
-Angular CLI is consumed from the project's local dev dependencies; a global
-install is not required.
-
----
-
-## Backend
-
-Run from `backend/`.
-
-```bash
-dotnet restore OmniAI.slnx
-dotnet build   OmniAI.slnx -c Release
-dotnet test    OmniAI.slnx -c Release
+```powershell
+pwsh -File tools/quality/test-backend.ps1
 ```
 
-Run the API locally:
+The runner restores packages with transitive NuGet auditing, builds Release and runs all four test projects. It creates private PostgreSQL and Redis services, then removes their containers, network and volumes. Coverage XML stays under `.quality/`. The gate measures unique executable source lines across the four product assemblies. Use a separate checkout for concurrent runs because .NET writes build outputs under `backend/`.
 
-```bash
-dotnet run --project src/OmniAI.Api
+Linux is the reference environment for integration tests. Direct Windows runs require separate disposable services and can differ in time-zone resolution and PDF text extraction. The three opt-in load and crash-boundary tests have separate performance procedures.
+
+Use Node 24.19 and npm 11.17 for the frontend.
+
+```sh
+cd frontend
+npm ci
+npm audit
+npm run format:check
+npm run i18n:check
+npm run test:ci
+npm run build
 ```
 
-The `http` launch profile listens on <http://localhost:5027>.
-In Development the OpenAPI document is at `/openapi/v1.json`.
+For interactive development, start the development API on port 5027 and run `npm start` in `frontend/`. The UI is served on port 4200. For browser journeys, use a disposable Development workspace, the local AI stand-in, the loopback Mailpit sink and installed Chrome, then run `npm run e2e`. These journeys create synthetic users and conversations. See the [development stack baseline](docs/phase-reports/PHASE_36_1_BASELINE_REPORT.md) and [operations runbook](docs/operations/operations-runbook.md).
 
-Build policy, applied solution-wide from `Directory.Build.props`:
-
-- nullable reference types and implicit usings enabled
-- .NET analyzers at `latest-recommended`, code style enforced during build
-- **warnings are errors** — do not silence a warning to obtain a green build
-
-NuGet versions are centrally managed in `Directory.Packages.props`. Add the
-version there, and reference the package without a version in the `.csproj`.
-
-## Frontend
-
-Run from `frontend/`.
-
-```bash
-npm install         # install dependencies
-npm run build       # production build
-npm run test:ci     # unit tests, single run
-npm start           # dev server on http://localhost:4200
-npm run format:check # Prettier verification
-npm run format      # Prettier, writing changes
-```
-
----
-
-## Repository layout
-
-```
-backend/
-  src/     OmniAI.Domain, OmniAI.Application, OmniAI.Infrastructure, OmniAI.Api
-  tests/   one test project per source project, plus a shared architecture helper
-frontend/  Angular administration application
-docs/
-  architecture/    architectural decisions and constraints
-  phase-reports/   per-phase delivery reports
-```
-
----
-
-## Secrets
-
-No credentials belong in this repository. API keys, channel tokens, database
-passwords, JWT signing keys and SSH credentials are supplied through the runtime
-environment or a secret store, never through source control. `.gitignore` blocks
-the common secret and environment file patterns, but it is a safety net, not a
-substitute for care.
+GitHub Actions runs backend, frontend and Git history checks on pull requests and pushes to main. See [deployment](docs/operations/production-deployment.md), [backup and restore](docs/operations/backup-restore.md) and the [WhatsApp validation runbook](docs/operations/meta-whatsapp-real-validation-runbook.md) for the corresponding operational procedures.
