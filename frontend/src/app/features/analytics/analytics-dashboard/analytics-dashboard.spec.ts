@@ -226,6 +226,41 @@ describe('AnalyticsDashboardPage', () => {
 
   afterEach(() => http.verify());
 
+  it('renders fractional medians, immediate replies and missing samples distinctly', async () => {
+    await mount();
+    await answer({
+      ...busy,
+      summary: {
+        ...busy.summary,
+        firstReply: {
+          aiConversations: 2,
+          aiMedianSeconds: 15.5,
+          teamConversations: 1,
+          teamMedianSeconds: 0,
+        },
+      },
+    });
+    const cells = () =>
+      [...host().querySelectorAll('[data-testid="first-reply"] tbody td')].map((el) =>
+        el.textContent?.trim(),
+      );
+    expect(cells()).toEqual(['15.5 sec', '2', '0 sec', '1']);
+    query<HTMLElement>('[data-testid="refresh"]')!.click();
+    await answer({
+      ...empty,
+      summary: {
+        ...empty.summary,
+        firstReply: {
+          aiConversations: 1,
+          aiMedianSeconds: 0.016,
+          teamConversations: 0,
+          teamMedianSeconds: null,
+        },
+      },
+    });
+    expect(cells()).toEqual(['Under 1 second', '1', 'No data', '0']);
+  });
+
   describe('loading', () => {
     it('shows a busy state while the first read is in flight', async () => {
       await mount();

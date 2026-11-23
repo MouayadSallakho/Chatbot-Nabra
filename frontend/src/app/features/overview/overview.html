@@ -107,6 +107,14 @@
         />
       }
 
+      @if (!dashboard() || dashboard()?.summary?.firstReply) {
+        <app-first-reply-card
+          class="tile-first-reply"
+          [times]="dashboard()?.summary?.firstReply ?? null"
+          [days]="7"
+        />
+      }
+
       <section class="bento-tile tile-messages" [attr.aria-busy]="!dashboard()" data-testid="week">
         @if (dashboard()) {
           <app-column-chart

@@ -547,7 +547,8 @@ public sealed class WorkspaceAnalyticsReaderTests(PostgresTestDatabase database)
         //
         // Phase 37.6 added one, the first-activity min(). Usage by purpose added
         // none: purpose is one more grouping key on the three usage statements.
-        Assert.InRange(recorded.Statements.Count, 1, 22);
+        // First-reply medians add one aggregate for the entire workspace window.
+        Assert.InRange(recorded.Statements.Count, 1, 23);
     }
 
     // ----------------------------------------------------------------- helpers

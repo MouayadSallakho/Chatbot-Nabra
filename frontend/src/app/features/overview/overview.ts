@@ -42,6 +42,7 @@ import { IconName } from '@app/shared/icon/icon-paths';
 import { LocalNumberPipe } from '@app/core/i18n/locale-pipes';
 import { LocaleFormat } from '@app/core/i18n/locale-format';
 import { VoiceSplit } from '@app/shared/voice/voice-split';
+import { FirstReplyCard } from '@app/features/analytics/first-reply-card';
 import { dayPart, greeting, todayWords } from './overview-words';
 import { AnsweredTile } from './tiles/answered-tile';
 import { AttentionItem, AttentionTone, AttentionTile } from './tiles/attention-tile';
@@ -76,8 +77,8 @@ interface Shortcut {
  *   messages, unread notifications, and any source that did not answer.
  * - **Channels**, **Messages per day** and **AI usage this month** (deep).
  *
- * The board's "First reply" tile is left out: the API offers no such figure
- * (backend ask BA39-2). Every number is the server's; each source is read only
+ * First reply shows the median per first responder over the seven-day period.
+ * Every number is the server's; each source is read only
  * with the permission that reveals it, and each fails on its own. Days are
  * local days of the workspace's zone.
  */
@@ -91,6 +92,7 @@ interface Shortcut {
     VoiceSplit,
     ColumnChart,
     AnsweredTile,
+    FirstReplyCard,
     AttentionTile,
     ChannelsTile,
     ConversationsTile,

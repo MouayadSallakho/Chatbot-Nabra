@@ -30,7 +30,8 @@ public sealed record AnalyticsSummaryResponse(
     long AiMessages,
     long HumanMessages,
     long SystemMessages,
-    long ConversationsAnsweredByAi);
+    long ConversationsAnsweredByAi,
+    FirstReplyTimes? FirstReply);
 
 /// <summary>What the workspace looks like now, regardless of the period.</summary>
 public sealed record AnalyticsSnapshotResponse(
@@ -316,7 +317,8 @@ public sealed record AnalyticsDashboardResponse(
             summary.AiMessages,
             summary.HumanMessages,
             summary.SystemMessages,
-            summary.ConversationsAnsweredByAi);
+            summary.ConversationsAnsweredByAi,
+            summary.FirstReply);
 
     private static AnalyticsAiOperationsResponse OperationsOf(AnalyticsAiOperations operations) =>
         new(operations.Attempts, operations.Completed, operations.Failed, operations.InProgress);

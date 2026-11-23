@@ -41,6 +41,7 @@ import { StackedBar } from '@app/shared/charts/stacked-bar';
 import { Icon } from '@app/shared/icon/icon';
 import { ScrollRegion } from '@app/shared/scroll-region/scroll-region';
 import { VoiceSplit } from '@app/shared/voice/voice-split';
+import { FirstReplyCard } from '@app/features/analytics/first-reply-card';
 import { Segmented } from '@app/shared/segmented/segmented';
 
 /**
@@ -84,6 +85,7 @@ import { Segmented } from '@app/shared/segmented/segmented';
     PageHeader,
     EmptyState,
     ProviderUsageCard,
+    FirstReplyCard,
     ScrollRegion,
     LocalNumberPipe,
     Icon,

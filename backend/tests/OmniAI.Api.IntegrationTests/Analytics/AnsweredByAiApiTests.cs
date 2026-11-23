@@ -63,6 +63,10 @@ public sealed class AnsweredByAiApiTests(WebChatApiFixture fixture) : IClassFixt
         JsonElement body = await DashboardAsync(owner, tenantId, "range=7d&compare=previous");
         JsonElement summary = body.GetProperty("summary");
 
+        JsonElement firstReply = summary.GetProperty("firstReply");
+        Assert.Equal(4, firstReply.GetProperty("aiConversations").GetInt64());
+        Assert.True(firstReply.GetProperty("aiMedianSeconds").GetDouble() >= 0);
+        Assert.Equal(0, firstReply.GetProperty("teamConversations").GetInt64());
         Assert.Equal(5, summary.GetProperty("conversationsStarted").GetInt64());
         Assert.Equal(1, summary.GetProperty("conversationsAnsweredByAi").GetInt64());
 
@@ -70,6 +74,7 @@ public sealed class AnsweredByAiApiTests(WebChatApiFixture fixture) : IClassFixt
         JsonElement previous = body.GetProperty("previous").GetProperty("summary");
         Assert.Equal(0, previous.GetProperty("conversationsAnsweredByAi").GetInt64());
         Assert.Equal(0, previous.GetProperty("conversationsStarted").GetInt64());
+        Assert.Equal(0, previous.GetProperty("firstReply").GetProperty("aiConversations").GetInt64());
 
         // Without compare=previous the member is in the summary and no "previous" appears.
         JsonElement plain = await DashboardAsync(owner, tenantId, "range=7d");

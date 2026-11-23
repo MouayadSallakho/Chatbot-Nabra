@@ -38,6 +38,13 @@ export interface AnalyticsPeriod {
   readonly timeZone: string;
 }
 
+export interface FirstReplyTimes {
+  readonly aiConversations: number;
+  readonly aiMedianSeconds: number | null;
+  readonly teamConversations: number;
+  readonly teamMedianSeconds: number | null;
+}
+
 /** What happened during the period. */
 export interface AnalyticsSummary {
   readonly conversationsStarted: number;
@@ -52,6 +59,7 @@ export interface AnalyticsSummary {
    * One of `conversationsStarted`, never more.
    */
   readonly conversationsAnsweredByAi: number;
+  readonly firstReply?: FirstReplyTimes | null;
 }
 
 /** What the workspace looks like now, whatever period is selected. */

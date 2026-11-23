@@ -157,6 +157,10 @@
             </p>
           }
 
+          @if (data.summary.firstReply; as times) {
+            <app-first-reply-card [times]="times" [days]="data.period.days" />
+          }
+
           <div class="analytics-pair">
             <!--
               Right now, whatever period is selected. Said on the page, because a

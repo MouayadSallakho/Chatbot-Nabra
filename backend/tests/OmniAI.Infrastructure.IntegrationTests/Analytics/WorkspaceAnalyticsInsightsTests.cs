@@ -109,6 +109,39 @@ public sealed class WorkspaceAnalyticsInsightsTests(PostgresTestDatabase databas
             recorded.Statements.Count(statement => statement.Contains("AT TIME ZONE", StringComparison.OrdinalIgnoreCase)));
     }
 
+    [Fact]
+    public async Task First_reply_medians_use_one_observation_per_conversation_and_the_window_cutoff()
+    {
+        AnalyticsWorld world = await NewWorldAsync();
+        DateTimeOffset start = new(2026, 11, 1, 9, 0, 0, TimeSpan.Zero);
+        AiAgent agent = await world.AgentAsync("Support", start.AddDays(-10));
+        AnalyticsWindow window = AnalyticsRange.SevenDays.Window(start.AddDays(1));
+
+        async Task Seed(DateTimeOffset opened, params (MessageSender Sender, DateTimeOffset At)[] messages)
+        {
+            var conversation = await world.WebChatAsync(agent, opened);
+            await world.SayAsync(conversation, messages);
+        }
+
+        await Seed(start, (MessageSender.AiAgent, start), (MessageSender.Customer, start.AddSeconds(2)),
+            (MessageSender.Customer, start.AddSeconds(5)), (MessageSender.System, start.AddSeconds(6)),
+            (MessageSender.AiAgent, start.AddSeconds(12)), (MessageSender.HumanAgent, start.AddHours(1)));
+        await Seed(start, (MessageSender.Customer, start), (MessageSender.AiAgent, start.AddSeconds(21)));
+        await Seed(start, (MessageSender.Customer, start), (MessageSender.HumanAgent, start),
+            (MessageSender.AiAgent, start.AddSeconds(3)));
+        await Seed(start, (MessageSender.Customer, start));
+        await Seed(start, (MessageSender.Customer, start), (MessageSender.HumanAgent, window.To));
+        await Seed(start, (MessageSender.Customer, start.AddMinutes(1)), (MessageSender.AiAgent, start),
+            (MessageSender.AiAgent, start.AddMinutes(2)));
+        await Seed(window.From, (MessageSender.Customer, window.From.AddSeconds(-2)), (MessageSender.AiAgent, window.From.AddSeconds(-1)));
+        await Seed(window.From.AddMinutes(-1), (MessageSender.Customer, window.From), (MessageSender.AiAgent, start));
+
+        WorkspaceAnalytics dashboard = await ReadAsync(world, window);
+        Assert.Equal(new FirstReplyTimes(2, 15.5, 1, 0), dashboard.Summary.FirstReply);
+        AnalyticsWorld other = await NewWorldAsync();
+        Assert.Equal(new FirstReplyTimes(0, null, 0, null), (await ReadAsync(other, window)).Summary.FirstReply);
+    }
+
     // ---------------------------------------------------------- first activity
 
     [Fact]
@@ -199,7 +232,7 @@ public sealed class WorkspaceAnalyticsInsightsTests(PostgresTestDatabase databas
     }
 
     [Fact]
-    public async Task The_comparison_is_four_counting_statements_whatever_the_workspace_holds()
+    public async Task The_comparison_has_a_fixed_number_of_aggregate_statements()
     {
         AnalyticsWorld world = await NewWorldAsync();
         AiAgent agent = await world.AgentAsync("Support", new DateTimeOffset(2026, 9, 1, 0, 0, 0, TimeSpan.Zero));
@@ -221,7 +254,9 @@ public sealed class WorkspaceAnalyticsInsightsTests(PostgresTestDatabase databas
 
         // Phase 39.1 (BA39-1): the summary's "answered by the AI" is one more
         // counting statement, whatever the workspace holds.
-        Assert.Equal(4, recorded.Statements.Count);
+        // First-reply medians and their sample counts share a single additional aggregate.
+        Assert.Equal(5, recorded.Statements.Count);
+        Assert.Single(recorded.Statements, sql => sql.Contains("percentile_cont", StringComparison.OrdinalIgnoreCase));
         Assert.All(recorded.Statements, statement => Assert.Contains("count(", statement, StringComparison.OrdinalIgnoreCase));
     }
 

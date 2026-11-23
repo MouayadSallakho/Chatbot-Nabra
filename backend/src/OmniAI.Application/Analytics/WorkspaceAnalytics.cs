@@ -28,7 +28,15 @@ public sealed record AnalyticsSummary(
     long AiMessages,
     long HumanMessages,
     long SystemMessages,
-    long ConversationsAnsweredByAi = 0);
+    long ConversationsAnsweredByAi = 0,
+    FirstReplyTimes? FirstReply = null);
+
+/// <summary>One sample per answered conversation, attributed to the first responder.</summary>
+public sealed record FirstReplyTimes(
+    long AiConversations,
+    double? AiMedianSeconds,
+    long TeamConversations,
+    double? TeamMedianSeconds);
 
 /// <summary>
 /// What the workspace looks like right now.

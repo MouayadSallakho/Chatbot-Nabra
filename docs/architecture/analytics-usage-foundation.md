@@ -162,8 +162,8 @@ today.
 
 `previous` carries `period`, `summary` and `aiOperations` only: the period's
 totals. The "open right now" figures (`current`) have no history to compare
-against, which the plan leaves outside Phase 37. It costs three more counting
-statements, read only when asked for.
+against. Requesting a comparison runs five additional aggregate statements,
+including the first-reply medians and sample counts.
 
 ### Analytics time is not transcript order
 
@@ -480,3 +480,22 @@ already held conversations before that migration (the local development database
 can hold a conversation that was taken over **and handed back** before it with no
 reply from the person: nothing recorded that takeover, so it counts as answered by
 the AI there.
+
+## 16. Median time to first reply (BA39-2)
+
+The overview uses the last seven workspace-local days. Analytics uses the selected
+7-, 30- or 90-day window. Both read `summary.firstReply`. When requested,
+`previous.summary.firstReply` uses its own start and end boundaries.
+
+Each conversation started in the window contributes at most one wait. In transcript
+ingestion order, find the first customer message, then the first subsequent AI or
+team message. Subtract their stored send timestamps in seconds. System notes,
+agent greetings before the customer writes and subsequent replies contribute no
+samples. A missing reply, a reply timestamp outside the half-open window, or a
+negative elapsed time from inconsistent timestamps also contributes no sample.
+
+PostgreSQL calculates a continuous median for each first responder. An even
+sample count uses the midpoint of the two middle waits. The API returns
+`aiMedianSeconds`, `teamMedianSeconds` and the two sample counts
+`aiConversations` and `teamConversations`. A group with no samples has a null
+median. An immediate reply has a measured wait of zero.

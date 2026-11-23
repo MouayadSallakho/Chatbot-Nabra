@@ -28,7 +28,7 @@ namespace OmniAI.Infrastructure.Analytics;
 /// rather than against an in-memory provider that would accept anything.
 /// </para>
 /// <para>
-/// <strong>Two statements are SQL (Phase 37.6).</strong> The usage buckets and the
+/// The usage buckets and the
 /// model breakdown sum token columns of an owned type, which EF translates as a
 /// correlated subquery per sum per group. They are written as one parameterised
 /// <c>GROUP BY</c> each, over the same tenant-and-window predicate, and a test
@@ -120,7 +120,7 @@ internal sealed class WorkspaceAnalyticsReader(OmniAiDbContext context)
     /// <remarks>
     /// The summary and the AI outcomes only, through exactly the methods
     /// <see cref="ReadAsync"/> uses, so the two periods of a comparison cannot mean
-    /// different things. Three statements.
+    /// different things.
     /// </remarks>
     public async Task<AnalyticsComparison> ReadComparisonAsync(
         TenantId tenantId,
@@ -207,8 +207,45 @@ internal sealed class WorkspaceAnalyticsReader(OmniAiDbContext context)
             Count(bySender, MessageSender.AiAgent),
             Count(bySender, MessageSender.HumanAgent),
             Count(bySender, MessageSender.System),
-            answeredByAi);
+            answeredByAi,
+            await FirstRepliesAsync(tenantId, window, cancellationToken).ConfigureAwait(false));
     }
+
+    // Each lateral lookup uses the conversation/ingestion index and stops at its first match.
+    // Pick the actual first reply before validating its timestamp; a later reply cannot replace it.
+    private Task<FirstReplyTimes> FirstRepliesAsync(
+        TenantId tenantId,
+        AnalyticsWindow window,
+        CancellationToken cancellationToken) =>
+        _context.Database.SqlQuery<FirstReplyTimes>($"""
+            SELECT count(*) FILTER (WHERE sender = 'AiAgent') AS "AiConversations",
+                   percentile_cont(0.5) WITHIN GROUP (ORDER BY seconds)
+                       FILTER (WHERE sender = 'AiAgent') AS "AiMedianSeconds",
+                   count(*) FILTER (WHERE sender = 'HumanAgent') AS "TeamConversations",
+                   percentile_cont(0.5) WITHIN GROUP (ORDER BY seconds)
+                       FILTER (WHERE sender = 'HumanAgent') AS "TeamMedianSeconds"
+              FROM (
+                SELECT reply.sender, extract(epoch FROM reply.sent_at - opening.sent_at)::float8 AS seconds
+                  FROM conversations c
+                  CROSS JOIN LATERAL (
+                      SELECT m.ingestion_sequence, m.sent_at FROM messages m
+                       WHERE m.conversation_id = c.id AND m.sender = 'Customer'
+                       ORDER BY m.ingestion_sequence LIMIT 1
+                  ) opening
+                  CROSS JOIN LATERAL (
+                      SELECT m.sender, m.sent_at FROM messages m
+                       WHERE m.conversation_id = c.id AND m.ingestion_sequence > opening.ingestion_sequence
+                         AND m.sender IN ('AiAgent', 'HumanAgent')
+                       ORDER BY m.ingestion_sequence LIMIT 1
+                  ) reply
+                 WHERE c.tenant_id = {tenantId.Value}
+                   AND c.started_at >= {window.From.ToUniversalTime()}
+                   AND c.started_at < {window.To.ToUniversalTime()}
+                   AND reply.sent_at >= opening.sent_at
+                   AND reply.sent_at >= {window.From.ToUniversalTime()}
+                   AND reply.sent_at < {window.To.ToUniversalTime()}
+              ) observations
+            """).SingleAsync(cancellationToken);
 
     /// <remarks>
     /// No date filter, and that is the point: see <c>AnalyticsSnapshot</c>.
