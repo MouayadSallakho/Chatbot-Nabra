@@ -371,6 +371,20 @@ public sealed class InboxStateApiTests(WebChatApiFixture fixture)
         Assert.Equal("conversations.filter.invalid", await CodeAsync(response));
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task An_invalid_search_is_refused_with_a_code(bool containsNull)
+    {
+        (HttpClient owner, Guid tenantId, _) = await WorkspaceAsync();
+        string search = containsNull ? "a%00b" : new string('a', 121);
+        using HttpResponseMessage response = await owner.GetAsync(WebChatApiFixture.Relative(
+            $"/api/tenants/{tenantId}/conversations?search={search}"));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("conversations.search.invalid", await CodeAsync(response));
+    }
+
     // ---- Unread -------------------------------------------------------------
 
     [Fact]

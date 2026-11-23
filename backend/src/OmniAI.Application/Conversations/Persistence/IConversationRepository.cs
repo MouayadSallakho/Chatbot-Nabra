@@ -278,6 +278,7 @@ public interface IConversationRepository
         int pageSize,
         ConversationListFilter filter,
         UserId viewer,
+        string? search = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>

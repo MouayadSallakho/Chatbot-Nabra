@@ -99,6 +99,36 @@
         >
       </nav>
 
+      <form
+        class="inbox-search"
+        role="search"
+        (submit)="$event.preventDefault(); searchFor(term.value)"
+      >
+        <input
+          #term
+          type="search"
+          class="input"
+          dir="auto"
+          maxlength="120"
+          aria-label="Search customer names or messages"
+          i18n-aria-label="@@inbox.search.prompt"
+          placeholder="Search customer names or messages"
+          i18n-placeholder="@@inbox.search.prompt"
+        />
+        <button type="submit" class="btn btn-secondary btn-sm" i18n="@@inbox.search.submit">
+          Search
+        </button>
+        @if (search()) {
+          <button
+            type="button"
+            class="btn btn-quiet btn-sm"
+            (click)="term.value = ''; searchFor(''); term.focus()"
+            i18n="@@inbox.search.clear"
+          >
+            Clear search
+          </button>
+        }
+      </form>
       <div class="inbox-tools">
         <app-mark-all-read (marked)="refresh()" />
         <button
@@ -171,6 +201,14 @@
           Try again
         </button>
       </app-empty-state>
+    } @else if (total() === 0 && search()) {
+      <app-empty-state
+        icon="conversations"
+        heading="No matching conversations"
+        i18n-heading="@@inbox.search.empty"
+        description="Try another name or message in this view."
+        i18n-description="@@inbox.search.hint"
+      />
     } @else if (total() === 0) {
       @switch (view()) {
         @case ('needs-person') {

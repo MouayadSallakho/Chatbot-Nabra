@@ -21,6 +21,7 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                 .HasAnnotation("ProductVersion", "10.0.11")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
+            NpgsqlModelBuilderExtensions.HasPostgresExtension(modelBuilder, "pg_trgm");
             NpgsqlModelBuilderExtensions.HasPostgresExtension(modelBuilder, "vector");
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
@@ -1070,6 +1071,12 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("Text")
+                        .HasDatabaseName("ix_messages_text_trgm");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("Text"), "gin");
+                    NpgsqlIndexBuilderExtensions.HasOperators(b.HasIndex("Text"), new[] { "gin_trgm_ops" });
+
                     b.HasIndex("ConversationId", "IngestionSequence")
                         .IsUnique()
                         .HasDatabaseName("ix_messages_conversation_ingestion");
@@ -1119,6 +1126,12 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                         .HasColumnName("xmin");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("DisplayName")
+                        .HasDatabaseName("ix_customers_display_name_trgm");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("DisplayName"), "gin");
+                    NpgsqlIndexBuilderExtensions.HasOperators(b.HasIndex("DisplayName"), new[] { "gin_trgm_ops" });
 
                     b.HasIndex("MergedIntoCustomerId");
 

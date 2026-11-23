@@ -98,7 +98,7 @@ public sealed class MigrationSchemaTests(PostgresTestDatabase database)
         // lists (M6, M4, M5), in the plan's order; Phase 37.6 the two it lists
         // (M7, M8); Phase 37.7 the two it lists (M9, M10); Phase 39.1 the two its
         // approved plan lists (AddUserDisplayName, AddWebChatGreetingPerLanguage).
-        Assert.Equal(15, applied.Length);
+        Assert.Equal(16, applied.Length);
         Assert.EndsWith("_ProductionReadinessHardening", applied[1], StringComparison.Ordinal);
         Assert.EndsWith("_AddUserLanguage", applied[2], StringComparison.Ordinal);
         Assert.EndsWith("_AddSecurityEvents", applied[3], StringComparison.Ordinal);
@@ -113,6 +113,7 @@ public sealed class MigrationSchemaTests(PostgresTestDatabase database)
         Assert.EndsWith("_AddReportScheduleLanguage", applied[12], StringComparison.Ordinal);
         Assert.EndsWith("_AddUserDisplayName", applied[13], StringComparison.Ordinal);
         Assert.EndsWith("_AddWebChatGreetingPerLanguage", applied[14], StringComparison.Ordinal);
+        Assert.EndsWith("_AddInboxSearchIndexes", applied[15], StringComparison.Ordinal);
     }
 
     /// <remarks>
@@ -169,17 +170,19 @@ public sealed class MigrationSchemaTests(PostgresTestDatabase database)
     /// is the prompt to write that measurement down.
     /// </remarks>
     [Fact]
-    public async Task Phase_22_added_no_index_to_messages_or_conversation_turns()
+    public async Task Message_and_turn_indexes_cover_ingestion_reconciliation_and_inbox_search()
     {
         object? count = await database.ExecuteScalarAsync(
             "SELECT count(*) FROM pg_indexes "
             + "WHERE tablename IN ('messages', 'conversation_turns')");
 
-        // Phase 22 added none of these. Five from before it, plus one since:
-        // Phase 35's partial index over turns still Generating, the stale-turn
-        // reconciler's only query (asserted by name below, so a different sixth
-        // index cannot hide behind the count).
-        Assert.Equal(6L, Convert.ToInt64(count, CultureInfo.InvariantCulture));
+        // Five original indexes, the stale-turn reconciler's partial index,
+        // and the inbox's substring index for historical message text.
+        Assert.Equal(7L, Convert.ToInt64(count, CultureInfo.InvariantCulture));
+
+        object? textIndex = await database.ExecuteScalarAsync(
+            "SELECT indexdef FROM pg_indexes WHERE tablename = 'messages' AND indexname = 'ix_messages_text_trgm'");
+        Assert.Contains("USING gin (text gin_trgm_ops)", textIndex as string, StringComparison.Ordinal);
 
         object? generating = await database.ExecuteScalarAsync(
             "SELECT indexdef FROM pg_indexes WHERE indexname = 'ix_conversation_turns_generating'");

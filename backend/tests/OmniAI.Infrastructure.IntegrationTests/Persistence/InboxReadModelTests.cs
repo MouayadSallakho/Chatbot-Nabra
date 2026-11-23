@@ -53,6 +53,41 @@ public sealed class InboxReadModelTests(PostgresTestDatabase database)
             await StatementsForEventsAsync(many.Id));
     }
 
+    [Fact]
+    public async Task Search_matches_names_and_older_messages_before_paging_and_respects_workspace_and_view()
+    {
+        Tenant tenant = await NewTenantAsync();
+        Tenant other = await NewTenantAsync();
+        Conversation named = WaitingOnAPerson(tenant);
+        Conversation historical = WaitingOnAPerson(tenant);
+        Conversation foreign = WaitingOnAPerson(other);
+        Conversation nearMiss = WaitingOnAPerson(tenant);
+        const string needle = "طلب A!_%";
+        foreach (Conversation conversation in new[] { historical, foreign })
+        {
+            conversation.AddTextMessage(MessageSender.Customer, needle, Start.AddMinutes(4));
+            conversation.AddTextMessage(MessageSender.Customer, "Later message", Start.AddMinutes(5));
+        }
+
+        nearMiss.AddTextMessage(MessageSender.Customer, "طلب A!xx", Start.AddMinutes(4));
+        await AddAsync(named, historical, foreign, nearMiss);
+        await using OmniAiDbContext context = database.CreateContext();
+        Customer customer = (await context.Customers.FindAsync(named.CustomerId))!;
+        customer.Rename(CustomerDisplayName.Create(needle), Start.AddDays(1));
+        await context.SaveChangesAsync();
+        ConversationRepository repository = new(context);
+        const string search = "طلب a!_%";
+        ConversationPage first = await repository.ListAsync(tenant.Id, 1, 1, ConversationListFilter.All, Viewer, search);
+        ConversationPage second = await repository.ListAsync(tenant.Id, 2, 1, ConversationListFilter.All, Viewer, search);
+        ConversationPage mine = await repository.ListAsync(tenant.Id, 1, 10, ConversationListFilter.Mine, Viewer, search);
+
+        Assert.Equal(2, first.Total);
+        Assert.Equal(historical.Id.Value, Assert.Single(first.Items).Id);
+        Assert.Equal(named.Id.Value, Assert.Single(second.Items).Id);
+        Assert.Empty(mine.Items);
+        Assert.Equal(0, mine.Total);
+    }
+
     // ---- Needs a person -------------------------------------------------------
 
     [Fact]

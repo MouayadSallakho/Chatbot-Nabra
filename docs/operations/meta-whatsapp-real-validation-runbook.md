@@ -249,7 +249,12 @@ Not yet authorized. Written here so it can be executed without improvisation.
 8. Verify token loaded into `OMNIAI_WHATSAPP_VERIFY_TOKEN`.
 9. Local stack running: PostgreSQL 17 + pgvector, Redis, the API, the Angular
    admin. `WhatsApp:GraphBaseAddress` left at its default, and
-   `OMNIAI_LIVE_META=1` set **for this session only**.
+   `OMNIAI_LIVE_META=1` set **for this session only**. For this human-only
+   rehearsal, start the disposable API and its inbound worker with
+   `OPENAI_API_KEY`, `OMNIAI_LIVE_OPENAI` and `OMNIAI_DEV_AI_STANDIN` unset
+   in their effective configuration. The first inbound message can start an AI
+   turn before the operator can open the inbox. With both text generators
+   disabled, that turn can be recorded as failed and has no reply to queue.
 10. Temporary HTTPS tunnel opened to the API (section 4).
 11. Callback configured in Meta: `https://<PUBLIC_HOST>/api/whatsapp/webhook`
     plus the verify token.
@@ -260,7 +265,7 @@ Not yet authorized. Written here so it can be executed without improvisation.
 15. Send a **real inbound WhatsApp message** from a phone to the test sender.
 16. Confirm it appears in the OmniAI Inbox as a WhatsApp conversation, with the
     customer reference masked.
-17. **Take over** the conversation — human handling, so no AI call is made.
+17. **Take over** the conversation and confirm that no automated reply was queued.
     Live AI over WhatsApp needs its own separate authorization.
 18. Send a **real outbound reply** from the Inbox. Expect exactly one delivery.
 19. Watch `Sent` → `Delivered` → `Read` arrive as receipts. Confirm no transcript

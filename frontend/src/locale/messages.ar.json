@@ -1,6 +1,11 @@
 {
   "locale": "ar",
   "translations": {
+    "inbox.search.prompt": "ابحث باسم العميل أو في الرسائل",
+    "inbox.search.submit": "بحث",
+    "inbox.search.clear": "مسح البحث",
+    "inbox.search.empty": "لا توجد محادثات مطابقة",
+    "inbox.search.hint": "جرّب اسماً آخر أو نص رسالة آخر في هذه القائمة.",
     "title.designLab": "مختبر التصميم",
     "title.signIn": "تسجيل الدخول",
     "title.createAccount": "إنشاء حساب",

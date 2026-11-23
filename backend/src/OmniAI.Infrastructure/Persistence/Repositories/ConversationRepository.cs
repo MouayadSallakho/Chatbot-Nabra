@@ -46,6 +46,7 @@ internal sealed class ConversationRepository(OmniAiDbContext context) : IConvers
         int pageSize,
         ConversationListFilter filter,
         UserId viewer,
+        string? search = null,
         CancellationToken cancellationToken = default)
     {
         IQueryable<HandledConversation> owned = WithHandlingFacts(
@@ -68,6 +69,21 @@ internal sealed class ConversationRepository(OmniAiDbContext context) : IConvers
 
             owned = owned.Where(handled =>
                 handled.Conversation.AssignedTo == me || handled.TakenOverBy == me);
+        }
+
+        if (!string.IsNullOrEmpty(search))
+        {
+            string pattern = "%" + search.Replace("!", "!!", StringComparison.Ordinal)
+                .Replace("%", "!%", StringComparison.Ordinal)
+                .Replace("_", "!_", StringComparison.Ordinal) + "%";
+            var namedCustomers = _context.Customers.FromSql($"""
+                SELECT * FROM customers
+                WHERE tenant_id = {tenantId.Value} AND display_name ILIKE {pattern} ESCAPE '!'
+                """);
+
+            owned = owned.Where(handled =>
+                namedCustomers.Any(customer => customer.Id == handled.Conversation.CustomerId) ||
+                handled.Conversation.Messages.Any(message => EF.Functions.ILike(message.Text, pattern, "!")));
         }
 
         int total = await owned.CountAsync(cancellationToken).ConfigureAwait(false);

@@ -298,11 +298,12 @@ internal static class ConversationEndpoints
         int? page,
         int? pageSize,
         string? filter,
+        string? search,
         ReadConversationsHandler handler,
         CancellationToken cancellationToken)
     {
         ConversationPage? result = await handler
-            .ListAsync(new ListConversationsQuery(tenantId, page, pageSize, filter), cancellationToken)
+            .ListAsync(new ListConversationsQuery(tenantId, page, pageSize, filter, search), cancellationToken)
             .ConfigureAwait(false);
 
         if (result is null)

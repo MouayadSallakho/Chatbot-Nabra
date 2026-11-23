@@ -46,6 +46,11 @@ internal sealed class MessageConfiguration : IEntityTypeConfiguration<Message>
             .HasColumnType("timestamp with time zone")
             .IsRequired();
 
+        builder.HasIndex(message => message.Text)
+            .HasDatabaseName("ix_messages_text_trgm")
+            .HasMethod("gin")
+            .HasOperators("gin_trgm_ops");
+
         // Ingestion order.
         //
         // Message.SentAt is deliberately not monotonic, so reload cannot order by

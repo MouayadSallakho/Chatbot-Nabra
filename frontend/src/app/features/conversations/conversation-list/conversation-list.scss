@@ -66,6 +66,17 @@
   margin-inline: calc(-1 * var(--space-3));
 }
 
+.inbox-search {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+
+  input {
+    flex: 1 1 12rem;
+    min-inline-size: 0;
+  }
+}
+
 .inbox-body {
   flex: 1 1 auto;
   min-block-size: 0;

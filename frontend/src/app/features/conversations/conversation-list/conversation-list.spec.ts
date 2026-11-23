@@ -137,6 +137,31 @@ describe('ConversationList', () => {
     expect(['Live updates on', 'Live updates paused']).toContain(shown[0].textContent?.trim());
   });
 
+  it('searches on submit, ignores a stale response and restores the full inbox on clear', async () => {
+    await mount('conversations.view');
+    const initial = http.expectOne(url);
+    const term = host().querySelector<HTMLInputElement>('input[type="search"]')!;
+    term.value = '  طلب & 5%  ';
+    host()
+      .querySelector('form[role="search"]')!
+      .dispatchEvent(new Event('submit', { cancelable: true }));
+    const empty = { items: [], total: 0, page: 1, pageSize: 20 };
+    http.expectOne(url + '&search=' + encodeURIComponent(term.value.trim())).flush(empty);
+    initial.flush({
+      ...empty,
+      items: [conversation('stale', 'old', '2026-09-07T10:00:00Z')],
+      total: 1,
+    });
+    await settle();
+    expect(text()).toContain('No matching conversations');
+    expect(rows()).toHaveLength(0);
+    button('Clear search')!.click();
+    http.expectOne(url).flush(empty);
+    await settle();
+    expect(term.value).toBe('');
+    expect(text()).toContain('No conversations yet');
+  });
+
   describe('the needs-a-person view', () => {
     const viewUrl = `${url}&filter=needs-person`;
     const emptyPage = { items: [], page: 1, pageSize: 20, total: 0 };

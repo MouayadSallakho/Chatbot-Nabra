@@ -91,6 +91,9 @@ public sealed class ConversationQueryInvalidException : Exception
     /// <summary>The stable code, such as <c>conversations.filter.invalid</c>.</summary>
     public string Code { get; }
 
+    public static ConversationQueryInvalidException InvalidSearch() =>
+        new("conversations.search.invalid", "Use up to 120 characters of search text without null characters.");
+
     /// <summary>The list was asked for a filter it does not know.</summary>
     public static ConversationQueryInvalidException UnknownFilter() =>
         new(

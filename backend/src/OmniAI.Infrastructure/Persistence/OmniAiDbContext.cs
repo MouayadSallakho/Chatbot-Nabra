@@ -350,6 +350,7 @@ public sealed class OmniAiDbContext(DbContextOptions<OmniAiDbContext> options)
         // in the model so a migration generated from it creates the extension
         // before the table that needs its type. See database-model-authority.md.
         builder.HasPostgresExtension(PersistenceSchema.VectorExtension);
+        builder.HasPostgresExtension("pg_trgm");
 
         // The allocator for message ingestion order. See PersistenceSchema for
         // why a sequence rather than a per-conversation counter.

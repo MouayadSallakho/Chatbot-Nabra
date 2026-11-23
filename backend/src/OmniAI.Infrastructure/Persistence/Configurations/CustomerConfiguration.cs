@@ -90,6 +90,11 @@ internal sealed class CustomerConfiguration : IEntityTypeConfiguration<Customer>
             .OnDelete(DeleteBehavior.Restrict);
 
         // The directory's own query: one workspace, newest first.
+        builder.HasIndex(customer => customer.DisplayName)
+            .HasDatabaseName("ix_customers_display_name_trgm")
+            .HasMethod("gin")
+            .HasOperators("gin_trgm_ops");
+
         builder.HasIndex(customer => new { customer.TenantId, customer.CreatedAt })
             .HasDatabaseName("ix_customers_tenant_created");
 

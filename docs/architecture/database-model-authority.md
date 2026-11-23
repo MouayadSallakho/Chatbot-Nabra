@@ -259,4 +259,17 @@ before the development database itself.
 | 39.1 | `AddUserDisplayName` | `users.display_name varchar(80) null`, no backfill |
 | 39.1 | `AddWebChatGreetingPerLanguage` | `web_chat_endpoints.widget_greeting_en` and `widget_greeting_ar`, `varchar(300) null`, no backfill |
 
+Inbox search adds `AddInboxSearchIndexes`. Its two PostgreSQL GIN trigram indexes cover
+`messages.text` and `customers.display_name` for case-insensitive substring searches.
+The migration installs `pg_trgm` if needed. On a managed database, provision that
+extension before running the migration if the migration role cannot install extensions.
+
+On PostgreSQL 17, a disposable table of 50,000 synthetic message bodies contained
+ten matches for `ILIKE '%موعد%'`. After `ANALYZE`, the unindexed predicate read
+417 local buffer pages and returned those matches in 38.9 ms. With the trigram
+index, the planner used a bitmap index scan and visited ten matching heap pages
+in 0.28 ms total. These timings measure the text predicate on this fixture.
+Workspace authorization, joins, counting, paging and network time are additional
+costs of an inbox request.
+
 Earlier phases' migrations are listed in their phase reports.

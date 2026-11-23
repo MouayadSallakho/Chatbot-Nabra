@@ -193,11 +193,13 @@ export class ConversationsApi {
     page = 1,
     pageSize = 20,
     view: ConversationView = 'all',
+    search = '',
   ): Observable<ConversationPage> {
     const filter = view === 'all' ? '' : `&filter=${view}`;
+    const query = search ? `&search=${encodeURIComponent(search)}` : '';
 
     return this.http.get<ConversationPage>(
-      `/api/tenants/${tenantId}/conversations?page=${page}&pageSize=${pageSize}${filter}`,
+      `/api/tenants/${tenantId}/conversations?page=${page}&pageSize=${pageSize}${filter}${query}`,
     );
   }
 

@@ -74,8 +74,7 @@ export { codeInitials };
  * channel's badge, the label by its code), when it last moved, the last message
  * and who wrote it, then at most two chips: why it waits for a person, and who
  * has it -- said once (note 13) -- or "AI is answering". Unread is a dot and a
- * heavier name, with the word for a screen reader (note 6). There is no
- * client-side search (D22; the board's search field is backend ask BA39-3).
+ * heavier name, with the word for a screen reader (note 6).
  *
  * <strong>Live, without jumps.</strong> A realtime notice re-reads the page in
  * place: rows keep their elements (tracked by id), nothing flips back to
@@ -125,6 +124,8 @@ export class ConversationList implements OnInit {
   protected readonly failure = signal<ApiError | null>(null);
   protected readonly conversations = signal<readonly ConversationSummary[]>([]);
   protected readonly total = signal(0);
+  protected readonly search = signal('');
+  private listVersion = 0;
 
   /** Whether a first page has arrived; after that, reloads keep it on screen. */
   protected readonly loaded = signal(false);
@@ -155,7 +156,8 @@ export class ConversationList implements OnInit {
    * view, and otherwise the shared read's, so the list never costs a read of its own.
    */
   protected readonly needsPersonCount = computed(() => {
-    const count = this.view() === 'needs-person' ? this.total() : this.signals.count();
+    const count =
+      this.view() === 'needs-person' && !this.search() ? this.total() : this.signals.count();
 
     return count === null ? null : this.format.number(count);
   });
@@ -309,13 +311,14 @@ export class ConversationList implements OnInit {
     }
 
     const view = this.view();
+    const version = this.listVersion;
 
     try {
       const page = await firstValueFrom(
-        this.api.list(tenantId, this.currentPage(), this.pageSize, view),
+        this.api.list(tenantId, this.currentPage(), this.pageSize, view, this.search()),
       );
 
-      if (view !== this.view()) {
+      if (view !== this.view() || version !== this.listVersion) {
         return;
       }
 
@@ -341,14 +344,15 @@ export class ConversationList implements OnInit {
     this.failure.set(null);
 
     const view = this.view();
+    const version = this.listVersion;
 
     try {
       const page = await firstValueFrom(
-        this.api.list(tenantId, this.currentPage(), this.pageSize, view),
+        this.api.list(tenantId, this.currentPage(), this.pageSize, view, this.search()),
       );
 
       // The reader moved to the other view while this was on its way.
-      if (view !== this.view()) {
+      if (view !== this.view() || version !== this.listVersion) {
         return;
       }
 
@@ -366,21 +370,39 @@ export class ConversationList implements OnInit {
       this.total.set(page.total);
       this.loaded.set(true);
     } catch (error) {
-      if (view === this.view()) {
+      if (view === this.view() && version === this.listVersion) {
         this.failure.set(toApiError(error));
       }
     } finally {
-      if (view === this.view()) {
+      if (view === this.view() && version === this.listVersion) {
         this.loading.set(false);
       }
     }
+  }
+
+  protected searchFor(value: string): void {
+    const search = value.trim();
+    if (search === this.search()) {
+      return;
+    }
+
+    this.search.set(search);
+    if (this.currentPage() !== 1) {
+      this.recordPage(1);
+    }
+    this.resetList(1);
   }
 
   /** A different list: its own skeleton and its own first read. */
   private switchView(): void {
     const page = Number(this.query().get(PAGE_QUERY_PARAM));
 
-    this.currentPage.set(Number.isInteger(page) && page >= 1 ? page : 1);
+    this.resetList(Number.isInteger(page) && page >= 1 ? page : 1);
+  }
+
+  private resetList(page: number): void {
+    this.listVersion++;
+    this.currentPage.set(page);
     this.conversations.set([]);
     this.total.set(0);
     this.loaded.set(false);
@@ -392,6 +414,7 @@ export class ConversationList implements OnInit {
       return;
     }
 
+    this.listVersion++;
     this.currentPage.set(page);
     this.recordPage(page);
     await this.load();

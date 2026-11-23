@@ -17,7 +17,8 @@ public sealed record ListConversationsQuery(
     Guid TenantId,
     int? Page,
     int? PageSize,
-    string? Filter = null);
+    string? Filter = null,
+    string? Search = null);
 
 /// <summary>One conversation of a workspace.</summary>
 public sealed record GetConversationQuery(Guid TenantId, Guid ConversationId);
@@ -135,6 +136,12 @@ public sealed class ReadConversationsHandler(
             return null;
         }
 
+        string? search = query.Search?.Trim();
+        if (search is { Length: > 120 } || search?.Contains('\0') == true)
+        {
+            throw ConversationQueryInvalidException.InvalidSearch();
+        }
+
         int page = Math.Max(query.Page ?? 1, 1);
         int pageSize = Math.Clamp(
             query.PageSize ?? _policy.DefaultPageSize,
@@ -148,6 +155,7 @@ public sealed class ReadConversationsHandler(
                 pageSize,
                 filter,
                 _authorizer.RequireCurrentUser(),
+                search,
                 cancellationToken)
             .ConfigureAwait(false);
     }

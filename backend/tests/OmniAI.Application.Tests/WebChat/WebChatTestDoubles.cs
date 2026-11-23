@@ -613,6 +613,7 @@ internal sealed class FakeWebChatWorld : IWebChatEndpointRepository, IWebChatRun
         int pageSize,
         ConversationListFilter filter,
         UserId viewer,
+        string? search = null,
         CancellationToken cancellationToken = default) =>
         Task.FromResult(new ConversationPage([], page, pageSize, 0));
 

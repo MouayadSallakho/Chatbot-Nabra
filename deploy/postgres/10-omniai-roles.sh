@@ -41,9 +41,10 @@ GRANT CONNECT ON DATABASE :"db" TO omniai_app;
 
 \connect :"db"
 
--- pgvector: created here as the superuser, so the migration's
+-- Install the vector and text-search extensions here, so the migration's
 -- CREATE EXTENSION IF NOT EXISTS is a no-op and the owner needs no extra rights.
 CREATE EXTENSION IF NOT EXISTS vector;
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
 ALTER SCHEMA public OWNER TO omniai_owner;
 REVOKE ALL ON SCHEMA public FROM PUBLIC;
