@@ -1,0 +1,39 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    command: ["postgres", "-c", "max_connections=300"]
+    environment:
+      POSTGRES_PASSWORD: disposable-test-only
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 2s
+      timeout: 3s
+      retries: 45
+  redis:
+    image: redis:7.4-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 45
+  tests:
+    image: mcr.microsoft.com/dotnet/sdk:10.0.404
+    working_dir: /repo/backend
+    volumes:
+      - .:/repo
+      - ${NABRA_RESULTS:?Set by test-backend.ps1}:/results
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      OMNIAI_TEST_POSTGRES: Host=postgres;Database=postgres;Username=postgres;Password=disposable-test-only
+      DOTNET_PROCESSOR_COUNT: "4"
+      OMNIAI_TEST_REDIS: redis:6379
+    command:
+      - sh
+      - -ec
+      - |
+        dotnet restore OmniAI.slnx -p:NuGetAuditMode=all
+        dotnet test OmniAI.slnx -m:1 --no-restore -c Release --collect:"XPlat Code Coverage" --results-directory /results

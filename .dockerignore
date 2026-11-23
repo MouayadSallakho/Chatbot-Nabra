@@ -1,6 +1,7 @@
 # Build context for deploy/*.Dockerfile (context = repository root).
 # Keep secrets, local state and build output out of every image.
 .git
+.quality
 .github
 .vs
 .vscode
