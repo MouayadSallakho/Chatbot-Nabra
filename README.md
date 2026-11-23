@@ -22,6 +22,8 @@ Production approval for the Meta channels is pending. The WhatsApp adapter curre
 
 ## Verify a checkout
 
+The backend owns orchestration, scheduling and integrations. Provider SDKs live in Infrastructure behind Application contracts. Domain models use tenant-scoped identities, and TLS terminates at the edge.
+
 Run from the repository root using PowerShell 7 and Docker with Linux containers.
 
 ```powershell
@@ -46,4 +48,4 @@ npm run build
 
 For interactive development, start the development API on port 5027 and run `npm start` in `frontend/`. The UI is served on port 4200. For browser journeys, use a disposable Development workspace, the local AI stand-in, the loopback Mailpit sink and installed Chrome, then run `npm run e2e`. These journeys create synthetic users and conversations. See the [development stack baseline](docs/phase-reports/PHASE_36_1_BASELINE_REPORT.md) and [operations runbook](docs/operations/operations-runbook.md).
 
-GitHub Actions runs backend, frontend and Git history checks on pull requests and pushes to main. See [deployment](docs/operations/production-deployment.md), [backup and restore](docs/operations/backup-restore.md) and the [WhatsApp validation runbook](docs/operations/meta-whatsapp-real-validation-runbook.md) for the corresponding operational procedures.
+GitHub Actions runs backend, frontend and Git history checks on pull requests and pushes to main. It also rebuilds the API, edge and migrator images and fails on fixable High or Critical vulnerabilities. The `main` branch requires all six checks. See [deployment](docs/operations/production-deployment.md), [backup and restore](docs/operations/backup-restore.md) and the [WhatsApp validation runbook](docs/operations/meta-whatsapp-real-validation-runbook.md) for the corresponding operational procedures.
