@@ -15,7 +15,7 @@ RUN npm run build
 COPY deploy/edge/csp-hashes.mjs /csp-hashes.mjs
 RUN node /csp-hashes.mjs dist/omniai-admin/browser/index.html > /spa-csp.conf
 
-FROM nginxinc/nginx-unprivileged:stable-alpine@sha256:f5116ed4606f3eb015dd4a8e28cb9b351476dc0ad4bc6e9f93b19cec130cdf03 AS runtime
+FROM nginxinc/nginx-unprivileged:mainline-alpine@sha256:b5047b9b76845eac124358373c6852377c52e4b05834a47647e955dd91cb8f1e AS runtime
 USER root
 RUN apk upgrade --no-cache
 RUN rm -f /etc/nginx/conf.d/default.conf
