@@ -1,0 +1,15 @@
+# Reviewed Phase 40 findings. Each entry applies only to one historical commit and line.
+# Local public widget URLs, synthetic test inputs and a documented SHA-256 digest.
+f138d196c4e7a9a405dcbcd00dc99e8a4c858699:docs/phase-reports/PHASE_37_5A_SCREENS_REPORT.md:generic-api-key:288
+c4a999231b22d9f0763c9245bad41ef83314ae5a:backend/tests/OmniAI.Api.IntegrationTests/Accounts/AccountProtectionApiTests.cs:generic-api-key:116
+c4a999231b22d9f0763c9245bad41ef83314ae5a:frontend/src/app/features/auth/reset-password/reset-password.spec.ts:generic-api-key:23
+3ca0e0f3a90592c558cf6c4c319eddbb4095308e:docs/phase-reports/PHASE_37_1_RELEASE_BLOCKERS_REPORT.md:generic-api-key:218
+edab9181dbe0d145e266a97cafa26f5e80f81543:docs/phase-reports/PHASE_36_12_LIVE_DOCKER_REPORT.md:generic-api-key:160
+783ad75f9371d6e6703d5d550ba0a5e53ca182d4:docs/phase-reports/PHASE_36_9_CHANNELS_WIDGET_REPORT.md:generic-api-key:149
+633167130bf15a0254dcf0a389836115f3342caa:docs/phase-reports/PHASE_36_BRAND_NABRA_REPORT.md:generic-api-key:142
+26c680ff549c994dd022a3c09665baeb95898475:docs/phase-reports/PHASE_36_1_BASELINE_REPORT.md:generic-api-key:194
+b2ca4425118c84b5f744ee2905ce03c4041abbe5:backend/tests/OmniAI.Api.IntegrationTests/Reliability/RestartRecoveryTests.cs:generic-api-key:30
+3e6d6a15a7fdbe1a3742784a2b843c2a11cf388d:frontend/src/app/features/embed/embed-session.spec.ts:generic-api-key:7
+3e6d6a15a7fdbe1a3742784a2b843c2a11cf388d:frontend/src/app/features/embed/embed-session.spec.ts:generic-api-key:45
+3e6d6a15a7fdbe1a3742784a2b843c2a11cf388d:frontend/src/app/features/embed/embed-chat/embed-chat.spec.ts:generic-api-key:13
+24ac222ef37d5550e8cbcdb2da88cc56459f0830:docs/phase-reports/PHASE_15_CONVERSATION_RUNTIME_WEBSITE_CHAT_REPORT.md:generic-api-key:200
