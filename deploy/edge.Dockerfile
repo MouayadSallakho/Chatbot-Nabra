@@ -15,7 +15,7 @@ RUN npm run build
 COPY deploy/edge/csp-hashes.mjs /csp-hashes.mjs
 RUN node /csp-hashes.mjs dist/omniai-admin/browser/index.html > /spa-csp.conf
 
-FROM nginxinc/nginx-unprivileged:1.29-alpine AS runtime
+FROM nginxinc/nginx-unprivileged:stable-alpine@sha256:f5116ed4606f3eb015dd4a8e28cb9b351476dc0ad4bc6e9f93b19cec130cdf03 AS runtime
 USER root
 RUN rm -f /etc/nginx/conf.d/default.conf
 COPY deploy/edge/nginx.conf /etc/nginx/nginx.conf
