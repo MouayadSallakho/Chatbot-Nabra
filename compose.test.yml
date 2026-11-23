@@ -1,6 +1,7 @@
 services:
   postgres:
     image: pgvector/pgvector:pg17
+    command: ["postgres", "-c", "max_connections=300"]
     environment:
       POSTGRES_PASSWORD: disposable-test-only
     healthcheck:
@@ -28,10 +29,11 @@ services:
         condition: service_healthy
     environment:
       OMNIAI_TEST_POSTGRES: Host=postgres;Database=postgres;Username=postgres;Password=disposable-test-only
+      DOTNET_PROCESSOR_COUNT: "4"
       OMNIAI_TEST_REDIS: redis:6379
     command:
       - sh
       - -ec
       - |
         dotnet restore OmniAI.slnx -p:NuGetAuditMode=all
-        dotnet test OmniAI.slnx --no-restore -c Release --collect:"XPlat Code Coverage" --results-directory /results
+        dotnet test OmniAI.slnx -m:1 --no-restore -c Release --collect:"XPlat Code Coverage" --results-directory /results

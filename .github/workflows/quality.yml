@@ -75,10 +75,10 @@ jobs:
           openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj /CN=localhost \
             -addext subjectAltName=DNS:localhost -keyout "$certs/tls.key" -out "$certs/tls.crt"
           sudo chown -R 101 "$certs"
-          docker run -d --rm --name nabra-edge-check --cap-drop ALL --security-opt no-new-privileges \
+          docker run -d --name nabra-edge-check --cap-drop ALL --security-opt no-new-privileges \
             -p 127.0.0.1:8443:8443 -v "$certs:/etc/nginx/certs:ro" nabra-quality:edge
-          trap 'docker stop nabra-edge-check' EXIT
-          sudo curl --fail --silent --show-error --retry 10 --retry-connrefused \
+          trap 'docker logs nabra-edge-check; docker rm -f nabra-edge-check' EXIT
+          sudo curl --fail --silent --show-error --retry 12 --retry-delay 1 --retry-all-errors \
             --cacert "$certs/tls.crt" https://localhost:8443/sign-in -o "$RUNNER_TEMP/sign-in.html"
           grep -F '<app-root' "$RUNNER_TEMP/sign-in.html"
       - name: Scan the image for known vulnerabilities
