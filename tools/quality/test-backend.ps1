@@ -17,6 +17,8 @@ try {
         foreach ($package in $coverage.coverage.packages.package) {
             if ($package.name -notin @('OmniAI.Domain','OmniAI.Application','OmniAI.Infrastructure','OmniAI.Api')) { continue }
             foreach ($class in $package.classes.class) {
+                # EF repeats the generated schema model for every migration.
+                if ($class.filename -match '(?:\.Designer|ModelSnapshot)\.cs$') { continue }
                 foreach ($line in $class.lines.line) {
                     $key = "$($package.name)/$($class.filename):$($line.number)"
                     $lines[$key] = ($lines[$key] -or [int]$line.hits -gt 0)

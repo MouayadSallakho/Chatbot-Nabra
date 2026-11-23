@@ -30,7 +30,7 @@ Run from the repository root using PowerShell 7 and Docker with Linux containers
 pwsh -File tools/quality/test-backend.ps1
 ```
 
-The runner restores packages with transitive NuGet auditing, builds Release and runs all four test projects. It creates private PostgreSQL and Redis services, then removes their containers, network and volumes. Coverage XML stays under `.quality/`. The gate measures unique executable source lines across the four product assemblies. Use a separate checkout for concurrent runs because .NET writes build outputs under `backend/`.
+The runner restores packages with transitive NuGet auditing, builds Release and runs all four test projects. It creates private PostgreSQL and Redis services, then removes their containers, network and volumes. Coverage XML stays under `.quality/` locally and is available as the `backend-coverage` Actions artifact for seven days. The 75% gate measures unique executable lines across the four product assemblies, excluding generated migration designers and model snapshots. Use a separate checkout for concurrent runs because .NET writes build outputs under `backend/`.
 
 Linux is the reference environment for integration tests. Direct Windows runs require separate disposable services and can differ in time-zone resolution and PDF text extraction. The three opt-in load and crash-boundary tests have separate performance procedures.
 
