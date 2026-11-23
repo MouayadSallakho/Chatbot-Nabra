@@ -286,6 +286,13 @@ internal static class ConversationEndpoints
             .WithName("ReplyToTenantConversation")
             .Produces<TranscriptMessageResponse>(StatusCodes.Status200OK);
 
+        workspace.MapGet("/assigned-members", async (Guid tenantId, ReadConversationsHandler handler, CancellationToken token) =>
+        {
+            var members = await handler.AssignedMembersAsync(tenantId, token).ConfigureAwait(false);
+            return members is null ? Results.NotFound() : Results.Ok(members.Select(member =>
+                new WorkspaceMemberResponse(member.UserId, member.Email, member.DisplayName)));
+        }).WithName("ListInboxAssignedMembers");
+
         workspace.MapGet("/assignees", ListAssigneesAsync)
             .WithName("ListTenantConversationAssignees");
 
@@ -299,11 +306,18 @@ internal static class ConversationEndpoints
         int? pageSize,
         string? filter,
         string? search,
+        ChannelKind? channel,
+        ConversationStatus? status,
+        Guid? assignedTo,
+        bool? unassigned,
+        DateTimeOffset? activeFrom,
+        DateTimeOffset? activeBefore,
         ReadConversationsHandler handler,
         CancellationToken cancellationToken)
     {
         ConversationPage? result = await handler
-            .ListAsync(new ListConversationsQuery(tenantId, page, pageSize, filter, search), cancellationToken)
+            .ListAsync(new ListConversationsQuery(tenantId, page, pageSize, filter, search,
+                new InboxFilters(channel, status, assignedTo, unassigned ?? false, activeFrom, activeBefore)), cancellationToken)
             .ConfigureAwait(false);
 
         if (result is null)

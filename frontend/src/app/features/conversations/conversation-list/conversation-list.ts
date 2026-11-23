@@ -29,7 +29,13 @@ import { VoiceChip } from '@app/shared/voice/voice-chip';
 import { Avatar, codeInitials } from '@app/shared/avatar/avatar';
 import { Chip } from '@app/shared/chip/chip';
 import { Segmented } from '@app/shared/segmented/segmented';
-import { ConversationSummary, ConversationView, ConversationsApi } from '../conversations-api';
+import {
+  ConversationSummary,
+  ConversationView,
+  ConversationsApi,
+  InboxFilters,
+  WorkspaceMember,
+} from '../conversations-api';
 import { CustomerLabel, customerLabel, customerLabelPlain } from '../customer-label';
 import { InboxState } from '../inbox-state';
 import { sameDay } from '../conversation-words';
@@ -125,6 +131,13 @@ export class ConversationList implements OnInit {
   protected readonly conversations = signal<readonly ConversationSummary[]>([]);
   protected readonly total = signal(0);
   protected readonly search = signal('');
+  private readonly criteria = signal<InboxFilters>({});
+  protected readonly filtered = computed(
+    () => !!this.search() || Object.values(this.criteria()).some(Boolean),
+  );
+  protected readonly members = signal<readonly WorkspaceMember[]>([]);
+  protected readonly memberState = signal<'idle' | 'loading' | 'ready' | 'error'>('idle');
+  protected readonly invalidRange = signal(false);
   private listVersion = 0;
 
   /** Whether a first page has arrived; after that, reloads keep it on screen. */
@@ -157,7 +170,7 @@ export class ConversationList implements OnInit {
    */
   protected readonly needsPersonCount = computed(() => {
     const count =
-      this.view() === 'needs-person' && !this.search() ? this.total() : this.signals.count();
+      this.view() === 'needs-person' && !this.filtered() ? this.total() : this.signals.count();
 
     return count === null ? null : this.format.number(count);
   });
@@ -315,7 +328,14 @@ export class ConversationList implements OnInit {
 
     try {
       const page = await firstValueFrom(
-        this.api.list(tenantId, this.currentPage(), this.pageSize, view, this.search()),
+        this.api.list(
+          tenantId,
+          this.currentPage(),
+          this.pageSize,
+          view,
+          this.search(),
+          this.criteria(),
+        ),
       );
 
       if (view !== this.view() || version !== this.listVersion) {
@@ -348,7 +368,14 @@ export class ConversationList implements OnInit {
 
     try {
       const page = await firstValueFrom(
-        this.api.list(tenantId, this.currentPage(), this.pageSize, view, this.search()),
+        this.api.list(
+          tenantId,
+          this.currentPage(),
+          this.pageSize,
+          view,
+          this.search(),
+          this.criteria(),
+        ),
       );
 
       // The reader moved to the other view while this was on its way.
@@ -380,13 +407,51 @@ export class ConversationList implements OnInit {
     }
   }
 
-  protected searchFor(value: string): void {
-    const search = value.trim();
-    if (search === this.search()) {
+  protected async loadMembers(): Promise<void> {
+    const tenantId = this.workspace.tenantId();
+    if (!tenantId || !this.canView() || this.memberState() === 'loading') {
+      return;
+    }
+    this.memberState.set('loading');
+    try {
+      this.members.set(await firstValueFrom(this.api.assignedMembers(tenantId)));
+      this.memberState.set('ready');
+    } catch {
+      this.memberState.set('error');
+    }
+  }
+
+  protected searchFor(form: HTMLFormElement): void {
+    const values = new FormData(form);
+    const field = (key: string) => String(values.get(key) ?? '');
+    const from = field('from');
+    const through = field('through');
+    this.invalidRange.set(!!from && !!through && from > through);
+    if (this.invalidRange()) {
       return;
     }
 
-    this.search.set(search);
+    // Calendar-day bounds in the same local time zone used to display row activity.
+    const boundary = (day: string, nextDay: boolean) => {
+      if (!day) return undefined;
+      const date = new Date(day + 'T00:00:00');
+      if (nextDay) {
+        date.setDate(date.getDate() + 1);
+        // Some zones skip midnight on the first day. Start the next day at its own midnight.
+        date.setHours(0, 0, 0, 0);
+      }
+      return date.toISOString();
+    };
+    const assignee = field('assignee');
+    this.criteria.set({
+      channel: field('channel'),
+      status: field('status'),
+      assignedTo: assignee === 'unassigned' ? undefined : assignee,
+      unassigned: assignee === 'unassigned' || undefined,
+      activeFrom: boundary(from, false),
+      activeBefore: boundary(through, true),
+    });
+    this.search.set(field('term').trim());
     if (this.currentPage() !== 1) {
       this.recordPage(1);
     }

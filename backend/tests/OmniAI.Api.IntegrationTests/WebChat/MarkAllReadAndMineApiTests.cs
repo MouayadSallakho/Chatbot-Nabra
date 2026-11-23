@@ -207,6 +207,11 @@ public sealed class MarkAllReadAndMineApiTests(WebChatApiFixture fixture)
         Assert.DoesNotContain(colleagues, ids);
         Assert.DoesNotContain(returned, ids);
 
+        JsonElement choices = await ReadAsync(colleague, Inbox(tenantId, "/assigned-members"));
+        Assert.Contains(choices.EnumerateArray(), member => member.GetProperty("userId").GetGuid() == ownerId);
+        Assert.Equal(new HashSet<Guid> { colleagues }, Ids(await ReadAsync(owner, Inbox(tenantId,
+            $"?assignedTo={colleagueId}&status=Open&channel=WebChat"))));
+
         // The colleague's own Mine is theirs: only the one assigned to them.
         Assert.Equal(new HashSet<Guid> { colleagues }, Ids(await ReadAsync(colleague, Inbox(tenantId, "?filter=mine&pageSize=50"))));
 
@@ -266,9 +271,12 @@ public sealed class MarkAllReadAndMineApiTests(WebChatApiFixture fixture)
 
         HttpClient blind = await fixture.CreateRestrictedMemberAsync(tenantId, "customers.view");
         Assert.Equal(HttpStatusCode.Forbidden, (await blind.GetAsync(Inbox(tenantId, "?filter=mine"))).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await blind.GetAsync(Inbox(tenantId, "/assigned-members"))).StatusCode);
 
         (HttpClient rival, Guid rivalTenantId, _) = await fixture.CreateOwnerAsync("Rival Mine Trading");
         Assert.Equal(HttpStatusCode.NotFound, (await rival.GetAsync(Inbox(tenantId, "?filter=mine"))).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await rival.GetAsync(Inbox(tenantId, "/assigned-members"))).StatusCode);
+        Assert.Empty((await ReadAsync(rival, Inbox(rivalTenantId, "/assigned-members"))).EnumerateArray());
         Assert.Equal(0, (await ReadAsync(rival, Inbox(rivalTenantId, "?filter=mine"))).GetProperty("total").GetInt32());
     }
 

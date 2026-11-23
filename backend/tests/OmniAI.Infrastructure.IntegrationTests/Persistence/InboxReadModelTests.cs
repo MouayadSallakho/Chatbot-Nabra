@@ -81,6 +81,9 @@ public sealed class InboxReadModelTests(PostgresTestDatabase database)
         ConversationPage second = await repository.ListAsync(tenant.Id, 2, 1, ConversationListFilter.All, Viewer, search);
         ConversationPage mine = await repository.ListAsync(tenant.Id, 1, 10, ConversationListFilter.Mine, Viewer, search);
 
+        var window = new InboxFilters(ActiveFrom: Start.AddMinutes(4), ActiveBefore: Start.AddMinutes(5));
+        var activity = await repository.ListAsync(tenant.Id, 1, 10, ConversationListFilter.All, Viewer, criteria: window);
+        Assert.Equal(nearMiss.Id.Value, Assert.Single(activity.Items).Id);
         Assert.Equal(2, first.Total);
         Assert.Equal(historical.Id.Value, Assert.Single(first.Items).Id);
         Assert.Equal(named.Id.Value, Assert.Single(second.Items).Id);

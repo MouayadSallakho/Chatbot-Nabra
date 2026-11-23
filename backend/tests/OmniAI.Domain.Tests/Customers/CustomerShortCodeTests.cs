@@ -22,6 +22,19 @@ public sealed class CustomerShortCodeTests
     }
 
     [Fact]
+    public void A_code_search_includes_every_colliding_id_suffix()
+    {
+        string[] suffixes = ["0abcdef1", "4abcdef1", "8abcdef1", "cabcdef1"];
+        foreach (string suffix in suffixes)
+        {
+            Guid id = Guid.Parse("00000000-0000-7000-8000-0000" + suffix);
+            Assert.Equal(suffixes, CustomerShortCode.MatchingIdSuffixes(CustomerShortCode.For(id).ToLowerInvariant()));
+        }
+
+        Assert.Empty(CustomerShortCode.MatchingIdSuffixes("HELLO!"));
+    }
+
+    [Fact]
     public void The_same_customer_always_has_the_same_code()
     {
         CustomerId customer = CustomerId.New();

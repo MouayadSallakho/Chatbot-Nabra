@@ -385,6 +385,18 @@ public sealed class InboxStateApiTests(WebChatApiFixture fixture)
         Assert.Equal("conversations.search.invalid", await CodeAsync(response));
     }
 
+    [Theory]
+    [InlineData("channel=99")]
+    [InlineData("status=99")]
+    [InlineData("activeFrom=2026-11-23T00:00:00Z&activeBefore=2026-11-23T00:00:00Z")]
+    [InlineData("unassigned=true&assignedTo=acada001-cc22-4444-bd11-cc0000000009")]
+    public async Task Contradictory_or_unknown_criteria_are_refused(string query)
+    {
+        (HttpClient owner, Guid tenantId, _) = await WorkspaceAsync();
+        using var response = await owner.GetAsync(WebChatApiFixture.Relative($"/api/tenants/{tenantId}/conversations?{query}"));
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
     // ---- Unread -------------------------------------------------------------
 
     [Fact]

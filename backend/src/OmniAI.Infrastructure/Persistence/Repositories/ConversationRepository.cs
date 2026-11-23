@@ -40,6 +40,16 @@ internal sealed class ConversationRepository(OmniAiDbContext context) : IConvers
     private readonly OmniAiDbContext _context =
         context ?? throw new ArgumentNullException(nameof(context));
 
+    public async Task<IReadOnlyList<ConversationMessageAuthor>> ListAssignedMembersAsync(
+        TenantId tenantId, CancellationToken cancellationToken)
+    {
+        var assigned = await _context.Conversations.Where(c => c.TenantId == tenantId && c.AssignedTo != null)
+            .Select(c => c.AssignedTo).Distinct().ToListAsync(cancellationToken).ConfigureAwait(false);
+        var members = await NameMembersAsync(assigned, cancellationToken).ConfigureAwait(false);
+        return [.. members.Values.OrderBy(member => member.DisplayName ?? member.Email, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(member => member.UserId)];
+    }
+
     public async Task<ConversationPage> ListAsync(
         TenantId tenantId,
         int page,
@@ -47,6 +57,7 @@ internal sealed class ConversationRepository(OmniAiDbContext context) : IConvers
         ConversationListFilter filter,
         UserId viewer,
         string? search = null,
+        InboxFilters? criteria = null,
         CancellationToken cancellationToken = default)
     {
         IQueryable<HandledConversation> owned = WithHandlingFacts(
@@ -71,18 +82,63 @@ internal sealed class ConversationRepository(OmniAiDbContext context) : IConvers
                 handled.Conversation.AssignedTo == me || handled.TakenOverBy == me);
         }
 
+        if (criteria?.Channel is { } channel)
+        {
+            owned = owned.Where(row => row.Conversation.Channel == channel);
+        }
+
+        if (criteria?.Status is { } status)
+        {
+            owned = owned.Where(row => row.Conversation.Status == status);
+        }
+
+        if (criteria?.AssignedTo is { } assignee)
+        {
+            UserId member = UserId.From(assignee);
+            owned = owned.Where(row => row.Conversation.AssignedTo == member);
+        }
+        else if (criteria?.Unassigned == true)
+        {
+            owned = owned.Where(row => row.Conversation.AssignedTo == null);
+        }
+
+        if (criteria?.ActiveFrom?.ToUniversalTime() is { } start)
+        {
+            owned = owned.Where(row => row.Conversation.LastActivityAt >= start);
+        }
+
+        if (criteria?.ActiveBefore?.ToUniversalTime() is { } end)
+        {
+            owned = owned.Where(row => row.Conversation.LastActivityAt < end);
+        }
+
         if (!string.IsNullOrEmpty(search))
         {
             string pattern = "%" + search.Replace("!", "!!", StringComparison.Ordinal)
                 .Replace("%", "!%", StringComparison.Ordinal)
                 .Replace("_", "!_", StringComparison.Ordinal) + "%";
+            string[] suffixes = CustomerShortCode.MatchingIdSuffixes(search);
             var namedCustomers = _context.Customers.FromSql($"""
                 SELECT * FROM customers
-                WHERE tenant_id = {tenantId.Value} AND display_name ILIKE {pattern} ESCAPE '!'
+                WHERE tenant_id = {tenantId.Value} AND (display_name ILIKE {pattern} ESCAPE '!'
+                    OR ({suffixes.Length > 0} AND right(id::text, 8) = ANY ({suffixes})))
                 """);
 
+            // Compare only the reference exposed by the inbox, including for very short numbers.
+            string reference = search.Length == 4 && search.All(char.IsAsciiDigit) ? "••••" + search : search;
+            bool searchReference = reference.StartsWith('•') && reference.Length <= 8;
+            var byReference = _context.Conversations.FromSql($"""
+                SELECT current.conversation_id AS id FROM (
+                    SELECT DISTINCT ON (conversation_id) conversation_id,
+                        CASE WHEN length(customer_id) <= 4 THEN repeat('•', length(customer_id))
+                             ELSE '••••' || right(customer_id, 4) END AS masked
+                    FROM whatsapp_contacts WHERE tenant_id = {tenantId.Value}
+                    ORDER BY conversation_id, started_at DESC, id DESC
+                ) AS current WHERE masked = {reference}
+                """);
             owned = owned.Where(handled =>
                 namedCustomers.Any(customer => customer.Id == handled.Conversation.CustomerId) ||
+                (searchReference && byReference.Any(match => match.Id == handled.Conversation.Id)) ||
                 handled.Conversation.Messages.Any(message => EF.Functions.ILike(message.Text, pattern, "!")));
         }
 
@@ -455,6 +511,7 @@ internal sealed class ConversationRepository(OmniAiDbContext context) : IConvers
                 .Where(contact =>
                     contact.TenantId == tenantId && onWhatsApp.Contains(contact.ConversationId))
                 .OrderByDescending(contact => contact.StartedAt)
+                .ThenByDescending(contact => contact.Id)
                 .Select(contact => new { contact.ConversationId, Number = contact.CustomerId })
                 .ToListAsync(cancellationToken)
                 .ConfigureAwait(false);

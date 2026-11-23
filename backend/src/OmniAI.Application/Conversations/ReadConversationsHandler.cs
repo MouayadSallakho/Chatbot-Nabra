@@ -18,7 +18,8 @@ public sealed record ListConversationsQuery(
     int? Page,
     int? PageSize,
     string? Filter = null,
-    string? Search = null);
+    string? Search = null,
+    InboxFilters? Criteria = null);
 
 /// <summary>One conversation of a workspace.</summary>
 public sealed record GetConversationQuery(Guid TenantId, Guid ConversationId);
@@ -142,6 +143,15 @@ public sealed class ReadConversationsHandler(
             throw ConversationQueryInvalidException.InvalidSearch();
         }
 
+        if (query.Criteria is { } criteria &&
+            ((criteria.Channel is { } channel && !Enum.IsDefined(channel)) ||
+             (criteria.Status is { } status && !Enum.IsDefined(status)) ||
+             criteria.AssignedTo == Guid.Empty || (criteria.AssignedTo.HasValue && criteria.Unassigned) ||
+             criteria.ActiveFrom >= criteria.ActiveBefore))
+        {
+            throw ConversationQueryInvalidException.InvalidCriteria();
+        }
+
         int page = Math.Max(query.Page ?? 1, 1);
         int pageSize = Math.Clamp(
             query.PageSize ?? _policy.DefaultPageSize,
@@ -156,8 +166,18 @@ public sealed class ReadConversationsHandler(
                 filter,
                 _authorizer.RequireCurrentUser(),
                 search,
+                query.Criteria,
                 cancellationToken)
             .ConfigureAwait(false);
+    }
+
+    public async Task<IReadOnlyList<ConversationMessageAuthor>?> AssignedMembersAsync(
+        Guid workspace, CancellationToken cancellationToken)
+    {
+        TenantId tenantId = TenantId.From(workspace);
+        return await AuthoriseAsync(tenantId, cancellationToken).ConfigureAwait(false)
+            ? await _conversations.ListAssignedMembersAsync(tenantId, cancellationToken).ConfigureAwait(false)
+            : null;
     }
 
     /// <returns>

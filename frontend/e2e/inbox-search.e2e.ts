@@ -8,12 +8,28 @@ test('finds an older message, clears a miss and keeps the inbox usable on a narr
   await page.goto('/conversations');
   const search = page.getByRole('searchbox');
   await expect(search).toHaveAccessibleName(
-    appLanguage === 'ar' ? 'ابحث باسم العميل أو في الرسائل' : 'Search customer names or messages',
+    appLanguage === 'ar'
+      ? 'ابحث بالاسم أو المرجع أو نص الرسالة'
+      : 'Search names, references or messages',
   );
   await search.fill('Opening message');
   await search.press('Enter');
   const row = page.locator('a.conversation-row').filter({ hasText: 'Reply number 49' });
   await expect(row).toHaveAttribute('href', new RegExp(e2eLongConversation()));
+  await page.locator('form[role="search"] summary').click();
+  await page.locator('select[name="channel"]').selectOption('WhatsApp');
+  const apply = page.getByRole('button', {
+    name: appLanguage === 'ar' ? 'تطبيق التصفية' : 'Apply filters',
+  });
+  await apply.click();
+  await expect(
+    page.getByText(appLanguage === 'ar' ? 'لا توجد محادثات مطابقة' : 'No matching conversations'),
+  ).toBeVisible();
+  await expect(row).toHaveCount(0);
+  await page.locator('select[name="channel"]').selectOption('WebChat');
+  await page.locator('select[name="status"]').selectOption('Open');
+  await search.press('Enter');
+  await expect(row).toBeVisible();
   await search.fill('طلب بلا نتيجة %_');
   await search.press('Enter');
   await expect(

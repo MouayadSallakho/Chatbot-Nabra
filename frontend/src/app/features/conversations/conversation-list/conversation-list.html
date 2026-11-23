@@ -100,33 +100,94 @@
       </nav>
 
       <form
+        #searchForm
         class="inbox-search"
         role="search"
-        (submit)="$event.preventDefault(); searchFor(term.value)"
+        (submit)="$event.preventDefault(); searchFor(searchForm)"
       >
         <input
           #term
+          name="term"
           type="search"
           class="input"
           dir="auto"
           maxlength="120"
-          aria-label="Search customer names or messages"
+          aria-label="Search names, references or messages"
           i18n-aria-label="@@inbox.search.prompt"
-          placeholder="Search customer names or messages"
+          placeholder="Search names, references or messages"
           i18n-placeholder="@@inbox.search.prompt"
         />
         <button type="submit" class="btn btn-secondary btn-sm" i18n="@@inbox.search.submit">
           Search
         </button>
-        @if (search()) {
+        @if (filtered()) {
           <button
             type="button"
             class="btn btn-quiet btn-sm"
-            (click)="term.value = ''; searchFor(''); term.focus()"
+            (click)="searchForm.reset(); searchFor(searchForm); term.focus()"
             i18n="@@inbox.search.clear"
           >
             Clear search
           </button>
+        }
+        <details #filters class="col-12" (toggle)="filters.open && loadMembers()">
+          <summary i18n="@@inbox.filter.heading">Filters</summary>
+          <div class="field-row">
+            <label class="field"
+              ><span i18n="@@inbox.filter.channel">Channel</span>
+              <select class="input" name="channel">
+                <option value="" i18n="@@inbox.filter.anyChannel">All channels</option>
+                <option value="WebChat" i18n="@@channel.webChat">Website chat</option>
+                <option value="WhatsApp" i18n="@@channel.whatsApp">WhatsApp</option>
+                <option value="Messenger" i18n="@@channel.messenger">Messenger</option>
+                <option value="Instagram" i18n="@@channel.instagram">Instagram</option>
+              </select>
+            </label>
+            <label class="field"
+              ><span i18n="@@inbox.filter.status">Conversation status</span>
+              <select class="input" name="status">
+                <option value="" i18n="@@inbox.filter.anyStatus">All statuses</option>
+                <option value="Open" i18n="@@conversation.status.open">Open</option>
+                <option value="Closed" i18n="@@conversation.status.closed">Closed</option>
+              </select>
+            </label>
+            <label class="field"
+              ><span i18n="@@inbox.filter.assignee">Assigned to</span>
+              <select class="input" name="assignee">
+                <option value="" i18n="@@inbox.filter.anyMember">Anyone</option>
+                <option value="unassigned" i18n="@@inbox.filter.unassigned">Unassigned</option>
+                @for (member of members(); track member.userId) {
+                  <option [value]="member.userId">{{ member.displayName || member.email }}</option>
+                }
+              </select>
+            </label>
+            @if (memberState() === 'error') {
+              <button
+                type="button"
+                class="btn btn-quiet btn-sm"
+                (click)="loadMembers()"
+                i18n="@@inbox.filter.retry"
+              >
+                Retry loading assignees
+              </button>
+            }
+            <label class="field"
+              ><span i18n="@@inbox.filter.from">Last activity from</span
+              ><input class="input" type="date" name="from"
+            /></label>
+            <label class="field"
+              ><span i18n="@@inbox.filter.through">Last activity through</span
+              ><input class="input" type="date" name="through"
+            /></label>
+          </div>
+          <button type="submit" class="btn btn-secondary btn-sm" i18n="@@inbox.filter.apply">
+            Apply filters
+          </button>
+        </details>
+        @if (invalidRange()) {
+          <span role="alert" i18n="@@inbox.filter.rangeError"
+            >The end date must be on or after the start date.</span
+          >
         }
       </form>
       <div class="inbox-tools">
@@ -201,12 +262,12 @@
           Try again
         </button>
       </app-empty-state>
-    } @else if (total() === 0 && search()) {
+    } @else if (total() === 0 && filtered()) {
       <app-empty-state
         icon="conversations"
         heading="No matching conversations"
         i18n-heading="@@inbox.search.empty"
-        description="Try another name or message in this view."
+        description="Try a different search or change the filters."
         i18n-description="@@inbox.search.hint"
       />
     } @else if (total() === 0) {

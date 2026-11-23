@@ -607,6 +607,10 @@ internal sealed class FakeWebChatWorld : IWebChatEndpointRepository, IWebChatRun
 
     // ---- IConversationRepository ----------------------------------------
 
+    public Task<IReadOnlyList<ConversationMessageAuthor>> ListAssignedMembersAsync(
+        TenantId tenantId, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<ConversationMessageAuthor>>([]);
+
     public Task<ConversationPage> ListAsync(
         TenantId tenantId,
         int page,
@@ -614,6 +618,7 @@ internal sealed class FakeWebChatWorld : IWebChatEndpointRepository, IWebChatRun
         ConversationListFilter filter,
         UserId viewer,
         string? search = null,
+        InboxFilters? criteria = null,
         CancellationToken cancellationToken = default) =>
         Task.FromResult(new ConversationPage([], page, pageSize, 0));
 

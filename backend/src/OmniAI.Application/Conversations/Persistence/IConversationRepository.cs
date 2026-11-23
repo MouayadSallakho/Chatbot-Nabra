@@ -48,6 +48,15 @@ public sealed record ConversationMessageRecord(
 /// </remarks>
 public sealed record ConversationMessageAuthor(Guid UserId, string Email, string? DisplayName = null);
 
+/// <summary>Inbox filters intersect the current view. The upper activity bound is exclusive.</summary>
+public sealed record InboxFilters(
+    ChannelKind? Channel = null,
+    ConversationStatus? Status = null,
+    Guid? AssignedTo = null,
+    bool Unassigned = false,
+    DateTimeOffset? ActiveFrom = null,
+    DateTimeOffset? ActiveBefore = null);
+
 /// <summary>One page of a conversation's history.</summary>
 /// <param name="Items">Messages in ingestion order, oldest first.</param>
 /// <param name="NextCursor">
@@ -269,6 +278,8 @@ public sealed record ConversationDetail(
 /// </remarks>
 public interface IConversationRepository
 {
+    Task<IReadOnlyList<ConversationMessageAuthor>> ListAssignedMembersAsync(
+        TenantId tenantId, CancellationToken cancellationToken);
     /// <summary>One page of a workspace's conversations, most recently active first.</summary>
     /// <param name="filter">Which conversations; the total counts the filtered set.</param>
     /// <param name="viewer">Whose read markers decide <c>Unread</c>.</param>
@@ -279,6 +290,7 @@ public interface IConversationRepository
         ConversationListFilter filter,
         UserId viewer,
         string? search = null,
+        InboxFilters? criteria = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>

@@ -30,6 +30,31 @@ public static class CustomerShortCode
     // a code read aloud or copied by hand cannot be mistaken for another one.
     private const string Alphabet = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
 
+    /// <summary>The four possible UUID suffixes for an exact, case-insensitive label search.</summary>
+    public static string[] MatchingIdSuffixes(string text)
+    {
+        if (text.Length != Length)
+        {
+            return [];
+        }
+
+        uint bits = 0;
+        foreach (char character in text)
+        {
+            int digit = Alphabet.IndexOf(char.ToUpperInvariant(character), StringComparison.Ordinal);
+            if (digit < 0)
+            {
+                return [];
+            }
+
+            bits = (bits << 5) | (uint)digit;
+        }
+
+        return Enumerable.Range(0, 4)
+            .Select(prefix => (((uint)prefix << 30) | bits).ToString("x8", System.Globalization.CultureInfo.InvariantCulture))
+            .ToArray();
+    }
+
     /// <summary>The code for this customer.</summary>
     public static string For(CustomerId customerId) => For(customerId.Value);
 

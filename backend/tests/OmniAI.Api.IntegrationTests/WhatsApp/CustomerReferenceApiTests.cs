@@ -31,6 +31,16 @@ public sealed class CustomerReferenceApiTests(WhatsAppApiFixture fixture)
         Guid customerId = inboxCustomer.GetProperty("id").GetGuid();
 
         Assert.Equal("••••0123", reference);
+        string inbox = $"/api/tenants/{tenantId}/conversations";
+        foreach (string key in new[] { reference, "0123", inboxCustomer.GetProperty("shortCode").GetString()!.ToLowerInvariant() })
+        {
+            JsonElement hits = await ReadAsync(owner, $"{inbox}?channel=WhatsApp&status=Open&unassigned=true&search={Uri.EscapeDataString(key)}");
+            Assert.Equal(conversationId, Assert.Single(hits.GetProperty("items").EnumerateArray()).GetProperty("id").GetGuid());
+        }
+        foreach (string query in new[] { $"search={FirstCustomer}", "search=44770090", "channel=WebChat", "status=Closed" })
+        {
+            Assert.Equal(0, (await ReadAsync(owner, $"{inbox}?{query}")).GetProperty("total").GetInt32());
+        }
 
         (JsonElement row, string listJson) = await DirectoryRowAsync(owner, tenantId, customerId);
         Assert.Equal(reference, row.GetProperty("reference").GetString());

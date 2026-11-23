@@ -162,6 +162,40 @@ describe('ConversationList', () => {
     expect(text()).toContain('No conversations yet');
   });
 
+  it('applies inclusive local calendar dates and assignment together, and rejects reversed dates', async () => {
+    await mount('conversations.view');
+    const empty = { items: [], page: 1, pageSize: 20, total: 0 };
+    http.expectOne(url).flush(empty);
+    await settle();
+    const form = host().querySelector<HTMLFormElement>('form[role="search"]')!;
+    const field = (name: string) => form.elements.namedItem(name) as HTMLInputElement;
+    field('channel').value = 'WhatsApp';
+    field('assignee').value = 'unassigned';
+    field('status').value = 'Closed';
+    field('from').value = '2026-03-08';
+    field('through').value = '2026-03-07';
+    const submit = () => form.dispatchEvent(new Event('submit', { cancelable: true }));
+    submit();
+    await settle();
+    expect(text()).toContain('The end date must be on or after the start date.');
+    field('through').value = '2026-03-08';
+    submit();
+    const from = encodeURIComponent(new Date(2026, 2, 8).toISOString());
+    const before = encodeURIComponent(new Date(2026, 2, 9).toISOString());
+    http
+      .expectOne(
+        url +
+          '&channel=WhatsApp&status=Closed&unassigned=true&activeFrom=' +
+          from +
+          '&activeBefore=' +
+          before,
+      )
+      .flush(empty);
+    await settle();
+    expect(text()).toContain('No matching conversations');
+    expect(text()).not.toContain('The end date must be on or after the start date.');
+  });
+
   describe('the needs-a-person view', () => {
     const viewUrl = `${url}&filter=needs-person`;
     const emptyPage = { items: [], page: 1, pageSize: 20, total: 0 };

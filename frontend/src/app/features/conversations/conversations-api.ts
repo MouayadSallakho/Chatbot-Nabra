@@ -6,6 +6,16 @@ import { Versioned, withEntityTag } from '@app/core/api/versioned';
 /** Which channel a conversation happened on. */
 export type ConversationChannel = 'WebChat' | 'WhatsApp' | 'Instagram' | 'Messenger';
 
+/** Applied inbox filters. Activity bounds are UTC instants; the end is exclusive. */
+export interface InboxFilters {
+  readonly channel?: string;
+  readonly status?: string;
+  readonly assignedTo?: string;
+  readonly unassigned?: boolean;
+  readonly activeFrom?: string;
+  readonly activeBefore?: string;
+}
+
 /** Who wrote a message. */
 export type MessageSender = 'Customer' | 'AiAgent' | 'HumanAgent' | 'System';
 
@@ -194,12 +204,17 @@ export class ConversationsApi {
     pageSize = 20,
     view: ConversationView = 'all',
     search = '',
+    criteria: InboxFilters = {},
   ): Observable<ConversationPage> {
     const filter = view === 'all' ? '' : `&filter=${view}`;
     const query = search ? `&search=${encodeURIComponent(search)}` : '';
+    const extra = Object.entries(criteria)
+      .filter(([, value]) => value)
+      .map(([key, value]) => `&${key}=${encodeURIComponent(value)}`)
+      .join('');
 
     return this.http.get<ConversationPage>(
-      `/api/tenants/${tenantId}/conversations?page=${page}&pageSize=${pageSize}${filter}${query}`,
+      `/api/tenants/${tenantId}/conversations?page=${page}&pageSize=${pageSize}${filter}${query}${extra}`,
     );
   }
 
@@ -282,6 +297,12 @@ export class ConversationsApi {
   }
 
   /** The colleagues a conversation may be routed to. */
+  assignedMembers(tenantId: string): Observable<readonly WorkspaceMember[]> {
+    return this.http.get<readonly WorkspaceMember[]>(
+      `/api/tenants/${tenantId}/conversations/assigned-members`,
+    );
+  }
+
   assignees(tenantId: string): Observable<readonly WorkspaceMember[]> {
     return this.http.get<readonly WorkspaceMember[]>(
       `/api/tenants/${tenantId}/conversations/assignees`,
