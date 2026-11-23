@@ -1,0 +1,4 @@
+# Golden CSVs reproduce the exported report bytes on every checkout.
+backend/tests/OmniAI.Infrastructure.IntegrationTests/Reports/Golden/en/*.csv text eol=crlf
+backend/tests/OmniAI.Infrastructure.IntegrationTests/Reports/Golden/en/*.xlsx.parts.txt text eol=lf
+backend/tests/OmniAI.Infrastructure.IntegrationTests/Reports/Golden/en/*.pdf.canonical binary
