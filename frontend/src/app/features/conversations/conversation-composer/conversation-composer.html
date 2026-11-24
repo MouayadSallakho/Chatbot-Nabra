@@ -27,7 +27,7 @@
       class="btn btn-primary btn-sm composer-send"
       [class.btn-loading]="sending()"
       [attr.aria-busy]="sending() || null"
-      [disabled]="empty() || tooLong()"
+      [disabled]="windowClosed() || empty() || tooLong()"
       [attr.aria-disabled]="sending() || null"
       (click)="send()"
       data-testid="send-reply"
@@ -39,6 +39,21 @@
     </button>
   </div>
 
+  <div>
+    <button
+      type="button"
+      class="btn btn-quiet btn-sm"
+      [disabled]="sending()"
+      [attr.aria-expanded]="quickOpen()"
+      (click)="quickOpen.set(!quickOpen())"
+      i18n="@@quick.title"
+    >
+      Quick replies
+    </button>
+    @if (quickOpen()) {
+      <app-quick-replies [draft]="text()" (choose)="insertQuickReply($event)" />
+    }
+  </div>
   <div class="composer-footer">
     <p id="composer-hint" class="composer-hint">
       <span i18n="@@composer.hint"

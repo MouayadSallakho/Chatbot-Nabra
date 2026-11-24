@@ -350,6 +350,7 @@ internal static class CompositionRoot
 
         // Reading conversations from the admin.
         services.AddScoped<ReadConversationsHandler>();
+        services.AddScoped<QuickReplyHandler>();
         services.AddScoped<ConversationHandoffHandler>();
         services.AddScoped<ConversationAssignmentHandler>();
         services.AddScoped<ReplyToConversationHandler>();

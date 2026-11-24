@@ -160,10 +160,10 @@ The current window ends at the request instant, part-way through today, while th
 previous one is complete; a client that shows a change should say "so far" for
 today.
 
-`previous` carries `period`, `summary` and `aiOperations` only: the period's
-totals. The "open right now" figures (`current`) have no history to compare
-against. Requesting a comparison runs five additional aggregate statements,
-including the first-reply medians and sample counts.
+`previous` carries `period`, `summary`, `aiOperations` and `dailyActivity`.
+The day buckets use the same workspace time zone and zero filling as the current
+period. The two periods align by day position. The "open right now" figures are
+a current snapshot. Requesting a comparison runs seven aggregate statements.
 
 ### Analytics time is not transcript order
 

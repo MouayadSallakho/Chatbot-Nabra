@@ -146,6 +146,9 @@
             <h1 id="conversation-title" class="conversation-title" tabindex="-1">
               <app-customer-label [customer]="current.customer" />
             </h1>
+            @if (current.replyWindow) {
+              <p class="conversation-meta" data-testid="reply-window">{{ windowText() }}</p>
+            }
             @if (!compact() || detailsOpen()) {
               <p class="conversation-meta">{{ meta() }}</p>
             }
@@ -423,7 +426,11 @@
 
         @if (canReply()) {
           @if (isHuman()) {
-            <app-conversation-composer [conversationId]="current.id" (sent)="onSent($event)" />
+            <app-conversation-composer
+              [windowClosed]="!!current.replyWindow && remainingMinutes() === 0"
+              [conversationId]="current.id"
+              (sent)="onSent($event)"
+            />
           } @else {
             <p class="composer-withheld" i18n="@@conversation.composerWithheld">
               The AI is answering this conversation. Take it over to reply yourself.

@@ -52,35 +52,23 @@ public sealed class CustomerServiceWindow(TimeProvider clock)
     /// have.
     /// </param>
     public bool IsOpen(DateTimeOffset? lastCustomerMessageAt) =>
-        lastCustomerMessageAt is DateTimeOffset last
-        && _clock.GetUtcNow() - last < Duration;
+        Describe(lastCustomerMessageAt).IsOpen;
 
-    /// <summary>
-    /// Whether a free-form reply to this conversation is allowed right now.
-    /// </summary>
-    /// <remarks>
-    /// Reads the tail of the transcript rather than a stored timestamp. A cached
-    /// "window closes at" column would be one more thing to keep correct across
-    /// every path that appends a customer message, and it would be wrong exactly
-    /// when a path forgot.
-    /// </remarks>
+    public ReplyWindow Describe(DateTimeOffset? lastCustomerMessageAt)
+    {
+        DateTimeOffset now = _clock.GetUtcNow();
+        DateTimeOffset? closesAt = lastCustomerMessageAt + Duration;
+        return new ReplyWindow(closesAt > now, closesAt, now);
+    }
+
     public async Task<bool> IsOpenAsync(
         IConversationRepository conversations,
         ConversationId conversationId,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(conversations);
-
-        IReadOnlyList<ConversationMessageRecord> tail = await conversations
-            .ListRecentMessagesAsync(conversationId, limit: 50, cancellationToken)
-            .ConfigureAwait(false);
-
-        DateTimeOffset? lastCustomerMessage = tail
-            .Where(message => message.Sender == MessageSender.Customer)
-            .Select(message => (DateTimeOffset?)message.SentAt)
-            .LastOrDefault();
-
-        return IsOpen(lastCustomerMessage);
+        return IsOpen(await conversations.LastCustomerMessageAtAsync(conversationId, cancellationToken)
+            .ConfigureAwait(false));
     }
 
     /// <summary>What a colleague is told when the window has closed.</summary>
@@ -93,3 +81,5 @@ public sealed class CustomerServiceWindow(TimeProvider clock)
         + "last message, and that window has closed. The reply is saved here but "
         + "was not delivered.";
 }
+
+public sealed record ReplyWindow(bool IsOpen, DateTimeOffset? ClosesAt, DateTimeOffset CheckedAt);

@@ -16,7 +16,6 @@ import {
 import { Router, RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { ApiError, toApiError } from '@app/core/api/api-error';
-import { AuthService } from '@app/core/auth/auth-service';
 import { Versioned } from '@app/core/api/versioned';
 import { PermissionService } from '@app/core/authorization/permission-service';
 import { ConversationRealtime } from '@app/core/realtime/conversation-realtime';
@@ -126,7 +125,6 @@ export class ConversationDetail {
   private readonly router = inject(Router);
   private readonly history = inject(NavigationHistory);
   private readonly inbox = inject(InboxState, { optional: true });
-  private readonly auth = inject(AuthService);
 
   /** From the route, through `withComponentInputBinding`. */
   readonly conversationId = input.required<string>();
@@ -297,7 +295,38 @@ export class ConversationDetail {
   /** Which conversation the screen's state belongs to, so a reused screen starts over. */
   private loadedFor: string | null = null;
 
+  private readonly replyWindow = computed(() => this.conversation()?.replyWindow);
+  protected readonly remainingMinutes = signal(0);
+  protected readonly windowText = computed(() => {
+    const minutes = this.remainingMinutes();
+    if (!minutes)
+      return $localize`:@@conversation.window.closed:WhatsApp replies are closed until the customer messages again.`;
+    const duration = this.format.number(minutes, {
+      style: 'unit',
+      unit: 'minute',
+      unitDisplay: 'short',
+    });
+    return $localize`:@@conversation.window.open:WhatsApp reply window · ${duration}:duration: remaining`;
+  });
+
   constructor() {
+    effect((onCleanup) => {
+      const window = this.replyWindow();
+      const duration =
+        window?.isOpen && window.closesAt
+          ? Date.parse(window.closesAt) - Date.parse(window.checkedAt)
+          : 0;
+      const deadline = performance.now() + duration;
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const tick = () => {
+        const remaining = Math.max(0, deadline - performance.now());
+        this.remainingMinutes.set(Math.ceil(remaining / 60_000));
+        if (remaining > 0) timer = setTimeout(tick, Math.ceil(remaining % 60_000 || 60_000));
+      };
+      tick();
+      onCleanup(() => clearTimeout(timer));
+    });
+
     // The inbox reuses this screen when another conversation is opened beside
     // the list, so it loads on every change of id, not once.
     effect(() => {
@@ -579,24 +608,8 @@ export class ConversationDetail {
     this.focusAfterRender('[data-testid="assignee"]');
   }
 
-  /**
-   * A reply the composer stored: on screen at once, without waiting for the re-read.
-   *
-   * The reply's response names no author (`sentBy: null`, 39.1 decision 8), and
-   * only a transcript read does. Until that re-read replaces it, the reply is
-   * the signed-in member's own, so it carries their name: never an empty author.
-   */
   protected onSent(message: TranscriptMessage): void {
-    const user = this.auth.user();
-    const own: TranscriptMessage =
-      message.sentBy === null && message.sender === 'HumanAgent' && user
-        ? {
-            ...message,
-            sentBy: { userId: user.id, email: user.email, displayName: user.displayName ?? null },
-          }
-        : message;
-
-    this.messages.update((current) => mergeMessages(current, [own]));
+    this.messages.update((current) => mergeMessages(current, [message]));
     // The server has already marked it read for whoever sent it.
     this.lastRead = Math.max(this.lastRead ?? -1, message.sequence);
   }

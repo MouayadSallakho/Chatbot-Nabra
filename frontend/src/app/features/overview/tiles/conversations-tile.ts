@@ -4,12 +4,11 @@ import { zonePhrase } from '@app/core/i18n/time-zone';
 import type { AnalyticsDashboard } from '@app/features/analytics/analytics-api';
 import {
   conversationsSummary,
-  dailyPoints,
+  conversationActivity,
   dataSinceSentence,
   summaryChanges,
 } from '@app/features/analytics/analytics-words';
 import { AreaChart } from '@app/shared/charts/area-chart';
-import type { ChartSeries } from '@app/shared/charts/chart-model';
 
 /**
  * "Conversations" (board Overview, the 2×2 tile): how many started in the last
@@ -19,9 +18,8 @@ import type { ChartSeries } from '@app/shared/charts/chart-model';
  * The change is said in words, with a glyph that only repeats them, and no
  * colour says whether a rise is good. The chart keeps its summary sentence and
  * its "View as table". The days are local days of the workspace's zone, and the
- * tile says which zone and how far back the data goes. The board's dashed line
- * for the week before is not drawn: the API returns the previous period's
- * totals, not its days (backend ask BA39-7a-1).
+ * tile says which zone and how far back the data goes. Each previous period
+ * day lines up with the same day offset in the current period.
  */
 @Component({
   selector: 'app-conversations-tile',
@@ -61,8 +59,8 @@ import type { ChartSeries } from '@app/shared/charts/chart-model';
         categoryLabel="Day"
         i18n-categoryLabel="@@analytics.table.day"
         [summary]="summary()"
-        [series]="series"
-        [points]="points()"
+        [series]="activity().series"
+        [points]="activity().points"
         [plotHeight]="132"
       />
       <p class="tile-quiet conv-note" data-testid="week-note">{{ note() }}</p>
@@ -81,13 +79,9 @@ export class ConversationsTile {
   /** The seven-day dashboard read with its comparison, or null while it loads. */
   readonly dashboard = input<AnalyticsDashboard | null>(null);
 
-  protected readonly series: readonly ChartSeries[] = [
-    {
-      key: 'conversations',
-      label: $localize`:@@overview.week.conversationsStarted:Conversations started`,
-      tone: 'current',
-    },
-  ];
+  protected readonly activity = computed(() =>
+    conversationActivity(this.dashboard(), this.locale.language),
+  );
 
   protected readonly total = computed(() =>
     this.locale.number(this.dashboard()?.summary.conversationsStarted ?? 0),
@@ -97,12 +91,6 @@ export class ConversationsTile {
     const d = this.dashboard();
 
     return d ? (summaryChanges(d, this.locale.language)?.conversations ?? null) : null;
-  });
-
-  protected readonly points = computed(() => {
-    const d = this.dashboard();
-
-    return d ? dailyPoints(d, this.locale.language) : [];
   });
 
   protected readonly summary = computed(() => {

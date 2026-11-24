@@ -19,6 +19,7 @@ import { LocaleFormat } from '@app/core/i18n/locale-format';
 import { pluralMessage } from '@app/core/i18n/plural';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
 import { ConversationsApi, TranscriptMessage } from '../conversations-api';
+import { QuickReplies } from '../quick-replies';
 import { InboxState, ReplyDraft } from '../inbox-state';
 
 /** The longest reply the platform stores. Matches the Domain's own bound. */
@@ -61,6 +62,7 @@ const RETRYABLE: ReadonlySet<ApiErrorKind> = new Set<ApiErrorKind>([
  */
 @Component({
   selector: 'app-conversation-composer',
+  imports: [QuickReplies],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './conversation-composer.html',
   styleUrl: './conversation-composer.scss',
@@ -74,6 +76,7 @@ export class ConversationComposer {
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly injector = inject(Injector);
 
+  readonly windowClosed = input(false);
   readonly conversationId = input.required<string>();
 
   /** A stored reply, for the transcript to show at once. */
@@ -143,6 +146,18 @@ export class ConversationComposer {
     });
   }
 
+  protected readonly quickOpen = signal(false);
+
+  protected insertQuickReply(reply: string): void {
+    if (this.sending()) return;
+    const draft = this.text();
+    const value = draft ? draft + '\n' + reply : reply;
+    this.text.set(value);
+    this.remember(value);
+    this.quickOpen.set(false);
+    this.focusBox();
+  }
+
   protected onInput(event: Event): void {
     const value = (event.target as HTMLTextAreaElement).value;
 
@@ -173,7 +188,7 @@ export class ConversationComposer {
     const raw = this.text();
     const text = raw.trim();
 
-    if (!tenantId || this.sending() || text.length === 0 || this.tooLong()) {
+    if (!tenantId || this.windowClosed() || this.sending() || text.length === 0 || this.tooLong()) {
       return;
     }
 

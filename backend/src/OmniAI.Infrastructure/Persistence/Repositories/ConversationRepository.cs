@@ -871,6 +871,14 @@ internal sealed class ConversationRepository(OmniAiDbContext context) : IConvers
                 : row)];
     }
 
+    public Task<DateTimeOffset?> LastCustomerMessageAtAsync(
+        ConversationId conversationId, CancellationToken cancellationToken = default) =>
+        _context.Set<Message>().Where(message =>
+                message.ConversationId == conversationId && message.Sender == MessageSender.Customer)
+            .OrderByDescending(message => EF.Property<long>(message, PersistenceSchema.MessageIngestionSequence))
+            .Select(message => (DateTimeOffset?)message.SentAt)
+            .FirstOrDefaultAsync(cancellationToken);
+
     public async Task<IReadOnlyList<ConversationMessageRecord>> ListRecentMessagesAsync(
         ConversationId conversationId,
         int limit,

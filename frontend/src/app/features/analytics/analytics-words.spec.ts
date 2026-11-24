@@ -1,6 +1,7 @@
 import { AnalyticsDashboard } from './analytics-api';
 import {
   dailyPoints,
+  conversationActivity,
   dataSinceSentence,
   failedRepliesTitle,
   figureChange,
@@ -48,6 +49,27 @@ describe('analytics words', () => {
       },
     ],
   } as unknown as AnalyticsDashboard;
+
+  it('pairs the same local day offset and keeps the previous date in the accessible label', () => {
+    const previous = dashboard.dailyActivity.map((day, i) => ({
+      ...day,
+      date: '2026-10-' + (15 + i),
+      conversationsStarted: i * 4,
+    }));
+    const data = {
+      ...dashboard,
+      previous: {
+        period: dashboard.period,
+        summary: dashboard.summary,
+        aiOperations: dashboard.aiOperations,
+        dailyActivity: previous,
+      },
+    };
+    const chart = conversationActivity(data, 'en');
+    expect(chart.points.map((day) => day.values['previous'])).toEqual([0, 4]);
+    expect(chart.points[0].longLabel).toContain('October 15, 2026');
+    expect(conversationActivity(dashboard, 'en').series).toHaveLength(1);
+  });
 
   it('writes a bucket date as the day it is, whatever the browser zone', () => {
     expect(localDay('2026-09-15', 'en', 'longDate')).toBe('September 15, 2026');

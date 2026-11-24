@@ -52,7 +52,7 @@ public interface IWorkspaceAnalyticsReader
     /// <remarks>
     /// The same definitions as <see cref="ReadAsync"/>'s summary and AI outcomes,
     /// over the same base sets, so the two periods cannot mean different things.
-    /// Three statements, whatever the workspace holds.
+    /// Includes the same daily buckets, with zeroes on quiet days.
     /// </remarks>
     Task<AnalyticsComparison> ReadComparisonAsync(
         TenantId tenantId,

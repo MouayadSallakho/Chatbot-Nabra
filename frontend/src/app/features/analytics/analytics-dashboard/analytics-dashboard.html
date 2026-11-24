@@ -248,8 +248,8 @@
                 categoryLabel="Day"
                 i18n-categoryLabel="@@analytics.table.day"
                 [summary]="conversationsSummary()"
-                [series]="conversationSeries"
-                [points]="points()"
+                [series]="activity().series"
+                [points]="activity().points"
                 [plotHeight]="140"
                 data-testid="conversations-chart"
               />

@@ -3006,6 +3006,36 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("OmniAI.Infrastructure.Persistence.Repositories.QuickReplyRow", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Language")
+                        .IsRequired()
+                        .HasMaxLength(2)
+                        .HasColumnType("character varying(2)")
+                        .HasColumnName("language");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "Language", "Text")
+                        .IsUnique();
+
+                    b.ToTable("quick_replies", (string)null);
+                });
+
             modelBuilder.Entity("OmniAI.Infrastructure.Persistence.UserReferenceRow", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3765,6 +3795,15 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_knowledge_chunks_document")
                         .HasAnnotation("OmniAI:SuppressForeignKeyIndex", true);
+                });
+
+            modelBuilder.Entity("OmniAI.Infrastructure.Persistence.Repositories.QuickReplyRow", b =>
+                {
+                    b.HasOne("OmniAI.Domain.Tenants.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("OmniAI.Infrastructure.Persistence.WhatsAppCredentialRow", b =>

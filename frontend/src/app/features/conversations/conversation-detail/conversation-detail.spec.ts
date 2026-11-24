@@ -14,7 +14,6 @@ import { MEDIA_QUERY_FACTORY, MediaQueries } from '@app/core/media/media';
 import { WhatsAppApi } from '@app/features/channels/whatsapp-api';
 import { ArabicFonts } from '@app/core/i18n/arabic-fonts';
 import { InboxSignals } from '@app/core/sounds/inbox-signals';
-import { AuthService } from '@app/core/auth/auth-service';
 import { CustomersApi } from '@app/features/customers/customers-api';
 import { ConversationsApi, TranscriptMessage } from '../conversations-api';
 import { ConversationComposer } from '../conversation-composer/conversation-composer';
@@ -1256,14 +1255,40 @@ describe('ConversationDetail', () => {
       expect(host().querySelector('[data-testid="assignee"]')).toBeNull();
     });
 
-    it("names the reader on their own reply until the re-read names it (the reply's response does not)", async () => {
-      await mount('conversations.view', 'conversations.reply');
+    it('updates the reply window and composer when the customer writes again', async () => {
+      const checkedAt = '2026-11-24T10:00:00Z';
+      const closed = {
+        ...humanDetail,
+        channel: 'WhatsApp',
+        replyWindow: { isOpen: false, closesAt: null, checkedAt },
+      };
+      const factsUrl = `/api/tenants/${tenantId}/whatsapp/conversations/${conversationId}`;
+      await opened(closed, 'conversations.reply');
+      http.expectOne(factsUrl).flush({ customerReference: '••42', deliveryStatuses: {} });
+      await settle();
+      expect(host().querySelector('[data-testid="reply-window"]')?.textContent).toContain('closed');
+      const composer = fixture.debugElement.query(By.directive(ConversationComposer))
+        .componentInstance as ConversationComposer;
+      expect(composer.windowClosed()).toBe(true);
+      notify!(conversationId);
+      await settle();
+      http
+        .expectOne(detailUrl)
+        .flush(
+          { ...closed, replyWindow: { isOpen: true, closesAt: '2026-11-24T11:00:00Z', checkedAt } },
+          tagged(closed),
+        );
+      await settle();
+      http.expectOne(catchUpUrl).flush({ items: [], nextCursor: null });
+      await settle();
+      http.expectOne(factsUrl).flush({ customerReference: '••42', deliveryStatuses: {} });
+      await settle();
+      expect(composer.windowClosed()).toBe(false);
+      expect(host().querySelector('[data-testid="reply-window"]')?.textContent).toContain('60');
+    });
 
-      (
-        TestBed.inject(AuthService) as unknown as {
-          account: { set: (user: unknown) => void };
-        }
-      ).account.set({ id: 'u-me', email: 'me@acme.test', displayName: 'Mona' });
+    it('shows the author returned by the reply endpoint', async () => {
+      await mount('conversations.view', 'conversations.reply');
 
       http.expectOne(detailUrl).flush(humanDetail, tagged(humanDetail));
       await settle();
@@ -1275,7 +1300,10 @@ describe('ConversationDetail', () => {
       const composer = fixture.debugElement.query(By.directive(ConversationComposer))
         .componentInstance as ConversationComposer;
 
-      composer.sent.emit(message('m9', 'HumanAgent', 'Mine', 20) as TranscriptMessage);
+      composer.sent.emit({
+        ...message('m9', 'HumanAgent', 'Mine', 20),
+        sentBy: { userId: 'u-9', email: 'mona@acme.test', displayName: 'Mona' },
+      } as TranscriptMessage);
       await settle();
 
       expect(host().querySelector('[data-testid="message-author"]')?.textContent?.trim()).toBe(

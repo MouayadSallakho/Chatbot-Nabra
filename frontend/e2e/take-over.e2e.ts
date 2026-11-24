@@ -70,6 +70,24 @@ test('a person takes over and answers, then returns the conversation to the AI',
 
     // The person answers; the visitor reads it live, after the line saying a person joined.
     await page.locator('#conversation-reply').fill(words.person);
+    const quick = page.getByRole('button', {
+      name: appLanguage === 'ar' ? 'الردود السريعة' : 'Quick replies',
+      exact: true,
+    });
+    await quick.click();
+    await page
+      .getByRole('button', {
+        name:
+          appLanguage === 'ar'
+            ? 'حفظ المسودة في ردود مساحة العمل'
+            : 'Save draft as a workspace reply',
+      })
+      .click();
+    const saved = page.getByRole('button', { name: words.person, exact: true });
+    await expect(saved).toBeVisible();
+    await page.locator('#conversation-reply').fill('');
+    await saved.click();
+    await expect(page.locator('#conversation-reply')).toHaveValue(words.person);
     await page.getByTestId('send-reply').click();
 
     await expect(visitor.locator('[data-sender="HumanAgent"]')).toContainText(words.person);

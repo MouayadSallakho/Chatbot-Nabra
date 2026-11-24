@@ -288,11 +288,10 @@ public sealed record WorkspaceAnalytics(
 /// (Phase 37.6, row 31).
 /// </summary>
 /// <remarks>
-/// <strong>The summary and the AI outcomes, nothing else.</strong> Those are the
-/// period's totals. The "open right now" snapshot has no history to compare
-/// against, so it has no previous value; the plan keeps that outside Phase 37.
+/// Summary, AI outcomes and daily activity for the preceding workspace-local period.
 /// </remarks>
 public sealed record AnalyticsComparison(
     AnalyticsPeriod Period,
     AnalyticsSummary Summary,
-    AnalyticsAiOperations AiOperations);
+    AnalyticsAiOperations AiOperations,
+    IReadOnlyList<AnalyticsDay> DailyActivity);

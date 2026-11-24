@@ -16,6 +16,7 @@ import {
 import {
   comparisonSentence,
   conversationsSummary,
+  conversationActivity,
   dailyPoints,
   dataSinceSentence,
   type FigureChange,
@@ -35,7 +36,7 @@ import { AppLanguage } from '@app/core/i18n/language';
 import { channelWord } from '@app/shared/channel/channel-badge';
 import { AreaChart } from '@app/shared/charts/area-chart';
 import { BarChart } from '@app/shared/charts/bar-chart';
-import { ChartBar, ChartPart, ChartSeries } from '@app/shared/charts/chart-model';
+import { ChartBar, ChartPart } from '@app/shared/charts/chart-model';
 import { ColumnChart } from '@app/shared/charts/column-chart';
 import { StackedBar } from '@app/shared/charts/stacked-bar';
 import { Icon } from '@app/shared/icon/icon';
@@ -237,14 +238,9 @@ export class AnalyticsDashboardPage {
 
   protected readonly series = senderSeries();
 
-  protected readonly conversationSeries: readonly ChartSeries[] = [
-    {
-      key: 'conversations',
-      label: $localize`:@@analytics.series.conversations:Conversations started`,
-      // The period being read, in emerald (calm-glass.md §2; Phase 39.7a).
-      tone: 'current',
-    },
-  ];
+  protected readonly activity = computed(() =>
+    conversationActivity(this.dashboard(), this.locale.language),
+  );
 
   protected readonly points = computed(() => {
     const dashboard = this.dashboard();

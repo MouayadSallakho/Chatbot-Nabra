@@ -689,6 +689,15 @@ internal sealed class FakeWebChatWorld : IWebChatEndpointRepository, IWebChatRun
         }
     }
 
+    public Task<DateTimeOffset?> LastCustomerMessageAtAsync(ConversationId conversationId, CancellationToken cancellationToken = default)
+    {
+        lock (_sync)
+        {
+            return Task.FromResult(_messages.Where(message => message.ConversationId == conversationId && message.Sender == MessageSender.Customer)
+                .OrderByDescending(message => message.Sequence).Select(message => (DateTimeOffset?)message.SentAt).FirstOrDefault());
+        }
+    }
+
     public Task<IReadOnlyList<ConversationMessageRecord>> ListRecentMessagesAsync(
         ConversationId conversationId,
         int limit,

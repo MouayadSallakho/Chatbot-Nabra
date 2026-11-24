@@ -153,13 +153,13 @@ public sealed record AnalyticsAiUsageResponse(
 /// </summary>
 /// <remarks>
 /// As many whole local days, ending where the current period starts, in the same
-/// zone. Only the period's totals: the "open right now" figures have no history to
-/// compare against.
+/// zone. Includes period totals and a bucket for each local date.
 /// </remarks>
 public sealed record AnalyticsComparisonResponse(
     AnalyticsPeriodResponse Period,
     AnalyticsSummaryResponse Summary,
-    AnalyticsAiOperationsResponse AiOperations);
+    AnalyticsAiOperationsResponse AiOperations,
+    IReadOnlyList<AnalyticsDayResponse> DailyActivity);
 
 /// <summary>One provider model's share of the spend.</summary>
 public sealed record AnalyticsModelUsageResponse(
@@ -221,14 +221,7 @@ public sealed record AnalyticsDashboardResponse(
                 analytics.Current.OpenConversations,
                 analytics.Current.OpenHandledByAi,
                 analytics.Current.OpenHandledByHuman),
-            [
-                .. analytics.DailyActivity.Select(day => new AnalyticsDayResponse(
-                    day.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
-                    day.ConversationsStarted,
-                    day.CustomerMessages,
-                    day.AiMessages,
-                    day.HumanMessages)),
-            ],
+            DaysOf(analytics.DailyActivity),
             [
                 .. analytics.Channels.Select(channel => new AnalyticsChannelResponse(
                     channel.Channel.ToString(),
@@ -304,8 +297,13 @@ public sealed record AnalyticsDashboardResponse(
                 : new AnalyticsComparisonResponse(
                     PeriodOf(analytics.Previous.Period),
                     SummaryOf(analytics.Previous.Summary),
-                    OperationsOf(analytics.Previous.AiOperations)));
+                    OperationsOf(analytics.Previous.AiOperations),
+                    DaysOf(analytics.Previous.DailyActivity)));
     }
+
+    private static AnalyticsDayResponse[] DaysOf(IReadOnlyList<AnalyticsDay> days) =>
+        [.. days.Select(day => new AnalyticsDayResponse(day.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+            day.ConversationsStarted, day.CustomerMessages, day.AiMessages, day.HumanMessages))];
 
     private static AnalyticsPeriodResponse PeriodOf(AnalyticsPeriod period) =>
         new(period.Range, period.From, period.To, period.Days, period.TimeZone);

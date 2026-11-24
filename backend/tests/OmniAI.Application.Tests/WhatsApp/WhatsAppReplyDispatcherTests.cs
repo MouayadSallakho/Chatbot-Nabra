@@ -100,6 +100,23 @@ public sealed class WhatsAppReplyDispatcherTests
         Assert.Equal(CustomerServiceWindow.ClosedReason, delivery.FailureReason);
     }
 
+    [Fact]
+    public async Task Only_an_inbound_message_reopens_the_window_even_after_a_long_transcript()
+    {
+        var world = World.Build(true, Noon.AddHours(-24));
+        var window = new CustomerServiceWindow(new FixedTimeProvider(Noon));
+        var id = world.Conversation.Id;
+        Assert.False(await window.IsOpenAsync(world.Harness.World, id));
+        world.Harness.World.SeedMessage(id, MessageSender.Customer, "Again", Noon.AddMinutes(-2));
+        for (int index = 0; index < 60; index++)
+        {
+            world.Harness.World.SeedMessage(id, MessageSender.HumanAgent, "Follow-up", Noon);
+        }
+        Assert.True(await window.IsOpenAsync(world.Harness.World, id));
+        Assert.Equal(Noon.AddHours(24).AddMinutes(-2), window.Describe(Noon.AddMinutes(-2)).ClosesAt);
+        Assert.False(window.Describe(null).IsOpen);
+    }
+
     private sealed class World
     {
         public required Harness Harness { get; init; }

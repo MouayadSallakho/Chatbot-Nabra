@@ -239,7 +239,7 @@ public sealed class WorkspaceAnalyticsInsightsTests(PostgresTestDatabase databas
 
         for (int index = 0; index < 5; index++)
         {
-            Conversation conversation = await world.WebChatAsync(agent, new DateTimeOffset(2026, 10, 20 + index, 9, 0, 0, TimeSpan.Zero));
+            Conversation conversation = await world.WebChatAsync(agent, new DateTimeOffset(2026, 9, 20 + index, 9, 0, 0, TimeSpan.Zero));
             await world.SayAsync(conversation, (MessageSender.Customer, conversation.StartedAt));
         }
 
@@ -247,15 +247,20 @@ public sealed class WorkspaceAnalyticsInsightsTests(PostgresTestDatabase databas
 
         await using (OmniAiDbContext context = database.CreateContext(recorded))
         {
-            await new WorkspaceAnalyticsReader(context).ReadComparisonAsync(
+            var comparison = await new WorkspaceAnalyticsReader(context).ReadComparisonAsync(
                 world.Tenant.Id,
                 AnalyticsRange.ThirtyDays.Window(new DateTimeOffset(2026, 11, 4, 12, 0, 0, TimeSpan.Zero)).Previous());
+            Assert.Equal(30, comparison.DailyActivity.Count);
+            Assert.Equal(5, comparison.DailyActivity.Sum(day => day.ConversationsStarted));
+            var active = Assert.Single(comparison.DailyActivity, day => day.Date == new DateOnly(2026, 9, 21));
+            Assert.Equal(1, active.ConversationsStarted);
+            Assert.Equal(1, active.CustomerMessages);
         }
 
         // Phase 39.1 (BA39-1): the summary's "answered by the AI" is one more
         // counting statement, whatever the workspace holds.
         // First-reply medians and their sample counts share a single additional aggregate.
-        Assert.Equal(5, recorded.Statements.Count);
+        Assert.Equal(7, recorded.Statements.Count);
         Assert.Single(recorded.Statements, sql => sql.Contains("percentile_cont", StringComparison.OrdinalIgnoreCase));
         Assert.All(recorded.Statements, statement => Assert.Contains("count(", statement, StringComparison.OrdinalIgnoreCase));
     }

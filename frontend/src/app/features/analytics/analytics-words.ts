@@ -68,6 +68,32 @@ export function dailyPoints(
   }));
 }
 
+export function conversationActivity(dashboard: AnalyticsDashboard | null, language: AppLanguage) {
+  const points = dashboard ? dailyPoints(dashboard, language) : [];
+  const previous = dashboard?.previous?.dailyActivity;
+  const series: ChartSeries[] = [
+    {
+      key: 'conversations',
+      label: $localize`:@@analytics.series.conversations:Conversations started`,
+      tone: 'current',
+    },
+  ];
+  if (!previous?.length || previous.length !== points.length) return { points, series };
+  series.push({
+    key: 'previous',
+    label: $localize`:@@analytics.days.previous:Previous period`,
+    tone: 'muted',
+  });
+  return {
+    series,
+    points: points.map((point, index) => ({
+      ...point,
+      longLabel: point.longLabel + ' / ' + localDay(previous[index].date, language, 'longDate'),
+      values: { ...point.values, previous: previous[index].conversationsStarted },
+    })),
+  };
+}
+
 /** One day's counts under the series keys, plus conversations for tables that carry them. */
 export function dayValues(day: AnalyticsDay): Readonly<Record<string, number>> {
   return {

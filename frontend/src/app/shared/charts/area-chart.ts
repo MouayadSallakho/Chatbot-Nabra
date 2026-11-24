@@ -61,7 +61,11 @@ import { TimeSeriesChart } from './time-series-chart';
             }
             @for (path of paths(); track path.key) {
               <path [attr.class]="'chart-area chart-tone-' + path.tone" [attr.d]="path.area" />
-              <path [attr.class]="'chart-line chart-tone-' + path.tone" [attr.d]="path.line" />
+              <path
+                [attr.class]="'chart-line chart-tone-' + path.tone"
+                [attr.stroke-dasharray]="path.key === 'previous' ? '5 4' : null"
+                [attr.d]="path.line"
+              />
             }
             @if (crosshair(); as cross) {
               <line

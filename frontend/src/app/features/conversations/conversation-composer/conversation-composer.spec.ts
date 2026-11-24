@@ -80,6 +80,35 @@ describe('ConversationComposer', () => {
 
   afterEach(() => http.verify());
 
+  it('keeps the draft while the window is closed and allows sending once reopened', async () => {
+    await mount();
+    await write('Keep my draft');
+    fixture.componentRef.setInput('windowClosed', true);
+    await settle();
+    expect(sendButton().disabled).toBe(true);
+    await fixture.componentInstance.send();
+    http.expectNone(replyUrl(first));
+    fixture.componentRef.setInput('windowClosed', false);
+    await settle();
+    expect(box().value).toBe('Keep my draft');
+    expect(sendButton().disabled).toBe(false);
+  });
+
+  it('inserts the selected saved reply as editable text without sending it', async () => {
+    await mount();
+    await write('Hello');
+    host().querySelector<HTMLButtonElement>('button[aria-expanded]')!.click();
+    await settle();
+    http
+      .expectOne(`/api/tenants/${tenantId}/conversations/quick-replies/en`)
+      .flush([{ id: 'a', text: 'Can I help?' }]);
+    await settle();
+    host().querySelector<HTMLButtonElement>('.quick-text')!.click();
+    await settle();
+    expect(box().value).toBe('Hello\nCan I help?');
+    http.expectNone(replyUrl(first));
+  });
+
   it("tells the inbox signals a reply is this browser's own, before it is sent", async () => {
     await mount();
 

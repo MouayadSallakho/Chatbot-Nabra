@@ -71,6 +71,9 @@ public sealed class AnsweredByAiApiTests(WebChatApiFixture fixture) : IClassFixt
         Assert.Equal(1, summary.GetProperty("conversationsAnsweredByAi").GetInt64());
 
         // The previous period carries the same figure; nothing started there.
+        var previousDays = body.GetProperty("previous").GetProperty("dailyActivity");
+        Assert.Equal(7, previousDays.GetArrayLength());
+        Assert.All(previousDays.EnumerateArray(), day => Assert.Equal(0, day.GetProperty("conversationsStarted").GetInt32()));
         JsonElement previous = body.GetProperty("previous").GetProperty("summary");
         Assert.Equal(0, previous.GetProperty("conversationsAnsweredByAi").GetInt64());
         Assert.Equal(0, previous.GetProperty("conversationsStarted").GetInt64());

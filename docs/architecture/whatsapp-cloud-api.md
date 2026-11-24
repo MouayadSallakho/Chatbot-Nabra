@@ -204,7 +204,11 @@ trip to be told the same thing in Meta's words.
 Measured from the last **Customer** message in the transcript — replies from the
 business do not extend it — read through `TimeProvider`. Checked when a reply is
 queued and **again in the worker immediately before sending**, because a delivery
-can sit in the outbox while the window closes.
+can sit in the outbox while the window closes. The conversation detail includes
+`replyWindow.isOpen`, `closesAt` and `checkedAt` for WhatsApp. The inbox shows the
+remaining time from this server snapshot and keeps the draft when sending closes.
+A new customer message refreshes the deadline. The lookup filters by customer
+before taking the latest transcript entry, regardless of later team messages.
 
 A reply outside the window is still stored and still shown in the transcript; the
 delivery says plainly that it did not reach the customer.

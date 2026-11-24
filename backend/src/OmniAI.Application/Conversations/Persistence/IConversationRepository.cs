@@ -255,6 +255,8 @@ public sealed record ConversationDetail(
     ConversationMessageAuthor? TakenOverBy = null,
     NeedsPersonReason? NeedsPersonReason = null)
 {
+    public OmniAI.Application.WhatsApp.ReplyWindow? ReplyWindow { get; init; }
+
     /// <summary>As on <see cref="ConversationSummary"/>.</summary>
     public bool NeedsPerson => NeedsPersonReason is not null;
 }
@@ -278,6 +280,8 @@ public sealed record ConversationDetail(
 /// </remarks>
 public interface IConversationRepository
 {
+    Task<DateTimeOffset?> LastCustomerMessageAtAsync(ConversationId conversationId, CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<ConversationMessageAuthor>> ListAssignedMembersAsync(
         TenantId tenantId, CancellationToken cancellationToken);
     /// <summary>One page of a workspace's conversations, most recently active first.</summary>

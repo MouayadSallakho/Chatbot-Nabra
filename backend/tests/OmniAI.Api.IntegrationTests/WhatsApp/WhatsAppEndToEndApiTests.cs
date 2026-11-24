@@ -65,6 +65,9 @@ public sealed class WhatsAppEndToEndApiTests(WhatsAppApiFixture fixture)
                 $"/api/tenants/{tenantId}/conversations/{conversationId}"));
 
         Assert.Equal("WhatsApp", conversation.GetProperty("channel").GetString());
+        JsonElement window = conversation.GetProperty("replyWindow");
+        Assert.True(window.GetProperty("isOpen").GetBoolean());
+        Assert.True(window.GetProperty("closesAt").GetDateTimeOffset() > window.GetProperty("checkedAt").GetDateTimeOffset());
 
         JsonElement facts = await ReadJsonAsync(
             owner,

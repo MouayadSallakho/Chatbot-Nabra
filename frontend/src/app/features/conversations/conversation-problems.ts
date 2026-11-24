@@ -14,6 +14,8 @@ const REPLY_NOT_SENT = $localize`:@@problem.conversations.reply.notSent:This rep
  * wording, and the English `detail` is never what an Arabic reader sees.
  */
 export const CONVERSATION_PROBLEM_WORDS: ProblemCatalogue = {
+  'conversations.quick_reply.text_invalid': $localize`:@@problem.quickReply.text:Use 1 to 500 characters of plain text for a saved reply.`,
+  'conversations.quick_reply.language_invalid': $localize`:@@problem.quickReply.lang:Choose English or Arabic for saved replies.`,
   'conversations.filter.invalid': $localize`:@@problem.conversations.filter.invalid:This list of conversations could not be shown. Open the full list instead.`,
   'conversations.read.sequence.invalid': $localize`:@@problem.conversations.read.sequence.invalid:This conversation could not be marked as read. Try again.`,
   'transcript.cursor.conflict': TRANSCRIPT_REFUSED,

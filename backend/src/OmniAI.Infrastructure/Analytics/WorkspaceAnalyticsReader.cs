@@ -135,7 +135,8 @@ internal sealed class WorkspaceAnalyticsReader(OmniAiDbContext context)
         AnalyticsAiOperations operations =
             await AiOperationsAsync(tenantId, window, cancellationToken).ConfigureAwait(false);
 
-        return new AnalyticsComparison(Period(window), summary, operations);
+        return new AnalyticsComparison(Period(window), summary, operations,
+            await DailyAsync(tenantId, window, cancellationToken).ConfigureAwait(false));
     }
 
     private static AnalyticsPeriod Period(AnalyticsWindow window) =>

@@ -237,6 +237,8 @@ internal sealed class ConversationInboxStore(OmniAiDbContext context) : IConvers
             message.Id,
             sentAt);
 
+        var author = await ReadAuthorAsync(sender, cancellationToken).ConfigureAwait(false);
+
         _context.HumanReplies.Add(reply);
 
         try
@@ -271,12 +273,7 @@ internal sealed class ConversationInboxStore(OmniAiDbContext context) : IConvers
             .CurrentValue;
 
         return new HumanReplyOutcome(
-            new ConversationMessageRecord(
-                message.Id.Value,
-                message.Sender,
-                message.Text,
-                message.SentAt,
-                sequence),
+            new ConversationMessageRecord(message.Id.Value, message.Sender, message.Text, message.SentAt, sequence, author),
             WasAlreadyStored: false);
     }
 
@@ -364,24 +361,28 @@ internal sealed class ConversationInboxStore(OmniAiDbContext context) : IConvers
     private async Task<ConversationMessageRecord?> ReadStoredReplyAsync(
         ConversationId conversationId,
         ClientMessageId clientMessageId,
-        CancellationToken cancellationToken) =>
-        await _context.HumanReplies
-            .AsNoTracking()
-            .Where(reply =>
-                reply.ConversationId == conversationId
-                && reply.ClientMessageId == clientMessageId)
-            .Join(
-                _context.Set<Message>().AsNoTracking(),
-                reply => reply.MessageId,
-                message => message.Id,
-                (reply, message) => new ConversationMessageRecord(
-                    message.Id.Value,
-                    message.Sender,
-                    message.Text,
-                    message.SentAt,
-                    EF.Property<long>(message, PersistenceSchema.MessageIngestionSequence)))
-            .FirstOrDefaultAsync(cancellationToken)
-            .ConfigureAwait(false);
+        CancellationToken cancellationToken)
+    {
+        var stored = await _context.HumanReplies.AsNoTracking()
+            .Where(reply => reply.ConversationId == conversationId && reply.ClientMessageId == clientMessageId)
+            .Join(_context.Set<Message>(), reply => reply.MessageId, message => message.Id,
+                (reply, message) => new {
+                    reply.Sender,
+                    Message = new ConversationMessageRecord(message.Id.Value, message.Sender, message.Text,
+                        message.SentAt, EF.Property<long>(message, PersistenceSchema.MessageIngestionSequence), null)
+                })
+            .FirstOrDefaultAsync(cancellationToken).ConfigureAwait(false);
+
+        return stored is null ? null : stored.Message with
+        {
+            SentBy = await ReadAuthorAsync(stored.Sender, cancellationToken).ConfigureAwait(false)
+        };
+    }
+
+    private Task<ConversationMessageAuthor> ReadAuthorAsync(UserId sender, CancellationToken cancellationToken) =>
+        _context.Users.Where(user => user.Id == sender.Value)
+            .Select(user => new ConversationMessageAuthor(user.Id, user.Email!, user.DisplayName))
+            .SingleAsync(cancellationToken);
 
     /// <summary>
     /// Whether a failed save was the idempotency index refusing a duplicate.

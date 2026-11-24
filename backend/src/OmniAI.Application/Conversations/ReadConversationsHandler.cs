@@ -104,7 +104,8 @@ public sealed class ConversationReadPolicy
 public sealed class ReadConversationsHandler(
     IConversationRepository conversations,
     TenantAuthorizer authorizer,
-    ConversationReadPolicy policy)
+    ConversationReadPolicy policy,
+    TimeProvider? clock = null)
 {
     private readonly IConversationRepository _conversations =
         conversations ?? throw new ArgumentNullException(nameof(conversations));
@@ -199,9 +200,17 @@ public sealed class ReadConversationsHandler(
             return null;
         }
 
-        return await _conversations
+        var detail = await _conversations
             .FindAsync(tenantId, conversationId, _authorizer.RequireCurrentUser(), cancellationToken)
             .ConfigureAwait(false);
+        if (detail?.Value.Channel != ChannelKind.WhatsApp)
+        {
+            return detail;
+        }
+
+        var last = await _conversations.LastCustomerMessageAtAsync(conversationId, cancellationToken).ConfigureAwait(false);
+        var window = new WhatsApp.CustomerServiceWindow(clock ?? TimeProvider.System).Describe(last);
+        return detail with { Value = detail.Value with { ReplyWindow = window } };
     }
 
     /// <returns>

@@ -114,6 +114,11 @@ export interface ConversationPage {
 
 /** One conversation's detail. */
 export interface ConversationDetail extends HandlingFacts {
+  readonly replyWindow?: {
+    readonly isOpen: boolean;
+    readonly closesAt: string | null;
+    readonly checkedAt: string;
+  } | null;
   readonly id: string;
   readonly channel: ConversationChannel;
   readonly status: 'Open' | 'Closed';

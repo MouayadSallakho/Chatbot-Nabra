@@ -180,7 +180,7 @@ internal sealed class RecordingAnalyticsReader : IWorkspaceAnalyticsReader
         return Task.FromResult(new AnalyticsComparison(
             new AnalyticsPeriod(window.Label, window.From, window.To, window.DayCount, window.TimeZone.Name),
             new AnalyticsSummary(0, 0, 0, 0, 0),
-            new AnalyticsAiOperations(0, 0, 0, 0)));
+            new AnalyticsAiOperations(0, 0, 0, 0), []));
     }
 
     public Task<WorkspaceAnalytics> ReadAsync(

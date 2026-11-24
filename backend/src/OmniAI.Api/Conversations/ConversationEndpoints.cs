@@ -126,7 +126,8 @@ public sealed record ConversationDetailResponse(
     long? LastReadSequence,
     WorkspaceMemberResponse? TakenOverBy,
     bool NeedsPerson,
-    string? NeedsPersonReason);
+    string? NeedsPersonReason,
+    OmniAI.Application.WhatsApp.ReplyWindow? ReplyWindow);
 
 /// <summary>A reply written by a person.</summary>
 /// <param name="ClientMessageId">
@@ -137,6 +138,8 @@ public sealed record ReplyToConversationRequest(string? ClientMessageId, string?
 
 /// <summary>Who to route a conversation to, or nobody.</summary>
 public sealed record AssignConversationRequest(Guid? Member);
+
+public sealed record SaveQuickReplyRequest(string? Text);
 
 /// <summary>Mark a conversation read up to a message (Phase 37.4).</summary>
 /// <param name="Sequence">
@@ -285,6 +288,18 @@ internal static class ConversationEndpoints
         workspace.MapPost("/{conversationId:guid}/messages", ReplyAsync)
             .WithName("ReplyToTenantConversation")
             .Produces<TranscriptMessageResponse>(StatusCodes.Status200OK);
+
+        workspace.MapGet("/quick-replies/{language}", async (Guid tenantId, string language, QuickReplyHandler handler, CancellationToken token) =>
+        {
+            var replies = await handler.ListAsync(tenantId, language, token).ConfigureAwait(false);
+            return replies is null ? Results.NotFound() : Results.Ok(replies);
+        }).WithName("ListWorkspaceQuickReplies").Produces<IReadOnlyList<QuickReply>>();
+        workspace.MapPost("/quick-replies/{language}", async (Guid tenantId, string language, SaveQuickReplyRequest request, QuickReplyHandler handler, CancellationToken token) =>
+            await handler.AddAsync(tenantId, language, request.Text, token).ConfigureAwait(false) ? Results.NoContent() : Results.NotFound())
+            .WithName("SaveWorkspaceQuickReply").Produces(StatusCodes.Status204NoContent).ProducesProblem(StatusCodes.Status400BadRequest);
+        workspace.MapDelete("/quick-replies/{language}/{id:guid}", async (Guid tenantId, string language, Guid id, QuickReplyHandler handler, CancellationToken token) =>
+            await handler.DeleteAsync(tenantId, language, id, token).ConfigureAwait(false) ? Results.NoContent() : Results.NotFound())
+            .WithName("DeleteWorkspaceQuickReply").Produces(StatusCodes.Status204NoContent).ProducesProblem(StatusCodes.Status400BadRequest);
 
         workspace.MapGet("/assigned-members", async (Guid tenantId, ReadConversationsHandler handler, CancellationToken token) =>
         {
@@ -695,7 +710,8 @@ internal static class ConversationEndpoints
             detail.LastReadSequence,
             ToMember(detail.TakenOverBy),
             detail.NeedsPerson,
-            detail.NeedsPersonReason?.ToString());
+            detail.NeedsPersonReason?.ToString(),
+            detail.ReplyWindow);
 
     private static WorkspaceMemberResponse? ToMember(ConversationMessageAuthor? author) =>
         author is null ? null : new WorkspaceMemberResponse(author.UserId, author.Email, author.DisplayName);

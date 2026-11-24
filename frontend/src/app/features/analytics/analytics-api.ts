@@ -262,6 +262,7 @@ export interface AnalyticsWhatsappDelivery {
  * same zone. Only the period's totals; "right now" has no history.
  */
 export interface AnalyticsComparison {
+  readonly dailyActivity?: readonly AnalyticsDay[];
   readonly period: AnalyticsPeriod;
   readonly summary: AnalyticsSummary;
   readonly aiOperations: AnalyticsAiOperations;

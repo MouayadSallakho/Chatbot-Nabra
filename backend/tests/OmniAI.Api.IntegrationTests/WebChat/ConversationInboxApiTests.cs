@@ -46,6 +46,28 @@ public sealed class ConversationInboxApiTests(WebChatApiFixture fixture)
 
     private sealed record Ticket(string TicketValue, int ExpiresInSeconds);
 
+    [Fact]
+    public async Task Quick_replies_are_shared_per_workspace_and_language_and_saving_is_idempotent()
+    {
+        var (owner, tenant, _) = await ConversationAsync();
+        var (other, otherTenant, _) = await ConversationAsync();
+        Uri Arabic(Guid id) => WebChatApiFixture.Relative($"/api/tenants/{id}/conversations/quick-replies/ar");
+        var route = Arabic(tenant);
+        var payload = new { text = "مرحبا" };
+        Assert.Equal(HttpStatusCode.NoContent, (await owner.PostAsJsonAsync(route, payload)).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await owner.PostAsJsonAsync(route, payload)).StatusCode);
+        var item = Assert.Single((await owner.GetFromJsonAsync<QuickReplyItem[]>(route))!);
+        Assert.Equal(payload.text, item.Text);
+        Assert.Empty((await owner.GetFromJsonAsync<QuickReplyItem[]>(WebChatApiFixture.Relative($"/api/tenants/{tenant}/conversations/quick-replies/en")))!);
+        Assert.Empty((await other.GetFromJsonAsync<QuickReplyItem[]>(Arabic(otherTenant)))!);
+        Assert.Equal(HttpStatusCode.NotFound, (await other.GetAsync(route)).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await owner.PostAsJsonAsync(route, new {text = "  "})).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await owner.DeleteAsync(WebChatApiFixture.Relative($"/api/tenants/{tenant}/conversations/quick-replies/ar/{item.Id}"))).StatusCode);
+        Assert.Empty((await owner.GetFromJsonAsync<QuickReplyItem[]>(route))!);
+    }
+
+    private sealed record QuickReplyItem(Guid Id, string Text);
+
     // ---- Handoff ---------------------------------------------------------
 
     [Fact]
@@ -171,6 +193,7 @@ public sealed class ConversationInboxApiTests(WebChatApiFixture fixture)
             message => message.Sender == "HumanAgent");
 
         Assert.NotNull(reply.SentBy);
+        Assert.Equal(reply.SentBy, (await sent.Content.ReadFromJsonAsync<TranscriptMessage>())!.SentBy);
         Assert.Contains("@", reply.SentBy.Email, StringComparison.Ordinal);
 
         // What the visitor reads back.
@@ -206,13 +229,15 @@ public sealed class ConversationInboxApiTests(WebChatApiFixture fixture)
 
         await HandoffAsync(owner, tenantId, conversation, "take-over", version);
 
-        await owner.PostAsJsonAsync(
-            Messages(tenantId, conversation),
-            new { clientMessageId = "same", text = "Only once" });
-
-        await owner.PostAsJsonAsync(
-            Messages(tenantId, conversation),
-            new { clientMessageId = "same", text = "Only once" });
+        var first = await owner.PostAsJsonAsync(
+            Messages(tenantId, conversation), new { clientMessageId = "same", text = "Only once" });
+        var retried = await owner.PostAsJsonAsync(
+            Messages(tenantId, conversation), new { clientMessageId = "same", text = "Only once" });
+        var stored = await first.Content.ReadFromJsonAsync<TranscriptMessage>();
+        var replay = await retried.Content.ReadFromJsonAsync<TranscriptMessage>();
+        Assert.NotNull(stored!.SentBy);
+        Assert.Equal(stored.SentBy, replay!.SentBy);
+        Assert.Equal(stored.Id, replay.Id);
 
         TranscriptPage? page = await owner.GetFromJsonAsync<TranscriptPage>(
             Messages(tenantId, conversation));
