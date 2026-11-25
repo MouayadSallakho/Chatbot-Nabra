@@ -261,6 +261,7 @@ internal sealed partial class DomainProblemDetailsHandler(
         InvitationStatusFilterInvalidException => "invitations.status.invalid",
 
         // Phase 38.7b: conversations.
+        InstagramExternalOwnerException => "instagram.reply.external_owner",
         ConversationNotHandledByHumanException => "conversations.reply.not_taken_over",
         _ => null,
     };
@@ -665,6 +666,8 @@ internal sealed partial class DomainProblemDetailsHandler(
             StatusCodes.Status400BadRequest,
             "Invalid conversation request",
             invalidQuery.Message),
+
+        InstagramExternalOwnerException external => (StatusCodes.Status409Conflict, "Instagram replies are paused", external.Message),
 
         ConversationNotHandledByHumanException notHuman => (
             StatusCodes.Status409Conflict,

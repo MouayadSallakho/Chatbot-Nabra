@@ -6,16 +6,20 @@ using OmniAI.Domain.Conversations;
 
 namespace OmniAI.Infrastructure.Persistence.Repositories;
 
-internal enum SimulatorSendStatus { Confirmed, Refused, Unconfirmed }
+internal enum SimulatorSendStatus { Confirmed, Refused, Unconfirmed, Withheld }
 
-internal static class MessengerPageTextSender
+internal static class SocialTextSender
 {
-    internal static async Task<SimulatorSendStatus> SendAsync(HttpMessageInvoker transport, Guid page, string recipient,
+    internal static async Task<SimulatorSendStatus> SendAsync(HttpMessageInvoker transport, ChannelKind channel, Guid page, string recipient,
         string text, CancellationToken token)
     {
-        using var request = new HttpRequestMessage(HttpMethod.Post, new Uri($"https://messenger.invalid/{page:N}/messages"))
+        bool instagram = channel == ChannelKind.Instagram;
+        using var request = new HttpRequestMessage(HttpMethod.Post, new Uri(instagram
+            ? $"https://instagram.invalid/ig-account-{page:N}/messages" : $"https://messenger.invalid/{page:N}/messages"))
         {
-            Content = JsonContent.Create(new { recipient = new { id = recipient }, messaging_type = "RESPONSE", message = new { text } }),
+            Content = instagram
+                ? JsonContent.Create(new { recipient = new { id = recipient }, message = new { text } })
+                : JsonContent.Create(new { recipient = new { id = recipient }, messaging_type = "RESPONSE", message = new { text } }),
         };
         try
         {
@@ -45,15 +49,18 @@ internal static class MessengerPageTextSender
 
 // In-process HTTP receiver. It validates the wire request and commits the customer-side receipt
 // before returning (or losing) its response. No socket or provider credential is used.
-internal sealed class SimulatedMessengerPage(Guid page, string recipient, Message message, SimulatorScenario scenario,
+internal sealed class SimulatedSocialAccount(ChannelKind channel, Guid page, string recipient, Message message, SimulatorScenario scenario,
     Func<CancellationToken, Task<int>> receive) : HttpMessageHandler
 {
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
         var body = await request.Content!.ReadFromJsonAsync<JsonElement>(cancellationToken).ConfigureAwait(false);
-        if (request.Method != HttpMethod.Post || request.RequestUri?.AbsolutePath != $"/{page:N}/messages" ||
+        bool instagram = channel == ChannelKind.Instagram;
+        string host = instagram ? "instagram.invalid" : "messenger.invalid";
+        string account = instagram ? $"ig-account-{page:N}" : page.ToString("N");
+        if (request.RequestUri?.Host != host || request.Method != HttpMethod.Post || request.RequestUri?.AbsolutePath != $"/{account}/messages" ||
             body.GetProperty("recipient").GetProperty("id").GetString() != recipient ||
-            body.GetProperty("messaging_type").GetString() != "RESPONSE" ||
+            (instagram ? body.TryGetProperty("messaging_type", out _) : body.GetProperty("messaging_type").GetString() != "RESPONSE") ||
             body.GetProperty("message").GetProperty("text").GetString() != message.Text ||
             scenario == SimulatorScenario.Refuse)
         {
@@ -63,7 +70,7 @@ internal sealed class SimulatedMessengerPage(Guid page, string recipient, Messag
         await receive(cancellationToken).ConfigureAwait(false);
         if (scenario == SimulatorScenario.LoseConfirmation)
         {
-            throw new TaskCanceledException("The simulated Page accepted the reply and its confirmation timed out.");
+            throw new TaskCanceledException("The simulated account accepted the reply and its confirmation timed out.");
         }
 
         return new HttpResponseMessage(HttpStatusCode.OK)

@@ -54,6 +54,8 @@ answer is the same for anybody and says nothing about the workspace.
 
 | Code | Status | Where | Meaning |
 | --- | --- | --- | --- |
+| `instagram.reply.external_owner` | 409 | Send a staff reply | Another app controls this Instagram conversation. Wait for control to return. |
+| `instagram.simulator.invalid_scenario` | 400 | Test local Instagram delivery | Select a supported delivery scenario. |
 | `instagram.simulator.invalid_event` | 400 | Import local Instagram Direct events | Supply Instagram events for the selected simulated professional account, up to 50 per batch. |
 | `instagram.simulator.invalid_message` | 400 | Simulate an Instagram DM | Supply a message ID and 1–2000 characters of text. |
 | `messenger.simulator.invalid_scenario` | 400 | Test local Messenger delivery | Select a supported local delivery scenario. |

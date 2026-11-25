@@ -51,17 +51,21 @@ public sealed class SocialSimulatorStoreTests(PostgresTestDatabase database) : I
     }
 
     [Theory]
-    [InlineData(MessageSender.AiAgent, SimulatorScenario.Refuse)]
-    [InlineData(MessageSender.HumanAgent, SimulatorScenario.Refuse)]
-    [InlineData(MessageSender.AiAgent, SimulatorScenario.LoseConfirmation)]
-    [InlineData(MessageSender.HumanAgent, SimulatorScenario.LoseConfirmation)]
+    [InlineData(ChannelKind.Messenger, MessageSender.AiAgent, SimulatorScenario.Refuse)]
+    [InlineData(ChannelKind.Messenger, MessageSender.HumanAgent, SimulatorScenario.Refuse)]
+    [InlineData(ChannelKind.Messenger, MessageSender.AiAgent, SimulatorScenario.LoseConfirmation)]
+    [InlineData(ChannelKind.Messenger, MessageSender.HumanAgent, SimulatorScenario.LoseConfirmation)]
+    [InlineData(ChannelKind.Instagram, MessageSender.AiAgent, SimulatorScenario.Refuse)]
+    [InlineData(ChannelKind.Instagram, MessageSender.HumanAgent, SimulatorScenario.Refuse)]
+    [InlineData(ChannelKind.Instagram, MessageSender.AiAgent, SimulatorScenario.LoseConfirmation)]
+    [InlineData(ChannelKind.Instagram, MessageSender.HumanAgent, SimulatorScenario.LoseConfirmation)]
     public async Task Recovery_is_scoped_repeatable_and_never_resends_an_uncertain_reply(
-        MessageSender sender, SimulatorScenario scenario)
+        ChannelKind channel, MessageSender sender, SimulatorScenario scenario)
     {
         var world = await new AnalyticsWorld(database).StartAsync();
         var now = DateTimeOffset.UtcNow;
         var agent = await world.AgentAsync("Support", now);
-        var address = new SimulatorAddress(world.Tenant.Id, agent.Id, Guid.NewGuid());
+        var address = new SimulatorAddress(world.Tenant.Id, agent.Id, Guid.NewGuid(), channel);
         await using var source = NpgsqlDataSource.Create(database.ConnectionString);
         var locks = new PostgresConversationLock(source);
         await using var context = database.CreateContext();
@@ -80,11 +84,31 @@ public sealed class SocialSimulatorStoreTests(PostgresTestDatabase database) : I
 
         var polled = await store.ReceiveAsync(address, default);
         Assert.Equal(issue, Assert.Single(polled.DeliveryIssues));
-        Assert.Equal(issue.Status, (await store.DeliveryStatusesAsync(address.Tenant, conversationId, default))[issue.Id]);
+        var statuses = channel == ChannelKind.Instagram
+            ? (await store.InstagramStateAsync(address.Tenant, conversationId, default)).Statuses
+            : await store.DeliveryStatusesAsync(address.Tenant, conversationId, default);
+        Assert.Equal(issue.Status, statuses[issue.Id]);
         Assert.Empty(await store.DeliveryStatusesAsync(TenantId.New(), conversationId, default));
         var row = context.Set<MessengerSimulatorReceipt>().AsNoTracking().Where(r => r.MessageId == MessageId.From(issue.Id));
         var originalReceipt = (await row.SingleAsync()).ReceivedAt;
         Assert.Equal(accepted, originalReceipt.HasValue);
+        if (channel == ChannelKind.Instagram)
+        {
+            await store.SetOwnershipAsync(address, new(true, 0), default);
+            var held = await store.ReceiveAsync(address, default, recover: issue.Id);
+            if (accepted)
+            {
+                // Inspecting an existing receipt sends nothing, even under external control.
+                Assert.Empty(held.DeliveryIssues);
+                Assert.Equal(originalReceipt, (await row.SingleAsync()).ReceivedAt);
+            }
+            else
+            {
+                Assert.Empty(held.Messages);
+                Assert.Equal(issue, Assert.Single(held.DeliveryIssues));
+            }
+            await store.SetOwnershipAsync(address, new(false, 1), default);
+        }
 
         await using var fresh = database.CreateContext();
         var restarted = new SocialSimulatorStore(fresh, locks, new TestNotifier());
@@ -102,13 +126,15 @@ public sealed class SocialSimulatorStoreTests(PostgresTestDatabase database) : I
         }
     }
 
-    [Fact]
-    public async Task Checking_an_uncertain_attempt_without_a_receiver_receipt_leaves_it_on_hold()
+    [Theory]
+    [InlineData(ChannelKind.Messenger)]
+    [InlineData(ChannelKind.Instagram)]
+    public async Task Checking_an_uncertain_attempt_without_a_receiver_receipt_leaves_it_on_hold(ChannelKind channel)
     {
         var world = await new AnalyticsWorld(database).StartAsync();
         var now = DateTimeOffset.UtcNow;
         var agent = await world.AgentAsync("Support", now);
-        var address = new SimulatorAddress(world.Tenant.Id, agent.Id, Guid.NewGuid());
+        var address = new SimulatorAddress(world.Tenant.Id, agent.Id, Guid.NewGuid(), channel);
         await using var source = NpgsqlDataSource.Create(database.ConnectionString);
         await using var context = database.CreateContext();
         var store = new SocialSimulatorStore(context, new PostgresConversationLock(source), new TestNotifier());
@@ -163,6 +189,34 @@ public sealed class SocialSimulatorStoreTests(PostgresTestDatabase database) : I
         Assert.Empty((await b.ReceiveAsync(messenger, default)).Messages);
         Assert.Null((await b.ReceiveAsync(address with { Visitor = Guid.NewGuid() }, default)).ConversationId);
         Assert.Null((await b.ReceiveAsync(address with { Tenant = TenantId.New() }, default)).ConversationId);
+    }
+
+    [Fact]
+    public async Task External_control_survives_replays_and_never_flushes_a_reply_pending_before_transfer()
+    {
+        var world = await new AnalyticsWorld(database).StartAsync();
+        var now = DateTimeOffset.UtcNow;
+        var agent = await world.AgentAsync("Support", now);
+        var address = new SimulatorAddress(world.Tenant.Id, agent.Id, Guid.NewGuid(), ChannelKind.Instagram);
+        await using var source = NpgsqlDataSource.Create(database.ConnectionString);
+        await using var context = database.CreateContext();
+        var store = new SocialSimulatorStore(context, new PostgresConversationLock(source), new TestNotifier());
+        var id = await store.ResolveAsync(address, now, default);
+        var dm = await context.Conversations.SingleAsync(c => c.Id == id);
+        await world.SayAsync(dm, (MessageSender.HumanAgent, now));
+        Assert.False(await store.SetOwnershipAsync(address with { Visitor = Guid.NewGuid() }, new(true, 0), default));
+        Assert.True(await store.SetOwnershipAsync(address, new(true, 0), default));
+        await using var fresh = database.CreateContext();
+        var restarted = new SocialSimulatorStore(fresh, new PostgresConversationLock(source), new TestNotifier());
+        var paused = await restarted.ReceiveAsync(address, default);
+        Assert.Equal(new SimulatorOwnership(true, 1), paused.Ownership);
+        Assert.Empty(paused.Messages);
+        Assert.Equal("Withheld", Assert.Single((await restarted.InstagramStateAsync(address.Tenant, id, default)).Statuses).Value);
+        await restarted.SetOwnershipAsync(address, new(false, 1), default);
+        await store.SetOwnershipAsync(address, new(true, 0), default);
+        var resumed = await store.ReceiveAsync(address, default);
+        Assert.Empty(resumed.Messages);
+        Assert.Equal(new SimulatorOwnership(false, 2), resumed.Ownership);
     }
 
     private sealed class TestNotifier : IConversationRealtimeNotifier

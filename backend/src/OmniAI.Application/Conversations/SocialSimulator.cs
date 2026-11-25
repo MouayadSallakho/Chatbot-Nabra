@@ -16,17 +16,21 @@ public sealed record SimulatorInboundText(string? SenderId, string? EventId, str
 public sealed record SimulatorMessage(Guid Id, string Sender, string Text, DateTimeOffset SentAt);
 public enum SimulatorScenario { Accept, Refuse, LoseConfirmation }
 public sealed record SimulatorDeliveryIssue(Guid Id, string Sender, string Text, string Status);
+public sealed record SimulatorOwnership(bool ExternalOwner, int Version);
+public sealed record InstagramInboxState(bool ExternalOwner, IReadOnlyDictionary<Guid, string> Statuses);
 public sealed record SimulatorMailbox(Guid? ConversationId, IReadOnlyList<SimulatorMessage> Messages,
-    IReadOnlyList<SimulatorDeliveryIssue> DeliveryIssues);
+    IReadOnlyList<SimulatorDeliveryIssue> DeliveryIssues, SimulatorOwnership? Ownership = null);
 public sealed record SimulatorAddress(TenantId Tenant, AiAgentId Agent, Guid Visitor, ChannelKind Channel = ChannelKind.Messenger);
 
 public interface ISocialSimulatorStore
 {
     Task<IReadOnlyList<SimulatorAgent>> AgentsAsync(TenantId tenant, CancellationToken token);
     Task<IReadOnlyDictionary<Guid, string>> DeliveryStatusesAsync(TenantId tenant, ConversationId conversation, CancellationToken token);
+    Task<bool> SetOwnershipAsync(SimulatorAddress address, SimulatorOwnership requested, CancellationToken token);
+    Task<InstagramInboxState> InstagramStateAsync(TenantId tenant, ConversationId conversation, CancellationToken token);
     Task<ConversationId> ResolveAsync(SimulatorAddress address, DateTimeOffset now, CancellationToken token);
     Task<SimulatorMailbox> ReceiveAsync(SimulatorAddress address, CancellationToken token,
-        SimulatorScenario scenario = SimulatorScenario.Accept, Guid? recover = null);
+        SimulatorScenario scenario = SimulatorScenario.Accept, Guid? recover = null, bool inspectOnly = false);
 }
 
 /// <summary>Runs authenticated test-customer turns through the same inbox workflow as other channels.</summary>
@@ -60,7 +64,7 @@ public sealed class SocialSimulator(TenantAuthorizer authorizer, ISocialSimulato
     }
 
     public async Task<SimulatorMailbox?> ReceiveAsync(Guid tenantId, Guid agentId, CancellationToken token,
-        SimulatorScenario scenario = SimulatorScenario.Accept, Guid? recover = null, ChannelKind channel = ChannelKind.Messenger)
+        SimulatorScenario scenario = SimulatorScenario.Accept, Guid? recover = null, ChannelKind channel = ChannelKind.Messenger, bool inspectOnly = false)
     {
         var tenant = TenantId.From(tenantId);
         if (!await CanTestAsync(tenant, token).ConfigureAwait(false))
@@ -69,7 +73,26 @@ public sealed class SocialSimulator(TenantAuthorizer authorizer, ISocialSimulato
         }
 
         return await store.ReceiveAsync(new SimulatorAddress(tenant, AiAgentId.From(agentId),
-            authorizer.RequireCurrentUser().Value, channel), token, scenario, recover).ConfigureAwait(false);
+            authorizer.RequireCurrentUser().Value, channel), token, scenario, recover, inspectOnly).ConfigureAwait(false);
+    }
+
+    public async Task<InstagramInboxState?> InstagramStateAsync(Guid tenantId, Guid conversationId, CancellationToken token)
+    {
+        var tenant = TenantId.From(tenantId);
+        return await authorizer.RequireAsync(tenant, PlatformPermissions.ConversationsView, token).ConfigureAwait(false)
+            ? await store.InstagramStateAsync(tenant, ConversationId.From(conversationId), token).ConfigureAwait(false) : null;
+    }
+
+    public async Task<SimulatorMailbox?> SetInstagramOwnershipAsync(Guid tenantId, Guid agentId, SimulatorOwnership requested, CancellationToken token)
+    {
+        var tenant = TenantId.From(tenantId);
+        if (!await CanTestAsync(tenant, token).ConfigureAwait(false))
+        {
+            return null;
+        }
+        var address = new SimulatorAddress(tenant, AiAgentId.From(agentId), authorizer.RequireCurrentUser().Value, ChannelKind.Instagram);
+        return await store.SetOwnershipAsync(address, requested, token).ConfigureAwait(false)
+            ? await store.ReceiveAsync(address, token, inspectOnly: true).ConfigureAwait(false) : null;
     }
 
     public Task<SimulatorMailbox?> SendAsync(Guid tenantId, Guid agentId, Guid eventId, string? text, CancellationToken token) =>
@@ -80,8 +103,8 @@ public sealed class SocialSimulator(TenantAuthorizer authorizer, ISocialSimulato
         CancellationToken token, SimulatorScenario scenario = SimulatorScenario.Accept) =>
         ApplyAsync(tenantId, agentId, messages, checkSender: true, ChannelKind.Messenger, scenario, token);
 
-    public Task<SimulatorMailbox?> SendInstagramAsync(Guid tenantId, Guid agentId, IReadOnlyList<SimulatorInboundText> messages, CancellationToken token) =>
-        ApplyAsync(tenantId, agentId, messages, checkSender: true, ChannelKind.Instagram, SimulatorScenario.Accept, token);
+    public Task<SimulatorMailbox?> SendInstagramAsync(Guid tenantId, Guid agentId, IReadOnlyList<SimulatorInboundText> messages, CancellationToken token, SimulatorScenario scenario = SimulatorScenario.Accept) =>
+        ApplyAsync(tenantId, agentId, messages, checkSender: true, ChannelKind.Instagram, scenario, token);
 
     private async Task<SimulatorMailbox?> ApplyAsync(Guid tenantId, Guid agentId, IReadOnlyList<SimulatorInboundText> messages,
         bool checkSender, ChannelKind channel, SimulatorScenario scenario, CancellationToken token)

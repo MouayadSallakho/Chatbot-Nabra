@@ -324,6 +324,8 @@ export class ConversationTranscript {
         return 'Delivered';
       case 'Refused':
         return 'Failed';
+      case 'Withheld':
+        return 'Withheld';
       case 'Unconfirmed':
         return 'Unknown';
     }

@@ -3024,6 +3024,18 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("conversation_id");
 
+                    b.Property<bool>("ExternalOwner")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("external_owner");
+
+                    b.Property<int>("OwnershipVersion")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("ownership_version");
+
                     b.HasKey("TenantId", "AgentId", "Visitor");
 
                     b.HasIndex("AgentId");

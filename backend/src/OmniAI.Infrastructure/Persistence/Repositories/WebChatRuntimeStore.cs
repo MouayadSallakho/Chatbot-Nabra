@@ -228,7 +228,9 @@ internal sealed class WebChatRuntimeStore(OmniAiDbContext context) : IWebChatRun
         ConversationHandling[] found = await _context.Conversations
             .AsNoTracking()
             .Where(conversation => conversation.Id == conversationId)
-            .Select(conversation => conversation.Handling)
+            .Select(conversation => conversation.Channel == ChannelKind.Instagram &&
+                    _context.Set<InstagramSimulatorThread>().Any(thread => thread.ConversationId == conversation.Id && thread.ExternalOwner)
+                        ? ConversationHandling.Human : conversation.Handling)
             .Take(1)
             .ToArrayAsync(cancellationToken)
             .ConfigureAwait(false);

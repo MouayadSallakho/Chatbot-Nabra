@@ -1,6 +1,11 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import type { SimulatorAgent, SimulatorMailbox } from '../messenger-simulator/messenger-api';
+import type {
+  DeliveryScenario,
+  SimulatorAgent,
+  SimulatorMailbox,
+  SimulatorOwnership,
+} from '../messenger-simulator/messenger-api';
 
 @Injectable({ providedIn: 'root' })
 export class InstagramSimulatorApi {
@@ -14,26 +19,60 @@ export class InstagramSimulatorApi {
     return this.http.get<readonly SimulatorAgent[]>(this.url(tenant));
   }
 
-  receive(tenant: string, agent: string) {
-    return this.http.get<SimulatorMailbox>(this.url(tenant) + '/' + agent + '/mailbox');
+  receive(tenant: string, agent: string, scenario: DeliveryScenario) {
+    return this.http.post<SimulatorMailbox>(
+      this.url(tenant) + '/' + agent + '/receive',
+      {},
+      { params: { scenario } },
+    );
   }
 
-  send(tenant: string, agent: SimulatorAgent, eventId: string, text: string) {
+  recover(tenant: string, agent: string, id: string) {
+    return this.http.post<SimulatorMailbox>(
+      this.url(tenant) + '/' + agent + '/deliveries/' + id + '/recover',
+      {},
+    );
+  }
+
+  ownership(tenant: string, agent: string, requested: SimulatorOwnership) {
+    return this.http.post<SimulatorMailbox>(
+      this.url(tenant) + '/' + agent + '/ownership',
+      requested,
+    );
+  }
+
+  state(tenant: string, conversation: string) {
+    return this.http.get<{ externalOwner: boolean; statuses: Readonly<Record<string, string>> }>(
+      this.url(tenant) + '/conversations/' + conversation + '/state',
+    );
+  }
+
+  send(
+    tenant: string,
+    agent: SimulatorAgent,
+    eventId: string,
+    text: string,
+    scenario: DeliveryScenario,
+  ) {
     const account = 'ig-account-' + agent.id.replaceAll('-', '');
-    return this.http.post<SimulatorMailbox>(this.url(tenant) + '/' + agent.id + '/direct-events', {
-      object: 'instagram',
-      entry: [
-        {
-          id: account,
-          messaging: [
-            {
-              sender: { id: agent.customerId },
-              recipient: { id: account },
-              message: { mid: eventId, text },
-            },
-          ],
-        },
-      ],
-    });
+    return this.http.post<SimulatorMailbox>(
+      this.url(tenant) + '/' + agent.id + '/direct-events',
+      {
+        object: 'instagram',
+        entry: [
+          {
+            id: account,
+            messaging: [
+              {
+                sender: { id: agent.customerId },
+                recipient: { id: account },
+                message: { mid: eventId, text },
+              },
+            ],
+          },
+        ],
+      },
+      { params: { scenario } },
+    );
   }
 }

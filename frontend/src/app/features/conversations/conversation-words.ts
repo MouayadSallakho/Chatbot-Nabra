@@ -98,6 +98,8 @@ export function sameDay(left: Date, right: Date): boolean {
 /** A WhatsApp reply's delivery state, as a word. Unknown values are shown as sent. */
 export function deliveryWord(status: string): string {
   switch (status) {
+    case 'Withheld':
+      return $localize`:@@ig.withheld:Paused before delivery`;
     case 'Pending':
       return $localize`:@@transcript.delivery.pending:Waiting to send`;
     case 'Sending':

@@ -52,7 +52,7 @@
           Try again
         </button>
       }
-      @if (agent() && !instagram) {
+      @if (agent()) {
         <label for="sim-scenario" class="text-small" i18n="@@ms.deliveryScenario"
           >Delivery test for new replies</label
         >
@@ -71,6 +71,30 @@
           </option>
         </select>
       }
+      @if (mailbox()?.ownership; as owner) {
+        <p class="text-small" role="status" data-testid="ig-owner">
+          @if (owner.externalOwner) {
+            <span i18n="@@ig.paused"
+              >Another app controls this conversation. Nabra replies are paused.</span
+            >
+          } @else {
+            <span i18n="@@ig.owned">Nabra controls this conversation.</span>
+          }
+        </p>
+        <button
+          type="button"
+          class="btn btn-secondary btn-sm"
+          data-testid="ig-switch-owner"
+          [disabled]="busy()"
+          (click)="switchOwner()"
+        >
+          @if (owner.externalOwner) {
+            <span i18n="@@ig.resume">Return control to Nabra</span>
+          } @else {
+            <span i18n="@@ig.transfer">Give control to another app</span>
+          }
+        </button>
+      }
       @if (mailbox()?.conversationId; as id) {
         <a [routerLink]="['/conversations', id]" class="btn btn-secondary" data-testid="sim-inbox"
           ><span i18n="@@ms.inbox">Open in inbox</span><app-icon name="arrow-end"
@@ -84,13 +108,19 @@
               <strong class="text-small">{{ voices[item.sender] }}</strong>
               <p class="delivery-preview text-small" dir="auto">{{ item.text }}</p>
               @if (item.status === 'Refused') {
-                <p class="text-small" i18n="@@ms.refused">
-                  The Page refused this reply. The customer has not received it.
-                </p>
+                @if (instagram) {
+                  <p class="text-small" i18n="@@ig.refused">
+                    Instagram refused this test reply before delivery.
+                  </p>
+                } @else {
+                  <p class="text-small" i18n="@@ms.refused">
+                    The Page refused this reply. The customer has not received it.
+                  </p>
+                }
                 <button
                   type="button"
                   class="btn btn-secondary btn-sm"
-                  [disabled]="busy()"
+                  [disabled]="busy() || !!mailbox()?.ownership?.externalOwner"
                   (click)="recover(item.id)"
                   i18n="@@ms.retryDelivery"
                 >

@@ -121,3 +121,6 @@ public sealed class ConversationQueryInvalidException : Exception
             "conversations.read.sequence.invalid",
             "The sequence must be a message sequence of zero or more.");
 }
+
+public sealed class InstagramExternalOwnerException()
+    : Exception("Another app controls this Instagram conversation.");

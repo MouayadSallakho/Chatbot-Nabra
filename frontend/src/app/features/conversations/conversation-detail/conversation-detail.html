@@ -213,7 +213,13 @@
                   [class.from-human]="sweep() === 'ai'"
                   (animationend)="endSweep()"
                 >
-                  <app-voice-chip [voice]="voice()" [label]="handlingText()" />
+                  @if (externalInstagram() === current.id) {
+                    <span class="chip chip-neutral" i18n="@@ig.externalChip"
+                      >Other app is answering</span
+                    >
+                  } @else {
+                    <app-voice-chip [voice]="voice()" [label]="handlingText()" />
+                  }
                 </span>
               }
               <!--
@@ -221,7 +227,7 @@
                 email. Nothing when nobody is named: AI mode, or a takeover from
                 before Phase 37.4.
               -->
-              @if (handler(); as member) {
+              @if (externalInstagram() !== current.id && handler(); as member) {
                 <span class="handling-who" data-testid="handled-by" i18n="@@conversation.handledBy"
                   >Handled by
                   <bdi [attr.dir]="member.isEmail ? 'ltr' : 'auto'">{{ member.text }}</bdi></span
@@ -331,7 +337,11 @@
               class="handling-help"
               [class.visually-hidden]="fill() && !panes() && !compact()"
             >
-              @if (isHuman()) {
+              @if (externalInstagram() === current.id) {
+                <span i18n="@@ig.ownerHelp"
+                  >Your handling choice takes effect when control returns to Nabra.</span
+                >
+              } @else if (isHuman()) {
                 <span i18n="@@conversation.returnHelp"
                   >The AI answers new messages again. Anything the customer sent while you were
                   handling this stays unanswered by it.</span
@@ -425,7 +435,11 @@
           </button>
         }
 
-        @if (canReply()) {
+        @if (externalInstagram() === current.id) {
+          <p class="composer-withheld" data-testid="ig-inbox-paused" i18n="@@ig.inboxPaused">
+            Replies are paused while another app controls this Instagram conversation.
+          </p>
+        } @else if (canReply()) {
           @if (isHuman()) {
             <app-conversation-composer
               [windowClosed]="!!current.replyWindow && remainingMinutes() === 0"

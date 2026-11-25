@@ -19,6 +19,8 @@ test('Instagram DMs survive replay and human takeover in their own inbox', async
   const path = base + '/instagram-simulator/' + id + '/direct-events';
   const text = page.locator('#sim-text');
   const submit = page.locator('form button[type="submit"]');
+  const scenario = page.locator('#sim-scenario');
+  await scenario.selectOption('Refuse');
   await text.fill(ar ? 'مرحباً، هل الحقيبة متوفرة؟' : 'Hello, is the bag available?');
   const [result] = await Promise.all([
     page.waitForResponse((r) => new URL(r.url()).pathname === path),
@@ -28,7 +30,9 @@ test('Instagram DMs survive replay and human takeover in their own inbox', async
   const stored = await result.json();
   const event = result.request().postDataJSON();
   expect(event.object).toBe('instagram');
-  await expect(page.locator('[data-sender="AiAgent"]')).toHaveCount(1);
+  const refused = page.locator('[data-delivery="Refused"]');
+  await expect(refused).toHaveCount(1);
+  await expect(page.locator('[data-sender="AiAgent"]')).toHaveCount(0);
   expect(await (await post(page.request, path, event)).json()).toEqual(stored);
   await expect(post(page.request, path, { ...event, object: 'page' })).rejects.toThrow(
     'answered 400',
@@ -46,6 +50,10 @@ test('Instagram DMs survive replay and human takeover in their own inbox', async
     { sender: original.sender, recipient: original.recipient, read: { mid: 'read-only' } },
   ];
   expect(await (await post(page.request, path, ignored)).json()).toEqual(stored);
+  await refused.getByRole('button').click();
+  await expect(refused).toHaveCount(0);
+  await expect(page.locator('[data-sender="AiAgent"]')).toHaveCount(1);
+  await scenario.selectOption('LoseConfirmation');
   const messengerBox = await (
     await post(page.request, base + '/messenger-simulator/' + id + '/receive', {})
   ).json();
@@ -71,10 +79,67 @@ test('Instagram DMs survive replay and human takeover in their own inbox', async
   await expect(page.locator('[data-sender="HumanAgent"]')).toHaveText(new RegExp(reply), {
     timeout: 12000,
   });
+  const uncertain = page.locator('[data-delivery="Unconfirmed"]');
+  await expect(uncertain).toHaveCount(1);
+  await expect(inbox.locator('[data-sim-delivery="Unconfirmed"]')).toHaveCount(1, {
+    timeout: 12000,
+  });
   await page.reload();
   await agent.selectOption({ index });
-  await expect(page.locator('[data-sender]')).toHaveCount(4);
-  await expect(page.locator('[data-sender="AiAgent"]')).toHaveCount(1);
+  await expect(uncertain).toHaveCount(1);
+  const receiptPath = base + '/instagram-simulator/' + id + '/mailbox';
+  const before = (await (await page.request.get(receiptPath)).json()).messages;
+  await uncertain.getByRole('button').click();
+  await expect(uncertain).toHaveCount(0);
+  expect((await (await page.request.get(receiptPath)).json()).messages).toEqual(before);
+  await expect(inbox.locator('[data-sim-delivery="Confirmed"]')).toHaveCount(2, { timeout: 12000 });
+  await inbox.getByTestId('return-to-ai').click();
+  await expect(inbox.getByTestId('take-over')).toBeVisible();
+
+  // External control is independent of Nabra's AI/staff switch.
+  const switchOwner = page.getByTestId('ig-switch-owner');
+  await switchOwner.click();
+  await expect(inbox.getByTestId('ig-inbox-paused')).toBeVisible({ timeout: 12000 });
+  await page.reload();
+  await agent.selectOption({ index });
+  const waiting = ar ? 'وصل سؤالي أثناء التحويل.' : 'My question during the transfer.';
+  await text.fill(waiting);
+  const [paused] = await Promise.all([
+    page.waitForResponse((r) => new URL(r.url()).pathname === path),
+    submit.click(),
+  ]);
+  const pausedBox = await paused.json();
+  expect(pausedBox.ownership.externalOwner).toBe(true);
+  expect(pausedBox.messages).toHaveLength(5);
+  await expect(inbox.getByTestId('transcript')).toContainText(waiting);
+  await inbox.getByTestId('take-over').click();
+  await expect(inbox.getByTestId('return-to-ai')).toBeVisible();
+  await expect(inbox.locator('#conversation-reply')).toHaveCount(0);
+  await expect(
+    post(page.request, base + '/conversations/' + stored.conversationId + '/messages', {
+      clientMessageId: crypto.randomUUID(),
+      text: 'Busy',
+    }),
+  ).rejects.toThrow('answered 409');
+  await switchOwner.click();
+  await expect(inbox.locator('#conversation-reply')).toBeVisible({ timeout: 12000 });
+  const stale = await post(page.request, base + '/instagram-simulator/' + id + '/ownership', {
+    externalOwner: true,
+    version: 0,
+  });
+  expect((await stale.json()).ownership.externalOwner).toBe(false);
+  await inbox.getByTestId('return-to-ai').click();
+  await expect(inbox.getByTestId('take-over')).toBeVisible();
+  expect(
+    (await (await post(page.request, path, paused.request().postDataJSON())).json()).messages,
+  ).toEqual(pausedBox.messages);
+  await text.fill(ar ? 'هل يمكن متابعة طلبي الآن؟' : 'Can we continue my order now?');
+  await submit.click();
+  await expect(page.locator('[data-sender="AiAgent"]')).toHaveCount(2);
+  await page.reload();
+  await agent.selectOption({ index });
+  await expect(page.locator('[data-sender]')).toHaveCount(7);
+  await expect(page.locator('[data-sender="AiAgent"]')).toHaveCount(2);
   for (const width of [1440, 390]) {
     await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
     await expect

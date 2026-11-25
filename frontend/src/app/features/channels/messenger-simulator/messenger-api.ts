@@ -19,7 +19,12 @@ export interface SimulatorDeliveryIssue {
   readonly text: string;
   readonly status: 'Refused' | 'Unconfirmed';
 }
+export interface SimulatorOwnership {
+  readonly externalOwner: boolean;
+  readonly version: number;
+}
 export interface SimulatorMailbox {
+  readonly ownership?: SimulatorOwnership | null;
   readonly deliveryIssues: readonly SimulatorDeliveryIssue[];
   readonly conversationId: string | null;
   readonly messages: readonly MailboxMessage[];

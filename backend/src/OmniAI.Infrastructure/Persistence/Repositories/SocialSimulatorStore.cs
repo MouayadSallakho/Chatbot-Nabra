@@ -20,6 +20,7 @@ internal sealed class MessengerReceiptConfiguration : IEntityTypeConfiguration<M
 {
     public void Configure(EntityTypeBuilder<MessengerSimulatorReceipt> builder)
     {
+        // Both simulators use message IDs from the shared inbox. Keep the original table name for existing receipts.
         builder.ToTable("messenger_simulator_receipts");
         builder.HasKey(row => row.MessageId);
         builder.Property(row => row.MessageId).HasColumnName("message_id").HasConversion(PersistenceConverters.MessageId).ValueGeneratedNever();
@@ -96,19 +97,62 @@ internal sealed class SocialSimulatorStore(OmniAiDbContext context, IConversatio
         return conversation.Id;
     }
 
-    public async Task<IReadOnlyDictionary<Guid, string>> DeliveryStatusesAsync(TenantId tenant, ConversationId conversation, CancellationToken token)
+    public async Task<bool> SetOwnershipAsync(SimulatorAddress address, SimulatorOwnership requested, CancellationToken token)
     {
-        var rows = await (from thread in context.Set<MessengerSimulatorThread>().AsNoTracking()
-                          join message in context.Set<Message>() on thread.ConversationId equals message.ConversationId
+        var conversation = await ConversationFor(address).SingleOrDefaultAsync(token).ConfigureAwait(false);
+        if (conversation is null)
+        {
+            return false;
+        }
+        await using var hold = await locks.AcquireAsync(conversation.Value.Value, token).ConfigureAwait(false);
+        await using var transaction = await context.Database.BeginTransactionAsync(token).ConfigureAwait(false);
+        var updated = await context.Set<InstagramSimulatorThread>()
+            .Where(t => t.ConversationId == conversation.Value && t.OwnershipVersion == requested.Version && t.ExternalOwner != requested.ExternalOwner)
+            .ExecuteUpdateAsync(u => u.SetProperty(t => t.ExternalOwner, requested.ExternalOwner)
+                .SetProperty(t => t.OwnershipVersion, t => t.OwnershipVersion + 1), token).ConfigureAwait(false);
+        if (updated > 0 && requested.ExternalOwner)
+        {
+            // A pending reply from the previous ownership period must never leave on a later poll.
+            await context.Database.ExecuteSqlInterpolatedAsync($"""
+                INSERT INTO messenger_simulator_receipts (message_id, status)
+                SELECT id, 'Withheld' FROM messages WHERE conversation_id = {conversation.Value.Value}
+                    AND sender IN ('AiAgent','HumanAgent')
+                ON CONFLICT (message_id) DO NOTHING
+                """, token).ConfigureAwait(false);
+        }
+        await transaction.CommitAsync(token).ConfigureAwait(false);
+        if (updated > 0)
+        {
+            await notifier.ConversationChangedAsync(address.Tenant, conversation.Value, token).ConfigureAwait(false);
+        }
+        return true;
+    }
+
+    public async Task<InstagramInboxState> InstagramStateAsync(TenantId tenant, ConversationId conversation, CancellationToken token)
+    {
+        var owner = await context.Set<InstagramSimulatorThread>()
+            .Where(t => t.TenantId == tenant && t.ConversationId == conversation)
+            .Select(t => (bool?)t.ExternalOwner).SingleOrDefaultAsync(token).ConfigureAwait(false);
+        return new InstagramInboxState(owner == true, owner.HasValue
+            ? await ReceiptStatusesAsync(conversation, token).ConfigureAwait(false) : new Dictionary<Guid, string>());
+    }
+
+    public async Task<IReadOnlyDictionary<Guid, string>> DeliveryStatusesAsync(TenantId tenant, ConversationId conversation, CancellationToken token) =>
+        await context.Set<MessengerSimulatorThread>().AnyAsync(t => t.TenantId == tenant && t.ConversationId == conversation, token).ConfigureAwait(false)
+            ? await ReceiptStatusesAsync(conversation, token).ConfigureAwait(false) : new Dictionary<Guid, string>();
+
+    private async Task<IReadOnlyDictionary<Guid, string>> ReceiptStatusesAsync(ConversationId conversation, CancellationToken token)
+    {
+        var rows = await (from message in context.Set<Message>()
                           join receipt in context.Set<MessengerSimulatorReceipt>() on message.Id equals receipt.MessageId
-                          where thread.TenantId == tenant && thread.ConversationId == conversation
+                          where message.ConversationId == conversation
                           orderby EF.Property<long>(message, PersistenceSchema.MessageIngestionSequence) descending
                           select new { message.Id, receipt.Status }).Take(40).ToListAsync(token).ConfigureAwait(false);
         return rows.ToDictionary(row => row.Id.Value, row => row.Status.ToString());
     }
 
     public async Task<SimulatorMailbox> ReceiveAsync(SimulatorAddress address, CancellationToken token,
-        SimulatorScenario scenario = SimulatorScenario.Accept, Guid? recover = null)
+        SimulatorScenario scenario = SimulatorScenario.Accept, Guid? recover = null, bool inspectOnly = false)
     {
         var thread = await ConversationFor(address).SingleOrDefaultAsync(token).ConfigureAwait(false);
         if (thread is null)
@@ -117,23 +161,16 @@ internal sealed class SocialSimulatorStore(OmniAiDbContext context, IConversatio
         }
 
         var conversation = thread.Value;
-        if (address.Channel == ChannelKind.Instagram)
-        {
-            var history = await context.Set<Message>().AsNoTracking()
-                .Where(m => m.ConversationId == conversation && (m.Sender == MessageSender.Customer ||
-                    m.Sender == MessageSender.AiAgent || m.Sender == MessageSender.HumanAgent))
-                .OrderByDescending(m => EF.Property<long>(m, PersistenceSchema.MessageIngestionSequence))
-                .Take(40).Select(m => new { m.Id, m.Sender, m.Text, m.SentAt }).ToListAsync(token).ConfigureAwait(false);
-            history.Reverse();
-            return new SimulatorMailbox(conversation.Value,
-                [.. history.Select(m => new SimulatorMessage(m.Id.Value, m.Sender.ToString(), m.Text, m.SentAt))], []);
-        }
-
         var receipts = context.Set<MessengerSimulatorReceipt>();
         var outbound = context.Set<Message>().AsNoTracking().Where(message => message.ConversationId == conversation &&
             (message.Sender == MessageSender.AiAgent || message.Sender == MessageSender.HumanAgent));
 
         await using var hold = await locks.AcquireAsync(conversation.Value, token).ConfigureAwait(false);
+        SimulatorOwnership? ownership = address.Channel == ChannelKind.Instagram
+            ? await context.Set<InstagramSimulatorThread>().Where(t => t.ConversationId == conversation)
+                .Select(t => new SimulatorOwnership(t.ExternalOwner, t.OwnershipVersion)).SingleAsync(token).ConfigureAwait(false)
+            : null;
+        bool canSend = ownership?.ExternalOwner != true;
         bool changed = false;
         if (recover is Guid target)
         {
@@ -141,7 +178,7 @@ internal sealed class SocialSimulatorStore(OmniAiDbContext context, IConversatio
             if (message is not null)
             {
                 var issue = await receipts.AsNoTracking().SingleOrDefaultAsync(r => r.MessageId == message.Id, token).ConfigureAwait(false);
-                if (issue?.Status == SimulatorSendStatus.Refused)
+                if (canSend && issue?.Status == SimulatorSendStatus.Refused)
                 {
                     await DispatchAsync(address, message, SimulatorScenario.Accept, token).ConfigureAwait(false);
                     changed = true;
@@ -155,7 +192,7 @@ internal sealed class SocialSimulatorStore(OmniAiDbContext context, IConversatio
                 }
             }
         }
-        else
+        else if (canSend && !inspectOnly)
         {
             var pending = await outbound.Where(m => !receipts.Any(r => r.MessageId == m.Id))
                 .OrderBy(m => EF.Property<long>(m, PersistenceSchema.MessageIngestionSequence))
@@ -174,7 +211,7 @@ internal sealed class SocialSimulatorStore(OmniAiDbContext context, IConversatio
 
         var issues = await (from message in outbound
                             join receipt in receipts.AsNoTracking() on message.Id equals receipt.MessageId
-                            where receipt.Status != SimulatorSendStatus.Confirmed
+                            where receipt.Status == SimulatorSendStatus.Unconfirmed || receipt.Status == SimulatorSendStatus.Refused
                             orderby EF.Property<long>(message, PersistenceSchema.MessageIngestionSequence)
                             select new { message.Id, message.Sender, message.Text, receipt.Status })
             .Take(40).ToListAsync(token).ConfigureAwait(false);
@@ -189,23 +226,27 @@ internal sealed class SocialSimulatorStore(OmniAiDbContext context, IConversatio
         rows.Reverse();
         return new SimulatorMailbox(conversation.Value,
             [.. rows.Select(row => new SimulatorMessage(row.Id.Value, row.Sender.ToString(), row.Text, row.SentAt))],
-            [.. issues.Select(row => new SimulatorDeliveryIssue(row.Id.Value, row.Sender.ToString(), row.Text, row.Status.ToString()))]);
+            [.. issues.Select(row => new SimulatorDeliveryIssue(row.Id.Value, row.Sender.ToString(), row.Text, row.Status.ToString()))], ownership);
     }
 
     private async Task DispatchAsync(SimulatorAddress address, Message message, SimulatorScenario scenario, CancellationToken token)
     {
         // A crash on either side of the send leaves an uncertain attempt, never an automatic replay.
-        await context.Database.ExecuteSqlInterpolatedAsync($"""
+        int claimed = await context.Database.ExecuteSqlInterpolatedAsync($"""
             INSERT INTO messenger_simulator_receipts (message_id, status) VALUES ({message.Id.Value}, 'Unconfirmed')
             ON CONFLICT (message_id) DO UPDATE SET status = 'Unconfirmed'
             WHERE messenger_simulator_receipts.status = 'Refused'
             """, token).ConfigureAwait(false);
+        if (claimed == 0)
+        {
+            return;
+        }
         var receipt = context.Set<MessengerSimulatorReceipt>().Where(r => r.MessageId == message.Id);
-        string recipient = SocialSimulator.CustomerId(address.Agent.Value, address.Visitor);
-        var receiver = new SimulatedMessengerPage(address.Agent.Value, recipient, message, scenario,
+        string recipient = SocialSimulator.CustomerId(address.Agent.Value, address.Visitor, address.Channel);
+        var receiver = new SimulatedSocialAccount(address.Channel, address.Agent.Value, recipient, message, scenario,
             ct => receipt.ExecuteUpdateAsync(update => update.SetProperty(r => r.ReceivedAt, DateTimeOffset.UtcNow), ct));
         using var transport = new HttpMessageInvoker(receiver);
-        var status = await MessengerPageTextSender.SendAsync(transport, address.Agent.Value, recipient, message.Text, token)
+        var status = await SocialTextSender.SendAsync(transport, address.Channel, address.Agent.Value, recipient, message.Text, token)
             .ConfigureAwait(false);
         await receipt.ExecuteUpdateAsync(update => update.SetProperty(r => r.Status, status), token).ConfigureAwait(false);
     }

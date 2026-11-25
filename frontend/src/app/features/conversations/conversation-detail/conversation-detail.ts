@@ -26,6 +26,7 @@ import { ArabicFonts } from '@app/core/i18n/arabic-fonts';
 import { LocaleFormat } from '@app/core/i18n/locale-format';
 import { pluralMessage } from '@app/core/i18n/plural';
 import { NavigationHistory } from '@app/core/navigation/navigation-history';
+import { InstagramSimulatorApi } from '@app/features/channels/instagram-simulator/instagram-api';
 import { MessengerSimulatorApi } from '@app/features/channels/messenger-simulator/messenger-api';
 import { WhatsAppApi, WhatsAppConversationFacts } from '@app/features/channels/whatsapp-api';
 import { EmptyState } from '@app/shared/empty-state/empty-state';
@@ -116,6 +117,8 @@ export class ConversationDetail {
   private readonly api = inject(ConversationsApi);
   private readonly workspace = inject(WorkspaceContextService);
   private readonly permissions = inject(PermissionService);
+  private readonly instagramApi = inject(InstagramSimulatorApi);
+  protected readonly externalInstagram = signal<string | null>(null);
   private readonly simulator = inject(MessengerSimulatorApi);
   protected readonly messengerStatuses = signal<Readonly<Record<string, string>>>({});
   private readonly whatsapp = inject(WhatsAppApi);
@@ -489,16 +492,29 @@ export class ConversationDetail {
       this.signals.transcriptRead(detail.value, incomingEvents, true);
     }
 
-    if ((typeof ngDevMode === 'undefined' || ngDevMode) && detail.value.channel === 'Messenger') {
+    if (
+      (typeof ngDevMode === 'undefined' || ngDevMode) &&
+      (detail.value.channel === 'Messenger' || detail.value.channel === 'Instagram')
+    ) {
       let statuses: Readonly<Record<string, string>> = {};
+      let external = this.externalInstagram() === id;
       try {
-        statuses = await firstValueFrom(this.simulator.statuses(tenantId, id));
+        if (detail.value.channel === 'Instagram') {
+          const state = await firstValueFrom(this.instagramApi.state(tenantId, id));
+          statuses = state.statuses;
+          external = state.externalOwner;
+        } else {
+          statuses = await firstValueFrom(this.simulator.statuses(tenantId, id));
+        }
       } catch {
         // Optional local delivery diagnostics. The conversation is still readable.
       }
-      if (id === this.conversationId() && tenantId === this.workspace.tenantId())
+      if (id === this.conversationId() && tenantId === this.workspace.tenantId()) {
+        this.externalInstagram.set(external ? id : null);
         this.messengerStatuses.set(statuses);
+      }
     } else {
+      this.externalInstagram.set(null);
       this.messengerStatuses.set({});
     }
     await this.readWhatsApp(tenantId, id);

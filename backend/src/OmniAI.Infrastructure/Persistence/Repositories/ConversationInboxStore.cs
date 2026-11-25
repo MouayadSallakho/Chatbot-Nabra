@@ -224,6 +224,12 @@ internal sealed class ConversationInboxStore(OmniAiDbContext context) : IConvers
     {
         ArgumentNullException.ThrowIfNull(conversation);
 
+        if (conversation.Channel == ChannelKind.Instagram && await _context.Set<InstagramSimulatorThread>()
+            .AnyAsync(thread => thread.ConversationId == conversation.Id && thread.ExternalOwner, cancellationToken).ConfigureAwait(false))
+        {
+            throw new InstagramExternalOwnerException();
+        }
+
         // The aggregate validates the text and allocates the message; the reply
         // row records who wrote it. One save, so a stored message always has an
         // author and a stored author always has a message.

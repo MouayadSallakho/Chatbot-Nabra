@@ -38,8 +38,8 @@ export class SocialSimulatorPage {
   protected readonly heading = this.instagram
     ? $localize`:@@ig.title:Instagram Direct simulator`
     : $localize`:@@ms.title:Messenger simulator`;
-  private readonly messenger = inject(MessengerSimulatorApi);
-  private readonly api = this.instagram ? inject(InstagramSimulatorApi) : this.messenger;
+  private readonly instagramApi = inject(InstagramSimulatorApi);
+  private readonly api = this.instagram ? this.instagramApi : inject(MessengerSimulatorApi);
   private readonly workspace = inject(WorkspaceContextService);
   protected readonly format = inject(LocaleFormat);
   protected readonly agents = signal<readonly SimulatorAgent[] | null>(null);
@@ -187,6 +187,31 @@ export class SocialSimulatorPage {
       this.scenario.set(value);
   }
 
+  protected async switchOwner(): Promise<void> {
+    const tenant = this.workspace.tenantId();
+    const owner = this.mailbox()?.ownership;
+    if (!tenant || !owner || this.busy()) return;
+    const generation = this.generation;
+    this.latestRead++;
+    this.reading = false;
+    this.busy.set(true);
+    this.issue.set('');
+    this.recoveryNotice.set('');
+    try {
+      const box = await firstValueFrom(
+        this.instagramApi.ownership(tenant, this.agent(), {
+          externalOwner: !owner.externalOwner,
+          version: owner.version,
+        }),
+      );
+      if (this.current(generation)) this.show(box);
+    } catch (error) {
+      if (this.current(generation)) this.issue.set(toApiError(error).message);
+    } finally {
+      if (this.current(generation)) this.busy.set(false);
+    }
+  }
+
   protected async recover(id: string): Promise<void> {
     const tenant = this.workspace.tenantId();
     if (!tenant || !this.agent() || this.busy()) return;
@@ -197,13 +222,15 @@ export class SocialSimulatorPage {
     this.issue.set('');
     this.recoveryNotice.set('');
     try {
-      const box = await firstValueFrom(this.messenger.recover(tenant, this.agent(), id));
+      const box = await firstValueFrom(this.api.recover(tenant, this.agent(), id));
       if (this.current(generation)) {
         this.show(box);
         this.recoveryNotice.set(
           box.deliveryIssues.some((item) => item.id === id)
             ? $localize`:@@ms.noReceipt:There is no receipt yet. The reply remains on hold.`
-            : $localize`:@@ms.recovered:The simulated Page confirmed delivery.`,
+            : this.instagram
+              ? $localize`:@@ig.recovered:The Instagram test account confirmed delivery.`
+              : $localize`:@@ms.recovered:The simulated Page confirmed delivery.`,
         );
       }
     } catch (error) {
