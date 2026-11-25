@@ -121,3 +121,25 @@ textarea {
     block-size: 16rem;
   }
 }
+
+.delivery-issues,
+.delivery-item {
+  display: grid;
+  gap: var(--space-2);
+}
+.delivery-item {
+  border-block-start: 1px solid var(--color-line);
+  padding-block: var(--space-3);
+  justify-items: start;
+  min-inline-size: 0;
+}
+.delivery-item p {
+  margin: 0;
+}
+.delivery-preview {
+  max-inline-size: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text-secondary);
+}

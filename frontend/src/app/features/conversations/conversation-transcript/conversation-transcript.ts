@@ -91,6 +91,7 @@ export class ConversationTranscript {
   readonly messages = input.required<readonly TranscriptMessage[]>();
   readonly handling = input.required<ConversationHandling>();
   readonly agentName = input<string | null>(null);
+  readonly messengerStatuses = input<Readonly<Record<string, string>>>({});
   readonly whatsApp = input<WhatsAppConversationFacts | null>(null);
 
   /** What the server says happened between the messages, in transcript order. */
@@ -318,6 +319,14 @@ export class ConversationTranscript {
    * unknown, and a colleague needs to be able to see which.
    */
   protected delivery(message: TranscriptMessage): string | null {
+    switch (this.messengerStatuses()[message.id]) {
+      case 'Confirmed':
+        return 'Delivered';
+      case 'Refused':
+        return 'Failed';
+      case 'Unconfirmed':
+        return 'Unknown';
+    }
     return this.whatsApp()?.deliveryStatuses[message.id] ?? null;
   }
 

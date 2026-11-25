@@ -8,12 +8,14 @@ Nabra gives each workspace a shared customer inbox. A website visitor can ask an
 | --- | --- | --- |
 | Website chat | Hosted page, embeddable widget, local AI replies, human takeover and realtime inbox | Run the browser journeys against the local development stack |
 | WhatsApp | Local text adapter, signed webhooks, encrypted credentials, inbound deduplication, durable outbound delivery and receipts | Exchange messages with a Meta test number when the owner is ready |
-| Messenger | Local Page event batches, AI replies, team takeover and a persistent local receiver | Exercise outgoing Page requests and retries against a simulated sender |
+| Messenger | Local Page events, AI and staff replies, delivery status in the inbox and recovery of simulated sends | Validate the Page connection and transport with a Meta test Page when the owner is ready |
 | Instagram Direct | Channel label and availability indicator | Build and exercise the professional-account adapter locally |
 
 Production approval for the Meta channels is pending. The WhatsApp adapter currently defaults to Graph API v26.0. Keep that tested default for the local baseline and validate the version supported by the new Meta app before enabling live traffic.
 
 In development, run the API with `OMNIAI_DEV_AI_STANDIN=1`, apply the database migrations and open **Channels → Local testing → Messenger** in the Angular development server. The tester needs workspace management, agent viewing and inbox viewing permissions. Each active agent has a simulated Page and each tester has a customer thread per Page. The simulator collects the latest 40 messages, including replies after a team member takes over. Use a test workspace because these conversations appear in its inbox and activity figures. The simulator posts Messenger-shaped Page events to its authenticated local `page-events` endpoint. It accepts text for the selected Page and tester, preserves opaque message IDs for replay, and skips echoes, read notifications and events without text. Public Meta callbacks and sending through Facebook are pending. [Meta Messenger Page event format](https://developers.facebook.com/docs/messenger-platform/getting-started/quick-start/)
+
+Under **Delivery test for new replies**, choose confirmation, refusal or a lost confirmation. The simulator exercises the Page text request against an in-process HTTP receiver. On refusal, **Retry delivery** sends that reply once after the simulated refusal clears. On lost confirmation, **Check receipt** looks for the receiver’s recorded acceptance. An uncertain attempt stays held across restarts. The staff transcript shows the latest 40 outbound delivery states. The local receipt lookup is a simulator capability. [Meta Page messages reference](https://developers.facebook.com/docs/graph-api/reference/page/messages/)
 
 ## Repository
 

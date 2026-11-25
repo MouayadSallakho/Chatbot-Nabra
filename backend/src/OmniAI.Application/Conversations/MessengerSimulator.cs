@@ -14,14 +14,19 @@ public sealed record SimulatorAgent(Guid Id, string Name);
 public sealed record SimulatorAgentOption(Guid Id, string Name, string CustomerId);
 public sealed record SimulatorInboundText(string? SenderId, string? EventId, string? Text);
 public sealed record SimulatorMessage(Guid Id, string Sender, string Text, DateTimeOffset SentAt);
-public sealed record SimulatorMailbox(Guid? ConversationId, IReadOnlyList<SimulatorMessage> Messages);
+public enum SimulatorScenario { Accept, Refuse, LoseConfirmation }
+public sealed record SimulatorDeliveryIssue(Guid Id, string Sender, string Text, string Status);
+public sealed record SimulatorMailbox(Guid? ConversationId, IReadOnlyList<SimulatorMessage> Messages,
+    IReadOnlyList<SimulatorDeliveryIssue> DeliveryIssues);
 public sealed record SimulatorAddress(TenantId Tenant, AiAgentId Agent, Guid Visitor);
 
 public interface IMessengerSimulatorStore
 {
     Task<IReadOnlyList<SimulatorAgent>> AgentsAsync(TenantId tenant, CancellationToken token);
+    Task<IReadOnlyDictionary<Guid, string>> DeliveryStatusesAsync(TenantId tenant, ConversationId conversation, CancellationToken token);
     Task<ConversationId> ResolveAsync(SimulatorAddress address, DateTimeOffset now, CancellationToken token);
-    Task<SimulatorMailbox> ReceiveAsync(SimulatorAddress address, CancellationToken token);
+    Task<SimulatorMailbox> ReceiveAsync(SimulatorAddress address, CancellationToken token,
+        SimulatorScenario scenario = SimulatorScenario.Accept, Guid? recover = null);
 }
 
 /// <summary>A simulated Page per agent and a Page-scoped visitor per signed-in tester.</summary>
@@ -42,10 +47,19 @@ public sealed class MessengerSimulator(TenantAuthorizer authorizer, IMessengerSi
     }
 
     // A synthetic Page-scoped ID, stable across reloads without exposing an operator's user ID.
-    private static string CustomerId(Guid page, Guid visitor) =>
+    public static string CustomerId(Guid page, Guid visitor) =>
         Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes($"{page:N}/{visitor:N}")));
 
-    public async Task<SimulatorMailbox?> ReceiveAsync(Guid tenantId, Guid agentId, CancellationToken token)
+    public async Task<IReadOnlyDictionary<Guid, string>?> DeliveryStatusesAsync(Guid tenantId, Guid conversationId, CancellationToken token)
+    {
+        var tenant = TenantId.From(tenantId);
+        return await authorizer.RequireAsync(tenant, PlatformPermissions.ConversationsView, token).ConfigureAwait(false)
+            ? await store.DeliveryStatusesAsync(tenant, ConversationId.From(conversationId), token).ConfigureAwait(false)
+            : null;
+    }
+
+    public async Task<SimulatorMailbox?> ReceiveAsync(Guid tenantId, Guid agentId, CancellationToken token,
+        SimulatorScenario scenario = SimulatorScenario.Accept, Guid? recover = null)
     {
         var tenant = TenantId.From(tenantId);
         if (!await CanTestAsync(tenant, token).ConfigureAwait(false))
@@ -54,18 +68,19 @@ public sealed class MessengerSimulator(TenantAuthorizer authorizer, IMessengerSi
         }
 
         return await store.ReceiveAsync(new SimulatorAddress(tenant, AiAgentId.From(agentId),
-            authorizer.RequireCurrentUser().Value), token).ConfigureAwait(false);
+            authorizer.RequireCurrentUser().Value), token, scenario, recover).ConfigureAwait(false);
     }
 
     public Task<SimulatorMailbox?> SendAsync(Guid tenantId, Guid agentId, Guid eventId, string? text, CancellationToken token) =>
         ApplyAsync(tenantId, agentId, [new SimulatorInboundText(null, eventId == Guid.Empty ? null : eventId.ToString("N"), text)],
-            checkSender: false, token);
+            checkSender: false, SimulatorScenario.Accept, token);
 
     public Task<SimulatorMailbox?> SendPageAsync(Guid tenantId, Guid agentId, IReadOnlyList<SimulatorInboundText> messages,
-        CancellationToken token) => ApplyAsync(tenantId, agentId, messages, checkSender: true, token);
+        CancellationToken token, SimulatorScenario scenario = SimulatorScenario.Accept) =>
+        ApplyAsync(tenantId, agentId, messages, checkSender: true, scenario, token);
 
     private async Task<SimulatorMailbox?> ApplyAsync(Guid tenantId, Guid agentId, IReadOnlyList<SimulatorInboundText> messages,
-        bool checkSender, CancellationToken token)
+        bool checkSender, SimulatorScenario scenario, CancellationToken token)
     {
         var tenant = TenantId.From(tenantId);
         if (!await CanTestAsync(tenant, token).ConfigureAwait(false))
@@ -111,7 +126,7 @@ public sealed class MessengerSimulator(TenantAuthorizer authorizer, IMessengerSi
             }
         }
 
-        return await store.ReceiveAsync(address, token).ConfigureAwait(false);
+        return await store.ReceiveAsync(address, token, scenario).ConfigureAwait(false);
     }
 
     private async Task<bool> CanTestAsync(TenantId tenant, CancellationToken token) =>

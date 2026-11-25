@@ -17,7 +17,12 @@ import { LocaleFormat } from '@app/core/i18n/locale-format';
 import { toApiError } from '@app/core/api/api-error';
 import { Icon } from '@app/shared/icon/icon';
 import { PageHeader } from '@app/shared/page-header/page-header';
-import { MessengerSimulatorApi, SimulatorAgent, SimulatorMailbox } from './messenger-api';
+import {
+  DeliveryScenario,
+  MessengerSimulatorApi,
+  SimulatorAgent,
+  SimulatorMailbox,
+} from './messenger-api';
 
 @Component({
   selector: 'app-messenger-simulator',
@@ -33,10 +38,12 @@ export class MessengerSimulatorPage {
   protected readonly agents = signal<readonly SimulatorAgent[] | null>(null);
   protected readonly agent = signal('');
   protected readonly mailbox = signal<SimulatorMailbox | null>(null);
+  protected readonly scenario = signal<DeliveryScenario>('Accept');
   protected readonly draft = signal('');
   protected readonly busy = signal(false);
   protected readonly issue = signal('');
   protected readonly readIssue = signal('');
+  protected readonly recoveryNotice = signal('');
   protected readonly loadingAgents = signal(false);
   protected readonly agentName = computed(
     () => this.agents()?.find((item) => item.id === this.agent())?.name,
@@ -83,7 +90,9 @@ export class MessengerSimulatorPage {
     this.generation++;
     this.latestRead++;
     this.reading = false;
+    this.recoveryNotice.set('');
     this.agent.set('');
+    this.scenario.set('Accept');
     this.mailbox.set(null);
     this.edit('');
     this.busy.set(false);
@@ -153,7 +162,7 @@ export class MessengerSimulatorPage {
       revision = ++this.latestRead;
     this.reading = true;
     try {
-      const box = await firstValueFrom(this.api.receive(tenant, agent));
+      const box = await firstValueFrom(this.api.receive(tenant, agent, this.scenario()));
       if (this.current(generation) && revision === this.latestRead) {
         this.show(box);
         this.readIssue.set('');
@@ -166,6 +175,37 @@ export class MessengerSimulatorPage {
     }
   }
 
+  protected setScenario(value: string): void {
+    if (value === 'Accept' || value === 'Refuse' || value === 'LoseConfirmation')
+      this.scenario.set(value);
+  }
+
+  protected async recover(id: string): Promise<void> {
+    const tenant = this.workspace.tenantId();
+    if (!tenant || !this.agent() || this.busy()) return;
+    const generation = this.generation;
+    this.latestRead++;
+    this.reading = false;
+    this.busy.set(true);
+    this.issue.set('');
+    this.recoveryNotice.set('');
+    try {
+      const box = await firstValueFrom(this.api.recover(tenant, this.agent(), id));
+      if (this.current(generation)) {
+        this.show(box);
+        this.recoveryNotice.set(
+          box.deliveryIssues.some((item) => item.id === id)
+            ? $localize`:@@ms.noReceipt:There is no receipt yet. The reply remains on hold.`
+            : $localize`:@@ms.recovered:The simulated Page confirmed delivery.`,
+        );
+      }
+    } catch (error) {
+      if (this.current(generation)) this.issue.set(toApiError(error).message);
+    } finally {
+      if (this.current(generation)) this.busy.set(false);
+    }
+  }
+
   protected async send(): Promise<void> {
     const tenant = this.workspace.tenantId(),
       agent = this.agents()?.find((item) => item.id === this.agent()),
@@ -175,10 +215,13 @@ export class MessengerSimulatorPage {
     this.latestRead++;
     this.reading = false;
     this.busy.set(true);
+    this.recoveryNotice.set('');
     this.issue.set('');
     this.eventId ||= crypto.randomUUID();
     try {
-      const box = await firstValueFrom(this.api.send(tenant, agent, this.eventId, text));
+      const box = await firstValueFrom(
+        this.api.send(tenant, agent, this.eventId, text, this.scenario()),
+      );
       if (this.current(generation)) {
         this.show(box);
         this.edit('');

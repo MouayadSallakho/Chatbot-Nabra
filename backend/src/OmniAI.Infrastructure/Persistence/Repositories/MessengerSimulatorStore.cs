@@ -11,7 +11,9 @@ namespace OmniAI.Infrastructure.Persistence.Repositories;
 internal sealed class MessengerSimulatorReceipt
 {
     public MessageId MessageId { get; init; }
-    public DateTimeOffset ReceivedAt { get; init; }
+    // Receipt is written by the simulated Page independently of the sender's confirmation.
+    public DateTimeOffset? ReceivedAt { get; set; }
+    public SimulatorSendStatus Status { get; set; }
 }
 
 internal sealed class MessengerReceiptConfiguration : IEntityTypeConfiguration<MessengerSimulatorReceipt>
@@ -22,6 +24,8 @@ internal sealed class MessengerReceiptConfiguration : IEntityTypeConfiguration<M
         builder.HasKey(row => row.MessageId);
         builder.Property(row => row.MessageId).HasColumnName("message_id").HasConversion(PersistenceConverters.MessageId).ValueGeneratedNever();
         builder.Property(row => row.ReceivedAt).HasColumnName("received_at");
+        builder.Property(row => row.Status).HasColumnName("status").HasConversion<string>()
+            .HasMaxLength(16).HasDefaultValue(SimulatorSendStatus.Confirmed);
         builder.HasOne<Message>().WithOne().HasForeignKey<MessengerSimulatorReceipt>(row => row.MessageId);
     }
 }
@@ -50,7 +54,7 @@ internal sealed class MessengerSimulatorConfiguration : IEntityTypeConfiguration
     }
 }
 
-internal sealed class MessengerSimulatorStore(OmniAiDbContext context, IConversationLock locks) : IMessengerSimulatorStore
+internal sealed class MessengerSimulatorStore(OmniAiDbContext context, IConversationLock locks, IConversationRealtimeNotifier notifier) : IMessengerSimulatorStore
 {
     public async Task<IReadOnlyList<SimulatorAgent>> AgentsAsync(TenantId tenant, CancellationToken token) =>
         await context.AiAgents.AsNoTracking().Where(agent => agent.TenantId == tenant && agent.Status == AiAgentStatus.Active)
@@ -80,34 +84,105 @@ internal sealed class MessengerSimulatorStore(OmniAiDbContext context, IConversa
         return conversation.Id;
     }
 
-    public async Task<SimulatorMailbox> ReceiveAsync(SimulatorAddress address, CancellationToken token)
+    public async Task<IReadOnlyDictionary<Guid, string>> DeliveryStatusesAsync(TenantId tenant, ConversationId conversation, CancellationToken token)
+    {
+        var rows = await (from thread in context.Set<MessengerSimulatorThread>().AsNoTracking()
+                          join message in context.Set<Message>() on thread.ConversationId equals message.ConversationId
+                          join receipt in context.Set<MessengerSimulatorReceipt>() on message.Id equals receipt.MessageId
+                          where thread.TenantId == tenant && thread.ConversationId == conversation
+                          orderby EF.Property<long>(message, PersistenceSchema.MessageIngestionSequence) descending
+                          select new { message.Id, receipt.Status }).Take(40).ToListAsync(token).ConfigureAwait(false);
+        return rows.ToDictionary(row => row.Id.Value, row => row.Status.ToString());
+    }
+
+    public async Task<SimulatorMailbox> ReceiveAsync(SimulatorAddress address, CancellationToken token,
+        SimulatorScenario scenario = SimulatorScenario.Accept, Guid? recover = null)
     {
         var thread = await Threads(address).AsNoTracking().SingleOrDefaultAsync(token).ConfigureAwait(false);
         if (thread is null)
         {
-            return new SimulatorMailbox(null, []);
+            return new SimulatorMailbox(null, [], []);
         }
 
-        // The simulator is a pull transport. A committed AI or human message is available
-        // after a restart; concurrent or repeated pulls acknowledge each message only once.
-        await context.Database.ExecuteSqlInterpolatedAsync($"""
-            INSERT INTO messenger_simulator_receipts (message_id, received_at)
-            SELECT m.id, now() FROM messages m
-             WHERE m.conversation_id = {thread.ConversationId.Value} AND m.sender IN ('AiAgent', 'HumanAgent')
-               AND NOT EXISTS (SELECT 1 FROM messenger_simulator_receipts r WHERE r.message_id = m.id)
-             ORDER BY m.ingestion_sequence
-            ON CONFLICT (message_id) DO NOTHING
-            """, token).ConfigureAwait(false);
+        var conversation = thread.ConversationId;
+        var receipts = context.Set<MessengerSimulatorReceipt>();
+        var outbound = context.Set<Message>().AsNoTracking().Where(message => message.ConversationId == conversation &&
+            (message.Sender == MessageSender.AiAgent || message.Sender == MessageSender.HumanAgent));
+
+        await using var hold = await locks.AcquireAsync(conversation.Value, token).ConfigureAwait(false);
+        bool changed = false;
+        if (recover is Guid target)
+        {
+            var message = await outbound.SingleOrDefaultAsync(m => m.Id == MessageId.From(target), token).ConfigureAwait(false);
+            if (message is not null)
+            {
+                var issue = await receipts.AsNoTracking().SingleOrDefaultAsync(r => r.MessageId == message.Id, token).ConfigureAwait(false);
+                if (issue?.Status == SimulatorSendStatus.Refused)
+                {
+                    await DispatchAsync(address, message, SimulatorScenario.Accept, token).ConfigureAwait(false);
+                    changed = true;
+                }
+                else if (issue?.Status == SimulatorSendStatus.Unconfirmed && issue.ReceivedAt.HasValue)
+                {
+                    await receipts.Where(r => r.MessageId == message.Id)
+                        .ExecuteUpdateAsync(update => update.SetProperty(r => r.Status, SimulatorSendStatus.Confirmed), token)
+                        .ConfigureAwait(false);
+                    changed = true;
+                }
+            }
+        }
+        else
+        {
+            var pending = await outbound.Where(m => !receipts.Any(r => r.MessageId == m.Id))
+                .OrderBy(m => EF.Property<long>(m, PersistenceSchema.MessageIngestionSequence))
+                .Take(40).ToListAsync(token).ConfigureAwait(false);
+            foreach (var message in pending)
+            {
+                await DispatchAsync(address, message, scenario, token).ConfigureAwait(false);
+                changed = true;
+            }
+        }
+
+        if (changed)
+        {
+            await notifier.ConversationChangedAsync(address.Tenant, conversation, token).ConfigureAwait(false);
+        }
+
+        var issues = await (from message in outbound
+                            join receipt in receipts.AsNoTracking() on message.Id equals receipt.MessageId
+                            where receipt.Status != SimulatorSendStatus.Confirmed
+                            orderby EF.Property<long>(message, PersistenceSchema.MessageIngestionSequence)
+                            select new { message.Id, message.Sender, message.Text, receipt.Status })
+            .Take(40).ToListAsync(token).ConfigureAwait(false);
 
         // Never deliver system notes, author addresses, or an outbound message not yet collected.
         var rows = await context.Set<Message>().AsNoTracking()
             .Where(message => message.ConversationId == thread.ConversationId &&
-                (message.Sender == MessageSender.Customer || context.Set<MessengerSimulatorReceipt>().Any(receipt => receipt.MessageId == message.Id)))
+                (message.Sender == MessageSender.Customer || context.Set<MessengerSimulatorReceipt>().Any(receipt => receipt.MessageId == message.Id && receipt.ReceivedAt != null)))
             .OrderByDescending(message => EF.Property<long>(message, PersistenceSchema.MessageIngestionSequence))
             .Take(40).Select(message => new { message.Id, message.Sender, message.Text, message.SentAt })
             .ToListAsync(token).ConfigureAwait(false);
         rows.Reverse();
         return new SimulatorMailbox(thread.ConversationId.Value,
-            [.. rows.Select(row => new SimulatorMessage(row.Id.Value, row.Sender.ToString(), row.Text, row.SentAt))]);
+            [.. rows.Select(row => new SimulatorMessage(row.Id.Value, row.Sender.ToString(), row.Text, row.SentAt))],
+            [.. issues.Select(row => new SimulatorDeliveryIssue(row.Id.Value, row.Sender.ToString(), row.Text, row.Status.ToString()))]);
+    }
+
+    private async Task DispatchAsync(SimulatorAddress address, Message message, SimulatorScenario scenario, CancellationToken token)
+    {
+        // A crash on either side of the send leaves an uncertain attempt, never an automatic replay.
+        await context.Database.ExecuteSqlInterpolatedAsync($"""
+            INSERT INTO messenger_simulator_receipts (message_id, status) VALUES ({message.Id.Value}, 'Unconfirmed')
+            ON CONFLICT (message_id) DO UPDATE SET status = 'Unconfirmed'
+            WHERE messenger_simulator_receipts.status = 'Refused'
+            """, token).ConfigureAwait(false);
+        var receipt = context.Set<MessengerSimulatorReceipt>().Where(r => r.MessageId == message.Id);
+        string recipient = MessengerSimulator.CustomerId(address.Agent.Value, address.Visitor);
+        var receiver = new SimulatedMessengerPage(address.Agent.Value, recipient, message, scenario,
+            ct => receipt.ExecuteUpdateAsync(update => update.SetProperty(r => r.ReceivedAt, DateTimeOffset.UtcNow), ct));
+        using var transport = new HttpMessageInvoker(receiver);
+        var status = await MessengerPageTextSender.SendAsync(transport, address.Agent.Value, recipient, message.Text, token)
+            .ConfigureAwait(false);
+        await receipt.ExecuteUpdateAsync(update => update.SetProperty(r => r.Status, status), token).ConfigureAwait(false);
     }
 }

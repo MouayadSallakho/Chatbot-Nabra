@@ -30,6 +30,8 @@ test('a local Messenger customer receives AI and team replies in the same conver
   await expect(input).toHaveValue('');
   await agents.selectOption({ index });
   await expect(input).toHaveValue(first);
+  const scenario = page.locator('#sim-scenario');
+  await scenario.selectOption('LoseConfirmation');
   const [sent] = await Promise.all([
     page.waitForResponse(
       (response) =>
@@ -68,6 +70,17 @@ test('a local Messenger customer receives AI and team replies in the same conver
   await expect(post(page.request, path, mixed)).rejects.toThrow('answered 404');
   expect(await (await post(page.request, path, echoed)).json()).toEqual(mailbox);
 
+  // The receiver already has the reply despite the lost confirmation. Reconciliation
+  // clears the issue while preserving the same message ID and history.
+  const uncertain = page.locator('[data-delivery="Unconfirmed"]');
+  await expect(uncertain).toHaveCount(1);
+  await uncertain.getByRole('button').click();
+  await expect(uncertain).toHaveCount(0);
+  expect((await (await post(page.request, legacyPath + '/receive', {})).json()).messages).toEqual(
+    mailbox.messages,
+  );
+  await scenario.selectOption('Refuse');
+
   // The customer and the operator see the same conversation from different tabs.
   const inboxPath = await page.getByTestId('sim-inbox').getAttribute('href');
   expect(inboxPath).toBe('/conversations/' + mailbox.conversationId);
@@ -84,7 +97,18 @@ test('a local Messenger customer receives AI and team replies in the same conver
   await inbox.getByTestId('send-reply').click();
   await expect(inbox.getByTestId('transcript')).toContainText(reply);
   await page.bringToFront();
-  await expect(page.locator('[data-sender="HumanAgent"]')).toContainText(reply, { timeout: 12000 });
+  const refused = page.locator('[data-delivery="Refused"]');
+  await expect(refused).toContainText(reply, { timeout: 12000 });
+  await expect(inbox.locator('[data-sim-delivery="Refused"]')).toHaveCount(1, { timeout: 12000 });
+  await expect(page.locator('[data-sender="HumanAgent"]')).toHaveCount(0);
+  await page.reload();
+  await agents.selectOption({ index });
+  await expect(refused).toContainText(reply);
+  await refused.getByRole('button').click();
+  await expect(refused).toHaveCount(0);
+  await expect(inbox.locator('[data-sim-delivery="Confirmed"]')).toHaveCount(2, { timeout: 12000 });
+  await expect(page.locator('[data-sender="HumanAgent"]')).toHaveCount(1);
+  await expect(page.locator('[data-sender="HumanAgent"]')).toContainText(reply);
   await page.reload();
   await agents.selectOption({ index });
   await expect(page.locator('[data-sender="HumanAgent"]')).toContainText(reply);

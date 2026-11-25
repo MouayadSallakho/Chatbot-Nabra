@@ -26,6 +26,7 @@ import { ArabicFonts } from '@app/core/i18n/arabic-fonts';
 import { LocaleFormat } from '@app/core/i18n/locale-format';
 import { pluralMessage } from '@app/core/i18n/plural';
 import { NavigationHistory } from '@app/core/navigation/navigation-history';
+import { MessengerSimulatorApi } from '@app/features/channels/messenger-simulator/messenger-api';
 import { WhatsAppApi, WhatsAppConversationFacts } from '@app/features/channels/whatsapp-api';
 import { EmptyState } from '@app/shared/empty-state/empty-state';
 import { Icon } from '@app/shared/icon/icon';
@@ -115,6 +116,8 @@ export class ConversationDetail {
   private readonly api = inject(ConversationsApi);
   private readonly workspace = inject(WorkspaceContextService);
   private readonly permissions = inject(PermissionService);
+  private readonly simulator = inject(MessengerSimulatorApi);
+  protected readonly messengerStatuses = signal<Readonly<Record<string, string>>>({});
   private readonly whatsapp = inject(WhatsAppApi);
   private readonly realtime = inject(ConversationRealtime);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
@@ -486,6 +489,18 @@ export class ConversationDetail {
       this.signals.transcriptRead(detail.value, incomingEvents, true);
     }
 
+    if ((typeof ngDevMode === 'undefined' || ngDevMode) && detail.value.channel === 'Messenger') {
+      let statuses: Readonly<Record<string, string>> = {};
+      try {
+        statuses = await firstValueFrom(this.simulator.statuses(tenantId, id));
+      } catch {
+        // Optional local delivery diagnostics. The conversation is still readable.
+      }
+      if (id === this.conversationId() && tenantId === this.workspace.tenantId())
+        this.messengerStatuses.set(statuses);
+    } else {
+      this.messengerStatuses.set({});
+    }
     await this.readWhatsApp(tenantId, id);
   }
 

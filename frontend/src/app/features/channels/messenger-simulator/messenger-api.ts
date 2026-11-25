@@ -12,7 +12,15 @@ export interface MailboxMessage {
   readonly text: string;
   readonly sentAt: string;
 }
+export type DeliveryScenario = 'Accept' | 'Refuse' | 'LoseConfirmation';
+export interface SimulatorDeliveryIssue {
+  readonly id: string;
+  readonly sender: 'AiAgent' | 'HumanAgent';
+  readonly text: string;
+  readonly status: 'Refused' | 'Unconfirmed';
+}
 export interface SimulatorMailbox {
+  readonly deliveryIssues: readonly SimulatorDeliveryIssue[];
   readonly conversationId: string | null;
   readonly messages: readonly MailboxMessage[];
 }
@@ -26,25 +34,50 @@ export class MessengerSimulatorApi {
   agents(tenant: string) {
     return this.http.get<readonly SimulatorAgent[]>(this.url(tenant));
   }
-  receive(tenant: string, agent: string) {
-    return this.http.post<SimulatorMailbox>(this.url(tenant) + '/' + agent + '/receive', {});
+  statuses(tenant: string, conversation: string) {
+    return this.http.get<Readonly<Record<string, string>>>(
+      this.url(tenant) + '/conversations/' + conversation + '/deliveries',
+    );
   }
-  send(tenant: string, agent: SimulatorAgent, eventId: string, text: string) {
+  recover(tenant: string, agent: string, id: string) {
+    return this.http.post<SimulatorMailbox>(
+      this.url(tenant) + '/' + agent + '/deliveries/' + id + '/recover',
+      {},
+    );
+  }
+  receive(tenant: string, agent: string, scenario: DeliveryScenario) {
+    return this.http.post<SimulatorMailbox>(
+      this.url(tenant) + '/' + agent + '/receive',
+      {},
+      { params: { scenario } },
+    );
+  }
+  send(
+    tenant: string,
+    agent: SimulatorAgent,
+    eventId: string,
+    text: string,
+    scenario: DeliveryScenario,
+  ) {
     const pageId = agent.id.replaceAll('-', '');
-    return this.http.post<SimulatorMailbox>(this.url(tenant) + '/' + agent.id + '/page-events', {
-      object: 'page',
-      entry: [
-        {
-          id: pageId,
-          messaging: [
-            {
-              sender: { id: agent.customerId },
-              recipient: { id: pageId },
-              message: { mid: eventId.replaceAll('-', ''), text },
-            },
-          ],
-        },
-      ],
-    });
+    return this.http.post<SimulatorMailbox>(
+      this.url(tenant) + '/' + agent.id + '/page-events',
+      {
+        object: 'page',
+        entry: [
+          {
+            id: pageId,
+            messaging: [
+              {
+                sender: { id: agent.customerId },
+                recipient: { id: pageId },
+                message: { mid: eventId.replaceAll('-', ''), text },
+              },
+            ],
+          },
+        ],
+      },
+      { params: { scenario } },
+    );
   }
 }

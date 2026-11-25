@@ -146,7 +146,13 @@
                       exactly the kind of thing somebody who cannot rely on hue must
                       still be able to read.
                     -->
-                  <span class="bubble-delivery">
+                  <span
+                    class="bubble-delivery"
+                    [attr.data-sim-delivery]="messengerStatuses()[row.message.id] || null"
+                  >
+                    @if (messengerStatuses()[row.message.id]) {
+                      <span class="text-small text-muted" i18n="@@ms.local">Local testing</span>
+                    }
                     <span
                       class="chip chip-sm"
                       [class.chip-success]="status === 'Delivered' || status === 'Read'"

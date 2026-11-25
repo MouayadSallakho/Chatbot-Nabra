@@ -3012,9 +3012,17 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("message_id");
 
-                    b.Property<DateTimeOffset>("ReceivedAt")
+                    b.Property<DateTimeOffset?>("ReceivedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("received_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasDefaultValue("Confirmed")
+                        .HasColumnName("status");
 
                     b.HasKey("MessageId");
 

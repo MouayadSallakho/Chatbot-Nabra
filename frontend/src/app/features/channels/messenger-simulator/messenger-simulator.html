@@ -46,10 +46,70 @@
           Try again
         </button>
       }
+      @if (agent()) {
+        <label for="sim-scenario" class="text-small" i18n="@@ms.deliveryScenario"
+          >Delivery test for new replies</label
+        >
+        <select
+          id="sim-scenario"
+          class="form-select"
+          #mode
+          [value]="scenario()"
+          [disabled]="busy()"
+          (change)="setScenario(mode.value)"
+        >
+          <option value="Accept" i18n="@@ms.normal">Confirm delivery</option>
+          <option value="Refuse" i18n="@@ms.refuse">Refuse before delivery</option>
+          <option value="LoseConfirmation" i18n="@@ms.lose">
+            Lose confirmation after delivery
+          </option>
+        </select>
+      }
       @if (mailbox()?.conversationId; as id) {
         <a [routerLink]="['/conversations', id]" class="btn btn-secondary" data-testid="sim-inbox"
           ><span i18n="@@ms.inbox">Open in inbox</span><app-icon name="arrow-end"
         /></a>
+      }
+      @if (mailbox()?.deliveryIssues?.length) {
+        <section class="delivery-issues" aria-labelledby="delivery-heading">
+          <h3 class="card-title" id="delivery-heading" i18n="@@ms.issues">Replies to check</h3>
+          @for (item of mailbox()?.deliveryIssues; track item.id) {
+            <div class="delivery-item" [attr.data-delivery]="item.status">
+              <strong class="text-small">{{ voices[item.sender] }}</strong>
+              <p class="delivery-preview text-small" dir="auto">{{ item.text }}</p>
+              @if (item.status === 'Refused') {
+                <p class="text-small" i18n="@@ms.refused">
+                  The Page refused this reply. The customer has not received it.
+                </p>
+                <button
+                  type="button"
+                  class="btn btn-secondary btn-sm"
+                  [disabled]="busy()"
+                  (click)="recover(item.id)"
+                  i18n="@@ms.retryDelivery"
+                >
+                  Retry delivery
+                </button>
+              } @else {
+                <p class="text-small" i18n="@@ms.unknown">
+                  Confirmation is missing. Check the receipt before sending again.
+                </p>
+                <button
+                  type="button"
+                  class="btn btn-secondary btn-sm"
+                  [disabled]="busy()"
+                  (click)="recover(item.id)"
+                  i18n="@@ms.checkReceipt"
+                >
+                  Check receipt
+                </button>
+              }
+            </div>
+          }
+        </section>
+      }
+      @if (recoveryNotice()) {
+        <p class="text-small" role="status">{{ recoveryNotice() }}</p>
       }
     </section>
     <section class="card thread">
