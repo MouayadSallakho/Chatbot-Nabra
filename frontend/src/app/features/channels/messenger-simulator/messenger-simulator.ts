@@ -168,7 +168,7 @@ export class MessengerSimulatorPage {
 
   protected async send(): Promise<void> {
     const tenant = this.workspace.tenantId(),
-      agent = this.agent(),
+      agent = this.agents()?.find((item) => item.id === this.agent()),
       text = this.draft().trim();
     if (!tenant || !agent || !text || text.length > 2000 || this.busy()) return;
     const generation = this.generation;

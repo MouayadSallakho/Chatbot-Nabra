@@ -16,7 +16,8 @@ test('a local Messenger customer receives AI and team replies in the same conver
   const index = arabic ? 1 : 0;
   await agents.selectOption({ index });
   const agent = await agents.inputValue();
-  const path = '/api/tenants/' + e2eWorkspace().tenantId + '/messenger-simulator/' + agent;
+  const path =
+    '/api/tenants/' + e2eWorkspace().tenantId + '/messenger-simulator/' + agent + '/page-events';
   const input = page.locator('#sim-text');
   const submit = page.locator('form button[type="submit"]');
   const first = arabic ? 'مرحباً، متى يصل طلبي؟' : 'Hello, when will my order arrive?';
@@ -41,6 +42,31 @@ test('a local Messenger customer receives AI and team replies in the same conver
   await expect(page.locator('[data-sender="AiAgent"]')).toHaveCount(1);
   const duplicate = await post(page.request, path, sent.request().postDataJSON());
   expect(await duplicate.json()).toEqual(mailbox);
+  const echoed = sent.request().postDataJSON();
+  const inbound = echoed.entry[0].messaging[0];
+  // A pending request from a previous simulator version still uses the same stored key.
+  const legacyPath = path.slice(0, -'/page-events'.length);
+  const legacy = await post(page.request, legacyPath, {
+    eventId: inbound.message.mid.replace(/^(.{8})(.{4})(.{4})(.{4})(.{12})$/, '$1-$2-$3-$4-$5'),
+    text: first,
+  });
+  expect(await legacy.json()).toEqual(mailbox);
+  echoed.entry[0].messaging = [
+    {
+      sender: inbound.recipient,
+      recipient: inbound.sender,
+      message: { mid: 'echo-1', text: first, is_echo: true },
+    },
+    { sender: inbound.sender, recipient: inbound.recipient, read: { watermark: Date.now() } },
+  ];
+  expect(await (await post(page.request, path, echoed)).json()).toEqual(mailbox);
+
+  // The entire batch is checked before the first new customer turn is opened.
+  const mixed = structuredClone(echoed);
+  const newText = { ...inbound, message: { mid: 'm.batch/1+', text: 'Fixture message' } };
+  mixed.entry[0].messaging = [newText, { ...newText, sender: { id: 'another-visitor' } }];
+  await expect(post(page.request, path, mixed)).rejects.toThrow('answered 404');
+  expect(await (await post(page.request, path, echoed)).json()).toEqual(mailbox);
 
   // The customer and the operator see the same conversation from different tabs.
   const inboxPath = await page.getByTestId('sim-inbox').getAttribute('href');
@@ -74,4 +100,16 @@ test('a local Messenger customer receives AI and team replies in the same conver
       contentType: 'image/png',
     });
   }
+
+  const batch = structuredClone(echoed);
+  batch.entry[0].messaging = [
+    { ...inbound, message: { mid: 'm.opaque/1+', text: 'First batched text' } },
+    { ...inbound, message: { mid: 'm.opaque/2+', text: 'Second batched text' } },
+  ];
+  const delivered = await (await post(page.request, path, batch)).json();
+  expect(delivered.messages.slice(-2).map((m: { text: string }) => m.text)).toEqual([
+    'First batched text',
+    'Second batched text',
+  ]);
+  expect(await (await post(page.request, path, batch)).json()).toEqual(delivered);
 });

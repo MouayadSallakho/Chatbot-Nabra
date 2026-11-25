@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using OmniAI.Application.AiAgents.Persistence;
 using OmniAI.Application.Authorization;
 using OmniAI.Domain;
@@ -9,6 +11,8 @@ using OmniAI.Domain.Tenants;
 namespace OmniAI.Application.Conversations;
 
 public sealed record SimulatorAgent(Guid Id, string Name);
+public sealed record SimulatorAgentOption(Guid Id, string Name, string CustomerId);
+public sealed record SimulatorInboundText(string? SenderId, string? EventId, string? Text);
 public sealed record SimulatorMessage(Guid Id, string Sender, string Text, DateTimeOffset SentAt);
 public sealed record SimulatorMailbox(Guid? ConversationId, IReadOnlyList<SimulatorMessage> Messages);
 public sealed record SimulatorAddress(TenantId Tenant, AiAgentId Agent, Guid Visitor);
@@ -24,12 +28,22 @@ public interface IMessengerSimulatorStore
 public sealed class MessengerSimulator(TenantAuthorizer authorizer, IMessengerSimulatorStore store,
     IAiAgentRepository agents, CustomerTurnRunner turns, TimeProvider clock)
 {
-    public async Task<IReadOnlyList<SimulatorAgent>?> AgentsAsync(Guid tenantId, CancellationToken token)
+    public async Task<IReadOnlyList<SimulatorAgentOption>?> AgentsAsync(Guid tenantId, CancellationToken token)
     {
         var tenant = TenantId.From(tenantId);
-        return await CanTestAsync(tenant, token).ConfigureAwait(false)
-            ? await store.AgentsAsync(tenant, token).ConfigureAwait(false) : null;
+        if (!await CanTestAsync(tenant, token).ConfigureAwait(false))
+        {
+            return null;
+        }
+
+        var visitor = authorizer.RequireCurrentUser().Value;
+        var options = await store.AgentsAsync(tenant, token).ConfigureAwait(false);
+        return [.. options.Select(agent => new SimulatorAgentOption(agent.Id, agent.Name, CustomerId(agent.Id, visitor)))];
     }
+
+    // A synthetic Page-scoped ID, stable across reloads without exposing an operator's user ID.
+    private static string CustomerId(Guid page, Guid visitor) =>
+        Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes($"{page:N}/{visitor:N}")));
 
     public async Task<SimulatorMailbox?> ReceiveAsync(Guid tenantId, Guid agentId, CancellationToken token)
     {
@@ -43,7 +57,15 @@ public sealed class MessengerSimulator(TenantAuthorizer authorizer, IMessengerSi
             authorizer.RequireCurrentUser().Value), token).ConfigureAwait(false);
     }
 
-    public async Task<SimulatorMailbox?> SendAsync(Guid tenantId, Guid agentId, Guid eventId, string? text, CancellationToken token)
+    public Task<SimulatorMailbox?> SendAsync(Guid tenantId, Guid agentId, Guid eventId, string? text, CancellationToken token) =>
+        ApplyAsync(tenantId, agentId, [new SimulatorInboundText(null, eventId == Guid.Empty ? null : eventId.ToString("N"), text)],
+            checkSender: false, token);
+
+    public Task<SimulatorMailbox?> SendPageAsync(Guid tenantId, Guid agentId, IReadOnlyList<SimulatorInboundText> messages,
+        CancellationToken token) => ApplyAsync(tenantId, agentId, messages, checkSender: true, token);
+
+    private async Task<SimulatorMailbox?> ApplyAsync(Guid tenantId, Guid agentId, IReadOnlyList<SimulatorInboundText> messages,
+        bool checkSender, CancellationToken token)
     {
         var tenant = TenantId.From(tenantId);
         if (!await CanTestAsync(tenant, token).ConfigureAwait(false))
@@ -51,11 +73,24 @@ public sealed class MessengerSimulator(TenantAuthorizer authorizer, IMessengerSi
             return null;
         }
 
-        string content = text?.Trim() ?? string.Empty;
-        if (eventId == Guid.Empty || content.Length is 0 or > 2000 || content.Any(c => char.IsControl(c) && c is not ('\r' or '\n' or '\t')))
+        var visitor = authorizer.RequireCurrentUser().Value;
+        var customerId = CustomerId(agentId, visitor);
+        // Validate the entire batch before recording a turn. A retry after a runtime failure
+        // can then replay every completed turn by its original message ID.
+        foreach (var message in messages)
         {
-            throw new DomainValidationException("Provide an event ID and 1 to 2000 characters of text.")
-            { Code = "messenger.simulator.invalid_message" };
+            if (checkSender && !string.Equals(message.SenderId, customerId, StringComparison.Ordinal))
+            {
+                return null;
+            }
+
+            string content = message.Text?.Trim() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(message.EventId) || message.EventId.Length > 512 ||
+                content.Length is 0 or > 2000 || content.Any(c => char.IsControl(c) && c is not ('\r' or '\n' or '\t')))
+            {
+                throw new DomainValidationException("Provide a message ID and 1 to 2000 characters of text.")
+                { Code = "messenger.simulator.invalid_message" };
+            }
         }
 
         var agent = await agents.FindAsync(tenant, AiAgentId.From(agentId), token).ConfigureAwait(false);
@@ -64,12 +99,17 @@ public sealed class MessengerSimulator(TenantAuthorizer authorizer, IMessengerSi
             return null;
         }
 
-        var address = new SimulatorAddress(tenant, agent.Value.Id, authorizer.RequireCurrentUser().Value);
-        var now = clock.GetUtcNow();
-        var conversation = await store.ResolveAsync(address, now, token).ConfigureAwait(false);
-        var key = ClientMessageId.Create(SocialInboundText.Key(ChannelKind.Messenger, eventId.ToString("N")));
-        await turns.RunAsync(new CustomerTurn(tenant, conversation, agent.Value, key, content, now),
-            beforeGeneration: null, token).ConfigureAwait(false);
+        var address = new SimulatorAddress(tenant, agent.Value.Id, visitor);
+        if (messages.Count > 0)
+        {
+            var conversation = await store.ResolveAsync(address, clock.GetUtcNow(), token).ConfigureAwait(false);
+            foreach (var message in messages)
+            {
+                var key = ClientMessageId.Create(SocialInboundText.Key(ChannelKind.Messenger, message.EventId!));
+                await turns.RunAsync(new CustomerTurn(tenant, conversation, agent.Value, key, message.Text!.Trim(), clock.GetUtcNow()),
+                    beforeGeneration: null, token).ConfigureAwait(false);
+            }
+        }
 
         return await store.ReceiveAsync(address, token).ConfigureAwait(false);
     }

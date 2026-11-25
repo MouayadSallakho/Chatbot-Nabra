@@ -54,6 +54,7 @@ answer is the same for anybody and says nothing about the workspace.
 
 | Code | Status | Where | Meaning |
 | --- | --- | --- | --- |
+| `messenger.simulator.invalid_page_event` | 400 | Import local Messenger Page events | Supply a Page envelope addressed to the selected simulated Page, with up to 50 events. |
 | `messenger.simulator.invalid_message` | 400 | Simulate a Messenger text | Provide an event ID and 1–2000 characters of text. |
 | `conversations.quick_reply.text_invalid` | 400 | Save a workspace reply | Supply 1–500 characters of plain text. |
 | `conversations.quick_reply.language_invalid` | 400 | Workspace quick replies | Choose `en` or `ar`. |
