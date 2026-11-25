@@ -97,20 +97,45 @@ internal sealed class SocialSimulatorStore(OmniAiDbContext context, IConversatio
         return conversation.Id;
     }
 
-    public async Task<bool> SetOwnershipAsync(SimulatorAddress address, SimulatorOwnership requested, CancellationToken token)
+    public async Task<bool> SetOwnershipAsync(SimulatorAddress address, SimulatorOwnership requested, CancellationToken token) =>
+        await UpdateOwnerAsync(address, requested.ExternalOwner, requested.Version, null, token).ConfigureAwait(false) is not null;
+
+    public Task<string?> ApplyHandoverAsync(SimulatorAddress address, InstagramHandover notice, CancellationToken token) =>
+        UpdateOwnerAsync(address, notice.ExternalOwner, null, notice.Timestamp, token);
+
+    private async Task<string?> UpdateOwnerAsync(SimulatorAddress address, bool external, int? expectedVersion, long? eventTime, CancellationToken token)
     {
         var conversation = await ConversationFor(address).SingleOrDefaultAsync(token).ConfigureAwait(false);
         if (conversation is null)
         {
-            return false;
+            return null;
         }
         await using var hold = await locks.AcquireAsync(conversation.Value.Value, token).ConfigureAwait(false);
+        var thread = context.Set<InstagramSimulatorThread>().Where(t => t.ConversationId == conversation.Value);
+        var current = await thread.AsNoTracking().SingleAsync(token).ConfigureAwait(false);
+        bool changed = current.ExternalOwner != external;
+        if ((expectedVersion.HasValue && expectedVersion != current.OwnershipVersion) || eventTime < current.LastHandoverTimestamp)
+        {
+            return "Stale";
+        }
+        bool tied = eventTime == current.LastHandoverTimestamp;
+        if (!changed && (tied || expectedVersion.HasValue))
+        {
+            return "Duplicate";
+        }
+        // Conflicting transfers in the same millisecond have no reliable order.
+        // Pause on either arrival order until a strictly newer notification resolves ownership.
+        if (tied && !external)
+        {
+            return "Conflict";
+        }
+
+        long timestamp = eventTime ?? Math.Max(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), current.LastHandoverTimestamp + 1);
+        int version = changed ? current.OwnershipVersion + 1 : current.OwnershipVersion;
         await using var transaction = await context.Database.BeginTransactionAsync(token).ConfigureAwait(false);
-        var updated = await context.Set<InstagramSimulatorThread>()
-            .Where(t => t.ConversationId == conversation.Value && t.OwnershipVersion == requested.Version && t.ExternalOwner != requested.ExternalOwner)
-            .ExecuteUpdateAsync(u => u.SetProperty(t => t.ExternalOwner, requested.ExternalOwner)
-                .SetProperty(t => t.OwnershipVersion, t => t.OwnershipVersion + 1), token).ConfigureAwait(false);
-        if (updated > 0 && requested.ExternalOwner)
+        await thread.ExecuteUpdateAsync(u => u.SetProperty(t => t.LastHandoverTimestamp, timestamp)
+            .SetProperty(t => t.ExternalOwner, external).SetProperty(t => t.OwnershipVersion, version), token).ConfigureAwait(false);
+        if (changed && external)
         {
             // A pending reply from the previous ownership period must never leave on a later poll.
             await context.Database.ExecuteSqlInterpolatedAsync($"""
@@ -121,11 +146,11 @@ internal sealed class SocialSimulatorStore(OmniAiDbContext context, IConversatio
                 """, token).ConfigureAwait(false);
         }
         await transaction.CommitAsync(token).ConfigureAwait(false);
-        if (updated > 0)
+        if (changed)
         {
             await notifier.ConversationChangedAsync(address.Tenant, conversation.Value, token).ConfigureAwait(false);
         }
-        return true;
+        return tied ? "Conflict" : "Applied";
     }
 
     public async Task<InstagramInboxState> InstagramStateAsync(TenantId tenant, ConversationId conversation, CancellationToken token)
@@ -166,11 +191,11 @@ internal sealed class SocialSimulatorStore(OmniAiDbContext context, IConversatio
             (message.Sender == MessageSender.AiAgent || message.Sender == MessageSender.HumanAgent));
 
         await using var hold = await locks.AcquireAsync(conversation.Value, token).ConfigureAwait(false);
-        SimulatorOwnership? ownership = address.Channel == ChannelKind.Instagram
+        var ownership = address.Channel == ChannelKind.Instagram
             ? await context.Set<InstagramSimulatorThread>().Where(t => t.ConversationId == conversation)
-                .Select(t => new SimulatorOwnership(t.ExternalOwner, t.OwnershipVersion)).SingleAsync(token).ConfigureAwait(false)
+                .Select(t => new { State = new SimulatorOwnership(t.ExternalOwner, t.OwnershipVersion), t.LastHandoverTimestamp }).SingleAsync(token).ConfigureAwait(false)
             : null;
-        bool canSend = ownership?.ExternalOwner != true;
+        bool canSend = ownership?.State.ExternalOwner != true;
         bool changed = false;
         if (recover is Guid target)
         {
@@ -226,7 +251,7 @@ internal sealed class SocialSimulatorStore(OmniAiDbContext context, IConversatio
         rows.Reverse();
         return new SimulatorMailbox(conversation.Value,
             [.. rows.Select(row => new SimulatorMessage(row.Id.Value, row.Sender.ToString(), row.Text, row.SentAt))],
-            [.. issues.Select(row => new SimulatorDeliveryIssue(row.Id.Value, row.Sender.ToString(), row.Text, row.Status.ToString()))], ownership);
+            [.. issues.Select(row => new SimulatorDeliveryIssue(row.Id.Value, row.Sender.ToString(), row.Text, row.Status.ToString()))], ownership?.State, ownership?.LastHandoverTimestamp ?? 0);
     }
 
     private async Task DispatchAsync(SimulatorAddress address, Message message, SimulatorScenario scenario, CancellationToken token)

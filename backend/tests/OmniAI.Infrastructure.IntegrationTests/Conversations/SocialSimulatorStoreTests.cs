@@ -219,9 +219,49 @@ public sealed class SocialSimulatorStoreTests(PostgresTestDatabase database) : I
         Assert.Equal(new SimulatorOwnership(false, 2), resumed.Ownership);
     }
 
+    [Fact]
+    public async Task Ownership_notifications_use_event_time_and_serialize_concurrent_redelivery()
+    {
+        var world = await new AnalyticsWorld(database).StartAsync();
+        var now = DateTimeOffset.UtcNow;
+        var agent = await world.AgentAsync("Support", now);
+        var address = new SimulatorAddress(world.Tenant.Id, agent.Id, Guid.NewGuid(), ChannelKind.Instagram);
+        await using var source = NpgsqlDataSource.Create(database.ConnectionString);
+        var locks = new PostgresConversationLock(source);
+        await using var a = database.CreateContext();
+        await using var b = database.CreateContext();
+        var notifier = new TestNotifier();
+        var first = new SocialSimulatorStore(a, locks, notifier);
+        var second = new SocialSimulatorStore(b, locks, notifier);
+        await first.ResolveAsync(address, now, default);
+        var takeover = new InstagramHandover("visitor", true, 100);
+        var results = await Task.WhenAll(first.ApplyHandoverAsync(address, takeover, default), second.ApplyHandoverAsync(address, takeover, default));
+        Assert.Contains("Applied", results);
+        Assert.Contains("Duplicate", results);
+        Assert.Equal(1, notifier.Changes);
+        Assert.Equal("Stale", await second.ApplyHandoverAsync(address, new("visitor", false, 99), default));
+        Assert.Equal("Conflict", await second.ApplyHandoverAsync(address, new("visitor", false, 100), default));
+        Assert.Equal(new SimulatorOwnership(true, 1), (await second.ReceiveAsync(address, default)).Ownership);
+        Assert.Equal("Applied", await second.ApplyHandoverAsync(address, new("visitor", false, 105), default));
+        // A newer notification with the same owner still advances the ordering boundary.
+        Assert.Equal("Applied", await first.ApplyHandoverAsync(address, new("visitor", false, 110), default));
+        Assert.Equal("Stale", await second.ApplyHandoverAsync(address, new("visitor", true, 108), default));
+        Assert.Equal("Stale", await first.ApplyHandoverAsync(address, takeover, default));
+        var current = await second.ReceiveAsync(address, default);
+        Assert.Equal(110, current.LastHandoverTimestamp);
+        Assert.Equal(new SimulatorOwnership(false, 2), current.Ownership);
+        Assert.Equal(2, notifier.Changes);
+        Assert.Equal("Conflict", await first.ApplyHandoverAsync(address, new("visitor", true, 110), default));
+        Assert.Equal(new SimulatorOwnership(true, 3), (await second.ReceiveAsync(address, default)).Ownership);
+    }
+
     private sealed class TestNotifier : IConversationRealtimeNotifier
     {
+        public int Changes { get; private set; }
         public Task ConversationChangedAsync(TenantId tenantId, ConversationId conversationId, CancellationToken cancellationToken = default)
-            => Task.CompletedTask;
+        {
+            Changes++;
+            return Task.CompletedTask;
+        }
     }
 }

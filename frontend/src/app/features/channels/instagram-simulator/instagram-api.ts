@@ -4,8 +4,38 @@ import type {
   DeliveryScenario,
   SimulatorAgent,
   SimulatorMailbox,
-  SimulatorOwnership,
 } from '../messenger-simulator/messenger-api';
+
+// Mirrors the local Instagram messaging_handover fixture.
+export function handoverNotice(agent: SimulatorAgent, external: boolean, timestamp: number) {
+  const account = 'ig-account-' + agent.id.replaceAll('-', '');
+  const transfer = {
+    previous_owner_app_id: external ? '10001' : '10002',
+    new_owner_app_id: external ? '10002' : '10001',
+  };
+  return {
+    object: 'instagram',
+    entry: [
+      {
+        id: account,
+        changes: [
+          {
+            field: 'messaging_handover',
+            value: {
+              sender: { id: agent.customerId },
+              recipient: { id: account },
+              timestamp,
+              ...(external ? { take_thread_control: transfer } : { pass_thread_control: transfer }),
+            },
+          },
+        ],
+      },
+    ],
+  };
+}
+
+export type HandoverNotice = ReturnType<typeof handoverNotice>;
+export type HandoverOutcome = 'Applied' | 'Duplicate' | 'Stale' | 'Conflict';
 
 @Injectable({ providedIn: 'root' })
 export class InstagramSimulatorApi {
@@ -34,10 +64,10 @@ export class InstagramSimulatorApi {
     );
   }
 
-  ownership(tenant: string, agent: string, requested: SimulatorOwnership) {
-    return this.http.post<SimulatorMailbox>(
-      this.url(tenant) + '/' + agent + '/ownership',
-      requested,
+  notify(tenant: string, agent: string, notice: HandoverNotice) {
+    return this.http.post<{ outcome: HandoverOutcome; mailbox: SimulatorMailbox }>(
+      this.url(tenant) + '/' + agent + '/handover-events',
+      notice,
     );
   }
 

@@ -98,7 +98,35 @@ test('Instagram DMs survive replay and human takeover in their own inbox', async
 
   // External control is independent of Nabra's AI/staff switch.
   const switchOwner = page.getByTestId('ig-switch-owner');
-  await switchOwner.click();
+  const notifyPath = base + '/instagram-simulator/' + id + '/handover-events';
+  const [taken] = await Promise.all([
+    page.waitForResponse((r) => new URL(r.url()).pathname === notifyPath),
+    switchOwner.click(),
+  ]);
+  const notice = taken.request().postDataJSON();
+  const initial = await taken.json();
+  expect(initial.outcome).toBe('Applied');
+  const [duplicate] = await Promise.all([
+    page.waitForResponse((r) => new URL(r.url()).pathname === notifyPath),
+    page.getByTestId('ig-replay-takeover').click(),
+  ]);
+  expect(duplicate.request().postDataJSON()).toEqual(notice);
+  const repeated = await duplicate.json();
+  expect(repeated.outcome).toBe('Duplicate');
+  expect(repeated.mailbox).toEqual(initial.mailbox);
+  await expect(page.locator('[data-handover="Duplicate"]')).toBeVisible();
+  // A previously unseen older return must not re-enable replies.
+  const delayedReturn = structuredClone(notice);
+  const delayed = delayedReturn.entry[0].changes[0].value;
+  delayed.timestamp -= 100;
+  delayed.pass_thread_control = { previous_owner_app_id: '10002', new_owner_app_id: '10001' };
+  delete delayed.take_thread_control;
+  const discarded = await (await post(page.request, notifyPath, delayedReturn)).json();
+  expect(discarded.outcome).toBe('Stale');
+  expect(discarded.mailbox.ownership.externalOwner).toBe(true);
+  const other = structuredClone(notice);
+  other.entry[0].changes[0].value.sender.id = 'another-visitor';
+  await expect(post(page.request, notifyPath, other)).rejects.toThrow('answered 404');
   await expect(inbox.getByTestId('ig-inbox-paused')).toBeVisible({ timeout: 12000 });
   await page.reload();
   await agent.selectOption({ index });
@@ -123,11 +151,12 @@ test('Instagram DMs survive replay and human takeover in their own inbox', async
   ).rejects.toThrow('answered 409');
   await switchOwner.click();
   await expect(inbox.locator('#conversation-reply')).toBeVisible({ timeout: 12000 });
-  const stale = await post(page.request, base + '/instagram-simulator/' + id + '/ownership', {
-    externalOwner: true,
-    version: 0,
+  const late = await (await post(page.request, notifyPath, notice)).json();
+  expect(late.outcome).toBe('Stale');
+  expect(late.mailbox.ownership).toEqual({
+    externalOwner: false,
+    version: initial.mailbox.ownership.version + 1,
   });
-  expect((await stale.json()).ownership.externalOwner).toBe(false);
   await inbox.getByTestId('return-to-ai').click();
   await expect(inbox.getByTestId('take-over')).toBeVisible();
   expect(

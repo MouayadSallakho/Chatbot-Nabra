@@ -94,6 +94,23 @@
             <span i18n="@@ig.transfer">Give control to another app</span>
           }
         </button>
+        @if (takeoverNotice(); as notice) {
+          <button
+            type="button"
+            class="btn btn-quiet btn-sm"
+            data-testid="ig-replay-takeover"
+            [disabled]="busy()"
+            (click)="switchOwner(notice)"
+            i18n="@@ig.repeatTakeover"
+          >
+            Repeat takeover notification
+          </button>
+        }
+        @if (handoverOutcome(); as outcome) {
+          <p class="text-small" role="status" [attr.data-handover]="outcome">
+            {{ outcomeText[outcome] }}
+          </p>
+        }
       }
       @if (mailbox()?.conversationId; as id) {
         <a [routerLink]="['/conversations', id]" class="btn btn-secondary" data-testid="sim-inbox"

@@ -26,6 +26,10 @@ internal static class InstagramSimulatorEndpoints
         group.MapPost("/{agentId:guid}/deliveries/{messageId:guid}/recover", async (Guid tenantId, Guid agentId, Guid messageId, SocialSimulator simulator, CancellationToken token) =>
             await simulator.ReceiveAsync(tenantId, agentId, token, recover: messageId, channel: ChannelKind.Instagram).ConfigureAwait(false) is { } box
                 ? Results.Ok(box) : Results.NotFound()).Produces<SimulatorMailbox>();
+        group.MapPost("/{agentId:guid}/handover-events", async (Guid tenantId, Guid agentId, InstagramHandoverEnvelope request,
+            SocialSimulator simulator, CancellationToken token) =>
+            await simulator.ApplyInstagramHandoverAsync(tenantId, agentId, request.Read(agentId), token).ConfigureAwait(false) is { } result
+                ? Results.Ok(result) : Results.NotFound()).Produces<HandoverResult>().ProducesProblem(StatusCodes.Status400BadRequest);
         group.MapPost("/{agentId:guid}/ownership", async (Guid tenantId, Guid agentId, OwnershipChange request, SocialSimulator simulator, CancellationToken token) =>
             await simulator.SetInstagramOwnershipAsync(tenantId, agentId, new SimulatorOwnership(request.ExternalOwner, request.Version), token).ConfigureAwait(false) is { } box
                 ? Results.Ok(box) : Results.NotFound()).Produces<SimulatorMailbox>();

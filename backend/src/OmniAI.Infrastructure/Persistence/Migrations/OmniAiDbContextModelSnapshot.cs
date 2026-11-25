@@ -3030,6 +3030,12 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                         .HasDefaultValue(false)
                         .HasColumnName("external_owner");
 
+                    b.Property<long>("LastHandoverTimestamp")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValue(0L)
+                        .HasColumnName("last_handover_timestamp");
+
                     b.Property<int>("OwnershipVersion")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer")

@@ -24,6 +24,7 @@ export interface SimulatorOwnership {
   readonly version: number;
 }
 export interface SimulatorMailbox {
+  readonly lastHandoverTimestamp?: number;
   readonly ownership?: SimulatorOwnership | null;
   readonly deliveryIssues: readonly SimulatorDeliveryIssue[];
   readonly conversationId: string | null;

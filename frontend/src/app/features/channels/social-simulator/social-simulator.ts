@@ -23,7 +23,12 @@ import {
   SimulatorAgent,
   SimulatorMailbox,
 } from '../messenger-simulator/messenger-api';
-import { InstagramSimulatorApi } from '../instagram-simulator/instagram-api';
+import {
+  InstagramSimulatorApi,
+  handoverNotice,
+  type HandoverNotice,
+  type HandoverOutcome,
+} from '../instagram-simulator/instagram-api';
 
 @Component({
   selector: 'app-social-simulator',
@@ -51,6 +56,14 @@ export class SocialSimulatorPage {
   protected readonly issue = signal('');
   protected readonly readIssue = signal('');
   protected readonly recoveryNotice = signal('');
+  protected readonly takeoverNotice = signal<HandoverNotice | null>(null);
+  protected readonly handoverOutcome = signal<HandoverOutcome | null>(null);
+  protected readonly outcomeText = {
+    Applied: $localize`:@@ig.noticeApplied:Ownership notification applied.`,
+    Duplicate: $localize`:@@ig.noticeDuplicate:Duplicate notification ignored. Control is unchanged.`,
+    Stale: $localize`:@@ig.noticeStale:Older notification ignored. The latest owner keeps control.`,
+    Conflict: $localize`:@@ig.noticeConflict:Conflicting notifications have the same time. Replies remain paused.`,
+  };
   protected readonly loadingAgents = signal(false);
   protected readonly agentName = computed(
     () => this.agents()?.find((item) => item.id === this.agent())?.name,
@@ -95,6 +108,8 @@ export class SocialSimulatorPage {
 
   private reset(): void {
     this.generation++;
+    this.takeoverNotice.set(null);
+    this.handoverOutcome.set(null);
     this.latestRead++;
     this.reading = false;
     this.recoveryNotice.set('');
@@ -187,10 +202,19 @@ export class SocialSimulatorPage {
       this.scenario.set(value);
   }
 
-  protected async switchOwner(): Promise<void> {
+  protected async switchOwner(replay?: HandoverNotice): Promise<void> {
     const tenant = this.workspace.tenantId();
-    const owner = this.mailbox()?.ownership;
-    if (!tenant || !owner || this.busy()) return;
+    const agent = this.agents()?.find((a) => a.id === this.agent());
+    const mailbox = this.mailbox();
+    if (!tenant || !agent || !mailbox?.ownership || this.busy()) return;
+    const external = !mailbox.ownership.externalOwner;
+    const notice =
+      replay ??
+      handoverNotice(
+        agent,
+        external,
+        Math.max(Date.now(), (mailbox.lastHandoverTimestamp ?? 0) + 1),
+      );
     const generation = this.generation;
     this.latestRead++;
     this.reading = false;
@@ -198,13 +222,12 @@ export class SocialSimulatorPage {
     this.issue.set('');
     this.recoveryNotice.set('');
     try {
-      const box = await firstValueFrom(
-        this.instagramApi.ownership(tenant, this.agent(), {
-          externalOwner: !owner.externalOwner,
-          version: owner.version,
-        }),
-      );
-      if (this.current(generation)) this.show(box);
+      const result = await firstValueFrom(this.instagramApi.notify(tenant, agent.id, notice));
+      if (this.current(generation)) {
+        this.show(result.mailbox);
+        this.handoverOutcome.set(result.outcome);
+        if (!replay && external) this.takeoverNotice.set(notice);
+      }
     } catch (error) {
       if (this.current(generation)) this.issue.set(toApiError(error).message);
     } finally {

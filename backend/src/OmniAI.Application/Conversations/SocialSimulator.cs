@@ -17,15 +17,18 @@ public sealed record SimulatorMessage(Guid Id, string Sender, string Text, DateT
 public enum SimulatorScenario { Accept, Refuse, LoseConfirmation }
 public sealed record SimulatorDeliveryIssue(Guid Id, string Sender, string Text, string Status);
 public sealed record SimulatorOwnership(bool ExternalOwner, int Version);
+public sealed record InstagramHandover(string SenderId, bool ExternalOwner, long Timestamp);
+public sealed record HandoverResult(string Outcome, SimulatorMailbox Mailbox);
 public sealed record InstagramInboxState(bool ExternalOwner, IReadOnlyDictionary<Guid, string> Statuses);
 public sealed record SimulatorMailbox(Guid? ConversationId, IReadOnlyList<SimulatorMessage> Messages,
-    IReadOnlyList<SimulatorDeliveryIssue> DeliveryIssues, SimulatorOwnership? Ownership = null);
+    IReadOnlyList<SimulatorDeliveryIssue> DeliveryIssues, SimulatorOwnership? Ownership = null, long LastHandoverTimestamp = 0);
 public sealed record SimulatorAddress(TenantId Tenant, AiAgentId Agent, Guid Visitor, ChannelKind Channel = ChannelKind.Messenger);
 
 public interface ISocialSimulatorStore
 {
     Task<IReadOnlyList<SimulatorAgent>> AgentsAsync(TenantId tenant, CancellationToken token);
     Task<IReadOnlyDictionary<Guid, string>> DeliveryStatusesAsync(TenantId tenant, ConversationId conversation, CancellationToken token);
+    Task<string?> ApplyHandoverAsync(SimulatorAddress address, InstagramHandover notice, CancellationToken token);
     Task<bool> SetOwnershipAsync(SimulatorAddress address, SimulatorOwnership requested, CancellationToken token);
     Task<InstagramInboxState> InstagramStateAsync(TenantId tenant, ConversationId conversation, CancellationToken token);
     Task<ConversationId> ResolveAsync(SimulatorAddress address, DateTimeOffset now, CancellationToken token);
@@ -81,6 +84,31 @@ public sealed class SocialSimulator(TenantAuthorizer authorizer, ISocialSimulato
         var tenant = TenantId.From(tenantId);
         return await authorizer.RequireAsync(tenant, PlatformPermissions.ConversationsView, token).ConfigureAwait(false)
             ? await store.InstagramStateAsync(tenant, ConversationId.From(conversationId), token).ConfigureAwait(false) : null;
+    }
+
+    public async Task<HandoverResult?> ApplyInstagramHandoverAsync(Guid tenantId, Guid agentId, InstagramHandover notice, CancellationToken token)
+    {
+        var tenant = TenantId.From(tenantId);
+        if (!await CanTestAsync(tenant, token).ConfigureAwait(false))
+        {
+            return null;
+        }
+        var visitor = authorizer.RequireCurrentUser().Value;
+        if (notice.SenderId != CustomerId(agentId, visitor, ChannelKind.Instagram))
+        {
+            return null;
+        }
+        var agent = await agents.FindAsync(tenant, AiAgentId.From(agentId), token).ConfigureAwait(false);
+        if (agent is null || agent.Value.Status != AiAgentStatus.Active)
+        {
+            return null;
+        }
+        var address = new SimulatorAddress(tenant, agent.Value.Id, visitor, ChannelKind.Instagram);
+        // Control can pass before the first customer DM arrives.
+        await store.ResolveAsync(address, clock.GetUtcNow(), token).ConfigureAwait(false);
+        var outcome = await store.ApplyHandoverAsync(address, notice, token).ConfigureAwait(false);
+        return outcome is null ? null : new HandoverResult(outcome,
+            await store.ReceiveAsync(address, token, inspectOnly: true).ConfigureAwait(false));
     }
 
     public async Task<SimulatorMailbox?> SetInstagramOwnershipAsync(Guid tenantId, Guid agentId, SimulatorOwnership requested, CancellationToken token)
