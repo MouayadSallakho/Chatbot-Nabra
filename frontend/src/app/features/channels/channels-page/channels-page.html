@@ -170,6 +170,30 @@
       </ul>
     </section>
 
+    @if (canSimulate()) {
+      <section class="page-section">
+        <h2 class="text-section-title" i18n="@@ms.local">Local testing</h2>
+        <div class="card channel" data-testid="channel-messenger">
+          <div class="channel-head">
+            <span class="channel-glyph" aria-hidden="true"><app-icon name="messenger" /></span>
+            <div>
+              <h3 class="card-title">{{ words.Messenger }}</h3>
+              <p class="text-small text-secondary" i18n="@@ms.intro">
+                Send a test message as a customer and follow the reply in your workspace inbox.
+              </p>
+            </div>
+          </div>
+          <div class="channel-actions">
+            <a
+              class="btn btn-secondary btn-sm"
+              routerLink="/channels/messenger-simulator"
+              i18n="@@ms.open"
+              >Open simulator</a
+            >
+          </div>
+        </div>
+      </section>
+    }
     <!-- ----------------------------------------------------- not built yet -->
     <section class="page-section" aria-labelledby="channels-later">
       <h2 id="channels-later" class="text-section-title" i18n="@@channels.later.heading">
@@ -188,13 +212,15 @@
           <span class="later-name">{{ words.Instagram }}</span>
           <span class="chip chip-neutral" i18n="@@channels.notAvailable">Not available yet</span>
         </li>
-        <li class="later" data-testid="channel-messenger">
-          <span class="channel-glyph is-quiet" aria-hidden="true"
-            ><app-icon name="messenger"
-          /></span>
-          <span class="later-name">{{ words.Messenger }}</span>
-          <span class="chip chip-neutral" i18n="@@channels.notAvailable">Not available yet</span>
-        </li>
+        @if (!canSimulate()) {
+          <li class="later" data-testid="channel-messenger">
+            <span class="channel-glyph is-quiet" aria-hidden="true"
+              ><app-icon name="messenger"
+            /></span>
+            <span class="later-name">{{ words.Messenger }}</span>
+            <span class="chip chip-neutral" i18n="@@channels.notAvailable">Not available yet</span>
+          </li>
+        }
       </ul>
     </section>
   }

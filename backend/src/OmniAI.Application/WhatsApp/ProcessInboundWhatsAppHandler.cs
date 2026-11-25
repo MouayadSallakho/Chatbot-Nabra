@@ -1,5 +1,3 @@
-using System.Security.Cryptography;
-using System.Text;
 using OmniAI.Application.AiAgents.Persistence;
 using OmniAI.Application.Concurrency;
 using OmniAI.Application.Conversations;
@@ -147,10 +145,6 @@ public sealed class ProcessInboundWhatsAppHandler(
     /// than duplicating, and collision-free in practice because the input is
     /// already provider-unique.
     /// </remarks>
-    internal static string KeyFor(ProviderMessageId providerMessageId)
-    {
-        byte[] digest = SHA256.HashData(Encoding.UTF8.GetBytes(providerMessageId.Value));
-
-        return "wa-" + Convert.ToHexStringLower(digest)[..40];
-    }
+    internal static string KeyFor(ProviderMessageId providerMessageId) =>
+        SocialInboundText.Key(ChannelKind.WhatsApp, providerMessageId.Value);
 }

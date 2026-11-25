@@ -163,6 +163,7 @@ public static class InfrastructureServiceCollectionExtensions
             CustomerRepository>();
         services.AddScoped<IConversationInboxStore, ConversationInboxStore>();
         services.AddScoped<IQuickReplyStore, QuickReplyStore>();
+        services.AddScoped<IMessengerSimulatorStore, MessengerSimulatorStore>();
 
         // Both mint values, neither holds state, and the primitives behind them
         // are static and thread-safe -- so one instance serves every caller. They

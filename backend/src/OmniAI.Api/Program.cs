@@ -189,6 +189,10 @@ app.MapCustomerEndpoints();
 // Reading the conversations customers have actually had. Read-only in this
 // release: there is no reply, no assignment and no handoff yet.
 app.MapConversationEndpoints();
+if (app.Environment.IsDevelopment() && OmniAI.Infrastructure.Ai.StandIn.LocalAiStandInSwitch.IsEnabled(app.Configuration, true))
+{
+    app.MapMessengerSimulator();
+}
 
 // The hosted chat page's own API. Anonymous by design -- a customer has no
 // account -- and the only surface in the platform where an unauthenticated

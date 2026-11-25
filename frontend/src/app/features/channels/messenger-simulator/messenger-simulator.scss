@@ -1,0 +1,123 @@
+.back,
+.actions,
+header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.back {
+  width: fit-content;
+  margin-block-end: var(--space-3);
+}
+.sim-grid {
+  display: grid;
+  grid-template-columns: minmax(15rem, 1fr) minmax(0, 2fr);
+  gap: var(--space-4);
+  align-items: start;
+}
+.side,
+.thread {
+  min-inline-size: 0;
+}
+.side {
+  display: grid;
+  align-content: start;
+  gap: var(--space-3);
+  padding: var(--space-5);
+}
+.glyph,
+.empty app-icon {
+  display: grid;
+  place-items: center;
+  inline-size: 3rem;
+  block-size: 3rem;
+  border-radius: var(--radius-tile);
+  background: var(--color-panel-soft);
+  color: var(--color-text);
+}
+header,
+form,
+.history {
+  padding: var(--space-4);
+}
+header,
+.actions {
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+.history {
+  block-size: clamp(15rem, 43vh, 30rem);
+  overflow: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  background: var(--color-panel-soft);
+  border-block: 1px solid var(--color-line);
+}
+.empty {
+  margin: auto;
+  display: grid;
+  justify-items: center;
+  text-align: center;
+  gap: var(--space-3);
+  color: var(--color-text-secondary);
+}
+article {
+  align-self: flex-start;
+  max-inline-size: 85%;
+  border: 1px solid var(--color-line);
+  background: var(--color-panel);
+  border-radius: var(--radius-tile);
+  padding: var(--space-3);
+}
+article.own {
+  align-self: flex-end;
+  border-inline-end: 3px solid var(--color-text-secondary);
+}
+article p {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin: 0;
+}
+.by {
+  font: var(--text-caption);
+  color: var(--color-text-secondary);
+  margin-block-end: var(--space-1);
+}
+form {
+  display: grid;
+  gap: var(--space-2);
+}
+textarea,
+select {
+  inline-size: 100%;
+  min-inline-size: 0;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-tile);
+  padding: var(--space-2);
+  background: var(--color-panel);
+  color: var(--color-text);
+  font: inherit;
+}
+select {
+  appearance: auto;
+}
+textarea {
+  resize: vertical;
+}
+@media (max-width: 48rem) {
+  .sim-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .side {
+    gap: var(--space-2);
+    padding: var(--space-3);
+  }
+  .side .glyph {
+    display: none;
+  }
+  .history {
+    block-size: 16rem;
+  }
+}

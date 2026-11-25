@@ -1,0 +1,77 @@
+import { post } from './support/api';
+import { directionOf, e2eWorkspace, expect, signedInTest as test } from './support/fixtures';
+
+test('a local Messenger customer receives AI and team replies in the same conversation', async ({
+  page,
+  appLanguage,
+}, info) => {
+  const arabic = appLanguage === 'ar';
+  await page.emulateMedia({ colorScheme: arabic ? 'dark' : 'light' });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/channels');
+  await page.locator('a[href="/channels/messenger-simulator"]').click();
+  await expect(page.locator('html')).toHaveAttribute('dir', directionOf(appLanguage));
+  const agents = page.locator('#sim-agent');
+  await expect(agents.locator('option')).toHaveCount(2);
+  const index = arabic ? 1 : 0;
+  await agents.selectOption({ index });
+  const agent = await agents.inputValue();
+  const path = '/api/tenants/' + e2eWorkspace().tenantId + '/messenger-simulator/' + agent;
+  const input = page.locator('#sim-text');
+  const submit = page.locator('form button[type="submit"]');
+  const first = arabic ? 'مرحباً، متى يصل طلبي؟' : 'Hello, when will my order arrive?';
+  const second = arabic ? 'هل يمكن تغيير وقت التوصيل؟' : 'Can I change the delivery time?';
+  const reply = arabic
+    ? 'نعم، سأرتب معك موعداً جديداً.'
+    : 'Yes, I can arrange another delivery time with you.';
+  await input.fill(first);
+  await agents.selectOption({ index: 1 - index });
+  await expect(input).toHaveValue('');
+  await agents.selectOption({ index });
+  await expect(input).toHaveValue(first);
+  const [sent] = await Promise.all([
+    page.waitForResponse(
+      (response) =>
+        new URL(response.url()).pathname === path && response.request().method() === 'POST',
+    ),
+    submit.click(),
+  ]);
+  expect(sent.status()).toBe(200);
+  const mailbox = await sent.json();
+  await expect(page.locator('[data-sender="AiAgent"]')).toHaveCount(1);
+  const duplicate = await post(page.request, path, sent.request().postDataJSON());
+  expect(await duplicate.json()).toEqual(mailbox);
+
+  // The customer and the operator see the same conversation from different tabs.
+  const inboxPath = await page.getByTestId('sim-inbox').getAttribute('href');
+  expect(inboxPath).toBe('/conversations/' + mailbox.conversationId);
+  const inbox = await page.context().newPage();
+  await inbox.goto(inboxPath!);
+  await inbox.getByTestId('take-over').click();
+  await expect(inbox.getByTestId('return-to-ai')).toBeVisible();
+  await input.fill(second);
+  await submit.click();
+  await expect(page.locator('[data-sender="Customer"]').last()).toContainText(second);
+  await expect(page.locator('[data-sender="AiAgent"]')).toHaveCount(1);
+  await expect(inbox.getByTestId('transcript')).toContainText(second);
+  await inbox.locator('#conversation-reply').fill(reply);
+  await inbox.getByTestId('send-reply').click();
+  await expect(inbox.getByTestId('transcript')).toContainText(reply);
+  await page.bringToFront();
+  await expect(page.locator('[data-sender="HumanAgent"]')).toContainText(reply, { timeout: 12000 });
+  await page.reload();
+  await agents.selectOption({ index });
+  await expect(page.locator('[data-sender="HumanAgent"]')).toContainText(reply);
+  await expect(page.locator('[data-sender]')).toHaveCount(4);
+  for (const width of [1440, 390]) {
+    await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
+    await expect
+      .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
+      .toBeLessThanOrEqual(width);
+    if (width === 390) await submit.scrollIntoViewIfNeeded();
+    await info.attach('messenger-' + width, {
+      body: await page.screenshot({ fullPage: true }),
+      contentType: 'image/png',
+    });
+  }
+});

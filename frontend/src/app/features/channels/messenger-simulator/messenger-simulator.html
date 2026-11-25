@@ -1,0 +1,135 @@
+<div class="page page-calm">
+  <a class="back text-small" routerLink="/channels"
+    ><app-icon name="arrow-start" /><span i18n="@@channels.heading">Channels</span></a
+  >
+  <app-page-header
+    heading="Messenger simulator"
+    i18n-heading="@@ms.title"
+    description="Test a local conversation from the customer’s side. Messages appear in this workspace’s inbox."
+    i18n-description="@@ms.description"
+  />
+  <div class="sim-grid">
+    <section class="card side">
+      <span class="glyph" aria-hidden="true"><app-icon name="messenger" /></span>
+      <h2 class="card-title" i18n="@@ms.page">Simulated Page</h2>
+      <p class="text-small text-secondary" i18n="@@ms.pageHint">
+        Each active agent has a test Page. Your account has a separate test customer on each Page.
+      </p>
+      @if (loadingAgents()) {
+        <p role="status" i18n="@@ms.loading">Loading agents…</p>
+      } @else if (agents()?.length) {
+        <label for="sim-agent" class="text-small" i18n="@@ms.route">Answering agent</label>
+        <select
+          id="sim-agent"
+          #choice
+          class="form-select"
+          [value]="agent()"
+          [disabled]="busy()"
+          (change)="select(choice.value)"
+        >
+          @for (item of agents(); track item.id) {
+            <option [value]="item.id">{{ item.name }}</option>
+          }
+        </select>
+      } @else if (agents()) {
+        <p i18n="@@ms.noAgent">Activate an AI agent to start testing.</p>
+        <a routerLink="/ai-agents" class="btn btn-secondary btn-sm" i18n="@@ms.agents"
+          >Open agents</a
+        >
+      } @else if (issue()) {
+        <button
+          type="button"
+          class="btn btn-secondary btn-sm"
+          (click)="loadAgents()"
+          i18n="@@ms.retry"
+        >
+          Try again
+        </button>
+      }
+      @if (mailbox()?.conversationId; as id) {
+        <a [routerLink]="['/conversations', id]" class="btn btn-secondary" data-testid="sim-inbox"
+          ><span i18n="@@ms.inbox">Open in inbox</span><app-icon name="arrow-end"
+        /></a>
+      }
+    </section>
+    <section class="card thread">
+      <header>
+        <div>
+          <h2 class="card-title" i18n="@@ms.thread">Customer conversation</h2>
+          @if (agentName()) {
+            <span class="text-small text-secondary" dir="auto">{{ agentName() }}</span>
+          }
+        </div>
+        <span class="chip chip-neutral" i18n="@@ms.local">Local testing</span>
+      </header>
+      <div
+        #history
+        class="history"
+        role="log"
+        aria-live="polite"
+        aria-label="Customer conversation"
+        i18n-aria-label="@@ms.thread"
+      >
+        @for (message of mailbox()?.messages; track message.id) {
+          <article [class.own]="message.sender === 'Customer'" [attr.data-sender]="message.sender">
+            <div class="by">{{ voices[message.sender] }}</div>
+            <p dir="auto">{{ message.text }}</p>
+          </article>
+        } @empty {
+          @if (agent() && !readIssue()) {
+            <div class="empty">
+              <app-icon name="messenger" />
+              @if (mailbox()) {
+                <p i18n="@@ms.empty">Send the first message to start the conversation.</p>
+              } @else {
+                <p role="status" i18n="@@ms.loadingThread">Loading conversation…</p>
+              }
+            </div>
+          }
+        }
+      </div>
+      @if (readIssue()) {
+        <p role="alert">
+          {{ readIssue() }}
+          <button type="button" class="btn btn-quiet btn-sm" (click)="refresh()" i18n="@@ms.retry">
+            Try again
+          </button>
+        </p>
+      }
+      <form (submit)="$event.preventDefault(); send()">
+        <label class="text-small" for="sim-text" i18n="@@ms.write"
+          >Message from the test customer</label
+        >
+        <textarea
+          #box
+          id="sim-text"
+          dir="auto"
+          rows="2"
+          maxlength="2000"
+          [disabled]="!agent()"
+          [readOnly]="busy()"
+          [value]="draft()"
+          (input)="edit(box.value)"
+        ></textarea>
+        <div class="actions">
+          <span class="text-caption" dir="ltr" aria-hidden="true"
+            >{{ format.number(draft().length) }} / {{ format.number(2000) }}</span
+          ><button
+            type="submit"
+            class="btn btn-primary"
+            [disabled]="!agent() || !draft().trim() || busy()"
+          >
+            @if (busy()) {
+              <span i18n="@@ms.sending">Sending…</span>
+            } @else {
+              <span i18n="@@ms.send">Send test message</span>
+            }
+          </button>
+        </div>
+      </form>
+    </section>
+  </div>
+  @if (issue()) {
+    <p class="alert alert-danger" role="alert">{{ issue() }}</p>
+  }
+</div>

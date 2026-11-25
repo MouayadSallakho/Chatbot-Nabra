@@ -2,6 +2,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   OnInit,
+  effect,
   computed,
   inject,
   signal,
@@ -16,6 +17,7 @@ import { EmptyState } from '@app/shared/empty-state/empty-state';
 import { Icon } from '@app/shared/icon/icon';
 import { PageHeader } from '@app/shared/page-header/page-header';
 import { WebChatAdminApi } from '../website-chat-api';
+import { MessengerSimulatorApi } from '../messenger-simulator/messenger-api';
 import { WhatsAppApi } from '../whatsapp-api';
 
 /** One built channel's real state, read from its own list. */
@@ -44,10 +46,7 @@ interface WhatsAppFacts {
  * not website chat sees one card with figures and one that says so. A list that
  * fails to load says "Not checked", never zero.
  *
- * <strong>Two are not built, and say so.</strong> Instagram and Messenger are
- * listed as not available yet, with no button and no link: a dead control, or a
- * page that looks like an unfinished configuration, would be a promise the
- * product cannot keep.
+ * Local Messenger testing appears when the development API exposes it.
  */
 @Component({
   selector: 'app-channels-page',
@@ -62,6 +61,17 @@ export class ChannelsPage implements OnInit {
   private readonly webChat = inject(WebChatAdminApi);
   private readonly whatsApp = inject(WhatsAppApi);
 
+  private readonly simulator = inject(MessengerSimulatorApi);
+  protected readonly simulatorTenant = signal<string | null>(null);
+  protected readonly canSimulate = computed(
+    () =>
+      this.simulatorTenant() !== null &&
+      this.simulatorTenant() === this.workspace.tenantId() &&
+      this.permissions.has('workspace.manage') &&
+      this.permissions.has('ai-agents.view') &&
+      this.permissions.has('conversations.view'),
+  );
+
   protected readonly words = CHANNEL_WORDS;
 
   protected readonly canViewWebChat = computed(() => this.permissions.has('website-chat.view'));
@@ -74,7 +84,9 @@ export class ChannelsPage implements OnInit {
    * not website chat still needs a way in, and each channel's own screen decides
    * what they may do once there.
    */
-  protected readonly canView = computed(() => this.canViewWebChat() || this.canViewWhatsApp());
+  protected readonly canView = computed(
+    () => this.canViewWebChat() || this.canViewWhatsApp() || this.canSimulate(),
+  );
 
   protected readonly webChatState = signal<ChannelState<WebChatFacts>>({ kind: 'loading' });
   protected readonly whatsAppState = signal<ChannelState<WhatsAppFacts>>({ kind: 'loading' });
@@ -90,6 +102,26 @@ export class ChannelsPage implements OnInit {
 
     return state.kind === 'ready' ? state.value : null;
   });
+
+  constructor() {
+    effect((onCleanup) => {
+      const tenant = this.workspace.tenantId();
+      this.simulatorTenant.set(null);
+      if (
+        (typeof ngDevMode === 'undefined' || ngDevMode) &&
+        tenant &&
+        this.permissions.has('workspace.manage') &&
+        this.permissions.has('ai-agents.view') &&
+        this.permissions.has('conversations.view')
+      ) {
+        const subscription = this.simulator.agents(tenant).subscribe({
+          next: () => this.simulatorTenant.set(tenant),
+          error: () => this.simulatorTenant.set(null),
+        });
+        onCleanup(() => subscription.unsubscribe());
+      }
+    });
+  }
 
   ngOnInit(): void {
     void this.loadWebChat();

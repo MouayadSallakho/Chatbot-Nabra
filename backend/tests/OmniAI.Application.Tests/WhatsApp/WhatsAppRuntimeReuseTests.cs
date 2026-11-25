@@ -42,6 +42,16 @@ public sealed class WhatsAppRuntimeReuseTests
     }
 
     [Fact]
+    public async Task An_inbound_turn_uses_the_same_persisted_key_as_existing_WhatsApp_conversations()
+    {
+        Scenario scenario = Scenario.Build();
+        await scenario.ProcessAsync("wamid.LEGACY==", "Hello");
+
+        var existingKey = ClientMessageId.Create("wa-8be6bff213187dac513c4369004d267931d84368");
+        Assert.NotNull(await scenario.Harness.World.FindTurnAsync(scenario.Conversation.Id, existingKey));
+    }
+
+    [Fact]
     public async Task A_redelivered_message_is_replayed_and_never_answered_twice()
     {
         Scenario scenario = Scenario.Build();

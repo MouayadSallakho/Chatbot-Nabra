@@ -53,6 +53,18 @@ export const channelRoutes: Routes = [
             (m) => m.WebsiteChatDetail,
           ),
       },
+      ...(typeof ngDevMode === 'undefined' || ngDevMode
+        ? [
+            {
+              path: 'messenger-simulator',
+              title: $localize`:@@ms.title:Messenger simulator`,
+              loadComponent: () =>
+                import('./messenger-simulator/messenger-simulator').then(
+                  (m) => m.MessengerSimulatorPage,
+                ),
+            },
+          ]
+        : []),
       {
         path: 'whatsapp',
         title: $localize`:@@title.whatsApp:WhatsApp`,
