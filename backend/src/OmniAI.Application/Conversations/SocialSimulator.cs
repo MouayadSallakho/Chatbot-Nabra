@@ -18,9 +18,9 @@ public enum SimulatorScenario { Accept, Refuse, LoseConfirmation }
 public sealed record SimulatorDeliveryIssue(Guid Id, string Sender, string Text, string Status);
 public sealed record SimulatorMailbox(Guid? ConversationId, IReadOnlyList<SimulatorMessage> Messages,
     IReadOnlyList<SimulatorDeliveryIssue> DeliveryIssues);
-public sealed record SimulatorAddress(TenantId Tenant, AiAgentId Agent, Guid Visitor);
+public sealed record SimulatorAddress(TenantId Tenant, AiAgentId Agent, Guid Visitor, ChannelKind Channel = ChannelKind.Messenger);
 
-public interface IMessengerSimulatorStore
+public interface ISocialSimulatorStore
 {
     Task<IReadOnlyList<SimulatorAgent>> AgentsAsync(TenantId tenant, CancellationToken token);
     Task<IReadOnlyDictionary<Guid, string>> DeliveryStatusesAsync(TenantId tenant, ConversationId conversation, CancellationToken token);
@@ -29,11 +29,11 @@ public interface IMessengerSimulatorStore
         SimulatorScenario scenario = SimulatorScenario.Accept, Guid? recover = null);
 }
 
-/// <summary>A simulated Page per agent and a Page-scoped visitor per signed-in tester.</summary>
-public sealed class MessengerSimulator(TenantAuthorizer authorizer, IMessengerSimulatorStore store,
+/// <summary>Runs authenticated test-customer turns through the same inbox workflow as other channels.</summary>
+public sealed class SocialSimulator(TenantAuthorizer authorizer, ISocialSimulatorStore store,
     IAiAgentRepository agents, CustomerTurnRunner turns, TimeProvider clock)
 {
-    public async Task<IReadOnlyList<SimulatorAgentOption>?> AgentsAsync(Guid tenantId, CancellationToken token)
+    public async Task<IReadOnlyList<SimulatorAgentOption>?> AgentsAsync(Guid tenantId, CancellationToken token, ChannelKind channel = ChannelKind.Messenger)
     {
         var tenant = TenantId.From(tenantId);
         if (!await CanTestAsync(tenant, token).ConfigureAwait(false))
@@ -43,12 +43,13 @@ public sealed class MessengerSimulator(TenantAuthorizer authorizer, IMessengerSi
 
         var visitor = authorizer.RequireCurrentUser().Value;
         var options = await store.AgentsAsync(tenant, token).ConfigureAwait(false);
-        return [.. options.Select(agent => new SimulatorAgentOption(agent.Id, agent.Name, CustomerId(agent.Id, visitor)))];
+        return [.. options.Select(agent => new SimulatorAgentOption(agent.Id, agent.Name, CustomerId(agent.Id, visitor, channel)))];
     }
 
     // A synthetic Page-scoped ID, stable across reloads without exposing an operator's user ID.
-    public static string CustomerId(Guid page, Guid visitor) =>
-        Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes($"{page:N}/{visitor:N}")));
+    public static string CustomerId(Guid page, Guid visitor, ChannelKind channel = ChannelKind.Messenger) =>
+        Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(
+            channel == ChannelKind.Instagram ? $"instagram/{page:N}/{visitor:N}" : $"{page:N}/{visitor:N}")));
 
     public async Task<IReadOnlyDictionary<Guid, string>?> DeliveryStatusesAsync(Guid tenantId, Guid conversationId, CancellationToken token)
     {
@@ -59,7 +60,7 @@ public sealed class MessengerSimulator(TenantAuthorizer authorizer, IMessengerSi
     }
 
     public async Task<SimulatorMailbox?> ReceiveAsync(Guid tenantId, Guid agentId, CancellationToken token,
-        SimulatorScenario scenario = SimulatorScenario.Accept, Guid? recover = null)
+        SimulatorScenario scenario = SimulatorScenario.Accept, Guid? recover = null, ChannelKind channel = ChannelKind.Messenger)
     {
         var tenant = TenantId.From(tenantId);
         if (!await CanTestAsync(tenant, token).ConfigureAwait(false))
@@ -68,19 +69,22 @@ public sealed class MessengerSimulator(TenantAuthorizer authorizer, IMessengerSi
         }
 
         return await store.ReceiveAsync(new SimulatorAddress(tenant, AiAgentId.From(agentId),
-            authorizer.RequireCurrentUser().Value), token, scenario, recover).ConfigureAwait(false);
+            authorizer.RequireCurrentUser().Value, channel), token, scenario, recover).ConfigureAwait(false);
     }
 
     public Task<SimulatorMailbox?> SendAsync(Guid tenantId, Guid agentId, Guid eventId, string? text, CancellationToken token) =>
         ApplyAsync(tenantId, agentId, [new SimulatorInboundText(null, eventId == Guid.Empty ? null : eventId.ToString("N"), text)],
-            checkSender: false, SimulatorScenario.Accept, token);
+            checkSender: false, ChannelKind.Messenger, SimulatorScenario.Accept, token);
 
     public Task<SimulatorMailbox?> SendPageAsync(Guid tenantId, Guid agentId, IReadOnlyList<SimulatorInboundText> messages,
         CancellationToken token, SimulatorScenario scenario = SimulatorScenario.Accept) =>
-        ApplyAsync(tenantId, agentId, messages, checkSender: true, scenario, token);
+        ApplyAsync(tenantId, agentId, messages, checkSender: true, ChannelKind.Messenger, scenario, token);
+
+    public Task<SimulatorMailbox?> SendInstagramAsync(Guid tenantId, Guid agentId, IReadOnlyList<SimulatorInboundText> messages, CancellationToken token) =>
+        ApplyAsync(tenantId, agentId, messages, checkSender: true, ChannelKind.Instagram, SimulatorScenario.Accept, token);
 
     private async Task<SimulatorMailbox?> ApplyAsync(Guid tenantId, Guid agentId, IReadOnlyList<SimulatorInboundText> messages,
-        bool checkSender, SimulatorScenario scenario, CancellationToken token)
+        bool checkSender, ChannelKind channel, SimulatorScenario scenario, CancellationToken token)
     {
         var tenant = TenantId.From(tenantId);
         if (!await CanTestAsync(tenant, token).ConfigureAwait(false))
@@ -89,7 +93,7 @@ public sealed class MessengerSimulator(TenantAuthorizer authorizer, IMessengerSi
         }
 
         var visitor = authorizer.RequireCurrentUser().Value;
-        var customerId = CustomerId(agentId, visitor);
+        var customerId = CustomerId(agentId, visitor, channel);
         // Validate the entire batch before recording a turn. A retry after a runtime failure
         // can then replay every completed turn by its original message ID.
         foreach (var message in messages)
@@ -104,7 +108,7 @@ public sealed class MessengerSimulator(TenantAuthorizer authorizer, IMessengerSi
                 content.Length is 0 or > 2000 || content.Any(c => char.IsControl(c) && c is not ('\r' or '\n' or '\t')))
             {
                 throw new DomainValidationException("Provide a message ID and 1 to 2000 characters of text.")
-                { Code = "messenger.simulator.invalid_message" };
+                { Code = channel == ChannelKind.Instagram ? "instagram.simulator.invalid_message" : "messenger.simulator.invalid_message" };
             }
         }
 
@@ -114,13 +118,13 @@ public sealed class MessengerSimulator(TenantAuthorizer authorizer, IMessengerSi
             return null;
         }
 
-        var address = new SimulatorAddress(tenant, agent.Value.Id, visitor);
+        var address = new SimulatorAddress(tenant, agent.Value.Id, visitor, channel);
         if (messages.Count > 0)
         {
             var conversation = await store.ResolveAsync(address, clock.GetUtcNow(), token).ConfigureAwait(false);
             foreach (var message in messages)
             {
-                var key = ClientMessageId.Create(SocialInboundText.Key(ChannelKind.Messenger, message.EventId!));
+                var key = ClientMessageId.Create(SocialInboundText.Key(channel, message.EventId!));
                 await turns.RunAsync(new CustomerTurn(tenant, conversation, agent.Value, key, message.Text!.Trim(), clock.GetUtcNow()),
                     beforeGeneration: null, token).ConfigureAwait(false);
             }

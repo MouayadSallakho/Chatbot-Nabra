@@ -13,6 +13,7 @@ internal static class SocialInboundText
         {
             ChannelKind.WhatsApp => "wa-",
             ChannelKind.Messenger => "ms-",
+            ChannelKind.Instagram => "ig-",
             _ => throw new ArgumentOutOfRangeException(nameof(channel)),
         };
         byte[] digest = SHA256.HashData(Encoding.UTF8.GetBytes(providerId));

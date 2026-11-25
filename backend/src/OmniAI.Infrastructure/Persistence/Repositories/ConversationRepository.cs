@@ -40,6 +40,25 @@ internal sealed class ConversationRepository(OmniAiDbContext context) : IConvers
     private readonly OmniAiDbContext _context =
         context ?? throw new ArgumentNullException(nameof(context));
 
+    private sealed class InboxAgent
+    {
+        public ConversationId ConversationId { get; init; }
+        public required string Name { get; init; }
+    }
+
+    private IQueryable<InboxAgent> InboxAgentNames(TenantId tenant)
+    {
+        var bindings = _context.WebChatSessions.Where(s => s.TenantId == tenant)
+            .Select(s => new { s.ConversationId, AgentId = s.AiAgentId })
+            .Concat(_context.Set<MessengerSimulatorThread>().Where(s => s.TenantId == tenant)
+                .Select(s => new { s.ConversationId, s.AgentId }))
+            .Concat(_context.Set<InstagramSimulatorThread>().Where(s => s.TenantId == tenant)
+                .Select(s => new { s.ConversationId, s.AgentId }));
+        return from binding in bindings
+               join agent in _context.AiAgents.Where(a => a.TenantId == tenant) on binding.AgentId equals agent.Id
+               select new InboxAgent { ConversationId = binding.ConversationId, Name = agent.Name.Value };
+    }
+
     public async Task<IReadOnlyList<ConversationMessageAuthor>> ListAssignedMembersAsync(
         TenantId tenantId, CancellationToken cancellationToken)
     {
@@ -147,6 +166,7 @@ internal sealed class ConversationRepository(OmniAiDbContext context) : IConvers
         // Most recently active first, with the id as a tie-break so two
         // conversations sharing an instant never swap places between pages and
         // hide a row or show one twice.
+        var agentsForInbox = InboxAgentNames(tenantId);
         var rows = await owned
             .OrderByDescending(handled => handled.Conversation.LastActivityAt)
             .ThenByDescending(handled => handled.Conversation.Id)
@@ -161,14 +181,8 @@ internal sealed class ConversationRepository(OmniAiDbContext context) : IConvers
                     handled.Conversation.Handling,
                     handled.Conversation.StartedAt,
                     handled.Conversation.LastActivityAt,
-                    _context.WebChatSessions
-                        .Where(session => session.ConversationId == handled.Conversation.Id)
-                        .Join(
-                            _context.AiAgents,
-                            session => session.AiAgentId,
-                            agent => agent.Id,
-                            (session, agent) => agent.Name.Value)
-                        .FirstOrDefault(),
+                    agentsForInbox.Where(binding => binding.ConversationId == handled.Conversation.Id)
+                        .Select(binding => binding.Name).FirstOrDefault(),
                     handled.Conversation.Messages.Count,
 
                     // The newest message by ingestion order, cut to a preview length.
@@ -367,6 +381,7 @@ internal sealed class ConversationRepository(OmniAiDbContext context) : IConvers
         // tracked entry, because this query is deliberately untracked: a list
         // screen reading a hundred conversations should not populate a change
         // tracker it will never save.
+        var agentsForInbox = InboxAgentNames(tenantId);
         var row = await WithHandlingFacts(
                 _context.Conversations
                     .AsNoTracking()
@@ -381,14 +396,8 @@ internal sealed class ConversationRepository(OmniAiDbContext context) : IConvers
                     handled.Conversation.Handling,
                     handled.Conversation.StartedAt,
                     handled.Conversation.LastActivityAt,
-                    _context.WebChatSessions
-                        .Where(session => session.ConversationId == handled.Conversation.Id)
-                        .Join(
-                            _context.AiAgents,
-                            session => session.AiAgentId,
-                            agent => agent.Id,
-                            (session, agent) => agent.Name.Value)
-                        .FirstOrDefault(),
+                    agentsForInbox.Where(binding => binding.ConversationId == handled.Conversation.Id)
+                        .Select(binding => binding.Name).FirstOrDefault(),
                     handled.Conversation.Messages.Count,
                     AssignedTo: null),
                 Assigned = handled.Conversation.AssignedTo,

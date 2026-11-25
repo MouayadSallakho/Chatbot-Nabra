@@ -54,32 +54,44 @@ internal sealed class MessengerSimulatorConfiguration : IEntityTypeConfiguration
     }
 }
 
-internal sealed class MessengerSimulatorStore(OmniAiDbContext context, IConversationLock locks, IConversationRealtimeNotifier notifier) : IMessengerSimulatorStore
+internal sealed class SocialSimulatorStore(OmniAiDbContext context, IConversationLock locks, IConversationRealtimeNotifier notifier) : ISocialSimulatorStore
 {
     public async Task<IReadOnlyList<SimulatorAgent>> AgentsAsync(TenantId tenant, CancellationToken token) =>
         await context.AiAgents.AsNoTracking().Where(agent => agent.TenantId == tenant && agent.Status == AiAgentStatus.Active)
             .OrderBy(agent => agent.Id).Select(agent => new SimulatorAgent(agent.Id.Value, agent.Name.Value))
             .ToListAsync(token).ConfigureAwait(false);
 
-    private IQueryable<MessengerSimulatorThread> Threads(SimulatorAddress address) =>
-        context.Set<MessengerSimulatorThread>().Where(row => row.TenantId == address.Tenant && row.AgentId == address.Agent && row.Visitor == address.Visitor);
+    private IQueryable<ConversationId?> ConversationFor(SimulatorAddress address) =>
+        address.Channel == ChannelKind.Instagram
+            ? context.Set<InstagramSimulatorThread>().Where(r => r.TenantId == address.Tenant && r.AgentId == address.Agent && r.Visitor == address.Visitor)
+                .Select(r => (ConversationId?)r.ConversationId)
+            : context.Set<MessengerSimulatorThread>().Where(r => r.TenantId == address.Tenant && r.AgentId == address.Agent && r.Visitor == address.Visitor)
+                .Select(r => (ConversationId?)r.ConversationId);
 
     public async Task<ConversationId> ResolveAsync(SimulatorAddress address, DateTimeOffset now, CancellationToken token)
     {
         // Serialise first contact on the simulated Page. The turn runner separately locks the conversation.
         await using var hold = await locks.AcquireAsync(address.Agent.Value, token).ConfigureAwait(false);
-        var thread = await Threads(address).SingleOrDefaultAsync(token).ConfigureAwait(false);
-        if (thread is not null)
+        var existing = await ConversationFor(address).SingleOrDefaultAsync(token).ConfigureAwait(false);
+        if (existing.HasValue)
         {
-            return thread.ConversationId;
+            return existing.Value;
         }
 
-        var customer = Customer.Create(address.Tenant, CustomerDisplayName.Create("Messenger · " + Guid.NewGuid().ToString("N")[..8]), now);
-        var conversation = Conversation.Start(address.Tenant, customer.Id, ChannelKind.Messenger, now);
+        var customer = Customer.Create(address.Tenant, CustomerDisplayName.Create($"{address.Channel} · {Guid.NewGuid().ToString("N")[..8]}"), now);
+        var conversation = Conversation.Start(address.Tenant, customer.Id, address.Channel, now);
         context.Customers.Add(customer);
         context.Conversations.Add(conversation);
-        context.Add(new MessengerSimulatorThread { TenantId = address.Tenant, AgentId = address.Agent,
-            Visitor = address.Visitor, ConversationId = conversation.Id });
+        if (address.Channel == ChannelKind.Instagram)
+        {
+            context.Add(new InstagramSimulatorThread { TenantId = address.Tenant, AgentId = address.Agent,
+                Visitor = address.Visitor, ConversationId = conversation.Id });
+        }
+        else
+        {
+            context.Add(new MessengerSimulatorThread { TenantId = address.Tenant, AgentId = address.Agent,
+                Visitor = address.Visitor, ConversationId = conversation.Id });
+        }
         await context.SaveChangesAsync(token).ConfigureAwait(false);
         return conversation.Id;
     }
@@ -98,13 +110,25 @@ internal sealed class MessengerSimulatorStore(OmniAiDbContext context, IConversa
     public async Task<SimulatorMailbox> ReceiveAsync(SimulatorAddress address, CancellationToken token,
         SimulatorScenario scenario = SimulatorScenario.Accept, Guid? recover = null)
     {
-        var thread = await Threads(address).AsNoTracking().SingleOrDefaultAsync(token).ConfigureAwait(false);
+        var thread = await ConversationFor(address).SingleOrDefaultAsync(token).ConfigureAwait(false);
         if (thread is null)
         {
             return new SimulatorMailbox(null, [], []);
         }
 
-        var conversation = thread.ConversationId;
+        var conversation = thread.Value;
+        if (address.Channel == ChannelKind.Instagram)
+        {
+            var history = await context.Set<Message>().AsNoTracking()
+                .Where(m => m.ConversationId == conversation && (m.Sender == MessageSender.Customer ||
+                    m.Sender == MessageSender.AiAgent || m.Sender == MessageSender.HumanAgent))
+                .OrderByDescending(m => EF.Property<long>(m, PersistenceSchema.MessageIngestionSequence))
+                .Take(40).Select(m => new { m.Id, m.Sender, m.Text, m.SentAt }).ToListAsync(token).ConfigureAwait(false);
+            history.Reverse();
+            return new SimulatorMailbox(conversation.Value,
+                [.. history.Select(m => new SimulatorMessage(m.Id.Value, m.Sender.ToString(), m.Text, m.SentAt))], []);
+        }
+
         var receipts = context.Set<MessengerSimulatorReceipt>();
         var outbound = context.Set<Message>().AsNoTracking().Where(message => message.ConversationId == conversation &&
             (message.Sender == MessageSender.AiAgent || message.Sender == MessageSender.HumanAgent));
@@ -157,13 +181,13 @@ internal sealed class MessengerSimulatorStore(OmniAiDbContext context, IConversa
 
         // Never deliver system notes, author addresses, or an outbound message not yet collected.
         var rows = await context.Set<Message>().AsNoTracking()
-            .Where(message => message.ConversationId == thread.ConversationId &&
+            .Where(message => message.ConversationId == conversation &&
                 (message.Sender == MessageSender.Customer || context.Set<MessengerSimulatorReceipt>().Any(receipt => receipt.MessageId == message.Id && receipt.ReceivedAt != null)))
             .OrderByDescending(message => EF.Property<long>(message, PersistenceSchema.MessageIngestionSequence))
             .Take(40).Select(message => new { message.Id, message.Sender, message.Text, message.SentAt })
             .ToListAsync(token).ConfigureAwait(false);
         rows.Reverse();
-        return new SimulatorMailbox(thread.ConversationId.Value,
+        return new SimulatorMailbox(conversation.Value,
             [.. rows.Select(row => new SimulatorMessage(row.Id.Value, row.Sender.ToString(), row.Text, row.SentAt))],
             [.. issues.Select(row => new SimulatorDeliveryIssue(row.Id.Value, row.Sender.ToString(), row.Text, row.Status.ToString()))]);
     }
@@ -177,7 +201,7 @@ internal sealed class MessengerSimulatorStore(OmniAiDbContext context, IConversa
             WHERE messenger_simulator_receipts.status = 'Refused'
             """, token).ConfigureAwait(false);
         var receipt = context.Set<MessengerSimulatorReceipt>().Where(r => r.MessageId == message.Id);
-        string recipient = MessengerSimulator.CustomerId(address.Agent.Value, address.Visitor);
+        string recipient = SocialSimulator.CustomerId(address.Agent.Value, address.Visitor);
         var receiver = new SimulatedMessengerPage(address.Agent.Value, recipient, message, scenario,
             ct => receipt.ExecuteUpdateAsync(update => update.SetProperty(r => r.ReceivedAt, DateTimeOffset.UtcNow), ct));
         using var transport = new HttpMessageInvoker(receiver);

@@ -10,7 +10,7 @@ import {
   untracked,
   viewChild,
 } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { WorkspaceContextService } from '@app/core/workspace/workspace-context-service';
 import { LocaleFormat } from '@app/core/i18n/locale-format';
@@ -22,17 +22,24 @@ import {
   MessengerSimulatorApi,
   SimulatorAgent,
   SimulatorMailbox,
-} from './messenger-api';
+} from '../messenger-simulator/messenger-api';
+import { InstagramSimulatorApi } from '../instagram-simulator/instagram-api';
 
 @Component({
-  selector: 'app-messenger-simulator',
+  selector: 'app-social-simulator',
   imports: [PageHeader, Icon, RouterLink],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  templateUrl: './messenger-simulator.html',
-  styleUrl: './messenger-simulator.scss',
+  templateUrl: './social-simulator.html',
+  styleUrl: './social-simulator.scss',
 })
-export class MessengerSimulatorPage {
-  private readonly api = inject(MessengerSimulatorApi);
+export class SocialSimulatorPage {
+  protected readonly instagram = inject(ActivatedRoute).snapshot.data['channel'] === 'Instagram';
+  protected readonly channelIcon = this.instagram ? 'instagram' : 'messenger';
+  protected readonly heading = this.instagram
+    ? $localize`:@@ig.title:Instagram Direct simulator`
+    : $localize`:@@ms.title:Messenger simulator`;
+  private readonly messenger = inject(MessengerSimulatorApi);
+  private readonly api = this.instagram ? inject(InstagramSimulatorApi) : this.messenger;
   private readonly workspace = inject(WorkspaceContextService);
   protected readonly format = inject(LocaleFormat);
   protected readonly agents = signal<readonly SimulatorAgent[] | null>(null);
@@ -190,7 +197,7 @@ export class MessengerSimulatorPage {
     this.issue.set('');
     this.recoveryNotice.set('');
     try {
-      const box = await firstValueFrom(this.api.recover(tenant, this.agent(), id));
+      const box = await firstValueFrom(this.messenger.recover(tenant, this.agent(), id));
       if (this.current(generation)) {
         this.show(box);
         this.recoveryNotice.set(

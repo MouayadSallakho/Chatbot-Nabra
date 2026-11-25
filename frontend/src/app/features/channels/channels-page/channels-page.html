@@ -173,46 +173,53 @@
     @if (canSimulate()) {
       <section class="page-section">
         <h2 class="text-section-title" i18n="@@ms.local">Local testing</h2>
-        <div class="card channel" data-testid="channel-messenger">
-          <div class="channel-head">
-            <span class="channel-glyph" aria-hidden="true"><app-icon name="messenger" /></span>
-            <div>
-              <h3 class="card-title">{{ words.Messenger }}</h3>
-              <p class="text-small text-secondary" i18n="@@ms.intro">
-                Send a test message as a customer and follow the reply in your workspace inbox.
-              </p>
-            </div>
-          </div>
-          <div class="channel-actions">
-            <a
-              class="btn btn-secondary btn-sm"
-              routerLink="/channels/messenger-simulator"
-              i18n="@@ms.open"
-              >Open simulator</a
-            >
-          </div>
-        </div>
+        <ul class="channel-grid">
+          @for (channel of ['Messenger', 'Instagram']; track channel) {
+            <li class="card channel" [attr.data-testid]="'channel-' + channel.toLowerCase()">
+              <div class="channel-head">
+                <span class="channel-glyph" aria-hidden="true"
+                  ><app-icon [name]="channel === 'Instagram' ? 'instagram' : 'messenger'"
+                /></span>
+                <div>
+                  <h3 class="card-title">
+                    {{ channel === 'Instagram' ? words.Instagram : words.Messenger }}
+                  </h3>
+                  <p class="text-small text-secondary" i18n="@@ms.intro">
+                    Send a test message as a customer and follow the reply in your workspace inbox.
+                  </p>
+                </div>
+              </div>
+              <div class="channel-actions">
+                <a
+                  class="btn btn-secondary btn-sm"
+                  [routerLink]="['/channels', channel.toLowerCase() + '-simulator']"
+                  i18n="@@ms.open"
+                  >Open simulator</a
+                >
+              </div>
+            </li>
+          }
+        </ul>
       </section>
-    }
-    <!-- ----------------------------------------------------- not built yet -->
-    <section class="page-section" aria-labelledby="channels-later">
-      <h2 id="channels-later" class="text-section-title" i18n="@@channels.later.heading">
-        Not available yet
-      </h2>
-      <p class="text-small text-secondary section-note" i18n="@@channels.later.lede">
-        Nabra cannot connect these yet. There is nothing to set up, and no conversations from them
-        reach your inbox.
-      </p>
+    } @else {
+      <section class="page-section" aria-labelledby="channels-later">
+        <h2 id="channels-later" class="text-section-title" i18n="@@channels.later.heading">
+          Not available yet
+        </h2>
+        <p class="text-small text-secondary section-note" i18n="@@channels.later.lede">
+          Nabra cannot connect these yet. There is nothing to set up, and no conversations from them
+          reach your inbox.
+        </p>
 
-      <ul class="later-list">
-        <li class="later" data-testid="channel-instagram">
-          <span class="channel-glyph is-quiet" aria-hidden="true"
-            ><app-icon name="instagram"
-          /></span>
-          <span class="later-name">{{ words.Instagram }}</span>
-          <span class="chip chip-neutral" i18n="@@channels.notAvailable">Not available yet</span>
-        </li>
-        @if (!canSimulate()) {
+        <ul class="later-list">
+          <li class="later" data-testid="channel-instagram">
+            <span class="channel-glyph is-quiet" aria-hidden="true"
+              ><app-icon name="instagram"
+            /></span>
+            <span class="later-name">{{ words.Instagram }}</span>
+            <span class="chip chip-neutral" i18n="@@channels.notAvailable">Not available yet</span>
+          </li>
+
           <li class="later" data-testid="channel-messenger">
             <span class="channel-glyph is-quiet" aria-hidden="true"
               ><app-icon name="messenger"
@@ -220,8 +227,8 @@
             <span class="later-name">{{ words.Messenger }}</span>
             <span class="chip chip-neutral" i18n="@@channels.notAvailable">Not available yet</span>
           </li>
-        }
-      </ul>
-    </section>
+        </ul>
+      </section>
+    }
   }
 </div>

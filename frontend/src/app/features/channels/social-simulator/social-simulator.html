@@ -3,18 +3,24 @@
     ><app-icon name="arrow-start" /><span i18n="@@channels.heading">Channels</span></a
   >
   <app-page-header
-    heading="Messenger simulator"
-    i18n-heading="@@ms.title"
+    [heading]="heading"
     description="Test a local conversation from the customer’s side. Messages appear in this workspace’s inbox."
     i18n-description="@@ms.description"
   />
   <div class="sim-grid">
     <section class="card side">
-      <span class="glyph" aria-hidden="true"><app-icon name="messenger" /></span>
-      <h2 class="card-title" i18n="@@ms.page">Simulated Page</h2>
-      <p class="text-small text-secondary" i18n="@@ms.pageHint">
-        Each active agent has a test Page. Your account has a separate test customer on each Page.
-      </p>
+      <span class="glyph" aria-hidden="true"><app-icon [name]="channelIcon" /></span>
+      @if (instagram) {
+        <h2 class="card-title" i18n="@@ig.account">Test professional account</h2>
+        <p class="text-small text-secondary" i18n="@@ig.accountHint">
+          Choose an agent to test its Instagram inbox as a customer.
+        </p>
+      } @else {
+        <h2 class="card-title" i18n="@@ms.page">Simulated Page</h2>
+        <p class="text-small text-secondary" i18n="@@ms.pageHint">
+          Each active agent has a test Page. Your account has a separate test customer on each Page.
+        </p>
+      }
       @if (loadingAgents()) {
         <p role="status" i18n="@@ms.loading">Loading agents…</p>
       } @else if (agents()?.length) {
@@ -46,7 +52,7 @@
           Try again
         </button>
       }
-      @if (agent()) {
+      @if (agent() && !instagram) {
         <label for="sim-scenario" class="text-small" i18n="@@ms.deliveryScenario"
           >Delivery test for new replies</label
         >
@@ -138,7 +144,7 @@
         } @empty {
           @if (agent() && !readIssue()) {
             <div class="empty">
-              <app-icon name="messenger" />
+              <app-icon [name]="channelIcon" />
               @if (mailbox()) {
                 <p i18n="@@ms.empty">Send the first message to start the conversation.</p>
               } @else {

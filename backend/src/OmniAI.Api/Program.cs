@@ -192,6 +192,7 @@ app.MapConversationEndpoints();
 if (app.Environment.IsDevelopment() && OmniAI.Infrastructure.Ai.StandIn.LocalAiStandInSwitch.IsEnabled(app.Configuration, true))
 {
     app.MapMessengerSimulator();
+    app.MapInstagramSimulator();
 }
 
 // The hosted chat page's own API. Anonymous by design -- a customer has no

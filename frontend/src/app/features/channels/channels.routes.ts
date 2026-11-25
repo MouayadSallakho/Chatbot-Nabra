@@ -59,9 +59,14 @@ export const channelRoutes: Routes = [
               path: 'messenger-simulator',
               title: $localize`:@@ms.title:Messenger simulator`,
               loadComponent: () =>
-                import('./messenger-simulator/messenger-simulator').then(
-                  (m) => m.MessengerSimulatorPage,
-                ),
+                import('./social-simulator/social-simulator').then((m) => m.SocialSimulatorPage),
+            },
+            {
+              path: 'instagram-simulator',
+              data: { channel: 'Instagram' },
+              title: $localize`:@@ig.title:Instagram Direct simulator`,
+              loadComponent: () =>
+                import('./social-simulator/social-simulator').then((m) => m.SocialSimulatorPage),
             },
           ]
         : []),

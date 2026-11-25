@@ -2,6 +2,8 @@ using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using OmniAI.Application.Conversations;
 using OmniAI.Domain.Conversations;
+using OmniAI.Domain.Users;
+using OmniAI.Application.Conversations.Persistence;
 using OmniAI.Domain.Tenants;
 using OmniAI.Infrastructure.Conversations;
 using OmniAI.Infrastructure.IntegrationTests.Analytics;
@@ -10,7 +12,7 @@ using OmniAI.Testing;
 
 namespace OmniAI.Infrastructure.IntegrationTests.Conversations;
 
-public sealed class MessengerSimulatorStoreTests(PostgresTestDatabase database) : IClassFixture<PostgresTestDatabase>
+public sealed class SocialSimulatorStoreTests(PostgresTestDatabase database) : IClassFixture<PostgresTestDatabase>
 {
     [Fact]
     public async Task Parallel_first_contact_shares_one_thread_and_only_its_visitor_collects_public_replies()
@@ -23,8 +25,8 @@ public sealed class MessengerSimulatorStoreTests(PostgresTestDatabase database) 
         var locks = new PostgresConversationLock(source);
         await using var first = database.CreateContext();
         await using var second = database.CreateContext();
-        var a = new MessengerSimulatorStore(first, locks, new TestNotifier());
-        var b = new MessengerSimulatorStore(second, locks, new TestNotifier());
+        var a = new SocialSimulatorStore(first, locks, new TestNotifier());
+        var b = new SocialSimulatorStore(second, locks, new TestNotifier());
 
         var ids = await Task.WhenAll(a.ResolveAsync(address, now, default), b.ResolveAsync(address, now, default));
         Assert.Equal(ids[0], ids[1]);
@@ -63,7 +65,7 @@ public sealed class MessengerSimulatorStoreTests(PostgresTestDatabase database) 
         await using var source = NpgsqlDataSource.Create(database.ConnectionString);
         var locks = new PostgresConversationLock(source);
         await using var context = database.CreateContext();
-        var store = new MessengerSimulatorStore(context, locks, new TestNotifier());
+        var store = new SocialSimulatorStore(context, locks, new TestNotifier());
         var conversationId = await store.ResolveAsync(address, now, default);
         var conversation = await context.Conversations.SingleAsync(row => row.Id == conversationId);
         await world.SayAsync(conversation, (sender, now));
@@ -85,7 +87,7 @@ public sealed class MessengerSimulatorStoreTests(PostgresTestDatabase database) 
         Assert.Equal(accepted, originalReceipt.HasValue);
 
         await using var fresh = database.CreateContext();
-        var restarted = new MessengerSimulatorStore(fresh, locks, new TestNotifier());
+        var restarted = new SocialSimulatorStore(fresh, locks, new TestNotifier());
         await Task.WhenAll(store.ReceiveAsync(address, default, recover: issue.Id),
             restarted.ReceiveAsync(address, default, recover: issue.Id));
         var final = await restarted.ReceiveAsync(address, default);
@@ -109,7 +111,7 @@ public sealed class MessengerSimulatorStoreTests(PostgresTestDatabase database) 
         var address = new SimulatorAddress(world.Tenant.Id, agent.Id, Guid.NewGuid());
         await using var source = NpgsqlDataSource.Create(database.ConnectionString);
         await using var context = database.CreateContext();
-        var store = new MessengerSimulatorStore(context, new PostgresConversationLock(source), new TestNotifier());
+        var store = new SocialSimulatorStore(context, new PostgresConversationLock(source), new TestNotifier());
         var id = await store.ResolveAsync(address, now, default);
         var conversation = await context.Conversations.SingleAsync(c => c.Id == id);
         await world.SayAsync(conversation, (MessageSender.HumanAgent, now));
@@ -122,6 +124,45 @@ public sealed class MessengerSimulatorStoreTests(PostgresTestDatabase database) 
         Assert.Empty(box.Messages);
         Assert.Equal("Unconfirmed", Assert.Single(box.DeliveryIssues).Status);
         Assert.Null((await context.Set<MessengerSimulatorReceipt>().AsNoTracking().SingleAsync(r => r.MessageId == message.Id)).ReceivedAt);
+    }
+
+    [Fact]
+    public async Task Instagram_owns_its_threads_and_shows_only_public_messages_to_the_scoped_visitor()
+    {
+        var world = await new AnalyticsWorld(database).StartAsync();
+        var now = DateTimeOffset.UtcNow;
+        var agent = await world.AgentAsync("Support", now);
+        var address = new SimulatorAddress(world.Tenant.Id, agent.Id, Guid.NewGuid(), ChannelKind.Instagram);
+        await using var source = NpgsqlDataSource.Create(database.ConnectionString);
+        var locks = new PostgresConversationLock(source);
+        await using var first = database.CreateContext();
+        await using var second = database.CreateContext();
+        var a = new SocialSimulatorStore(first, locks, new TestNotifier());
+        var b = new SocialSimulatorStore(second, locks, new TestNotifier());
+
+        var ids = await Task.WhenAll(a.ResolveAsync(address, now, default), b.ResolveAsync(address, now, default));
+        Assert.Equal(ids[0], ids[1]);
+        var messenger = address with { Channel = ChannelKind.Messenger };
+        Assert.NotEqual(ids[0], await a.ResolveAsync(messenger, now, default));
+        Assert.NotEqual(SocialSimulator.CustomerId(agent.Id.Value, address.Visitor),
+            SocialSimulator.CustomerId(agent.Id.Value, address.Visitor, ChannelKind.Instagram));
+
+        var dm = await first.Conversations.SingleAsync(c => c.Id == ids[0]);
+        Assert.Equal(ChannelKind.Instagram, dm.Channel);
+        var inbox = new ConversationRepository(second);
+        var viewer = UserId.New();
+        var detail = await inbox.FindAsync(address.Tenant, dm.Id, viewer);
+        Assert.Equal("Support", detail!.Value.AiAgentName);
+        var list = await inbox.ListAsync(address.Tenant, 1, 10, ConversationListFilter.All, viewer);
+        Assert.Equal("Support", Assert.Single(list.Items, row => row.Id == dm.Id.Value).AiAgentName);
+        await world.SayAsync(dm, (MessageSender.Customer, now), (MessageSender.AiAgent, now),
+            (MessageSender.System, now), (MessageSender.HumanAgent, now));
+        var mailbox = await b.ReceiveAsync(address, default);
+        Assert.Collection(mailbox.Messages, customer => Assert.Equal("Customer", customer.Sender),
+            ai => Assert.Equal("AiAgent", ai.Sender), staff => Assert.Equal("HumanAgent", staff.Sender));
+        Assert.Empty((await b.ReceiveAsync(messenger, default)).Messages);
+        Assert.Null((await b.ReceiveAsync(address with { Visitor = Guid.NewGuid() }, default)).ConversationId);
+        Assert.Null((await b.ReceiveAsync(address with { Tenant = TenantId.New() }, default)).ConversationId);
     }
 
     private sealed class TestNotifier : IConversationRealtimeNotifier

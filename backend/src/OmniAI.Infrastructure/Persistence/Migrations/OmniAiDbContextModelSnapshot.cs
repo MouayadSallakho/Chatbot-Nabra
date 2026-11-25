@@ -3006,6 +3006,34 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("OmniAI.Infrastructure.Persistence.Repositories.InstagramSimulatorThread", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("AgentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("agent_id");
+
+                    b.Property<Guid>("Visitor")
+                        .HasColumnType("uuid")
+                        .HasColumnName("visitor");
+
+                    b.Property<Guid>("ConversationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("conversation_id");
+
+                    b.HasKey("TenantId", "AgentId", "Visitor");
+
+                    b.HasIndex("AgentId");
+
+                    b.HasIndex("ConversationId")
+                        .IsUnique();
+
+                    b.ToTable("instagram_simulator_threads", (string)null);
+                });
+
             modelBuilder.Entity("OmniAI.Infrastructure.Persistence.Repositories.MessengerSimulatorReceipt", b =>
                 {
                     b.Property<Guid>("MessageId")
@@ -3846,6 +3874,21 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_knowledge_chunks_document")
                         .HasAnnotation("OmniAI:SuppressForeignKeyIndex", true);
+                });
+
+            modelBuilder.Entity("OmniAI.Infrastructure.Persistence.Repositories.InstagramSimulatorThread", b =>
+                {
+                    b.HasOne("OmniAI.Domain.AiAgents.AiAgent", null)
+                        .WithMany()
+                        .HasForeignKey("AgentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("OmniAI.Domain.Conversations.Conversation", null)
+                        .WithMany()
+                        .HasForeignKey("ConversationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("OmniAI.Infrastructure.Persistence.Repositories.MessengerSimulatorReceipt", b =>

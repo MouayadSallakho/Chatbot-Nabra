@@ -54,6 +54,8 @@ answer is the same for anybody and says nothing about the workspace.
 
 | Code | Status | Where | Meaning |
 | --- | --- | --- | --- |
+| `instagram.simulator.invalid_event` | 400 | Import local Instagram Direct events | Supply Instagram events for the selected simulated professional account, up to 50 per batch. |
+| `instagram.simulator.invalid_message` | 400 | Simulate an Instagram DM | Supply a message ID and 1–2000 characters of text. |
 | `messenger.simulator.invalid_scenario` | 400 | Test local Messenger delivery | Select a supported local delivery scenario. |
 | `messenger.simulator.invalid_page_event` | 400 | Import local Messenger Page events | Supply a Page envelope addressed to the selected simulated Page, with up to 50 events. |
 | `messenger.simulator.invalid_message` | 400 | Simulate a Messenger text | Provide an event ID and 1–2000 characters of text. |
