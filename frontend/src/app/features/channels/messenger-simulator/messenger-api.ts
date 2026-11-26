@@ -1,5 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
+import { simulatorMessage } from '../social-simulator/simulator-message';
 
 export interface SimulatorAgent {
   readonly id: string;
@@ -65,6 +66,7 @@ export class MessengerSimulatorApi {
     eventId: string,
     text: string,
     scenario: DeliveryScenario,
+    attachment = '',
   ) {
     const pageId = agent.id.replaceAll('-', '');
     return this.http.post<SimulatorMailbox>(
@@ -78,7 +80,7 @@ export class MessengerSimulatorApi {
               {
                 sender: { id: agent.customerId },
                 recipient: { id: pageId },
-                message: { mid: eventId.replaceAll('-', ''), text },
+                message: simulatorMessage(eventId.replaceAll('-', ''), text, attachment),
               },
             ],
           },

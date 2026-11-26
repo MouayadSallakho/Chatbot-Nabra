@@ -372,6 +372,12 @@
                     <span class="row-text" dir="auto">{{
                       row.conversation.lastMessagePreview
                     }}</span>
+                  } @else if (
+                    row.conversation.lastMessagePreview === '' &&
+                    row.conversation.lastMessageSender === 'Customer'
+                  ) {
+                    <span class="row-sender">{{ row.sender }}</span>
+                    <span class="row-text" i18n="@@inbox.attachmentPreview">Attachment</span>
                   } @else {
                     <span class="row-text row-empty" i18n="@@inbox.noMessages"
                       >No messages yet</span

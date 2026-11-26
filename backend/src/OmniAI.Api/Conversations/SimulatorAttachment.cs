@@ -2,9 +2,18 @@ using SkiaSharp;
 
 namespace OmniAI.Api.Conversations;
 
-/// <summary>Decodes a bounded local test upload and retains only a freshly encoded thumbnail.</summary>
-internal static class LocalInstagramImage
+internal sealed record SimulatorAttachmentPayload(string? Url);
+
+/// <summary>Media shared by the local Messenger and Instagram event fixtures.</summary>
+internal sealed record SimulatorAttachment(string? Type, SimulatorAttachmentPayload? Payload)
 {
+    internal const int MaxPerMessage = 10;
+    internal const int MaxRequestBytes = 2_000_000;
+
+    internal static string[]? Read(SimulatorAttachment?[]? attachments) =>
+        attachments is { Length: > 0 } ? attachments.Select(item =>
+            item is { Type: "image" } ? Preview(item.Payload?.Url) : "Unsupported").ToArray() : null;
+
     internal static string Preview(string? url)
     {
         if (url == "https://media.example.test/nabra/parcel.png")

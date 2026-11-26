@@ -15,7 +15,8 @@ public sealed class MessengerPageEnvelopeTests
             {"sender":{"id":"aba00000000000000000000000000001"},"recipient":{"id":"visitor"},
              "message":{"is_echo":true,"mid":"m.echo","text":"Reply"}},
             {"delivery":{"mids":["m.echo"]}},{"read":{"watermark":1731933000124}},
-            {"message":{"mid":"m.photo","attachments":[{"type":"image"}]}}
+            {"sender":{"id":"visitor"},"recipient":{"id":"aba00000000000000000000000000001"},
+             "message":{"mid":"m.photo","attachments":[{"type":"image","payload":{"url":"https://media.example.test/nabra/parcel.png"}},{"type":"image"},{"type":"file"}]}}
           ]},
           {"id":"aba00000000000000000000000000001","messaging":[
             {"sender":{"id":"visitor"},"recipient":{"id":"aba00000000000000000000000000001"},
@@ -25,12 +26,18 @@ public sealed class MessengerPageEnvelopeTests
         """;
 
     [Fact]
-    public void Page_fixture_preserves_order_and_opaque_ids_and_skips_non_customer_text()
+    public void Page_fixture_preserves_text_and_ordered_media_and_skips_echoes_and_receipts()
     {
         var envelope = JsonSerializer.Deserialize<MessengerPageEnvelope>(Fixture, JsonSerializerOptions.Web)!;
         var texts = envelope.ReadTexts(Page);
         Assert.Collection(texts,
             first => { Assert.Equal("visitor", first.SenderId); Assert.Equal("m.opaque/1+", first.EventId); Assert.Equal("مرحباً", first.Text); },
+            media =>
+            {
+                Assert.Equal("m.photo", media.EventId);
+                Assert.Null(media.Text);
+                Assert.Equal(["SampleImage", "UnavailableImage", "Unsupported"], Assert.IsType<string[]>(media.Attachments));
+            },
             second => { Assert.Equal("m.opaque/2+", second.EventId); Assert.Equal("Second", second.Text); });
     }
 

@@ -215,38 +215,36 @@
         </p>
       }
       <form (submit)="$event.preventDefault(); send()">
-        @if (instagram) {
-          <label class="text-small" for="sim-media" i18n="@@media.choose">Test attachment</label>
-          <select
-            #media
-            id="sim-media"
-            [value]="attachmentChoice()"
-            [disabled]="!agent() || busy()"
-            (change)="selectAttachment(media.value)"
+        <label class="text-small" for="sim-media" i18n="@@media.choose">Test attachment</label>
+        <select
+          #media
+          id="sim-media"
+          [value]="attachmentChoice()"
+          [disabled]="!agent() || busy()"
+          (change)="selectAttachment(media.value)"
+        >
+          <option value="" i18n="@@media.none">No attachment</option>
+          <option value="sample" i18n="@@media.sample">Parcel label image</option>
+          <option value="upload" i18n="@@media.upload">Choose an image from this device</option>
+          <option value="unavailable" i18n="@@media.missingOption">
+            Image with a missing preview
+          </option>
+          <option value="unsupported" i18n="@@media.unsupportedOption">
+            Unsupported file type
+          </option>
+        </select>
+        @if (attachmentChoice() === 'upload') {
+          <label for="sim-image" i18n="@@media.uploadHint"
+            >PNG or JPEG, up to 512 KB and 2048 pixels per side.</label
           >
-            <option value="" i18n="@@media.none">No attachment</option>
-            <option value="sample" i18n="@@media.sample">Parcel label image</option>
-            <option value="upload" i18n="@@media.upload">Choose an image from this device</option>
-            <option value="unavailable" i18n="@@media.missingOption">
-              Image with a missing preview
-            </option>
-            <option value="unsupported" i18n="@@media.unsupportedOption">
-              Unsupported file type
-            </option>
-          </select>
-          @if (attachmentChoice() === 'upload') {
-            <label for="sim-image" i18n="@@media.uploadHint"
-              >PNG or JPEG, up to 512 KB and 2048 pixels per side.</label
-            >
-            <input
-              #imageFile
-              id="sim-image"
-              type="file"
-              accept="image/png,image/jpeg"
-              [disabled]="busy()"
-              (change)="readImage(imageFile.files?.[0])"
-            />
-          }
+          <input
+            #imageFile
+            id="sim-image"
+            type="file"
+            accept="image/png,image/jpeg"
+            [disabled]="busy()"
+            (change)="readImage(imageFile.files?.[0])"
+          />
         }
         <label class="text-small" for="sim-text" i18n="@@ms.write"
           >Message from the test customer</label

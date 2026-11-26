@@ -32,6 +32,7 @@ internal static class MessengerSimulatorEndpoints
             SocialSimulator simulator, CancellationToken token) =>
             await simulator.SendPageAsync(tenantId, agentId, request.ReadTexts(agentId), token, ReadScenario(scenario)).ConfigureAwait(false) is { } box
                 ? Results.Ok(box) : Results.NotFound())
+            .WithMetadata(new Microsoft.AspNetCore.Mvc.RequestSizeLimitAttribute(SimulatorAttachment.MaxRequestBytes))
             .Produces<SimulatorMailbox>().ProducesProblem(StatusCodes.Status400BadRequest);
         group.MapPost("/{agentId:guid}", async (Guid tenantId, Guid agentId, SimulatedText request, SocialSimulator simulator, CancellationToken token) =>
             await simulator.SendAsync(tenantId, agentId, request.EventId, request.Text, token).ConfigureAwait(false) is { } box ? Results.Ok(box) : Results.NotFound())

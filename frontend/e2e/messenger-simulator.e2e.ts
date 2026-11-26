@@ -5,6 +5,7 @@ test('a local Messenger customer receives AI and team replies in the same conver
   page,
   appLanguage,
 }, info) => {
+  test.setTimeout(100_000);
   const arabic = appLanguage === 'ar';
   await page.emulateMedia({ colorScheme: arabic ? 'dark' : 'light' });
   await page.setViewportSize({ width: 1440, height: 900 });
@@ -88,8 +89,30 @@ test('a local Messenger customer receives AI and team replies in the same conver
   await inbox.goto(inboxPath!);
   await inbox.getByTestId('take-over').click();
   await expect(inbox.getByTestId('return-to-ai')).toBeVisible();
+  const media = page.locator('#sim-media');
+  await media.selectOption('upload');
+  await page.locator('#sim-image').setInputFiles('public/media/parcel-label.png');
   await input.fill(second);
-  await submit.click();
+  const [upload] = await Promise.all([
+    page.waitForResponse((response) => new URL(response.url()).pathname === path),
+    submit.click(),
+  ]);
+  expect(upload.ok()).toBe(true);
+  const uploaded = await upload.json();
+  const photo = uploaded.messages.at(-1);
+  expect(photo.attachments).toEqual([expect.stringMatching(/^data:image\/jpeg;base64,/u)]);
+  expect(await (await post(page.request, path, upload.request().postDataJSON())).json()).toEqual(
+    uploaded,
+  );
+  const staffImage = inbox.getByTestId('transcript').locator('app-message-attachments img');
+  await expect(staffImage).toHaveCount(1);
+  await expect
+    .poll(() => staffImage.evaluate((img: HTMLImageElement) => img.naturalWidth))
+    .toBe(320);
+  await expect(page.locator('[data-sender="Customer"] img')).toHaveAttribute(
+    'src',
+    photo.attachments[0],
+  );
   await expect(page.locator('[data-sender="Customer"]').last()).toContainText(second);
   await expect(page.locator('[data-sender="AiAgent"]')).toHaveCount(1);
   await expect(inbox.getByTestId('transcript')).toContainText(second);
@@ -113,6 +136,32 @@ test('a local Messenger customer receives AI and team replies in the same conver
   await agents.selectOption({ index });
   await expect(page.locator('[data-sender="HumanAgent"]')).toContainText(reply);
   await expect(page.locator('[data-sender]')).toHaveCount(4);
+  await inbox.reload();
+  await expect(staffImage).toHaveAttribute('src', photo.attachments[0]);
+  await info.attach('messenger-staff-photo', {
+    body: await inbox.screenshot(),
+    contentType: 'image/png',
+  });
+  await inbox.getByTestId('return-to-ai').click();
+  await expect(inbox.getByTestId('take-over')).toBeVisible();
+  for (const [choice, label] of [
+    ['unavailable', arabic ? 'تعذّرت معاينة الصورة.' : 'The image preview is unavailable.'],
+    [
+      'unsupported',
+      arabic ? 'لا تتوفر معاينة لهذا النوع من المرفقات.' : 'This attachment type has no preview.',
+    ],
+  ]) {
+    await media.selectOption(choice);
+    await submit.click();
+    await expect(page.locator('[data-sender="Customer"]').last()).toContainText(label);
+    await expect(inbox.getByTestId('transcript')).toContainText(label);
+    await expect(
+      inbox.locator(`a.conversation-row[href="${inboxPath}"] .row-preview`),
+    ).toContainText(arabic ? 'مرفق' : 'Attachment');
+    await expect(page.locator('[data-sender="AiAgent"]')).toHaveCount(1);
+  }
+  await inbox.getByTestId('take-over').click();
+  await expect(inbox.getByTestId('return-to-ai')).toBeVisible();
   for (const width of [1440, 390]) {
     await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
     await expect

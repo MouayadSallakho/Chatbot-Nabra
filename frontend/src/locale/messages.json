@@ -1019,6 +1019,7 @@
     "inbox.empty.heading": "No conversations yet",
     "inbox.empty.body": "When somebody opens one of this workspace's chat links and says something, the conversation appears here.",
     "inbox.refreshFailed": "Could not refresh the list.",
+    "inbox.attachmentPreview": "Attachment",
     "inbox.noMessages": "No messages yet",
     "inbox.handledBy": "Handled by {$START_TAG_BDI}{$INTERPOLATION}{$CLOSE_TAG_BDI}",
     "inbox.assignedTo": "Assigned to {$START_TAG_BDI}{$INTERPOLATION}{$CLOSE_TAG_BDI}",

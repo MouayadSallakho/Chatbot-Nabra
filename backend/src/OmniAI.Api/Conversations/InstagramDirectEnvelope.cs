@@ -44,17 +44,11 @@ internal sealed record InstagramDirectEnvelope(
                     throw InvalidEvent();
                 }
 
-                if (dm.Attachments is { Length: > 10 })
+                if (dm.Attachments is { Length: > SimulatorAttachment.MaxPerMessage })
                 {
                     throw InvalidEvent();
                 }
-                string[]? attachments = dm.IsUnsupported ? ["Unsupported"] : dm.Attachments is { Length: > 0 }
-                    ? dm.Attachments.Select(a => a switch
-                    {
-                        { Type: "image" } => LocalInstagramImage.Preview(a.Payload?.Url),
-                        _ => "Unsupported",
-                    }).ToArray()
-                    : null;
+                string[]? attachments = dm.IsUnsupported ? ["Unsupported"] : SimulatorAttachment.Read(dm.Attachments);
                 texts.Add(new SimulatorInboundText(item.Sender.Id, dm.Mid, dm.Text, attachments));
             }
         }
@@ -72,6 +66,4 @@ internal sealed record InstagramMessagingEvent(InstagramParty? Sender, Instagram
 internal sealed record InstagramParty(string? Id);
 internal sealed record InstagramDirectMessage(string? Mid, string? Text,
     [property: JsonPropertyName("is_echo")] bool IsEcho, [property: JsonPropertyName("is_deleted")] bool IsDeleted,
-    [property: JsonPropertyName("is_unsupported")] bool IsUnsupported, InstagramAttachment?[]? Attachments = null);
-internal sealed record InstagramAttachment(string? Type, InstagramAttachmentPayload? Payload);
-internal sealed record InstagramAttachmentPayload(string? Url);
+    [property: JsonPropertyName("is_unsupported")] bool IsUnsupported, SimulatorAttachment?[]? Attachments = null);

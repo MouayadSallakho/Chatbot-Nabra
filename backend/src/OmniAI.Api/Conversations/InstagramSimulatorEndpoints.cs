@@ -39,7 +39,7 @@ internal static class InstagramSimulatorEndpoints
         group.MapPost("/{agentId:guid}/direct-events", async (Guid tenantId, Guid agentId, InstagramDirectEnvelope request, SimulatorScenario? scenario,
             SocialSimulator simulator, CancellationToken token) =>
             await simulator.SendInstagramAsync(tenantId, agentId, request.ReadTexts(agentId), token, ReadScenario(scenario)).ConfigureAwait(false) is { } box
-                ? Results.Ok(box) : Results.NotFound()).WithMetadata(new Microsoft.AspNetCore.Mvc.RequestSizeLimitAttribute(2_000_000))
+                ? Results.Ok(box) : Results.NotFound()).WithMetadata(new Microsoft.AspNetCore.Mvc.RequestSizeLimitAttribute(SimulatorAttachment.MaxRequestBytes))
                 .Produces<SimulatorMailbox>().ProducesProblem(StatusCodes.Status400BadRequest);
     }
     private static SimulatorScenario ReadScenario(SimulatorScenario? scenario) =>

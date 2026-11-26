@@ -33,18 +33,19 @@ internal sealed record MessengerPageEnvelope(
                     throw InvalidEnvelope();
                 }
 
-                // Delivery/read notifications, attachments without text and echoes do not start turns.
-                if (item.Message is not { IsEcho: false, Text: not null } message)
+                if (item.Message is not { IsEcho: false } message ||
+                    (message.Text is null && message.Attachments is not { Length: > 0 }))
                 {
                     continue;
                 }
 
-                if (item.Recipient?.Id != page || string.IsNullOrWhiteSpace(item.Sender?.Id))
+                if (item.Recipient?.Id != page || string.IsNullOrWhiteSpace(item.Sender?.Id) ||
+                    item.Sender.Id == page || message.Attachments is { Length: > SimulatorAttachment.MaxPerMessage })
                 {
                     throw InvalidEnvelope();
                 }
 
-                result.Add(new SimulatorInboundText(item.Sender.Id, message.Mid, message.Text));
+                result.Add(new SimulatorInboundText(item.Sender.Id, message.Mid, message.Text, SimulatorAttachment.Read(message.Attachments)));
             }
         }
 
@@ -59,4 +60,5 @@ internal sealed record MessengerPageEnvelope(
 internal sealed record MessengerPageEntry(string? Id, MessengerPageEvent?[]? Messaging);
 internal sealed record MessengerPageEvent(MessengerParty? Sender, MessengerParty? Recipient, MessengerPageMessage? Message);
 internal sealed record MessengerParty(string? Id);
-internal sealed record MessengerPageMessage(string? Mid, string? Text, [property: JsonPropertyName("is_echo")] bool IsEcho);
+internal sealed record MessengerPageMessage(string? Mid, string? Text, [property: JsonPropertyName("is_echo")] bool IsEcho,
+    SimulatorAttachment?[]? Attachments = null);

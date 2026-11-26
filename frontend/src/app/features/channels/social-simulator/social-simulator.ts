@@ -325,16 +325,7 @@ export class SocialSimulatorPage {
     this.eventId ||= crypto.randomUUID();
     try {
       const box = await firstValueFrom(
-        this.instagram
-          ? this.instagramApi.send(
-              tenant,
-              agent,
-              this.eventId,
-              text,
-              this.scenario(),
-              this.attachment(),
-            )
-          : this.api.send(tenant, agent, this.eventId, text, this.scenario()),
+        this.api.send(tenant, agent, this.eventId, text, this.scenario(), this.attachment()),
       );
       if (this.current(generation)) {
         this.show(box);

@@ -14,6 +14,36 @@ namespace OmniAI.Infrastructure.IntegrationTests.Conversations;
 
 public sealed class SocialSimulatorStoreTests(PostgresTestDatabase database) : IClassFixture<PostgresTestDatabase>
 {
+    [Theory]
+    [InlineData(ChannelKind.Messenger, ChannelKind.Instagram)]
+    [InlineData(ChannelKind.Instagram, ChannelKind.Messenger)]
+    public async Task Media_is_scoped_to_its_thread_and_removed_with_its_conversation(ChannelKind channel, ChannelKind other)
+    {
+        var world = await new AnalyticsWorld(database).StartAsync();
+        var now = DateTimeOffset.UtcNow;
+        var agent = await world.AgentAsync("Support", now);
+        var address = new SimulatorAddress(world.Tenant.Id, agent.Id, Guid.NewGuid(), channel);
+        await using var source = NpgsqlDataSource.Create(database.ConnectionString);
+        await using var context = database.CreateContext();
+        var store = new SocialSimulatorStore(context, new PostgresConversationLock(source), new TestNotifier());
+        var id = await store.ResolveAsync(address, now, default);
+        var conversation = await context.Conversations.SingleAsync(c => c.Id == id);
+        var message = conversation.AddCustomerMedia(null, ["SampleImage"], now);
+        await context.SaveChangesAsync();
+        context.ChangeTracker.Clear();
+
+        var box = await store.ReceiveAsync(address, default);
+        Assert.Equal(["SampleImage"], Assert.IsType<string[]>(Assert.Single(box.Messages).Attachments));
+        foreach (var outside in new[] { address with { Channel = other }, address with { Tenant = TenantId.New() },
+            address with { Visitor = Guid.NewGuid() } })
+        {
+            Assert.Empty((await store.ReceiveAsync(outside, default)).Messages);
+        }
+        await context.Conversations.Where(c => c.Id == id).ExecuteDeleteAsync();
+        Assert.False(await context.Set<Message>().AnyAsync(m => m.Id == message.Id));
+        Assert.Empty((await store.ReceiveAsync(address, default)).Messages);
+    }
+
     [Fact]
     public async Task Parallel_first_contact_shares_one_thread_and_only_its_visitor_collects_public_replies()
     {

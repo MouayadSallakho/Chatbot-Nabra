@@ -190,6 +190,11 @@ test('Instagram DMs survive replay and human takeover in their own inbox', async
     await page.locator('#sim-media').selectOption(option);
     await submit.click();
     await expect(inbox.getByTestId('transcript')).toContainText(label);
+    await expect(
+      inbox.locator(
+        `a.conversation-row[href="/conversations/${stored.conversationId}"] .row-preview`,
+      ),
+    ).toContainText(ar ? 'مرفق' : 'Attachment');
     await expect(page.locator('[data-sender="AiAgent"]')).toHaveCount(2);
   }
   await inbox.reload();

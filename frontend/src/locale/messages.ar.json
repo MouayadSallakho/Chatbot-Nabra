@@ -707,6 +707,7 @@
     "inbox.empty.body": "عندما يفتح أحدهم رابطًا من روابط الدردشة في مساحة العمل هذه ويكتب شيئًا، تظهر المحادثة هنا.",
     "inbox.refreshFailed": "تعذّر تحديث القائمة.",
     "inbox.noMessages": "لا رسائل بعد",
+    "inbox.attachmentPreview": "مرفق",
     "inbox.handledBy": "استلام المحادثة: {$START_TAG_BDI}{$INTERPOLATION}{$CLOSE_TAG_BDI}",
     "inbox.waiting": "بانتظار رد الفريق",
     "inbox.assignedTo": "مسندة إلى {$START_TAG_BDI}{$INTERPOLATION}{$CLOSE_TAG_BDI}",

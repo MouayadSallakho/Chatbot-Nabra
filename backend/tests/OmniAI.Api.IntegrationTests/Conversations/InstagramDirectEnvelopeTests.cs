@@ -33,7 +33,7 @@ public sealed class InstagramDirectEnvelopeTests
     [InlineData("https://other.example/customer.png")]
     public void Unreadable_images_get_an_unavailable_preview(string url)
     {
-        Assert.Equal("UnavailableImage", LocalInstagramImage.Preview(url));
+        Assert.Equal("UnavailableImage", SimulatorAttachment.Preview(url));
     }
 
     [Fact]

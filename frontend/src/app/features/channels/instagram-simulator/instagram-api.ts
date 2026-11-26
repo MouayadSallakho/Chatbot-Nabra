@@ -1,5 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
+import { simulatorMessage } from '../social-simulator/simulator-message';
 import type {
   DeliveryScenario,
   SimulatorAgent,
@@ -97,27 +98,7 @@ export class InstagramSimulatorApi {
               {
                 sender: { id: agent.customerId },
                 recipient: { id: account },
-                message: {
-                  mid: eventId,
-                  text,
-                  ...(attachment
-                    ? {
-                        attachments: [
-                          {
-                            type: attachment === 'unsupported' ? 'file' : 'image',
-                            payload: {
-                              url:
-                                attachment === 'sample'
-                                  ? 'https://media.example.test/nabra/parcel.png'
-                                  : attachment.startsWith('data:')
-                                    ? attachment
-                                    : null,
-                            },
-                          },
-                        ],
-                      }
-                    : {}),
-                },
+                message: simulatorMessage(eventId, text, attachment),
               },
             ],
           },
