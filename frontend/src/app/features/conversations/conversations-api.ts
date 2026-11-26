@@ -137,6 +137,7 @@ export interface ConversationDetail extends HandlingFacts {
 
 /** One message in a transcript. */
 export interface TranscriptMessage {
+  readonly attachments?: readonly string[] | null;
   readonly id: string;
   readonly sender: MessageSender;
   readonly text: string;

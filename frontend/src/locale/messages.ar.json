@@ -1,6 +1,18 @@
 {
   "locale": "ar",
   "translations": {
+    "media.parcelAlt": "صورة تجريبية لملصق طرد",
+    "media.unsupported": "لا تتوفر معاينة لهذا النوع من المرفقات.",
+    "media.unavailable": "تعذّرت معاينة الصورة.",
+    "media.choose": "مرفق تجريبي",
+    "media.customerAlt": "صورة أرسلها العميل",
+    "media.upload": "اختيار صورة من الجهاز",
+    "media.uploadHint": "صورة PNG أو JPEG، حتى 512 كيلوبايت و2048 بكسل لكل بُعد.",
+    "media.uploadError": "تعذّرت قراءة الصورة. اختر ملف PNG أو JPEG حتى 512 كيلوبايت.",
+    "media.none": "بلا مرفق",
+    "media.sample": "صورة ملصق طرد",
+    "media.missingOption": "صورة تفتقد المعاينة",
+    "media.unsupportedOption": "نوع ملف غير مدعوم",
     "ig.externalChip": "يتولى الرد تطبيق آخر",
     "ig.ownerHelp": "يسري اختيارك لمن يتولى الرد عند عودة التحكم إلى نبرة.",
     "ig.inboxPaused": "الردود متوقفة مؤقتاً لأن تطبيقاً آخر يدير محادثة إنستغرام هذه.",

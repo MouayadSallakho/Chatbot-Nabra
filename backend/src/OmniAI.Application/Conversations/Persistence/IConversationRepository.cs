@@ -31,7 +31,8 @@ public sealed record ConversationMessageRecord(
     string Text,
     DateTimeOffset SentAt,
     long IngestionSequence,
-    ConversationMessageAuthor? SentBy = null);
+    ConversationMessageAuthor? SentBy = null,
+    string[]? Attachments = null);
 
 /// <summary>
 /// The person behind a human reply, for the workspace's own screens.

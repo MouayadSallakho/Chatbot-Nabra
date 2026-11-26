@@ -1039,6 +1039,10 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.PrimitiveCollection<string[]>("Attachments")
+                        .HasColumnType("text[]")
+                        .HasColumnName("attachments");
+
                     b.Property<string>("ContentType")
                         .IsRequired()
                         .HasMaxLength(32)

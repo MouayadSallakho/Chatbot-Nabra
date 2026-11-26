@@ -41,6 +41,8 @@ internal sealed class MessageConfiguration : IEntityTypeConfiguration<Message>
             .HasMaxLength(Message.MaxTextLength)
             .IsRequired();
 
+        builder.Property(message => message.Attachments).HasColumnName("attachments").HasColumnType("text[]");
+
         builder.Property(message => message.SentAt)
             .HasColumnName("sent_at")
             .HasColumnType("timestamp with time zone")

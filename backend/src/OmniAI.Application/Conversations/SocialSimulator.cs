@@ -12,8 +12,8 @@ namespace OmniAI.Application.Conversations;
 
 public sealed record SimulatorAgent(Guid Id, string Name);
 public sealed record SimulatorAgentOption(Guid Id, string Name, string CustomerId);
-public sealed record SimulatorInboundText(string? SenderId, string? EventId, string? Text);
-public sealed record SimulatorMessage(Guid Id, string Sender, string Text, DateTimeOffset SentAt);
+public sealed record SimulatorInboundText(string? SenderId, string? EventId, string? Text, string[]? Attachments = null);
+public sealed record SimulatorMessage(Guid Id, string Sender, string Text, DateTimeOffset SentAt, string[]? Attachments = null);
 public enum SimulatorScenario { Accept, Refuse, LoseConfirmation }
 public sealed record SimulatorDeliveryIssue(Guid Id, string Sender, string Text, string Status);
 public sealed record SimulatorOwnership(bool ExternalOwner, int Version);
@@ -156,7 +156,8 @@ public sealed class SocialSimulator(TenantAuthorizer authorizer, ISocialSimulato
 
             string content = message.Text?.Trim() ?? string.Empty;
             if (string.IsNullOrWhiteSpace(message.EventId) || message.EventId.Length > 512 ||
-                content.Length is 0 or > 2000 || content.Any(c => char.IsControl(c) && c is not ('\r' or '\n' or '\t')))
+                (content.Length == 0 && message.Attachments is not { Length: > 0 }) || content.Length > 2000 ||
+                content.Any(c => char.IsControl(c) && c is not ('\r' or '\n' or '\t')))
             {
                 throw new DomainValidationException("Provide a message ID and 1 to 2000 characters of text.")
                 { Code = channel == ChannelKind.Instagram ? "instagram.simulator.invalid_message" : "messenger.simulator.invalid_message" };
@@ -176,7 +177,7 @@ public sealed class SocialSimulator(TenantAuthorizer authorizer, ISocialSimulato
             foreach (var message in messages)
             {
                 var key = ClientMessageId.Create(SocialInboundText.Key(channel, message.EventId!));
-                await turns.RunAsync(new CustomerTurn(tenant, conversation, agent.Value, key, message.Text!.Trim(), clock.GetUtcNow()),
+                await turns.RunAsync(new CustomerTurn(tenant, conversation, agent.Value, key, message.Text?.Trim() ?? string.Empty, clock.GetUtcNow(), message.Attachments),
                     beforeGeneration: null, token).ConfigureAwait(false);
             }
         }

@@ -7,6 +7,7 @@ export interface SimulatorAgent {
   readonly customerId: string;
 }
 export interface MailboxMessage {
+  readonly attachments?: readonly string[] | null;
   readonly id: string;
   readonly sender: 'Customer' | 'AiAgent' | 'HumanAgent';
   readonly text: string;

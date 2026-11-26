@@ -18,6 +18,7 @@ import {
 import { LocaleFormat } from '@app/core/i18n/locale-format';
 import { pluralMessage } from '@app/core/i18n/plural';
 import { Avatar } from '@app/shared/avatar/avatar';
+import { MessageAttachments } from '@app/shared/message-attachments/message-attachments';
 import { Orb } from '@app/shared/orb/orb';
 import type { WhatsAppConversationFacts } from '@app/features/channels/whatsapp-api';
 import type {
@@ -69,7 +70,7 @@ let nextId = 0;
 @Component({
   selector: 'app-conversation-transcript',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Avatar, Orb],
+  imports: [Avatar, Orb, MessageAttachments],
   // While the transcript scrolls by itself it is a named region a keyboard can
   // reach: focus it, then the arrow keys, Page Up/Down, Home and End scroll it,
   // whether or not it holds a link or a button (WCAG 2.1.1; Phase 36.12).

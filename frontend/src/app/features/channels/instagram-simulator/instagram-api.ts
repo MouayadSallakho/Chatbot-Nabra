@@ -83,6 +83,7 @@ export class InstagramSimulatorApi {
     eventId: string,
     text: string,
     scenario: DeliveryScenario,
+    attachment = '',
   ) {
     const account = 'ig-account-' + agent.id.replaceAll('-', '');
     return this.http.post<SimulatorMailbox>(
@@ -96,7 +97,27 @@ export class InstagramSimulatorApi {
               {
                 sender: { id: agent.customerId },
                 recipient: { id: account },
-                message: { mid: eventId, text },
+                message: {
+                  mid: eventId,
+                  text,
+                  ...(attachment
+                    ? {
+                        attachments: [
+                          {
+                            type: attachment === 'unsupported' ? 'file' : 'image',
+                            payload: {
+                              url:
+                                attachment === 'sample'
+                                  ? 'https://media.example.test/nabra/parcel.png'
+                                  : attachment.startsWith('data:')
+                                    ? attachment
+                                    : null,
+                            },
+                          },
+                        ],
+                      }
+                    : {}),
+                },
               },
             ],
           },

@@ -60,10 +60,11 @@ public sealed class Message
     /// <summary>What kind of content this message carries.</summary>
     public MessageContentType ContentType { get; }
 
+    /// <summary>Ordered media descriptors, absent for text-only messages.</summary>
+    public string[]? Attachments { get; private set; }
+
     /// <summary>
-    /// The message text. Always present, because both content types currently
-    /// defined are textual. When non-textual content arrives this becomes
-    /// conditional on <see cref="ContentType"/>.
+    /// Message text or media caption. Media-only messages carry an empty caption.
     /// </summary>
     public string Text { get; }
 
@@ -80,14 +81,15 @@ public sealed class Message
         MessageSender sender,
         MessageContentType contentType,
         string? text,
-        DateTimeOffset sentAt) =>
-        new(
+        DateTimeOffset sentAt,
+        string[]? attachments = null) =>
+        new Message(
             MessageId.New(),
             conversationId,
             sender,
             contentType,
-            NormaliseText(text),
-            sentAt);
+            attachments is not null && string.IsNullOrWhiteSpace(text) ? string.Empty : NormaliseText(text),
+            sentAt) { Attachments = attachments?.ToArray() };
 
     /// <summary>
     /// Validates and normalises message text: surrounding whitespace is trimmed

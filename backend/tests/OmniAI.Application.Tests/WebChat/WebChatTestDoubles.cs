@@ -467,6 +467,7 @@ internal sealed class FakeWebChatWorld : IWebChatEndpointRepository, IWebChatRun
         ClientMessageId clientMessageId,
         string text,
         DateTimeOffset sentAt,
+        string[]? attachments = null,
         CancellationToken cancellationToken = default)
     {
         lock (_sync)

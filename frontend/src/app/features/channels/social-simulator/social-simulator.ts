@@ -16,6 +16,7 @@ import { WorkspaceContextService } from '@app/core/workspace/workspace-context-s
 import { LocaleFormat } from '@app/core/i18n/locale-format';
 import { toApiError } from '@app/core/api/api-error';
 import { Icon } from '@app/shared/icon/icon';
+import { MessageAttachments } from '@app/shared/message-attachments/message-attachments';
 import { PageHeader } from '@app/shared/page-header/page-header';
 import {
   DeliveryScenario,
@@ -32,7 +33,7 @@ import {
 
 @Component({
   selector: 'app-social-simulator',
-  imports: [PageHeader, Icon, RouterLink],
+  imports: [PageHeader, Icon, RouterLink, MessageAttachments],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './social-simulator.html',
   styleUrl: './social-simulator.scss',
@@ -52,6 +53,10 @@ export class SocialSimulatorPage {
   protected readonly mailbox = signal<SimulatorMailbox | null>(null);
   protected readonly scenario = signal<DeliveryScenario>('Accept');
   protected readonly draft = signal('');
+  protected readonly attachment = signal('');
+  protected readonly attachmentChoice = computed(() =>
+    this.attachment().startsWith('data:') ? 'upload' : this.attachment(),
+  );
   protected readonly busy = signal(false);
   protected readonly issue = signal('');
   protected readonly readIssue = signal('');
@@ -74,7 +79,10 @@ export class SocialSimulatorPage {
     HumanAgent: $localize`:@@ms.team:Support team`,
   };
   private readonly history = viewChild<ElementRef<HTMLElement>>('history');
-  private readonly drafts = new Map<string, { text: string; eventId: string }>();
+  private readonly drafts = new Map<
+    string,
+    { text: string; attachment: string; eventId: string }
+  >();
   private eventId = '';
   private generation = 0;
   private latestRead = 0;
@@ -116,6 +124,7 @@ export class SocialSimulatorPage {
     this.agent.set('');
     this.scenario.set('Accept');
     this.mailbox.set(null);
+    this.attachment.set('');
     this.edit('');
     this.busy.set(false);
     this.issue.set('');
@@ -142,14 +151,19 @@ export class SocialSimulatorPage {
 
   protected select(id: string): void {
     const previous = this.agent();
-    if (previous && this.draft())
-      this.drafts.set(previous, { text: this.draft(), eventId: this.eventId });
+    if (previous && (this.draft() || this.attachment()))
+      this.drafts.set(previous, {
+        text: this.draft(),
+        attachment: this.attachment(),
+        eventId: this.eventId,
+      });
     else this.drafts.delete(previous);
     this.reset();
     this.agent.set(id);
     const saved = this.drafts.get(id);
     if (saved) {
       this.draft.set(saved.text);
+      this.attachment.set(saved.attachment);
       this.eventId = saved.eventId;
     }
     void this.refresh();
@@ -158,6 +172,32 @@ export class SocialSimulatorPage {
   protected edit(value: string): void {
     this.draft.set(value);
     this.eventId = '';
+  }
+
+  protected selectAttachment(value: string): void {
+    this.attachment.set(value);
+    this.eventId = '';
+  }
+
+  protected readImage(file?: File): void {
+    this.selectAttachment('upload');
+    this.issue.set('');
+    if (!file) return;
+    const error = $localize`:@@media.uploadError:Could not read the image. Choose a PNG or JPEG up to 512 KB.`;
+    if (file.size > 512 * 1024 || !['image/png', 'image/jpeg'].includes(file.type)) {
+      this.issue.set(error);
+      return;
+    }
+    const generation = this.generation;
+    const reader = new FileReader();
+    this.busy.set(true);
+    reader.onloadend = () => {
+      if (!this.current(generation)) return;
+      this.busy.set(false);
+      if (typeof reader.result === 'string' && !reader.error) this.selectAttachment(reader.result);
+      else this.issue.set(error);
+    };
+    reader.readAsDataURL(file);
   }
 
   private current(generation: number): boolean {
@@ -267,7 +307,15 @@ export class SocialSimulatorPage {
     const tenant = this.workspace.tenantId(),
       agent = this.agents()?.find((item) => item.id === this.agent()),
       text = this.draft().trim();
-    if (!tenant || !agent || !text || text.length > 2000 || this.busy()) return;
+    if (
+      !tenant ||
+      !agent ||
+      (!text && !this.attachment()) ||
+      this.attachment() === 'upload' ||
+      text.length > 2000 ||
+      this.busy()
+    )
+      return;
     const generation = this.generation;
     this.latestRead++;
     this.reading = false;
@@ -277,11 +325,21 @@ export class SocialSimulatorPage {
     this.eventId ||= crypto.randomUUID();
     try {
       const box = await firstValueFrom(
-        this.api.send(tenant, agent, this.eventId, text, this.scenario()),
+        this.instagram
+          ? this.instagramApi.send(
+              tenant,
+              agent,
+              this.eventId,
+              text,
+              this.scenario(),
+              this.attachment(),
+            )
+          : this.api.send(tenant, agent, this.eventId, text, this.scenario()),
       );
       if (this.current(generation)) {
         this.show(box);
         this.edit('');
+        this.attachment.set('');
         this.readIssue.set('');
       }
     } catch (error) {

@@ -13,10 +13,8 @@ public sealed class InstagramDirectEnvelopeTests
     {
         const string fixture = """
             {"object":"instagram","entry":[{"id":"ig-account-acdc0000000000000000000000000001","messaging":[
-              {"message":{"mid":"photo","attachments":[{"type":"image"}]}},
               {"message":{"mid":"removed","text":"old","is_deleted":true}},
               {"message":{"mid":"out","text":"reply","is_echo":true}},
-              {"message":{"mid":"unknown","text":"unsupported","is_unsupported":true}},
               {"reaction":{"mid":"another","action":"react","emoji":"❤️"}},
               {"sender":{"id":"customer"},"recipient":{"id":"ig-account-acdc0000000000000000000000000001"},
                "message":{"mid":"ig.opaque/1+","text":"مرحباً"}}
@@ -27,6 +25,37 @@ public sealed class InstagramDirectEnvelopeTests
         Assert.Equal("customer", dm.SenderId);
         Assert.Equal("ig.opaque/1+", dm.EventId);
         Assert.Equal("مرحباً", dm.Text);
+    }
+
+    [Theory]
+    [InlineData("data:image/png;base64,invalid64")]
+    [InlineData("data:image/jpeg;base64,aGVsbG8=")]
+    [InlineData("https://other.example/customer.png")]
+    public void Unreadable_images_get_an_unavailable_preview(string url)
+    {
+        Assert.Equal("UnavailableImage", LocalInstagramImage.Preview(url));
+    }
+
+    [Fact]
+    public void Media_keeps_one_message_id_and_caption_and_does_not_forward_remote_urls()
+    {
+        const string fixture = """
+            {"object":"instagram","entry":[{"id":"ig-account-acdc0000000000000000000000000001","messaging":[
+              {"sender":{"id":"visitor"},"recipient":{"id":"ig-account-acdc0000000000000000000000000001"},
+               "message":{"mid":"album","text":"My parcel","attachments":[
+                 {"type":"image","payload":{"url":"https://media.example.test/nabra/parcel.png"}},
+                 {"type":"image","payload":{"url":"https://other.example/photo"}},
+                 {"type":"file"}]}},
+              {"sender":{"id":"visitor"},"recipient":{"id":"ig-account-acdc0000000000000000000000000001"},
+               "message":{"mid":"unknown","is_unsupported":true}}
+            ]}]}
+            """;
+        var messages = JsonSerializer.Deserialize<InstagramDirectEnvelope>(fixture, JsonSerializerOptions.Web)!.ReadTexts(Agent);
+        Assert.Equal("album", messages[0].EventId);
+        Assert.Equal("My parcel", messages[0].Text);
+        Assert.Equal(["SampleImage", "UnavailableImage", "Unsupported"], Assert.IsType<string[]>(messages[0].Attachments));
+        Assert.Equal(["Unsupported"], Assert.IsType<string[]>(messages[1].Attachments));
+        Assert.Null(messages[1].Text);
     }
 
     [Theory]

@@ -184,6 +184,7 @@ public interface IWebChatRuntimeStore
         ClientMessageId clientMessageId,
         string text,
         DateTimeOffset sentAt,
+        string[]? attachments = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>

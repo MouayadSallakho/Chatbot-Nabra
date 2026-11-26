@@ -101,7 +101,7 @@ public sealed class ConversationContextPolicy
 
             AiTurnRole? role = RoleOf(message.Sender);
 
-            if (role is null)
+            if (role is null || message.Text.Length == 0)
             {
                 continue;
             }

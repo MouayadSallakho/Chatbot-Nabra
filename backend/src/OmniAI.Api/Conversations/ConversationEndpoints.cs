@@ -184,7 +184,8 @@ public sealed record TranscriptMessageResponse(
     string Text,
     DateTimeOffset SentAt,
     long Sequence,
-    WorkspaceMemberResponse? SentBy);
+    WorkspaceMemberResponse? SentBy,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string[]? Attachments = null);
 
 /// <summary>A page of a transcript.</summary>
 /// <param name="PreviousCursor">
@@ -433,7 +434,7 @@ internal static class ConversationEndpoints
                     message.Text,
                     message.SentAt,
                     message.IngestionSequence,
-                    ToMember(message.SentBy)))],
+                    ToMember(message.SentBy), message.Attachments))],
                 page.NextCursor,
                 page.PreviousCursor,
                 page.Events is null

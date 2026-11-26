@@ -33,8 +33,8 @@ internal sealed record InstagramDirectEnvelope(
                     throw InvalidEvent();
                 }
 
-                // Echoes, unsent messages and non-text notifications never start a customer turn.
-                if (item.Message is not { Text: not null, IsEcho: false, IsDeleted: false, IsUnsupported: false } dm)
+                if (item.Message is not { IsEcho: false, IsDeleted: false } dm ||
+                    (dm.Text is null && dm.Attachments is not { Length: > 0 } && !dm.IsUnsupported))
                 {
                     continue;
                 }
@@ -44,7 +44,18 @@ internal sealed record InstagramDirectEnvelope(
                     throw InvalidEvent();
                 }
 
-                texts.Add(new SimulatorInboundText(item.Sender.Id, dm.Mid, dm.Text));
+                if (dm.Attachments is { Length: > 10 })
+                {
+                    throw InvalidEvent();
+                }
+                string[]? attachments = dm.IsUnsupported ? ["Unsupported"] : dm.Attachments is { Length: > 0 }
+                    ? dm.Attachments.Select(a => a switch
+                    {
+                        { Type: "image" } => LocalInstagramImage.Preview(a.Payload?.Url),
+                        _ => "Unsupported",
+                    }).ToArray()
+                    : null;
+                texts.Add(new SimulatorInboundText(item.Sender.Id, dm.Mid, dm.Text, attachments));
             }
         }
 
@@ -61,4 +72,6 @@ internal sealed record InstagramMessagingEvent(InstagramParty? Sender, Instagram
 internal sealed record InstagramParty(string? Id);
 internal sealed record InstagramDirectMessage(string? Mid, string? Text,
     [property: JsonPropertyName("is_echo")] bool IsEcho, [property: JsonPropertyName("is_deleted")] bool IsDeleted,
-    [property: JsonPropertyName("is_unsupported")] bool IsUnsupported);
+    [property: JsonPropertyName("is_unsupported")] bool IsUnsupported, InstagramAttachment?[]? Attachments = null);
+internal sealed record InstagramAttachment(string? Type, InstagramAttachmentPayload? Payload);
+internal sealed record InstagramAttachmentPayload(string? Url);

@@ -584,7 +584,7 @@ internal sealed class ConversationRepository(OmniAiDbContext context) : IConvers
                 message.Sender,
                 message.Text,
                 message.SentAt,
-                EF.Property<long>(message, PersistenceSchema.MessageIngestionSequence)))
+                EF.Property<long>(message, PersistenceSchema.MessageIngestionSequence), null, message.Attachments))
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 
@@ -628,7 +628,7 @@ internal sealed class ConversationRepository(OmniAiDbContext context) : IConvers
                 message.Sender,
                 message.Text,
                 message.SentAt,
-                EF.Property<long>(message, PersistenceSchema.MessageIngestionSequence)))
+                EF.Property<long>(message, PersistenceSchema.MessageIngestionSequence), null, message.Attachments))
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 

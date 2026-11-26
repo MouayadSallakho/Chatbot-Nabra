@@ -246,11 +246,11 @@ internal sealed class SocialSimulatorStore(OmniAiDbContext context, IConversatio
             .Where(message => message.ConversationId == conversation &&
                 (message.Sender == MessageSender.Customer || context.Set<MessengerSimulatorReceipt>().Any(receipt => receipt.MessageId == message.Id && receipt.ReceivedAt != null)))
             .OrderByDescending(message => EF.Property<long>(message, PersistenceSchema.MessageIngestionSequence))
-            .Take(40).Select(message => new { message.Id, message.Sender, message.Text, message.SentAt })
+            .Take(40).Select(message => new { message.Id, message.Sender, message.Text, message.SentAt, message.Attachments })
             .ToListAsync(token).ConfigureAwait(false);
         rows.Reverse();
         return new SimulatorMailbox(conversation.Value,
-            [.. rows.Select(row => new SimulatorMessage(row.Id.Value, row.Sender.ToString(), row.Text, row.SentAt))],
+            [.. rows.Select(row => new SimulatorMessage(row.Id.Value, row.Sender.ToString(), row.Text, row.SentAt, row.Attachments))],
             [.. issues.Select(row => new SimulatorDeliveryIssue(row.Id.Value, row.Sender.ToString(), row.Text, row.Status.ToString()))], ownership?.State, ownership?.LastHandoverTimestamp ?? 0);
     }
 

@@ -488,15 +488,29 @@ public sealed class Conversation
         return true;
     }
 
+    public Message AddCustomerMedia(string? caption, string[] attachments, DateTimeOffset sentAt)
+    {
+        RequireOpen("add a message");
+        ArgumentNullException.ThrowIfNull(attachments);
+        if (attachments.Length is 0 or > 10 || attachments.Any(item =>
+            item is not ("SampleImage" or "UnavailableImage" or "Unsupported") &&
+            !(item is { Length: <= 65559 } && item.StartsWith("data:image/jpeg;base64,", StringComparison.Ordinal))))
+        {
+            throw new DomainValidationException("Invalid attachment descriptors.") { Code = "conversations.attachments.invalid" };
+        }
+        return Append(MessageSender.Customer, MessageContentType.Media, caption, sentAt, attachments);
+    }
+
     private Message Append(
         MessageSender sender,
         MessageContentType contentType,
         string? text,
-        DateTimeOffset sentAt)
+        DateTimeOffset sentAt,
+        string[]? attachments = null)
     {
         DateTimeOffset instant = RequireInstant(sentAt, "sent instant");
 
-        Message message = Message.Create(Id, sender, contentType, text, instant);
+        Message message = Message.Create(Id, sender, contentType, text, instant, attachments);
 
         // Appended only once the message has been built successfully, so a
         // rejected message leaves the conversation exactly as it was.

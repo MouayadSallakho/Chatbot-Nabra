@@ -5,6 +5,7 @@ test('Instagram DMs survive replay and human takeover in their own inbox', async
   page,
   appLanguage,
 }, info) => {
+  test.setTimeout(100_000);
   const ar = appLanguage === 'ar';
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/channels');
@@ -131,6 +132,8 @@ test('Instagram DMs survive replay and human takeover in their own inbox', async
   await page.reload();
   await agent.selectOption({ index });
   const waiting = ar ? 'وصل سؤالي أثناء التحويل.' : 'My question during the transfer.';
+  await page.locator('#sim-media').selectOption('upload');
+  await page.locator('#sim-image').setInputFiles('public/media/parcel-label.png');
   await text.fill(waiting);
   const [paused] = await Promise.all([
     page.waitForResponse((r) => new URL(r.url()).pathname === path),
@@ -139,7 +142,15 @@ test('Instagram DMs survive replay and human takeover in their own inbox', async
   const pausedBox = await paused.json();
   expect(pausedBox.ownership.externalOwner).toBe(true);
   expect(pausedBox.messages).toHaveLength(5);
+  expect(pausedBox.messages.at(-1).attachments).toEqual([
+    expect.stringMatching(/^data:image\/jpeg;base64,/u),
+  ]);
+  const receipt = await (await post(page.request, path, paused.request().postDataJSON())).json();
+  expect(receipt.messages).toEqual(pausedBox.messages);
   await expect(inbox.getByTestId('transcript')).toContainText(waiting);
+  const preview = inbox.getByTestId('transcript').locator('app-message-attachments img');
+  await expect(preview).toHaveCount(1);
+  await expect.poll(() => preview.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBe(320);
   await inbox.getByTestId('take-over').click();
   await expect(inbox.getByTestId('return-to-ai')).toBeVisible();
   await expect(inbox.locator('#conversation-reply')).toHaveCount(0);
@@ -169,6 +180,28 @@ test('Instagram DMs survive replay and human takeover in their own inbox', async
   await agent.selectOption({ index });
   await expect(page.locator('[data-sender]')).toHaveCount(7);
   await expect(page.locator('[data-sender="AiAgent"]')).toHaveCount(2);
+  for (const [option, label] of [
+    ['unavailable', ar ? 'تعذّرت معاينة الصورة.' : 'The image preview is unavailable.'],
+    [
+      'unsupported',
+      ar ? 'لا تتوفر معاينة لهذا النوع من المرفقات.' : 'This attachment type has no preview.',
+    ],
+  ]) {
+    await page.locator('#sim-media').selectOption(option);
+    await submit.click();
+    await expect(inbox.getByTestId('transcript')).toContainText(label);
+    await expect(page.locator('[data-sender="AiAgent"]')).toHaveCount(2);
+  }
+  await inbox.reload();
+  await expect(preview).toHaveCount(1);
+  await expect(inbox.getByTestId('transcript').locator('app-message-attachments')).toHaveCount(3);
+  await text.fill(ar ? 'متى يصل الطرد؟' : 'When will the parcel arrive?');
+  await submit.click();
+  await expect(page.locator('[data-sender="AiAgent"]')).toHaveCount(3);
+  await info.attach('instagram-staff-attachments', {
+    body: await inbox.screenshot(),
+    contentType: 'image/png',
+  });
   for (const width of [1440, 390]) {
     await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
     await expect

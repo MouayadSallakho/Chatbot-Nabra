@@ -23,7 +23,8 @@ public sealed record CustomerTurn(
     AiAgent Agent,
     ClientMessageId ClientMessageId,
     string Text,
-    DateTimeOffset SentAt);
+    DateTimeOffset SentAt,
+    string[]? Attachments = null);
 
 /// <summary>What a customer turn produced.</summary>
 /// <param name="CustomerMessage">The message the customer sent, as stored.</param>
@@ -158,7 +159,7 @@ public sealed class CustomerTurnRunner(
                 .ConfigureAwait(false)
             ?? ConversationHandling.Ai;
 
-        bool answeredByAi = handling == ConversationHandling.Ai;
+        bool answeredByAi = handling == ConversationHandling.Ai && turn.Text.Length > 0;
 
         if (answeredByAi && beforeGeneration is not null)
         {
@@ -177,6 +178,7 @@ public sealed class CustomerTurnRunner(
                 turn.ClientMessageId,
                 turn.Text,
                 turn.SentAt,
+                turn.Attachments,
                 cancellationToken)
             .ConfigureAwait(false);
 
@@ -204,7 +206,7 @@ public sealed class CustomerTurnRunner(
             return new CustomerTurnOutcome(
                 customer,
                 Reply: null,
-                ConversationHandling.Human,
+                handling,
                 WasReplay: false);
         }
 

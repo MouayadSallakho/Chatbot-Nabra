@@ -68,6 +68,7 @@ internal sealed class WebChatRuntimeStore(OmniAiDbContext context) : IWebChatRun
         ClientMessageId clientMessageId,
         string text,
         DateTimeOffset sentAt,
+        string[]? attachments = null,
         CancellationToken cancellationToken = default)
     {
         // Only the conversation row, not its history. Appending needs the
@@ -82,7 +83,9 @@ internal sealed class WebChatRuntimeStore(OmniAiDbContext context) : IWebChatRun
             return null;
         }
 
-        Message message = conversation.AddTextMessage(MessageSender.Customer, text, sentAt);
+        Message message = attachments is null
+            ? conversation.AddTextMessage(MessageSender.Customer, text, sentAt)
+            : conversation.AddCustomerMedia(text, attachments, sentAt);
 
         ConversationTurn turn = ConversationTurn.Begin(
             conversationId,
