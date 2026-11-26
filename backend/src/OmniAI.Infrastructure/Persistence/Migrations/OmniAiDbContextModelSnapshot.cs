@@ -3010,6 +3010,23 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("OmniAI.Infrastructure.Persistence.Repositories.AfterHoursTeam", b =>
+                {
+                    b.Property<Guid>("Tenant")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("Role")
+                        .HasColumnType("uuid")
+                        .HasColumnName("role_id");
+
+                    b.HasKey("Tenant");
+
+                    b.HasIndex("Role", "Tenant");
+
+                    b.ToTable("inbox_after_hours_teams", (string)null);
+                });
+
             modelBuilder.Entity("OmniAI.Infrastructure.Persistence.Repositories.InboxRoute", b =>
                 {
                     b.Property<Guid>("Tenant")
@@ -3035,6 +3052,29 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                     b.HasIndex("Role", "Tenant");
 
                     b.ToTable("inbox_routes", (string)null);
+                });
+
+            modelBuilder.Entity("OmniAI.Infrastructure.Persistence.Repositories.InboxSchedule", b =>
+                {
+                    b.Property<Guid>("Tenant")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<bool>("Enabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("enabled");
+
+                    b.PrimitiveCollection<int[]>("Minutes")
+                        .IsRequired()
+                        .HasColumnType("integer[]")
+                        .HasColumnName("minutes");
+
+                    b.HasKey("Tenant");
+
+                    b.ToTable("inbox_schedules", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_inbox_schedule_week", "cardinality(minutes) = 14");
+                        });
                 });
 
             modelBuilder.Entity("OmniAI.Infrastructure.Persistence.Repositories.InstagramSimulatorThread", b =>
@@ -3925,12 +3965,37 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                         .HasAnnotation("OmniAI:SuppressForeignKeyIndex", true);
                 });
 
+            modelBuilder.Entity("OmniAI.Infrastructure.Persistence.Repositories.AfterHoursTeam", b =>
+                {
+                    b.HasOne("OmniAI.Infrastructure.Persistence.Repositories.InboxSchedule", null)
+                        .WithOne("Destination")
+                        .HasForeignKey("OmniAI.Infrastructure.Persistence.Repositories.AfterHoursTeam", "Tenant")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("OmniAI.Domain.Authorization.TenantRole", null)
+                        .WithMany()
+                        .HasForeignKey("Role", "Tenant")
+                        .HasPrincipalKey("Id", "TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("OmniAI.Infrastructure.Persistence.Repositories.InboxRoute", b =>
                 {
                     b.HasOne("OmniAI.Domain.Authorization.TenantRole", null)
                         .WithMany()
                         .HasForeignKey("Role", "Tenant")
                         .HasPrincipalKey("Id", "TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("OmniAI.Infrastructure.Persistence.Repositories.InboxSchedule", b =>
+                {
+                    b.HasOne("OmniAI.Domain.Tenants.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("Tenant")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
@@ -4011,6 +4076,11 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("OmniAI.Domain.WebChat.WebChatEndpoint", b =>
                 {
                     b.Navigation("AllowedOrigins");
+                });
+
+            modelBuilder.Entity("OmniAI.Infrastructure.Persistence.Repositories.InboxSchedule", b =>
+                {
+                    b.Navigation("Destination");
                 });
 #pragma warning restore 612, 618
         }

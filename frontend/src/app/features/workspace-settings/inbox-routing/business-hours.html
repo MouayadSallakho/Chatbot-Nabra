@@ -1,0 +1,116 @@
+<details class="hours-panel">
+  <summary data-testid="hours-settings" i18n="@@hours.title">
+    Business hours and after-hours assignment
+  </summary>
+  <form (submit)="$event.preventDefault(); save()">
+    <fieldset [disabled]="busy()">
+      <label class="toggle"
+        ><input
+          #enabled
+          type="checkbox"
+          data-testid="hours-enabled"
+          [checked]="draft().enabled"
+          (change)="edit({ enabled: enabled.checked })"
+        />
+        <span i18n="@@hours.enable">Use business hours for new conversations</span></label
+      >
+      @if (draft().enabled) {
+        <p class="text-muted" i18n="@@hours.zone">
+          Weekly schedule in <bdi>{{ zone() }}</bdi
+          >. During opening hours, channel and language rules apply.
+        </p>
+        @for (item of days; track item.day) {
+          @let s = shift(item.day);
+          @let all = s?.startMinute === 0 && s?.endMinute === 1440;
+          <fieldset class="day">
+            <legend>{{ item.name }}</legend>
+            <label
+              ><span class="visually-hidden" i18n="@@hours.dayMode">Opening hours</span>
+              <select
+                #mode
+                class="input"
+                [attr.data-day]="item.day"
+                (change)="setMode(item.day, mode.value)"
+              >
+                <option value="closed" [selected]="!s" i18n="@@hours.closed">Closed</option>
+                <option value="shift" [selected]="s && !all" i18n="@@hours.shift">Set times</option>
+                <option value="all" [selected]="all" i18n="@@hours.all">Open all day</option>
+              </select></label
+            >
+            @if (s && !all) {
+              <label
+                ><span i18n="@@hours.from">Opens at</span>
+                <input
+                  #start
+                  class="input"
+                  type="time"
+                  required
+                  [value]="time(s.startMinute)"
+                  (input)="changeTime(s, 'startMinute', start.value)"
+              /></label>
+              <label
+                ><span i18n="@@hours.until">Closes at</span>
+                <input
+                  #end
+                  class="input"
+                  type="time"
+                  required
+                  [value]="time(s.endMinute)"
+                  (input)="changeTime(s, 'endMinute', end.value)"
+              /></label>
+              @if (s.endMinute >= 0 && s.startMinute > s.endMinute) {
+                <small i18n="@@hours.nextDay">Closes the following day</small>
+              }
+            }
+          </fieldset>
+        }
+        <label
+          ><span i18n="@@hours.team">Outside business hours, assign to</span>
+          <select
+            #role
+            class="input"
+            data-testid="after-hours-team"
+            (change)="edit({ afterHoursRoleId: role.value || null })"
+          >
+            <option value="" [selected]="!draft().afterHoursRoleId" i18n="@@routing.default">
+              General inbox · Unassigned
+            </option>
+            @for (r of roles(); track r.id) {
+              <option [value]="r.id" [selected]="draft().afterHoursRoleId === r.id">
+                {{ r.name }}
+              </option>
+            }
+          </select></label
+        >
+      }
+      @if (!valid()) {
+        <p role="alert" i18n="@@hours.invalid">
+          Enter different opening and closing times, or choose Open all day.
+        </p>
+      }
+      <button
+        class="btn btn-primary btn-sm"
+        type="submit"
+        data-testid="save-hours"
+        [disabled]="!dirty() || !valid()"
+        i18n="@@hours.save"
+      >
+        Save business hours
+      </button>
+      @if (dirty()) {
+        <button
+          type="button"
+          class="btn btn-secondary btn-sm"
+          (click)="discard()"
+          i18n="@@hours.discard"
+        >
+          Discard changes
+        </button>
+      }
+    </fieldset>
+    @if (error()) {
+      <p role="alert">{{ error() }}</p>
+    }
+    <span role="status">{{ notice() }}</span>
+  </form>
+</details>

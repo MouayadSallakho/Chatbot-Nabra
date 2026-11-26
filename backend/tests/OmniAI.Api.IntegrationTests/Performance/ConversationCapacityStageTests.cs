@@ -40,8 +40,8 @@ public sealed class ConversationCapacityStageTests(CapacityApiFixture api, ITest
         int[] stages = [.. (Environment.GetEnvironmentVariable("OMNIAI_PERF_STAGES") ?? "1,5,10,25,40,50,75,100")
             .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Select(int.Parse)];
-        int seconds = int.Parse(Environment.GetEnvironmentVariable("OMNIAI_PERF_STAGE_SECONDS") ?? "15");
-        int providerMs = int.Parse(Environment.GetEnvironmentVariable("OMNIAI_PERF_PROVIDER_MS") ?? "200");
+        int seconds = int.Parse(Environment.GetEnvironmentVariable("OMNIAI_PERF_STAGE_SECONDS") ?? "15", System.Globalization.CultureInfo.InvariantCulture);
+        int providerMs = int.Parse(Environment.GetEnvironmentVariable("OMNIAI_PERF_PROVIDER_MS") ?? "200", System.Globalization.CultureInfo.InvariantCulture);
 
         LatencyOpenAiHandler provider = api.ResetProvider();
         provider.Latency = TimeSpan.FromMilliseconds(providerMs);

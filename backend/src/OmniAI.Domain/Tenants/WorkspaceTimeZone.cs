@@ -103,6 +103,8 @@ public sealed partial class WorkspaceTimeZone : IEquatable<WorkspaceTimeZone>
     public DateOnly DateOf(DateTimeOffset instant) =>
         DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(instant, Rules).DateTime);
 
+    public DateTimeOffset LocalTimeOf(DateTimeOffset instant) => TimeZoneInfo.ConvertTime(instant, Rules);
+
     /// <summary>
     /// The first instant of a local date.
     /// </summary>

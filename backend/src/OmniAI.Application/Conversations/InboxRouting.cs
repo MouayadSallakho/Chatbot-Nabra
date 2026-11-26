@@ -8,12 +8,13 @@ namespace OmniAI.Application.Conversations;
 
 public sealed record RoutingRule(string Channel, string Language, Guid RoleId);
 public sealed record RoutingTeam(Guid Id, string Name);
-public sealed record RoutingSettings(IReadOnlyList<RoutingRule> Rules, IReadOnlyList<RoutingTeam> Teams);
+public sealed record RoutingSettings(IReadOnlyList<RoutingRule> Rules, IReadOnlyList<RoutingTeam> Teams, RoutingHours Hours);
 
 public interface IInboxRoutingStore
 {
     Task<RoutingSettings> ReadAsync(TenantId tenant, CancellationToken token);
     Task<bool> SetAsync(TenantId tenant, ChannelKind channel, string language, Guid? role, CancellationToken token);
+    Task<bool> SetHoursAsync(TenantId tenant, RoutingHours hours, CancellationToken token);
 }
 
 public sealed class InboxRoutingHandler(TenantAuthorizer authorizer, IInboxRoutingStore store)
@@ -27,6 +28,18 @@ public sealed class InboxRoutingHandler(TenantAuthorizer authorizer, IInboxRouti
         var tenant = TenantId.From(tenantId);
         return await CanManageAsync(tenant, token).ConfigureAwait(false)
             ? await store.ReadAsync(tenant, token).ConfigureAwait(false) : null;
+    }
+
+    public async Task<bool> SetHoursAsync(Guid tenantId, RoutingHours hours, CancellationToken token)
+    {
+        var tenant = TenantId.From(tenantId);
+        if (!await CanManageAsync(tenant, token).ConfigureAwait(false))
+        {
+            return false;
+        }
+        ArgumentNullException.ThrowIfNull(hours);
+        hours.Validate();
+        return await store.SetHoursAsync(tenant, hours, token).ConfigureAwait(false);
     }
 
     public async Task<bool> SetAsync(Guid tenantId, string channel, string language, Guid? role, CancellationToken token)

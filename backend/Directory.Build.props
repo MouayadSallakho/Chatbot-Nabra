@@ -9,7 +9,8 @@
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <InvariantGlobalization>true</InvariantGlobalization>
+    <!-- Windows uses ICU to resolve the IANA time-zone names stored by workspaces. -->
+    <InvariantGlobalization Condition="'$(OS)' != 'Windows_NT'">true</InvariantGlobalization>
   </PropertyGroup>
 
   <!--

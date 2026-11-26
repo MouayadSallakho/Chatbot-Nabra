@@ -382,7 +382,7 @@
           Automatic conversation assignment
         </summary>
         @if (routingOpen()) {
-          <app-inbox-routing [tenant]="workspace.id" />
+          <app-inbox-routing [tenant]="workspace.id" [zone]="workspace.timeZone" />
         }
       </details>
     }

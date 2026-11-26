@@ -1,9 +1,16 @@
 <p class="text-muted" i18n="@@routing.help">
-  Choose a workspace role for each channel and language. The first customer message goes to the
-  eligible member with the fewest open conversations. If the language is unclear or nobody can
-  reply, the conversation stays unassigned.
+  Choose a workspace role for each channel and language. The eligible member with the fewest open
+  conversations receives the first message. Outside scheduled hours, the after-hours destination
+  takes priority.
 </p>
 @if (settings(); as data) {
+  <app-business-hours
+    [tenant]="tenant()"
+    [zone]="zone()"
+    [hours]="data.hours"
+    [roles]="data.teams"
+    (saved)="hoursSaved($event)"
+  />
   @for (channel of channels; track channel.id) {
     <fieldset>
       <legend>{{ channel.name }}</legend>

@@ -83,12 +83,12 @@ internal sealed class WebChatRuntimeStore(OmniAiDbContext context) : IWebChatRun
             return null;
         }
 
-        var rule = await InboxRoutingStore.FirstMessageRuleAsync(_context, conversation, text, cancellationToken).ConfigureAwait(false);
+        var rule = await InboxRoutingStore.FirstMessageRoleAsync(_context, conversation, text, sentAt, cancellationToken).ConfigureAwait(false);
         await using var routingTransaction = rule is null ? null :
             await _context.Database.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
         if (rule is not null)
         {
-            await InboxRoutingStore.AssignAsync(_context, conversation, rule, sentAt, cancellationToken).ConfigureAwait(false);
+            await InboxRoutingStore.AssignAsync(_context, conversation, rule.Value, sentAt, cancellationToken).ConfigureAwait(false);
         }
         Message message = attachments is null
             ? conversation.AddTextMessage(MessageSender.Customer, text, sentAt)

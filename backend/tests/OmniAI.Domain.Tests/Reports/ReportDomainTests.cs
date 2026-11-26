@@ -1,3 +1,4 @@
+using System.Globalization;
 using OmniAI.Domain.Reports;
 using OmniAI.Domain.Tenants;
 using OmniAI.Domain.Users;
@@ -29,7 +30,8 @@ public sealed class ReportDomainTests
     [InlineData("2026-09-10", "2026-09-10")]
     [InlineData("2026-09-10", "2026-09-09")]
     public void An_empty_or_reversed_period_is_refused(string from, string to) =>
-        Assert.Throws<DomainValidationException>(() => ReportPeriod.Create(DateOnly.Parse(from), DateOnly.Parse(to)));
+        Assert.Throws<DomainValidationException>(() => ReportPeriod.Create(
+            DateOnly.Parse(from, CultureInfo.InvariantCulture), DateOnly.Parse(to, CultureInfo.InvariantCulture)));
 
     [Fact]
     public void A_period_may_cover_at_most_366_days()

@@ -2,20 +2,27 @@ import { HttpClient } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, effect, inject, input, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { toApiError } from '@app/core/api/api-error';
+import { BusinessHours, type Hours } from './business-hours';
 
 interface Settings {
+  hours: Hours;
   rules: { channel: string; language: string; roleId: string }[];
   teams: { id: string; name: string }[];
 }
 
 @Component({
   selector: 'app-inbox-routing',
+  imports: [BusinessHours],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './inbox-routing.html',
   styleUrl: './inbox-routing.scss',
 })
 export class InboxRouting {
   readonly tenant = input.required<string>();
+  readonly zone = input.required<string>();
+  protected hoursSaved(hours: Hours) {
+    this.settings.update((s) => s && { ...s, hours });
+  }
   private readonly http = inject(HttpClient);
   protected readonly settings = signal<Settings | null>(null);
   protected readonly busy = signal(false);

@@ -293,6 +293,8 @@ internal static class ConversationEndpoints
 
         workspace.MapGet("/routing", async (Guid tenantId, InboxRoutingHandler handler, CancellationToken token) =>
             await handler.ReadAsync(tenantId, token).ConfigureAwait(false) is { } settings ? Results.Ok(settings) : Results.NotFound());
+        workspace.MapPut("/routing/hours", async (Guid tenantId, RoutingHours request, InboxRoutingHandler handler, CancellationToken token) =>
+            await handler.SetHoursAsync(tenantId, request, token).ConfigureAwait(false) ? Results.NoContent() : Results.NotFound());
         workspace.MapPut("/routing/{channel}/{language}", async (Guid tenantId, string channel, string language,
             SaveRoutingRuleRequest request, InboxRoutingHandler handler, CancellationToken token) =>
             await handler.SetAsync(tenantId, channel, language, request.RoleId, token).ConfigureAwait(false) ? Results.NoContent() : Results.NotFound());

@@ -32,13 +32,16 @@ public sealed class Message
     /// </remarks>
     public const int MaxTextLength = 32_000;
 
+    private readonly string[]? _attachments;
+
     private Message(
         MessageId id,
         ConversationId conversationId,
         MessageSender sender,
         MessageContentType contentType,
         string text,
-        DateTimeOffset sentAt)
+        DateTimeOffset sentAt,
+        string[]? attachments)
     {
         Id = id;
         ConversationId = conversationId;
@@ -46,6 +49,7 @@ public sealed class Message
         ContentType = contentType;
         Text = text;
         SentAt = sentAt;
+        _attachments = attachments?.ToArray();
     }
 
     /// <summary>Identity.</summary>
@@ -61,7 +65,7 @@ public sealed class Message
     public MessageContentType ContentType { get; }
 
     /// <summary>Ordered media descriptors, absent for text-only messages.</summary>
-    public string[]? Attachments { get; private set; }
+    public string[]? Attachments => _attachments?.ToArray();
 
     /// <summary>
     /// Message text or media caption. Media-only messages carry an empty caption.
@@ -89,7 +93,8 @@ public sealed class Message
             sender,
             contentType,
             attachments is not null && string.IsNullOrWhiteSpace(text) ? string.Empty : NormaliseText(text),
-            sentAt) { Attachments = attachments?.ToArray() };
+            sentAt,
+            attachments);
 
     /// <summary>
     /// Validates and normalises message text: surrounding whitespace is trimmed
