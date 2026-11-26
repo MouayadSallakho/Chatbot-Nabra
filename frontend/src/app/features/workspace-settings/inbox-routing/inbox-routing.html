@@ -1,0 +1,47 @@
+<p class="text-muted" i18n="@@routing.help">
+  Choose a workspace role for each channel and language. The first customer message goes to the
+  eligible member with the fewest open conversations. If the language is unclear or nobody can
+  reply, the conversation stays unassigned.
+</p>
+@if (settings(); as data) {
+  @for (channel of channels; track channel.id) {
+    <fieldset>
+      <legend>{{ channel.name }}</legend>
+      @for (language of languages; track language.id) {
+        <label
+          ><span>{{ language.name }}</span>
+          <select
+            #targetRole
+            class="input"
+            [attr.data-route]="channel.id + '-' + language.id"
+            [disabled]="busy()"
+            (change)="save(channel.id, language.id, targetRole)"
+          >
+            <option value="" [selected]="!target(channel.id, language.id)" i18n="@@routing.default">
+              General inbox · Unassigned
+            </option>
+            @for (team of data.teams; track team.id) {
+              <option [value]="team.id" [selected]="target(channel.id, language.id) === team.id">
+                {{ team.name }}
+              </option>
+            }
+          </select>
+        </label>
+      }
+    </fieldset>
+  }
+} @else if (busy()) {
+  <p role="status" i18n="@@routing.loading">Loading routing rules…</p>
+}
+@if (error()) {
+  <p role="alert">{{ error() }}</p>
+  <button
+    type="button"
+    class="btn btn-secondary btn-sm"
+    (click)="load(tenant())"
+    i18n="@@routing.reload"
+  >
+    Reload rules
+  </button>
+}
+<span role="status">{{ notice() }}</span>

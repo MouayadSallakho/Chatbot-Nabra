@@ -83,6 +83,13 @@ internal sealed class WebChatRuntimeStore(OmniAiDbContext context) : IWebChatRun
             return null;
         }
 
+        var rule = await InboxRoutingStore.FirstMessageRuleAsync(_context, conversation, text, cancellationToken).ConfigureAwait(false);
+        await using var routingTransaction = rule is null ? null :
+            await _context.Database.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
+        if (rule is not null)
+        {
+            await InboxRoutingStore.AssignAsync(_context, conversation, rule, sentAt, cancellationToken).ConfigureAwait(false);
+        }
         Message message = attachments is null
             ? conversation.AddTextMessage(MessageSender.Customer, text, sentAt)
             : conversation.AddCustomerMedia(text, attachments, sentAt);
@@ -115,6 +122,10 @@ internal sealed class WebChatRuntimeStore(OmniAiDbContext context) : IWebChatRun
             return null;
         }
 
+        if (routingTransaction is not null)
+        {
+            await routingTransaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+        }
         return turn;
     }
 

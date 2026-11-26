@@ -3010,6 +3010,33 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("OmniAI.Infrastructure.Persistence.Repositories.InboxRoute", b =>
+                {
+                    b.Property<Guid>("Tenant")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<string>("Channel")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("channel");
+
+                    b.Property<string>("Language")
+                        .HasMaxLength(2)
+                        .HasColumnType("character varying(2)")
+                        .HasColumnName("language");
+
+                    b.Property<Guid>("Role")
+                        .HasColumnType("uuid")
+                        .HasColumnName("role_id");
+
+                    b.HasKey("Tenant", "Channel", "Language");
+
+                    b.HasIndex("Role", "Tenant");
+
+                    b.ToTable("inbox_routes", (string)null);
+                });
+
             modelBuilder.Entity("OmniAI.Infrastructure.Persistence.Repositories.InstagramSimulatorThread", b =>
                 {
                     b.Property<Guid>("TenantId")
@@ -3896,6 +3923,16 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_knowledge_chunks_document")
                         .HasAnnotation("OmniAI:SuppressForeignKeyIndex", true);
+                });
+
+            modelBuilder.Entity("OmniAI.Infrastructure.Persistence.Repositories.InboxRoute", b =>
+                {
+                    b.HasOne("OmniAI.Domain.Authorization.TenantRole", null)
+                        .WithMany()
+                        .HasForeignKey("Role", "Tenant")
+                        .HasPrincipalKey("Id", "TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("OmniAI.Infrastructure.Persistence.Repositories.InstagramSimulatorThread", b =>

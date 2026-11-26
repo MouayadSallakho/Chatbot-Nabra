@@ -1,0 +1,47 @@
+using OmniAI.Application.Authorization;
+using OmniAI.Domain;
+using OmniAI.Domain.Authorization;
+using OmniAI.Domain.Conversations;
+using OmniAI.Domain.Tenants;
+
+namespace OmniAI.Application.Conversations;
+
+public sealed record RoutingRule(string Channel, string Language, Guid RoleId);
+public sealed record RoutingTeam(Guid Id, string Name);
+public sealed record RoutingSettings(IReadOnlyList<RoutingRule> Rules, IReadOnlyList<RoutingTeam> Teams);
+
+public interface IInboxRoutingStore
+{
+    Task<RoutingSettings> ReadAsync(TenantId tenant, CancellationToken token);
+    Task<bool> SetAsync(TenantId tenant, ChannelKind channel, string language, Guid? role, CancellationToken token);
+}
+
+public sealed class InboxRoutingHandler(TenantAuthorizer authorizer, IInboxRoutingStore store)
+{
+    private async Task<bool> CanManageAsync(TenantId tenant, CancellationToken token) =>
+        await authorizer.RequireAsync(tenant, PlatformPermissions.WorkspaceManage, token).ConfigureAwait(false) &&
+        await authorizer.RequireAsync(tenant, PlatformPermissions.ConversationsAssign, token).ConfigureAwait(false);
+
+    public async Task<RoutingSettings?> ReadAsync(Guid tenantId, CancellationToken token)
+    {
+        var tenant = TenantId.From(tenantId);
+        return await CanManageAsync(tenant, token).ConfigureAwait(false)
+            ? await store.ReadAsync(tenant, token).ConfigureAwait(false) : null;
+    }
+
+    public async Task<bool> SetAsync(Guid tenantId, string channel, string language, Guid? role, CancellationToken token)
+    {
+        var tenant = TenantId.From(tenantId);
+        if (!await CanManageAsync(tenant, token).ConfigureAwait(false))
+        {
+            return false;
+        }
+        if (!Enum.TryParse<ChannelKind>(channel, out var kind) || !Enum.IsDefined(kind) || kind.ToString() != channel ||
+            language is not ("ar" or "en") || role == Guid.Empty)
+        {
+            throw new DomainValidationException("Select a supported channel, language and workspace role.")
+            { Code = "conversations.routing.invalid" };
+        }
+        return await store.SetAsync(tenant, kind, language, role, token).ConfigureAwait(false);
+    }
+}

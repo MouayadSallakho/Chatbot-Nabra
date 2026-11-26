@@ -291,9 +291,12 @@ internal sealed class ConversationInboxStore(OmniAiDbContext context) : IConvers
             membership => membership.UserId == member && membership.TenantId == tenantId,
             cancellationToken);
 
-    public async Task<IReadOnlyList<ConversationMessageAuthor>> ListEligibleAssigneesAsync(
+    public Task<IReadOnlyList<ConversationMessageAuthor>> ListEligibleAssigneesAsync(
         TenantId tenantId,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default) => ListEligibleForRoleAsync(tenantId, null, cancellationToken);
+
+    internal async Task<IReadOnlyList<ConversationMessageAuthor>> ListEligibleForRoleAsync(
+        TenantId tenantId, TenantRoleId? requiredRole, CancellationToken cancellationToken)
     {
         // Roles are loaded and the permission is computed in memory rather than
         // filtered in SQL, because what a role permits is a Domain rule: an Owner
@@ -308,6 +311,8 @@ internal sealed class ConversationInboxStore(OmniAiDbContext context) : IConvers
         List<Guid> userIds = await _context.TenantMemberships
             .AsNoTracking()
             .Where(membership => membership.TenantId == tenantId)
+            .Where(membership => requiredRole == null || _context.TenantRoleAssignments.Any(a =>
+                a.TenantId == tenantId && a.UserId == membership.UserId && a.TenantRoleId == requiredRole))
             .Select(membership => membership.UserId.Value)
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
@@ -355,7 +360,9 @@ internal sealed class ConversationInboxStore(OmniAiDbContext context) : IConvers
                 continue;
             }
 
-            if (EffectivePermissions.Union(roles).Contains(PlatformPermissions.ConversationsReply))
+            var permissions = EffectivePermissions.Union(roles);
+            if (permissions.Contains(PlatformPermissions.ConversationsReply) &&
+                (requiredRole is null || permissions.Contains(PlatformPermissions.ConversationsView)))
             {
                 eligible.Add(new ConversationMessageAuthor(member.Id, member.Email!, member.DisplayName));
             }

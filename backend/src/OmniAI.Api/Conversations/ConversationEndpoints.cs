@@ -140,6 +140,7 @@ public sealed record ReplyToConversationRequest(string? ClientMessageId, string?
 public sealed record AssignConversationRequest(Guid? Member);
 
 public sealed record SaveQuickReplyRequest(string? Text);
+public sealed record SaveRoutingRuleRequest(Guid RoleId);
 
 /// <summary>Mark a conversation read up to a message (Phase 37.4).</summary>
 /// <param name="Sequence">
@@ -290,6 +291,14 @@ internal static class ConversationEndpoints
             .WithName("ReplyToTenantConversation")
             .Produces<TranscriptMessageResponse>(StatusCodes.Status200OK);
 
+        workspace.MapGet("/routing", async (Guid tenantId, InboxRoutingHandler handler, CancellationToken token) =>
+            await handler.ReadAsync(tenantId, token).ConfigureAwait(false) is { } settings ? Results.Ok(settings) : Results.NotFound());
+        workspace.MapPut("/routing/{channel}/{language}", async (Guid tenantId, string channel, string language,
+            SaveRoutingRuleRequest request, InboxRoutingHandler handler, CancellationToken token) =>
+            await handler.SetAsync(tenantId, channel, language, request.RoleId, token).ConfigureAwait(false) ? Results.NoContent() : Results.NotFound());
+        workspace.MapDelete("/routing/{channel}/{language}", async (Guid tenantId, string channel, string language,
+            InboxRoutingHandler handler, CancellationToken token) =>
+            await handler.SetAsync(tenantId, channel, language, null, token).ConfigureAwait(false) ? Results.NoContent() : Results.NotFound());
         workspace.MapGet("/quick-replies/{language}", async (Guid tenantId, string language, QuickReplyHandler handler, CancellationToken token) =>
         {
             var replies = await handler.ListAsync(tenantId, language, token).ConfigureAwait(false);

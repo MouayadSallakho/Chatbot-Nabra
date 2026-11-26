@@ -12,6 +12,7 @@ import { firstValueFrom } from 'rxjs';
 import { ApiError, toApiError } from '@app/core/api/api-error';
 import { TenantApi, TenantDetails } from '@app/core/api/tenant-api';
 import { PermissionService } from '@app/core/authorization/permission-service';
+import { InboxRouting } from '../inbox-routing/inbox-routing';
 import { ConfirmDialog } from '@app/core/feedback/confirm-dialog';
 import { ToastService } from '@app/core/feedback/toast-service';
 import { HasUnsavedChanges, protectUnsavedChanges } from '@app/core/navigation/unsaved-changes';
@@ -141,7 +142,7 @@ function normalise(text: string): string {
 @Component({
   selector: 'app-workspace-settings-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, PageHeader, EmptyState, Icon, ConfirmDialog],
+  imports: [ReactiveFormsModule, PageHeader, EmptyState, Icon, ConfirmDialog, InboxRouting],
   templateUrl: './workspace-settings-page.html',
   styleUrl: './workspace-settings-page.scss',
 })
@@ -156,6 +157,8 @@ export class WorkspaceSettingsPage implements HasUnsavedChanges {
 
   protected readonly canView = computed(() => this.permissions.has('workspace.view'));
   protected readonly canManage = computed(() => this.permissions.has('workspace.manage'));
+  protected readonly canRoute = computed(() => this.canManage() && this.permissions.has('conversations.assign'));
+  protected readonly routingOpen = signal(false);
 
   protected readonly loading = signal(true);
   protected readonly failure = signal<ApiError | null>(null);

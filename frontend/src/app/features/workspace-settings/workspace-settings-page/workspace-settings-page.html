@@ -376,6 +376,16 @@
       </section>
     }
 
+    @if (canRoute() && saved(); as workspace) {
+      <details #routing class="card card-body" (toggle)="routingOpen.set(routing.open)">
+        <summary data-testid="routing-settings" i18n="@@routing.title">
+          Automatic conversation assignment
+        </summary>
+        @if (routingOpen()) {
+          <app-inbox-routing [tenant]="workspace.id" />
+        }
+      </details>
+    }
     <app-confirm-dialog
       #zoneDialog
       [heading]="zoneDialogHeading()"

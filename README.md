@@ -23,6 +23,8 @@ Use **Give control to another app**, then **Repeat takeover notification** to re
 
 In the Messenger and Instagram simulators, **Test attachment** accepts a sample parcel image or a local PNG or JPEG up to 512 KiB and 2048 pixels per side. The simulator stores a JPEG thumbnail up to 320 pixels wide or tall with the message. Customer and staff see the same preview or a localized reason it is unavailable. Captions follow the usual reply rules. A media-only turn is recorded without calling the text assistant. Replaying a message ID preserves the original attachments. External media retrieval is deferred to provider integration.
 
+In **Workspace settings → Automatic conversation assignment**, managers with conversation assignment permission can select a workspace role for each channel and language. On the first customer message, Nabra uses Arabic script or common English words as a local language hint. A matching rule assigns an eligible role member with the fewest open conversations across the workspace. Members must be able to view and reply. The assignee can find the conversation in **Mine**. Missing rules, unclear language, media without a caption and teams without eligible members leave the conversation in the general inbox under **Unassigned**. Changing a rule affects new conversations. Assignment and taking over replies are independent actions.
+
 ## Repository
 
 - `backend/` contains the .NET 10 domain, application use cases, infrastructure and HTTP API. PostgreSQL with pgvector stores tenant data and knowledge embeddings. Redis supports realtime and protection services.

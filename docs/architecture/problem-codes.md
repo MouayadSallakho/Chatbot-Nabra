@@ -64,6 +64,7 @@ answer is the same for anybody and says nothing about the workspace.
 | `messenger.simulator.invalid_message` | 400 | Simulate a Messenger text | Provide an event ID and 1–2000 characters of text. |
 | `conversations.quick_reply.text_invalid` | 400 | Save a workspace reply | Supply 1–500 characters of plain text. |
 | `conversations.quick_reply.language_invalid` | 400 | Workspace quick replies | Choose `en` or `ar`. |
+| `conversations.routing.invalid` | 400 | Manage inbox routing | Choose a supported channel, Arabic or English, and a workspace role. |
 | `conversations.filter.invalid` | 400 | `GET …/conversations` | `filter` is not `needs-person` or, from Phase 39.1, `mine` (or empty). Refused rather than ignored, so a misspelt filter never shows every conversation under a heading that promises a few |
 | `transcript.cursor.conflict` | 400 | `GET …/conversations/{id}/messages` | `after` was combined with `before` or `tail=true`: a page cannot be read forwards and backwards at once |
 | `transcript.include.invalid` | 400 | `GET …/conversations/{id}/messages` | `include` names something other than `events` |
