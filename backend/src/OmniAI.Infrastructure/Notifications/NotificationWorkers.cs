@@ -107,12 +107,27 @@ internal sealed partial class NotificationDispatchWorker(
         }
     }
 
+    private DateTimeOffset _nextEscalationScan;
+
     private async Task<int> RunBatchAsync(CancellationToken cancellationToken)
     {
         IReadOnlyList<ClaimedOccurrence> claimed;
 
         await using (AsyncServiceScope scope = scopes.CreateAsyncScope())
         {
+            var now = clock.GetUtcNow();
+            if (now >= _nextEscalationScan)
+            {
+                // Even a failed scan must leave subsequent passes free to deliver other notifications.
+                _nextEscalationScan = now.AddSeconds(30);
+                int queued = await FirstReplyEscalations.EnqueueAsync(
+                    scope.ServiceProvider.GetRequiredService<Persistence.OmniAiDbContext>(), now,
+                    _options.DispatchBatchSize, cancellationToken).ConfigureAwait(false);
+                if (queued == _options.DispatchBatchSize)
+                {
+                    _nextEscalationScan = now;
+                }
+            }
             claimed = await scope.ServiceProvider
                 .GetRequiredService<INotificationOccurrenceStore>()
                 .ClaimAsync(_options.DispatchBatchSize, _options.DispatchMaxAttempts, _options.DispatchLease, clock.GetUtcNow(), cancellationToken)

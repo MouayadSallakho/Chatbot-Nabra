@@ -97,6 +97,11 @@ export function notificationText(
         title: $localize`:@@notification.indexingFailed.title:Knowledge indexing failed`,
         body: $localize`:@@notification.indexingFailed.body:Indexing failed for a knowledge document, so it was not updated. Try indexing it again.`,
       };
+    case 'FirstReplyEscalated':
+      return {
+        title: $localize`:@@notification.escalated.title:An unassigned conversation needs its first reply`,
+        body: $localize`:@@notification.escalated.body:The escalation deadline passed. Open the conversation to assign it or reply.`,
+      };
     case 'WhatsAppDeliveryUnknown':
       return {
         title: $localize`:@@notification.whatsappUnknown.title:A WhatsApp delivery outcome is unknown`,
@@ -118,6 +123,8 @@ export function categoryWord(category: NotificationCategory): string {
       return $localize`:@@notification.category.billing:Billing`;
     case 'Knowledge':
       return $localize`:@@notification.category.knowledge:Knowledge`;
+    case 'Inbox':
+      return $localize`:@@inbox.title:Inbox`;
     case 'ChannelHealth':
       return $localize`:@@notification.category.channelHealth:Channel health`;
   }

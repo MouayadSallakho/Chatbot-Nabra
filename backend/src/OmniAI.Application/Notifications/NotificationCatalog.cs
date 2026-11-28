@@ -54,6 +54,7 @@ public static class NotificationCatalog
         NotificationCategory.Usage => PlatformPermissions.AnalyticsView,
         NotificationCategory.Billing => PlatformPermissions.BillingView,
         NotificationCategory.Knowledge => PlatformPermissions.KnowledgeManage,
+        NotificationCategory.Inbox => PlatformPermissions.ConversationsView,
         NotificationCategory.ChannelHealth => PlatformPermissions.WhatsAppManage,
         _ => throw new ArgumentOutOfRangeException(nameof(category), category, "Unknown category."),
     };
@@ -137,6 +138,11 @@ public static class NotificationCatalog
                 sourceId is Guid document
                     ? string.Create(CultureInfo.InvariantCulture, $"/knowledge/{document:D}")
                     : "/knowledge"),
+
+            NotificationKind.FirstReplyEscalated => new(
+                "An unassigned conversation needs its first reply",
+                "The escalation deadline passed. Open the conversation to assign it or reply.",
+                sourceId is Guid conversation ? $"/conversations/{conversation:D}" : "/conversations"),
 
             NotificationKind.WhatsAppDeliveryUnknown => new(
                 "A WhatsApp delivery outcome is unknown",
@@ -291,6 +297,10 @@ public static class NotificationCatalog
         NotificationKind.KnowledgeIndexingFailed => (
             "فشلت فهرسة المعرفة",
             "فشلت فهرسة أحد مستندات المعرفة، فلم يُحدَّث. أعد محاولة فهرسته."),
+
+        NotificationKind.FirstReplyEscalated => (
+            "محادثة غير مسندة تنتظر ردّها الأول",
+            "انتهت مهلة التصعيد. افتح المحادثة لإسنادها أو الرد عليها."),
 
         NotificationKind.WhatsAppDeliveryUnknown => (
             "نتيجة تسليم رسالة واتساب غير معروفة",

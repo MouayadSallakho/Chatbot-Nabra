@@ -231,6 +231,8 @@ internal sealed class NotificationStore(OmniAiDbContext context) : INotification
                       FROM notification_occurrences candidate
                      WHERE candidate.processed_at IS NOT NULL
                        AND candidate.occurred_at < @before
+                       AND (candidate.kind <> 'FirstReplyEscalated' OR NOT EXISTS (
+                           SELECT 1 FROM conversations c WHERE c.tenant_id = candidate.tenant_id AND c.id = candidate.source_id))
                      ORDER BY candidate.occurred_at, candidate.id
                      LIMIT @batch_size
                  )

@@ -4,7 +4,7 @@ namespace OmniAI.Domain.Notifications;
 /// The product area an operational notification is about.
 /// </summary>
 /// <remarks>
-/// Deliberately five values, and the unit an email preference is chosen by. A
+/// Email preferences use the report, usage, billing, knowledge and channel categories. Inbox alerts appear in-app. A
 /// category is not a permission: who is told is decided by the kind's recipient
 /// policy, from permissions that already exist.
 /// </remarks>
@@ -15,6 +15,7 @@ public enum NotificationCategory
     Billing = 3,
     Knowledge = 4,
     ChannelHealth = 5,
+    Inbox = 6,
 }
 
 /// <summary>
@@ -62,6 +63,7 @@ public enum NotificationKind
     BillingCanceled = 11,
     KnowledgeIndexingFailed = 12,
     WhatsAppDeliveryUnknown = 13,
+    FirstReplyEscalated = 14,
 }
 
 /// <summary>
@@ -111,6 +113,7 @@ public static class NotificationKinds
 
         NotificationKind.KnowledgeIndexingFailed => NotificationCategory.Knowledge,
 
+        NotificationKind.FirstReplyEscalated => NotificationCategory.Inbox,
         NotificationKind.WhatsAppDeliveryUnknown => NotificationCategory.ChannelHealth,
 
         _ => throw new DomainValidationException("That notification kind is not recognised.")
@@ -136,6 +139,7 @@ public static class NotificationKinds
             or NotificationKind.BillingPastDue
             or NotificationKind.BillingCanceled
             or NotificationKind.KnowledgeIndexingFailed
+            or NotificationKind.FirstReplyEscalated
             or NotificationKind.WhatsAppDeliveryUnknown => NotificationSeverity.Warning,
 
         NotificationKind.UsageCritical

@@ -2246,6 +2246,10 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<int?>("EscalationDelayMinutes")
+                        .HasColumnType("integer")
+                        .HasColumnName("escalation_delay_minutes");
+
                     b.Property<int>("FirstReplyTargetMinutes")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
@@ -2292,6 +2296,8 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
 
                     b.ToTable("tenants", null, t =>
                         {
+                            t.HasCheckConstraint("ck_tenants_escalation_delay", "escalation_delay_minutes BETWEEN 0 AND 1440");
+
                             t.HasCheckConstraint("ck_tenants_first_reply_target", "first_reply_target_minutes BETWEEN 1 AND 1440");
                         });
                 });

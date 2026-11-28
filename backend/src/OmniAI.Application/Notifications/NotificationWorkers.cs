@@ -178,7 +178,7 @@ public sealed class NotificationDispatcher(
 
         HashSet<UserId> emailed = [];
 
-        if (_email.IsConfigured)
+        if (_email.IsConfigured && category != NotificationCategory.Inbox)
         {
             foreach (UserId recipient in recipients)
             {

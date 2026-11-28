@@ -1,4 +1,5 @@
 using System.Data.Common;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using Npgsql;
 using OmniAI.Application.Notifications;
@@ -147,6 +148,16 @@ internal sealed class NotificationOccurrenceStore(OmniAiDbContext context)
 
                 return null;
             }
+        }
+
+        if (occurrence.Kind == NotificationKind.FirstReplyEscalated &&
+            !await FirstReplyEscalations.StillDueAsync(_context, occurrence, now, cancellationToken).ConfigureAwait(false))
+        {
+            // No notification was delivered. A later unassignment or a shorter target may qualify again.
+            await _context.Database.ExecuteSqlInterpolatedAsync(
+                $"DELETE FROM notification_occurrences WHERE id = {occurrence.Id.Value}", cancellationToken).ConfigureAwait(false);
+            await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+            return [];
         }
 
         List<UserId> written = [];

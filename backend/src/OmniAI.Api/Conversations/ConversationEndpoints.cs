@@ -140,7 +140,7 @@ public sealed record ReplyToConversationRequest(string? ClientMessageId, string?
 public sealed record AssignConversationRequest(Guid? Member);
 
 public sealed record SaveQuickReplyRequest(string? Text);
-public sealed record FirstReplyTargetRequest(int Minutes);
+public sealed record FirstReplyTargetRequest([property: JsonRequired] int Minutes);
 public sealed record SaveRoutingRuleRequest(Guid RoleId);
 
 /// <summary>Mark a conversation read up to a message (Phase 37.4).</summary>
@@ -294,6 +294,10 @@ internal static class ConversationEndpoints
 
         workspace.MapGet("/routing", async (Guid tenantId, InboxRoutingHandler handler, CancellationToken token) =>
             await handler.ReadAsync(tenantId, token).ConfigureAwait(false) is { } settings ? Results.Ok(settings) : Results.NotFound());
+        workspace.MapPut("/routing/escalation", async (Guid tenantId, FirstReplyTargetRequest request, InboxRoutingHandler handler, CancellationToken token) =>
+            await handler.SetEscalationAsync(tenantId, request.Minutes, token).ConfigureAwait(false) ? Results.NoContent() : Results.NotFound());
+        workspace.MapDelete("/routing/escalation", async (Guid tenantId, InboxRoutingHandler handler, CancellationToken token) =>
+            await handler.SetEscalationAsync(tenantId, null, token).ConfigureAwait(false) ? Results.NoContent() : Results.NotFound());
         workspace.MapPut("/routing/first-reply-target", async (Guid tenantId, FirstReplyTargetRequest request, InboxRoutingHandler handler, CancellationToken token) =>
             await handler.SetTargetAsync(tenantId, request.Minutes, token).ConfigureAwait(false) ? Results.NoContent() : Results.NotFound());
         workspace.MapPut("/routing/hours", async (Guid tenantId, RoutingHours request, InboxRoutingHandler handler, CancellationToken token) =>

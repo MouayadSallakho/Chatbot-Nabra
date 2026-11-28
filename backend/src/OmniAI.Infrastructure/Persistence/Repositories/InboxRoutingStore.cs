@@ -41,13 +41,20 @@ internal sealed class InboxRoutingStore(OmniAiDbContext db) : IInboxRoutingStore
             .OrderBy(r => r.Channel).ThenBy(r => r.Language).ToListAsync(token).ConfigureAwait(false);
         var schedule = await db.Set<InboxSchedule>().AsNoTracking().Include(s => s.Destination)
             .SingleOrDefaultAsync(s => s.Tenant == tenant, token).ConfigureAwait(false);
+        var limits = await db.Tenants.Where(t => t.Id == tenant).Select(t => new {
+            Target = EF.Property<int>(t, "FirstReplyTargetMinutes"), Delay = EF.Property<int?>(t, "EscalationDelayMinutes")
+        }).SingleAsync(token).ConfigureAwait(false);
         return new RoutingSettings([.. rules.Select(r => new RoutingRule(r.Channel.ToString(), r.Language, r.Role.Value))],
             [.. roles.Select(r => new RoutingTeam(r.Id.Value, r.Name.Value)).OrderBy(r => r.Name, StringComparer.OrdinalIgnoreCase)],
-            schedule?.Hours() ?? RoutingHours.Default, await TargetAsync(db, tenant, token).ConfigureAwait(false));
+            schedule?.Hours() ?? RoutingHours.Default, limits.Target, limits.Delay);
     }
 
     internal static Task<int> TargetAsync(OmniAiDbContext db, TenantId tenant, CancellationToken token) =>
         db.Tenants.Where(t => t.Id == tenant).Select(t => EF.Property<int>(t, "FirstReplyTargetMinutes")).SingleAsync(token);
+
+    public Task SetEscalationAsync(TenantId tenant, int? delay, CancellationToken token) =>
+        db.Tenants.Where(t => t.Id == tenant).ExecuteUpdateAsync(
+            updates => updates.SetProperty(t => EF.Property<int?>(t, "EscalationDelayMinutes"), delay), token);
 
     public Task SetTargetAsync(TenantId tenant, int minutes, CancellationToken token) =>
         db.Tenants.Where(t => t.Id == tenant).ExecuteUpdateAsync(

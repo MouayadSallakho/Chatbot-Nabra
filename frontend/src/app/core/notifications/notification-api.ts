@@ -5,7 +5,8 @@ import { Versioned, withEntityTag } from '@app/core/api/versioned';
 
 export type NotificationSeverity = 'Information' | 'Warning' | 'Critical';
 
-export type NotificationCategory = 'Reports' | 'Usage' | 'Billing' | 'Knowledge' | 'ChannelHealth';
+export type NotificationCategory =
+  'Reports' | 'Usage' | 'Billing' | 'Knowledge' | 'ChannelHealth' | 'Inbox';
 
 /**
  * One notification, as the server wrote it.
@@ -161,6 +162,8 @@ export function actionLabel(category: NotificationCategory): string {
       return $localize`:@@notifications.action.billing:Open Billing`;
     case 'Knowledge':
       return $localize`:@@notifications.action.knowledge:Open Knowledge`;
+    case 'Inbox':
+      return $localize`:@@notifications.action.conversation:Open conversation`;
     case 'ChannelHealth':
       return $localize`:@@notifications.action.whatsapp:Open WhatsApp`;
   }

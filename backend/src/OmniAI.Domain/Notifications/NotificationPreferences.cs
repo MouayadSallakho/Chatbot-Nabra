@@ -76,6 +76,7 @@ public sealed class NotificationPreferences
         NotificationCategory.Usage => EmailUsage,
         NotificationCategory.Billing => EmailBilling,
         NotificationCategory.Knowledge => EmailKnowledge,
+        NotificationCategory.Inbox => false,
         NotificationCategory.ChannelHealth => EmailChannelHealth,
         _ => false,
     };

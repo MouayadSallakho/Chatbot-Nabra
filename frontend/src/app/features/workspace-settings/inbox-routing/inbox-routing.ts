@@ -7,6 +7,7 @@ import { BusinessHours, type Hours } from './business-hours';
 interface Settings {
   hours: Hours;
   firstReplyTargetMinutes: number;
+  escalationDelayMinutes: number | null;
   rules: { channel: string; language: string; roleId: string }[];
   teams: { id: string; name: string }[];
 }
@@ -84,6 +85,34 @@ export class InboxRouting {
       if (this.tenant() === tenant) {
         this.settings.update((s) => s && { ...s, firstReplyTargetMinutes: minutes });
         this.notice.set($localize`:@@inbox.target.saved:First reply target saved.`);
+      }
+    } catch (error) {
+      if (this.tenant() === tenant) this.error.set(toApiError(error).message);
+    } finally {
+      if (this.tenant() === tenant) this.busy.set(false);
+    }
+  }
+
+  protected async saveEscalation(control: HTMLInputElement): Promise<void> {
+    const delay = control.value === '' ? null : control.valueAsNumber;
+    const tenant = this.tenant();
+    if (
+      this.busy() ||
+      !control.reportValidity() ||
+      delay === this.settings()?.escalationDelayMinutes
+    )
+      return;
+    this.busy.set(true);
+    this.error.set('');
+    this.notice.set('');
+    const url = this.url(tenant) + '/escalation';
+    try {
+      await firstValueFrom(
+        delay === null ? this.http.delete<void>(url) : this.http.put<void>(url, { minutes: delay }),
+      );
+      if (this.tenant() === tenant) {
+        this.settings.update((s) => s && { ...s, escalationDelayMinutes: delay });
+        this.notice.set($localize`:@@inbox.escalation.saved:Escalation rule saved.`);
       }
     } catch (error) {
       if (this.tenant() === tenant) this.error.set(toApiError(error).message);

@@ -29,6 +29,32 @@
       Save target
     </button>
   </form>
+  <form (submit)="$event.preventDefault(); saveEscalation(delay)">
+    <fieldset [disabled]="busy()">
+      <legend i18n="@@inbox.escalation.title">Overdue conversation alerts</legend>
+      <p id="escalation-help" class="text-muted" i18n="@@inbox.escalation.help">
+        Notify inbox viewers once if a conversation is still unassigned and unanswered after the
+        first reply target. Enter 0 to notify at the target, or leave blank to turn alerts off.
+      </p>
+      <label
+        ><span i18n="@@inbox.escalation.delay">Extra minutes before notifying the team</span>
+        <input
+          #delay
+          type="number"
+          class="input"
+          min="0"
+          max="1440"
+          step="1"
+          [value]="data.escalationDelayMinutes ?? ''"
+          aria-describedby="escalation-help"
+          data-testid="escalation-delay"
+        />
+      </label>
+      <button type="submit" class="btn btn-secondary btn-sm" i18n="@@inbox.escalation.save">
+        Save escalation rule
+      </button>
+    </fieldset>
+  </form>
   <app-business-hours
     [tenant]="tenant()"
     [zone]="zone()"
