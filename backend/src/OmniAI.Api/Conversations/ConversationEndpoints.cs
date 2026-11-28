@@ -292,6 +292,15 @@ internal static class ConversationEndpoints
             .WithName("ReplyToTenantConversation")
             .Produces<TranscriptMessageResponse>(StatusCodes.Status200OK);
 
+        workspace.MapGet("/{conversationId:guid}/notes", async (Guid tenantId, Guid conversationId, long? before,
+            ConversationNotesHandler handler, CancellationToken token) =>
+            await handler.ListAsync(tenantId, conversationId, before, token).ConfigureAwait(false) is { } page
+                ? Results.Ok(page) : Results.NotFound()).WithName("ListConversationNotes");
+        workspace.MapPost("/{conversationId:guid}/notes", async (Guid tenantId, Guid conversationId, AddConversationNote request,
+            ConversationNotesHandler handler, CancellationToken token) =>
+            await handler.AddAsync(tenantId, conversationId, request, token).ConfigureAwait(false) is { } note
+                ? Results.Ok(note) : Results.NotFound()).WithName("AddConversationNote");
+
         workspace.MapGet("/routing", async (Guid tenantId, InboxRoutingHandler handler, CancellationToken token) =>
             await handler.ReadAsync(tenantId, token).ConfigureAwait(false) is { } settings ? Results.Ok(settings) : Results.NotFound());
         workspace.MapPut("/routing/escalation", async (Guid tenantId, FirstReplyTargetRequest request, InboxRoutingHandler handler, CancellationToken token) =>

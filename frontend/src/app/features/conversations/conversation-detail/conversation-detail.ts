@@ -46,6 +46,7 @@ import {
 } from '../conversations-api';
 import { InboxState } from '../inbox-state';
 import { ConversationTranscript } from '../conversation-transcript/conversation-transcript';
+import { ConversationNotes } from '../conversation-notes/conversation-notes';
 import { ConversationComposer } from '../conversation-composer/conversation-composer';
 import { ConversationContext } from '../conversation-context/conversation-context';
 import { CustomerLabel } from '../customer-label';
@@ -107,6 +108,7 @@ export interface AssignOption {
     VoiceTrack,
     ConversationTranscript,
     ConversationComposer,
+    ConversationNotes,
     ConversationContext,
     CustomerLabel,
   ],
@@ -118,6 +120,7 @@ export class ConversationDetail {
   private readonly workspace = inject(WorkspaceContextService);
   private readonly permissions = inject(PermissionService);
   private readonly instagramApi = inject(InstagramSimulatorApi);
+  protected readonly notesFor = signal<string | null>(null);
   protected readonly externalInstagram = signal<string | null>(null);
   private readonly simulator = inject(MessengerSimulatorApi);
   protected readonly messengerStatuses = signal<Readonly<Record<string, string>>>({});
@@ -342,6 +345,7 @@ export class ConversationDetail {
         this.signals.viewing(id);
 
         if (id !== this.loadedFor) {
+          this.notesFor.set(null);
           void this.load();
         }
       });

@@ -68,6 +68,59 @@ public sealed class ConversationInboxApiTests(WebChatApiFixture fixture)
 
     private sealed record QuickReplyItem(Guid Id, string Text);
 
+    [Fact]
+    public async Task Internal_notes_stay_out_of_both_transcripts_and_retries_store_one_copy()
+    {
+        var (owner, tenant, conversation, visitor) = await ConversationWithVisitorAsync();
+        var (other, otherTenant, _) = await ConversationAsync();
+        var notes = Action(tenant, conversation, "notes");
+        var publicMessages = WebChatApiFixture.Relative($"{ChatRoot}/conversations/{conversation.ConversationId}/messages");
+        var publicBefore = await visitor.GetStringAsync(publicMessages);
+        var messagesBefore = await owner.GetStringAsync(Messages(tenant, conversation));
+        var detailBefore = await ReadAsync(owner, tenant, conversation);
+        var payload = new { requestId = Guid.NewGuid(), text = "Private shift handover" };
+
+        var responses = await Task.WhenAll(owner.PostAsJsonAsync(notes, payload), owner.PostAsJsonAsync(notes, payload));
+        Assert.All(responses, response => Assert.Equal(HttpStatusCode.OK, response.StatusCode));
+        var page = await owner.GetFromJsonAsync<OmniAI.Application.Conversations.ConversationNotePage>(notes);
+        var note = Assert.Single(page!.Items);
+        Assert.Equal(payload.text, note.Text);
+        Assert.False(string.IsNullOrWhiteSpace(note.Author));
+        Assert.Null(page.NextBefore);
+        Assert.Equal(HttpStatusCode.BadRequest, (await owner.PostAsJsonAsync(notes, new { payload.requestId, text = "Different" })).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await owner.PostAsJsonAsync(notes, new { requestId = Guid.NewGuid(), text = "   " })).StatusCode);
+
+        Assert.Equal(publicBefore, await visitor.GetStringAsync(publicMessages));
+        Assert.Equal(messagesBefore, await owner.GetStringAsync(Messages(tenant, conversation)));
+        Assert.Equal(detailBefore, await ReadAsync(owner, tenant, conversation));
+        Assert.Equal(HttpStatusCode.Unauthorized, (await visitor.GetAsync(notes)).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await other.GetAsync(notes)).StatusCode);
+        var foreignConversation = Action(otherTenant, conversation, "notes");
+        Assert.Equal(HttpStatusCode.NotFound, (await other.GetAsync(foreignConversation)).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await other.PostAsJsonAsync(foreignConversation, payload)).StatusCode);
+    }
+
+    [Fact]
+    public async Task Older_internal_notes_resume_before_the_last_note_on_the_previous_page()
+    {
+        var (owner, tenant, conversation) = await ConversationAsync();
+        var notes = Action(tenant, conversation, "notes");
+        for (int i = 0; i < 21; i++)
+        {
+            var response = await owner.PostAsJsonAsync(notes, new { requestId = Guid.NewGuid(), text = $"Note {i}" });
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        }
+
+        var newest = (await owner.GetFromJsonAsync<OmniAI.Application.Conversations.ConversationNotePage>(notes))!;
+        Assert.Equal(20, newest.Items.Count);
+        Assert.Equal("Note 20", newest.Items[0].Text);
+        Assert.Equal(newest.Items[^1].Id, newest.NextBefore);
+        var earlier = Action(tenant, conversation, $"notes?before={newest.NextBefore}");
+        var oldest = (await owner.GetFromJsonAsync<OmniAI.Application.Conversations.ConversationNotePage>(earlier))!;
+        Assert.Equal("Note 0", Assert.Single(oldest.Items).Text);
+        Assert.Null(oldest.NextBefore);
+    }
+
     // ---- Handoff ---------------------------------------------------------
 
     [Fact]

@@ -65,6 +65,8 @@ answer is the same for anybody and says nothing about the workspace.
 | `conversations.quick_reply.text_invalid` | 400 | Save a workspace reply | Supply 1–500 characters of plain text. |
 | `conversations.quick_reply.language_invalid` | 400 | Workspace quick replies | Choose `en` or `ar`. |
 | `conversations.routing.invalid` | 400 | Manage inbox routing | Choose a supported channel, Arabic or English, and a workspace role. |
+| `conversations.note.invalid` | 400 | Add internal note | Provide a request ID and 1–2,000 characters of text. |
+| `conversations.note.request_reused` | 400 | Retry internal note | Reuse the same ID only when retrying identical content. |
 | `conversations.routing.escalation_invalid` | 400 | Save escalation delay | Choose 0–1440 additional minutes after the first reply target. |
 | `conversations.routing.target_invalid` | 400 | Save first reply target | Choose a whole number of minutes from 1 to 1440. |
 | `conversations.routing.hours_invalid` | 400 | Save business hours | Supply at most one interval per weekday, with a start in 0–1439 and a different end in 0–1440 minutes. |

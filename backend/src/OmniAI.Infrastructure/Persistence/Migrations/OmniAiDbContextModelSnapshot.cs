@@ -3219,6 +3219,47 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                     b.ToTable("quick_replies", (string)null);
                 });
 
+            modelBuilder.Entity("OmniAI.Infrastructure.Persistence.Repositories.StoredConversationNote", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<Guid>("AuthorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("author_id");
+
+                    b.Property<Guid>("ConversationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("conversation_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("RequestId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("request_id");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ConversationId", "Id");
+
+                    b.HasIndex("ConversationId", "AuthorId", "RequestId")
+                        .IsUnique();
+
+                    b.ToTable("conversation_notes", (string)null);
+                });
+
             modelBuilder.Entity("OmniAI.Infrastructure.Persistence.UserReferenceRow", b =>
                 {
                     b.Property<Guid>("Id")
@@ -4059,6 +4100,15 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                     b.HasOne("OmniAI.Domain.Tenants.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("OmniAI.Infrastructure.Persistence.Repositories.StoredConversationNote", b =>
+                {
+                    b.HasOne("OmniAI.Domain.Conversations.Conversation", null)
+                        .WithMany()
+                        .HasForeignKey("ConversationId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

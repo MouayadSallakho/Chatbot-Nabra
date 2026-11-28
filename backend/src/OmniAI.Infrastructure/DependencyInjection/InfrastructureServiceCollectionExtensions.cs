@@ -164,6 +164,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<IConversationInboxStore, ConversationInboxStore>();
         services.AddScoped<IQuickReplyStore, QuickReplyStore>();
         services.AddScoped<IInboxRoutingStore, InboxRoutingStore>();
+        services.AddScoped<IConversationNoteStore, ConversationNoteStore>();
         services.AddScoped<ISocialSimulatorStore, SocialSimulatorStore>();
 
         // Both mint values, neither holds state, and the primitives behind them

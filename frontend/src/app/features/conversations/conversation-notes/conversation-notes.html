@@ -1,0 +1,89 @@
+<section data-testid="note-panel" aria-labelledby="team-notes-title">
+  <h2 id="team-notes-title" i18n="@@teamNotes.heading">Internal notes</h2>
+  <p class="audience" i18n="@@teamNotes.audience">Only your team can read these notes.</p>
+  @if (canWrite()) {
+    <form (submit)="$event.preventDefault(); save()">
+      <label for="internal-note" i18n="@@teamNotes.label">Leave a note for a teammate</label>
+      <textarea
+        class="textarea"
+        #field
+        id="internal-note"
+        dir="auto"
+        rows="3"
+        maxlength="2000"
+        data-testid="note-input"
+        [disabled]="saving()"
+        [value]="draft()"
+        (input)="edit(field.value)"
+      ></textarea>
+      <button
+        class="btn btn-primary btn-sm"
+        type="submit"
+        data-testid="save-note"
+        [disabled]="!draft().trim() || saving()"
+        i18n="@@teamNotes.save"
+      >
+        Save internal note
+      </button>
+      @if (writeFailed()) {
+        <p class="form-error" role="alert" i18n="@@teamNotes.saveError">
+          Could not confirm the save. Try again.
+        </p>
+      }
+    </form>
+  }
+
+  @if (readFailed()) {
+    <p role="alert" class="form-error" i18n="@@teamNotes.loadError">
+      Could not load internal notes.
+    </p>
+    <button
+      type="button"
+      class="btn btn-secondary btn-sm"
+      (click)="refresh()"
+      i18n="@@teamNotes.retry"
+    >
+      Try again
+    </button>
+  } @else if (page(); as result) {
+    @for (note of result.items; track note.id) {
+      <article data-testid="team-note">
+        <header>
+          @if (note.author) {
+            <bdi>{{ note.author }}</bdi>
+          } @else {
+            <span i18n="@@teamNotes.former">Former teammate</span>
+          }
+          <time [attr.datetime]="note.createdAt">{{
+            format.date(note.createdAt, 'dateTime')
+          }}</time>
+        </header>
+        <p dir="auto">{{ note.text }}</p>
+      </article>
+    } @empty {
+      <p class="audience" i18n="@@teamNotes.empty">No internal notes yet.</p>
+    }
+    @if (result.nextBefore !== null) {
+      <button
+        type="button"
+        class="btn btn-secondary btn-sm"
+        (click)="navigate(result.nextBefore)"
+        i18n="@@teamNotes.older"
+      >
+        Older notes
+      </button>
+    }
+  } @else {
+    <p class="audience" role="status" i18n="@@teamNotes.loading">Loading notes…</p>
+  }
+  @if (before() !== null) {
+    <button
+      type="button"
+      class="btn btn-secondary btn-sm"
+      (click)="navigate(null)"
+      i18n="@@teamNotes.latest"
+    >
+      Latest notes
+    </button>
+  }
+</section>

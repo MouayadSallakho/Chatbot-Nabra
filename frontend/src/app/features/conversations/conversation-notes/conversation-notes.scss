@@ -1,0 +1,60 @@
+:host {
+  display: block;
+  min-block-size: 0;
+  overflow: auto;
+  padding: var(--space-4) var(--page-gutter);
+}
+section {
+  max-inline-size: 52rem;
+  margin-inline: auto;
+}
+h2 {
+  font: var(--text-title-2);
+  margin: 0;
+}
+.audience,
+time {
+  color: var(--color-text-secondary);
+}
+.audience {
+  margin-block: var(--space-1) var(--space-4);
+}
+form,
+article {
+  padding: var(--space-4);
+  margin-block-end: var(--space-3);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-panel);
+  background: var(--color-panel);
+}
+form {
+  display: grid;
+  gap: var(--space-2);
+}
+textarea {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  min-height: 4rem;
+}
+form button {
+  justify-self: start;
+}
+header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: baseline;
+}
+bdi {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+time {
+  font: var(--text-caption);
+}
+article p {
+  margin-block: var(--space-2) 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

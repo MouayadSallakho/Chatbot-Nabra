@@ -404,55 +404,81 @@
         </aside>
       }
 
-      <app-conversation-transcript
-        [conversationId]="current.id"
-        [messages]="messages()"
-        [events]="events()"
-        [hasEarlier]="hasEarlier()"
-        [loadingEarlier]="loadingEarlier()"
-        [earlierFailure]="earlierFailure()"
-        (earlierRequested)="loadEarlier()"
-        (newestSeen)="markRead($event)"
-        [handling]="current.handling"
-        [needsPersonReason]="current.needsPersonReason"
-        [agentName]="current.agentName"
-        [whatsApp]="whatsAppFacts()"
-        [messengerStatuses]="messengerStatuses()"
-        [scrollRegion]="fill()"
-        (unseenChange)="unseen.set($event)"
-      />
+      <div class="conversation-views">
+        <button
+          type="button"
+          class="btn btn-secondary btn-sm"
+          data-testid="show-messages"
+          [attr.aria-pressed]="notesFor() !== current.id"
+          (click)="notesFor.set(null)"
+          i18n="@@teamNotes.messages"
+        >
+          Messages
+        </button>
+        <button
+          type="button"
+          class="btn btn-secondary btn-sm"
+          data-testid="show-notes"
+          [attr.aria-pressed]="notesFor() === current.id"
+          (click)="notesFor.set(current.id)"
+          i18n="@@teamNotes.tab"
+        >
+          Internal notes
+        </button>
+      </div>
+      @if (notesFor() === current.id) {
+        <app-conversation-notes [conversationId]="current.id" [canWrite]="canReply()" />
+      } @else {
+        <app-conversation-transcript
+          [conversationId]="current.id"
+          [messages]="messages()"
+          [events]="events()"
+          [hasEarlier]="hasEarlier()"
+          [loadingEarlier]="loadingEarlier()"
+          [earlierFailure]="earlierFailure()"
+          (earlierRequested)="loadEarlier()"
+          (newestSeen)="markRead($event)"
+          [handling]="current.handling"
+          [needsPersonReason]="current.needsPersonReason"
+          [agentName]="current.agentName"
+          [whatsApp]="whatsAppFacts()"
+          [messengerStatuses]="messengerStatuses()"
+          [scrollRegion]="fill()"
+          (unseenChange)="unseen.set($event)"
+        />
 
-      <footer class="conversation-footer">
-        @if (unseen() > 0) {
-          <button
-            type="button"
-            class="btn btn-secondary btn-sm new-messages"
-            (click)="showNewest()"
-            data-testid="new-messages"
-          >
-            <app-icon name="chevron-down" [strokeWidth]="1.75" />
-            <span>{{ unseenText() }}</span>
-          </button>
-        }
-
-        @if (externalInstagram() === current.id) {
-          <p class="composer-withheld" data-testid="ig-inbox-paused" i18n="@@ig.inboxPaused">
-            Replies are paused while another app controls this Instagram conversation.
-          </p>
-        } @else if (canReply()) {
-          @if (isHuman()) {
-            <app-conversation-composer
-              [windowClosed]="!!current.replyWindow && remainingMinutes() === 0"
-              [conversationId]="current.id"
-              (sent)="onSent($event)"
-            />
-          } @else {
-            <p class="composer-withheld" i18n="@@conversation.composerWithheld">
-              The AI is answering this conversation. Take it over to reply yourself.
-            </p>
+        <footer class="conversation-footer">
+          @if (unseen() > 0) {
+            <button
+              type="button"
+              class="btn btn-secondary btn-sm new-messages"
+              (click)="showNewest()"
+              data-testid="new-messages"
+            >
+              <app-icon name="chevron-down" [strokeWidth]="1.75" />
+              <span>{{ unseenText() }}</span>
+            </button>
           }
-        }
-      </footer>
+
+          @if (externalInstagram() === current.id) {
+            <p class="composer-withheld" data-testid="ig-inbox-paused" i18n="@@ig.inboxPaused">
+              Replies are paused while another app controls this Instagram conversation.
+            </p>
+          } @else if (canReply()) {
+            @if (isHuman()) {
+              <app-conversation-composer
+                [windowClosed]="!!current.replyWindow && remainingMinutes() === 0"
+                [conversationId]="current.id"
+                (sent)="onSent($event)"
+              />
+            } @else {
+              <p class="composer-withheld" i18n="@@conversation.composerWithheld">
+                The AI is answering this conversation. Take it over to reply yourself.
+              </p>
+            }
+          }
+        </footer>
+      }
     </section>
 
     @if (detailsOpen() && panes()) {

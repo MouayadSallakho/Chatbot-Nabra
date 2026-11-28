@@ -353,6 +353,7 @@ internal static class CompositionRoot
         services.AddScoped<SocialSimulator>();
         services.AddScoped<QuickReplyHandler>();
         services.AddScoped<InboxRoutingHandler>();
+        services.AddScoped<ConversationNotesHandler>();
         services.AddScoped<ConversationHandoffHandler>();
         services.AddScoped<ConversationAssignmentHandler>();
         services.AddScoped<ReplyToConversationHandler>();
