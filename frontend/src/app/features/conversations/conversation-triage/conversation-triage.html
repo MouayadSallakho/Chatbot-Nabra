@@ -1,0 +1,89 @@
+<section class="triage-panel" data-testid="triage-panel" aria-labelledby="triage-title">
+  @if (latestCustomer(); as message) {
+    <div class="triage-message">
+      <h2 id="triage-title" i18n="@@triage.latest">Latest customer message</h2>
+      <p dir="auto">
+        @if (message.text) {
+          {{ message.text }}
+        } @else {
+          <span i18n="@@triage.attachment">Attachment</span>
+        }
+      </p>
+    </div>
+  } @else {
+    <h2 id="triage-title" i18n="@@triage.review">Conversation review</h2>
+  }
+  <app-conversation-notes [conversationId]="conversation().id" [canWrite]="false" />
+  <div class="triage-assignment">
+    @if (assignedName(); as name) {
+      <p role="status" data-testid="triage-assigned" i18n="@@triage.assigned">
+        Assigned to <bdi>{{ name }}</bdi>
+      </p>
+    } @else if (conversation().status === 'Closed') {
+      <p role="status" i18n="@@triage.closed">This conversation is closed.</p>
+    } @else if (canAssign()) {
+      @switch (membersState()) {
+        @case ('failed') {
+          <p role="alert" i18n="@@triage.membersError">Could not load eligible teammates.</p>
+          <button
+            type="button"
+            class="btn btn-secondary btn-sm"
+            (click)="reloadMembers.emit()"
+            i18n="@@triage.retry"
+          >
+            Reload teammates
+          </button>
+        }
+        @case ('loading') {
+          <p role="status" i18n="@@triage.loading">Loading teammates…</p>
+        }
+        @case ('ready') {
+          @if (members().length) {
+            <label for="triage-teammate" i18n="@@triage.label">Who should follow up?</label>
+            <select
+              #choice
+              class="select"
+              id="triage-teammate"
+              data-testid="triage-teammate"
+              [disabled]="busy()"
+              (change)="candidate.set(choice.value)"
+            >
+              <option value="" [selected]="!candidate()" i18n="@@triage.choose">
+                Choose a teammate
+              </option>
+              @for (option of members(); track option.userId) {
+                <option
+                  [value]="option.userId"
+                  [selected]="candidate() === option.userId"
+                  dir="auto"
+                >
+                  {{ memberName(option).text }}
+                </option>
+              }
+            </select>
+            <button
+              class="btn btn-primary btn-sm"
+              type="button"
+              data-testid="triage-assign"
+              [disabled]="!candidate() || busy() || stale()"
+              (click)="assign.emit(candidate())"
+              i18n="@@triage.assign"
+            >
+              Assign conversation
+            </button>
+          } @else {
+            <p i18n="@@triage.empty">No teammates are eligible to receive this conversation.</p>
+          }
+        }
+      }
+    }
+    <a
+      class="triage-back"
+      data-testid="triage-back"
+      routerLink="/conversations"
+      queryParamsHandling="preserve"
+      i18n="@@triage.back"
+      >Back to overdue conversations</a
+    >
+  </div>
+</section>

@@ -405,12 +405,24 @@
       }
 
       <div class="conversation-views">
+        @if (view() === 'overdue') {
+          <button
+            type="button"
+            class="btn btn-secondary btn-sm"
+            data-testid="show-triage"
+            [attr.aria-pressed]="panel() === 'triage'"
+            (click)="panel.set('triage')"
+            i18n="@@triage.tab"
+          >
+            Team review
+          </button>
+        }
         <button
           type="button"
           class="btn btn-secondary btn-sm"
           data-testid="show-messages"
-          [attr.aria-pressed]="notesFor() !== current.id"
-          (click)="notesFor.set(null)"
+          [attr.aria-pressed]="panel() === 'messages'"
+          (click)="panel.set('messages')"
           i18n="@@teamNotes.messages"
         >
           Messages
@@ -419,14 +431,26 @@
           type="button"
           class="btn btn-secondary btn-sm"
           data-testid="show-notes"
-          [attr.aria-pressed]="notesFor() === current.id"
-          (click)="notesFor.set(current.id)"
+          [attr.aria-pressed]="panel() === 'notes'"
+          (click)="panel.set('notes')"
           i18n="@@teamNotes.tab"
         >
           Internal notes
         </button>
       </div>
-      @if (notesFor() === current.id) {
+      @if (panel() === 'triage') {
+        <app-conversation-triage
+          [conversation]="current"
+          [messages]="messages()"
+          [members]="assignees()"
+          [membersState]="membersState()"
+          [canAssign]="canAssign()"
+          [busy]="working()"
+          [stale]="actionFailure()?.kind === 'stale'"
+          (assign)="assign($event, true)"
+          (reloadMembers)="loadAssignees()"
+        />
+      } @else if (panel() === 'notes') {
         <app-conversation-notes [conversationId]="current.id" [canWrite]="canReply()" />
       } @else {
         <app-conversation-transcript

@@ -1249,6 +1249,60 @@ describe('ConversationDetail', () => {
       expect(document.activeElement).toBe(host().querySelector('[data-testid="assignee"]'));
     });
 
+    it('reviews a private note and assigns only after the reviewer chooses a teammate', async () => {
+      await opened(detail, 'conversations.assign');
+      fixture.componentRef.setInput('view', 'overdue');
+      await settle();
+      http.expectOne(`${detailUrl}/notes`).flush({
+        items: [
+          { id: 3, author: 'Rana', createdAt: detail.startedAt, text: 'Sara handles delivery.' },
+        ],
+        nextBefore: null,
+      });
+      await settle();
+
+      const panel = host().querySelector<HTMLElement>('[data-testid="triage-panel"]')!;
+      expect(panel.textContent).toContain('Sara handles delivery.');
+      const submit = panel.querySelector<HTMLButtonElement>('[data-testid="triage-assign"]')!;
+      expect(submit.disabled).toBe(true);
+      const choice = panel.querySelector('select')!;
+      choice.value = sara.userId;
+      choice.dispatchEvent(new Event('change'));
+      await settle();
+      http.expectNone(`${detailUrl}/assignment`);
+      submit.click();
+      const request = http.expectOne(`${detailUrl}/assignment`);
+      expect(request.request.headers.get('If-Match')).toBe('"v1"');
+      expect(request.request.body).toEqual({ member: sara.userId });
+      const assigned = { ...detail, assignedTo: sara };
+      request.flush(assigned, tagged(assigned, '"v2"'));
+      await settle();
+      expect(panel.querySelector('[role="status"]')?.textContent).toContain('Sara');
+      expect(panel.querySelector('select')).toBeNull();
+      http.expectNone((req) => req.method === 'POST');
+    });
+
+    it('keeps a stale assignment visible as a conflict and never resubmits it', async () => {
+      await opened(detail, 'conversations.assign');
+      fixture.componentRef.setInput('view', 'overdue');
+      await settle();
+      http.expectOne(`${detailUrl}/notes`).flush({ items: [], nextBefore: null });
+      const choice = host().querySelector<HTMLSelectElement>('#triage-teammate')!;
+      choice.value = sara.userId;
+      choice.dispatchEvent(new Event('change'));
+      await settle();
+      const submit = host().querySelector<HTMLButtonElement>('[data-testid="triage-assign"]')!;
+      submit.click();
+      http
+        .expectOne(`${detailUrl}/assignment`)
+        .flush({}, { status: 412, statusText: 'Precondition Failed' });
+      await settle();
+      expect(host().querySelector('[data-testid="stale"]')).not.toBeNull();
+      expect(submit.disabled).toBe(true);
+      expect(host().querySelector('[data-testid="triage-assigned"]')).toBeNull();
+      http.expectNone(`${detailUrl}/assignment`);
+    });
+
     it('offers no Assign without the permission', async () => {
       await opened(detail);
 

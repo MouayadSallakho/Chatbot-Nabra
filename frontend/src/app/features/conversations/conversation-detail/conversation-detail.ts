@@ -46,6 +46,7 @@ import {
 } from '../conversations-api';
 import { InboxState } from '../inbox-state';
 import { ConversationTranscript } from '../conversation-transcript/conversation-transcript';
+import { ConversationTriage } from '../conversation-triage/conversation-triage';
 import { ConversationNotes } from '../conversation-notes/conversation-notes';
 import { ConversationComposer } from '../conversation-composer/conversation-composer';
 import { ConversationContext } from '../conversation-context/conversation-context';
@@ -109,6 +110,7 @@ export interface AssignOption {
     ConversationTranscript,
     ConversationComposer,
     ConversationNotes,
+    ConversationTriage,
     ConversationContext,
     CustomerLabel,
   ],
@@ -120,7 +122,9 @@ export class ConversationDetail {
   private readonly workspace = inject(WorkspaceContextService);
   private readonly permissions = inject(PermissionService);
   private readonly instagramApi = inject(InstagramSimulatorApi);
-  protected readonly notesFor = signal<string | null>(null);
+  readonly view = input<string>();
+  protected readonly panel = signal<'messages' | 'notes' | 'triage'>('messages');
+  protected readonly membersState = signal<'loading' | 'ready' | 'failed'>('loading');
   protected readonly externalInstagram = signal<string | null>(null);
   private readonly simulator = inject(MessengerSimulatorApi);
   protected readonly messengerStatuses = signal<Readonly<Record<string, string>>>({});
@@ -340,12 +344,13 @@ export class ConversationDetail {
     // the list, so it loads on every change of id, not once.
     effect(() => {
       const id = this.conversationId();
+      const overdue = this.view() === 'overdue';
 
       untracked(() => {
+        this.panel.set(overdue ? 'triage' : 'messages');
         this.signals.viewing(id);
 
         if (id !== this.loadedFor) {
-          this.notesFor.set(null);
           void this.load();
         }
       });
@@ -633,14 +638,24 @@ export class ConversationDetail {
   }
 
   /** Routes it to a colleague, or to nobody. */
-  protected async assign(member: string | null): Promise<void> {
-    await this.change((tenantId, version) =>
+  protected async assign(member: string | null, fromReview = false): Promise<void> {
+    const id = this.conversationId();
+    if (
+      fromReview &&
+      (!member || this.conversation()?.assignedTo || this.conversation()?.status !== 'Open')
+    )
+      return;
+    const changed = await this.change((tenantId, version) =>
       firstValueFrom(this.api.assign(tenantId, this.conversationId(), member, version)),
     );
 
     // The menu gave focus back to its trigger; keep it there once the header
     // has re-rendered with the new assignee.
-    this.focusAfterRender('[data-testid="assignee"]');
+    if (changed && this.conversationId() === id) {
+      this.focusAfterRender(
+        fromReview ? '[data-testid="triage-back"]' : '[data-testid="assignee"]',
+      );
+    }
   }
 
   protected onSent(message: TranscriptMessage): void {
@@ -724,12 +739,14 @@ export class ConversationDetail {
     void this.router.navigateByUrl(this.history.returnUrl('/conversations'));
   }
 
-  private async loadAssignees(tenantId: string): Promise<void> {
+  protected async loadAssignees(tenantId = this.workspace.tenantId()): Promise<void> {
+    if (!tenantId || !this.canAssign()) return;
+    this.membersState.set('loading');
     try {
       this.assignees.set(await firstValueFrom(this.api.assignees(tenantId)));
+      this.membersState.set('ready');
     } catch {
-      // No list means the assignment control offers nothing, which is a
-      // degraded control rather than a broken screen.
+      this.membersState.set('failed');
     }
   }
 
@@ -759,7 +776,7 @@ export class ConversationDetail {
     try {
       const updated = await write(tenantId, version);
 
-      this.adopt(updated, { announce: true });
+      if (updated.value.id === this.conversationId()) this.adopt(updated, { announce: true });
       this.inbox?.touched();
 
       return true;

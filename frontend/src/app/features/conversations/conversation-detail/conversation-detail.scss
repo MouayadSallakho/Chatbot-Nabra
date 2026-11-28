@@ -80,6 +80,7 @@
 
 .conversation-views {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--space-2);
   padding: var(--space-2) var(--page-gutter);
   border-block-end: 1px solid var(--color-line);
