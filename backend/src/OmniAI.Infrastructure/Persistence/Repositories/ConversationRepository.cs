@@ -21,7 +21,7 @@ namespace OmniAI.Infrastructure.Persistence.Repositories;
 /// gap-tolerant number rather than a timestamp a channel chose — which is exactly
 /// why it can also be a cursor.
 /// </remarks>
-internal sealed class ConversationRepository(OmniAiDbContext context) : IConversationRepository
+internal sealed class ConversationRepository(OmniAiDbContext context, TimeProvider? clock = null) : IConversationRepository
 {
     /// <summary>How much of a message is shown as a list preview.</summary>
     private const int PreviewLength = 160;
@@ -161,42 +161,61 @@ internal sealed class ConversationRepository(OmniAiDbContext context) : IConvers
                 handled.Conversation.Messages.Any(message => EF.Functions.ILike(message.Text, pattern, "!")));
         }
 
-        int total = await owned.CountAsync(cancellationToken).ConfigureAwait(false);
+        int? target = null;
+        var queue = owned.Select(row => new { Handled = row, WaitingSince = (DateTimeOffset?)null });
+        if (filter == ConversationListFilter.Overdue)
+        {
+            target = await InboxRoutingStore.TargetAsync(_context, tenantId, cancellationToken).ConfigureAwait(false);
+            var cutoff = (clock ?? TimeProvider.System).GetUtcNow().AddMinutes(-target.Value);
+            // Match the analytics definition: a reply is an AI or staff message ingested after the opening customer turn.
+            queue = from row in owned
+                    where row.Conversation.Status == ConversationStatus.Open && row.Conversation.AssignedTo == null
+                    from opening in _context.Set<Message>().Where(m => m.ConversationId == row.Conversation.Id && m.Sender == MessageSender.Customer)
+                        .OrderBy(m => EF.Property<long>(m, PersistenceSchema.MessageIngestionSequence)).Take(1)
+                    where opening.SentAt <= cutoff && !_context.Set<Message>().Any(m => m.ConversationId == row.Conversation.Id &&
+                        (m.Sender == MessageSender.AiAgent || m.Sender == MessageSender.HumanAgent) &&
+                        EF.Property<long>(m, PersistenceSchema.MessageIngestionSequence) > EF.Property<long>(opening, PersistenceSchema.MessageIngestionSequence))
+                    select new { Handled = row, WaitingSince = (DateTimeOffset?)opening.SentAt };
+        }
+
+        int total = await queue.CountAsync(cancellationToken).ConfigureAwait(false);
 
         // Most recently active first, with the id as a tie-break so two
         // conversations sharing an instant never swap places between pages and
         // hide a row or show one twice.
         var agentsForInbox = InboxAgentNames(tenantId);
-        var rows = await owned
-            .OrderByDescending(handled => handled.Conversation.LastActivityAt)
-            .ThenByDescending(handled => handled.Conversation.Id)
+        var ordered = filter == ConversationListFilter.Overdue
+            ? queue.OrderBy(row => row.WaitingSince).ThenBy(row => row.Handled.Conversation.Id)
+            : queue.OrderByDescending(row => row.Handled.Conversation.LastActivityAt).ThenByDescending(row => row.Handled.Conversation.Id);
+        var rows = await ordered
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
-            .Select(handled => new
+            .Select(row => new
             {
+                row.WaitingSince,
                 Summary = new ConversationSummary(
-                    handled.Conversation.Id.Value,
-                    handled.Conversation.Channel,
-                    handled.Conversation.Status,
-                    handled.Conversation.Handling,
-                    handled.Conversation.StartedAt,
-                    handled.Conversation.LastActivityAt,
-                    agentsForInbox.Where(binding => binding.ConversationId == handled.Conversation.Id)
+                    row.Handled.Conversation.Id.Value,
+                    row.Handled.Conversation.Channel,
+                    row.Handled.Conversation.Status,
+                    row.Handled.Conversation.Handling,
+                    row.Handled.Conversation.StartedAt,
+                    row.Handled.Conversation.LastActivityAt,
+                    agentsForInbox.Where(binding => binding.ConversationId == row.Handled.Conversation.Id)
                         .Select(binding => binding.Name).FirstOrDefault(),
-                    handled.Conversation.Messages.Count,
+                    row.Handled.Conversation.Messages.Count,
 
                     // The newest message by ingestion order, cut to a preview length.
                     // Read as a correlated subquery so a list of fifty conversations
                     // is one round trip rather than fifty-one, and so no transcript is
                     // loaded to show one line of it.
-                    handled.Conversation.Messages
+                    row.Handled.Conversation.Messages
                         .OrderByDescending(message =>
                             EF.Property<long>(message, PersistenceSchema.MessageIngestionSequence))
                         .Select(message => message.Text.Length > PreviewLength
                             ? message.Text.Substring(0, PreviewLength)
                             : message.Text)
                         .FirstOrDefault(),
-                    handled.Conversation.Messages
+                    row.Handled.Conversation.Messages
                         .OrderByDescending(message =>
                             EF.Property<long>(message, PersistenceSchema.MessageIngestionSequence))
                         .Select(message => (MessageSender?)message.Sender)
@@ -205,17 +224,17 @@ internal sealed class ConversationRepository(OmniAiDbContext context) : IConvers
                     // Ids only, below. Turning them into names is one more query
                     // for the page, for the reason set out on NameMembersAsync.
                     AssignedTo: null),
-                handled.Conversation.CustomerId,
-                Assigned = handled.Conversation.AssignedTo,
-                handled.TakenOverBy,
-                handled.Reason,
+                row.Handled.Conversation.CustomerId,
+                Assigned = row.Handled.Conversation.AssignedTo,
+                row.Handled.TakenOverBy,
+                row.Handled.Reason,
 
                 // Unread for this reader: two more correlated subqueries in the
                 // same statement, never a query per row.
-                Newest = handled.Conversation.Messages.Max(message =>
+                Newest = row.Handled.Conversation.Messages.Max(message =>
                     (long?)EF.Property<long>(message, PersistenceSchema.MessageIngestionSequence)),
                 Read = _context.ConversationReads
-                    .Where(read => read.ConversationId == handled.Conversation.Id && read.UserId == viewer)
+                    .Where(read => read.ConversationId == row.Handled.Conversation.Id && read.UserId == viewer)
                     .Select(read => (long?)read.LastReadSequence)
                     .FirstOrDefault(),
             })
@@ -237,6 +256,7 @@ internal sealed class ConversationRepository(OmniAiDbContext context) : IConvers
         [
             .. rows.Select(row => row.Summary with
             {
+                WaitingSince = row.WaitingSince,
                 AssignedTo = Named(members, row.Assigned),
                 Customer = customers.GetValueOrDefault(row.Summary.Id),
                 Unread = IsUnread(row.Newest, row.Read),
@@ -245,7 +265,7 @@ internal sealed class ConversationRepository(OmniAiDbContext context) : IConvers
             }),
         ];
 
-        return new ConversationPage(items, page, pageSize, total);
+        return new ConversationPage(items, page, pageSize, total, target);
     }
 
     /// <summary>

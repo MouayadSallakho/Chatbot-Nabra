@@ -91,6 +91,53 @@ public sealed class InboxReadModelTests(PostgresTestDatabase database)
         Assert.Equal(0, mine.Total);
     }
 
+    private sealed class QueueClock : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => Start.AddMinutes(30);
+    }
+
+    [Fact]
+    public async Task Overdue_uses_the_opening_customer_turn_and_orders_before_paging()
+    {
+        Tenant tenant = await NewTenantAsync();
+        Tenant other = await NewTenantAsync();
+        Conversation First(Tenant workspace, int minute)
+        {
+            var c = Conversation.Start(workspace.Id, CustomerId.New(), ChannelKind.WebChat, Start);
+            c.AddTextMessage(MessageSender.Customer, "Help", Start.AddMinutes(minute));
+            return c;
+        }
+        var oldest = Conversation.Start(tenant.Id, CustomerId.New(), ChannelKind.WebChat, Start);
+        oldest.AddTextMessage(MessageSender.AiAgent, "Welcome", Start);
+        oldest.AddTextMessage(MessageSender.Customer, "Question", Start.AddMinutes(1));
+        oldest.AddTextMessage(MessageSender.Customer, "Still waiting", Start.AddMinutes(28));
+        var edge = First(tenant, 15);
+        var fresh = First(tenant, 16);
+        var answered = First(tenant, 2);
+        answered.AddTextMessage(MessageSender.AiAgent, "Answer", Start.AddMinutes(3));
+        answered.AddTextMessage(MessageSender.Customer, "New question", Start.AddMinutes(4));
+        var human = First(tenant, 3);
+        human.TakeOverByHuman(Start.AddMinutes(4));
+        human.AddTextMessage(MessageSender.HumanAgent, "Reply", Start.AddMinutes(5));
+        var closed = First(tenant, 2);
+        closed.Close(Start.AddMinutes(3));
+        await AddAsync(oldest, edge, fresh, answered, human, closed, First(other, 2),
+            Conversation.Start(tenant.Id, CustomerId.New(), ChannelKind.WebChat, Start));
+        await using var db = database.CreateContext();
+        var repository = new ConversationRepository(db, new QueueClock());
+        Task<ConversationPage> Read(int page) => repository.ListAsync(tenant.Id, page, 1, ConversationListFilter.Overdue, Viewer);
+        var first = await Read(1);
+        Assert.Equal(2, first.Total);
+        Assert.Equal(15, first.FirstReplyTargetMinutes);
+        Assert.Equal(oldest.Id.Value, Assert.Single(first.Items).Id);
+        Assert.Equal(Start.AddMinutes(1), first.Items[0].WaitingSince);
+        Assert.Equal(edge.Id.Value, Assert.Single((await Read(2)).Items).Id);
+        await new InboxRoutingStore(db).SetTargetAsync(tenant.Id, 20, default);
+        Assert.Equal(1, (await Read(1)).Total);
+        await AnswerAsync(oldest);
+        Assert.Empty((await Read(1)).Items);
+    }
+
     // ---- Needs a person -------------------------------------------------------
 
     [Fact]

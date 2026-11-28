@@ -101,7 +101,7 @@ public sealed class ConversationQueryInvalidException : Exception
     public static ConversationQueryInvalidException UnknownFilter() =>
         new(
             "conversations.filter.invalid",
-            "That filter is not known. Use needs-person or mine, or leave the filter out.");
+            "That filter is not known. Use needs-person, mine or overdue, or leave the filter out.");
 
     /// <summary><c>after</c> was combined with <c>before</c> or <c>tail</c>.</summary>
     public static ConversationQueryInvalidException CursorConflict() =>

@@ -27,6 +27,8 @@ In **Workspace settings → Automatic conversation assignment**, managers with c
 
 The **Business hours and after-hours assignment** panel optionally sets one shift per weekday in the workspace time zone. A day can also be closed or open all day. A shift includes its opening minute, excludes its closing minute, and continues overnight if its end is earlier than its start. Nabra evaluates the first customer message timestamp, including on daylight-saving transitions. Inside the schedule it applies the channel and language rules. Outside the schedule, the selected on-call role handles new conversations across channels and languages, including media-only messages. Selecting the general inbox, removing the role, or having no eligible member leaves the conversation unassigned. The schedule starts disabled and changes apply to new conversations.
 
+In **Inbox → First reply overdue**, the team sees open, unassigned conversations that have reached the workspace's first reply target, longest wait first. Each row shows elapsed minutes from the first customer message. A greeting before that message does not count as a reply. A later customer message does not restart the clock. A recorded AI or team reply, assignment, or closure removes the conversation from this queue. The elapsed clock also runs outside business hours. Workspace routing settings default to 15 minutes and accept 1–1,440 minutes. The open queue refreshes on inbox changes and checks for newly overdue conversations every 30 seconds.
+
 ## Repository
 
 - `backend/` contains the .NET 10 domain, application use cases, infrastructure and HTTP API. PostgreSQL with pgvector stores tenant data and knowledge embeddings. Redis supports realtime and protection services.

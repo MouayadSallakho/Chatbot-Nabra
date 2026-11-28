@@ -49,8 +49,14 @@
 }
 
 // The three views share the track; "Needs a person" and its count get more room.
+.row-wait {
+  color: var(--color-text);
+  font-weight: 600;
+}
+
 .inbox-views {
   display: flex;
+  flex-wrap: wrap;
 
   .is-wide {
     flex-grow: 1.6;

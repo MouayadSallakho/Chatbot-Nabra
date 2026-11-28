@@ -8,7 +8,8 @@ internal sealed class TenantConfiguration : IEntityTypeConfiguration<Tenant>
 {
     public void Configure(EntityTypeBuilder<Tenant> builder)
     {
-        builder.ToTable("tenants");
+        builder.ToTable("tenants", t => t.HasCheckConstraint("ck_tenants_first_reply_target", "first_reply_target_minutes BETWEEN 1 AND 1440"));
+        builder.Property<int>("FirstReplyTargetMinutes").HasColumnName("first_reply_target_minutes").HasDefaultValue(15);
 
         builder.HasKey(tenant => tenant.Id);
 

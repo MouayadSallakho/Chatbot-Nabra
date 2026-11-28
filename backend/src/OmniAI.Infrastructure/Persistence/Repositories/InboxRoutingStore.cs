@@ -43,8 +43,15 @@ internal sealed class InboxRoutingStore(OmniAiDbContext db) : IInboxRoutingStore
             .SingleOrDefaultAsync(s => s.Tenant == tenant, token).ConfigureAwait(false);
         return new RoutingSettings([.. rules.Select(r => new RoutingRule(r.Channel.ToString(), r.Language, r.Role.Value))],
             [.. roles.Select(r => new RoutingTeam(r.Id.Value, r.Name.Value)).OrderBy(r => r.Name, StringComparer.OrdinalIgnoreCase)],
-            schedule?.Hours() ?? RoutingHours.Default);
+            schedule?.Hours() ?? RoutingHours.Default, await TargetAsync(db, tenant, token).ConfigureAwait(false));
     }
+
+    internal static Task<int> TargetAsync(OmniAiDbContext db, TenantId tenant, CancellationToken token) =>
+        db.Tenants.Where(t => t.Id == tenant).Select(t => EF.Property<int>(t, "FirstReplyTargetMinutes")).SingleAsync(token);
+
+    public Task SetTargetAsync(TenantId tenant, int minutes, CancellationToken token) =>
+        db.Tenants.Where(t => t.Id == tenant).ExecuteUpdateAsync(
+            updates => updates.SetProperty(t => EF.Property<int>(t, "FirstReplyTargetMinutes"), minutes), token);
 
     public async Task<bool> SetHoursAsync(TenantId tenant, RoutingHours hours, CancellationToken token)
     {

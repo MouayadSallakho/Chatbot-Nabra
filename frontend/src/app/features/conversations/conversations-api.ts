@@ -81,6 +81,7 @@ interface HandlingFacts {
 
 /** One conversation, in the list. */
 export interface ConversationSummary extends HandlingFacts {
+  readonly waitingSince?: string | null;
   readonly id: string;
   readonly channel: ConversationChannel;
   readonly status: 'Open' | 'Closed';
@@ -102,10 +103,11 @@ export interface ConversationSummary extends HandlingFacts {
  * the reader's own (assigned to them, or taken over by them: `filter=mine`,
  * Phase 39.1).
  */
-export type ConversationView = 'all' | 'needs-person' | 'mine';
+export type ConversationView = 'all' | 'needs-person' | 'mine' | 'overdue';
 
 /** A page of conversations. */
 export interface ConversationPage {
+  readonly firstReplyTargetMinutes?: number | null;
   readonly items: readonly ConversationSummary[];
   readonly page: number;
   readonly pageSize: number;

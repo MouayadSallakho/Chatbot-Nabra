@@ -337,7 +337,8 @@ public sealed class ReadConversationsHandler(
                 ? ConversationListFilter.NeedsPerson
                 : string.Equals(filter.Trim(), "mine", StringComparison.OrdinalIgnoreCase)
                     ? ConversationListFilter.Mine
-                    : throw ConversationQueryInvalidException.UnknownFilter();
+                    : string.Equals(filter.Trim(), "overdue", StringComparison.OrdinalIgnoreCase)
+                        ? ConversationListFilter.Overdue : throw ConversationQueryInvalidException.UnknownFilter();
 
     /// <summary>Reads <c>include</c>: a comma-separated list whose only member is <c>events</c>.</summary>
     private static bool ParseInclude(string? include)

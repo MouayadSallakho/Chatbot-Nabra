@@ -97,7 +97,22 @@
           i18n="@@inbox.view.mine"
           >Mine</a
         >
+        <a
+          class="segmented-option"
+          [routerLink]="viewPath()"
+          [queryParams]="{ view: 'overdue', page: null }"
+          queryParamsHandling="merge"
+          [attr.aria-current]="view() === 'overdue' ? 'true' : null"
+          data-testid="view-overdue"
+          i18n="@@inbox.overdue.view"
+          >First reply overdue</a
+        >
       </nav>
+      @if (view() === 'overdue' && loaded() && firstReplyTarget(); as minutes) {
+        <p class="inbox-description" i18n="@@inbox.overdue.hint">
+          Unassigned · First reply target: {{ minutes }} min · Longest wait first
+        </p>
+      }
 
       <form
         #searchForm
@@ -282,6 +297,13 @@
             data-testid="needs-person-empty"
           />
         }
+        @case ('overdue') {
+          <app-empty-state
+            icon="conversations"
+            heading="No overdue first replies"
+            i18n-heading="@@inbox.overdue.empty"
+          />
+        }
         @case ('mine') {
           <app-empty-state
             icon="conversations"
@@ -386,6 +408,11 @@
                 </span>
 
                 <span class="row-chips">
+                  @if (row.waitMinutes; as minutes) {
+                    <span class="row-wait" data-testid="row-wait" i18n="@@inbox.overdue.wait"
+                      >Waiting {{ minutes }} min</span
+                    >
+                  }
                   @if (row.reason; as reason) {
                     <!-- The dot and the words: never by colour alone (BA-7). -->
                     <app-chip [tone]="reason.tone" size="sm" data-testid="row-reason">{{

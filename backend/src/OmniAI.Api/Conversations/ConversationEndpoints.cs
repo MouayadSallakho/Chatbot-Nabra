@@ -93,14 +93,14 @@ public sealed record ConversationSummaryResponse(
     bool Unread,
     WorkspaceMemberResponse? TakenOverBy,
     bool NeedsPerson,
-    string? NeedsPersonReason);
+    string? NeedsPersonReason, DateTimeOffset? WaitingSince = null);
 
 /// <summary>A page of conversations.</summary>
 public sealed record ConversationPageResponse(
     IReadOnlyList<ConversationSummaryResponse> Items,
     int Page,
     int PageSize,
-    int Total);
+    int Total, int? FirstReplyTargetMinutes = null);
 
 /// <summary>One conversation's detail.</summary>
 /// <param name="Customer">Who it is with (Phase 37.4).</param>
@@ -140,6 +140,7 @@ public sealed record ReplyToConversationRequest(string? ClientMessageId, string?
 public sealed record AssignConversationRequest(Guid? Member);
 
 public sealed record SaveQuickReplyRequest(string? Text);
+public sealed record FirstReplyTargetRequest(int Minutes);
 public sealed record SaveRoutingRuleRequest(Guid RoleId);
 
 /// <summary>Mark a conversation read up to a message (Phase 37.4).</summary>
@@ -232,7 +233,7 @@ internal static class ConversationEndpoints
 
         workspace.MapGet("/", ListAsync)
             .WithName("ListTenantConversations")
-            .WithSummary("Lists conversations, most recently active first, with the customer, the reader's unread state, who took it over and why it needs a person. Optional filter=needs-person, which keeps exactly the rows whose needsPerson is true, or filter=mine (Phase 39.1), which keeps the rows assigned to the reader or taken over by the reader; 400 conversations.filter.invalid for any other value; total counts the filtered set.")
+            .WithSummary("Lists conversations, most recently active first, with the customer, the reader's unread state, who took it over and why it needs a person. Optional filter=needs-person, which keeps exactly the rows whose needsPerson is true, or filter=mine (Phase 39.1), which keeps the rows assigned to the reader or taken over by the reader; filter=overdue lists open unassigned conversations past their first reply target, oldest wait first; 400 conversations.filter.invalid for any other value; total counts the filtered set.")
             .Produces<ConversationPageResponse>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status403Forbidden);
@@ -293,6 +294,8 @@ internal static class ConversationEndpoints
 
         workspace.MapGet("/routing", async (Guid tenantId, InboxRoutingHandler handler, CancellationToken token) =>
             await handler.ReadAsync(tenantId, token).ConfigureAwait(false) is { } settings ? Results.Ok(settings) : Results.NotFound());
+        workspace.MapPut("/routing/first-reply-target", async (Guid tenantId, FirstReplyTargetRequest request, InboxRoutingHandler handler, CancellationToken token) =>
+            await handler.SetTargetAsync(tenantId, request.Minutes, token).ConfigureAwait(false) ? Results.NoContent() : Results.NotFound());
         workspace.MapPut("/routing/hours", async (Guid tenantId, RoutingHours request, InboxRoutingHandler handler, CancellationToken token) =>
             await handler.SetHoursAsync(tenantId, request, token).ConfigureAwait(false) ? Results.NoContent() : Results.NotFound());
         workspace.MapPut("/routing/{channel}/{language}", async (Guid tenantId, string channel, string language,
@@ -370,10 +373,10 @@ internal static class ConversationEndpoints
                     item.Unread,
                     ToMember(item.TakenOverBy),
                     item.NeedsPerson,
-                    item.NeedsPersonReason?.ToString()))],
+                    item.NeedsPersonReason?.ToString(), item.WaitingSince))],
                 result.Page,
                 result.PageSize,
-                result.Total));
+                result.Total, result.FirstReplyTargetMinutes));
     }
 
     /// <summary><c>GET /api/tenants/{tenantId}/conversations/{conversationId}</c>.</summary>

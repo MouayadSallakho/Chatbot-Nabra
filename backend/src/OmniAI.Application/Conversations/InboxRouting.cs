@@ -8,12 +8,13 @@ namespace OmniAI.Application.Conversations;
 
 public sealed record RoutingRule(string Channel, string Language, Guid RoleId);
 public sealed record RoutingTeam(Guid Id, string Name);
-public sealed record RoutingSettings(IReadOnlyList<RoutingRule> Rules, IReadOnlyList<RoutingTeam> Teams, RoutingHours Hours);
+public sealed record RoutingSettings(IReadOnlyList<RoutingRule> Rules, IReadOnlyList<RoutingTeam> Teams, RoutingHours Hours, int FirstReplyTargetMinutes);
 
 public interface IInboxRoutingStore
 {
     Task<RoutingSettings> ReadAsync(TenantId tenant, CancellationToken token);
     Task<bool> SetAsync(TenantId tenant, ChannelKind channel, string language, Guid? role, CancellationToken token);
+    Task SetTargetAsync(TenantId tenant, int minutes, CancellationToken token);
     Task<bool> SetHoursAsync(TenantId tenant, RoutingHours hours, CancellationToken token);
 }
 
@@ -28,6 +29,22 @@ public sealed class InboxRoutingHandler(TenantAuthorizer authorizer, IInboxRouti
         var tenant = TenantId.From(tenantId);
         return await CanManageAsync(tenant, token).ConfigureAwait(false)
             ? await store.ReadAsync(tenant, token).ConfigureAwait(false) : null;
+    }
+
+    public async Task<bool> SetTargetAsync(Guid tenantId, int minutes, CancellationToken token)
+    {
+        var tenant = TenantId.From(tenantId);
+        if (!await CanManageAsync(tenant, token).ConfigureAwait(false))
+        {
+            return false;
+        }
+        if (minutes is < 1 or > 1440)
+        {
+            throw new DomainValidationException("Choose a first reply target between 1 and 1440 minutes.")
+            { Code = "conversations.routing.target_invalid" };
+        }
+        await store.SetTargetAsync(tenant, minutes, token).ConfigureAwait(false);
+        return true;
     }
 
     public async Task<bool> SetHoursAsync(Guid tenantId, RoutingHours hours, CancellationToken token)

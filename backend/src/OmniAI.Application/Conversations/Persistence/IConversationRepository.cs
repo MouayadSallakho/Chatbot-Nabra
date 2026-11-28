@@ -134,6 +134,7 @@ public sealed record ConversationSummary(
     /// Whether it is in <c>filter=needs-person</c>: exactly when it has a reason.
     /// </summary>
     public bool NeedsPerson => NeedsPersonReason is not null;
+    public DateTimeOffset? WaitingSince { get; init; }
 }
 
 /// <summary>
@@ -185,6 +186,7 @@ public enum ConversationListFilter
     /// the inbox's "Mine" tab.
     /// </summary>
     Mine = 2,
+    Overdue = 3,
 }
 
 /// <summary>What changed in a transcript besides its messages.</summary>
@@ -229,7 +231,7 @@ public sealed record ConversationPage(
     IReadOnlyList<ConversationSummary> Items,
     int Page,
     int PageSize,
-    int Total);
+    int Total, int? FirstReplyTargetMinutes = null);
 
 /// <summary>One conversation's detail, for the admin.</summary>
 /// <param name="Customer">Who it is with (Phase 37.4).</param>

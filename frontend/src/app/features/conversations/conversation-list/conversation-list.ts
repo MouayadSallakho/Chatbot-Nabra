@@ -50,6 +50,7 @@ const VIEW_QUERY_PARAM = 'view';
 
 /** One row: its chips (`inbox-rows.ts`), its time and its avatar's letters. */
 interface ConversationRow extends InboxRow {
+  readonly waitMinutes: string | null;
   readonly when: string;
   readonly whenFull: string;
   /** The customer's label as one string, for the avatar's initials. */
@@ -59,7 +60,7 @@ interface ConversationRow extends InboxRow {
 }
 
 /** The views the address can name; anything else is the full list. */
-const VIEWS: readonly ConversationView[] = ['all', 'needs-person', 'mine'];
+const VIEWS: readonly ConversationView[] = ['all', 'needs-person', 'mine', 'overdue'];
 
 /** Kept here for the callers that import it from the list (it lives with the avatar). */
 export { codeInitials };
@@ -130,6 +131,7 @@ export class ConversationList implements OnInit {
   protected readonly failure = signal<ApiError | null>(null);
   protected readonly conversations = signal<readonly ConversationSummary[]>([]);
   protected readonly total = signal(0);
+  protected readonly firstReplyTarget = signal<string | null>(null);
   protected readonly search = signal('');
   private readonly criteria = signal<InboxFilters>({});
   protected readonly filtered = computed(
@@ -201,6 +203,15 @@ export class ConversationList implements OnInit {
       return {
         ...inboxRow(conversation, view),
         when: this.format.date(last, sameDay(last, now) ? 'time' : 'dayMonth'),
+        waitMinutes:
+          view === 'overdue' && conversation.waitingSince
+            ? this.format.number(
+                Math.max(
+                  0,
+                  Math.floor((now.getTime() - Date.parse(conversation.waitingSince)) / 60000),
+                ),
+              )
+            : null,
         whenFull: this.format.date(last, 'dateTime'),
         avatarName: customerLabelPlain(conversation.customer),
         avatarText: label.kind === 'label' && label.code !== null ? codeInitials(label.code) : '',
@@ -224,6 +235,14 @@ export class ConversationList implements OnInit {
     effect((onCleanup) => {
       if (this.canView()) {
         onCleanup(this.signals.showCount());
+      }
+    });
+
+    // A conversation can cross the target even when no new message arrives.
+    effect((onCleanup) => {
+      if (this.view() === 'overdue' && this.canView()) {
+        const timer = setInterval(() => void this.refresh(), 30000);
+        onCleanup(() => clearInterval(timer));
       }
     });
 
@@ -342,8 +361,15 @@ export class ConversationList implements OnInit {
         return;
       }
 
+      if (page.items.length === 0 && this.currentPage() > 1) {
+        await this.goTo(Math.max(1, Math.ceil(page.total / this.pageSize)));
+        return;
+      }
       this.conversations.set(page.items);
       this.total.set(page.total);
+      this.firstReplyTarget.set(
+        page.firstReplyTargetMinutes ? this.format.number(page.firstReplyTargetMinutes) : null,
+      );
     } catch {
       // What is on screen is the last thing the server confirmed. An error
       // banner over a correct list because one background read lost a race
@@ -395,6 +421,9 @@ export class ConversationList implements OnInit {
       );
       this.conversations.set(page.items);
       this.total.set(page.total);
+      this.firstReplyTarget.set(
+        page.firstReplyTargetMinutes ? this.format.number(page.firstReplyTargetMinutes) : null,
+      );
       this.loaded.set(true);
     } catch (error) {
       if (view === this.view() && version === this.listVersion) {

@@ -2246,6 +2246,12 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<int>("FirstReplyTargetMinutes")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(15)
+                        .HasColumnName("first_reply_target_minutes");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -2284,7 +2290,10 @@ namespace OmniAI.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("ix_tenants_slug");
 
-                    b.ToTable("tenants", (string)null);
+                    b.ToTable("tenants", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_tenants_first_reply_target", "first_reply_target_minutes BETWEEN 1 AND 1440");
+                        });
                 });
 
             modelBuilder.Entity("OmniAI.Domain.Tenants.TenantMembership", b =>

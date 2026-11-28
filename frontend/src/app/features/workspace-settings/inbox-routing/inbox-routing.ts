@@ -6,6 +6,7 @@ import { BusinessHours, type Hours } from './business-hours';
 
 interface Settings {
   hours: Hours;
+  firstReplyTargetMinutes: number;
   rules: { channel: string; language: string; roleId: string }[];
   teams: { id: string; name: string }[];
 }
@@ -57,6 +58,33 @@ export class InboxRouting {
     try {
       const result = await firstValueFrom(this.http.get<Settings>(this.url(tenant)));
       if (this.tenant() === tenant) this.settings.set(result);
+    } catch (error) {
+      if (this.tenant() === tenant) this.error.set(toApiError(error).message);
+    } finally {
+      if (this.tenant() === tenant) this.busy.set(false);
+    }
+  }
+
+  protected async saveTarget(control: HTMLInputElement): Promise<void> {
+    const minutes = control.valueAsNumber;
+    const tenant = this.tenant();
+    if (
+      this.busy() ||
+      !control.reportValidity() ||
+      minutes === this.settings()?.firstReplyTargetMinutes
+    )
+      return;
+    this.busy.set(true);
+    this.error.set('');
+    this.notice.set('');
+    try {
+      await firstValueFrom(
+        this.http.put<void>(this.url(tenant) + '/first-reply-target', { minutes }),
+      );
+      if (this.tenant() === tenant) {
+        this.settings.update((s) => s && { ...s, firstReplyTargetMinutes: minutes });
+        this.notice.set($localize`:@@inbox.target.saved:First reply target saved.`);
+      }
     } catch (error) {
       if (this.tenant() === tenant) this.error.set(toApiError(error).message);
     } finally {
